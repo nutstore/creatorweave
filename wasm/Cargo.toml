@@ -1,0 +1,38 @@
+[workspace]
+members = [
+    "crates/core",
+    "crates/wasm-bindings",
+    # "crates/plugin-api",  # Phase 2 启用
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <email@example.com>"]
+license = "MIT"
+repository = "https://github.com/yourusername/browser-fs-analyzer"
+
+[workspace.dependencies]
+# Shared dependency versions
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+# WASM dependencies
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = "0.1"
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "z"        # 优化体积
+lto = true             # 链接时优化
+codegen-units = 1      # 单个代码生成单元
+strip = true           # 移除调试符号
+panic = "abort"        # 减少 panic 处理代码
+
+[profile.release.package."*"]
+opt-level = 3          # 依赖项使用最高优化级别

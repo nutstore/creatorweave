@@ -1,0 +1,5 @@
+# Rust 格式化配置
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+use_small_heuristics = "Default"

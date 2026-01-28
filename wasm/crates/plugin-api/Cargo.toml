@@ -1,0 +1,12 @@
+[package]
+name = "browser-fs-analyzer-plugin-api"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { workspace = true }
+# Phase 2: 添加 wasmtime 或 wasmer 作为 WASM 运行时
+# wasmtime = "19.0.0"
