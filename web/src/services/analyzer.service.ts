@@ -31,8 +31,8 @@ export async function analyzeFiles(
   let maxFile: MaxFile | null = null
   let folderCount = 0
 
-  // Batch size for processing files
-  const batchSize = 100
+  // Batch size for processing files (reduced to avoid WASM memory issues)
+  const batchSize = 50
 
   try {
     // Process files in batches
