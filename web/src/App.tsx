@@ -1,41 +1,131 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useAnalysisStore } from '@/store/analysis.store'
+import { isSupported, selectFolder } from '@/services/fsAccess.service'
+import { traverseDirectory } from '@/services/traversal.service'
+import { analyzeFiles } from '@/services/analyzer.service'
+import { Header } from '@/components/Header'
+import { HeroSection } from '@/components/HeroSection'
+import { ProgressPanel } from '@/components/ProgressPanel'
+import { ResultsPanel } from '@/components/ResultsPanel'
+import { ErrorDisplay } from '@/components/ErrorDisplay'
+import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const {
+    isAnalyzing,
+    progress,
+    fileCount,
+    totalSize,
+    currentPath,
+    error,
+    result,
+    startAnalysis,
+    updateProgress,
+    completeAnalysis,
+    setError,
+    reset,
+  } = useAnalysisStore()
 
+  // Check browser compatibility on mount
+  const [isSupportedBrowser, setIsSupportedBrowser] = useState(true)
+
+  useEffect(() => {
+    setIsSupportedBrowser(isSupported())
+  }, [])
+
+  const handleSelectFolder = async () => {
+    try {
+      reset()
+      startAnalysis()
+
+      const handle = await selectFolder()
+
+      // Collect all files
+      const files: any[] = []
+      for await (const file of traverseDirectory(handle)) {
+        files.push(file)
+
+        // Update progress every 10 files
+        if (files.length % 10 === 0) {
+          updateProgress(
+            files.length,
+            files.reduce((sum, f) => sum + f.size, 0),
+            file.path
+          )
+        }
+      }
+
+      // Analyze files
+      const analysisResult = await analyzeFiles(files, (count, size, path) => {
+        updateProgress(count, size, path)
+      })
+
+      completeAnalysis(analysisResult)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setError(errorMessage)
+    }
+  }
+
+  const handleReanalyze = () => {
+    reset()
+    handleSelectFolder()
+  }
+
+  // Show unsupported browser message
+  if (!isSupportedBrowser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <UnsupportedBrowser />
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <ErrorDisplay error={error} onRetry={handleReanalyze} onClose={reset} />
+      </div>
+    )
+  }
+
+  // Show progress
+  if (isAnalyzing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <ProgressPanel
+          progress={progress}
+          fileCount={fileCount}
+          totalSize={totalSize}
+          currentPath={currentPath}
+        />
+      </div>
+    )
+  }
+
+  // Show results
+  if (result) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <ResultsPanel
+          result={result}
+          onReanalyze={handleReanalyze}
+          onSelectFolder={handleSelectFolder}
+        />
+      </div>
+    )
+  }
+
+  // Show hero section (default)
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="container mx-auto px-4 py-8">
-        <header className="mb-8 text-center">
-          <h1 className="mb-2 text-4xl font-bold text-gray-900">Browser File System Analyzer</h1>
-          <p className="text-gray-600">Local file system analyzer powered by WebAssembly</p>
-        </header>
-
-        <div className="mx-auto max-w-2xl rounded-lg bg-white p-8 shadow-lg">
-          <h2 className="mb-4 text-2xl font-semibold">Getting Started</h2>
-          <p className="mb-6 text-gray-600">
-            Click the button below to select a folder and start analyzing your local files
-          </p>
-
-          <button
-            onClick={() => setCount((c) => c + 1)}
-            className="rounded-lg bg-blue-600 px-6 py-3 text-white transition-colors hover:bg-blue-700"
-          >
-            Select Folder (Test: {count})
-          </button>
-
-          <div className="mt-8 rounded-lg bg-blue-50 p-4">
-            <h3 className="mb-2 font-semibold">Tech Stack</h3>
-            <ul className="space-y-1 text-sm text-gray-700">
-              <li>✅ React + TypeScript + Vite</li>
-              <li>✅ Tailwind CSS + shadcn/ui</li>
-              <li>✅ Zustand State Management</li>
-              <li>✅ Rust + WebAssembly</li>
-              <li>✅ File System Access API</li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      <Header />
+      <HeroSection onSelectFolder={handleSelectFolder} isAnalyzing={isAnalyzing} />
     </div>
   )
 }
