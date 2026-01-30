@@ -42,12 +42,35 @@ export interface Message {
   usage?: MessageUsage
 }
 
+/** Runtime status for a conversation */
+export type ConversationStatus = 'idle' | 'pending' | 'streaming' | 'tool_calling' | 'error'
+
 export interface Conversation {
   id: string
   title: string
   messages: Message[]
   createdAt: number
   updatedAt: number
+  /** Runtime status (not persisted) */
+  status: ConversationStatus
+  /** Streaming content being received (not persisted) */
+  streamingContent: string
+  /** Streaming reasoning content (not persisted) */
+  streamingReasoning: string
+  /** Whether reasoning is actively streaming (not persisted) */
+  isReasoningStreaming: boolean
+  /** Complete reasoning content (not persisted) */
+  completedReasoning: string | null
+  /** Whether content is actively streaming (not persisted) */
+  isContentStreaming: boolean
+  /** Complete content (not persisted) */
+  completedContent: string | null
+  /** Currently executing tool call (not persisted) */
+  currentToolCall: ToolCall | null
+  /** Streaming tool call arguments (not persisted) */
+  streamingToolArgs: string
+  /** Error message (not persisted) */
+  error: string | null
 }
 
 /** Generate a unique message ID */
@@ -105,5 +128,16 @@ export function createConversation(title?: string): Conversation {
     messages: [],
     createdAt: now,
     updatedAt: now,
+    // Runtime state (not persisted)
+    status: 'idle',
+    streamingContent: '',
+    streamingReasoning: '',
+    isReasoningStreaming: false,
+    completedReasoning: null,
+    isContentStreaming: false,
+    completedContent: null,
+    currentToolCall: null,
+    streamingToolArgs: '',
+    error: null,
   }
 }

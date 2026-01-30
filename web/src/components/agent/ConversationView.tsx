@@ -1,12 +1,12 @@
 /**
  * ConversationView - pure conversation display and interaction.
  *
- * Extracted from AgentPanel: contains only the message list, streaming indicator,
- * input area, and agent loop logic. No internal sidebar or top bar.
+ * Now uses conversation store for per-conversation runtime state.
+ * Multiple conversations can run simultaneously.
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, StopCircle, MessageSquare } from 'lucide-react'
+import { Send, StopCircle, MessageSquare, Bot } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -14,13 +14,7 @@ import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { groupMessagesIntoTurns } from './group-messages'
 import { createUserMessage } from '@/agent/message-types'
-import type { Message, ToolCall } from '@/agent/message-types'
-import { AgentLoop } from '@/agent/agent-loop'
-import { GLMProvider } from '@/agent/llm/glm-provider'
-import { ContextManager } from '@/agent/context-manager'
-import { getToolRegistry } from '@/agent/tool-registry'
-import { loadApiKey } from '@/security/api-key-store'
-import { LLM_PROVIDER_CONFIGS } from '@/agent/providers/types'
+import type { Message } from '@/agent/message-types'
 
 interface ConversationViewProps {
   /** Optional initial message to send immediately (from WelcomeScreen) */
@@ -33,36 +27,10 @@ export function ConversationView({
   onInitialMessageConsumed,
 }: ConversationViewProps) {
   const [input, setInput] = useState('')
-  const [toolResults, setToolResults] = useState<Map<string, string>>(new Map())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const agentLoopRef = useRef<AgentLoop | null>(null)
 
-  const {
-    status,
-    streamingContent,
-    streamingReasoning,
-    isReasoningStreaming,
-    completedReasoning,
-    completedContent,
-    streamingToolArgs,
-    currentToolCall,
-    directoryHandle,
-    setStatus,
-    appendStreamingContent,
-    appendStreamingReasoning,
-    resetStreamingContent,
-    setCurrentToolCall,
-    appendStreamingToolArgs,
-    resetStreamingToolArgs,
-    setError,
-    reset: resetAgent,
-    resetStreamingReasoning,
-    setReasoningStreaming,
-    setCompletedReasoning,
-    setContentStreaming,
-    setCompletedContent,
-  } = useAgentStore()
+  const { directoryHandle } = useAgentStore()
 
   // Subscribe directly to conversations and activeConversationId to ensure updates trigger re-renders
   const conversations = useConversationStore((s) => s.conversations)
@@ -73,13 +41,16 @@ export function ConversationView({
   const createNew = useConversationStore((s) => s.createNew)
   const updateMessages = useConversationStore((s) => s.updateMessages)
   const setActive = useConversationStore((s) => s.setActive)
+  const runAgent = useConversationStore((s) => s.runAgent)
+  const cancelAgent = useConversationStore((s) => s.cancelAgent)
+  const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
 
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [streamingContent, streamingReasoning, streamingToolArgs, status])
+  }, [activeConversation])
 
   // Build tool results map from conversation messages
   const buildToolResultsMap = useCallback((messages: Message[]) => {
@@ -93,17 +64,21 @@ export function ConversationView({
   }, [])
 
   // Update tool results when conversation changes
-  useEffect(() => {
+  const toolResults = useMemo(() => {
     if (activeConversation) {
-      setToolResults(buildToolResultsMap(activeConversation.messages))
+      return buildToolResultsMap(activeConversation.messages)
     }
+    return new Map<string, string>()
   }, [activeConversation, buildToolResultsMap])
 
   // Handle initial message from WelcomeScreen (one-shot).
   // The conversation is already created by WorkspaceLayout before this component mounts.
   const initialMessageHandled = useRef(false)
+  const convId = activeConversationId
+  const isRunning = convId ? isConversationRunning(convId) : false
+
   useEffect(() => {
-    if (initialMessage && !initialMessageHandled.current && status === 'idle') {
+    if (initialMessage && !initialMessageHandled.current && !isRunning && convId) {
       initialMessageHandled.current = true
       sendMessage(initialMessage)
       onInitialMessageConsumed?.()
@@ -112,136 +87,36 @@ export function ConversationView({
   }, [initialMessage])
 
   const sendMessage = async (text: string) => {
-    if (!text.trim() || status !== 'idle') return
+    if (!text.trim()) return
 
     if (!hasApiKey) {
-      setError('API Key 未设置，请先在设置中配置')
+      // TODO: Show error message
       return
     }
 
     // Use the current active conversation — it must already exist.
-    // (WorkspaceLayout creates it before mounting ConversationView,
-    //  or user clicks on an existing one from the sidebar.)
-    let convId = activeConversationId
-    if (!convId) {
+    let targetConvId = convId
+    if (!targetConvId) {
       // Fallback: create one if somehow missing
       const conv = createNew(text.slice(0, 30))
-      convId = conv.id
-      setActive(convId)
+      targetConvId = conv.id
+      setActive(targetConvId)
+    }
+
+    // Check if already running
+    if (isConversationRunning(targetConvId)) {
+      return
     }
 
     // Add user message
     const userMsg = createUserMessage(text)
-    const conv = conversations.find((c) => c.id === convId)
+    const conv = conversations.find((c) => c.id === targetConvId)
     const currentMessages = conv ? [...conv.messages, userMsg] : [userMsg]
-    updateMessages(convId, currentMessages)
+    updateMessages(targetConvId, currentMessages)
     setInput('')
-    resetStreamingContent()
 
-    // Setup agent
-    try {
-      const apiKey = await loadApiKey(providerType)
-      if (!apiKey) {
-        setError('API Key 未设置，请先在设置中配置')
-        return
-      }
-
-      const config = LLM_PROVIDER_CONFIGS[providerType]
-      const provider = new GLMProvider({
-        apiKey,
-        baseUrl: config.baseURL,
-        model: modelName,
-      })
-
-      const contextManager = new ContextManager({
-        maxContextTokens: provider.maxContextTokens,
-        reserveTokens: maxTokens,
-      })
-
-      const toolRegistry = getToolRegistry()
-
-      const agentLoop = new AgentLoop({
-        provider,
-        toolRegistry,
-        contextManager,
-        toolContext: {
-          directoryHandle: directoryHandle,
-        },
-        maxIterations: 20,
-      })
-      agentLoopRef.current = agentLoop
-
-      setStatus('thinking')
-
-      await agentLoop.run(currentMessages, {
-        onMessageStart: () => {
-          resetStreamingContent()
-          resetStreamingReasoning()
-          setReasoningStreaming(false)
-          setCompletedReasoning('')
-          setContentStreaming(false)
-          setCompletedContent('')
-          setStatus('streaming')
-        },
-        onReasoningStart: () => {
-          setReasoningStreaming(true)
-        },
-        onReasoningDelta: (delta) => {
-          appendStreamingReasoning(delta)
-        },
-        onReasoningComplete: (reasoning) => {
-          setReasoningStreaming(false)
-          setCompletedReasoning(reasoning)
-        },
-        onContentStart: () => {
-          setContentStreaming(true)
-        },
-        onContentDelta: (delta) => {
-          appendStreamingContent(delta)
-        },
-        onContentComplete: (content) => {
-          setContentStreaming(false)
-          setCompletedContent(content)
-          resetStreamingContent()
-        },
-        onToolCallStart: (tc: ToolCall) => {
-          setStatus('tool_calling')
-          setCurrentToolCall(tc)
-          resetStreamingToolArgs()
-        },
-        onToolCallDelta: (_index: number, argsDelta: string) => {
-          appendStreamingToolArgs(argsDelta)
-        },
-        onToolCallComplete: (tc: ToolCall, result: string) => {
-          setToolResults((prev) => {
-            const next = new Map(prev)
-            next.set(tc.id, result)
-            return next
-          })
-          setCurrentToolCall(null)
-        },
-        onMessagesUpdated: (msgs) => {
-          // Progressively update conversation so user sees tool calls in real-time
-          updateMessages(convId, msgs)
-          setToolResults(buildToolResultsMap(msgs))
-        },
-        onComplete: (msgs) => {
-          updateMessages(convId, msgs)
-          setToolResults(buildToolResultsMap(msgs))
-          // Defer resetAgent to ensure UI has a chance to render the updated messages first
-          Promise.resolve().then(() => resetAgent())
-        },
-        onError: (err) => {
-          setError(err.message)
-        },
-      })
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        resetAgent()
-        return
-      }
-      setError(error instanceof Error ? error.message : String(error))
-    }
+    // Run agent
+    await runAgent(targetConvId, providerType, modelName, maxTokens, directoryHandle)
   }
 
   const handleSend = () => {
@@ -249,8 +124,9 @@ export function ConversationView({
   }
 
   const handleCancel = () => {
-    agentLoopRef.current?.cancel()
-    resetAgent()
+    if (convId) {
+      cancelAgent(convId)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -260,29 +136,28 @@ export function ConversationView({
     }
   }
 
-  const isProcessing = status !== 'idle' && status !== 'error'
+  const status = activeConversation?.status || 'idle'
+  const isProcessing = isRunning
 
   // Build streaming state for the last message when processing
   const streamingState = useMemo(() => {
-    if (!isProcessing) return undefined
+    if (!activeConversation || !isProcessing) return undefined
     return {
-      reasoning: isReasoningStreaming,
-      content: status === 'streaming',
+      reasoning: activeConversation.isReasoningStreaming,
+      content: activeConversation.isContentStreaming,
     }
-  }, [isProcessing, isReasoningStreaming, status])
+  }, [activeConversation, isProcessing])
 
   // When processing, we have streaming content/reasoning that should be displayed
-  // as part of the current assistant turn
   const streamingContentMessage = useMemo(() => {
-    if (!isProcessing) return undefined
-    const reasoning = completedReasoning || streamingReasoning
-    const content = completedContent || streamingContent
+    if (!activeConversation || !isProcessing) return undefined
+    const reasoning = activeConversation.completedReasoning || activeConversation.streamingReasoning
+    const content = activeConversation.completedContent || activeConversation.streamingContent
     if (!reasoning && !content) return undefined
     return { reasoning, content }
-  }, [isProcessing, completedReasoning, streamingReasoning, completedContent, streamingContent])
+  }, [activeConversation, isProcessing])
 
   const turns = useMemo(() => {
-    // Immer ensures messages reference changes properly
     const messages = activeConversation?.messages || []
     return groupMessagesIntoTurns(messages)
   }, [activeConversation?.messages])
@@ -310,6 +185,7 @@ export function ConversationView({
                 turn={turn}
                 toolResults={toolResults}
                 isProcessing={isProcessing}
+                isWaiting={false}
                 streamingState={
                   // Only pass streaming state to the last assistant turn when processing
                   isProcessing && idx === turns.length - 1 ? streamingState : undefined
@@ -321,17 +197,42 @@ export function ConversationView({
                 currentToolCall={
                   // Pass current tool call to the last assistant turn when in tool_calling phase
                   isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                    ? currentToolCall
+                    ? activeConversation?.currentToolCall
                     : undefined
                 }
                 streamingToolArgs={
                   // Pass streaming tool args to the last assistant turn when in tool_calling phase
                   isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                    ? streamingToolArgs
+                    ? activeConversation?.streamingToolArgs
                     : undefined
                 }
               />
             )
+          )}
+
+          {/* Pending indicator - show when waiting for response and no assistant turn yet */}
+          {isProcessing && status === 'pending' && (
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+                <Bot className="h-4 w-4" />
+              </div>
+              <div className="inline-block rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500 shadow-sm">
+                <span className="flex items-center gap-1">
+                  <span
+                    className="h-2 w-2 animate-bounce rounded-full bg-primary-400"
+                    style={{ animationDelay: '0ms' }}
+                  />
+                  <span
+                    className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
+                    style={{ animationDelay: '160ms' }}
+                  />
+                  <span
+                    className="h-2 w-2 animate-bounce rounded-full bg-primary-600"
+                    style={{ animationDelay: '320ms' }}
+                  />
+                </span>
+              </div>
+            </div>
           )}
 
           <div ref={messagesEndRef} />

@@ -34,6 +34,8 @@ interface AssistantTurnBubbleProps {
   toolResults: Map<string, string>
   /** Whether agent is still processing this turn */
   isProcessing?: boolean
+  /** Whether agent is waiting (pending - request sent, waiting for response) */
+  isWaiting?: boolean
   /** Streaming state flags (only for last turn when processing) */
   streamingState?: StreamingState
   /** Streaming content (only for last turn when processing) */
@@ -48,6 +50,7 @@ export function AssistantTurnBubble({
   turn,
   toolResults,
   isProcessing,
+  isWaiting,
   streamingState,
   streamingContent,
   currentToolCall,
@@ -77,6 +80,26 @@ export function AssistantTurnBubble({
           />
         ))}
 
+        {/* Waiting indicator - three bouncing dots */}
+        {isWaiting && (
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+            <span className="flex items-center gap-1">
+              <span
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                style={{ animationDelay: '0ms' }}
+              />
+              <span
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                style={{ animationDelay: '150ms' }}
+              />
+              <span
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
+                style={{ animationDelay: '300ms' }}
+              />
+            </span>
+          </div>
+        )}
+
         {/* Streaming content area - rendered as part of the current turn */}
         {isProcessing &&
           streamingContent &&
@@ -98,7 +121,7 @@ export function AssistantTurnBubble({
         )}
 
         {/* Summary footer: timestamp + aggregated token usage + copy button (only show when not processing) */}
-        {!isProcessing && (
+        {!isProcessing && !isWaiting && (
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span>
               {new Date(turn.timestamp).toLocaleTimeString('zh-CN', {

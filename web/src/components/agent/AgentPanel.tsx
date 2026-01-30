@@ -1,9 +1,21 @@
 /**
  * AgentPanel - main conversation interface for the AI agent.
+ *
+ * Now uses conversation store for per-conversation runtime state.
+ * Multiple conversations can run simultaneously.
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, FolderOpen, Settings, Plus, Trash2, StopCircle, MessageSquare } from 'lucide-react'
+import {
+  Send,
+  FolderOpen,
+  Settings,
+  Plus,
+  Trash2,
+  StopCircle,
+  MessageSquare,
+  Bot,
+} from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -12,50 +24,16 @@ import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { groupMessagesIntoTurns } from './group-messages'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { createUserMessage } from '@/agent/message-types'
-import type { Message, ToolCall } from '@/agent/message-types'
-import { AgentLoop } from '@/agent/agent-loop'
-import { GLMProvider } from '@/agent/llm/glm-provider'
-import { ContextManager } from '@/agent/context-manager'
-import { getToolRegistry } from '@/agent/tool-registry'
-import { loadApiKey } from '@/security/api-key-store'
+import type { Message } from '@/agent/message-types'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
-import { LLM_PROVIDER_CONFIGS } from '@/agent/providers/types'
 
 export function AgentPanel() {
   const [input, setInput] = useState('')
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [toolResults, setToolResults] = useState<Map<string, string>>(new Map())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const agentLoopRef = useRef<AgentLoop | null>(null)
 
-  const {
-    status,
-    streamingContent,
-    streamingReasoning,
-    isReasoningStreaming,
-    completedReasoning,
-    completedContent,
-    streamingToolArgs,
-    currentToolCall,
-    directoryHandle,
-    directoryName,
-    setStatus,
-    appendStreamingContent,
-    appendStreamingReasoning,
-    resetStreamingContent,
-    setCurrentToolCall,
-    appendStreamingToolArgs,
-    resetStreamingToolArgs,
-    setDirectoryHandle,
-    setError,
-    reset: resetAgent,
-    resetStreamingReasoning,
-    setReasoningStreaming,
-    setCompletedReasoning,
-    setContentStreaming,
-    setCompletedContent,
-  } = useAgentStore()
+  const { directoryHandle, directoryName, setDirectoryHandle } = useAgentStore()
 
   const {
     conversations,
@@ -67,6 +45,9 @@ export function AgentPanel() {
     setActive,
     updateMessages,
     deleteConversation,
+    runAgent,
+    cancelAgent,
+    isConversationRunning,
   } = useConversationStore()
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
@@ -79,7 +60,10 @@ export function AgentPanel() {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeConversation, streamingContent, status])
+  }, [activeConversation])
+
+  const conversation = activeConversation()
+  const convId = activeConversationId
 
   // Build tool results map from conversation messages
   const buildToolResultsMap = useCallback((messages: Message[]) => {
@@ -92,13 +76,12 @@ export function AgentPanel() {
     return map
   }, [])
 
-  const conversation = activeConversation()
-
   // Update tool results when conversation changes
-  useEffect(() => {
+  const toolResults = useMemo(() => {
     if (conversation) {
-      setToolResults(buildToolResultsMap(conversation.messages))
+      return buildToolResultsMap(conversation.messages)
     }
+    return new Map<string, string>()
   }, [conversation, buildToolResultsMap])
 
   const handleSelectFolder = async () => {
@@ -107,148 +90,51 @@ export function AgentPanel() {
       setDirectoryHandle(handle)
     } catch (error) {
       if (error instanceof Error && error.message === 'User cancelled') return
-      setError(error instanceof Error ? error.message : String(error))
+      // Error handling can be added here if needed
     }
   }
 
   const handleSend = async () => {
     const text = input.trim()
-    if (!text || status !== 'idle') return
+    if (!text) return
 
+    if (!convId) {
+      const conv = createNew(text.slice(0, 30))
+      setActive(conv.id)
+      // Wait for state to update
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const newConvId = conv.id
+      await handleSendToConversation(newConvId, text)
+    } else {
+      // Check if already running
+      if (isConversationRunning(convId)) {
+        return
+      }
+      await handleSendToConversation(convId, text)
+    }
+  }
+
+  const handleSendToConversation = async (conversationId: string, text: string) => {
     if (!hasApiKey) {
       setSettingsOpen(true)
       return
     }
 
-    // Ensure we have a conversation
-    let convId = activeConversationId
-    if (!convId) {
-      const conv = createNew(text.slice(0, 30))
-      convId = conv.id
-    }
-
     // Add user message
     const userMsg = createUserMessage(text)
-    const conv = useConversationStore.getState().conversations.find((c) => c.id === convId)
+    const conv = conversations.find((c) => c.id === conversationId)
     const currentMessages = conv ? [...conv.messages, userMsg] : [userMsg]
-    updateMessages(convId!, currentMessages)
+    updateMessages(conversationId, currentMessages)
     setInput('')
-    resetStreamingContent()
 
-    // Setup agent
-    try {
-      const apiKey = await loadApiKey(providerType)
-      if (!apiKey) {
-        setError('API Key 未设置，请先在设置中配置')
-        setSettingsOpen(true)
-        return
-      }
-
-      const config = LLM_PROVIDER_CONFIGS[providerType]
-      const provider = new GLMProvider({
-        apiKey,
-        baseUrl: config.baseURL,
-        model: modelName,
-      })
-
-      const contextManager = new ContextManager({
-        maxContextTokens: provider.maxContextTokens,
-        reserveTokens: maxTokens,
-      })
-
-      const toolRegistry = getToolRegistry()
-
-      const agentLoop = new AgentLoop({
-        provider,
-        toolRegistry,
-        contextManager,
-        toolContext: {
-          directoryHandle: directoryHandle,
-        },
-        maxIterations: 20,
-      })
-      agentLoopRef.current = agentLoop
-
-      setStatus('thinking')
-
-      const resultMessages = await agentLoop.run(currentMessages, {
-        onMessageStart: () => {
-          resetStreamingContent()
-          resetStreamingReasoning()
-          setReasoningStreaming(false)
-          setCompletedReasoning('')
-          setContentStreaming(false)
-          setCompletedContent('')
-          setStatus('streaming')
-        },
-        onReasoningStart: () => {
-          setReasoningStreaming(true)
-        },
-        onReasoningDelta: (delta) => {
-          appendStreamingReasoning(delta)
-        },
-        onReasoningComplete: (reasoning) => {
-          setReasoningStreaming(false)
-          setCompletedReasoning(reasoning)
-        },
-        onContentStart: () => {
-          setContentStreaming(true)
-        },
-        onContentDelta: (delta) => {
-          appendStreamingContent(delta)
-        },
-        onContentComplete: (content) => {
-          setContentStreaming(false)
-          setCompletedContent(content)
-          resetStreamingContent()
-        },
-        onToolCallStart: (tc: ToolCall) => {
-          setStatus('tool_calling')
-          setCurrentToolCall(tc)
-          resetStreamingToolArgs()
-        },
-        onToolCallDelta: (_index: number, argsDelta: string) => {
-          appendStreamingToolArgs(argsDelta)
-        },
-        onToolCallComplete: (tc: ToolCall, result: string) => {
-          setToolResults((prev) => {
-            const next = new Map(prev)
-            next.set(tc.id, result)
-            return next
-          })
-          setCurrentToolCall(null)
-        },
-        onMessagesUpdated: (msgs) => {
-          updateMessages(convId!, msgs)
-          setToolResults(buildToolResultsMap(msgs))
-        },
-        onComplete: (msgs) => {
-          updateMessages(convId!, msgs)
-          setToolResults(buildToolResultsMap(msgs))
-          // Defer resetAgent to ensure UI has a chance to render the updated messages first
-          Promise.resolve().then(() => resetAgent())
-        },
-        onError: (err) => {
-          setError(err.message)
-        },
-      })
-
-      // Final update in case onComplete wasn't called
-      updateMessages(convId!, resultMessages)
-      setToolResults(buildToolResultsMap(resultMessages))
-      resetAgent()
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        resetAgent()
-        return
-      }
-      setError(error instanceof Error ? error.message : String(error))
-    }
+    // Run agent
+    await runAgent(conversationId, providerType, modelName, maxTokens, directoryHandle)
   }
 
   const handleCancel = () => {
-    agentLoopRef.current?.cancel()
-    resetAgent()
+    if (convId) {
+      cancelAgent(convId)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -258,29 +144,29 @@ export function AgentPanel() {
     }
   }
 
-  const isProcessing = status !== 'idle' && status !== 'error'
+  // Get current conversation status
+  const isProcessing = conversation ? isConversationRunning(conversation.id) : false
+  const status = conversation?.status || 'idle'
 
   // Build streaming state for the last message when processing
   const streamingState = useMemo(() => {
-    if (!isProcessing) return undefined
+    if (!conversation || !isProcessing) return undefined
     return {
-      reasoning: isReasoningStreaming,
-      content: status === 'streaming',
+      reasoning: conversation.isReasoningStreaming,
+      content: conversation.isContentStreaming,
     }
-  }, [isProcessing, isReasoningStreaming, status])
+  }, [conversation, isProcessing])
 
   // When processing, we have streaming content/reasoning that should be displayed
-  // as part of the current assistant turn
   const streamingContentMessage = useMemo(() => {
-    if (!isProcessing) return undefined
-    const reasoning = completedReasoning || streamingReasoning
-    const content = completedContent || streamingContent
+    if (!conversation || !isProcessing) return undefined
+    const reasoning = conversation.completedReasoning || conversation.streamingReasoning
+    const content = conversation.completedContent || conversation.streamingContent
     if (!reasoning && !content) return undefined
     return { reasoning, content }
-  }, [isProcessing, completedReasoning, streamingReasoning, completedContent, streamingContent])
+  }, [conversation, isProcessing])
 
   const turns = useMemo(() => {
-    // Immer ensures messages reference changes properly
     const messages = conversation?.messages || []
     return groupMessagesIntoTurns(messages)
   }, [conversation?.messages])
@@ -341,29 +227,36 @@ export function AgentPanel() {
             </button>
           </div>
           <div className="space-y-0.5 px-2">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                className={`group flex cursor-pointer items-center rounded-md px-2 py-1.5 text-xs ${
-                  conv.id === activeConversationId
-                    ? 'bg-primary-100 text-primary-700'
-                    : 'text-neutral-600 hover:bg-neutral-200'
-                }`}
-                onClick={() => setActive(conv.id)}
-              >
-                <span className="min-w-0 flex-1 truncate">{conv.title}</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    deleteConversation(conv.id)
-                  }}
-                  className="ml-1 hidden shrink-0 rounded p-0.5 text-neutral-400 hover:text-red-500 group-hover:block"
+            {conversations.map((conv) => {
+              const isRunning = isConversationRunning(conv.id)
+              return (
+                <div
+                  key={conv.id}
+                  className={`group flex cursor-pointer items-center rounded-md px-2 py-1.5 text-xs ${
+                    conv.id === activeConversationId
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                  onClick={() => setActive(conv.id)}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
+                  {/* Status indicator */}
+                  {isRunning && (
+                    <span className="mr-1.5 h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{conv.title}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteConversation(conv.id)
+                    }}
+                    className="ml-1 hidden shrink-0 rounded p-0.5 text-neutral-400 hover:text-red-500 group-hover:block"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -390,6 +283,7 @@ export function AgentPanel() {
                   turn={turn}
                   toolResults={toolResults}
                   isProcessing={isProcessing}
+                  isWaiting={false}
                   streamingState={
                     // Only pass streaming state to the last assistant turn when processing
                     isProcessing && idx === turns.length - 1 ? streamingState : undefined
@@ -401,17 +295,42 @@ export function AgentPanel() {
                   currentToolCall={
                     // Pass current tool call to the last assistant turn when in tool_calling phase
                     isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                      ? currentToolCall
+                      ? conversation?.currentToolCall
                       : undefined
                   }
                   streamingToolArgs={
                     // Pass streaming tool args to the last assistant turn when in tool_calling phase
                     isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                      ? streamingToolArgs
+                      ? conversation?.streamingToolArgs
                       : undefined
                   }
                 />
               )
+            )}
+
+            {/* Pending indicator - show when waiting for response and no assistant turn yet */}
+            {isProcessing && status === 'pending' && (
+              <div className="flex gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="inline-block rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500 shadow-sm">
+                  <span className="flex items-center gap-1">
+                    <span
+                      className="h-2 w-2 animate-bounce rounded-full bg-primary-400"
+                      style={{ animationDelay: '0ms' }}
+                    />
+                    <span
+                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
+                      style={{ animationDelay: '160ms' }}
+                    />
+                    <span
+                      className="h-2 w-2 animate-bounce rounded-full bg-primary-600"
+                      style={{ animationDelay: '320ms' }}
+                    />
+                  </span>
+                </div>
+              </div>
             )}
 
             <div ref={messagesEndRef} />

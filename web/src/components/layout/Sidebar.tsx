@@ -65,6 +65,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
     createNew,
     setActive,
     deleteConversation,
+    isConversationRunning,
   } = useConversationStore()
 
   const { directoryHandle, directoryName } = useAgentStore()
@@ -227,29 +228,36 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
           </div>
 
           <div className="flex-1 space-y-0.5 overflow-y-auto px-1.5 pb-1.5">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                className={`group flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs ${
-                  conv.id === activeConversationId
-                    ? 'bg-primary-100 font-medium text-primary-700'
-                    : 'text-neutral-600 hover:bg-neutral-200'
-                }`}
-                onClick={() => setActive(conv.id)}
-              >
-                <span className="min-w-0 flex-1 truncate">{conv.title}</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    deleteConversation(conv.id)
-                  }}
-                  className="ml-1 hidden shrink-0 rounded p-0.5 text-neutral-400 hover:text-red-500 group-hover:block"
+            {conversations.map((conv) => {
+              const isRunning = isConversationRunning(conv.id)
+              return (
+                <div
+                  key={conv.id}
+                  className={`group flex cursor-pointer items-center rounded-md px-2.5 py-1.5 text-xs ${
+                    conv.id === activeConversationId
+                      ? 'bg-primary-100 font-medium text-primary-700'
+                      : 'text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                  onClick={() => setActive(conv.id)}
                 >
-                  <Trash2 className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
+                  {/* Running status indicator */}
+                  {isRunning && (
+                    <span className="mr-1.5 h-2 w-2 shrink-0 animate-pulse rounded-full bg-yellow-500" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{conv.title}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      deleteConversation(conv.id)
+                    }}
+                    className="ml-1 hidden shrink-0 rounded p-0.5 text-neutral-400 hover:text-red-500 group-hover:block"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              )
+            })}
           </div>
         </div>
 

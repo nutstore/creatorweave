@@ -15,7 +15,7 @@ import { RemotePanel } from '@/components/remote/RemotePanel'
 
 export function TopBar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { directoryHandle, directoryName, setDirectoryHandle, setError } = useAgentStore()
+  const { directoryHandle, directoryName, setDirectoryHandle } = useAgentStore()
   const { hasApiKey } = useSettingsStore()
 
   const handleSelectFolder = async () => {
@@ -24,7 +24,7 @@ export function TopBar() {
       setDirectoryHandle(handle)
     } catch (error) {
       if (error instanceof Error && error.message === 'User cancelled') return
-      setError(error instanceof Error ? error.message : String(error))
+      console.error('Failed to select folder:', error)
     }
   }
 

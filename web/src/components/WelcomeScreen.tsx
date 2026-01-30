@@ -18,7 +18,7 @@ interface WelcomeScreenProps {
 export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
   const [input, setInput] = useState('')
   const { hasApiKey } = useSettingsStore()
-  const { directoryHandle, setDirectoryHandle, setError } = useAgentStore()
+  const { directoryHandle, setDirectoryHandle } = useAgentStore()
   const { conversations } = useConversationStore()
 
   const handleSubmit = () => {
@@ -41,7 +41,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
       setDirectoryHandle(handle)
     } catch (error) {
       if (error instanceof Error && error.message === 'User cancelled') return
-      setError(error instanceof Error ? error.message : String(error))
+      console.error('Failed to select folder:', error)
     }
   }
 
