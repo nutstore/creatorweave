@@ -17,6 +17,8 @@ import type { Message, ToolCall, ToolResult } from './message-types'
 import { createAssistantMessage, createToolMessage } from './message-types'
 import { ContextManager } from './context-manager'
 import { ToolRegistry } from './tool-registry'
+import { getSkillManager } from '@/skills/skill-manager'
+import type { SkillMatchContext } from '@/skills/skill-types'
 
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = `You are an AI coding assistant running in the browser. You have access to the user's local project files through the File System Access API.
@@ -63,6 +65,7 @@ export class AgentLoop {
   private contextManager: ContextManager
   private toolContext: ToolContext
   private maxIterations: number
+  private baseSystemPrompt: string
   private abortController: AbortController | null = null
 
   constructor(config: AgentLoopConfig) {
@@ -71,12 +74,29 @@ export class AgentLoop {
     this.contextManager = config.contextManager
     this.toolContext = config.toolContext
     this.maxIterations = config.maxIterations || MAX_ITERATIONS
-    this.contextManager.setSystemPrompt(config.systemPrompt || DEFAULT_SYSTEM_PROMPT)
+    this.baseSystemPrompt = config.systemPrompt || DEFAULT_SYSTEM_PROMPT
+    this.contextManager.setSystemPrompt(this.baseSystemPrompt)
   }
 
   /** Update system prompt (e.g. when skills are injected) */
   setSystemPrompt(prompt: string): void {
+    this.baseSystemPrompt = prompt
     this.contextManager.setSystemPrompt(prompt)
+  }
+
+  /** Inject matching skills into the system prompt based on conversation context */
+  private injectSkills(messages: Message[]): void {
+    // Extract user message for matching (use the last user message)
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
+    if (!lastUserMsg) return
+
+    const context: SkillMatchContext = {
+      userMessage: lastUserMsg.content || '',
+    }
+
+    const skillManager = getSkillManager()
+    const enhanced = skillManager.getEnhancedSystemPrompt(this.baseSystemPrompt, context)
+    this.contextManager.setSystemPrompt(enhanced)
   }
 
   /** Cancel the current agent loop */
@@ -92,6 +112,9 @@ export class AgentLoop {
     this.abortController = new AbortController()
     const signal = this.abortController.signal
     const allMessages = [...messages]
+
+    // Inject matching skills into system prompt
+    this.injectSkills(messages)
 
     try {
       for (let iteration = 0; iteration < this.maxIterations; iteration++) {
