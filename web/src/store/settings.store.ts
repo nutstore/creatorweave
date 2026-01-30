@@ -29,7 +29,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      providerType: 'glm',
+      providerType: 'glm-coding',
       modelName: 'glm-4-flash',
       customBaseUrl: '',
       temperature: 0.7,

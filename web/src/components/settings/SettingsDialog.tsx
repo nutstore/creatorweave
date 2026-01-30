@@ -16,6 +16,7 @@ interface SettingsDialogProps {
 
 const PROVIDER_LABELS: Record<LLMProviderType, string> = {
   glm: '智谱 GLM',
+  'glm-coding': '智谱 GLM (Coding)',
   kimi: 'Kimi (Moonshot)',
   minimax: 'MiniMax',
   qwen: '通义千问 (Qwen)',

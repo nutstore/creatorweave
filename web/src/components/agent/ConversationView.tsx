@@ -50,8 +50,7 @@ export function ConversationView({
     reset: resetAgent,
   } = useAgentStore()
 
-  const { activeConversationId, activeConversation, createNew, updateMessages } =
-    useConversationStore()
+  const { activeConversation, createNew, updateMessages } = useConversationStore()
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
 
@@ -80,9 +79,12 @@ export function ConversationView({
     }
   }, [conversation, buildToolResultsMap])
 
-  // Handle initial message from WelcomeScreen
+  // Handle initial message from WelcomeScreen (one-shot).
+  // The conversation is already created by WorkspaceLayout before this component mounts.
+  const initialMessageHandled = useRef(false)
   useEffect(() => {
-    if (initialMessage && status === 'idle') {
+    if (initialMessage && !initialMessageHandled.current && status === 'idle') {
+      initialMessageHandled.current = true
       sendMessage(initialMessage)
       onInitialMessageConsumed?.()
     }
@@ -97,18 +99,22 @@ export function ConversationView({
       return
     }
 
-    // Ensure we have a conversation
-    let convId = activeConversationId
+    // Use the current active conversation — it must already exist.
+    // (WorkspaceLayout creates it before mounting ConversationView,
+    //  or user clicks on an existing one from the sidebar.)
+    const convId = useConversationStore.getState().activeConversationId
     if (!convId) {
+      // Fallback: create one if somehow missing
       const conv = createNew(text.slice(0, 30))
-      convId = conv.id
+      useConversationStore.getState().setActive(conv.id)
     }
+    const resolvedConvId = useConversationStore.getState().activeConversationId!
 
     // Add user message
     const userMsg = createUserMessage(text)
-    const conv = useConversationStore.getState().conversations.find((c) => c.id === convId)
+    const conv = useConversationStore.getState().conversations.find((c) => c.id === resolvedConvId)
     const currentMessages = conv ? [...conv.messages, userMsg] : [userMsg]
-    updateMessages(convId!, currentMessages)
+    updateMessages(resolvedConvId, currentMessages)
     setInput('')
     resetStreamingContent()
 
@@ -147,7 +153,7 @@ export function ConversationView({
 
       setStatus('thinking')
 
-      const resultMessages = await agentLoop.run(currentMessages, {
+      await agentLoop.run(currentMessages, {
         onMessageStart: () => {
           resetStreamingContent()
           setStatus('streaming')
@@ -171,7 +177,7 @@ export function ConversationView({
           setCurrentToolCall(null)
         },
         onComplete: (msgs) => {
-          updateMessages(convId!, msgs)
+          updateMessages(resolvedConvId, msgs)
           setToolResults(buildToolResultsMap(msgs))
           resetAgent()
         },
@@ -179,11 +185,6 @@ export function ConversationView({
           setError(err.message)
         },
       })
-
-      // Final update in case onComplete wasn't called
-      updateMessages(convId!, resultMessages)
-      setToolResults(buildToolResultsMap(resultMessages))
-      resetAgent()
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         resetAgent()

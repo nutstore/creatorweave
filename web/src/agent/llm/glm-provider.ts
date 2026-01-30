@@ -22,6 +22,8 @@ export interface GLMProviderConfig {
 const DEFAULT_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4'
 const DEFAULT_MODEL = 'glm-4-flash'
 const MAX_CONTEXT_TOKENS = 128000
+const MAX_RETRIES = 3
+const INITIAL_RETRY_DELAY_MS = 1000
 
 export class GLMProvider implements LLMProvider {
   readonly name = 'GLM'
@@ -39,16 +41,11 @@ export class GLMProvider implements LLMProvider {
 
   async chat(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     const body = this.buildRequestBody(request, false)
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    const response = await this.fetchWithRetry(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(body),
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`GLM API error (${response.status}): ${errorText}`)
-    }
 
     return response.json()
   }
@@ -58,17 +55,16 @@ export class GLMProvider implements LLMProvider {
     signal?: AbortSignal
   ): AsyncGenerator<ChatCompletionChunk> {
     const body = this.buildRequestBody(request, true)
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    console.log(
+      `[GLMProvider] Request: model=${this.model}, messages=${request.messages.length}, tools=${request.tools?.length ?? 0}, toolChoice=${request.toolChoice}`
+    )
+    console.log('[GLMProvider] Request body tools:', body.tools ? 'present' : 'absent')
+    const response = await this.fetchWithRetry(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(body),
       signal,
     })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`GLM API error (${response.status}): ${errorText}`)
-    }
 
     if (!response.body) {
       throw new Error('No response body for streaming')
@@ -89,6 +85,41 @@ export class GLMProvider implements LLMProvider {
   /** Update model */
   updateModel(model: string): void {
     this.model = model
+  }
+
+  /** Fetch with exponential backoff retry for 429 and 5xx errors */
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    let lastError: Error | null = null
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        const delay = INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1)
+        console.log(`[GLMProvider] Retry ${attempt}/${MAX_RETRIES} after ${delay}ms`)
+        await new Promise((r) => setTimeout(r, delay))
+      }
+
+      const response = await fetch(url, init)
+
+      if (response.ok) return response
+
+      const isRetryable = response.status === 429 || response.status >= 500
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const retryAfter = response.headers.get('retry-after')
+        if (retryAfter) {
+          const retryMs = parseInt(retryAfter, 10) * 1000
+          if (!isNaN(retryMs) && retryMs > 0) {
+            console.log(`[GLMProvider] Server requested retry-after: ${retryMs}ms`)
+            await new Promise((r) => setTimeout(r, retryMs))
+          }
+        }
+        lastError = new Error(`GLM API error (${response.status})`)
+        continue
+      }
+
+      const errorText = await response.text()
+      throw new Error(`GLM API error (${response.status}): ${errorText}`)
+    }
+
+    throw lastError || new Error('GLM API request failed after retries')
   }
 
   private getHeaders(): Record<string, string> {

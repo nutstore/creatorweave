@@ -10,11 +10,16 @@ export interface LLMProviderConfig {
   headers?: Record<string, string>
 }
 
-export type LLMProviderType = 'glm' | 'kimi' | 'minimax' | 'qwen'
+export type LLMProviderType = 'glm' | 'glm-coding' | 'kimi' | 'minimax' | 'qwen'
 
 export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfig, 'apiKey'>> = {
   glm: {
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
+    modelName: 'glm-4-flash',
+    headers: {},
+  },
+  'glm-coding': {
+    baseURL: 'https://open.bigmodel.cn/api/coding/paas/v4/',
     modelName: 'glm-4-flash',
     headers: {},
   },

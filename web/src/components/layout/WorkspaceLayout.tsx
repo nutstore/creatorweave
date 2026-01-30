@@ -2,6 +2,13 @@
  * WorkspaceLayout - main layout for the AI workbench.
  *
  * Composes: TopBar + Sidebar + Main content (WelcomeScreen or ConversationView)
+ *
+ * When user sends a message from WelcomeScreen:
+ * 1. WelcomeScreen calls onStartConversation(text)
+ * 2. WorkspaceLayout creates a new conversation, sets it active, stores pendingMessage
+ * 3. React re-renders → ConversationView mounts with initialMessage prop
+ * 4. ConversationView's useEffect picks up initialMessage and calls sendMessage()
+ * 5. pendingMessage is cleared via onInitialMessageConsumed callback
  */
 
 import { useState, useCallback } from 'react'
@@ -17,6 +24,8 @@ export function WorkspaceLayout() {
 
   const handleStartConversation = useCallback(
     (text: string) => {
+      // Create conversation first, then set active — ConversationView will
+      // receive the initialMessage and send it (single path, no duplication).
       const conv = createNew(text.slice(0, 30))
       setActive(conv.id)
       setPendingMessage(text)

@@ -21,17 +21,25 @@ import { getSkillManager } from '@/skills/skill-manager'
 import type { SkillMatchContext } from '@/skills/skill-types'
 
 const MAX_ITERATIONS = 20
-const DEFAULT_SYSTEM_PROMPT = `You are an AI coding assistant running in the browser. You have access to the user's local project files through the File System Access API.
+const DEFAULT_SYSTEM_PROMPT = `You are a powerful AI assistant running in the browser with full access to the user's local project files through tools.
+
+IMPORTANT: You CAN and MUST use the provided tools to interact with the user's file system. You are NOT a regular chatbot - you have real tool-calling capabilities. Never say "I cannot access files" or "I cannot view files" - instead, USE the tools to do it.
 
 Available tools:
-- file_read: Read file contents
+- file_read: Read file contents by path
 - file_write: Write/create files (auto-creates directories)
 - file_edit: Apply text replacements to files
-- glob: Search for files by pattern
+- glob: Search for files by pattern (e.g. "**/*.ts")
 - grep: Search file contents with regex
-- list_files: List directory structure
+- list_files: List directory structure as a tree
 
-Always read files before editing them. Use glob/grep to find relevant files. Be concise and helpful.`
+When the user asks about files, code, or their project:
+1. Use list_files or glob to discover the project structure
+2. Use file_read to read relevant files
+3. Use grep to search for specific patterns
+4. ALWAYS call the appropriate tool - never guess or refuse
+
+Always read files before editing them. Be concise and helpful.`
 
 export interface AgentCallbacks {
   /** Called when a new assistant message starts */
@@ -126,6 +134,10 @@ export class AgentLoop {
 
         // Stream LLM response
         const tools = this.toolRegistry.getToolDefinitions()
+        console.log(
+          `[AgentLoop] Iteration ${iteration}, messages: ${trimmedMessages.length}, tools: ${tools.length}, tool names:`,
+          tools.map((t) => t.function.name)
+        )
         callbacks?.onMessageStart?.()
 
         let content = ''
@@ -196,6 +208,9 @@ export class AgentLoop {
         allMessages.push(assistantMsg)
 
         // If no tool calls, we're done
+        console.log(
+          `[AgentLoop] finishReason: ${finishReason}, toolCalls: ${toolCalls.length}, content length: ${content.length}`
+        )
         if (finishReason !== 'tool_calls' || toolCalls.length === 0) {
           break
         }
