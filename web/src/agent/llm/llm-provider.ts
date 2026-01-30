@@ -67,6 +67,8 @@ export interface ChatCompletionChunk {
     delta: {
       role?: 'assistant'
       content?: string | null
+      /** Chain-of-thought reasoning content (GLM-4.7+ specific) */
+      reasoning_content?: string | null
       tool_calls?: Array<{
         index: number
         id?: string

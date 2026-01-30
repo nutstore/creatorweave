@@ -1,9 +1,9 @@
 /**
- * ThinkingIndicator - minimal status indicator for thinking and tool_calling states.
- * Streaming content is now rendered as a live MessageBubble instead.
+ * ThinkingIndicator - minimal status indicator for the "thinking" state.
+ * Tool calling is now rendered via ToolCallDisplay for visual consistency.
  */
 
-import { Loader2, Wrench } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 interface ThinkingIndicatorProps {
   status: 'thinking' | 'tool_calling'
@@ -19,15 +19,10 @@ export function ThinkingIndicator({ status, toolName }: ThinkingIndicatorProps) 
           <span>思考中...</span>
         </>
       )}
-      {status === 'tool_calling' && (
+      {status === 'tool_calling' && toolName && (
         <>
-          <Wrench className="h-3.5 w-3.5 animate-pulse text-amber-500" />
-          <span>
-            调用工具{' '}
-            <code className="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700">
-              {toolName}
-            </code>
-          </span>
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>调用工具 {toolName}...</span>
         </>
       )}
     </div>

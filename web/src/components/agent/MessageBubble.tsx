@@ -2,7 +2,8 @@
  * MessageBubble - renders a single message in the conversation.
  */
 
-import { User, Bot } from 'lucide-react'
+import { useState } from 'react'
+import { User, Bot, Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
@@ -19,6 +20,8 @@ interface MessageBubbleProps {
 }
 
 export function MessageBubble({ message, toolResults }: MessageBubbleProps) {
+  const [reasoningOpen, setReasoningOpen] = useState(false)
+
   if (message.role === 'system') return null
   if (message.role === 'tool') return null // Tool results are shown inline with tool calls
 
@@ -38,7 +41,7 @@ export function MessageBubble({ message, toolResults }: MessageBubbleProps) {
       {/* Content */}
       <div className={`min-w-0 max-w-[80%] ${isUser ? 'text-right' : ''}`}>
         {/* Text content */}
-        {message.content && (
+        {(message.content || message.reasoning) && (
           <div
             className={`inline-block rounded-lg px-4 py-2 text-sm ${
               isUser
@@ -46,13 +49,36 @@ export function MessageBubble({ message, toolResults }: MessageBubbleProps) {
                 : 'bg-white text-neutral-800 shadow-sm ring-1 ring-neutral-200'
             }`}
           >
+            {/* Reasoning (collapsible) */}
+            {!isUser && message.reasoning && (
+              <div className="mb-2 border-b border-neutral-100 pb-2">
+                <button
+                  type="button"
+                  onClick={() => setReasoningOpen(!reasoningOpen)}
+                  className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600"
+                >
+                  <Brain className="h-3 w-3" />
+                  <span>思考过程</span>
+                  {reasoningOpen ? (
+                    <ChevronDown className="h-3 w-3" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3" />
+                  )}
+                </button>
+                {reasoningOpen && (
+                  <div className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap text-xs text-neutral-400">
+                    {message.reasoning}
+                  </div>
+                )}
+              </div>
+            )}
             {isUser ? (
               <div className="whitespace-pre-wrap break-words">{message.content}</div>
-            ) : (
+            ) : message.content ? (
               <div className="prose-sm max-w-none break-words">
                 <MarkdownContent content={message.content} />
               </div>
-            )}
+            ) : null}
           </div>
         )}
 

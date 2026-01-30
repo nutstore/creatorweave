@@ -18,10 +18,14 @@ interface AgentState {
   status: AgentStatus
   /** Streaming content being received */
   streamingContent: string
+  /** Streaming reasoning/thinking content (GLM-4.7+) */
+  streamingReasoning: string
   /** Currently executing tool call */
   currentToolCall: ToolCall | null
   /** Current tool call result */
   currentToolResult: string | null
+  /** Streaming tool call arguments (tool_stream mode) */
+  streamingToolArgs: string
   /** Directory handle for file operations */
   directoryHandle: FileSystemDirectoryHandle | null
   /** Directory name for display */
@@ -32,9 +36,12 @@ interface AgentState {
   // Actions
   setStatus: (status: AgentStatus) => void
   appendStreamingContent: (delta: string) => void
+  appendStreamingReasoning: (delta: string) => void
   resetStreamingContent: () => void
   setCurrentToolCall: (tc: ToolCall | null) => void
   setCurrentToolResult: (result: string | null) => void
+  appendStreamingToolArgs: (delta: string) => void
+  resetStreamingToolArgs: () => void
   setDirectoryHandle: (handle: FileSystemDirectoryHandle | null) => void
   restoreDirectoryHandle: () => Promise<void>
   setError: (error: string | null) => void
@@ -95,8 +102,10 @@ async function verifyPermission(handle: FileSystemDirectoryHandle): Promise<bool
 export const useAgentStore = create<AgentState>()((set) => ({
   status: 'idle',
   streamingContent: '',
+  streamingReasoning: '',
   currentToolCall: null,
   currentToolResult: null,
+  streamingToolArgs: '',
   directoryHandle: null,
   directoryName: null,
   error: null,
@@ -104,9 +113,14 @@ export const useAgentStore = create<AgentState>()((set) => ({
   setStatus: (status) => set({ status }),
   appendStreamingContent: (delta) =>
     set((state) => ({ streamingContent: state.streamingContent + delta })),
-  resetStreamingContent: () => set({ streamingContent: '' }),
+  appendStreamingReasoning: (delta) =>
+    set((state) => ({ streamingReasoning: state.streamingReasoning + delta })),
+  resetStreamingContent: () => set({ streamingContent: '', streamingReasoning: '' }),
   setCurrentToolCall: (currentToolCall) => set({ currentToolCall }),
   setCurrentToolResult: (currentToolResult) => set({ currentToolResult }),
+  appendStreamingToolArgs: (delta) =>
+    set((state) => ({ streamingToolArgs: state.streamingToolArgs + delta })),
+  resetStreamingToolArgs: () => set({ streamingToolArgs: '' }),
   setDirectoryHandle: (handle) => {
     set({ directoryHandle: handle, directoryName: handle?.name || null })
     persistHandle(handle).catch(console.error)
@@ -130,8 +144,10 @@ export const useAgentStore = create<AgentState>()((set) => ({
     set({
       status: 'idle',
       streamingContent: '',
+      streamingReasoning: '',
       currentToolCall: null,
       currentToolResult: null,
+      streamingToolArgs: '',
       error: null,
     }),
 }))

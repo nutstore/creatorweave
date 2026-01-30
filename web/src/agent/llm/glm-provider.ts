@@ -25,6 +25,9 @@ const MAX_CONTEXT_TOKENS = 128000
 const MAX_RETRIES = 3
 const INITIAL_RETRY_DELAY_MS = 1000
 
+/** Models that support the Zhipu-specific `tool_stream` parameter */
+const TOOL_STREAM_MODELS = new Set(['glm-4.7', 'glm-4.7v', 'glm-4.6', 'glm-4.6v'])
+
 export class GLMProvider implements LLMProvider {
   readonly name = 'GLM'
   readonly maxContextTokens = MAX_CONTEXT_TOKENS
@@ -122,6 +125,11 @@ export class GLMProvider implements LLMProvider {
     throw lastError || new Error('GLM API request failed after retries')
   }
 
+  /** Check if the current baseUrl points to Zhipu's API */
+  private isZhipuProvider(): boolean {
+    return this.baseUrl.includes('bigmodel.cn')
+  }
+
   private getHeaders(): Record<string, string> {
     return {
       'Content-Type': 'application/json',
@@ -139,9 +147,13 @@ export class GLMProvider implements LLMProvider {
       stream,
     }
 
-    // Request token usage in streaming responses (returned in the final chunk)
     if (stream) {
+      // Request token usage in streaming responses (returned in the final chunk)
       body.stream_options = { include_usage: true }
+      // Stream tool call deltas incrementally (Zhipu-specific, GLM-4.7/4.6 only)
+      if (this.isZhipuProvider() && TOOL_STREAM_MODELS.has(this.model)) {
+        body.tool_stream = true
+      }
     }
 
     if (request.tools && request.tools.length > 0) {

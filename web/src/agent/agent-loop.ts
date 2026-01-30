@@ -44,14 +44,20 @@ Always read files before editing them. Be concise and helpful.`
 export interface AgentCallbacks {
   /** Called when a new assistant message starts */
   onMessageStart?: () => void
+  /** Called with streaming reasoning/thinking deltas (GLM-4.7+) */
+  onReasoningDelta?: (delta: string) => void
   /** Called with streaming content deltas */
   onContentDelta?: (delta: string) => void
   /** Called when content streaming completes */
   onContentComplete?: (content: string) => void
   /** Called when the LLM requests a tool call */
   onToolCallStart?: (toolCall: ToolCall) => void
+  /** Called with streaming tool call argument deltas (tool_stream mode) */
+  onToolCallDelta?: (index: number, argsDelta: string) => void
   /** Called when a tool execution completes */
   onToolCallComplete?: (toolCall: ToolCall, result: string) => void
+  /** Called when messages are updated mid-loop (e.g. after assistant msg or tool result) */
+  onMessagesUpdated?: (messages: Message[]) => void
   /** Called when the entire agent loop finishes */
   onComplete?: (messages: Message[]) => void
   /** Called on error */
@@ -141,6 +147,7 @@ export class AgentLoop {
         callbacks?.onMessageStart?.()
 
         let content = ''
+        let reasoning = ''
         const toolCalls: ToolCall[] = []
         // Buffer for accumulating tool call deltas by index
         const toolCallBuffers = new Map<number, { id: string; name: string; arguments: string }>()
@@ -163,6 +170,12 @@ export class AgentLoop {
           const choice = chunk.choices[0]
           if (!choice) continue
 
+          // Accumulate reasoning content (GLM-4.7+ chain-of-thought)
+          if (choice.delta.reasoning_content) {
+            reasoning += choice.delta.reasoning_content
+            callbacks?.onReasoningDelta?.(choice.delta.reasoning_content)
+          }
+
           // Accumulate content
           if (choice.delta.content) {
             content += choice.delta.content
@@ -178,8 +191,22 @@ export class AgentLoop {
                 toolCallBuffers.set(tcDelta.index, buffer)
               }
               if (tcDelta.id) buffer.id = tcDelta.id
-              if (tcDelta.function?.name) buffer.name += tcDelta.function.name
-              if (tcDelta.function?.arguments) buffer.arguments += tcDelta.function.arguments
+              if (tcDelta.function?.name) {
+                const isFirstName = !buffer.name
+                buffer.name = tcDelta.function.name
+                // Notify UI only once when we first learn the tool name
+                if (isFirstName) {
+                  callbacks?.onToolCallStart?.({
+                    id: buffer.id,
+                    type: 'function',
+                    function: { name: buffer.name, arguments: '' },
+                  })
+                }
+              }
+              if (tcDelta.function?.arguments) {
+                buffer.arguments += tcDelta.function.arguments
+                callbacks?.onToolCallDelta?.(tcDelta.index, tcDelta.function.arguments)
+              }
             }
           }
 
@@ -217,9 +244,11 @@ export class AgentLoop {
         const assistantMsg = createAssistantMessage(
           content || null,
           toolCalls.length > 0 ? toolCalls : undefined,
-          msgUsage
+          msgUsage,
+          reasoning || null
         )
         allMessages.push(assistantMsg)
+        callbacks?.onMessagesUpdated?.(allMessages)
 
         // If no tool calls, we're done
         console.log(
@@ -252,6 +281,7 @@ export class AgentLoop {
             content: result,
           }
           allMessages.push(createToolMessage(toolResult))
+          callbacks?.onMessagesUpdated?.(allMessages)
         }
       }
 

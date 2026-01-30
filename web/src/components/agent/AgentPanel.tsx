@@ -10,6 +10,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import { MessageBubble } from './MessageBubble'
 import { StreamingBubble } from './StreamingBubble'
 import { ThinkingIndicator } from './ThinkingIndicator'
+import { ToolCallDisplay } from './ToolCallDisplay'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { createUserMessage } from '@/agent/message-types'
 import type { Message, ToolCall } from '@/agent/message-types'
@@ -32,13 +33,18 @@ export function AgentPanel() {
   const {
     status,
     streamingContent,
+    streamingReasoning,
+    streamingToolArgs,
     currentToolCall,
     directoryHandle,
     directoryName,
     setStatus,
     appendStreamingContent,
+    appendStreamingReasoning,
     resetStreamingContent,
     setCurrentToolCall,
+    appendStreamingToolArgs,
+    resetStreamingToolArgs,
     setDirectoryHandle,
     setError,
     reset: resetAgent,
@@ -163,6 +169,9 @@ export function AgentPanel() {
           resetStreamingContent()
           setStatus('streaming')
         },
+        onReasoningDelta: (delta) => {
+          appendStreamingReasoning(delta)
+        },
         onContentDelta: (delta) => {
           appendStreamingContent(delta)
         },
@@ -172,6 +181,10 @@ export function AgentPanel() {
         onToolCallStart: (tc: ToolCall) => {
           setStatus('tool_calling')
           setCurrentToolCall(tc)
+          resetStreamingToolArgs()
+        },
+        onToolCallDelta: (_index: number, argsDelta: string) => {
+          appendStreamingToolArgs(argsDelta)
         },
         onToolCallComplete: (tc: ToolCall, result: string) => {
           setToolResults((prev) => {
@@ -180,6 +193,10 @@ export function AgentPanel() {
             return next
           })
           setCurrentToolCall(null)
+        },
+        onMessagesUpdated: (msgs) => {
+          updateMessages(convId!, msgs)
+          setToolResults(buildToolResultsMap(msgs))
         },
         onComplete: (msgs) => {
           updateMessages(convId!, msgs)
@@ -321,14 +338,35 @@ export function AgentPanel() {
                 <MessageBubble key={msg.id} message={msg} toolResults={toolResults} />
               ))}
 
-            {/* Streaming assistant bubble */}
-            {status === 'streaming' && streamingContent && (
-              <StreamingBubble content={streamingContent} />
+            {/* Streaming reasoning bubble — shows model thinking process */}
+            {status === 'streaming' && streamingReasoning && !streamingContent && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-neutral-100 px-4 py-3 text-neutral-800">
+                  <div className="mb-1 text-xs font-medium text-neutral-400">思考中...</div>
+                  <div className="whitespace-pre-wrap text-sm text-neutral-500">
+                    {streamingReasoning}
+                  </div>
+                </div>
+              </div>
             )}
 
-            {/* Thinking / tool calling indicator */}
-            {(status === 'thinking' || status === 'tool_calling') && (
-              <ThinkingIndicator status={status} toolName={currentToolCall?.function.name} />
+            {/* Streaming assistant bubble */}
+            {status === 'streaming' && streamingContent && (
+              <StreamingBubble
+                content={streamingContent}
+                reasoning={streamingReasoning || undefined}
+              />
+            )}
+
+            {/* Thinking indicator */}
+            {status === 'thinking' && <ThinkingIndicator status={status} />}
+
+            {/* Tool calling — use ToolCallDisplay for consistent style */}
+            {status === 'tool_calling' && currentToolCall && (
+              <ToolCallDisplay
+                toolCall={currentToolCall}
+                streamingArgs={streamingToolArgs || undefined}
+              />
             )}
 
             <div ref={messagesEndRef} />

@@ -32,6 +32,8 @@ export interface Message {
   id: string
   role: MessageRole
   content: string | null
+  /** Chain-of-thought reasoning content (GLM-4.7+), not sent back to API */
+  reasoning?: string | null
   toolCalls?: ToolCall[]
   toolCallId?: string // For tool role messages
   name?: string // Tool name for tool role messages
@@ -67,12 +69,14 @@ export function createUserMessage(content: string): Message {
 export function createAssistantMessage(
   content: string | null,
   toolCalls?: ToolCall[],
-  usage?: MessageUsage
+  usage?: MessageUsage,
+  reasoning?: string | null
 ): Message {
   return {
     id: generateId(),
     role: 'assistant',
     content,
+    reasoning: reasoning || null,
     toolCalls,
     usage,
     timestamp: Date.now(),
