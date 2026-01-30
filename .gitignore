@@ -65,3 +65,4 @@ playwright/.cache/
 
 # Other
 .turbo/
+.playwright-mcp/

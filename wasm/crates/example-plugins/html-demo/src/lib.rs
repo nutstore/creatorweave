@@ -152,7 +152,7 @@ pub fn finalize(outputs_json: String) -> String {
         .filter_map(|o| o.data["chars"].as_u64())
         .sum();
 
-    let avg_complexity = if outputs.len() > 0 {
+    let avg_complexity = if !outputs.is_empty() {
         outputs
             .iter()
             .filter_map(|o| o.data["complexity"].as_u64())

@@ -1,9 +1,11 @@
-import { Folder, Moon, Puzzle, X } from 'lucide-react'
+import { Folder, Moon, Puzzle, X, Bot } from 'lucide-react'
 import type { PluginInstance } from '@/types/plugin'
 
+export type AppView = 'home' | 'plugins' | 'agent'
+
 interface HeaderProps {
-  onViewChange?: (view: 'home' | 'plugins') => void
-  currentView?: 'home' | 'plugins'
+  onViewChange?: (view: AppView) => void
+  currentView?: AppView
   selectedPlugins?: PluginInstance[]
   onClearPlugin?: () => void
 }
@@ -50,6 +52,16 @@ export function Header({
                     {pluginCount}
                   </span>
                 )}
+              </button>
+              <button
+                type="button"
+                onClick={() => onViewChange('agent')}
+                className={`nav-item flex items-center gap-1.5 ${
+                  currentView === 'agent' ? 'nav-item-active' : 'nav-item-inactive'
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                AI 助手
               </button>
             </nav>
           )}

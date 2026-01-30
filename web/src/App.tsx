@@ -6,12 +6,14 @@ import { analyzeFiles } from '@/services/analyzer.service'
 import { getPluginLoader } from '@/services/plugin-loader.service'
 import { PluginExecutorService } from '@/services/plugin-executor.service'
 import { Header } from '@/components/Header'
+import type { AppView } from '@/components/Header'
 import { HeroSection } from '@/components/HeroSection'
 import { ProgressPanel } from '@/components/ProgressPanel'
 import { ResultsPanel } from '@/components/ResultsPanel'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { PluginManager } from '@/components/plugins'
+import { MainLayout } from '@/components/layout/MainLayout'
 import type {
   PluginInstance,
   Plugin,
@@ -19,8 +21,6 @@ import type {
   FileResult,
   PluginResultWithMetadata,
 } from '@/types/plugin'
-
-type AppView = 'home' | 'plugins'
 
 function App() {
   const {
@@ -265,6 +265,23 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <Header currentView={currentView} onViewChange={setCurrentView} />
         <UnsupportedBrowser />
+      </div>
+    )
+  }
+
+  // Show agent view with dual-pane layout
+  if (currentView === 'agent') {
+    return (
+      <div className="flex h-screen flex-col bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          selectedPlugins={selectedPlugins}
+          onClearPlugin={handleClearPlugin}
+        />
+        <div className="flex-1 overflow-hidden">
+          <MainLayout />
+        </div>
       </div>
     )
   }

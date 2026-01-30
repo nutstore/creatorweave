@@ -137,7 +137,7 @@ impl PluginValidator {
         // WASM magic: 00 61 73 6D 01 00 00 00
         //              \0  a  s  m  ...
         let magic = [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00];
-        &bytes[..8] == magic
+        bytes[..8] == magic
     }
 
     /// Check for required exports in WASM
