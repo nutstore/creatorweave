@@ -10,6 +10,7 @@ import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCallDisplay } from './ToolCallDisplay'
+import { CopyButton } from './CopyButton'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -67,7 +68,7 @@ export function MessageBubble({
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           </div>
 
-          {/* Timestamp */}
+          {/* Timestamp + Copy button */}
           <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-400">
             <span>
               {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
@@ -75,6 +76,7 @@ export function MessageBubble({
                 minute: '2-digit',
               })}
             </span>
+            <CopyButton content={message.content || ''} />
           </div>
         </div>
       </div>
@@ -136,7 +138,13 @@ export function MessageBubble({
               ↑{formatTokens(message.usage.promptTokens)} ↓
               {formatTokens(message.usage.completionTokens)}
             </span>
+            {message.content && <CopyButton content={message.content} />}
           </div>
+        )}
+
+        {/* Copy button for completed messages with content but no usage */}
+        {!isStreamingReasoning && !isStreamingContent && !message.usage && message.content && (
+          <CopyButton content={message.content} />
         )}
       </div>
     </div>

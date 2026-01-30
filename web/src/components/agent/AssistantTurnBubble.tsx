@@ -11,6 +11,7 @@ import type { Message, ToolCall } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
+import { CopyButton } from './CopyButton'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -55,6 +56,9 @@ export function AssistantTurnBubble({
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
 
+  // Find the last message with content for copy button
+  const lastMessageWithContent = [...turn.messages].reverse().find((msg) => msg.content)
+
   return (
     <div className="flex gap-3">
       {/* Single avatar for the entire turn */}
@@ -93,7 +97,7 @@ export function AssistantTurnBubble({
           />
         )}
 
-        {/* Summary footer: timestamp + aggregated token usage (only show when not processing) */}
+        {/* Summary footer: timestamp + aggregated token usage + copy button (only show when not processing) */}
         {!isProcessing && (
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span>
@@ -109,6 +113,9 @@ export function AssistantTurnBubble({
                 ↑{formatTokens(turn.totalUsage.promptTokens)} ↓
                 {formatTokens(turn.totalUsage.completionTokens)}
               </span>
+            )}
+            {lastMessageWithContent?.content && (
+              <CopyButton content={lastMessageWithContent.content} />
             )}
           </div>
         )}

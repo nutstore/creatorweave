@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebContainer Claude Code 测试</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "@webcontainer/api": "https://cdn.jsdelivr.net/npm/@webcontainer/api@1.5.1/dist/index.js"
+        }
+    }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #4cc9f0;
+        }
+        .status {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #16213e;
+            border-left: 4px solid #4cc9f0;
+        }
+        .status.error {
+            border-left-color: #f72585;
+            background: #2d1b2e;
+        }
+        .status.success {
+            border-left-color: #4ade80;
+            background: #1b2e1d;
+        }
+        .status.info {
+            border-left-color: #60a5fa;
+            background: #1b2d3e;
+        }
+        #console-output {
+            background: #0f0f1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+            min-height: 200px;
+            max-height: 500px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-line {
+            margin: 4px 0;
+        }
+        .log-line.info { color: #60a5fa; }
+        .log-line.success { color: #4ade80; }
+        .log-line.error { color: #f72585; }
+        .log-line.command { color: #fbbf24; }
+        .log-line.output { color: #94a3b8; }
+        button {
+            background: #4cc9f0;
+            color: #1a1a2e;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background: #3ab0d6;
+        }
+        button:disabled {
+            background: #444;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+        .progress {
+            display: none;
+            margin-top: 15px;
+        }
+        .progress.active {
+            display: block;
+        }
+        .progress-bar {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4cc9f0;
+            width: 0%;
+            transition: width 0.3s;
+            animation: progress 2s ease-in-out infinite;
+        }
+        @keyframes progress {
+            0% { width: 0%; }
+            50% { width: 70%; }
+            100% { width: 100%; }
+        }
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .step-number {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .step.active .step-number {
+            background: #4cc9f0;
+            color: #1a1a2e;
+        }
+        .step.completed .step-number {
+            background: #4ade80;
+            color: #1a1a2e;
+        }
+        .step.failed .step-number {
+            background: #f72585;
+        }
+        .step-text {
+            flex: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 WebContainer + Claude Code 测试</h1>
+
+        <div class="status info" id="main-status">
+            准备就绪。点击"开始测试"按钮开始验证。
+        </div>
+
+        <div class="progress" id="progress">
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div id="steps">
+            <div class="step" id="step-1">
+                <div class="step-number">1</div>
+                <div class="step-text">加载 WebContainer...</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-number">2</div>
+                <div class="step-text">启动 WebContainer 实例...</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-number">3</div>
+                <div class="step-text">安装 claude-code...</div>
+            </div>
+            <div class="step" id="step-4">
+                <div class="step-number">4</div>
+                <div class="step-text">测试运行 claude-code...</div>
+            </div>
+            <div class="step" id="step-5">
+                <div class="step-number">5</div>
+                <div class="step-text">验证结果</div>
+            </div>
+        </div>
+
+        <div style="margin: 20px 0;">
+            <button id="start-btn">开始测试</button>
+            <button id="clear-btn">清空日志</button>
+        </div>
+
+        <div id="console-output"></div>
+    </div>
+
+    <script type="module">
+        import { WebContainer } from '@webcontainer/api';
+
+        let webcontainer = null;
+        const consoleOutput = document.getElementById('console-output');
+        const mainStatus = document.getElementById('main-status');
+        const progress = document.getElementById('progress');
+        const startBtn = document.getElementById('start-btn');
+
+        function log(message, type = 'info') {
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            const time = new Date().toLocaleTimeString();
+            line.textContent = `[${time}] ${message}`;
+            consoleOutput.appendChild(line);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        }
+
+        function updateStatus(message, type = 'info') {
+            mainStatus.textContent = message;
+            mainStatus.className = `status ${type}`;
+        }
+
+        function setStep(stepNumber, status) {
+            const step = document.getElementById(`step-${stepNumber}`);
+            step.className = `step ${status}`;
+        }
+
+        function showProgress(show) {
+            progress.classList.toggle('active', show);
+        }
+
+        async function startTest() {
+            startBtn.disabled = true;
+            showProgress(true);
+            clearConsole();
+
+            try {
+                // Step 1: Load WebContainer
+                log('Step 1: 检查 WebContainer 是否可用...', 'info');
+                setStep(1, 'active');
+
+                if (typeof WebContainer === 'undefined') {
+                    throw new Error('WebContainer 未加载');
+                }
+                log('✓ WebContainer 已加载', 'success');
+                log(`  版本: ${WebContainer.version || 'unknown'}`, 'output');
+                setStep(1, 'completed');
+
+                // Step 2: Boot WebContainer
+                log('\nStep 2: 启动 WebContainer...', 'info');
+                setStep(2, 'active');
+
+                webcontainer = await WebContainer.boot();
+                log('✓ WebContainer 启动成功', 'success');
+                log(`  工作目录: ${webcontainer.workdir}`, 'output');
+                setStep(2, 'completed');
+
+                // Step 3: Install claude-code
+                log('\nStep 3: 安装 claude-code...', 'info');
+                setStep(3, 'active');
+
+                log('执行: npm install --yes @anthropic-ai/claude-code', 'command');
+                const installProcess = await webcontainer.spawn('npm', ['install', '--yes', '@anthropic-ai/claude-code']);
+
+                let installOutput = '';
+                installProcess.output.pipeTo(new WritableStream({
+                    write(data) {
+                        installOutput += data;
+                        log(data, 'output');
+                    }
+                }));
+
+                const exitCode = await installProcess.exit;
+                log(`npm install 退出码: ${exitCode}`, exitCode === 0 ? 'success' : 'error');
+
+                if (exitCode !== 0) {
+                    setStep(3, 'failed');
+                    throw new Error(`npm install 失败，退出码: ${exitCode}`);
+                }
+                setStep(3, 'completed');
+
+                // Step 4: Test running claude-code
+                log('\nStep 4: 测试运行 claude-code...', 'info');
+                setStep(4, 'active');
+
+                // Try npx
+                log('尝试: npx claude-code --version', 'command');
+                const npxProcess = await webcontainer.spawn('npx', ['claude-code', '--version']);
+
+                let npxOutput = '';
+                npxProcess.output.pipeTo(new WritableStream({
+                    write(data) {
+                        npxOutput += data;
+                        log(data, 'output');
+                    }
+                }));
+
+                const npxExit = await npxProcess.exit;
+                log(`npx claude-code --version 退出码: ${npxExit}`, npxExit === 0 ? 'success' : 'error');
+
+                if (npxExit === 0) {
+                    log('✓ npx claude-code 运行成功！', 'success');
+                    setStep(4, 'completed');
+                } else {
+                    // Try direct path
+                    log('\n尝试: ./node_modules/.bin/claude-code --version', 'command');
+                    const directProcess = await webcontainer.spawn('./node_modules/.bin/claude-code', ['--version']);
+
+                    let directOutput = '';
+                    directProcess.output.pipeTo(new WritableStream({
+                        write(data) {
+                            directOutput += data;
+                            log(data, 'output');
+                        }
+                    }));
+
+                    const directExit = await directProcess.exit;
+                    log(`./node_modules/.bin/claude-code --version 退出码: ${directExit}`, directExit === 0 ? 'success' : 'error');
+
+                    if (directExit === 0) {
+                        log('✓ 直接路径运行成功！', 'success');
+                        setStep(4, 'completed');
+                    } else {
+                        setStep(4, 'failed');
+                    }
+                }
+
+                // Step 5: Final result
+                log('\n=== 测试完成 ===', 'info');
+                setStep(5, 'completed');
+                showProgress(false);
+
+                updateStatus('测试完成！请查看上方日志了解详细结果。', 'success');
+
+            } catch (error) {
+                log(`\n❌ 错误: ${error.message}`, 'error');
+                if (error.stack) {
+                    log(`堆栈: ${error.stack}`, 'error');
+                }
+                updateStatus(`测试失败: ${error.message}`, 'error');
+                showProgress(false);
+
+                // Mark current step as failed
+                for (let i = 1; i <= 5; i++) {
+                    const step = document.getElementById(`step-${i}`);
+                    if (step.classList.contains('active')) {
+                        setStep(i, 'failed');
+                        break;
+                    }
+                }
+            } finally {
+                startBtn.disabled = false;
+            }
+        }
+
+        function clearConsole() {
+            consoleOutput.innerHTML = '';
+        }
+
+        // 设置按钮事件监听器
+        document.getElementById('start-btn').addEventListener('click', startTest);
+        document.getElementById('clear-btn').addEventListener('click', clearConsole);
+
+        // 暴露到 window 以便调试
+        window.webcontainer = webcontainer;
+        window.startTest = startTest;
+        window.clearConsole = clearConsole;
+
+        log('WebContainer 测试工具已加载', 'info');
+        log('点击"开始测试"按钮开始验证', 'info');
+    </script>
+</body>
+</html>
