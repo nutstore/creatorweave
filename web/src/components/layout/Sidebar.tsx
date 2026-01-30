@@ -3,6 +3,8 @@
  *
  * Top: Conversation list (always visible)
  * Bottom: Resource tabs (Files/Plugins/Changes) - visible when a folder is selected
+ *
+ * File preview is handled by WorkspaceLayout (push-squeeze panel in main area).
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
@@ -10,13 +12,19 @@ import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, History } 
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
-import { FilePreview } from '@/components/file-viewer/FilePreview'
 import { UndoPanel } from '@/components/file-viewer/UndoPanel'
 import { getUndoManager } from '@/undo/undo-manager'
 
 type ResourceTab = 'files' | 'plugins' | 'changes'
 
-export function Sidebar() {
+interface SidebarProps {
+  /** Called when user clicks a file in the tree */
+  onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
+  /** Currently selected file path (for highlight in tree) */
+  selectedFilePath?: string | null
+}
+
+export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
   const {
     conversations,
     activeConversationId,
@@ -44,26 +52,16 @@ export function Sidebar() {
   const [width, setWidth] = useState(260)
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
 
-  // File preview state
-  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
-  const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
-  const [showFilePreview, setShowFilePreview] = useState(false)
-
   // Drag sidebar width
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
-  const handleFileSelect = useCallback((path: string, handle: FileSystemFileHandle) => {
-    setSelectedFilePath(path)
-    setSelectedFileHandle(handle)
-    setShowFilePreview(true)
-    setResourceTab('files')
-  }, [])
-
-  const handleClosePreview = useCallback(() => {
-    setSelectedFilePath(null)
-    setSelectedFileHandle(null)
-    setShowFilePreview(false)
-  }, [])
+  const handleFileSelect = useCallback(
+    (path: string, handle: FileSystemFileHandle) => {
+      onFileSelect?.(path, handle)
+      setResourceTab('files')
+    },
+    [onFileSelect]
+  )
 
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
@@ -214,34 +212,12 @@ export function Sidebar() {
             {/* Tab content */}
             <div className="flex-1 overflow-hidden">
               {resourceTab === 'files' && (
-                <div className="flex h-full flex-col overflow-hidden">
-                  {showFilePreview && selectedFilePath ? (
-                    <div className="flex h-full flex-col overflow-hidden">
-                      <div className="h-2/5 overflow-hidden border-b border-neutral-200">
-                        <FileTreePanel
-                          directoryHandle={directoryHandle}
-                          rootName={directoryName}
-                          onFileSelect={handleFileSelect}
-                          selectedPath={selectedFilePath}
-                        />
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <FilePreview
-                          filePath={selectedFilePath}
-                          fileHandle={selectedFileHandle}
-                          onClose={handleClosePreview}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <FileTreePanel
-                      directoryHandle={directoryHandle}
-                      rootName={directoryName}
-                      onFileSelect={handleFileSelect}
-                      selectedPath={selectedFilePath}
-                    />
-                  )}
-                </div>
+                <FileTreePanel
+                  directoryHandle={directoryHandle}
+                  rootName={directoryName}
+                  onFileSelect={handleFileSelect}
+                  selectedPath={selectedFilePath}
+                />
               )}
 
               {resourceTab === 'plugins' && (
