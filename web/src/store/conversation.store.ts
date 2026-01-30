@@ -99,7 +99,9 @@ export const useConversationStore = create<ConversationState>()((set, get) => ({
   loadFromDB: async () => {
     try {
       const conversations = await loadConversations()
-      set({ conversations, loaded: true })
+      // Auto-activate the most recently updated conversation
+      const activeId = conversations.length > 0 ? conversations[0].id : null
+      set({ conversations, activeConversationId: activeId, loaded: true })
     } catch (error) {
       console.error('[conversation.store] Failed to load conversations:', error)
       set({ loaded: true })
