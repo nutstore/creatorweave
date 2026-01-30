@@ -6,14 +6,18 @@
  */
 
 import { useState } from 'react'
-import { FolderOpen, Settings, Sparkles } from 'lucide-react'
+import { FolderOpen, Settings, Sparkles, Wrench } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemotePanel } from '@/components/remote/RemotePanel'
 
-export function TopBar() {
+interface TopBarProps {
+  onSkillsManagerOpen?: () => void
+}
+
+export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { directoryHandle, directoryName, setDirectoryHandle } = useAgentStore()
   const { hasApiKey } = useSettingsStore()
@@ -75,6 +79,16 @@ export function TopBar() {
 
           {/* Remote */}
           <RemotePanel />
+
+          {/* Skills */}
+          <button
+            type="button"
+            onClick={onSkillsManagerOpen}
+            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+            title="技能管理"
+          >
+            <Wrench className="h-4 w-4" />
+          </button>
 
           {/* Settings */}
           <button

@@ -3,7 +3,7 @@
  * Uses FileSystemDirectoryHandle to list directory contents on demand.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 
@@ -277,10 +277,22 @@ export function FileTreePanel({
     [onFileSelect]
   )
 
-  // Auto-load root when directory handle changes
-  if (directoryHandle && !loaded && !loading) {
-    loadRoot()
-  }
+  // Reset states when directoryHandle changes
+  useEffect(() => {
+    if (!directoryHandle) return
+    // Reset all states to trigger fresh load
+    setLoaded(false)
+    setLoading(false)
+    setExpandedPaths(new Set())
+    setRootNodes([])
+  }, [directoryHandle])
+
+  // Auto-load root when directoryHandle is available and not loaded
+  useEffect(() => {
+    if (directoryHandle && !loaded && !loading) {
+      loadRoot()
+    }
+  }, [directoryHandle, loaded, loading, loadRoot])
 
   if (!directoryHandle) {
     return (

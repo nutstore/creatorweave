@@ -19,15 +19,28 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useConversationStore } from '@/store/conversation.store'
+import { useAgentStore } from '@/store/agent.store'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { ConversationView } from '@/components/agent/ConversationView'
 import { WelcomeScreen } from '@/components/WelcomeScreen'
 import { FilePreview } from '@/components/file-viewer/FilePreview'
+import { SkillsManager } from '@/components/skills/SkillsManager'
+import { ProjectSkillsDialog } from '@/components/skills/ProjectSkillsDialog'
+import { scanProjectSkills } from '@/skills/skill-scanner'
+import { useSkillsStore } from '@/store/skills.store'
+import type { SkillMetadata } from '@/skills/skill-types'
 
 export function WorkspaceLayout() {
   const { activeConversationId, createNew, setActive } = useConversationStore()
+  const { directoryHandle } = useAgentStore()
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+
+  // Skills management state
+  const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
+  const [projectSkills, setProjectSkills] = useState<SkillMetadata[]>([])
+  const [showProjectSkillsDialog, setShowProjectSkillsDialog] = useState(false)
+  const skillsStore = useSkillsStore()
 
   // File preview state (push-squeeze panel)
   const [previewFilePath, setPreviewFilePath] = useState<string | null>(null)
@@ -60,6 +73,72 @@ export function WorkspaceLayout() {
     setPreviewFilePath(null)
     setPreviewFileHandle(null)
   }, [])
+
+  // Skills management handlers
+  const handleSkillsManagerOpen = useCallback(() => {
+    setSkillsManagerOpen(true)
+  }, [])
+
+  const handleProjectSkillsConfirm = useCallback(
+    async (selectedIds: string[]) => {
+      // Load selected skills into the skills store
+      for (const id of selectedIds) {
+        const skill = projectSkills.find((s) => s.id === id)
+        if (skill) {
+          await skillsStore.addSkill(skill as any)
+        }
+      }
+      setShowProjectSkillsDialog(false)
+      setProjectSkills([])
+    },
+    [projectSkills, skillsStore]
+  )
+
+  const handleProjectSkillsSkip = useCallback(() => {
+    setShowProjectSkillsDialog(false)
+    setProjectSkills([])
+  }, [])
+
+  // Initialize skills on mount
+  useEffect(() => {
+    if (!skillsStore.loaded) {
+      skillsStore.loadSkills()
+    }
+  }, [skillsStore])
+
+  // Scan project skills when directoryHandle changes
+  useEffect(() => {
+    if (!directoryHandle) return
+
+    const scanForSkills = async () => {
+      try {
+        console.log('[WorkspaceLayout] Scanning project skills...')
+        const result = await scanProjectSkills(directoryHandle)
+        console.log('[WorkspaceLayout] Scan result:', result.skills.length, 'skills found')
+
+        if (result.errors.length > 0) {
+          console.warn('[WorkspaceLayout] Scan errors:', result.errors)
+        }
+
+        if (result.skills.length > 0) {
+          console.log(
+            '[WorkspaceLayout] Found skills:',
+            result.skills.map((s) => s.name)
+          )
+          setProjectSkills(result.skills)
+          setShowProjectSkillsDialog(true)
+        } else {
+          console.log(
+            '[WorkspaceLayout] No project skills found (checked .claude/skills/ and .skills/)'
+          )
+        }
+      } catch (error) {
+        console.error('Failed to scan project skills:', error)
+      }
+    }
+
+    scanForSkills()
+  }, [directoryHandle])
 
   // ESC key to close preview
   useEffect(() => {
@@ -108,7 +187,7 @@ export function WorkspaceLayout() {
 
   return (
     <div className="flex h-screen flex-col bg-white">
-      <TopBar />
+      <TopBar onSkillsManagerOpen={handleSkillsManagerOpen} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar onFileSelect={handleFileSelect} selectedFilePath={previewFilePath} />
 
@@ -150,6 +229,17 @@ export function WorkspaceLayout() {
           )}
         </div>
       </div>
+
+      {/* Skills Manager Dialog */}
+      <SkillsManager open={skillsManagerOpen} onClose={() => setSkillsManagerOpen(false)} />
+
+      {/* Project Skills Discovery Dialog */}
+      <ProjectSkillsDialog
+        open={showProjectSkillsDialog}
+        skills={projectSkills}
+        onConfirm={handleProjectSkillsConfirm}
+        onSkip={handleProjectSkillsSkip}
+      />
     </div>
   )
 }

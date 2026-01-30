@@ -15,26 +15,49 @@ import { scanProjectSkills } from './skill-scanner'
 import { BUILTIN_SKILLS } from './builtin-skills'
 
 export class SkillManager {
-  private initialized = false
+  private _initialized = false
   private cachedSkills: Skill[] = []
+  private initPromise: Promise<void> | null = null
+
+  /** Check if the skill manager has been initialized */
+  get initialized(): boolean {
+    return this._initialized
+  }
 
   /**
    * Initialize the skill system.
    * Loads skills from IndexedDB and seeds builtins if needed.
+   * Safe to call multiple times - subsequent calls will await the same promise.
    */
   async initialize(): Promise<void> {
-    if (this.initialized) return
+    // If already initialized, return immediately
+    if (this._initialized) return
 
-    // Seed builtin skills if they don't exist yet
-    for (const builtin of BUILTIN_SKILLS) {
-      const existing = await storage.getSkillById(builtin.id)
-      if (!existing) {
-        await storage.saveSkill(builtin, '')
+    // If initialization is in progress, await the same promise
+    if (this.initPromise) return this.initPromise
+
+    // Start initialization
+    this.initPromise = this._doInitialize()
+    await this.initPromise
+    this.initPromise = null
+  }
+
+  private async _doInitialize(): Promise<void> {
+    try {
+      // Seed builtin skills if they don't exist yet
+      for (const builtin of BUILTIN_SKILLS) {
+        const existing = await storage.getSkillById(builtin.id)
+        if (!existing) {
+          await storage.saveSkill(builtin, '')
+        }
       }
-    }
 
-    await this.refreshCache()
-    this.initialized = true
+      await this.refreshCache()
+      this._initialized = true
+    } catch (error) {
+      console.error('[SkillManager] Initialization failed:', error)
+      throw error
+    }
   }
 
   /**
@@ -63,6 +86,7 @@ export class SkillManager {
 
   /**
    * Get the enhanced system prompt with matching skills injected.
+   * This is a synchronous method - ensure initialize() has been called first.
    */
   getEnhancedSystemPrompt(basePrompt: string, context: SkillMatchContext): string {
     const enabledSkills = this.cachedSkills.filter((s) => s.enabled)

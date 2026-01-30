@@ -6,6 +6,17 @@ import { create } from 'zustand'
 import type { Skill, SkillMetadata, SkillCategory } from '@/skills/skill-types'
 import * as storage from '@/skills/skill-storage'
 import { parseSkillMd, serializeSkillMd } from '@/skills/skill-parser'
+import { getSkillManager } from '@/skills/skill-manager'
+
+/** Refresh SkillManager cache to keep it in sync with store */
+async function refreshSkillManagerCache() {
+  try {
+    const manager = getSkillManager()
+    await manager.refreshCache()
+  } catch (error) {
+    console.error('[SkillsStore] Failed to refresh SkillManager cache:', error)
+  }
+}
 
 interface SkillsState {
   /** All skill metadata (lightweight) */
@@ -37,6 +48,10 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     try {
       const metadata = await storage.getAllSkillMetadata()
       set({ skills: metadata, loaded: true, loading: false })
+      // Initialize and sync SkillManager
+      const manager = getSkillManager()
+      await manager.initialize()
+      await refreshSkillManagerCache()
     } catch {
       set({ loading: false })
     }
@@ -48,6 +63,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     // Refresh metadata list
     const metadata = await storage.getAllSkillMetadata()
     set({ skills: metadata })
+    await refreshSkillManagerCache()
   },
 
   importSkillMd: async (content) => {
@@ -66,6 +82,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     await storage.saveSkill(result.skill, content)
     const metadata = await storage.getAllSkillMetadata()
     set({ skills: metadata })
+    await refreshSkillManagerCache()
     return { success: true }
   },
 
@@ -74,6 +91,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     set((state) => ({
       skills: state.skills.filter((s) => s.id !== id),
     }))
+    await refreshSkillManagerCache()
   },
 
   toggleSkill: async (id, enabled) => {
@@ -81,6 +99,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     set((state) => ({
       skills: state.skills.map((s) => (s.id === id ? { ...s, enabled } : s)),
     }))
+    await refreshSkillManagerCache()
   },
 
   getFullSkill: async (id) => {
