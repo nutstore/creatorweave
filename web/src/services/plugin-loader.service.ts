@@ -155,6 +155,10 @@ export class PluginLoaderService {
       const metadata = await loadPromise
       this.plugins.set(metadata.id, instance)
       this.workers.set(metadata.id, worker)
+
+      // Auto-register as Agent tool
+      this.registerAsAgentTool(metadata)
+
       return instance
     } catch (error) {
       console.error('[PluginLoader] Load failed:', error)
@@ -318,6 +322,9 @@ export class PluginLoaderService {
       instance.worker.terminate()
       this.workers.delete(pluginId)
     }
+
+    // Auto-unregister from Agent tool registry
+    this.unregisterAgentTool(pluginId)
 
     this.plugins.delete(pluginId)
   }
@@ -504,6 +511,37 @@ export class PluginLoaderService {
     }
 
     await Promise.allSettled(promises)
+  }
+
+  //===========================================================================
+  // Agent Tool Registry Integration
+  //===========================================================================
+
+  /** Register a loaded plugin as an Agent tool */
+  private registerAsAgentTool(metadata: PluginMetadata): void {
+    try {
+      // Dynamic import to avoid circular dependency
+      import('@/agent/tool-registry').then(({ getToolRegistry }) => {
+        const registry = getToolRegistry()
+        registry.registerPlugin(metadata)
+        console.log(`[PluginLoader] Registered plugin as Agent tool: wasm_plugin_${metadata.id}`)
+      })
+    } catch {
+      // Tool registry may not be initialized yet
+    }
+  }
+
+  /** Unregister a plugin from the Agent tool registry */
+  private unregisterAgentTool(pluginId: string): void {
+    try {
+      import('@/agent/tool-registry').then(({ getToolRegistry }) => {
+        const registry = getToolRegistry()
+        registry.unregisterPlugin(pluginId)
+        console.log(`[PluginLoader] Unregistered Agent tool: wasm_plugin_${pluginId}`)
+      })
+    } catch {
+      // Tool registry may not be available
+    }
   }
 }
 

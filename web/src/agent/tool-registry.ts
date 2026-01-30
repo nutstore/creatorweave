@@ -3,6 +3,7 @@
  */
 
 import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext } from './tools/tool-types'
+import type { PluginMetadata } from '@/types/plugin'
 
 // Import built-in tools
 import { fileReadDefinition, fileReadExecutor } from './tools/file-read.tool'
@@ -11,6 +12,7 @@ import { fileEditDefinition, fileEditExecutor } from './tools/file-edit.tool'
 import { globDefinition, globExecutor } from './tools/glob.tool'
 import { grepDefinition, grepExecutor } from './tools/grep.tool'
 import { listFilesDefinition, listFilesExecutor } from './tools/list-files.tool'
+import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 
 export class ToolRegistry {
   private tools = new Map<string, ToolEntry>()
@@ -72,6 +74,34 @@ export class ToolRegistry {
     this.register(globDefinition, globExecutor)
     this.register(grepDefinition, grepExecutor)
     this.register(listFilesDefinition, listFilesExecutor)
+  }
+
+  /** Register a WASM plugin as an Agent tool */
+  registerPlugin(metadata: PluginMetadata): void {
+    const definition = pluginToToolDefinition(metadata)
+    const executor = createPluginBridgeExecutor(metadata.id)
+    this.register(definition, executor)
+  }
+
+  /** Unregister a WASM plugin tool */
+  unregisterPlugin(pluginId: string): boolean {
+    return this.unregister(`wasm_plugin_${pluginId}`)
+  }
+
+  /** Register all currently loaded plugins */
+  async registerLoadedPlugins(): Promise<void> {
+    try {
+      const { getPluginLoader } = await import('@/services/plugin-loader.service')
+      const loader = getPluginLoader()
+      const plugins = loader.getAllPlugins()
+      for (const [, instance] of plugins) {
+        if (instance.state === 'Loaded' || instance.state === 'Active') {
+          this.registerPlugin(instance.metadata)
+        }
+      }
+    } catch {
+      // Plugin loader may not be available
+    }
   }
 }
 
