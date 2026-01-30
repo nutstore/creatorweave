@@ -68,12 +68,18 @@ export type WorkerMessage =
   | { type: 'STREAM_CHUNK'; payload: { chunk: StreamChunk; index: number } }
   | { type: 'STREAM_END' }
   | { type: 'STREAM_ERROR'; payload: { error: string } }
+  // Tool ABI messages
+  | { type: 'GET_TOOL_SCHEMA' }
+  | { type: 'EXECUTE_TOOL'; payload: { input: string } }
 
 interface WasmExports {
   get_plugin_info: () => string
   process_file: (input: string) => string
   finalize?: (outputs: string) => string
   cleanup?: () => void
+  // Tool ABI (optional)
+  get_tool_schema?: () => string
+  execute_tool?: (input: string) => string
 }
 
 // Worker state
@@ -122,6 +128,14 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'STREAM_ERROR':
         handleStreamError(message.payload)
+        break
+
+      case 'GET_TOOL_SCHEMA':
+        handleGetToolSchema()
+        break
+
+      case 'EXECUTE_TOOL':
+        handleExecuteTool(message.payload)
         break
 
       default:
@@ -341,6 +355,59 @@ function handleCleanup() {
     type: 'CLEANUP',
     payload: { success: true },
   })
+}
+
+//=============================================================================
+// Tool ABI Support
+//=============================================================================
+
+function handleGetToolSchema() {
+  try {
+    if (!wasmExports) {
+      throw new Error('Plugin not loaded')
+    }
+
+    if (typeof wasmExports.get_tool_schema !== 'function') {
+      sendResponse({
+        type: 'RESULT',
+        payload: { toolSchema: null, isToolCapable: false },
+      })
+      return
+    }
+
+    const schemaJson = wasmExports.get_tool_schema()
+    const schema = JSON.parse(schemaJson)
+
+    sendResponse({
+      type: 'RESULT',
+      payload: { toolSchema: schema, isToolCapable: true },
+    })
+  } catch (error) {
+    sendError(`Failed to get tool schema: ${error}`)
+  }
+}
+
+function handleExecuteTool(payload: { input: string }) {
+  try {
+    if (!wasmExports) {
+      throw new Error('Plugin not loaded')
+    }
+
+    if (typeof wasmExports.execute_tool !== 'function') {
+      sendError('Plugin does not support tool execution (missing execute_tool export)')
+      return
+    }
+
+    const outputJson = wasmExports.execute_tool(payload.input)
+    const output = JSON.parse(outputJson)
+
+    sendResponse({
+      type: 'RESULT',
+      payload: { toolOutput: output },
+    })
+  } catch (error) {
+    sendError(`Tool execution failed: ${error}`)
+  }
 }
 
 //=============================================================================

@@ -6,6 +6,7 @@ members = [
     "crates/example-plugins/md5-calculator",   # Phase 2 Week 6: 示例插件
     "crates/example-plugins/line-counter",     # Phase 2 Week 6: 示例插件
     "crates/example-plugins/html-demo",        # HTML 渲染示例插件
+    "crates/plugin-sdk",                        # Phase 4: Plugin SDK 模板
 ]
 resolver = "2"
 

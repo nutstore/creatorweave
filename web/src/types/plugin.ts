@@ -105,6 +105,8 @@ export type PluginWorkerMessageType =
   | 'STREAM_INIT'
   | 'STREAM_CHUNK'
   | 'STREAM_FINALIZE'
+  | 'GET_TOOL_SCHEMA'
+  | 'EXECUTE_TOOL'
 
 /**
  * Worker response types
@@ -278,4 +280,54 @@ export interface PluginResultWithMetadata extends PluginResult {
   pluginId?: string
   pluginName?: string
   pluginVersion?: string
+}
+
+//=============================================================================
+// Tool ABI Types (Phase 4)
+//=============================================================================
+
+/**
+ * Tool schema property (JSON Schema subset)
+ */
+export interface WasmToolSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+  description?: string
+  enum?: string[]
+  items?: WasmToolSchemaProperty
+  default?: unknown
+}
+
+/**
+ * Tool parameter schema
+ */
+export interface WasmToolParameterSchema {
+  type: 'object'
+  properties: Record<string, WasmToolSchemaProperty>
+  required?: string[]
+}
+
+/**
+ * Tool schema returned by get_tool_schema()
+ */
+export interface WasmToolSchema {
+  name: string
+  description: string
+  parameters: WasmToolParameterSchema
+}
+
+/**
+ * Tool input passed to execute_tool()
+ */
+export interface WasmToolInput {
+  args: Record<string, unknown>
+  working_dir?: string
+}
+
+/**
+ * Tool output returned by execute_tool()
+ */
+export interface WasmToolOutput {
+  success: boolean
+  result: string
+  error?: string
 }

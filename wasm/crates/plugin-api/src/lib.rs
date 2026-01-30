@@ -127,6 +127,12 @@ pub mod security;
 // ABI constants
 pub mod abi;
 
+// Tool ABI (Agent tool interface)
+pub mod tool_abi;
+
+// Tool types (schema, input, output)
+pub mod tool_types;
+
 // Prelude module for convenient imports
 pub mod prelude {
     // Re-export all types
@@ -134,6 +140,12 @@ pub mod prelude {
         FileInput, FileOutput, PluginCapabilities, PluginInfo, PluginResult, ProcessingStatus,
         ResourceLimits, ValidationResult, BFOSA_API_VERSION, DEFAULT_MAX_EXECUTION_TIME,
         DEFAULT_MAX_MEMORY,
+    };
+
+    // Re-export tool types
+    pub use crate::tool_types::{
+        ToolInput, ToolOutput, ToolParameterSchema, ToolSchema, ToolSchemaBuilder,
+        ToolSchemaProperty,
     };
 }
 
@@ -144,6 +156,9 @@ pub use types::{
 };
 
 pub use validator::{PluginValidator, RuntimeValidator};
+
+// Tool types re-exports
+pub use tool_types::{ToolInput, ToolOutput, ToolSchema, ToolSchemaBuilder};
 
 // Current API version
 pub use types::{BFOSA_API_VERSION, DEFAULT_MAX_EXECUTION_TIME, DEFAULT_MAX_MEMORY};

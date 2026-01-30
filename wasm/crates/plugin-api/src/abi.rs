@@ -88,6 +88,14 @@ pub const BFOSA_FINALIZE: &str = "bfosa_finalize";
 pub const BFOSA_CLEANUP: &str = "bfosa_cleanup";
 
 //=============================================================================
+// Optional Tool Exports (Agent Tool ABI)
+//=============================================================================
+
+/// Optional exports for Agent tool functionality.
+/// See `tool_abi` module for full documentation.
+pub const OPTIONAL_TOOL_EXPORTS: &[&str] = &["get_tool_schema", "execute_tool"];
+
+//=============================================================================
 // Optional Streaming Exports
 //=============================================================================
 
