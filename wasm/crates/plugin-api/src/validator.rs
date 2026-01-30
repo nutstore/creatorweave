@@ -271,7 +271,7 @@ mod tests {
     fn test_validate_empty_bytes() {
         let result = PluginValidator::validate(&[]);
         assert!(!result.is_valid);
-        assert!(result.errors.len() >= 1);
+        assert!(!result.errors.is_empty());
     }
 
     #[test]

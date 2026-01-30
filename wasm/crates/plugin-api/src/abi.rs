@@ -275,6 +275,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::const_is_empty)]
     fn test_required_exports_defined() {
         assert!(!REQUIRED_EXPORTS.is_empty());
         assert_eq!(REQUIRED_EXPORTS.len(), 4);

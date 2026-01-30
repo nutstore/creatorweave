@@ -166,8 +166,6 @@ mod tests {
     #[test]
     fn test_reexports() {
         // Verify that common types are accessible at crate root
-        use serde_json::json;
-
         let _info = PluginInfo {
             id: "test".to_string(),
             name: "Test".to_string(),

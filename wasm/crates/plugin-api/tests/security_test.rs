@@ -201,7 +201,7 @@ fn test_memory_exceeds_limit() {
 
 #[test]
 fn test_memory_bytes_calculation() {
-    let mut tracker = MemoryUsage::new(10, 100);
+    let tracker = MemoryUsage::new(10, 100);
     assert_eq!(tracker.current_bytes(), 10 * 65536);
     assert_eq!(tracker.peak_bytes(), 10 * 65536);
     assert_eq!(tracker.limit_bytes(), 100 * 65536);
@@ -241,14 +241,14 @@ fn test_timeout_remaining() {
     // The actual elapsed time depends on the clock implementation
     // This test verifies the method exists and returns a valid type
     let remaining = enforcer.remaining();
-    assert!(remaining >= 0);
+    assert!(remaining <= 1000);
 }
 
 #[test]
 fn test_timeout_elapsed() {
     let enforcer = TimeoutEnforcer::new(1000);
     let elapsed = enforcer.elapsed();
-    assert!(elapsed >= 0);
+    let _ = elapsed; // verify method exists and returns u64
 }
 
 //=============================================================================

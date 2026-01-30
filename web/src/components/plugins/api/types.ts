@@ -60,7 +60,7 @@ export interface AnalysisResult {
   averageSize: number
   folderCount: number
   duration: number
-  files: FileInfo[]
+  files?: FileInfo[]
   pluginResults?: PluginResultEntry[]
 }
 
@@ -73,9 +73,9 @@ export interface FileInfo {
 }
 
 export interface PluginResultEntry {
-  pluginId: string
-  pluginName: string
-  summary: string
+  pluginId?: string
+  pluginName?: string
+  summary?: string
   metrics?: unknown
 }
 
