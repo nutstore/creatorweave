@@ -42,9 +42,7 @@ export function UndoPanel() {
   if (modifications.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <p className="text-center text-xs text-neutral-400">
-          暂无文件变更记录
-        </p>
+        <p className="text-center text-xs text-neutral-400">暂无文件变更记录</p>
       </div>
     )
   }
@@ -53,9 +51,7 @@ export function UndoPanel() {
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5">
-        <span className="text-xs font-medium text-neutral-600">
-          变更记录 ({activeCount})
-        </span>
+        <span className="text-xs font-medium text-neutral-600">变更记录 ({activeCount})</span>
         {modifications.length > 0 && (
           <button
             type="button"
@@ -88,9 +84,7 @@ export function UndoPanel() {
               <div className="mt-0.5 truncate text-[10px] text-neutral-400" title={mod.path}>
                 {mod.path}
               </div>
-              <div className="text-[10px] text-neutral-400">
-                {formatTime(mod.timestamp)}
-              </div>
+              <div className="text-[10px] text-neutral-400">{formatTime(mod.timestamp)}</div>
             </div>
 
             {/* Undo button */}
@@ -104,9 +98,7 @@ export function UndoPanel() {
                 <Undo2 className="h-3.5 w-3.5" />
               </button>
             )}
-            {mod.undone && (
-              <span className="shrink-0 text-[10px] text-neutral-400">已撤销</span>
-            )}
+            {mod.undone && <span className="shrink-0 text-[10px] text-neutral-400">已撤销</span>}
           </div>
         ))}
       </div>

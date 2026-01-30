@@ -31,8 +31,7 @@ export function MainLayout() {
 
   // File preview state
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
-  const [selectedFileHandle, setSelectedFileHandle] =
-    useState<FileSystemFileHandle | null>(null)
+  const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
 
   // Drag state
   const dragRef = useRef<{
@@ -40,14 +39,11 @@ export function MainLayout() {
     startWidth: number
   } | null>(null)
 
-  const handleFileSelect = useCallback(
-    (path: string, handle: FileSystemFileHandle) => {
-      setSelectedFilePath(path)
-      setSelectedFileHandle(handle)
-      setLeftTab('preview')
-    },
-    []
-  )
+  const handleFileSelect = useCallback((path: string, handle: FileSystemFileHandle) => {
+    setSelectedFilePath(path)
+    setSelectedFileHandle(handle)
+    setLeftTab('preview')
+  }, [])
 
   const handleClosePreview = useCallback(() => {
     setSelectedFilePath(null)

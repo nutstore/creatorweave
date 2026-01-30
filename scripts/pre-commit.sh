@@ -51,6 +51,11 @@ if [ -d "$PROJECT_ROOT/web/src" ]; then
         echo -e "${RED}❌ ESLint check failed${NC}"
         FAILED=1
     fi
+
+    # Add back any files modified by lint-staged (only tracked files)
+    echo ""
+    echo "📝 Adding back formatted files..."
+    git add -u .
 fi
 
 # Final result

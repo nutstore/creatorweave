@@ -4,14 +4,7 @@
  */
 
 import { useState, useCallback } from 'react'
-import {
-  ChevronRight,
-  ChevronDown,
-  File,
-  Folder,
-  FolderOpen,
-  RefreshCw,
-} from 'lucide-react'
+import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 
 /** File tree node */
@@ -36,12 +29,26 @@ interface FileTreePanelProps {
 function getFileIcon(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase()
   const iconMap: Record<string, string> = {
-    ts: '🟦', tsx: '⚛️', js: '🟨', jsx: '⚛️',
-    rs: '🦀', py: '🐍', go: '🔵',
-    json: '📋', md: '📝', css: '🎨', scss: '🎨',
-    html: '🌐', svg: '🖼️', png: '🖼️', jpg: '🖼️',
-    toml: '⚙️', yaml: '⚙️', yml: '⚙️',
-    lock: '🔒', wasm: '⚡',
+    ts: '🟦',
+    tsx: '⚛️',
+    js: '🟨',
+    jsx: '⚛️',
+    rs: '🦀',
+    py: '🐍',
+    go: '🔵',
+    json: '📋',
+    md: '📝',
+    css: '🎨',
+    scss: '🎨',
+    html: '🌐',
+    svg: '🖼️',
+    png: '🖼️',
+    jpg: '🖼️',
+    toml: '⚙️',
+    yaml: '⚙️',
+    yml: '⚙️',
+    lock: '🔒',
+    wasm: '⚡',
   }
   return iconMap[ext || ''] || ''
 }
@@ -243,10 +250,7 @@ export function FileTreePanel({
       // Load children if not yet loaded
       if (!node.loaded) {
         try {
-          const children = await loadChildren(
-            node.handle as FileSystemDirectoryHandle,
-            node.path
-          )
+          const children = await loadChildren(node.handle as FileSystemDirectoryHandle, node.path)
           node.children = children
           node.loaded = true
           // Force re-render by creating new array
@@ -282,7 +286,9 @@ export function FileTreePanel({
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-center text-xs text-neutral-400">
-          选择项目文件夹后<br />文件树将显示在这里
+          选择项目文件夹后
+          <br />
+          文件树将显示在这里
         </p>
       </div>
     )

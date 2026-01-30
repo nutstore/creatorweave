@@ -17,16 +17,38 @@ interface FilePreviewProps {
 function getLangFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   const langMap: Record<string, string> = {
-    ts: 'typescript', tsx: 'tsx', js: 'javascript', jsx: 'jsx',
-    rs: 'rust', py: 'python', go: 'go', rb: 'ruby',
-    java: 'java', kt: 'kotlin', swift: 'swift', c: 'c',
-    cpp: 'cpp', h: 'c', hpp: 'cpp',
-    css: 'css', scss: 'scss', less: 'less',
-    html: 'html', xml: 'xml', svg: 'xml',
-    json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml',
-    md: 'markdown', mdx: 'mdx',
-    sh: 'bash', bash: 'bash', zsh: 'bash',
-    sql: 'sql', graphql: 'graphql',
+    ts: 'typescript',
+    tsx: 'tsx',
+    js: 'javascript',
+    jsx: 'jsx',
+    rs: 'rust',
+    py: 'python',
+    go: 'go',
+    rb: 'ruby',
+    java: 'java',
+    kt: 'kotlin',
+    swift: 'swift',
+    c: 'c',
+    cpp: 'cpp',
+    h: 'c',
+    hpp: 'cpp',
+    css: 'css',
+    scss: 'scss',
+    less: 'less',
+    html: 'html',
+    xml: 'xml',
+    svg: 'xml',
+    json: 'json',
+    yaml: 'yaml',
+    yml: 'yaml',
+    toml: 'toml',
+    md: 'markdown',
+    mdx: 'mdx',
+    sh: 'bash',
+    bash: 'bash',
+    zsh: 'bash',
+    sql: 'sql',
+    graphql: 'graphql',
     dockerfile: 'dockerfile',
     vue: 'vue',
     php: 'php',
@@ -44,12 +66,40 @@ function getLangFromPath(path: string): string {
 function isBinaryExtension(path: string): boolean {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   const binaryExts = new Set([
-    'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg',
-    'wasm', 'zip', 'gz', 'tar', 'br', 'zst',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx',
-    'mp3', 'mp4', 'webm', 'ogg', 'wav', 'avi',
-    'woff', 'woff2', 'ttf', 'eot', 'otf',
-    'exe', 'dll', 'so', 'dylib',
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'ico',
+    'bmp',
+    'svg',
+    'wasm',
+    'zip',
+    'gz',
+    'tar',
+    'br',
+    'zst',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'mp3',
+    'mp4',
+    'webm',
+    'ogg',
+    'wav',
+    'avi',
+    'woff',
+    'woff2',
+    'ttf',
+    'eot',
+    'otf',
+    'exe',
+    'dll',
+    'so',
+    'dylib',
   ])
   return binaryExts.has(ext)
 }
@@ -168,9 +218,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           <span className="truncate text-xs font-medium text-neutral-700" title={filePath}>
             {fileName}
           </span>
-          <span className="shrink-0 text-[10px] text-neutral-400">
-            {formatBytes(fileSize)}
-          </span>
+          <span className="shrink-0 text-[10px] text-neutral-400">{formatBytes(fileSize)}</span>
         </div>
         <div className="flex items-center gap-1">
           {content && (
@@ -180,11 +228,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
               title="复制内容"
             >
-              {copied ? (
-                <Check className="h-3 w-3 text-green-500" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
+              {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
             </button>
           )}
           <button
@@ -200,13 +244,9 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
 
       {/* Content */}
       <div className="flex-1 overflow-auto" ref={contentRef}>
-        {loading && (
-          <div className="p-4 text-center text-xs text-neutral-400">加载中...</div>
-        )}
+        {loading && <div className="p-4 text-center text-xs text-neutral-400">加载中...</div>}
 
-        {error && (
-          <div className="p-4 text-center text-xs text-red-500">{error}</div>
-        )}
+        {error && <div className="p-4 text-center text-xs text-red-500">{error}</div>}
 
         {isBinary && !loading && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
