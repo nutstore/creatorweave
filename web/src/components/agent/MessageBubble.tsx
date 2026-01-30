@@ -7,6 +7,12 @@ import type { Message } from '@/agent/message-types'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 
+/** Format token count: 999 → "999", 1234 → "1.2K" */
+function formatTokens(n: number): string {
+  if (n < 1000) return String(n)
+  return (n / 1000).toFixed(n < 10000 ? 2 : 1) + 'K'
+}
+
 interface MessageBubbleProps {
   message: Message
   toolResults?: Map<string, string>
@@ -59,12 +65,24 @@ export function MessageBubble({ message, toolResults }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* Timestamp */}
-        <div className={`mt-1 text-xs text-neutral-400 ${isUser ? 'text-right' : ''}`}>
-          {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+        {/* Timestamp + Token usage */}
+        <div
+          className={`mt-1 flex items-center gap-2 text-xs text-neutral-400 ${isUser ? 'justify-end' : ''}`}
+        >
+          <span>
+            {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </span>
+          {!isUser && message.usage && (
+            <span
+              title={`输入 ${message.usage.promptTokens} + 输出 ${message.usage.completionTokens} = ${message.usage.totalTokens} tokens`}
+            >
+              ↑{formatTokens(message.usage.promptTokens)} ↓
+              {formatTokens(message.usage.completionTokens)}
+            </span>
+          )}
         </div>
       </div>
     </div>

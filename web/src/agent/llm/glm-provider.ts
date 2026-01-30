@@ -139,6 +139,11 @@ export class GLMProvider implements LLMProvider {
       stream,
     }
 
+    // Request token usage in streaming responses (returned in the final chunk)
+    if (stream) {
+      body.stream_options = { include_usage: true }
+    }
+
     if (request.tools && request.tools.length > 0) {
       body.tools = request.tools
       body.tool_choice = request.toolChoice || 'auto'

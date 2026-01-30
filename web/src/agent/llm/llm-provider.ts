@@ -52,6 +52,13 @@ export interface ChatCompletionResponse {
   }
 }
 
+/** Token usage stats returned by the API */
+export interface TokenUsage {
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+}
+
 /** Streaming chunk */
 export interface ChatCompletionChunk {
   id: string
@@ -69,6 +76,8 @@ export interface ChatCompletionChunk {
     }
     finish_reason: 'stop' | 'tool_calls' | 'length' | null
   }>
+  /** Token usage - present in the final chunk when stream_options.include_usage is true */
+  usage?: TokenUsage
 }
 
 /** LLM Provider interface */

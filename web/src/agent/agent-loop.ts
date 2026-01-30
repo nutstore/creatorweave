@@ -10,10 +10,10 @@
  * 6. Max 20 iterations
  */
 
-import type { LLMProvider } from './llm/llm-provider'
+import type { LLMProvider, TokenUsage } from './llm/llm-provider'
 import { messagesToChatMessages } from './llm/llm-provider'
 import type { ToolContext } from './tools/tool-types'
-import type { Message, ToolCall, ToolResult } from './message-types'
+import type { Message, ToolCall, ToolResult, MessageUsage } from './message-types'
 import { createAssistantMessage, createToolMessage } from './message-types'
 import { ContextManager } from './context-manager'
 import { ToolRegistry } from './tool-registry'
@@ -146,6 +146,7 @@ export class AgentLoop {
         const toolCallBuffers = new Map<number, { id: string; name: string; arguments: string }>()
 
         let finishReason: string | null = null
+        let usage: TokenUsage | undefined
 
         const stream = this.provider.chatStream(
           {
@@ -185,6 +186,11 @@ export class AgentLoop {
           if (choice.finish_reason) {
             finishReason = choice.finish_reason
           }
+
+          // Capture usage from the final chunk (when stream_options.include_usage is set)
+          if (chunk.usage) {
+            usage = chunk.usage
+          }
         }
 
         // Build tool calls from buffers
@@ -200,10 +206,18 @@ export class AgentLoop {
           callbacks?.onContentComplete?.(content)
         }
 
-        // Create assistant message
+        // Create assistant message with token usage
+        const msgUsage: MessageUsage | undefined = usage
+          ? {
+              promptTokens: usage.prompt_tokens,
+              completionTokens: usage.completion_tokens,
+              totalTokens: usage.total_tokens,
+            }
+          : undefined
         const assistantMsg = createAssistantMessage(
           content || null,
-          toolCalls.length > 0 ? toolCalls : undefined
+          toolCalls.length > 0 ? toolCalls : undefined,
+          msgUsage
         )
         allMessages.push(assistantMsg)
 

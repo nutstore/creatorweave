@@ -21,6 +21,13 @@ export interface ToolResult {
   isError?: boolean
 }
 
+/** Token usage stats for a message */
+export interface MessageUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
 export interface Message {
   id: string
   role: MessageRole
@@ -29,6 +36,8 @@ export interface Message {
   toolCallId?: string // For tool role messages
   name?: string // Tool name for tool role messages
   timestamp: number
+  /** Token usage for this assistant message (from API response) */
+  usage?: MessageUsage
 }
 
 export interface Conversation {
@@ -55,12 +64,17 @@ export function createUserMessage(content: string): Message {
 }
 
 /** Create an assistant message */
-export function createAssistantMessage(content: string | null, toolCalls?: ToolCall[]): Message {
+export function createAssistantMessage(
+  content: string | null,
+  toolCalls?: ToolCall[],
+  usage?: MessageUsage
+): Message {
   return {
     id: generateId(),
     role: 'assistant',
     content,
     toolCalls,
+    usage,
     timestamp: Date.now(),
   }
 }
