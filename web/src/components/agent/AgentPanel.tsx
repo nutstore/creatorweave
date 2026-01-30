@@ -8,6 +8,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { MessageBubble } from './MessageBubble'
+import { StreamingBubble } from './StreamingBubble'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { createUserMessage } from '@/agent/message-types'
@@ -320,13 +321,14 @@ export function AgentPanel() {
                 <MessageBubble key={msg.id} message={msg} toolResults={toolResults} />
               ))}
 
-            {/* Thinking/streaming indicator */}
-            {isProcessing && (
-              <ThinkingIndicator
-                status={status as 'thinking' | 'streaming' | 'tool_calling'}
-                streamingContent={streamingContent || undefined}
-                toolName={currentToolCall?.function.name}
-              />
+            {/* Streaming assistant bubble */}
+            {status === 'streaming' && streamingContent && (
+              <StreamingBubble content={streamingContent} />
+            )}
+
+            {/* Thinking / tool calling indicator */}
+            {(status === 'thinking' || status === 'tool_calling') && (
+              <ThinkingIndicator status={status} toolName={currentToolCall?.function.name} />
             )}
 
             <div ref={messagesEndRef} />

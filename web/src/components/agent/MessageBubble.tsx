@@ -5,6 +5,7 @@
 import { User, Bot } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ToolCallDisplay } from './ToolCallDisplay'
+import { MarkdownContent } from './MarkdownContent'
 
 interface MessageBubbleProps {
   message: Message
@@ -39,7 +40,13 @@ export function MessageBubble({ message, toolResults }: MessageBubbleProps) {
                 : 'bg-white text-neutral-800 shadow-sm ring-1 ring-neutral-200'
             }`}
           >
-            <div className="whitespace-pre-wrap break-words">{message.content}</div>
+            {isUser ? (
+              <div className="whitespace-pre-wrap break-words">{message.content}</div>
+            ) : (
+              <div className="prose-sm max-w-none break-words">
+                <MarkdownContent content={message.content} />
+              </div>
+            )}
           </div>
         )}
 

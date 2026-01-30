@@ -27,6 +27,9 @@
     "micromatch": "^4.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "shiki": "^3.21.0",
     "tailwind-merge": "^2.5.5",
     "zustand": "^4.5.5"

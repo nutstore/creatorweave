@@ -11,6 +11,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { MessageBubble } from './MessageBubble'
+import { StreamingBubble } from './StreamingBubble'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { createUserMessage } from '@/agent/message-types'
 import type { Message, ToolCall } from '@/agent/message-types'
@@ -233,13 +234,14 @@ export function ConversationView({
               <MessageBubble key={msg.id} message={msg} toolResults={toolResults} />
             ))}
 
-          {/* Thinking/streaming indicator */}
-          {isProcessing && (
-            <ThinkingIndicator
-              status={status as 'thinking' | 'streaming' | 'tool_calling'}
-              streamingContent={streamingContent || undefined}
-              toolName={currentToolCall?.function.name}
-            />
+          {/* Streaming assistant bubble — shows live markdown as tokens arrive */}
+          {status === 'streaming' && streamingContent && (
+            <StreamingBubble content={streamingContent} />
+          )}
+
+          {/* Thinking / tool calling indicator */}
+          {(status === 'thinking' || status === 'tool_calling') && (
+            <ThinkingIndicator status={status} toolName={currentToolCall?.function.name} />
           )}
 
           <div ref={messagesEndRef} />
