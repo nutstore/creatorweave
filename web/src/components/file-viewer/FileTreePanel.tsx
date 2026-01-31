@@ -186,12 +186,22 @@ export function FileTreePanel({
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
+  /** Hidden files to exclude from file tree */
+  const HIDDEN_PATTERNS = [/^\.DS_Store$/, /^\.AppleDouble$/, /^\.LSOverride$/, /^._/]
+
+  /** Check if a file/directory name should be hidden */
+  function isHidden(name: string): boolean {
+    return HIDDEN_PATTERNS.some((pattern) => pattern.test(name))
+  }
+
   /** Load children of a directory handle */
   const loadChildren = useCallback(
     async (dirHandle: FileSystemDirectoryHandle, parentPath: string): Promise<TreeNode[]> => {
       const children: TreeNode[] = []
       for await (const entry of dirHandle.entries()) {
         const [name, handle] = entry
+        // Skip hidden files like .DS_Store
+        if (isHidden(name)) continue
         const path = parentPath ? `${parentPath}/${name}` : name
 
         if (handle.kind === 'file') {
