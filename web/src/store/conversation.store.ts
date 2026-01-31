@@ -20,6 +20,7 @@ import { ContextManager } from '@/agent/context-manager'
 import { getToolRegistry } from '@/agent/tool-registry'
 import { loadApiKey } from '@/security/api-key-store'
 import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
+import { generateFollowUp } from '@/agent/follow-up-generator'
 
 const DB_NAME = 'bfosa-conversations'
 const DB_VERSION = 1
@@ -122,6 +123,9 @@ interface ConversationState {
   // AgentLoop management (not persisted)
   agentLoops: Map<string, AgentLoop>
 
+  // Follow-up suggestions (not persisted) - per conversation
+  suggestedFollowUps: Map<string, string>
+
   // Computed
   activeConversation: () => Conversation | null
 
@@ -164,6 +168,11 @@ interface ConversationState {
   resetStreamingToolArgs: (id: string) => void
   setConversationError: (id: string, error: string | null) => void
   resetConversationState: (id: string) => void
+
+  // Follow-up suggestion actions
+  setSuggestedFollowUp: (conversationId: string, suggestion: string) => void
+  clearSuggestedFollowUp: (conversationId: string) => void
+  getSuggestedFollowUp: (conversationId: string) => string
 }
 
 export const useConversationStore = create<ConversationState>()(
@@ -172,6 +181,7 @@ export const useConversationStore = create<ConversationState>()(
     activeConversationId: null,
     loaded: false,
     agentLoops: new Map(),
+    suggestedFollowUps: new Map(),
 
     activeConversation: () => {
       const { conversations, activeConversationId } = get()
@@ -219,6 +229,8 @@ export const useConversationStore = create<ConversationState>()(
           }))
           state.activeConversationId = activeId
           state.loaded = true
+          // Clear follow-up suggestions on reload (not persisted)
+          state.suggestedFollowUps.clear()
         })
       } catch (error) {
         console.error('[conversation.store] Failed to load conversations:', error)
@@ -306,6 +318,8 @@ export const useConversationStore = create<ConversationState>()(
         if (state.activeConversationId === id) {
           state.activeConversationId = null
         }
+        // Clear follow-up suggestion for deleted conversation
+        state.suggestedFollowUps.delete(id)
       })
       deleteConversationFromDB(id).catch(console.error)
     },
@@ -487,7 +501,7 @@ export const useConversationStore = create<ConversationState>()(
               if (c) c.messages = msgs
             })
           },
-          onComplete: (msgs: Message[]) => {
+          onComplete: async (msgs: Message[]) => {
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) {
@@ -500,6 +514,24 @@ export const useConversationStore = create<ConversationState>()(
             // Persist final state
             const finalConv = get().conversations.find((c) => c.id === conversationId)
             if (finalConv) persistConversation(finalConv).catch(console.error)
+
+            // Generate follow-up suggestion (async, non-blocking)
+            try {
+              const apiKey = await loadApiKey(providerType)
+              if (apiKey) {
+                const suggestion = await generateFollowUp(
+                  msgs,
+                  providerType as LLMProviderType,
+                  apiKey
+                )
+                if (suggestion) {
+                  get().setSuggestedFollowUp(conversationId, suggestion)
+                }
+              }
+            } catch (error) {
+              // Silently fail - follow-up is optional
+              console.error('[conversation.store] Failed to generate follow-up:', error)
+            }
           },
           onError: (err: Error) => {
             set((state) => {
@@ -670,6 +702,23 @@ export const useConversationStore = create<ConversationState>()(
           c.error = null
         }
       })
+    },
+
+    // Follow-up suggestion actions
+    setSuggestedFollowUp: (conversationId: string, suggestion: string) => {
+      set((state) => {
+        state.suggestedFollowUps.set(conversationId, suggestion)
+      })
+    },
+
+    clearSuggestedFollowUp: (conversationId: string) => {
+      set((state) => {
+        state.suggestedFollowUps.delete(conversationId)
+      })
+    },
+
+    getSuggestedFollowUp: (conversationId: string) => {
+      return get().suggestedFollowUps.get(conversationId) || ''
     },
   }))
 )

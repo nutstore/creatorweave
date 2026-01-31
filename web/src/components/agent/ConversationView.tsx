@@ -44,6 +44,8 @@ export function ConversationView({
   const runAgent = useConversationStore((s) => s.runAgent)
   const cancelAgent = useConversationStore((s) => s.cancelAgent)
   const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
+  const getSuggestedFollowUp = useConversationStore((s) => s.getSuggestedFollowUp)
+  const clearSuggestedFollowUp = useConversationStore((s) => s.clearSuggestedFollowUp)
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
 
@@ -77,6 +79,9 @@ export function ConversationView({
   const convId = activeConversationId
   const isRunning = convId ? isConversationRunning(convId) : false
 
+  // Get follow-up suggestion for current conversation
+  const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
+
   useEffect(() => {
     if (initialMessage && !initialMessageHandled.current && !isRunning && convId) {
       initialMessageHandled.current = true
@@ -87,7 +92,7 @@ export function ConversationView({
   }, [initialMessage])
 
   const sendMessage = async (text: string) => {
-    if (!text.trim()) return
+    if (!text) return
 
     if (!hasApiKey) {
       // TODO: Show error message
@@ -120,7 +125,15 @@ export function ConversationView({
   }
 
   const handleSend = () => {
-    sendMessage(input)
+    // Use follow-up suggestion if input is empty
+    const textToSend = input || suggestedFollowUp
+    if (textToSend) {
+      sendMessage(textToSend)
+      // Clear the follow-up suggestion after sending
+      if (!input && convId) {
+        clearSuggestedFollowUp(convId)
+      }
+    }
   }
 
   const handleCancel = () => {
@@ -247,7 +260,10 @@ export function ConversationView({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key'}
+            placeholder={
+              suggestedFollowUp ||
+              (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
+            }
             rows={1}
             className="max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-300"
             disabled={isProcessing || !hasApiKey}
@@ -265,7 +281,7 @@ export function ConversationView({
             <button
               type="button"
               onClick={handleSend}
-              disabled={!input.trim() || !hasApiKey}
+              disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
               className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
               title="发送"
             >
