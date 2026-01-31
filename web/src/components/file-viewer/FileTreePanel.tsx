@@ -228,20 +228,47 @@ export function FileTreePanel({
     []
   )
 
-  /** Load root directory */
-  const loadRoot = useCallback(async () => {
-    if (!directoryHandle) return
-    setLoading(true)
-    try {
-      const children = await loadChildren(directoryHandle, '')
-      setRootNodes(children)
-      setLoaded(true)
-    } catch (error) {
-      console.error('[FileTree] Failed to load root:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [directoryHandle, loadChildren])
+  /** Load root directory and optionally reload expanded paths */
+  const loadRoot = useCallback(
+    async (preserveExpanded: boolean = false) => {
+      if (!directoryHandle) return
+      setLoading(true)
+      try {
+        const children = await loadChildren(directoryHandle, '')
+        setRootNodes(children)
+        setLoaded(true)
+
+        // If preserving expanded state, recursively reload all expanded directories
+        if (preserveExpanded && expandedPaths.size > 0) {
+          const reloadExpanded = async (nodes: TreeNode[]): Promise<void> => {
+            for (const node of nodes) {
+              if (node.kind === 'directory' && expandedPaths.has(node.path)) {
+                try {
+                  const childNodes = await loadChildren(
+                    node.handle as FileSystemDirectoryHandle,
+                    node.path
+                  )
+                  node.children = childNodes
+                  node.loaded = true
+                  // Recursively reload nested expanded directories
+                  await reloadExpanded(childNodes)
+                } catch (error) {
+                  console.error(`[FileTree] Failed to reload ${node.path}:`, error)
+                }
+              }
+            }
+          }
+          await reloadExpanded(children)
+          setRootNodes((prev) => [...prev])
+        }
+      } catch (error) {
+        console.error('[FileTree] Failed to load root:', error)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [directoryHandle, loadChildren, expandedPaths]
+  )
 
   /** Toggle directory expand/collapse */
   const handleToggle = useCallback(
@@ -326,8 +353,7 @@ export function FileTreePanel({
         <button
           type="button"
           onClick={() => {
-            setLoaded(false)
-            loadRoot()
+            loadRoot(true)
           }}
           className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
           title="刷新"
