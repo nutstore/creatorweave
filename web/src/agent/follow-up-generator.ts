@@ -35,24 +35,48 @@ const FLASH_MODEL_CONFIGS: Record<LLMProviderType, { model: string; baseURL: str
 
 /**
  * Build messages for follow-up generation
- * Uses only recent messages to save tokens
+ * Uses only the last turn (user message + assistant response)
  */
 function buildFollowUpMessages(messages: Message[]): Array<{
   role: 'user' | 'assistant'
   content: string
 }> {
-  // Take last 3 messages for context
-  const recent = messages.slice(-3)
-
   const chatMessages: Array<{ role: 'user' | 'assistant'; content: string }> = []
 
-  for (const msg of recent) {
-    if (msg.role === 'user' || msg.role === 'assistant') {
-      chatMessages.push({
-        role: msg.role,
-        content: msg.content || '...',
-      })
+  // Find last user message
+  let lastUserMessage: Message | null = null
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      lastUserMessage = messages[i]
+      break
     }
+  }
+
+  // Find last assistant message (after the last user message)
+  let lastAssistantMessage: Message | null = null
+  if (lastUserMessage) {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant' && messages[i].id > lastUserMessage.id) {
+        lastAssistantMessage = messages[i]
+        break
+      }
+    }
+  }
+
+  // Add user message
+  if (lastUserMessage) {
+    chatMessages.push({
+      role: 'user',
+      content: lastUserMessage.content || '...',
+    })
+  }
+
+  // Add assistant response
+  if (lastAssistantMessage) {
+    chatMessages.push({
+      role: 'assistant',
+      content: lastAssistantMessage.content || '...',
+    })
   }
 
   // Add system prompt as last message
