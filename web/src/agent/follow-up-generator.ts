@@ -52,12 +52,18 @@ function buildFollowUpMessages(messages: Message[]): Array<{
     }
   }
 
-  // Find last assistant message (after the last user message)
+  // Find last assistant message (after the last user message) with actual content
   let lastAssistantMessage: Message | null = null
   if (lastUserMessage) {
     for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant' && messages[i].id > lastUserMessage.id) {
-        lastAssistantMessage = messages[i]
+      const msg = messages[i]
+      if (
+        msg.role === 'assistant' &&
+        msg.id > lastUserMessage.id &&
+        msg.content &&
+        msg.content.trim().length > 0
+      ) {
+        lastAssistantMessage = msg
         break
       }
     }
@@ -71,11 +77,11 @@ function buildFollowUpMessages(messages: Message[]): Array<{
     })
   }
 
-  // Add assistant response
+  // Add assistant response (only if it has content, validated above)
   if (lastAssistantMessage) {
     chatMessages.push({
       role: 'assistant',
-      content: lastAssistantMessage.content || '...',
+      content: lastAssistantMessage.content!,
     })
   }
 
