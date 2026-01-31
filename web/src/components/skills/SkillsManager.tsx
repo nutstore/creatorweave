@@ -7,7 +7,6 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Plus, Search, RefreshCw, FolderOpen, User, Building, ChevronDown } from 'lucide-react'
-import { Scrollbar } from 'react-scrollbars-custom'
 import { DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -156,7 +155,7 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
         </div>
 
         {/* Skills List */}
-        <Scrollbar className="-mx-6 flex-1">
+        <div className="custom-scrollbar -mx-6 flex-1 overflow-y-auto">
           <div className="space-y-4 px-6">
             {/* Project Skills */}
             {projectSkills.length > 0 && (
@@ -190,7 +189,7 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
               isReadOnly
             />
           </div>
-        </Scrollbar>
+        </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-neutral-100 pt-4">

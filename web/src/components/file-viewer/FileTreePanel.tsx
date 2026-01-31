@@ -5,7 +5,6 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
-import { Scrollbar } from 'react-scrollbars-custom'
 import { formatBytes } from '@/lib/utils'
 
 /** File tree node */
@@ -364,7 +363,7 @@ export function FileTreePanel({
       </div>
 
       {/* Tree */}
-      <Scrollbar className="flex-1">
+      <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="py-1">
           {loading && rootNodes.length === 0 ? (
             <div className="p-3 text-center text-xs text-neutral-400">加载中...</div>
@@ -379,7 +378,7 @@ export function FileTreePanel({
             />
           )}
         </div>
-      </Scrollbar>
+      </div>
     </div>
   )
 }

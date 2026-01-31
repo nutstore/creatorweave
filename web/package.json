@@ -29,7 +29,6 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
-    "react-scrollbars-custom": "^4.1.1",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
     "shiki": "^3.21.0",

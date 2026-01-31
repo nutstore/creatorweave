@@ -7,7 +7,6 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Send, StopCircle, MessageSquare, Bot } from 'lucide-react'
-import { Scrollbar } from 'react-scrollbars-custom'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -179,7 +178,7 @@ export function ConversationView({
   return (
     <div className="flex h-full flex-col bg-white">
       {/* Messages area */}
-      <Scrollbar className="flex-1">
+      <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="px-4 py-4">
           {activeConversation?.messages.length === 0 && !isProcessing && (
             <div className="flex h-full items-center justify-center">
@@ -253,7 +252,7 @@ export function ConversationView({
             <div ref={messagesEndRef} />
           </div>
         </div>
-      </Scrollbar>
+      </div>
 
       {/* Input area */}
       <div className="border-t border-neutral-200 bg-white px-4 py-3">

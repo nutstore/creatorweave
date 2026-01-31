@@ -3,7 +3,6 @@
  */
 
 import { Undo2, Trash2, FileEdit, FilePlus, FileX } from 'lucide-react'
-import { Scrollbar } from 'react-scrollbars-custom'
 import { useUndoStore } from '@/store/undo.store'
 import type { FileModification } from '@/undo/undo-types'
 
@@ -66,7 +65,7 @@ export function UndoPanel() {
       </div>
 
       {/* Modification list */}
-      <Scrollbar className="flex-1">
+      <div className="custom-scrollbar flex-1 overflow-y-auto">
         {modifications.map((mod) => (
           <div
             key={mod.id}
@@ -102,7 +101,7 @@ export function UndoPanel() {
             {mod.undone && <span className="shrink-0 text-[10px] text-neutral-400">已撤销</span>}
           </div>
         ))}
-      </Scrollbar>
+      </div>
     </div>
   )
 }

@@ -16,7 +16,6 @@ import {
   MessageSquare,
   Bot,
 } from 'lucide-react'
-import { Scrollbar } from 'react-scrollbars-custom'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -216,7 +215,7 @@ export function AgentPanel() {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Conversation list sidebar */}
-        <Scrollbar className="w-48 shrink-0 border-r border-neutral-200 bg-neutral-50">
+        <div className="custom-scrollbar w-48 shrink-0 overflow-y-auto border-r border-neutral-200 bg-neutral-50">
           <div className="p-2">
             <button
               type="button"
@@ -259,11 +258,11 @@ export function AgentPanel() {
               )
             })}
           </div>
-        </Scrollbar>
+        </div>
 
         {/* Messages area */}
         <div className="flex flex-1 flex-col overflow-hidden">
-          <Scrollbar className="flex-1">
+          <div className="custom-scrollbar flex-1 overflow-y-auto">
             <div className="space-y-4 p-4">
               {turns.length === 0 && (
                 <div className="flex h-full items-center justify-center">
@@ -337,7 +336,7 @@ export function AgentPanel() {
 
               <div ref={messagesEndRef} />
             </div>
-          </Scrollbar>
+          </div>
 
           {/* Input area */}
           <div className="border-t border-neutral-200 bg-white p-3">
