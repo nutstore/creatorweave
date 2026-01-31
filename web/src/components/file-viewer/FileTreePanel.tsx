@@ -327,7 +327,6 @@ export function FileTreePanel({
           type="button"
           onClick={() => {
             setLoaded(false)
-            setExpandedPaths(new Set())
             loadRoot()
           }}
           className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
