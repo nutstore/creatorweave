@@ -28,7 +28,7 @@ English | [简体中文](./README.md)
 
 - Rust (1.75+)
 - Node.js (18+)
-- npm or yarn
+- pnpm (recommended) or npm/yarn
 
 ### Installation
 
@@ -40,7 +40,7 @@ cd browser-fs-analyzer
 # Install dependencies
 make install
 # or
-cd web && npm install
+cd web && pnpm install
 ```
 
 ### Development
@@ -49,7 +49,7 @@ cd web && npm install
 # Start development server
 make dev
 # or
-cd web && npm run dev
+cd web && pnpm run dev
 
 # Visit http://localhost:3000
 ```

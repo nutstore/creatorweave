@@ -7,6 +7,7 @@ import type { ConnectionState } from '@/remote/ws-client'
 import type { SessionRole } from '@/remote/remote-session'
 import { RemoteSession } from '@/remote/remote-session'
 import type { RemoteMessage, StateSyncMessage } from '@/remote/remote-protocol'
+import type { EncryptionState } from '@browser-fs-analyzer/encryption'
 
 type RemoteMessageEntry = { role: string; content: string | null; messageId: string }
 
@@ -83,6 +84,10 @@ interface RemoteState {
   // Track if remote has ever connected (for auto-close panel behavior)
   remoteHasConnected: boolean
 
+  // Encryption state
+  encryptionState: EncryptionState
+  encryptionError: string | null
+
   // Remote view (for Remote role)
   remoteMessages: RemoteMessageEntry[]
   remoteAgentStatus: 'idle' | 'thinking' | 'tool_calling' | 'error'
@@ -114,6 +119,8 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
   relayUrl: 'ws://localhost:3001',
   error: null,
   remoteHasConnected: false, // Track if remote has ever connected
+  encryptionState: 'none',
+  encryptionError: null,
   remoteMessages: [],
   remoteAgentStatus: 'idle',
   thinkingText: '',
@@ -160,6 +167,10 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
           set({ remoteHasConnected: true })
         }
       },
+      onEncryptionStateChange: (state, error) => {
+        console.log('[RemoteStore] Encryption state:', state, error ?? '')
+        set({ encryptionState: state, encryptionError: error })
+      },
       onError: (error) => {
         console.log('[RemoteStore] Error:', error)
         set({ error })
@@ -199,6 +210,8 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
         }
       },
       onPeerChange: (peerCount) => set({ peerCount }),
+      onEncryptionStateChange: (state, error) =>
+        set({ encryptionState: state, encryptionError: error }),
       onError: (error) => set({ error }),
       onAgentEvent: (event: RemoteMessage) => {
         handleRemoteAgentEvent(event, set, get)
@@ -234,6 +247,8 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
           set({ remoteHasConnected: true })
         }
       },
+      onEncryptionStateChange: (state, error) =>
+        set({ encryptionState: state, encryptionError: error }),
       onError: (error) => {
         console.log('[RemoteStore] Reconnection error:', error)
         set({ error })
@@ -280,6 +295,8 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
       connectionState: 'disconnected',
       peerCount: 0,
       remoteHasConnected: false, // Reset remote connection tracking
+      encryptionState: 'none',
+      encryptionError: null,
       remoteMessages: [],
       remoteAgentStatus: 'idle',
       thinkingText: '',
@@ -301,7 +318,7 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
     }
   },
 
-  clearError: () => set({ error: null }),
+  clearError: () => set({ error: null, encryptionError: null }),
 }))
 
 // ============================================================================

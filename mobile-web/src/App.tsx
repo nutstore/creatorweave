@@ -4,11 +4,13 @@
  * - Auto-joins session when URL contains ?session=xxx parameter
  * - Shows input form for manual session ID entry when no session parameter
  * - Saves session to localStorage for auto-reconnect after refresh
+ * - E2E encryption using shared encryption package
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { generatePublicKey } from './crypto'
+import { Lock, Unlock, AlertTriangle, Key, RefreshCw } from 'lucide-react'
+import { E2EEncryption, type EncryptionState, isEncryptedEnvelope, type RemoteMessage, type EncryptedEnvelope } from '@browser-fs-analyzer/encryption'
 
 // UUID validation regex (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -66,23 +68,6 @@ function clearSession(): void {
 // Types
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
-type RemoteMessage =
-  | { type: 'session:joined'; sessionId: string; peerCount: number }
-  | { type: 'session:error'; error: string }
-  | { type: 'session:closed'; sessionId: string; reason: 'host_disconnected' | 'session_ended' }
-  | { type: 'peer:disconnected'; sessionId: string }
-  | { type: 'agent:message'; role: 'user' | 'assistant'; content: string; messageId: string; timestamp: number }
-  | { type: 'agent:thinking'; delta: string }
-  | { type: 'agent:status'; status: 'idle' | 'thinking' | 'tool_calling' | 'error' }
-  | { type: 'agent:tool_call'; toolName: string; args: string; toolCallId: string }
-  | { type: 'agent:tool_result'; toolCallId: string; result: string }
-  | { type: 'file:change'; path: string; changeType: 'create' | 'modify' | 'delete'; preview?: string }
-  | { type: 'sync:state'; messages: Array<{ role: string; content: string | null; messageId: string; timestamp: number }>; agentStatus: 'idle' | 'thinking' | 'tool_calling' | 'error' }
-  | { type: 'session:create'; sessionId: string; publicKey: string }
-  | { type: 'session:join'; sessionId: string; publicKey: string }
-  | { type: 'ping'; timestamp: number }
-  | { type: 'pong'; timestamp: number }
-
 interface MessageEntry {
   role: string
   content: string
@@ -100,6 +85,10 @@ export function App() {
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'tool_calling' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
 
+  // Encryption state
+  const [encryptionState, setEncryptionState] = useState<EncryptionState>('none')
+  const [encryptionError, setEncryptionError] = useState<string | null>(null)
+
   // Session input form state
   const [sessionInput, setSessionInput] = useState('')
   const [inputError, setInputError] = useState<string | null>(null)
@@ -107,7 +96,7 @@ export function App() {
 
   // WebSocket ref
   const wsRef = useRef<Socket | null>(null)
-  const encryptionRef = useRef<{ publicKey: string } | null>(null)
+  const encryptionRef = useRef<E2EEncryption | null>(null)
 
   // Ref to track current sessionId for closure-safe access
   const sessionIdRef = useRef<string | null>(null)
@@ -164,10 +153,33 @@ export function App() {
   }, [])
 
   // Handle WebSocket messages (defined first to avoid forward reference issues)
-  const handleWSMessage = useCallback((msg: RemoteMessage) => {
+  const handleWSMessage = useCallback(async (msg: RemoteMessage | EncryptedEnvelope) => {
     console.log('[WS] Received:', msg)
 
-    switch (msg.type) {
+    // Decrypt if encrypted
+    let messageToProcess: RemoteMessage
+    if (isEncryptedEnvelope(msg)) {
+      if (!encryptionRef.current || !encryptionRef.current.isReady()) {
+        console.error('[WS] Received encrypted message but encryption not ready')
+        setEncryptionError('Received encrypted message but encryption not ready')
+        return
+      }
+      try {
+        const decrypted = await encryptionRef.current.decrypt(msg)
+        messageToProcess = decrypted
+        console.log('[WS] Decrypted:', messageToProcess)
+      } catch (e) {
+        const errorMsg = `Decryption failed: ${e instanceof Error ? e.message : String(e)}`
+        console.error('[WS]', errorMsg)
+        setEncryptionError(errorMsg)
+        return
+      }
+    } else {
+      messageToProcess = msg
+    }
+
+    // Now process the message
+    switch (messageToProcess.type) {
       case 'session:joined':
         setConnectionState('connected')
         setError(null) // Clear any errors when session is ready
@@ -180,14 +192,15 @@ export function App() {
         break
 
       case 'session:error':
-        setError(msg.error)
+        setError((messageToProcess as { type: 'session:error'; error: string }).error)
         setConnectionState('disconnected')
         clearSession() // Clear invalid session
         resetReconnectState()
         break
 
       case 'session:closed':
-        console.log('[Mobile] Session closed by host:', msg.reason)
+        const closedMsg = messageToProcess as { type: 'session:closed'; sessionId: string; reason: 'host_disconnected' | 'session_ended' }
+        console.log('[Mobile] Session closed by host:', closedMsg.reason)
         // Stop reconnecting and show input form
         resetReconnectState()
         clearSession()
@@ -203,22 +216,24 @@ export function App() {
         break
 
       case 'agent:message':
+        const agentMsg = messageToProcess as { type: 'agent:message'; role: 'user' | 'assistant'; content: string; messageId: string; timestamp: number }
         setMessages((prev) => [...prev, {
-          role: msg.role,
-          content: msg.content,
-          messageId: msg.messageId,
-          timestamp: msg.timestamp
+          role: agentMsg.role,
+          content: agentMsg.content,
+          messageId: agentMsg.messageId,
+          timestamp: agentMsg.timestamp
         }])
         break
 
       case 'agent:thinking':
+        const thinkingMsg = messageToProcess as { type: 'agent:thinking'; delta: string }
         // Append to last assistant message
         setMessages((prev) => {
           const last = prev[prev.length - 1]
           if (last && last.role === 'assistant') {
             return [
               ...prev.slice(0, -1),
-              { ...last, content: last.content + msg.delta }
+              { ...last, content: last.content + thinkingMsg.delta }
             ]
           }
           return prev
@@ -226,34 +241,62 @@ export function App() {
         break
 
       case 'agent:status':
-        setAgentStatus(msg.status)
+        setAgentStatus((messageToProcess as { type: 'agent:status'; status: 'idle' | 'thinking' | 'tool_calling' | 'error' }).status)
         break
 
       case 'agent:tool_call':
+        const toolMsg = messageToProcess as { type: 'agent:tool_call'; toolName: string; args: string; toolCallId: string }
         setMessages((prev) => [...prev, {
           role: 'tool',
-          content: `[Tool: ${msg.toolName}](${msg.args})`,
-          messageId: msg.toolCallId,
+          content: `[Tool: ${toolMsg.toolName}](${toolMsg.args})`,
+          messageId: toolMsg.toolCallId,
           timestamp: Date.now()
         }])
         break
 
       case 'sync:state':
-        setMessages(msg.messages.map((m: any) => ({
+        const syncMsg = messageToProcess as { type: 'sync:state'; messages: Array<{ role: string; content: string | null; messageId: string; timestamp: number }>; agentStatus: 'idle' | 'thinking' | 'tool_calling' | 'error' }
+        setMessages(syncMsg.messages.map((m: any) => ({
           role: m.role || 'unknown',
           content: m.content || '',
           messageId: m.messageId || '',
           timestamp: m.timestamp || Date.now()
         })))
-        setAgentStatus(msg.agentStatus)
+        setAgentStatus(syncMsg.agentStatus)
         break
 
       case 'session:create':
       case 'session:join':
-        // Key exchange - store peer's public key
-        if (msg.publicKey) {
-          console.log('[E2E] Received peer public key (encryption can be enhanced later)')
+        // Key exchange: derive shared key from peer's public key
+        const keyExchangeMsg = messageToProcess as { type: 'session:create' | 'session:join'; sessionId: string; publicKey: string }
+        if (keyExchangeMsg.publicKey && encryptionRef.current) {
+          try {
+            await encryptionRef.current.deriveSharedKey(keyExchangeMsg.publicKey)
+            // After deriving the shared key, send encryption:ready message
+            if (encryptionRef.current.isReady()) {
+              const readyMsg = await encryptionRef.current.encrypt({
+                type: 'encryption:ready',
+                encrypted: true,
+                timestamp: Date.now(),
+              })
+              wsRef.current?.emit('message', readyMsg)
+            }
+          } catch (e) {
+            const errorMsg = `Key exchange failed: ${e instanceof Error ? e.message : String(e)}`
+            setError(errorMsg)
+            setEncryptionError(errorMsg)
+          }
         }
+        break
+
+      case 'encryption:ready':
+        console.log('[Mobile] Received encryption:ready from peer')
+        break
+
+      case 'encryption:error':
+        const errMsg = messageToProcess as { type: 'encryption:error'; error: string; timestamp: number }
+        console.log('[Mobile] Encryption error from peer:', errMsg.error)
+        setEncryptionError(`Peer encryption error: ${errMsg.error}`)
         break
     }
   }, [scheduleReconnect, resetReconnectState])
@@ -263,13 +306,24 @@ export function App() {
     try {
       console.log('[Mobile] Joining session:', sessionId)
       setError(null) // Clear any previous errors
+      setEncryptionError(null)
       setConnectionState('connecting')
       setSessionId(sessionId)
       sessionIdRef.current = sessionId // Update ref immediately for closure-safe access
 
+      // Initialize encryption
+      const encryption = new E2EEncryption(true) // Enable debug mode
+      encryptionRef.current = encryption
+
+      // Subscribe to encryption state changes
+      const unsubscribe = encryption.onStateChange((state, error) => {
+        console.log('[Mobile] Encryption state:', state, error ?? '')
+        setEncryptionState(state)
+        setEncryptionError(error ?? null)
+      })
+
       // Generate key pair
-      const publicKey = await generatePublicKey()
-      encryptionRef.current = { publicKey }
+      const publicKey = await encryption.generateKeyPair()
 
       // Connect WebSocket
       if (wsRef.current) {
@@ -284,7 +338,7 @@ export function App() {
         console.log('[WS] Connected to relay server')
         // Clear any errors when connected to server
         setError(null)
-        // Send join message
+        // Send join message with public key
         ws.emit('message', {
           type: 'session:join',
           sessionId,
@@ -302,6 +356,8 @@ export function App() {
       })
 
       ws.on('disconnect', () => {
+        // Unsubscribe from encryption state
+        unsubscribe()
         console.log('[WS] Disconnected from server')
         // Only try to reconnect if we have a session ID
         if (sessionIdRef.current) {
@@ -338,12 +394,29 @@ export function App() {
     if (!input.trim() || !wsRef.current || connectionState !== 'connected') return
 
     const messageId = `msg-${Date.now()}`
-    wsRef.current.emit('message', {
+    const message = {
       type: 'remote:send_message',
       content: input.trim(),
       messageId,
       timestamp: Date.now()
-    })
+    }
+
+    // Encrypt if encryption is ready
+    if (encryptionRef.current && encryptionRef.current.isReady()) {
+      encryptionRef.current.encrypt(message)
+        .then((encrypted) => {
+          wsRef.current?.emit('message', encrypted)
+        })
+        .catch((e) => {
+          const errorMsg = `Encryption failed: ${e instanceof Error ? e.message : String(e)}`
+          setError(errorMsg)
+          setEncryptionError(errorMsg)
+        })
+    } else {
+      setError('Encryption not ready, cannot send message securely')
+      setEncryptionError('Encryption not ready')
+      return
+    }
 
     // Add to local messages
     setMessages((prev) => [...prev, {
@@ -387,6 +460,22 @@ export function App() {
     }
   }
 
+  // Encryption state display
+  const getEncryptionDisplay = () => {
+    switch (encryptionState) {
+      case 'none':
+        return { icon: <Unlock className="w-4 h-4" />, text: '未加密', color: 'text-gray-400' }
+      case 'generating':
+        return { icon: <Key className="w-4 h-4 animate-pulse" />, text: '生成密钥...', color: 'text-yellow-400' }
+      case 'exchanging':
+        return { icon: <RefreshCw className="w-4 h-4 animate-spin" />, text: '交换密钥...', color: 'text-yellow-400' }
+      case 'ready':
+        return { icon: <Lock className="w-4 h-4" />, text: '已加密', color: 'text-green-400' }
+      case 'error':
+        return { icon: <AlertTriangle className="w-4 h-4" />, text: '加密错误', color: 'text-red-400' }
+    }
+  }
+
   // Get session ID from URL or localStorage and auto-join (run once on mount)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
@@ -420,6 +509,10 @@ export function App() {
           <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${getConnectionDisplay().color}`} />
             <span className="text-xs opacity-80">{getConnectionDisplay().text}</span>
+            {/* Encryption status indicator */}
+            <span className={`text-sm ${getEncryptionDisplay().color}`} title={getEncryptionDisplay().text}>
+              {getEncryptionDisplay().icon}
+            </span>
             {sessionId && connectionState === 'connected' && (
               <button
                 onClick={disconnectSession}
@@ -430,6 +523,19 @@ export function App() {
             )}
           </div>
         </div>
+        {/* Encryption error display */}
+        {encryptionError && (
+          <div className="max-w-lg mx-auto mt-2 bg-red-500/20 text-white px-3 py-1 rounded text-xs flex items-center gap-2">
+            <span>⚠️</span>
+            <span className="flex-1 truncate">{encryptionError}</span>
+            <button
+              onClick={() => setEncryptionError(null)}
+              className="text-white/80 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </header>
 
       {/* Content */}

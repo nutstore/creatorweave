@@ -22,11 +22,11 @@ fi
 # Build frontend
 echo "📦 Building frontend..."
 cd "$PROJECT_ROOT/web"
-npm run build
+pnpm run build
 
 echo ""
 echo "✅ Build completed successfully!"
 echo "📂 Output: $PROJECT_ROOT/web/dist/"
 echo ""
 echo "To preview the build:"
-echo "  cd web && npm run preview"
+echo "  cd web && pnpm run preview"

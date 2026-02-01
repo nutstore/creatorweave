@@ -3,6 +3,7 @@
  *
  * Always shows:
  * - Connection state indicator
+ * - Encryption state indicator (🔓/🔒/⚠️)
  * - Session ID (with copy button)
  * - Peer count
  * - Disconnect button
@@ -12,12 +13,48 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useRemoteStore } from '@/store/remote.store'
 import { RemoteControlPanel } from './RemoteControlPanel'
-import { QrCode } from 'lucide-react'
+import { QrCode, Lock, Unlock, AlertTriangle, Key, RefreshCw } from 'lucide-react'
+
+const ENCRYPTION_STATE_CONFIG: Record<
+  string,
+  { icon: React.ReactNode; color: string; tooltip: string }
+> = {
+  none: { icon: <Unlock className="h-3 w-3" />, color: 'text-gray-400', tooltip: 'No encryption' },
+  generating: {
+    icon: <Key className="h-3 w-3 animate-pulse" />,
+    color: 'text-yellow-400',
+    tooltip: 'Generating keys...',
+  },
+  exchanging: {
+    icon: <RefreshCw className="h-3 w-3 animate-spin" />,
+    color: 'text-yellow-400',
+    tooltip: 'Exchanging keys...',
+  },
+  ready: {
+    icon: <Lock className="h-3 w-3 text-green-500" />,
+    color: 'text-green-500',
+    tooltip: 'E2E encrypted',
+  },
+  error: {
+    icon: <AlertTriangle className="h-3 w-3 text-red-500" />,
+    color: 'text-red-500',
+    tooltip: 'Encryption error',
+  },
+}
 
 export const RemoteBadge: React.FC = () => {
   const [panelOpen, setPanelOpen] = useState(false)
-  const { connectionState, role, sessionId, peerCount, error, closeSession, clearError } =
-    useRemoteStore()
+  const {
+    connectionState,
+    role,
+    sessionId,
+    peerCount,
+    error,
+    encryptionState,
+    encryptionError,
+    closeSession,
+    clearError,
+  } = useRemoteStore()
 
   const isActive = role !== 'none'
 
@@ -76,6 +113,14 @@ export const RemoteBadge: React.FC = () => {
         {/* Connection indicator */}
         <span className={`h-2 w-2 rounded-full ${displayState.color}`} title={displayState.label} />
 
+        {/* Encryption indicator */}
+        <span
+          className={ENCRYPTION_STATE_CONFIG[encryptionState]?.color}
+          title={ENCRYPTION_STATE_CONFIG[encryptionState]?.tooltip}
+        >
+          {ENCRYPTION_STATE_CONFIG[encryptionState]?.icon}
+        </span>
+
         {/* Role badge */}
         <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium uppercase">
           {role}
@@ -104,14 +149,14 @@ export const RemoteBadge: React.FC = () => {
           <span className="text-xs text-muted-foreground">Waiting for remote...</span>
         )}
 
-        {/* Error */}
-        {error && (
+        {/* Error or Encryption Error */}
+        {(error || encryptionError) && (
           <button
             onClick={clearError}
             className="max-w-[120px] truncate text-xs text-destructive"
-            title={error}
+            title={(error ?? '') || (encryptionError ?? '')}
           >
-            {error}
+            {error || encryptionError}
           </button>
         )}
 

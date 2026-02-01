@@ -6,7 +6,14 @@
  */
 
 import { WSClient, type ConnectionState, type WSClientCallbacks } from './ws-client'
-import { E2EEncryption, generateSessionId } from './encryption'
+import {
+  E2EEncryption,
+  generateSessionId,
+  type EncryptionState,
+  isEncryptedEnvelope,
+  isProtocolMessage,
+  mustEncrypt,
+} from '@browser-fs-analyzer/encryption'
 import type {
   RemoteMessage,
   WireMessage,
@@ -14,7 +21,6 @@ import type {
   FileChangeEvent,
   StateSyncMessage,
 } from './remote-protocol'
-import { isEncryptedEnvelope } from './remote-protocol'
 
 export type SessionRole = 'host' | 'remote' | 'none'
 
@@ -27,6 +33,8 @@ export interface RemoteSessionCallbacks {
   onSessionIdChange?: (sessionId: string) => void
   /** Peer joined/left */
   onPeerChange?: (peerCount: number) => void
+  /** Encryption state changed */
+  onEncryptionStateChange?: (state: EncryptionState, error?: string) => void
   /** Received a user message from remote peer (Host only) */
   onRemoteMessage?: (content: string, messageId: string) => void
   /** Received agent cancel from remote peer (Host only) */
@@ -43,7 +51,8 @@ const DEFAULT_RELAY_URL = 'ws://localhost:3001'
 
 export class RemoteSession {
   private client: WSClient
-  private encryption = new E2EEncryption()
+  private encryption = new E2EEncryption(false) // Debug mode off by default
+  private encryptionStateUnsubscribe: (() => void) | null = null
   private callbacks: RemoteSessionCallbacks
   private role: SessionRole = 'none'
   private sessionId: string | null = null
@@ -52,6 +61,12 @@ export class RemoteSession {
 
   constructor(relayUrl: string = DEFAULT_RELAY_URL, callbacks: RemoteSessionCallbacks = {}) {
     this.callbacks = callbacks
+
+    // Subscribe to encryption state changes
+    this.encryptionStateUnsubscribe = this.encryption.onStateChange((state, error) => {
+      console.log('[RemoteSession] Encryption state:', state, error ?? '')
+      this.callbacks.onEncryptionStateChange?.(state, error)
+    })
 
     const wsCallbacks: WSClientCallbacks = {
       onStateChange: (state) => {
@@ -222,6 +237,7 @@ export class RemoteSession {
       })
     }
     this.client.close()
+    this.encryptionStateUnsubscribe?.()
     this.encryption.reset()
     this.role = 'none'
     this.sessionId = null
@@ -305,21 +321,37 @@ export class RemoteSession {
   // ---- Private ----
 
   private async sendSecure(message: RemoteMessage): Promise<void> {
-    let wireMessage: WireMessage = message
+    // Protocol messages are sent unencrypted
+    if (isProtocolMessage(message)) {
+      this.client.send(message)
+      return
+    }
 
-    if (this.encryptionEnabled && this.encryption.isReady()) {
+    // Messages that MUST be encrypted
+    if (mustEncrypt(message.type) && this.encryptionEnabled) {
+      if (!this.encryption.isReady()) {
+        const error = `Cannot send "${message.type}": encryption not ready`
+        this.callbacks.onError?.(error)
+        throw new Error(error)
+      }
+
       try {
-        wireMessage = await this.encryption.encrypt(message)
-      } catch {
-        // Fallback to unencrypted if encryption fails
+        const wireMessage = await this.encryption.encrypt(message)
+        this.client.send(wireMessage)
+        return
+      } catch (e) {
+        const error = `Encryption failed for "${message.type}": ${e instanceof Error ? e.message : String(e)}`
+        this.callbacks.onError?.(error)
+        throw new Error(error)
       }
     }
 
-    this.client.send(wireMessage)
+    // Other messages sent as-is
+    this.client.send(message)
   }
 
-  private async handleMessage(raw: RemoteMessage): Promise<void> {
-    let message = raw
+  private async handleMessage(raw: WireMessage): Promise<void> {
+    let message: RemoteMessage
 
     // Decrypt if needed
     if (isEncryptedEnvelope(raw)) {
@@ -328,11 +360,15 @@ export class RemoteSession {
         return
       }
       try {
-        message = await this.encryption.decrypt(raw)
-      } catch {
-        this.callbacks.onError?.('Failed to decrypt message')
+        message = (await this.encryption.decrypt(raw)) as RemoteMessage
+      } catch (e) {
+        this.callbacks.onError?.(
+          `Failed to decrypt message: ${e instanceof Error ? e.message : String(e)}`
+        )
         return
       }
+    } else {
+      message = raw as RemoteMessage
     }
 
     switch (message.type) {
@@ -355,12 +391,33 @@ export class RemoteSession {
         if (message.publicKey) {
           try {
             await this.encryption.deriveSharedKey(message.publicKey)
+            // After deriving the shared key, send encryption:ready message
+            if (this.encryption.isReady()) {
+              try {
+                const readyMsg = await this.encryption.encrypt({
+                  type: 'encryption:ready',
+                  encrypted: true,
+                  timestamp: Date.now(),
+                })
+                this.client.send(readyMsg)
+              } catch (e) {
+                this.callbacks.onError?.(`Failed to send encryption:ready: ${e}`)
+              }
+            }
           } catch (e) {
             this.callbacks.onError?.(
               `Key exchange failed: ${e instanceof Error ? e.message : String(e)}`
             )
           }
         }
+        break
+
+      case 'encryption:ready':
+        console.log('[RemoteSession] Received encryption:ready from peer')
+        break
+
+      case 'encryption:error':
+        this.callbacks.onError?.(`Encryption error from peer: ${(message as any).error}`)
         break
 
       // Remote commands (received by Host)

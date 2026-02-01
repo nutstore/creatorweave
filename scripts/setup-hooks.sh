@@ -11,9 +11,9 @@ echo ""
 
 # Check if husky is installed in web
 cd "$PROJECT_ROOT/web"
-if ! npm list husky &> /dev/null; then
+if ! pnpm list husky &> /dev/null; then
     echo "📦 Installing husky and lint-staged..."
-    npm install --save-dev husky lint-staged
+    pnpm install --save-dev husky lint-staged
 fi
 
 # Initialize husky in web directory

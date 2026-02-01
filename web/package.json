@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:wasm && vite build",
+    "build": "pnpm run build:wasm && vite build",
     "build:wasm": "cd ../wasm && bash scripts/build-wasm.sh && cd ../web && cp public/wasm/line_counter.js src/wasm/ && cp public/wasm/md5_calculator.js src/wasm/",
     "preview": "vite preview",
     "test": "vitest",
@@ -19,6 +19,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@browser-fs-analyzer/encryption": "workspace:*",
     "@types/qrcode.react": "^1.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

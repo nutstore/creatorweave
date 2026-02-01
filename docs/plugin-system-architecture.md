@@ -1638,10 +1638,10 @@ wasm-pack build --target web --out-dir ./pkg
 wasm-opt ./pkg/my_plugin_bg.wasm -O4 -o ./pkg/my_plugin_bg_opt.wasm
 
 # Test plugin locally
-npm run test:plugin
+pnpm run test:plugin
 
 # Package for distribution
-npm run package:plugin
+pnpm run package:plugin
 ```
 
 ---

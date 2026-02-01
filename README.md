@@ -29,7 +29,7 @@
 
 - Rust (1.75+)
 - Node.js (18+)
-- npm 或 yarn
+- pnpm (推荐) 或 npm/yarn
 
 ### 一键设置
 
@@ -138,11 +138,11 @@ bash scripts/clean.sh       # 清理构建产物
 cd wasm && wasm-pack build --target web --out-dir ../web/public/wasm crates/wasm-bindings
 
 # 启动前端开发服务器
-cd web && npm run dev
+cd web && pnpm run dev
 
 # 运行测试
 cd wasm/crates/core && cargo test
-cd web && npm test
+cd web && pnpm test
 ```
 
 ## 🏗️ 技术架构

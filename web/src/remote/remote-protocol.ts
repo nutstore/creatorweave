@@ -150,6 +150,24 @@ export interface PongMessage {
 }
 
 // ============================================================================
+// Encryption state (Bidirectional)
+// ============================================================================
+
+/** Indicates encryption is ready (sent after key exchange completes) */
+export interface EncryptionReadyMessage {
+  type: 'encryption:ready'
+  encrypted: true // This message itself is encrypted to verify the channel
+  timestamp: number
+}
+
+/** Indicates encryption error */
+export interface EncryptionErrorMessage {
+  type: 'encryption:error'
+  error: string
+  timestamp: number
+}
+
+// ============================================================================
 // Union type
 // ============================================================================
 
@@ -172,6 +190,8 @@ export type RemoteMessage =
   | StateSyncMessage
   | PingMessage
   | PongMessage
+  | EncryptionReadyMessage
+  | EncryptionErrorMessage
 
 /** Envelope wrapping encrypted messages */
 export interface EncryptedEnvelope {

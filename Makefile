@@ -27,7 +27,7 @@ help: ## Show help message
 	@echo '  make typecheck     - Run TypeScript type check'
 	@echo ''
 	@echo '$(GREEN)Individual Commands:$(NC)'
-	@echo '  make install-deps  - Install npm dependencies only'
+	@echo '  make install-deps  - Install pnpm dependencies only'
 	@echo '  make build-wasm    - Build WASM module'
 	@echo '  make build-web     - Build frontend'
 	@echo '  make test-rust     - Run Rust tests'
@@ -43,9 +43,9 @@ setup-hooks: ## Install git pre-commit hooks
 
 install: install-deps ## Alias for install-deps
 
-install-deps: ## Install npm dependencies
+install-deps: ## Install pnpm dependencies
 	@echo '$(BLUE)Installing dependencies...$(NC)'
-	@cd web && npm install
+	@cd web && pnpm install
 	@echo '$(GREEN)✅ Dependencies installed!$(NC)'
 
 dev: ## Start development server
@@ -61,7 +61,7 @@ build-wasm: ## Build WASM module only
 
 build-web: ## Build frontend only
 	@echo '$(BLUE)Building frontend...$(NC)'
-	@cd web && npm run build
+	@cd web && pnpm run build
 	@echo '$(GREEN)✅ Frontend built!$(NC)'
 
 test: ## Run all tests
@@ -74,7 +74,7 @@ test-rust: ## Run Rust tests
 
 test-web: ## Run frontend tests
 	@echo '$(BLUE)Running frontend tests...$(NC)'
-	@cd web && npm test
+	@cd web && pnpm test
 	@echo '$(GREEN)✅ Frontend tests passed!$(NC)'
 
 lint: ## Run all linters (ESLint + Clippy)
@@ -101,12 +101,12 @@ lint-rust-fix: ## Fix Rust linting issues
 
 lint-web: ## Run frontend linter (ESLint)
 	@echo '$(BLUE)Running ESLint...$(NC)'
-	@cd web && npm run lint
+	@cd web && pnpm run lint
 	@echo '$(GREEN)✅ ESLint checks passed!$(NC)'
 
 lint-web-fix: ## Fix frontend linting issues
 	@echo '$(BLUE)Fixing ESLint issues...$(NC)'
-	@cd web && npm run lint:fix
+	@cd web && pnpm run lint:fix
 	@echo '$(GREEN)✅ ESLint issues fixed!$(NC)'
 
 format: ## Format all code (Rust + TypeScript + CSS)
@@ -122,12 +122,12 @@ fmt: ## Format Rust code
 
 fmt-web: ## Format frontend code
 	@echo '$(BLUE)Formatting frontend code...$(NC)'
-	@cd web && npm run format
+	@cd web && pnpm run format
 	@echo '$(GREEN)✅ Frontend code formatted!$(NC)'
 
 typecheck: ## Run TypeScript type check
 	@echo '$(BLUE)Running TypeScript type check...$(NC)'
-	@cd web && npm run typecheck
+	@cd web && pnpm run typecheck
 	@echo '$(GREEN)✅ Type check passed!$(NC)'
 
 clean: ## Clean build artifacts

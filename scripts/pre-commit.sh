@@ -37,7 +37,7 @@ if [ -d "$PROJECT_ROOT/web/src" ]; then
 
     # TypeScript type check
     echo "🔍 Running TypeScript type check..."
-    if ! npm run typecheck; then
+    if ! pnpm run typecheck; then
         echo ""
         echo -e "${RED}❌ TypeScript type check failed${NC}"
         FAILED=1

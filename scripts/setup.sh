@@ -43,14 +43,14 @@ echo "📦 Adding WASM target..."
 rustup target add wasm32-unknown-unknown
 echo "✅ WASM target added"
 
-# Install npm dependencies
-echo "📦 Installing npm dependencies..."
+# Install pnpm dependencies
+echo "📦 Installing pnpm dependencies..."
 cd "$PROJECT_ROOT/web"
 if [ ! -d "node_modules" ]; then
-    npm install
-    echo "✅ npm dependencies installed"
+    pnpm install
+    echo "✅ pnpm dependencies installed"
 else
-    echo "✅ npm dependencies already installed"
+    echo "✅ pnpm dependencies already installed"
 fi
 
 # Create WASM output directory
