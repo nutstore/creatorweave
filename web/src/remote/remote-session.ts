@@ -23,6 +23,8 @@ export interface RemoteSessionCallbacks {
   onConnectionStateChange?: (state: ConnectionState) => void
   /** Session role established */
   onRoleChange?: (role: SessionRole) => void
+  /** Session ID changed */
+  onSessionIdChange?: (sessionId: string) => void
   /** Peer joined/left */
   onPeerChange?: (peerCount: number) => void
   /** Received a user message from remote peer (Host only) */
@@ -37,7 +39,7 @@ export interface RemoteSessionCallbacks {
   onError?: (error: string) => void
 }
 
-const DEFAULT_RELAY_URL = 'wss://relay.example.com'
+const DEFAULT_RELAY_URL = 'ws://localhost:3001'
 
 export class RemoteSession {
   private client: WSClient
@@ -46,6 +48,7 @@ export class RemoteSession {
   private role: SessionRole = 'none'
   private sessionId: string | null = null
   private encryptionEnabled = true
+  private lastPublicKey: string | null = null // Save for reconnection
 
   constructor(relayUrl: string = DEFAULT_RELAY_URL, callbacks: RemoteSessionCallbacks = {}) {
     this.callbacks = callbacks
@@ -59,6 +62,9 @@ export class RemoteSession {
       },
       onError: (err) => {
         this.callbacks.onError?.(err)
+      },
+      onReconnect: () => {
+        this.handleReconnect()
       },
     }
 
@@ -85,12 +91,19 @@ export class RemoteSession {
    * Returns the session ID to share with remote peers.
    */
   async createSession(): Promise<string> {
+    console.log('[RemoteSession] createSession: Starting...')
     this.sessionId = generateSessionId()
     this.role = 'host'
+    console.log('[RemoteSession] Generated sessionId:', this.sessionId, 'role:', this.role)
+
     this.callbacks.onRoleChange?.(this.role)
+    this.callbacks.onSessionIdChange?.(this.sessionId)
 
     // Generate encryption key pair
+    console.log('[RemoteSession] Generating encryption key pair...')
     const publicKey = await this.encryption.generateKeyPair()
+    this.lastPublicKey = publicKey // Save for reconnection
+    console.log('[RemoteSession] Key pair generated')
 
     // Connect to relay
     this.client.connect()
@@ -114,9 +127,11 @@ export class RemoteSession {
     this.sessionId = sessionId
     this.role = 'remote'
     this.callbacks.onRoleChange?.(this.role)
+    this.callbacks.onSessionIdChange?.(sessionId)
 
     // Generate encryption key pair
     const publicKey = await this.encryption.generateKeyPair()
+    this.lastPublicKey = publicKey // Save for reconnection
 
     // Connect to relay
     this.client.connect()
@@ -129,6 +144,73 @@ export class RemoteSession {
       sessionId,
       publicKey,
     })
+  }
+
+  /**
+   * Reconnect as Host using an existing sessionId.
+   * This allows reconnection after page reload or temporary disconnect.
+   */
+  async reconnectAsHost(sessionId: string): Promise<void> {
+    console.log('[RemoteSession] Reconnecting as host with sessionId:', sessionId)
+    this.sessionId = sessionId
+    this.role = 'host'
+    this.callbacks.onRoleChange?.(this.role)
+    this.callbacks.onSessionIdChange?.(this.sessionId)
+
+    // Generate new encryption key pair
+    const publicKey = await this.encryption.generateKeyPair()
+    this.lastPublicKey = publicKey
+
+    // Connect to relay
+    this.client.connect()
+
+    // Wait for connection, then send create message with existing sessionId
+    await this.waitForConnection()
+
+    this.client.send({
+      type: 'session:create',
+      sessionId: this.sessionId,
+      publicKey,
+    })
+  }
+
+  /**
+   * Handle automatic reconnection after connection loss.
+   * Resends the session join/create message with saved session info.
+   */
+  private async handleReconnect(): Promise<void> {
+    console.log(
+      '[RemoteSession] Handling reconnection, role:',
+      this.role,
+      'sessionId:',
+      this.sessionId
+    )
+
+    if (!this.sessionId || !this.lastPublicKey) {
+      console.log('[RemoteSession] No session info saved, skipping reconnect')
+      return
+    }
+
+    // Regenerate key pair for security (new connection, new keys)
+    const publicKey = await this.encryption.generateKeyPair()
+    this.lastPublicKey = publicKey
+
+    // Resend session message based on role
+    if (this.role === 'host') {
+      console.log('[RemoteSession] Resending session:create after reconnect')
+      this.client.send({
+        type: 'session:create',
+        sessionId: this.sessionId,
+        publicKey,
+      })
+    } else if (this.role === 'remote') {
+      console.log('[RemoteSession] Resending session:join after reconnect')
+      this.client.send({
+        type: 'session:join',
+        sessionId: this.sessionId,
+        publicKey,
+      })
+    }
   }
 
   /** Close the session */

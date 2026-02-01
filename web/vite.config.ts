@@ -20,6 +20,7 @@ export default defineConfig({
     },
   },
   server: {
+    host: '0.0.0.0', // Listen on all interfaces for mobile access
     port: 3000,
     open: true,
   },

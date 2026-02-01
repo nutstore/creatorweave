@@ -11,7 +11,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
-import { RemotePanel } from '@/components/remote/RemotePanel'
+import { RemoteBadge } from '@/components/remote/RemoteBadge'
 
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
@@ -78,7 +78,7 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
           )}
 
           {/* Remote */}
-          <RemotePanel />
+          <RemoteBadge />
 
           {/* Skills */}
           <button

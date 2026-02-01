@@ -10,6 +10,67 @@ import type { RemoteMessage, StateSyncMessage } from '@/remote/remote-protocol'
 
 type RemoteMessageEntry = { role: string; content: string | null; messageId: string }
 
+// ============================================================================
+// LocalStorage Keys
+// ============================================================================
+
+const STORAGE_KEY = 'bfs-remote-session'
+
+interface StoredSession {
+  sessionId: string
+  role: SessionRole
+  relayUrl: string
+  savedAt: number
+}
+
+function saveSessionToStorage(sessionId: string, role: SessionRole, relayUrl: string): void {
+  try {
+    const data: StoredSession = {
+      sessionId,
+      role,
+      relayUrl,
+      savedAt: Date.now(),
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    console.log('[RemoteStore] Session saved to localStorage:', data)
+  } catch (e) {
+    console.warn('[RemoteStore] Failed to save session to localStorage:', e)
+  }
+}
+
+function loadSessionFromStorage(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as StoredSession
+
+    // Check if session is too old (24 hours)
+    const MAX_AGE = 24 * 60 * 60 * 1000
+    if (Date.now() - data.savedAt > MAX_AGE) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+
+    return data
+  } catch (e) {
+    console.warn('[RemoteStore] Failed to load session from localStorage:', e)
+    return null
+  }
+}
+
+function clearSessionFromStorage(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+    console.log('[RemoteStore] Session cleared from localStorage')
+  } catch (e) {
+    console.warn('[RemoteStore] Failed to clear session from localStorage:', e)
+  }
+}
+
+// ============================================================================
+// Store Interface
+// ============================================================================
+
 interface RemoteState {
   // Connection
   connectionState: ConnectionState
@@ -18,6 +79,9 @@ interface RemoteState {
   peerCount: number
   relayUrl: string
   error: string | null
+
+  // Track if remote has ever connected (for auto-close panel behavior)
+  remoteHasConnected: boolean
 
   // Remote view (for Remote role)
   remoteMessages: RemoteMessageEntry[]
@@ -35,6 +99,7 @@ interface RemoteState {
   setRelayUrl: (url: string) => void
   createSession: () => Promise<string>
   joinSession: (sessionId: string) => Promise<void>
+  reconnect: (sessionId: string, role: SessionRole, relayUrl: string) => Promise<void>
   closeSession: () => void
   sendMessage: (content: string, messageId: string) => void
   sendCancel: () => void
@@ -46,8 +111,9 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
   role: 'none',
   sessionId: null,
   peerCount: 0,
-  relayUrl: 'wss://relay.example.com',
+  relayUrl: 'ws://localhost:3001',
   error: null,
+  remoteHasConnected: false, // Track if remote has ever connected
   remoteMessages: [],
   remoteAgentStatus: 'idle',
   thinkingText: '',
@@ -65,11 +131,39 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
 
   createSession: async () => {
     const { relayUrl } = get()
+    console.log('[RemoteStore] Creating session with relayUrl:', relayUrl)
+
     const session = new RemoteSession(relayUrl, {
-      onConnectionStateChange: (state) => set({ connectionState: state }),
-      onRoleChange: (role) => set({ role }),
-      onPeerChange: (peerCount) => set({ peerCount }),
-      onError: (error) => set({ error }),
+      onConnectionStateChange: (state) => {
+        console.log('[RemoteStore] Connection state:', state)
+        set({ connectionState: state })
+      },
+      onRoleChange: (role) => {
+        console.log('[RemoteStore] Role changed to:', role)
+        set({ role })
+        // Save session when role is established
+        const sessionId = get().sessionId
+        if (sessionId && role !== 'none') {
+          saveSessionToStorage(sessionId, role, relayUrl)
+        }
+      },
+      onSessionIdChange: (sessionId) => {
+        console.log('[RemoteStore] SessionId changed to:', sessionId)
+        set({ sessionId })
+      },
+      onPeerChange: (peerCount) => {
+        set({ peerCount })
+        // Track if remote has connected (peerCount > 1 means host + remote)
+        // Only set to true when transitioning from disconnected to connected
+        // Never auto-reset to false - this allows proper panel auto-close behavior
+        if (peerCount > 1 && !get().remoteHasConnected) {
+          set({ remoteHasConnected: true })
+        }
+      },
+      onError: (error) => {
+        console.log('[RemoteStore] Error:', error)
+        set({ error })
+      },
       onRemoteMessage: (content, messageId) => {
         const store = get()
         store._onRemoteMessage?.(content, messageId)
@@ -83,7 +177,13 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
     set({ session })
 
     const sessionId = await session.createSession()
+    console.log('[RemoteStore] Session created with ID:', sessionId)
+    // sessionId 已经通过 onSessionIdChange 回调设置，这里再次设置以确保一致性
     set({ sessionId })
+
+    // Save session to localStorage for auto-reconnect
+    saveSessionToStorage(sessionId, 'host', get().relayUrl)
+
     return sessionId
   },
 
@@ -91,7 +191,13 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
     const { relayUrl } = get()
     const session = new RemoteSession(relayUrl, {
       onConnectionStateChange: (state) => set({ connectionState: state }),
-      onRoleChange: (role) => set({ role }),
+      onRoleChange: (role) => {
+        set({ role })
+        // Save session when role is established
+        if (role !== 'none') {
+          saveSessionToStorage(sessionId, role, relayUrl)
+        }
+      },
       onPeerChange: (peerCount) => set({ peerCount }),
       onError: (error) => set({ error }),
       onAgentEvent: (event: RemoteMessage) => {
@@ -109,17 +215,71 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
     await session.joinSession(sessionId)
   },
 
+  reconnect: async (sessionId, role, relayUrl) => {
+    console.log('[RemoteStore] Reconnecting to session:', sessionId, 'as', role)
+
+    const session = new RemoteSession(relayUrl, {
+      onConnectionStateChange: (state) => {
+        console.log('[RemoteStore] Reconnection state:', state)
+        set({ connectionState: state })
+      },
+      onRoleChange: (r) => set({ role: r }),
+      onSessionIdChange: (id) => set({ sessionId: id }),
+      onPeerChange: (peerCount) => {
+        set({ peerCount })
+        // Track if remote has connected (peerCount > 1 means host + remote)
+        // Only set to true when transitioning from disconnected to connected
+        // Never auto-reset to false - this allows proper panel auto-close behavior
+        if (peerCount > 1 && !get().remoteHasConnected) {
+          set({ remoteHasConnected: true })
+        }
+      },
+      onError: (error) => {
+        console.log('[RemoteStore] Reconnection error:', error)
+        set({ error })
+      },
+      onRemoteMessage: (content, messageId) => {
+        const store = get()
+        store._onRemoteMessage?.(content, messageId)
+      },
+      onRemoteCancel: () => {
+        const store = get()
+        store._onRemoteCancel?.()
+      },
+      onAgentEvent: (event: RemoteMessage) => {
+        handleRemoteAgentEvent(event, set, get)
+      },
+      onStateSync: (state: StateSyncMessage) => {
+        set({
+          remoteMessages: state.messages,
+          remoteAgentStatus: state.agentStatus,
+        })
+      },
+    })
+
+    set({ session, sessionId, relayUrl })
+
+    // Rejoin the session using the appropriate method
+    if (role === 'host') {
+      await session.reconnectAsHost(sessionId)
+    } else {
+      await session.joinSession(sessionId)
+    }
+  },
+
   closeSession: () => {
     const { session } = get()
     if (session) {
       session.close()
     }
+    clearSessionFromStorage()
     set({
       session: null,
       sessionId: null,
       role: 'none',
       connectionState: 'disconnected',
       peerCount: 0,
+      remoteHasConnected: false, // Reset remote connection tracking
       remoteMessages: [],
       remoteAgentStatus: 'idle',
       thinkingText: '',
@@ -143,6 +303,45 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
 
   clearError: () => set({ error: null }),
 }))
+
+// ============================================================================
+// Auto-reconnect on load
+// ============================================================================
+
+/** Attempt to reconnect to a previously saved session */
+export function attemptReconnect(): boolean {
+  const stored = loadSessionFromStorage()
+  if (!stored) {
+    console.log('[RemoteStore] No saved session found')
+    return false
+  }
+
+  console.log('[RemoteStore] Found saved session, attempting reconnect...')
+  const store = useRemoteStore.getState()
+
+  // Set initial state
+  useRemoteStore.setState({
+    sessionId: stored.sessionId,
+    role: stored.role,
+    relayUrl: stored.relayUrl,
+    connectionState: 'connecting',
+    peerCount: 0, // Reset peer count, will be updated when session:joined arrives
+  })
+
+  // Attempt reconnection
+  store.reconnect(stored.sessionId, stored.role, stored.relayUrl).catch((err) => {
+    console.error('[RemoteStore] Auto-reconnect failed:', err)
+    // Clear stored session on failure
+    clearSessionFromStorage()
+    useRemoteStore.setState({
+      connectionState: 'disconnected',
+      role: 'none',
+      sessionId: null,
+    })
+  })
+
+  return true
+}
 
 /** Register callbacks for Host mode (called by AgentPanel) */
 export function registerRemoteCallbacks(

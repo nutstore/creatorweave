@@ -157,14 +157,12 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
 }
 
 /**
- * Generate a human-friendly session ID (e.g. "abc-1234-xyz")
+ * Generate a UUID v4 session ID.
+ * Uses crypto.randomUUID() which is available in all modern browsers and Node.js.
+ *
+ * Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+ * Example: 550e8400-e29b-41d4-a716-446655440000
  */
 export function generateSessionId(): string {
-  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
-  const segments = [3, 4, 3]
-  return segments
-    .map((len) =>
-      Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-    )
-    .join('-')
+  return crypto.randomUUID()
 }

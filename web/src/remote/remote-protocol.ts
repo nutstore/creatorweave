@@ -42,6 +42,13 @@ export interface SessionCloseMessage {
   sessionId: string
 }
 
+export interface SessionClosedMessage {
+  type: 'session:closed'
+  sessionId: string
+  /** Reason for closure (e.g., 'host_disconnected', 'session_ended') */
+  reason: 'host_disconnected' | 'session_ended'
+}
+
 export interface PeerDisconnectedMessage {
   type: 'peer:disconnected'
   sessionId: string
@@ -152,6 +159,7 @@ export type RemoteMessage =
   | SessionJoinedMessage
   | SessionErrorMessage
   | SessionCloseMessage
+  | SessionClosedMessage
   | PeerDisconnectedMessage
   | AgentMessageEvent
   | AgentThinkingEvent

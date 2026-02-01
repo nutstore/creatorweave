@@ -1,5 +1,5 @@
 /**
- * WebSocket Client - connects to the relay server with reconnection and heartbeat.
+ * WebSocket Client - Socket.IO based client for relay server connection.
  *
  * Features:
  * - Automatic reconnection with exponential backoff
@@ -8,7 +8,8 @@
  * - Graceful close and cleanup
  */
 
-import type { WireMessage, RemoteMessage } from './remote-protocol'
+import { io, Socket } from 'socket.io-client'
+import type { RemoteMessage } from './remote-protocol'
 
 export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
@@ -16,6 +17,7 @@ export interface WSClientCallbacks {
   onStateChange?: (state: ConnectionState) => void
   onMessage?: (message: RemoteMessage) => void
   onError?: (error: string) => void
+  onReconnect?: () => void // Called when successfully reconnected after disconnect
 }
 
 /** Reconnection configuration */
@@ -26,8 +28,8 @@ const HEARTBEAT_INTERVAL_MS = 30_000
 const HEARTBEAT_TIMEOUT_MS = 10_000
 
 export class WSClient {
-  private ws: WebSocket | null = null
-  private url: string
+  private socket: Socket | null = null
+  private serverUrl: string
   private callbacks: WSClientCallbacks
   private state: ConnectionState = 'disconnected'
   private reconnectAttempt = 0
@@ -37,7 +39,7 @@ export class WSClient {
   private intentionallyClosed = false
 
   constructor(url: string, callbacks: WSClientCallbacks) {
-    this.url = url
+    this.serverUrl = url
     this.callbacks = callbacks
   }
 
@@ -48,7 +50,7 @@ export class WSClient {
 
   /** Connect to the relay server */
   connect(): void {
-    if (this.ws && (this.state === 'connected' || this.state === 'connecting')) {
+    if (this.socket && this.socket.connected) {
       return
     }
 
@@ -56,25 +58,57 @@ export class WSClient {
     this.setState('connecting')
 
     try {
-      this.ws = new WebSocket(this.url)
-      this.ws.onopen = this.handleOpen.bind(this)
-      this.ws.onclose = this.handleClose.bind(this)
-      this.ws.onerror = this.handleError.bind(this)
-      this.ws.onmessage = this.handleMessage.bind(this)
+      // Normalize and convert URL for Socket.IO
+      // - ws:// → http://
+      // - wss:// → https://
+      // - No protocol → assume ws://
+      let normalizedUrl = this.serverUrl.trim()
+      if (!normalizedUrl.startsWith('ws://') && !normalizedUrl.startsWith('wss://')) {
+        normalizedUrl = 'ws://' + normalizedUrl
+      }
+      const httpUrl = normalizedUrl.replace('ws://', 'http://').replace('wss://', 'https://')
+
+      this.socket = io(httpUrl, {
+        transports: ['websocket', 'polling'],
+        reconnection: false, // We handle reconnection ourselves
+        timeout: 10000,
+      })
+
+      this.setupSocketHandlers()
     } catch (e) {
       this.callbacks.onError?.(`Connection failed: ${e instanceof Error ? e.message : String(e)}`)
       this.scheduleReconnect()
     }
   }
 
-  /** Send a message through the WebSocket */
-  send(message: WireMessage): boolean {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+  private setupSocketHandlers(): void {
+    if (!this.socket) return
+
+    this.socket.on('connect', () => {
+      this.handleOpen()
+    })
+
+    this.socket.on('disconnect', () => {
+      this.handleClose()
+    })
+
+    this.socket.on('error', () => {
+      this.handleError()
+    })
+
+    this.socket.on('message', (data: any) => {
+      this.handleMessage(data)
+    })
+  }
+
+  /** Send a message through the Socket.IO connection */
+  send(message: any): boolean {
+    if (!this.socket || !this.socket.connected) {
       return false
     }
 
     try {
-      this.ws.send(JSON.stringify(message))
+      this.socket.emit('message', message)
       return true
     } catch {
       return false
@@ -90,7 +124,7 @@ export class WSClient {
 
   /** Update the server URL (for reconnection to a different server) */
   setUrl(url: string): void {
-    this.url = url
+    this.serverUrl = url
   }
 
   // ---- Private ----
@@ -103,9 +137,15 @@ export class WSClient {
   }
 
   private handleOpen(): void {
+    const wasReconnecting = this.reconnectAttempt > 0
     this.reconnectAttempt = 0
     this.setState('connected')
     this.startHeartbeat()
+
+    // Notify callbacks if this was a reconnection
+    if (wasReconnecting) {
+      this.callbacks.onReconnect?.()
+    }
   }
 
   private handleClose(): void {
@@ -119,25 +159,20 @@ export class WSClient {
   }
 
   private handleError(): void {
-    this.callbacks.onError?.('WebSocket error')
+    this.callbacks.onError?.('Socket.IO error')
   }
 
-  private handleMessage(event: MessageEvent): void {
+  private handleMessage(data: any): void {
     // Reset heartbeat timeout on any received message
     this.clearHeartbeatTimeout()
 
-    try {
-      const data = JSON.parse(event.data as string)
-
-      // Handle pong internally
-      if (data.type === 'pong') {
-        return
-      }
-
-      this.callbacks.onMessage?.(data as RemoteMessage)
-    } catch {
-      this.callbacks.onError?.('Failed to parse message')
+    // Handle pong internally
+    if (data.type === 'pong') {
+      return
     }
+
+    // Socket.IO automatically deserializes JSON
+    this.callbacks.onMessage?.(data as RemoteMessage)
   }
 
   private scheduleReconnect(): void {
@@ -167,13 +202,13 @@ export class WSClient {
   private startHeartbeat(): void {
     this.stopHeartbeat()
     this.heartbeatTimer = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
+      if (this.socket?.connected) {
         this.send({ type: 'ping', timestamp: Date.now() })
 
         // Set timeout for pong response
         this.heartbeatTimeout = setTimeout(() => {
           // No pong received — connection is stale
-          this.ws?.close()
+          this.socket?.disconnect()
         }, HEARTBEAT_TIMEOUT_MS)
       }
     }, HEARTBEAT_INTERVAL_MS)
@@ -200,15 +235,9 @@ export class WSClient {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null
     }
-    if (this.ws) {
-      this.ws.onopen = null
-      this.ws.onclose = null
-      this.ws.onerror = null
-      this.ws.onmessage = null
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
-        this.ws.close()
-      }
-      this.ws = null
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket = null
     }
   }
 }
