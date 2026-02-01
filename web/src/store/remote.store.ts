@@ -6,8 +6,9 @@ import { create } from 'zustand'
 import type { ConnectionState } from '@/remote/ws-client'
 import type { SessionRole } from '@/remote/remote-session'
 import { RemoteSession } from '@/remote/remote-session'
-import type { RemoteMessage, StateSyncMessage } from '@/remote/remote-protocol'
+import type { RemoteMessage, StateSyncMessage, FileEntry } from '@/remote/remote-protocol'
 import type { EncryptionState } from '@browser-fs-analyzer/encryption'
+import { fileDiscoveryService } from '@/services/file-discovery.service'
 
 type RemoteMessageEntry = { role: string; content: string | null; messageId: string }
 
@@ -100,6 +101,13 @@ interface RemoteState {
   _onRemoteMessage: ((content: string, messageId: string) => void) | null
   _onRemoteCancel: (() => void) | null
 
+  // File discovery (for Remote sessions)
+  fileTree: FileEntry | null
+  recentFiles: FileEntry[]
+
+  // Callbacks for file discovery events
+  _onFileSelect: ((path: string) => void) | null
+
   // Actions
   setRelayUrl: (url: string) => void
   createSession: () => Promise<string>
@@ -109,6 +117,13 @@ interface RemoteState {
   sendMessage: (content: string, messageId: string) => void
   sendCancel: () => void
   clearError: () => void
+
+  // File discovery actions
+  setFileTree: (tree: FileEntry | null) => void
+  setRecentFiles: (files: FileEntry[]) => void
+  handleFileSearch: (query: string, limit?: number) => FileEntry[]
+  handleFileSelect: (path: string) => void
+  pushRecentFilesToRemote: () => void
 }
 
 export const useRemoteStore = create<RemoteState>()((set, get) => ({
@@ -127,6 +142,11 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
   session: null,
   _onRemoteMessage: null,
   _onRemoteCancel: null,
+
+  // File discovery state
+  fileTree: null,
+  recentFiles: [],
+  _onFileSelect: null,
 
   setRelayUrl: (url) => {
     set({ relayUrl: url })
@@ -182,6 +202,14 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
       onRemoteCancel: () => {
         const store = get()
         store._onRemoteCancel?.()
+      },
+      // File discovery callbacks (for Host role)
+      onFileSearch: (query, limit) => {
+        return get().handleFileSearch(query, limit)
+      },
+      onFileSelect: (path) => {
+        const store = get()
+        store._onFileSelect?.(path)
       },
     })
 
@@ -319,7 +347,86 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
   },
 
   clearError: () => set({ error: null, encryptionError: null }),
+
+  // ========================================================================
+  // File Discovery Actions
+  // ========================================================================
+
+  setFileTree: (tree) => {
+    set({ fileTree: tree })
+    // Update file discovery service with new tree
+    if (tree) {
+      const flatTree = fileDiscoveryService.convertFileTreeToFlat(tree)
+      console.log('[RemoteStore] File tree updated:', flatTree.length, 'files')
+    }
+  },
+
+  setRecentFiles: (files) => {
+    set({ recentFiles: files })
+  },
+
+  handleFileSearch: (query, limit = 50) => {
+    const { fileTree } = get()
+    if (!fileTree) {
+      return []
+    }
+    return fileDiscoveryService.search(query, [fileTree], { limit })
+  },
+
+  handleFileSelect: (path) => {
+    const store = get()
+    console.log('[RemoteStore] File selected:', path)
+    store._onFileSelect?.(path)
+
+    // Track this file access
+    const file = findFileByPath(store.fileTree, path)
+    if (file) {
+      fileDiscoveryService.trackFileAccess(file)
+    }
+  },
+
+  pushRecentFilesToRemote: () => {
+    const { session } = get()
+    if (!session) return
+
+    const recentFiles = fileDiscoveryService.getRecentFiles()
+    if (recentFiles.length === 0) return
+
+    const message: {
+      type: 'files:recent'
+      files: FileEntry[]
+      trigger: 'modified' | 'accessed'
+    } = {
+      type: 'files:recent',
+      files: recentFiles,
+      trigger: 'accessed',
+    }
+
+    session.send(message)
+    console.log('[RemoteStore] Pushed recent files to remote:', recentFiles.length)
+  },
 }))
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Find a file entry by path in the file tree
+ */
+function findFileByPath(node: FileEntry | null, path: string): FileEntry | null {
+  if (!node) return null
+  if (node.path === path) return node
+
+  if (node.type === 'directory' && node.children) {
+    for (const child of node.children) {
+      const found = findFileByPath(child, path)
+      if (found) return found
+    }
+  }
+
+  return null
+}
 
 // ============================================================================
 // Auto-reconnect on load

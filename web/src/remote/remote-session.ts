@@ -20,6 +20,10 @@ import type {
   AgentStatusEvent,
   FileChangeEvent,
   StateSyncMessage,
+  FileSearchRequest,
+  FileSearchResult,
+  FileSelectMessage,
+  FileEntry,
 } from './remote-protocol'
 
 export type SessionRole = 'host' | 'remote' | 'none'
@@ -43,6 +47,9 @@ export interface RemoteSessionCallbacks {
   onAgentEvent?: (event: RemoteMessage) => void
   /** Received state sync (Remote only) */
   onStateSync?: (state: StateSyncMessage) => void
+  /** File discovery callbacks (Host only) */
+  onFileSearch?: (query: string, limit: number | undefined) => FileEntry[]
+  onFileSelect?: (path: string) => void
   /** Error occurred */
   onError?: (error: string) => void
 }
@@ -318,6 +325,11 @@ export class RemoteSession {
     this.sendSecure({ type: 'remote:cancel' })
   }
 
+  /** Send an unencrypted message (for file discovery, etc.) */
+  send(message: RemoteMessage): void {
+    this.client.send(message)
+  }
+
   // ---- Private ----
 
   private async sendSecure(message: RemoteMessage): Promise<void> {
@@ -442,6 +454,31 @@ export class RemoteSession {
       // State sync (received by Remote)
       case 'sync:state':
         this.callbacks.onStateSync?.(message)
+        break
+
+      // File discovery messages
+      case 'file:search': {
+        const searchMsg = message as FileSearchRequest
+        const results = this.callbacks.onFileSearch?.(searchMsg.query, searchMsg.limit) ?? []
+        const response: FileSearchResult = {
+          type: 'file:search-result',
+          query: searchMsg.query,
+          results,
+          hasMore: false,
+        }
+        this.client.send(response)
+        break
+      }
+
+      case 'file:selected': {
+        const selectMsg = message as FileSelectMessage
+        this.callbacks.onFileSelect?.(selectMsg.path)
+        break
+      }
+
+      case 'files:recent':
+        // Host receives this but doesn't need to handle (it sends these)
+        console.log('[RemoteSession] Received files:recent (no action needed on Host)')
         break
 
       default:

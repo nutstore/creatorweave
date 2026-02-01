@@ -168,6 +168,49 @@ export interface EncryptionErrorMessage {
 }
 
 // ============================================================================
+// File Discovery Messages (Remote ←→ Host)
+// ============================================================================
+
+/** File entry shared between Host and Remote */
+export interface FileEntry {
+  path: string // Full path
+  name: string // File/directory name
+  type: 'file' | 'directory'
+  extension?: string
+  size?: number
+  modified?: number
+  children?: FileEntry[] // Child entries for directories
+}
+
+/** Remote requests file search */
+export interface FileSearchRequest {
+  type: 'file:search'
+  query: string
+  limit?: number // Default 50
+}
+
+/** Host returns search results */
+export interface FileSearchResult {
+  type: 'file:search-result'
+  query: string
+  results: FileEntry[]
+  hasMore: boolean
+}
+
+/** Host pushes recent files to Remote */
+export interface RecentFilesMessage {
+  type: 'files:recent'
+  files: FileEntry[]
+  trigger: 'modified' | 'accessed'
+}
+
+/** Remote selects a file for @reference */
+export interface FileSelectMessage {
+  type: 'file:selected'
+  path: string
+}
+
+// ============================================================================
 // Union type
 // ============================================================================
 
@@ -192,6 +235,10 @@ export type RemoteMessage =
   | PongMessage
   | EncryptionReadyMessage
   | EncryptionErrorMessage
+  | FileSearchRequest
+  | FileSearchResult
+  | RecentFilesMessage
+  | FileSelectMessage
 
 /** Envelope wrapping encrypted messages */
 export interface EncryptedEnvelope {
