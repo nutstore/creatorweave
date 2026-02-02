@@ -63,10 +63,11 @@ cd browser-fs-analyzer
 ### 5. 安装依赖
 
 ```bash
-# 安装前端依赖
-cd web
-npm install
-cd ..
+# 使用 pnpm 安装依赖（推荐）
+pnpm install
+
+# 或单独安装 web 依赖
+cd web && pnpm install
 ```
 
 ### 6. 添加 WASM 目标
@@ -128,7 +129,7 @@ wasm-pack test --headless --chrome
 
 # 前端测试
 cd web
-npm test
+pnpm test
 ```
 
 ## IDE 配置
@@ -165,22 +166,35 @@ browser-fs-analyzer/
 │   ├── Cargo.toml           # Workspace 配置
 │   ├── crates/
 │   │   ├── core/            # 核心库
-│   │   └── wasm-bindings/   # WASM 绑定
+│   │   ├── wasm-bindings/   # WASM 绑定
+│   │   ├── plugin-api/      # 插件 API
+│   │   ├── plugin-sdk/      # 插件 SDK 模板
+│   │   └── example-plugins/ # 示例插件
 │   └── scripts/             # 构建脚本
 │
-├── web/                     # React 前端
+├── web/                     # React 前端 (桌面端)
 │   ├── src/
 │   │   ├── components/      # React 组件
 │   │   ├── store/           # Zustand stores
-│   │   ├── hooks/           # 自定义 hooks
 │   │   ├── services/        # 业务逻辑
-│   │   └── lib/             # 工具函数
-│   ├── package.json
-│   └── vite.config.ts
+│   │   ├── remote/          # 远程会话
+│   │   └── wasm/            # WASM 集成
+│   └── package.json
 │
+├── mobile-web/              # React 前端 (移动端远程控制)
+│   └── src/
+│
+├── relay-server/            # Socket.IO 中继服务器
+│   └── src/
+│
+├── packages/                # Monorepo 共享包
+│   ├── ui/                  # 共享 UI 组件
+│   ├── encryption/          # E2E 加密
+│   └── conversation/        # 对话管理
+│
+├── plugins/                 # 插件开发文档
 └── docs/                    # 文档
     ├── architecture/        # 架构文档
-    ├── api/                 # API 文档
     └── development/         # 开发指南
 ```
 

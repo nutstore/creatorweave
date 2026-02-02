@@ -638,44 +638,44 @@ cd mobile-web && pnpm run dev --port 3002
 
 ---
 
-## 🎯 Phase 2: 进阶扩展
+## 🎯 Phase 2: 插件系统 ✅
 
-### 方向 A: 动态插件系统（推荐）
+### 动态插件系统（已完成）
 
-**场景**：用户上传外部 WASM 插件扩展功能
+**已实现**：
+- ✅ 插件 API (`crates/plugin-api`)
+- ✅ 插件 SDK (`crates/plugin-sdk`)
+- ✅ 示例插件：MD5 计算、行数统计、HTML 演示
+- ✅ 插件管理 UI（上传、启用、禁用）
+- ✅ 并行执行多插件
 
-**实现**：
-1. 设计插件 API trait
-2. 实现动态加载器（wasmtime/wasmer）
-3. 创建示例插件（MD5 计算、代码行数统计）
+**文档**：[插件系统架构](../plugin-system-architecture.md) | [插件开发指南](../../plugins/README.md)
 
-### 方向 B: 安全内容预览
+### 计划中的功能
 
-**场景**：安全预览 HTML/MD 文件
+**方向 B: 安全内容预览**
+- 使用 `sandbox` iframe 预览 HTML/MD 文件
+- 通过 CSP 限制脚本执行
 
-**实现**：
-1. 使用 `sandbox` iframe
-2. 通过 CSP 限制脚本执行
-3. 隔离恶意文件
-
-### 方向 C: 批量文件处理器
-
-**场景**：批量重命名、添加版权头
-
-**实现**：
-1. 使用 `createWritable()` 获取写流
-2. 批量修改文件
-3. 原子性写入
+**方向 C: 批量文件处理器**
+- 批量重命名、添加版权头
+- 使用 `createWritable()` 获取写流
 
 ---
 
 ## 📚 参考资料
 
+### 外部资源
 - [File System Access API - Chrome Developers](https://developer.chrome.com/docs/capabilities/web-apis/file-system-access)
 - [OPFS - MDN Web Docs](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API)
 - [wasm-bindgen - GitHub](https://github.com/rustwasm/wasm-bindgen)
 - [Zustand - GitHub](https://github.com/pmndrs/zustand)
 - [shadcn/ui - Official Site](https://ui.shadcn.com/)
+
+### 项目内部文档
+- [OPFS 使用场景指南](./opfs-guide.md) - OPFS 技术应用场景和实现建议
+- [插件系统架构](../plugin-system-architecture.md) - 动态插件系统设计
+- [远程会话架构](../remote-session-architecture.md) - 移动端远程控制设计
 
 ---
 

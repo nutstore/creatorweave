@@ -25,7 +25,7 @@ This script will:
 - ✅ Check Rust and Node.js installation
 - ✅ Install wasm-pack
 - ✅ Add WASM target
-- ✅ Install npm dependencies
+- ✅ Install pnpm dependencies
 
 ### Step 2: Start Development Server
 
@@ -55,7 +55,7 @@ Or run the script directly:
 bash scripts/build.sh
 
 # Preview the build
-cd web && npm run preview
+cd web && pnpm run preview
 ```
 
 ## 📋 Available Commands
@@ -107,9 +107,9 @@ If you prefer manual setup:
 cargo install wasm-pack
 rustup target add wasm32-unknown-unknown
 
-# 2. Install npm dependencies
-cd web
-npm install
+# 2. Install pnpm dependencies
+pnpm install
+# or: cd web && pnpm install
 
 # 3. Build WASM
 cd ../wasm
@@ -117,7 +117,7 @@ wasm-pack build --target web --out-dir ../web/public/wasm crates/wasm-bindings
 
 # 4. Start dev server
 cd ../web
-npm run dev
+pnpm run dev
 ```
 
 ## 🏗️ Project Structure
@@ -127,25 +127,34 @@ browser-fs-analyzer/
 ├── wasm/                  # Rust + WASM module
 │   ├── crates/
 │   │   ├── core/          # Core computation logic
-│   │   └── wasm-bindings/ # WASM bindings
+│   │   ├── wasm-bindings/ # WASM bindings
+│   │   ├── plugin-api/    # Plugin API
+│   │   ├── plugin-sdk/    # Plugin SDK
+│   │   └── example-plugins/# Example plugins
 │   └── scripts/           # WASM build scripts
 │
-├── web/                   # React frontend
+├── web/                   # React frontend (Desktop)
 │   ├── src/
 │   │   ├── components/    # React components
 │   │   ├── store/         # Zustand stores
-│   │   ├── hooks/         # Custom hooks
 │   │   ├── services/      # Business logic
-│   │   └── lib/           # Utilities
+│   │   ├── remote/        # Remote session
+│   │   └── wasm/          # WASM integration
 │   └── package.json
 │
-├── scripts/               # Development scripts
-│   ├── setup.sh
-│   ├── dev.sh
-│   ├── build.sh
-│   ├── test.sh
-│   └── clean.sh
+├── mobile-web/            # React frontend (Mobile Remote)
+│   └── src/
 │
+├── relay-server/          # Socket.IO relay server
+│   └── src/
+│
+├── packages/              # Monorepo shared packages
+│   ├── ui/                # Shared UI components
+│   ├── encryption/        # E2E encryption
+│   └── conversation/      # Conversation management
+│
+├── plugins/               # Plugin development docs
+├── scripts/               # Development scripts
 └── docs/                  # Documentation
 ```
 
@@ -170,16 +179,16 @@ rustup target add wasm32-unknown-unknown
 lsof -ti:3000 | xargs kill -9
 
 # Or use a different port
-cd web && npm run dev -- --port 3001
+cd web && pnpm run dev -- --port 3001
 ```
 
 ### Issue: Dependencies not installing
 
 ```bash
-# Clear npm cache and reinstall
+# Clear pnpm cache and reinstall
 cd web
-rm -rf node_modules package-lock.json
-npm install
+rm -rf node_modules
+pnpm install
 ```
 
 ## 📚 Next Steps
@@ -193,7 +202,7 @@ npm install
 1. **Hot Reload**: Vite provides hot module replacement for faster development
 2. **WASM Changes**: When modifying Rust code, run `make build-wasm` to rebuild the WASM module
 3. **TypeScript**: The project uses strict TypeScript - ensure type safety
-4. **Code Style**: Run `make fmt` to format Rust code and `npm run format` for frontend code
+4. **Code Style**: Run `make fmt` to format Rust code and `pnpm run format` for frontend code
 
 ## 🤝 Need Help?
 

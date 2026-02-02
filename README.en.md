@@ -136,11 +136,11 @@ Real-time analysis results:
 - ✅ WASM accumulation calculation
 - ✅ Real-time result display
 
-### Phase 2: Advanced Features (Planned)
+### Phase 2: Advanced Features ✅
 
-- 🔲 **Dynamic Plugin System** - Support external WASM plugins
-- 🔲 **Secure Content Preview** - Preview HTML/MD in iframe sandbox
-- 🔲 **Batch File Processing** - Batch rename, add copyright headers
+- ✅ **Dynamic Plugin System** - Support external WASM plugins
+- 🔲 **Secure Content Preview** - Preview HTML/MD in iframe sandbox (Planned)
+- 🔲 **Batch File Processing** - Batch rename, add copyright headers (Planned)
 
 ## 📦 Project Structure
 
@@ -149,22 +149,35 @@ browser-fs-analyzer/
 ├── wasm/                      # Rust + WASM
 │   ├── crates/
 │   │   ├── core/              # Core library
-│   │   └── wasm-bindings/     # WASM bindings
+│   │   ├── wasm-bindings/     # WASM bindings
+│   │   ├── plugin-api/        # Plugin API
+│   │   ├── plugin-sdk/        # Plugin SDK
+│   │   └── example-plugins/   # Example plugins
 │   └── scripts/               # Build scripts
 │
-├── web/                       # React frontend
+├── web/                       # React frontend (Desktop)
 │   ├── src/
 │   │   ├── components/        # React components
 │   │   ├── store/             # Zustand stores
-│   │   ├── hooks/             # Custom hooks
 │   │   ├── services/          # Business logic
-│   │   └── lib/               # Utility functions
-│   ├── package.json
-│   └── vite.config.ts
+│   │   ├── remote/            # Remote session
+│   │   └── wasm/              # WASM integration
+│   └── package.json
 │
+├── mobile-web/                # React frontend (Mobile Remote)
+│   └── src/
+│
+├── relay-server/              # Socket.IO relay server
+│   └── src/
+│
+├── packages/                  # Monorepo shared packages
+│   ├── ui/                    # Shared UI components
+│   ├── encryption/            # E2E encryption
+│   └── conversation/          # Conversation management
+│
+├── plugins/                   # Plugin development docs
 └── docs/                      # Documentation
     ├── architecture/          # Architecture docs
-    ├── api/                   # API docs
     └── development/           # Development guides
 ```
 
