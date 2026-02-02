@@ -114,7 +114,8 @@ export function App() {
     filePickerOpen,
     setFilePickerOpen,
     toggleFileSelection,
-    setSocket
+    setSocket,
+    hostRootName
   } = useRemoteStore()
 
   // Directory change toast state
@@ -640,7 +641,12 @@ export function App() {
       {/* Header */}
       <header className="bg-primary-600 text-white px-4 py-3 shadow-md">
         <div className="flex items-center justify-between max-w-lg mx-auto">
-          <h1 className="text-lg font-semibold">BFOSA Remote</h1>
+          <div className="flex flex-col">
+            <h1 className="text-lg font-semibold">BFOSA Remote</h1>
+            {hostRootName && (
+              <span className="text-xs opacity-70 truncate max-w-[200px]">{hostRootName}</span>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <div className={`w-2 h-2 rounded-full ${getConnectionDisplay().color}`} />
             <span className="text-xs opacity-80">{getConnectionDisplay().text}</span>
