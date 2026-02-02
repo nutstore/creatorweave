@@ -90,8 +90,8 @@ export function Toast({
   return (
     <div
       className={clsx(
-        'fixed top-16 left-4 right-4 max-w-lg mx-auto z-50',
-        'animate-in slide-in-from-top fade-in duration-300',
+        'fixed top-4 left-4 max-w-sm z-50',
+        'animate-in slide-in-from-top-left fade-in duration-300',
         exiting && 'animate-out fade-out duration-300',
         className
       )}
