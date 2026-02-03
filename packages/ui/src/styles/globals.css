@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ========== Base Colors ========== */
+    --background: 0 0% 100%;       /* #FFFFFF */
+    --foreground: 10 10% 9%;       /* #171717 */
+
+    --card: 0 0% 100%;
+    --card-foreground: 10 10% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 10 10% 9%;
+
+    --secondary: 0 0% 96%;         /* #F5F5F5 */
+    --secondary-foreground: 10 10% 9%;
+
+    --muted: 0 0% 96%;             /* #F5F5F5 */
+    --muted-foreground: 0 0% 45%;  /* #737373 */
+
+    --accent: 0 0% 96%;
+    --accent-foreground: 10 10% 9%;
+
+    --destructive: 15 74% 57%;     /* #E07B54 - custom orange-red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 90%;            /* #E5E5E5 */
+    --input: 0 0% 90%;
+    --ring: 174 72% 56%;           /* Teal */
+
+    --radius: 0.5rem;              /* 8px */
+
+    /* ========== Primary (Teal) ========== */
+    --primary: 174 72% 56%;         /* #14B8A6 */
+    --primary-foreground: 0 0% 100%;
+    --primary-50: 174 64% 97%;      /* #F0FDFA */
+    --primary-100: 174 64% 94%;     /* #CCFBF1 */
+    --primary-500: 174 72% 56%;     /* #14B8A6 */
+    --primary-600: 174 75% 38%;     /* #0D9488 */
+    --primary-700: 174 62% 38%;     /* #0F766E */
+
+    /* ========== Status Colors ========== */
+    --success: 142 76% 36%;         /* #16A34A */
+    --success-bg: 142 76% 96%;      /* #DCFCE7 */
+    --success-text: 142 71% 45%;    /* #15803D */
+
+    --warning: 35 84% 43%;          /* #D97706 */
+    --warning-bg: 48 96% 89%;       /* #FEF3C7 */
+
+    --danger: 15 74% 57%;           /* #E07B54 */
+    --danger-bg: 25 95% 97%;        /* #FFF7ED */
+    --danger-border: 24 74% 66%;    /* #FDBA74 */
+  }
+
+  .dark {
+    /* ========== Base Colors ========== */
+    --background: 180 4% 4%;        /* #0A0A0A */
+    --foreground: 0 0% 90%;         /* #E5E5E5 */
+
+    --card: 180 4% 4%;
+    --card-foreground: 0 0% 90%;
+
+    --popover: 180 4% 4%;
+    --popover-foreground: 0 0% 90%;
+
+    --secondary: 0 0% 9%;           /* #171717 */
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 45%;
+
+    --accent: 0 0% 9%;
+    --accent-foreground: 0 0% 90%;
+
+    --destructive: 15 74% 67%;      /* #F59E6B */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 0 0% 15%;             /* #262626 */
+    --input: 0 0% 15%;
+    --ring: 174 83% 62%;            /* #2DD4BF */
+
+    /* ========== Primary (Teal) ========== */
+    --primary: 174 83% 62%;         /* #2DD4BF - brighter in dark mode */
+    --primary-foreground: 180 4% 4%;
+    --primary-50: 177 43% 13%;      /* #042F2E */
+    --primary-100: 174 56% 29%;     /* #134E4A */
+    --primary-500: 174 72% 56%;     /* #14B8A6 */
+    --primary-600: 174 83% 62%;     /* #2DD4BF */
+    --primary-700: 174 76% 70%;     /* #5EEAD4 */
+
+    /* ========== Status Colors ========== */
+    --success: 142 71% 45%;         /* #22C55E */
+    --success-bg: 142 76% 12%;      /* #052E16 */
+    --success-text: 142 76% 66%;    /* #4ADE80 */
+
+    --warning: 43 96% 56%;          /* #FBBF24 */
+    --warning-bg: 38 92% 12%;       /* #451A03 */
+
+    --danger: 24 74% 67%;           /* #F59E6B */
+    --danger-bg: 20 33% 17%;        /* #431407 */
+    --danger-border: 24 71% 45%;    /* #C2410C */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

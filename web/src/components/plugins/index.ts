@@ -24,4 +24,5 @@ export type { AnalysisResult, FileInfo } from './api/types'
 
 // Plugin UI components
 export { PluginDialog } from './ui/PluginDialog'
-export { PluginToastContainer, PluginToast } from './ui/PluginToast'
+export { showToast, closeToast, closeAllToasts } from './ui/PluginToast'
+export type { ToastType, ToastMessage } from './ui/PluginToast'

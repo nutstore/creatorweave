@@ -15,7 +15,7 @@ import { generateBFSAAPIScript } from './api/BFSAAPIScript'
 import { handleBFSAAPICall, type APIHandlerContext } from './api/BFSAAPIHandler'
 import { IFRAME_STYLES } from './styles/iframe-styles'
 import { PluginDialog } from './ui/PluginDialog'
-import { PluginToastContainer, type ToastMessage, type ToastType } from './ui/PluginToast'
+import { showToast, type ToastType } from './ui/PluginToast'
 
 export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTMLRendererProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -30,20 +30,12 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
     onResult: (result: boolean | null) => void
   }>({ isOpen: false, message: '', type: 'info', onResult: () => {} })
 
-  // Toast state
-  const [toasts, setToasts] = useState<ToastMessage[]>([])
-
   // =============================================================================
-  // Show toast notification
+  // Show toast notification (now using sonner)
   // =============================================================================
 
-  const showToast = useCallback((message: string, type: ToastType) => {
-    const id = `toast_${Date.now()}`
-    setToasts((prev) => [...prev, { id, message, type }])
-  }, [])
-
-  const closeToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
+  const handleShowToast = useCallback((message: string, type: ToastType) => {
+    showToast(message, type)
   }, [])
 
   // =============================================================================
@@ -109,7 +101,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
 
   const apiContext: APIHandlerContext = {
     analysisData,
-    showToast,
+    showToast: handleShowToast,
     showConfirm,
     resizeIframe,
     toggleFullscreen,
@@ -246,8 +238,6 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
         }}
       />
 
-      {/* Toasts */}
-      <PluginToastContainer toasts={toasts} onClose={closeToast} />
     </div>
   )
 }

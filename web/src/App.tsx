@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Toaster } from 'sonner'
 import { isSupported } from '@/services/fsAccess.service'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'
@@ -26,7 +27,12 @@ function App() {
     return <UnsupportedBrowser />
   }
 
-  return <WorkspaceLayout />
+  return (
+    <>
+      <WorkspaceLayout />
+      <Toaster position="bottom-right" />
+    </>
+  )
 }
 
 export default App
