@@ -68,3 +68,15 @@ playwright/.cache/
 .turbo/
 .playwright-mcp/
 *.tsbuildinfo
+
+# Docs
+docs/
+
+# Node version
+.nvmrc
+
+# Specific doc files to ignore
+docs/analysis-report.md
+docs/design/design-system.md
+docs/design/p0-performance-and-testing.md
+docs/technical-debt-plan.md
