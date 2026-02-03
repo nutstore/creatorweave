@@ -64,17 +64,17 @@ describe('PluginLoaderService', () => {
   })
 
   describe('validateWasmFormat', () => {
-    it('should reject invalid WASM (bad magic number)', () => {
+    it('should reject invalid WASM (bad magic number)', async () => {
       const invalidBytes = new ArrayBuffer(8)
       new Uint8Array(invalidBytes).set([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-      loader['loadPlugin'](invalidBytes).should.be.rejected()
+      await expect(loader['loadPlugin'](invalidBytes)).rejects.toThrow()
     })
 
-    it('should reject non-WASM data', () => {
+    it('should reject non-WASM data', async () => {
       const shortBytes = new ArrayBuffer(4)
 
-      loader['loadPlugin'](shortBytes).should.be.rejected()
+      await expect(loader['loadPlugin'](shortBytes)).rejects.toThrow()
     })
   })
 

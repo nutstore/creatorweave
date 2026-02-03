@@ -385,7 +385,13 @@ export async function processBatch<T, R>(
  * @param path File path
  */
 export function getFileExtension(path: string): string {
-  const ext = path.substring(path.lastIndexOf('.'))
+  const lastDot = path.lastIndexOf('.')
+  // No dot found, or dot is at the start (hidden file) - return filename as-is
+  if (lastDot <= 0) {
+    return path
+  }
+  // Has extension - return lowercase version
+  const ext = path.substring(lastDot)
   return ext.toLowerCase()
 }
 

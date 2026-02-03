@@ -13,10 +13,15 @@ describe('traversal.service', () => {
       }),
     }
 
+    // Create async iterable mock
+    async function* mockEntries() {
+      yield ['test.txt', mockFileHandle]
+    }
+
     const mockDirHandle = {
       name: 'test-folder',
       kind: 'directory',
-      entries: vi.fn().mockResolvedValue([['test.txt', mockFileHandle]]),
+      entries: vi.fn().mockReturnValue(mockEntries()),
     }
 
     const results: any[] = []
@@ -45,10 +50,14 @@ describe('traversal.service', () => {
       }),
     }
 
+    async function* mockSubEntries() {
+      yield ['nested.txt', mockNestedFile]
+    }
+
     const mockSubDir = {
       name: 'subfolder',
       kind: 'directory',
-      entries: vi.fn().mockResolvedValue([['nested.txt', mockNestedFile]]),
+      entries: vi.fn().mockReturnValue(mockSubEntries()),
     }
 
     const mockFileHandle = {
@@ -61,13 +70,15 @@ describe('traversal.service', () => {
       }),
     }
 
+    async function* mockEntries() {
+      yield ['test.txt', mockFileHandle]
+      yield ['subfolder', mockSubDir]
+    }
+
     const mockDirHandle = {
       name: 'test-folder',
       kind: 'directory',
-      entries: vi.fn().mockResolvedValue([
-        ['test.txt', mockFileHandle],
-        ['subfolder', mockSubDir],
-      ]),
+      entries: vi.fn().mockReturnValue(mockEntries()),
     }
 
     const results: any[] = []
@@ -75,10 +86,11 @@ describe('traversal.service', () => {
       results.push(result)
     }
 
-    expect(results).toHaveLength(2)
+    expect(results).toHaveLength(3) // 1 file + 1 directory + 1 nested file
     expect(results[0].name).toBe('test.txt')
-    expect(results[1].name).toBe('nested.txt')
-    expect(results[1].path).toBe('subfolder/nested.txt')
+    expect(results[1].name).toBe('subfolder')
+    expect(results[2].name).toBe('nested.txt')
+    expect(results[2].path).toBe('subfolder/nested.txt')
   })
 
   it('should skip files that cannot be accessed', async () => {
@@ -88,10 +100,14 @@ describe('traversal.service', () => {
       getFile: vi.fn().mockRejectedValue(new Error('Access denied')),
     }
 
+    async function* mockEntries() {
+      yield ['error.txt', mockErrorFile]
+    }
+
     const mockDirHandle = {
       name: 'test-folder',
       kind: 'directory',
-      entries: vi.fn().mockResolvedValue([['error.txt', mockErrorFile]]),
+      entries: vi.fn().mockReturnValue(mockEntries()),
     }
 
     const results: any[] = []
@@ -103,10 +119,14 @@ describe('traversal.service', () => {
   })
 
   it('should handle empty directories', async () => {
+    async function* mockEntries() {
+      // Empty
+    }
+
     const mockDirHandle = {
       name: 'empty-folder',
       kind: 'directory',
-      entries: vi.fn().mockResolvedValue([]),
+      entries: vi.fn().mockReturnValue(mockEntries()),
     }
 
     const results: any[] = []

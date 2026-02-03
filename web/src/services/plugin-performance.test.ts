@@ -11,7 +11,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PluginLoaderService } from './plugin-loader.service'
-import { PluginExecutor } from './plugin-executor.service'
+import { PluginExecutorService } from './plugin-executor.service'
 import { PluginResultAggregator } from './plugin-aggregator.service'
 import type { PluginInstance, FileEntry } from '../types/plugin'
 
@@ -31,20 +31,20 @@ class PerformanceMonitor {
     return performance.now() - startTime
   }
 
-  measure<T>(marker: string, fn: () => T): T {
+  measure<T>(marker: string, fn: () => T): number {
     this.start(marker)
-    const result = fn()
+    fn()
     const duration = this.end(marker)
     console.log(`[Performance] ${marker}: ${duration.toFixed(2)}ms`)
-    return result
+    return duration
   }
 
-  async measureAsync<T>(marker: string, fn: () => Promise<T>): Promise<T> {
+  async measureAsync<T>(marker: string, fn: () => Promise<T>): Promise<number> {
     this.start(marker)
-    const result = await fn()
+    await fn()
     const duration = this.end(marker)
     console.log(`[Performance] ${marker}: ${duration.toFixed(2)}ms`)
-    return result
+    return duration
   }
 }
 
@@ -185,11 +185,11 @@ describe('Plugin Loading Performance', () => {
 
 describe('Plugin Execution Performance', () => {
   let monitor: PerformanceMonitor
-  let executor: PluginExecutor
+  let executor: PluginExecutorService
 
   beforeEach(() => {
     monitor = new PerformanceMonitor()
-    executor = new PluginExecutor()
+    executor = new PluginExecutorService()
   })
 
   it('should process single file quickly', async () => {
@@ -274,33 +274,23 @@ describe('Result Aggregation Performance', () => {
   })
 
   it('should aggregate small results quickly', () => {
-    const results = [
-      {
-        pluginId: 'test-plugin',
-        fileId: '/test/file1.txt',
-        success: true,
-        output: {
-          path: '/test/file1.txt',
-          status: 'Success',
-          data: { lines: 42 },
+    // Create proper PluginResult Map
+    const pluginResults = new Map([
+      [
+        'test-plugin',
+        {
+          summary: 'Processed 2 files',
+          filesProcessed: 2,
+          filesSkipped: 0,
+          filesWithErrors: 0,
+          metrics: { totalLines: 66 },
+          warnings: [],
         },
-        executionTime: 10,
-      },
-      {
-        pluginId: 'test-plugin',
-        fileId: '/test/file2.txt',
-        success: true,
-        output: {
-          path: '/test/file2.txt',
-          status: 'Success',
-          data: { lines: 24 },
-        },
-        executionTime: 8,
-      },
-    ]
+      ],
+    ])
 
     const duration = monitor.measure('aggregate-small', () => {
-      aggregator.aggregate(results, 2, 18)
+      aggregator.aggregate(pluginResults, 2, 18)
     })
 
     expect(duration).toBeLessThan(10) // 10ms
@@ -308,20 +298,23 @@ describe('Result Aggregation Performance', () => {
 
   it('should aggregate large results efficiently', () => {
     const fileCount = 1000
-    const results = Array.from({ length: fileCount }, (_, i) => ({
-      pluginId: 'test-plugin',
-      fileId: `/test/file${i}.txt`,
-      success: true,
-      output: {
-        path: `/test/file${i}.txt`,
-        status: 'Success',
-        data: { lines: Math.floor(Math.random() * 100) },
-      },
-      executionTime: Math.floor(Math.random() * 20),
-    }))
+    // Create proper PluginResult Map
+    const pluginResults = new Map([
+      [
+        'test-plugin',
+        {
+          summary: `Processed ${fileCount} files`,
+          filesProcessed: fileCount,
+          filesSkipped: 0,
+          filesWithErrors: 0,
+          metrics: { totalLines: fileCount * 50 },
+          warnings: [],
+        },
+      ],
+    ])
 
     const duration = monitor.measure('aggregate-large', () => {
-      aggregator.aggregate(results, fileCount, 500)
+      aggregator.aggregate(pluginResults, fileCount, 500)
     })
 
     // Aggregation should be fast even for large result sets
