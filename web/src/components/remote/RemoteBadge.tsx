@@ -1,44 +1,41 @@
 /**
- * Remote Badge - status indicator in the header bar.
+ * Remote Badge - 顶部导航栏远程控制状态指示器
  *
- * Always shows:
- * - Connection state indicator
- * - Encryption state indicator (🔓/🔒/⚠️)
- * - Session ID (with copy button)
- * - Peer count
- * - Disconnect button
- * - Button to open RemoteControlPanel
+ * 布局：状态区 | 操作区，中间竖线分隔
+ * 7 种状态，信息密度最小化，靠视觉通道传达状态
  */
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useRemoteStore } from '@/store/remote.store'
 import { RemoteControlPanel } from './RemoteControlPanel'
-import { QrCode, Lock, Unlock, AlertTriangle, Key, RefreshCw } from 'lucide-react'
+import { QrCode, Lock, LockOpen, Key, RefreshCw, AlertTriangle } from 'lucide-react'
 
-const ENCRYPTION_STATE_CONFIG: Record<
+// 加密状态配置
+const ENCRYPTION_CONFIG: Record<
   string,
-  { icon: React.ReactNode; color: string; tooltip: string }
+  { icon: React.ReactNode; color: string; animation?: string }
 > = {
-  none: { icon: <Unlock className="h-3 w-3" />, color: 'text-gray-400', tooltip: 'No encryption' },
+  none: {
+    icon: <LockOpen className="h-3 w-3" />,
+    color: 'text-gray-400',
+  },
   generating: {
-    icon: <Key className="h-3 w-3 animate-pulse" />,
+    icon: <Key className="h-3 w-3" />,
     color: 'text-yellow-400',
-    tooltip: 'Generating keys...',
+    animation: 'animate-pulse',
   },
   exchanging: {
-    icon: <RefreshCw className="h-3 w-3 animate-spin" />,
+    icon: <RefreshCw className="h-3 w-3" />,
     color: 'text-yellow-400',
-    tooltip: 'Exchanging keys...',
+    animation: 'animate-spin',
   },
   ready: {
-    icon: <Lock className="h-3 w-3 text-green-500" />,
+    icon: <Lock className="h-3 w-3" />,
     color: 'text-green-500',
-    tooltip: 'E2E encrypted',
   },
   error: {
-    icon: <AlertTriangle className="h-3 w-3 text-red-500" />,
+    icon: <AlertTriangle className="h-3 w-3" />,
     color: 'text-red-500',
-    tooltip: 'Encryption error',
   },
 }
 
@@ -47,139 +44,126 @@ export const RemoteBadge: React.FC = () => {
   const {
     connectionState,
     role,
-    sessionId,
+    encryptionState,
     peerCount,
     error,
-    encryptionState,
     encryptionError,
     closeSession,
     clearError,
   } = useRemoteStore()
 
   const isActive = role !== 'none'
+  const hasError = error || encryptionError
 
-  // Derive display state based on WebSocket connection AND peer presence
-  const displayState = useMemo(() => {
-    // If WebSocket is not connected, show that state
-    if (connectionState === 'disconnected') {
-      return { label: 'Disconnected', color: 'bg-gray-400' }
-    }
+  // 连接状态对应的圆点颜色
+  const connectionDotColor = useMemo(() => {
+    if (!isActive) return 'bg-gray-400'
+    if (connectionState === 'disconnected') return 'bg-gray-400'
     if (connectionState === 'connecting' || connectionState === 'reconnecting') {
-      return { label: 'Connecting...', color: 'bg-yellow-400' }
+      return 'bg-yellow-400'
     }
-
-    // WebSocket is connected, check peer status
+    // Host: 有 peer 才算真正连接
     if (role === 'host') {
-      // Host: only "connected" when there's at least one remote peer
-      if (peerCount > 1) {
-        return { label: 'Connected', color: 'bg-green-400' }
-      }
-      return { label: 'Waiting for remote...', color: 'bg-yellow-400' }
+      return peerCount > 1 ? 'bg-green-400' : 'bg-yellow-400'
     }
+    // Remote: 连接到 relay 就算 ready
+    return 'bg-green-400'
+  }, [isActive, connectionState, role, peerCount])
 
-    // Remote: connected to relay means ready
-    return { label: 'Connected', color: 'bg-green-400' }
-  }, [connectionState, role, peerCount])
+  // 是否已连接（用于显示 QR 按钮）
+  const isConnected = connectionState === 'connected'
 
-  const handleCopySessionId = useCallback(() => {
-    if (sessionId) {
-      navigator.clipboard.writeText(sessionId).catch(() => {
-        // Fallback: do nothing
-      })
-    }
-  }, [sessionId])
-
-  // Inactive state - show button to open RemoteControlPanel
+  // ========================================
+  // Inactive 视图 (role === 'none')
+  // ========================================
   if (!isActive) {
     return (
       <>
         <button
           onClick={() => setPanelOpen(true)}
-          className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent"
-          title="Open Remote Control"
+          className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-accent"
+          title="打开远程控制"
         >
           <span className="h-2 w-2 rounded-full bg-gray-400" />
-          Remote
+          <span>Remote</span>
         </button>
         <RemoteControlPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
       </>
     )
   }
 
-  // Active session view - always show full status
+  // ========================================
+  // Active 视图 (role !== 'none')
+  // ========================================
+  const encryptionConfig = ENCRYPTION_CONFIG[encryptionState] || ENCRYPTION_CONFIG.none
+
   return (
     <>
-      <div className="flex items-center gap-3 rounded-md border px-3 py-1.5 text-sm">
-        {/* Connection indicator */}
-        <span className={`h-2 w-2 rounded-full ${displayState.color}`} title={displayState.label} />
+      <div className="flex items-center rounded-md border px-3 py-1.5 text-sm">
+        {/* ==================== 状态区 ==================== */}
+        <div className="flex items-center gap-2 pr-3">
+          {/* 1. 连接圆点 */}
+          <span className={`h-2 w-2 rounded-full ${connectionDotColor}`} />
 
-        {/* Encryption indicator */}
-        <span
-          className={ENCRYPTION_STATE_CONFIG[encryptionState]?.color}
-          title={ENCRYPTION_STATE_CONFIG[encryptionState]?.tooltip}
-        >
-          {ENCRYPTION_STATE_CONFIG[encryptionState]?.icon}
-        </span>
-
-        {/* Role badge */}
-        <span className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium uppercase">
-          {role}
-        </span>
-
-        {/* Session ID */}
-        {sessionId && (
-          <button
-            onClick={handleCopySessionId}
-            className="font-mono text-xs text-muted-foreground hover:text-foreground"
-            title="Click to copy session ID"
-          >
-            {sessionId.slice(0, 8)}...
-          </button>
-        )}
-
-        {/* Peer count - only shown for Host, showing connected Remote count (excluding self) */}
-        {role === 'host' && peerCount > 1 && (
-          <span className="text-xs text-muted-foreground" title="Connected remote devices">
-            {peerCount - 1} Remote{peerCount - 1 !== 1 ? 's' : ''}
+          {/* 2. 加密图标 */}
+          <span className={encryptionConfig.animation}>
+            <span className={encryptionConfig.color}>{encryptionConfig.icon}</span>
           </span>
-        )}
 
-        {/* Status text for Host when waiting */}
-        {role === 'host' && peerCount <= 1 && connectionState === 'connected' && (
-          <span className="text-xs text-muted-foreground">Waiting for remote...</span>
-        )}
+          {/* 3. 角色徽章 */}
+          <span className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground">
+            {role === 'host' ? 'HOST' : 'REMOTE'}
+          </span>
+        </div>
 
-        {/* Error or Encryption Error */}
-        {(error || encryptionError) && (
-          <button
-            onClick={clearError}
-            className="max-w-[120px] truncate text-xs text-destructive"
-            title={(error ?? '') || (encryptionError ?? '')}
-          >
-            {error || encryptionError}
-          </button>
-        )}
+        {/* ==================== 分隔线 ==================== */}
+        <div className="mx-1 h-4 w-px bg-border" />
 
-        {/* QR Code button - opens RemoteControlPanel */}
-        <button
-          onClick={() => setPanelOpen(true)}
-          className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-          title="Show QR Code"
-        >
-          <QrCode className="h-4 w-4" />
-        </button>
-
-        {/* Disconnect */}
-        <button
-          onClick={closeSession}
-          className="ml-auto rounded px-2 py-0.5 text-xs text-destructive hover:bg-destructive/10"
-          title="Disconnect"
-        >
-          Disconnect
-        </button>
+        {/* ==================== 操作区 ==================== */}
+        <div className="flex items-center gap-2 pl-3">
+          {/* Error 状态：显示错误文字 + 分隔线 + Disconnect */}
+          {hasError ? (
+            <>
+              <button
+                onClick={clearError}
+                className="max-w-[120px] truncate text-xs text-red-500 hover:underline"
+                title={error || encryptionError || undefined}
+              >
+                {error || encryptionError}
+              </button>
+              <div className="h-4 w-px bg-border" />
+              <button
+                onClick={closeSession}
+                className="text-xs text-red-500 transition-colors hover:bg-destructive/10"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <>
+              {/* QR 按钮 (连接时显示) */}
+              {isConnected && (
+                <button
+                  onClick={() => setPanelOpen(true)}
+                  className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  title="显示二维码"
+                >
+                  <QrCode className="h-3.5 w-3.5" />
+                </button>
+              )}
+              {/* Disconnect 按钮 */}
+              <button
+                onClick={closeSession}
+                className="text-xs text-red-500 transition-colors hover:bg-destructive/10 hover:text-red-600"
+              >
+                Disconnect
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* RemoteControlPanel - dialog for QR code and session management */}
+      {/* RemoteControlPanel 对话框 */}
       <RemoteControlPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
     </>
   )
