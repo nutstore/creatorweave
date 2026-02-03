@@ -18579,6 +18579,615 @@
           "padding": 24
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "7sFPE",
+      "x": 0,
+      "y": 1936,
+      "name": "FolderBtn - 交互状态",
+      "width": 800,
+      "layout": "vertical",
+      "gap": 24,
+      "padding": 32,
+      "children": [
+        {
+          "type": "frame",
+          "id": "egogZ",
+          "name": "titleFrame",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "nYWZx",
+              "name": "mainTitle",
+              "fill": "$text-primary",
+              "content": "FolderBtn 交互状态设计",
+              "fontFamily": "Inter",
+              "fontSize": 24,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "616JG",
+              "name": "subtitle",
+              "fill": "$text-secondary",
+              "content": "完整的按钮交互状态展示",
+              "fontFamily": "Inter",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "FGtIw",
+          "name": "row1",
+          "width": "fill_container",
+          "gap": 32,
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "NOeJV",
+              "name": "defaultFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "xZT0z",
+                  "name": "defaultLabel",
+                  "fill": "$text-primary",
+                  "content": "Default (默认)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "es71R",
+                  "name": "defaultDesc",
+                  "fill": "$text-secondary",
+                  "content": "常规显示状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "tJc9O",
+                  "name": "defaultBtn",
+                  "width": "fill_container",
+                  "height": 36,
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$border-default"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "Al0fa",
+                      "name": "defaultIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "folder-open",
+                      "iconFontFamily": "lucide",
+                      "fill": "$primary-600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "RyoCb",
+                      "name": "defaultText",
+                      "fill": "$text-secondary",
+                      "content": "选择文件夹",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "esm9C",
+              "name": "hoverFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "DyWBA",
+                  "name": "hoverLabel",
+                  "fill": "$text-primary",
+                  "content": "Hover (悬停)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "gHUTm",
+                  "name": "hoverDesc",
+                  "fill": "$text-secondary",
+                  "content": "鼠标悬停状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "4uV6D",
+                  "name": "hoverBtn",
+                  "width": "fill_container",
+                  "height": 36,
+                  "fill": "$primary-50",
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "#000000"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "vp4cC",
+                      "name": "hoverIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "folder-open",
+                      "iconFontFamily": "lucide",
+                      "fill": "$primary-600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GVcq3",
+                      "name": "hoverText",
+                      "fill": "$text-primary",
+                      "content": "选择文件夹",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Q7pFb",
+              "name": "pressedFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "gsg4z",
+                  "name": "pressedLabel",
+                  "fill": "$text-primary",
+                  "content": "Pressed (按压)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "k2ecw",
+                  "name": "pressedDesc",
+                  "fill": "$text-secondary",
+                  "content": "鼠标按下状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "1hYhH",
+                  "name": "pressedBtn",
+                  "width": "fill_container",
+                  "height": 36,
+                  "fill": "$primary-100",
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$primary-500"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "7gCF0",
+                      "name": "pressedIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "folder-open",
+                      "iconFontFamily": "lucide",
+                      "fill": "$primary-700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "HVvVq",
+                      "name": "pressedText",
+                      "fill": "$text-primary",
+                      "content": "选择文件夹",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "C9EqQ",
+          "name": "row2",
+          "width": "fill_container",
+          "gap": 32,
+          "justifyContent": "space_between",
+          "children": [
+            {
+              "type": "frame",
+              "id": "85Djz",
+              "name": "focusedFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "GdbeX",
+                  "name": "focusedLabel",
+                  "fill": "$text-primary",
+                  "content": "Focused (焦点)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "ksCg0",
+                  "name": "focusedDesc",
+                  "fill": "$text-secondary",
+                  "content": "键盘焦点状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "74exE",
+                  "name": "focusedBtn",
+                  "width": "fill_container",
+                  "height": 36,
+                  "fill": "$primary-50",
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 2,
+                    "fill": "$primary-500"
+                  },
+                  "effect": {
+                    "type": "shadow",
+                    "shadowType": "outer",
+                    "color": "$primary-500",
+                    "blur": 8
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "XJLt6",
+                      "name": "focusedIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "folder-open",
+                      "iconFontFamily": "lucide",
+                      "fill": "$primary-600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GN0Ig",
+                      "name": "focusedText",
+                      "fill": "$text-primary",
+                      "content": "选择文件夹",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "6phhx",
+              "name": "disabledFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "qKXmB",
+                  "name": "disabledLabel",
+                  "fill": "$text-primary",
+                  "content": "Disabled (禁用)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "Kd4vH",
+                  "name": "disabledDesc",
+                  "fill": "$text-secondary",
+                  "content": "不可用状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "PLmhI",
+                  "name": "disabledBtn",
+                  "opacity": 0.5,
+                  "width": "fill_container",
+                  "height": 36,
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$border-subtle"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "p0RTf",
+                      "name": "disabledIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "folder-open",
+                      "iconFontFamily": "lucide",
+                      "fill": "$text-muted"
+                    },
+                    {
+                      "type": "text",
+                      "id": "Dy1la",
+                      "name": "disabledText",
+                      "fill": "$text-muted",
+                      "content": "选择文件夹",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "F29qt",
+              "name": "loadingFrame",
+              "width": 220,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "kE6Bk",
+                  "name": "loadingLabel",
+                  "fill": "$text-primary",
+                  "content": "Loading (加载)",
+                  "fontFamily": "Inter",
+                  "fontSize": 14,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "HDgHd",
+                  "name": "loadingDesc",
+                  "fill": "$text-secondary",
+                  "content": "加载中状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "Qd9rm",
+                  "name": "loadingBtn",
+                  "width": "fill_container",
+                  "height": 36,
+                  "cornerRadius": 6,
+                  "stroke": {
+                    "align": "inside",
+                    "thickness": 1,
+                    "fill": "$border-default"
+                  },
+                  "gap": 6,
+                  "padding": [
+                    6,
+                    12
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon_font",
+                      "id": "p3EyL",
+                      "name": "loadingIcon",
+                      "width": 14,
+                      "height": 14,
+                      "iconFontName": "refresh-cw",
+                      "iconFontFamily": "lucide",
+                      "fill": "$primary-600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "RzrHr",
+                      "name": "loadingText",
+                      "fill": "$text-secondary",
+                      "content": "加载中...",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AyihB",
+          "name": "designNotes",
+          "width": "fill_container",
+          "fill": "$bg-secondary",
+          "cornerRadius": 8,
+          "layout": "vertical",
+          "gap": 16,
+          "padding": 24,
+          "children": [
+            {
+              "type": "text",
+              "id": "nrj53",
+              "name": "notesTitle",
+              "fill": "$text-primary",
+              "content": "设计规范说明",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "600"
+            },
+            {
+              "type": "frame",
+              "id": "IcxQC",
+              "name": "notes1",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "NOZ7k",
+                  "name": "notes1Label",
+                  "fill": "$text-primary",
+                  "content": "尺寸规范",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "PDjHD",
+                  "name": "notes1Text",
+                  "fill": "$text-secondary",
+                  "content": "• 高度: 36px  • 内边距: 6px 垂直, 12px 水平  • 圆角: 6px",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "8WC79",
+              "name": "notes2",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "oSL4J",
+                  "name": "notes2Label",
+                  "fill": "$text-primary",
+                  "content": "颜色系统",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "tzrZ7",
+                  "name": "notes2Text",
+                  "fill": "$text-secondary",
+                  "content": "• 主题色: Teal ($primary-600)  • 边框: $border-default  • 文字: $text-secondary",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "pvsa6",
+              "name": "notes3",
+              "layout": "vertical",
+              "gap": 4,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "tIUzM",
+                  "name": "notes3Label",
+                  "fill": "$text-primary",
+                  "content": "交互反馈",
+                  "fontFamily": "Inter",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "dKcKQ",
+                  "name": "notes3Text",
+                  "fill": "$text-secondary",
+                  "content": "• Hover: 背景色 $primary-50  • Pressed: 背景色 $primary-100  • Focused: 2px 边框 + 阴影",
+                  "fontFamily": "Inter",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ],
   "themes": {

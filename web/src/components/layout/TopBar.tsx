@@ -57,20 +57,20 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
             <button
               type="button"
               onClick={handleSelectFolder}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+              className="flex h-9 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
               title={t('topbar.switchFolder')}
             >
               <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <FolderOpen className="h-3.5 w-3.5 text-neutral-500" />
+              <FolderOpen className="h-4 w-4 text-neutral-500" />
               <span className="max-w-[120px] truncate">{directoryName}</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleSelectFolder}
-              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+              className="hover:border-primary-200 active:border-primary-300 flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:bg-primary-100"
             >
-              <FolderOpen className="h-3.5 w-3.5" />
+              <FolderOpen className="h-4 w-4" />
               {t('topbar.openFolder')}
             </button>
           )}

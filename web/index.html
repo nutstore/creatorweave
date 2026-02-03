@@ -9,6 +9,12 @@
       content="Browser-based File System Analyzer - Analyze local folders with WebAssembly"
     />
     <title>Browser FS Analyzer</title>
+    <!-- React Grab - 仅开发环境加载 -->
+    <script type="module">
+      if (import.meta.env.DEV) {
+        import('react-grab');
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
