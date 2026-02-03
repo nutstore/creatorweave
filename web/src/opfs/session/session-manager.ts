@@ -17,6 +17,7 @@ const INDEX_FILE = 'sessions.json'
 interface InternalSessionMetadata {
   sessionId: string
   rootDirectory: string
+  name: string
   createdAt: number
   lastAccessedAt: number
 }
@@ -32,7 +33,7 @@ interface InternalSessionMetadata {
  */
 export class SessionManager {
   private opfsRoot?: FileSystemDirectoryHandle
-  private sessionsRoot?: FileSystemDirectoryHandle
+  public sessionsRoot?: FileSystemDirectoryHandle
   private sessions: Map<string, SessionWorkspace> = new Map()
   private index: InternalSessionMetadata[] = []
   private initialized = false
@@ -91,9 +92,14 @@ export class SessionManager {
    * Create a new session workspace
    * @param rootDirectory Root directory path for the session
    * @param sessionId Optional session ID (auto-generated if not provided)
+   * @param name Optional session name
    * @returns Session workspace
    */
-  async createSession(rootDirectory: string, sessionId?: string): Promise<SessionWorkspace> {
+  async createSession(
+    rootDirectory: string,
+    sessionId?: string,
+    name?: string
+  ): Promise<SessionWorkspace> {
     if (!this.initialized) await this.initialize()
 
     const id = sessionId || generateId('session')
@@ -110,6 +116,7 @@ export class SessionManager {
     const metadata: InternalSessionMetadata = {
       sessionId: id,
       rootDirectory,
+      name: name || rootDirectory.split('/').pop() || id,
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
     }
@@ -274,6 +281,19 @@ export class SessionManager {
       if (workspace) {
         await workspace.updateRootDirectory(rootDirectory)
       }
+    }
+  }
+
+  /**
+   * Update session name
+   * @param sessionId Session ID
+   * @param name New session name
+   */
+  async updateSessionName(sessionId: string, name: string): Promise<void> {
+    const metadata = this.index.find((s) => s.sessionId === sessionId)
+    if (metadata) {
+      metadata.name = name
+      await this.saveIndex()
     }
   }
 

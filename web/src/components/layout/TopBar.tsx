@@ -15,7 +15,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
-import { SessionBadge } from '@/components/session'
+import { SessionBadgeWithStorage } from '@/components/session'
 
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
@@ -84,8 +84,8 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
           {/* Remote */}
           <RemoteBadge />
 
-          {/* Session - OPFS session status */}
-          <SessionBadge compact />
+          {/* Session - OPFS session status with storage dropdown */}
+          <SessionBadgeWithStorage compact />
 
           {/* Skills */}
           <button

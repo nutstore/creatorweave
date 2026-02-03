@@ -18,7 +18,7 @@ import {
   emitComplete,
   emitError,
 } from '@/streaming-bus'
-import { useSessionStore } from './session.store'
+import { useSessionStore, DEFAULT_CONVERSATION_NAME } from './session.store'
 import { StreamingQueue } from '../utils/streaming-queue'
 
 // Enable Immer Map/Set support
@@ -225,6 +225,59 @@ export const useConversationStore = create<ConversationState>()(
         const conversations = await loadConversations()
         // Auto-activate the most recently updated conversation
         const activeId = conversations.length > 0 ? conversations[0].id : null
+
+        // Ensure OPFS sessions exist for all loaded conversations
+        const { getSessionManager } = await import('@/opfs/session')
+        const manager = await getSessionManager()
+
+        // Track failures for summary reporting
+        const failedSessions: Array<{ id: string; title: string; error: string }> = []
+
+        for (const conv of conversations) {
+          const rootDir = `/conversations/${conv.id}`
+          try {
+            // Check if session exists by root directory
+            const existing = manager.getSessionByRoot(rootDir)
+            if (!existing) {
+              // Create session for existing conversation with title
+              await manager.createSession(rootDir, conv.id, conv.title || DEFAULT_CONVERSATION_NAME)
+            } else {
+              // Session exists, update name if conversation title has changed
+              const targetName = conv.title || DEFAULT_CONVERSATION_NAME
+              if (existing.name !== targetName) {
+                await manager.updateSessionName(existing.sessionId, targetName)
+              }
+            }
+          } catch (e) {
+            const errorMsg = e instanceof Error ? e.message : String(e)
+            console.error(`[conversation.store] Failed to ensure session for ${conv.id}:`, e)
+            failedSessions.push({
+              id: conv.id,
+              title: conv.title || DEFAULT_CONVERSATION_NAME,
+              error: errorMsg,
+            })
+          }
+        }
+
+        // Log summary if there were failures
+        if (failedSessions.length > 0) {
+          console.warn(
+            `[conversation.store] Failed to create/update ${failedSessions.length} session(s):`,
+            failedSessions.map((f) => `"${f.title}" (${f.id}): ${f.error}`).join('; ')
+          )
+        }
+
+        // Now refresh the session store to pick up the sessions we just ensured exist
+        const sessionStore = useSessionStore.getState()
+        await sessionStore.refreshSessions()
+
+        // Switch to active session if exists
+        if (activeId) {
+          await sessionStore.switchSession(activeId).catch((e) => {
+            console.error('[conversation.store] Failed to switch to active session:', e)
+          })
+        }
+
         set((state) => {
           // Merge loaded conversations with runtime state defaults
           state.conversations = conversations.map((conv) => ({
@@ -280,12 +333,13 @@ export const useConversationStore = create<ConversationState>()(
 
       // Switch the corresponding session workspace
       if (id) {
-        useSessionStore
-          .getState()
-          .switchSession(id)
-          .catch((e) => {
+        const sessionStore = useSessionStore.getState()
+        // Only call switchSession if session is different (avoid circular call)
+        if (sessionStore.activeSessionId !== id) {
+          sessionStore.switchSession(id).catch((e) => {
             console.error('[conversation.store] Failed to switch session workspace:', e)
           })
+        }
       }
     },
 

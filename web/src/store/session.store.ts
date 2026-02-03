@@ -17,6 +17,38 @@ import { getSessionManager, SessionWorkspace } from '@/opfs/session'
 // Enable Immer Map/Set support
 enableMapSet()
 
+/** Default conversation name when title is not available */
+export const DEFAULT_CONVERSATION_NAME = '对话'
+
+/**
+ * Session metadata shape from SessionManager (matches InternalSessionMetadata)
+ */
+interface SessionManagerMetadata {
+  sessionId: string
+  rootDirectory: string
+  name: string
+  createdAt: number
+  lastAccessedAt: number
+}
+
+/**
+ * Get display name for a session with fallback strategy
+ * Priority: stored name > conversation title > directory name > session ID
+ */
+export function getSessionDisplayName(
+  meta: SessionManagerMetadata,
+  convTitles: Map<string, string>
+): string {
+  if (meta.name) {
+    return meta.name
+  }
+  const convTitle = convTitles.get(meta.sessionId)
+  if (convTitle) {
+    return convTitle
+  }
+  return meta.rootDirectory.split('/').pop() || meta.sessionId
+}
+
 /**
  * Extended session metadata with runtime statistics
  */
@@ -98,14 +130,30 @@ export const useSessionStore = create<SessionState>()(
         // Get all session metadata
         const internalSessions = manager.getAllSessions()
 
+        // Get conversation titles for better session names
+        const { useConversationStore } = await import('./conversation.store')
+        const conversations = useConversationStore.getState().conversations
+        const convTitles = new Map(conversations.map((c) => [c.id, c.title]))
+
         // Enrich with stats from workspaces
         const sessions: SessionWithStats[] = []
         for (const meta of internalSessions) {
           const workspace = await manager.getSession(meta.sessionId)
           if (workspace) {
+            // Use fallback strategy for session name
+            const sessionName = getSessionDisplayName(meta, convTitles)
+
+            // Update the metadata if name was missing and we found a conversation title
+            if (!meta.name) {
+              const convTitle = convTitles.get(meta.sessionId)
+              if (convTitle) {
+                await manager.updateSessionName(meta.sessionId, convTitle)
+              }
+            }
+
             sessions.push({
               id: meta.sessionId,
-              name: meta.rootDirectory.split('/').pop() || meta.sessionId,
+              name: sessionName,
               createdAt: meta.createdAt,
               lastActiveAt: meta.lastAccessedAt,
               cacheSize: 0,
@@ -177,6 +225,16 @@ export const useSessionStore = create<SessionState>()(
     },
 
     switchSession: async (id) => {
+      // Avoid redundant call if already active
+      const currentActiveId = get().activeSessionId
+      if (currentActiveId === id) {
+        return
+      }
+
+      // Capture target conversation ID before async operations to avoid race condition
+      // We'll switch to this specific ID regardless of what happens during await
+      const targetConversationId = id
+
       set({ isLoading: true, error: null })
 
       try {
@@ -198,6 +256,15 @@ export const useSessionStore = create<SessionState>()(
           state.currentUndoCount = workspace.undoCount
           state.isLoading = false
         })
+
+        // Also switch the active conversation to match the session
+        const { useConversationStore } = await import('./conversation.store')
+        // Only call setActive if conversation is different (avoid circular call)
+        // Check against captured target to avoid race condition
+        const convStore = useConversationStore.getState()
+        if (convStore.activeConversationId !== targetConversationId) {
+          await convStore.setActive(targetConversationId)
+        }
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to switch session'
         set({
@@ -215,6 +282,8 @@ export const useSessionStore = create<SessionState>()(
         const manager = await getSessionManager()
         await manager.deleteSession(id)
 
+        let newActiveId: string | null = null
+
         set((state) => {
           // First, filter to get remaining sessions
           const remaining = state.sessions.filter((s) => s.id !== id)
@@ -222,13 +291,20 @@ export const useSessionStore = create<SessionState>()(
 
           // If deleted session was active, clear active or switch to another
           if (state.activeSessionId === id) {
-            state.activeSessionId = remaining.length > 0 ? remaining[0].id : null
+            newActiveId = remaining.length > 0 ? remaining[0].id : null
+            state.activeSessionId = newActiveId
             state.currentPendingCount = remaining.length > 0 ? remaining[0]?.pendingCount || 0 : 0
             state.currentUndoCount = remaining.length > 0 ? remaining[0]?.undoCount || 0 : 0
           }
 
           state.isLoading = false
         })
+
+        // Also switch the active conversation to match the new session
+        if (newActiveId !== null) {
+          const { useConversationStore } = await import('./conversation.store')
+          await useConversationStore.getState().setActive(newActiveId)
+        }
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to delete session'
         set({

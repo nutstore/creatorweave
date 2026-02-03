@@ -129,6 +129,39 @@ async function getActiveWorkspace() {
   return { workspace, sessionId: activeSessionId }
 }
 
+/**
+ * Check if error is a quota exceeded error
+ */
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+    return true
+  }
+  if (error instanceof Error && error.name === 'QuotaExceededError') {
+    return true
+  }
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes('QuotaExceededError') ||
+    message.includes('quota') ||
+    message.includes('配额') ||
+    message.includes('空间不足')
+  )
+}
+
+/**
+ * Show quota exceeded alert to user
+ */
+function showQuotaAlert() {
+  alert(
+    '存储空间不足\n\n' +
+      '浏览器配额已满或磁盘剩余空间不足。\n\n' +
+      '建议：\n' +
+      '1. 清空所有缓存（点击会话菜单 → 清空所有缓存）\n' +
+      '2. 清理旧会话（点击会话菜单 → 清理旧会话）\n' +
+      '3. 检查磁盘剩余空间'
+  )
+}
+
 export const useOPFSStore = create<OPFSState>()(
   immer((set, get) => ({
     sessionId: null,
@@ -203,6 +236,14 @@ export const useOPFSStore = create<OPFSState>()(
         useSessionStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to write file'
+
+        // Check for quota exceeded error
+        if (isQuotaError(e)) {
+          showQuotaAlert()
+          set({ error: '存储空间不足，请清理缓存后重试', isLoading: false })
+          throw new Error('存储空间不足')
+        }
+
         set({ error: message, isLoading: false })
         throw new Error(message)
       }
@@ -261,6 +302,14 @@ export const useOPFSStore = create<OPFSState>()(
         return result
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to sync changes'
+
+        // Check for quota exceeded error
+        if (isQuotaError(e)) {
+          showQuotaAlert()
+          set({ error: '同步失败：存储空间不足', isLoading: false })
+          throw new Error('存储空间不足')
+        }
+
         set({ error: message, isLoading: false })
         throw new Error(message)
       }
