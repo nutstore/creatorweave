@@ -92,6 +92,16 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/i18n:
+    dependencies:
+      react:
+        specifier: ^18.0.0
+        version: 18.3.1
+    devDependencies:
+      typescript:
+        specifier: ^5.3.3
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       react:
