@@ -16,6 +16,7 @@ import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { SessionBadgeWithStorage } from '@/components/session'
+import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
@@ -86,6 +87,9 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
 
           {/* Session - OPFS session status with storage dropdown */}
           <SessionBadgeWithStorage compact />
+
+          {/* Language Switcher */}
+          <LanguageSwitcher />
 
           {/* Skills */}
           <button

@@ -169,6 +169,9 @@ importers:
       '@browser-fs-analyzer/encryption':
         specifier: workspace:*
         version: link:../packages/encryption
+      '@browser-fs-analyzer/i18n':
+        specifier: workspace:*
+        version: link:../packages/i18n
       '@types/qrcode.react':
         specifier: ^1.0.5
         version: 1.0.5

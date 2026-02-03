@@ -1,5 +1,3 @@
-import type { TranslationObject } from './types'
-
 /**
  * 获取嵌套对象的值，支持点号路径
  * @example getNested(obj, 'common.save') => obj.common.save
