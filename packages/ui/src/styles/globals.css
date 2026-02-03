@@ -32,6 +32,26 @@
 
     --radius: 0.5rem;              /* 8px */
 
+    /* ========== Extended Backgrounds ========== */
+    --bg-tertiary: 0 0% 98%;       /* #FAFAFA */
+    --bg-elevated: 0 0% 100%;      /* #FFFFFF */
+    --bg-hover: 0 0% 94%;          /* #F0F0F0 */
+
+    /* ========== Extended Text Colors ========== */
+    --text-primary: 10 10% 9%;      /* #171717 */
+    --text-secondary: 0 0% 32%;    /* #525252 */
+    --text-tertiary: 0 0% 45%;     /* #737373 */
+    --text-muted: 0 0% 64%;        /* #A3A3A3 */
+    --text-on-primary: 0 0% 100%;  /* #FFFFFF */
+
+    /* ========== Extended Borders ========== */
+    --border-strong: 0 0% 83%;     /* #D4D4D4 */
+    --border-subtle: 0 0% 94%;     /* #F0F0F0 */
+
+    /* ========== Gray Colors ========== */
+    --gray-100: 0 0% 96%;          /* #F3F4F6 */
+    --gray-200: 0 0% 90%;          /* #E5E7EB */
+
     /* ========== Primary (Teal) ========== */
     --primary: 174 72% 56%;         /* #14B8A6 */
     --primary-foreground: 0 0% 100%;
@@ -43,13 +63,19 @@
 
     /* ========== Status Colors ========== */
     --success: 142 76% 36%;         /* #16A34A */
+    --success-50: 142 76% 97%;      /* #F0FDF4 - 浅绿背景 */
+    --success-200: 142 76% 87%;     /* #BBF7D0 - 绿色边框 */
     --success-bg: 142 76% 96%;      /* #DCFCE7 */
     --success-text: 142 71% 45%;    /* #15803D */
 
     --warning: 35 84% 43%;          /* #D97706 */
+    --warning-50: 48 96% 96%;       /* #FEFCE8 - 浅琥珀背景 */
+    --warning-200: 48 96% 83%;      /* #FDE68A - 琥珀边框 */
     --warning-bg: 48 96% 89%;       /* #FEF3C7 */
 
     --danger: 15 74% 57%;           /* #E07B54 */
+    --danger-50: 25 95% 96%;        /* #FFF7ED - 浅橙背景 */
+    --danger-200: 24 74% 78%;       /* #FED7AA - 橙色边框 */
     --danger-bg: 25 95% 97%;        /* #FFF7ED */
     --danger-border: 24 74% 66%;    /* #FDBA74 */
   }
@@ -81,6 +107,26 @@
     --input: 0 0% 15%;
     --ring: 174 83% 62%;            /* #2DD4BF */
 
+    /* ========== Extended Backgrounds ========== */
+    --bg-tertiary: 0 0% 10%;        /* #1A1A1A */
+    --bg-elevated: 0 0% 12%;        /* #1F1F1F */
+    --bg-hover: 0 0% 15%;           /* #252525 */
+
+    /* ========== Extended Text Colors ========== */
+    --text-primary: 0 0% 90%;       /* #E5E5E5 */
+    --text-secondary: 0 0% 64%;     /* #A3A3A3 */
+    --text-tertiary: 0 0% 45%;      /* #737373 */
+    --text-muted: 0 0% 32%;         /* #525252 */
+    --text-on-primary: 0 0% 100%;   /* #FFFFFF */
+
+    /* ========== Extended Borders ========== */
+    --border-strong: 0 0% 25%;      /* #404040 */
+    --border-subtle: 0 0% 12%;      /* #1F1F1F */
+
+    /* ========== Gray Colors ========== */
+    --gray-100: 0 0% 12%;           /* #1F2937 */
+    --gray-200: 0 0% 22%;           /* #374151 */
+
     /* ========== Primary (Teal) ========== */
     --primary: 174 83% 62%;         /* #2DD4BF - brighter in dark mode */
     --primary-foreground: 180 4% 4%;
@@ -92,13 +138,19 @@
 
     /* ========== Status Colors ========== */
     --success: 142 71% 45%;         /* #22C55E */
+    --success-50: 142 76% 10%;      /* #052E16 */
+    --success-200: 142 76% 20%;     /* #166534 */
     --success-bg: 142 76% 12%;      /* #052E16 */
     --success-text: 142 76% 66%;    /* #4ADE80 */
 
     --warning: 43 96% 56%;          /* #FBBF24 */
+    --warning-50: 38 92% 10%;       /* #451A03 */
+    --warning-200: 43 92% 25%;      /* #92400E */
     --warning-bg: 38 92% 12%;       /* #451A03 */
 
     --danger: 24 74% 67%;           /* #F59E6B */
+    --danger-50: 20 33% 15%;        /* #431407 */
+    --danger-200: 24 71% 35%;       /* #9A3412 */
     --danger-bg: 20 33% 17%;        /* #431407 */
     --danger-border: 24 71% 45%;    /* #C2410C */
   }
@@ -118,5 +170,65 @@
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Text colors - using simple names to avoid Tailwind prefix issues */
+  .text-primary {
+    color: hsl(var(--text-primary));
+  }
+  .text-secondary {
+    color: hsl(var(--text-secondary));
+  }
+  .text-tertiary {
+    color: hsl(var(--text-tertiary));
+  }
+  .text-muted {
+    color: hsl(var(--text-muted));
+  }
+  .text-danger {
+    color: hsl(var(--danger));
+  }
+  .text-success {
+    color: hsl(var(--success));
+  }
+  .text-success-text {
+    color: hsl(var(--success-text));
+  }
+  .text-primary-600 {
+    color: hsl(var(--primary-600));
+  }
+
+  /* Background colors */
+  .bg-primary-50 {
+    background-color: hsl(var(--primary-50));
+  }
+  .bg-primary-600 {
+    background-color: hsl(var(--primary-600));
+  }
+  .bg-primary-700 {
+    background-color: hsl(var(--primary-700));
+  }
+  .bg-danger-bg {
+    background-color: hsl(var(--danger-bg));
+  }
+  .bg-gray-100 {
+    background-color: hsl(var(--gray-100));
+  }
+  .bg-danger {
+    background-color: hsl(var(--danger));
+  }
+  .bg-success-bg {
+    background-color: hsl(var(--success-bg));
+  }
+
+  /* Border colors */
+  .border-danger {
+    border-color: hsl(var(--danger-border));
+  }
+  .border-danger-solid {
+    border-color: hsl(var(--danger));
+  }
+  .border-gray-200 {
+    border-color: hsl(var(--gray-200));
   }
 }

@@ -110,6 +110,9 @@ export { Badge, badgeVariants } from './components/ui/badge'
 
 export { Avatar, AvatarImage, AvatarFallback } from './components/ui/avatar'
 
+// ========== Brand Components ==========
+export * from './components/brand'
+
 // ========== Navigation Components ==========
 export {
   DropdownMenu,

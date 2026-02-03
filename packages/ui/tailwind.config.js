@@ -1,7 +1,16 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ['class'],
-  content: ['./src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    './.storybook/**/*.{js,ts,jsx,tsx}',
+  ],
+  safelist: [
+    {
+      pattern: /(text|bg|border)-((primary|secondary|danger|success|warning|gray)-|text-|text-on-)(.+)?/,
+      variants: ['hover', 'focus'],
+    },
+  ],
   theme: {
   	container: {
   		center: true,
@@ -52,17 +61,41 @@ export default {
   			},
   			success: {
   				DEFAULT: 'hsl(var(--success))',
+  				'50': 'hsl(var(--success-50))',
+  				'200': 'hsl(var(--success-200))',
   				bg: 'hsl(var(--success-bg))',
   				text: 'hsl(var(--success-text))'
   			},
   			warning: {
   				DEFAULT: 'hsl(var(--warning))',
+  				'50': 'hsl(var(--warning-50))',
+  				'200': 'hsl(var(--warning-200))',
   				bg: 'hsl(var(--warning-bg))'
   			},
   			danger: {
   				DEFAULT: 'hsl(var(--danger))',
+  				'50': 'hsl(var(--danger-50))',
+  				'200': 'hsl(var(--danger-200))',
   				bg: 'hsl(var(--danger-bg))',
   				border: 'hsl(var(--danger-border))'
+  			},
+  			/* Extended backgrounds */
+  			'bg-tertiary': 'hsl(var(--bg-tertiary))',
+  			'bg-elevated': 'hsl(var(--bg-elevated))',
+  			'bg-hover': 'hsl(var(--bg-hover))',
+  			/* Extended text colors */
+  			'text-primary': 'hsl(var(--text-primary))',
+  			'text-secondary': 'hsl(var(--text-secondary))',
+  			'text-tertiary': 'hsl(var(--text-tertiary))',
+  			'text-muted': 'hsl(var(--text-muted))',
+  			'text-on-primary': 'hsl(var(--text-on-primary))',
+  			/* Extended borders */
+  			'border-strong': 'hsl(var(--border-strong))',
+  			'border-subtle': 'hsl(var(--border-subtle))',
+  			/* Gray colors */
+  			gray: {
+  				'100': 'hsl(var(--gray-100))',
+  				'200': 'hsl(var(--gray-200))',
   			}
   		},
   		borderRadius: {
