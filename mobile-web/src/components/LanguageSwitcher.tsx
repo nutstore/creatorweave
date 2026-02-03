@@ -2,6 +2,7 @@
  * LanguageSwitcher - 移动端语言切换组件
  *
  * 设置页面内的语言切换选项
+ * Phase 5: Added i18n support
  */
 
 import { Check, Globe } from 'lucide-react'

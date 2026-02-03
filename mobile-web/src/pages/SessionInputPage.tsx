@@ -1,6 +1,7 @@
 /**
  * SessionInputPage - Session ID 输入页面
  * 用于手动输入会话 ID 加入会话
+ * Phase 5: Added i18n support
  */
 
 import { useState, useCallback, useEffect } from 'react'
@@ -8,6 +9,7 @@ import { Key, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useRemoteStore } from '../store/remote.store'
 import { useConnection } from '../contexts/ConnectionContext'
+import { useT } from '../i18n'
 
 // UUID validation regex (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -16,6 +18,7 @@ export function SessionInputPage() {
   const navigate = useNavigate()
   const [sessionInput, setSessionInput] = useState('')
   const [inputError, setInputError] = useState<string | null>(null)
+  const t = useT()
 
   // 从 store 获取连接状态
   const {
@@ -47,11 +50,11 @@ export function SessionInputPage() {
   const handleJoinSession = () => {
     const trimmed = sessionInput.trim()
     if (!trimmed) {
-      setInputError('请输入会话 ID')
+      setInputError(t('mobile.sessionInput.errorRequired'))
       return
     }
     if (!isValidUUID(trimmed)) {
-      setInputError('无效的会话 ID 格式，应为 UUID 格式 (如 xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)')
+      setInputError(t('mobile.sessionInput.errorInvalidFormat'))
       return
     }
     setInputError(null)
@@ -78,9 +81,9 @@ export function SessionInputPage() {
           <Key className="w-8 h-8 text-primary-600" />
         </div>
 
-        <h2 className="text-xl font-semibold text-neutral-800 text-center mb-2">加入远程会话</h2>
+        <h2 className="text-xl font-semibold text-neutral-800 text-center mb-2">{t('mobile.sessionInput.title')}</h2>
         <p className="text-sm text-neutral-500 text-center mb-6">
-          输入 PC 端显示的会话 ID
+          {t('mobile.sessionInput.subtitle')}
         </p>
 
         {/* Session ID Input */}
@@ -93,12 +96,12 @@ export function SessionInputPage() {
               setInputError(null)
             }}
             onKeyDown={handleKeyDown}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            placeholder={t('mobile.sessionInput.placeholder')}
             disabled={connectionState === 'connecting' || connectionState === 'reconnecting'}
             className={`w-full px-4 py-3 rounded-xl border text-center font-mono text-sm tracking-wider
               ${inputError ? 'border-red-300 bg-red-50' : 'border-neutral-200 bg-neutral-50'}
               focus:border-primary-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 transition-colors disabled:opacity-50`}
-            aria-label="会话 ID 输入框"
+            aria-label={t('mobile.sessionInput.inputLabel')}
           />
         </div>
 
@@ -120,7 +123,7 @@ export function SessionInputPage() {
         {showProgress && (
           <div className="mb-4 bg-neutral-100 px-3 py-2 rounded-lg text-xs">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-neutral-600">正在重连...</span>
+              <span className="text-neutral-600">{t('mobile.sessionInput.reconnecting')}</span>
               <span className="text-neutral-400">
                 {Math.min(reconnectAttempt, reconnectMaxAttempts)} / {reconnectMaxAttempts}
               </span>
@@ -138,7 +141,7 @@ export function SessionInputPage() {
 
         {/* Helper Text */}
         <p className="text-xs text-neutral-400 text-center mb-4">
-          会话 ID 格式: UUID (8-4-4-4-12)
+          {t('mobile.sessionInput.formatHint')}
         </p>
 
         {/* Buttons Row */}
@@ -171,10 +174,10 @@ export function SessionInputPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   />
                 </svg>
-                连接中...
+                {t('mobile.sessionInput.connecting')}
               </>
             ) : (
-              '加入会话'
+              t('mobile.sessionInput.joinSession')
             )}
           </button>
 
@@ -183,7 +186,7 @@ export function SessionInputPage() {
             <button
               onClick={handleCancel}
               className="px-4 py-3 rounded-xl font-medium bg-neutral-200 text-neutral-600 hover:bg-neutral-300 transition-colors flex items-center justify-center"
-              aria-label="取消连接"
+              aria-label={t('mobile.sessionInput.cancel')}
             >
               <X className="w-5 h-5" />
             </button>
@@ -201,7 +204,7 @@ export function SessionInputPage() {
                 d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h2m10 0h.01M12 12v4M8 20H4m12-4h2M4 16h2"
               />
             </svg>
-            或者使用 iOS 相机扫描二维码自动加入
+            {t('mobile.sessionInput.qrHint')}
           </p>
         </div>
       </div>

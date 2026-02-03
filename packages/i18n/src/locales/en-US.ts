@@ -113,11 +113,47 @@ export const enUS = {
     regenerate: 'Regenerate',
   },
 
+  // 移动端专属
   mobile: {
     menu: 'Menu',
     back: 'Back',
     home: 'Home',
     profile: 'Profile',
+    // Settings page
+    settings: {
+      connectionStatus: 'Connection Status',
+      status: 'Status',
+      statusConnected: 'Connected',
+      statusConnecting: 'Connecting...',
+      statusDisconnected: 'Disconnected',
+      directory: 'Directory',
+      encryption: 'Encryption',
+      encryptionReady: 'End-to-end encryption enabled',
+      encryptionExchanging: 'Exchanging keys...',
+      encryptionError: 'Encryption error',
+      encryptionNone: 'No encryption',
+      sessionId: 'Session ID',
+      sessionManagement: 'Session Management',
+      clearLocalData: 'Clear local session data',
+      clearDataConfirm: 'Are you sure you want to clear local session data?',
+      about: 'About',
+      disconnect: 'Disconnect',
+    },
+    // Session input page
+    sessionInput: {
+      title: 'Join Remote Session',
+      subtitle: 'Enter the session ID displayed on PC',
+      placeholder: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+      inputLabel: 'Session ID input',
+      joinSession: 'Join Session',
+      connecting: 'Connecting...',
+      reconnecting: 'Reconnecting...',
+      cancel: 'Cancel',
+      errorRequired: 'Please enter session ID',
+      errorInvalidFormat: 'Invalid session ID format, should be UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)',
+      formatHint: 'Session ID format: UUID (8-4-4-4-12)',
+      qrHint: 'Or scan QR code with iOS camera to join automatically',
+    },
   },
 } as const
 

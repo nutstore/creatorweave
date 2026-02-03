@@ -1,6 +1,7 @@
 /**
  * MainLayout - 主布局容器
  * 整合 TopBar、内容区域和 BottomNav
+ * Phase 5: Added i18n support
  */
 
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
@@ -8,6 +9,7 @@ import type { ReactNode } from 'react'
 import { TopBar, type TopBarAction } from './TopBar'
 import { BottomNav } from './BottomNav'
 import { useRemoteStore } from '../store/remote.store'
+import { useT } from '../i18n'
 
 export interface MainLayoutProps {
   children?: ReactNode
@@ -29,6 +31,7 @@ export function MainLayout({
   const navigate = useNavigate()
   const location = useLocation()
   const { connectionState } = useRemoteStore()
+  const t = useT()
 
   // 自动判断是否显示返回按钮：会话详情页和设置页显示
   const shouldShowBack = showBack !== undefined
@@ -49,7 +52,7 @@ export function MainLayout({
   }
 
   // 会话详情页显示会话标题
-  const pageTitle = title || (location.pathname.startsWith('/chats/') ? '会话详情' : '')
+  const pageTitle = title || (location.pathname.startsWith('/chats/') ? t('session.current') : '')
 
   return (
     <div className="flex h-screen flex-col bg-neutral-50">

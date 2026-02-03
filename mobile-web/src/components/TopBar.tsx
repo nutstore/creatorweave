@@ -1,10 +1,12 @@
 /**
  * TopBar - 顶部状态栏组件
  * 显示连接状态、加密状态、返回按钮和操作按钮
+ * Phase 5: Added i18n support
  */
 
 import { ArrowLeft, Lock, Unlock, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useRemoteStore } from '../store/remote.store'
+import { useT } from '../i18n'
 
 export interface TopBarAction {
   icon: React.ElementType
@@ -22,6 +24,7 @@ export interface TopBarProps {
 
 export function TopBar({ title, showBack, onBack, actions = [] }: TopBarProps) {
   const { connectionState, encryptionState } = useRemoteStore()
+  const t = useT()
 
   const getStatusDot = () => {
     switch (connectionState) {
@@ -55,7 +58,7 @@ export function TopBar({ title, showBack, onBack, actions = [] }: TopBarProps) {
           <button
             onClick={onBack}
             className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-neutral-100 active:scale-95 transition-transform"
-            aria-label="返回"
+            aria-label={t('mobile.back')}
           >
             <ArrowLeft className="h-5 w-5 text-neutral-600" />
           </button>
@@ -66,10 +69,10 @@ export function TopBar({ title, showBack, onBack, actions = [] }: TopBarProps) {
         {/* 连接状态圆点 */}
         <span
           className={`h-2 w-2 rounded-full ${getStatusDot()}`}
-          aria-label={`连接状态: ${connectionState}`}
+          aria-label={`${t('mobile.settings.status')}: ${connectionState}`}
         />
         {/* 加密状态图标 */}
-        <span aria-label={`加密状态: ${encryptionState}`}>
+        <span aria-label={`${t('mobile.settings.encryption')}: ${encryptionState}`}>
           {getEncryptionIcon()}
         </span>
         {/* 操作按钮 */}
