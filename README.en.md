@@ -18,8 +18,8 @@ English | [简体中文](./README.md)
 - 🌐 **Browser-Native** - Leverages the File System Access API of modern browsers
 - ⚡ **High Performance** - Rust + WebAssembly for compute-intensive tasks
 - 🎨 **Modern UI** - Built with React + Tailwind CSS + shadcn/ui
-- 💾 **Smart Caching** - Three-tier storage (OPFS, IndexedDB, localStorage)
-- 🔄 **State Persistence** - Zustand + persist middleware for quick state recovery
+- 💾 **SQLite + OPFS Storage** - SQLite WASM with OPFS VFS for high-performance local database
+- 🔄 **Seamless Migration** - Automatic migration from IndexedDB to SQLite
 - 🔐 **Secure Sandbox** - Runs entirely in browser sandbox, no data uploaded
 - 📱 **Remote Control** - E2E encrypted remote session with mobile device support [See docs](./docs/remote-session-architecture.md)
 
@@ -92,8 +92,9 @@ Real-time analysis results:
 | Build Tool | Vite |
 | UI Components | shadcn/ui + Tailwind CSS |
 | State Management | Zustand |
+| Data Storage | SQLite WASM + OPFS VFS |
 | Compute Layer | Rust + WebAssembly |
-| Browser API | File System Access API |
+| Browser APIs | File System Access API, Origin Private File System |
 
 ### Architecture Diagram
 
@@ -125,6 +126,63 @@ Real-time analysis results:
 ```
 
 **Detailed Documentation**: [docs/architecture/overview.md](./docs/architecture/overview.md)
+
+## 💾 Storage Architecture
+
+### SQLite + OPFS VFS
+
+The application uses **SQLite WASM** with **OPFS VFS** for local data persistence:
+
+```
+┌─────────────────────────────────────┐
+│         React UI (Frontend)          │
+│  - Graceful fallback: IndexedDB      │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│    Repository Layer (Data Access)    │
+│  - conversations, skills, plugins     │
+│  - sessions, api-keys                │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│   SQLite Worker (Web Worker)         │
+│  - @sqlite.org/sqlite-wasm           │
+│  - OPFS VFS for persistence          │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│   Origin Private File System (OPFS) │
+│  - /bfosa-unified.sqlite             │
+│  - Auto-persisted, no manual save     │
+└─────────────────────────────────────┘
+```
+
+### Storage Features
+
+| Feature | Description |
+|---------|-------------|
+| **Single-File DB** | All data in `/bfosa-unified.sqlite` |
+| **Auto Persistence** | OpfsDb auto-syncs writes to OPFS |
+| **ACID Transactions** | Full transaction support |
+| **SQL Queries** | JOIN, aggregation, and complex queries |
+| **Seamless Migration** | Auto-migrate from IndexedDB on first run |
+
+### COOP/COEP Requirements
+
+OPFS VFS requires `SharedArrayBuffer`, which needs COOP/COEP response headers:
+
+```typescript
+// vite.config.ts (auto-configured via vite-plugin-sqlite)
+server: {
+  headers: {
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+  },
+}
+```
+
+**Diagnostic Tool**: Visit `/test-coop-coep.html` to verify COOP/COEP configuration
 
 ## 🔑 Core Features
 
@@ -160,6 +218,12 @@ browser-fs-analyzer/
 │   │   ├── components/        # React components
 │   │   ├── store/             # Zustand stores
 │   │   ├── services/          # Business logic
+│   │   ├── sqlite/            # SQLite storage layer
+│   │   │   ├── repositories/  # Data repositories
+│   │   │   ├── sqlite-database.ts
+│   │   │   ├── sqlite-worker.ts
+│   │   │   └── migration.ts   # IndexedDB → SQLite migration
+│   │   ├── storage/           # Storage initialization
 │   │   ├── remote/            # Remote session
 │   │   └── wasm/              # WASM integration
 │   └── package.json
@@ -197,6 +261,7 @@ make test-web
 ## 📚 Documentation
 
 - [Architecture Overview](./docs/architecture/overview.md) - Complete technical architecture
+- [SQLite Storage Architecture](./web/src/sqlite/README.md) - SQLite + OPFS VFS storage details
 - [Development Setup](./docs/development/setup.md) - Development environment guide
 - [Rust/WASM Data Flow](./docs/architecture/rust-wasm-flow.md) - WASM integration details
 
@@ -213,13 +278,18 @@ make clean       # Clean build artifacts
 
 ## 🌐 Browser Compatibility
 
-| Browser | Version | File System Access API | OPFS |
-|---------|---------|----------------------|------|
-| Chrome | 86+ | ✅ | ✅ |
-| Edge | 86+ | ✅ | ✅ |
-| Opera | 72+ | ✅ | ✅ |
-| Firefox | - | ❌ | ⚠️ |
-| Safari | - | ❌ | ❌ |
+| Browser | Version | File System Access API | OPFS | SQLite WASM |
+|---------|---------|----------------------|------|-------------|
+| Chrome | 86+ | ✅ | ✅ | ✅ |
+| Edge | 86+ | ✅ | ✅ | ✅ |
+| Opera | 72+ | ✅ | ✅ | ✅ |
+| Firefox | 111+ | ⚠️ | ⚠️ | ⚠️ (requires COOP/COEP) |
+| Safari | 16.4+ | ❌ | ❌ | ❌ |
+
+**Notes**:
+- **OPFS VFS** requires `SharedArrayBuffer` which needs COOP/COEP response headers
+- Firefox has limited support and may need manual OPFS enablement
+- Safari doesn't support SQLite WASM OPFS mode yet, will auto-fallback to IndexedDB
 
 ## 🤝 Contributing
 

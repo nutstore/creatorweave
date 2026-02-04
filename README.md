@@ -18,8 +18,8 @@
 - 🌐 **纯浏览器运行** - 利用现代浏览器的 File System Access API
 - ⚡ **高性能计算** - 使用 Rust + WebAssembly 处理计算密集型任务
 - 🎨 **现代化 UI** - 基于 React + Tailwind CSS + shadcn/ui
-- 💾 **智能缓存** - 支持 OPFS、IndexedDB、localStorage 三层存储
-- 🔄 **状态持久化** - Zustand + persist 中间件快速恢复状态
+- 💾 **SQLite + OPFS 存储** - 使用 SQLite WASM + OPFS VFS 实现高性能本地数据库
+- 🔄 **平滑迁移** - 自动从 IndexedDB 迁移到 SQLite，无缝升级
 - 🔐 **安全隔离** - 完全在浏览器沙盒中运行，不上传任何数据
 - 🧩 **插件系统** - 支持动态加载 WASM 插件扩展分析功能
 - 📱 **远程控制** - E2E 加密远程会话，支持移动设备控制 [查看详情](./docs/remote-session-architecture.md)
@@ -156,8 +156,9 @@ cd web && pnpm test
 | 构建工具 | Vite |
 | UI 组件 | shadcn/ui + Tailwind CSS |
 | 状态管理 | Zustand |
+| 数据存储 | SQLite WASM + OPFS VFS |
 | 计算层 | Rust + WebAssembly |
-| 浏览器 API | File System Access API |
+| 浏览器 API | File System Access API, Origin Private File System |
 
 ### 架构设计
 
@@ -189,6 +190,63 @@ cd web && pnpm test
 ```
 
 **详细架构文档**: [docs/architecture/overview.md](./docs/architecture/overview.md)
+
+## 💾 存储架构
+
+### SQLite + OPFS VFS
+
+应用使用 **SQLite WASM** 配合 **OPFS VFS** 作为本地存储引擎：
+
+```
+┌─────────────────────────────────────┐
+│         React UI (前端)              │
+│  - 优雅降级：IndexedDB fallback      │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│    Repository Layer (数据访问)       │
+│  - conversations, skills, plugins    │
+│  - sessions, api-keys                │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│   SQLite Worker (Web Worker)         │
+│  - @sqlite.org/sqlite-wasm           │
+│  - OPFS VFS for persistence          │
+└─────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────┐
+│   Origin Private File System (OPFS) │
+│  - /bfosa-unified.sqlite             │
+│  - 自动持久化，无需手动保存            │
+└─────────────────────────────────────┘
+```
+
+### 存储特性
+
+| 特性 | 说明 |
+|------|------|
+| **单文件数据库** | 所有数据存储在 `/bfosa-unified.sqlite` |
+| **自动持久化** | OpfsDb 自动同步写入 OPFS |
+| **ACID 事务** | 完整的事务支持 |
+| **SQL 查询** | 支持 JOIN、聚合等复杂查询 |
+| **平滑迁移** | 首次启动自动从 IndexedDB 迁移 |
+
+### COOP/COEP 要求
+
+OPFS VFS 需要 `SharedArrayBuffer`，必须配置 COOP/COEP 响应头：
+
+```typescript
+// vite.config.ts (已通过 vite-plugin-sqlite 自动配置)
+server: {
+  headers: {
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+  },
+}
+```
+
+**诊断工具**: 访问 `/test-coop-coep.html` 检查 COOP/COEP 配置状态
 
 ## 🔑 核心功能
 
@@ -229,6 +287,12 @@ browser-fs-analyzer/
 │   │   ├── hooks/             # 自定义 hooks
 │   │   ├── services/          # 业务逻辑
 │   │   │   └── plugin-*.ts    # 插件服务
+│   │   ├── sqlite/            # SQLite 存储层
+│   │   │   ├── repositories/  # 数据仓库
+│   │   │   ├── sqlite-database.ts
+│   │   │   ├── sqlite-worker.ts
+│   │   │   └── migration.ts   # IndexedDB → SQLite 迁移
+│   │   ├── storage/           # 存储初始化
 │   │   ├── workers/           # Web Workers
 │   │   ├── types/             # TypeScript 类型
 │   │   └── lib/               # 工具函数
@@ -270,6 +334,7 @@ make test-web
 ## 📚 文档
 
 - [架构概览](./docs/architecture/overview.md) - 完整的技术架构设计
+- [SQLite 存储架构](./web/src/sqlite/README.md) - SQLite + OPFS VFS 存储详解
 - [开发环境搭建](./docs/development/setup.md) - 开发环境配置指南
 - [Rust/WASM 数据流](./docs/architecture/rust-wasm-flow.md) - WASM 集成详解
 - [Pre-Commit Hooks](./docs/development/pre-commit-hooks.md) - Git hooks 配置和使用
@@ -278,13 +343,18 @@ make test-web
 
 ## 🌐 浏览器兼容性
 
-| 浏览器 | 版本 | File System Access API | OPFS |
-|--------|------|----------------------|------|
-| Chrome | 86+ | ✅ | ✅ |
-| Edge | 86+ | ✅ | ✅ |
-| Opera | 72+ | ✅ | ✅ |
-| Firefox | - | ❌ | ⚠️ |
-| Safari | - | ❌ | ❌ |
+| 浏览器 | 版本 | File System Access API | OPFS | SQLite WASM |
+|--------|------|----------------------|------|-------------|
+| Chrome | 86+ | ✅ | ✅ | ✅ |
+| Edge | 86+ | ✅ | ✅ | ✅ |
+| Opera | 72+ | ✅ | ✅ | ✅ |
+| Firefox | 111+ | ⚠️ | ⚠️ | ⚠️ (需要 COOP/COEP) |
+| Safari | 16.4+ | ❌ | ❌ | ❌ |
+
+**注意**:
+- **OPFS VFS** 需要 `SharedArrayBuffer`，必须配置 COOP/COEP 响应头
+- Firefox 支持有限，需要手动启用 OPFS
+- Safari 暂不支持 SQLite WASM 的 OPFS 模式，会自动降级到 IndexedDB
 
 ## 🤝 贡献
 
