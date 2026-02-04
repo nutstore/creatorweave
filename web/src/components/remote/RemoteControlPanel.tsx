@@ -7,9 +7,19 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { Copy } from 'lucide-react'
+import { Copy, X } from 'lucide-react'
 import { useRemoteStore } from '@/store/remote.store'
-import { BrandDialog, BrandDialogContent, BrandInput, BrandButton } from '@browser-fs-analyzer/ui'
+import {
+  BrandDialog,
+  BrandDialogContent,
+  BrandDialogHeader,
+  BrandDialogBody,
+  BrandDialogFooter,
+  BrandDialogClose,
+  BrandInput,
+  BrandButton,
+} from '@browser-fs-analyzer/ui'
+import { useT } from '@/i18n'
 
 interface RemoteControlPanelProps {
   open: boolean
@@ -17,6 +27,7 @@ interface RemoteControlPanelProps {
 }
 
 export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, onClose }) => {
+  const t = useT()
   const [relayUrl, setRelayUrl] = useState(useRemoteStore.getState().relayUrl)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -100,118 +111,124 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
   return (
     <BrandDialog open={open} onOpenChange={onClose} modal={false}>
       <BrandDialogContent
-        className="max-w-md p-6"
+        className="!w-[480px]"
         onPointerDownOutside={(e) => {
           if (isActive) e.preventDefault()
         }}
       >
-        {/* Header */}
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Remote Control</h2>
-        </div>
+        <BrandDialogHeader>
+          <h2 className="text-base font-semibold">{t('remote.title')}</h2>
+          <BrandDialogClose className="text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </BrandDialogClose>
+        </BrandDialogHeader>
 
-        {/* Relay URL */}
-        <label className="mb-1 block text-sm font-medium text-gray-600">Relay Server</label>
-        <BrandInput
-          value={relayUrl}
-          onChange={(e) => setRelayUrl(e.target.value)}
-          placeholder="ws://localhost:3001"
-          disabled={isActive}
-          className="mb-4"
-        />
-
-        {/* QR Code display */}
-        {hasSession ? (
-          <div className="mb-4">
-            <label className="mb-2 block text-sm font-medium text-gray-600">
-              Scan with mobile to connect
+        <BrandDialogBody className="gap-4">
+          {/* Relay URL */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-600">
+              {t('remote.relayServer')}
             </label>
-            <p className="mb-2 text-xs text-gray-500">Scan QR code or open link on mobile device</p>
-
-            {/* QR Code */}
-            <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-4">
-              <QRCodeCanvas value={joinUrl!} size={200} level="M" includeMargin={false} />
-            </div>
-
-            {/* Session ID with copy button */}
-            <div className="mt-3 flex items-center justify-center gap-2">
-              <code className="font-mono text-sm text-gray-600">{sessionId}</code>
-              <BrandButton
-                variant="outline"
-                onClick={handleCopySessionId}
-                className="h-6 !px-2 !py-0 !text-xs"
-                title="Copy session ID"
-              >
-                <Copy className="mr-1 h-3 w-3" />
-                {copied ? 'Copied!' : 'Copy'}
-              </BrandButton>
-            </div>
-
-            {/* URLs for reference */}
-            <div className="mt-2 space-y-1">
-              <a
-                href={joinUrl!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block break-all text-center text-xs text-primary-600 underline hover:text-primary-700"
-              >
-                {joinUrl}
-              </a>
-              <a
-                href={mobileUrl!}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block break-all text-center text-xs text-gray-400 hover:text-gray-600"
-              >
-                Direct: {mobileUrl}
-              </a>
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 py-8 text-center text-sm text-gray-500">
-            Click "Create Session" to generate QR code
-          </div>
-        )}
-
-        {/* Error display */}
-        {error && <p className="mb-4 text-sm text-danger">{error}</p>}
-
-        {/* Connection status (when active) */}
-        {isActive && (
-          <div className="mb-4 flex items-center justify-center gap-2 rounded-md bg-gray-50 px-3 py-2">
-            <span
-              className={`h-2 w-2 rounded-full ${
-                connectionState === 'connected' ? 'bg-success-500' : 'bg-warning-500'
-              }`}
+            <BrandInput
+              value={relayUrl}
+              onChange={(e) => setRelayUrl(e.target.value)}
+              placeholder="ws://localhost:3001"
+              disabled={isActive}
             />
-            <span className="text-sm text-gray-700">
-              {connectionState === 'connected' ? 'Connected' : 'Connecting...'}
-            </span>
-            {peerCount > 0 && (
-              <span className="text-xs text-gray-500">
-                ({peerCount} peer{peerCount !== 1 ? 's' : ''})
-              </span>
-            )}
           </div>
-        )}
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2">
+          {/* QR Code display */}
+          {hasSession ? (
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-600">
+                {t('remote.scanToConnect')}
+              </label>
+              <p className="mb-2 text-xs text-gray-500">{t('remote.scanHint')}</p>
+
+              {/* QR Code */}
+              <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-4">
+                <QRCodeCanvas value={joinUrl!} size={200} level="M" includeMargin={false} />
+              </div>
+
+              {/* Session ID with copy button */}
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <code className="font-mono text-sm text-gray-600">{sessionId}</code>
+                <BrandButton
+                  iconButton
+                  variant="default"
+                  onClick={handleCopySessionId}
+                  className="h-6 w-6"
+                  title={copied ? t('remote.copied') : t('remote.copySessionId')}
+                >
+                  <Copy className="h-3 w-3" />
+                </BrandButton>
+              </div>
+
+              {/* URLs for reference */}
+              <div className="mt-2 space-y-1">
+                <a
+                  href={joinUrl!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block break-all text-center text-xs text-primary-600 underline hover:text-primary-700"
+                >
+                  {joinUrl}
+                </a>
+                <a
+                  href={mobileUrl!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block break-all text-center text-xs text-gray-400 hover:text-gray-600"
+                >
+                  {t('remote.direct')}: {mobileUrl}
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-gray-500">
+              {t('remote.clickToCreate')}
+            </div>
+          )}
+
+          {/* Error display */}
+          {error && <p className="text-sm text-danger">{error}</p>}
+
+          {/* Connection status (when active) */}
+          {isActive && (
+            <div className="flex items-center justify-center gap-2 rounded-md bg-gray-50 px-3 py-2">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  connectionState === 'connected' ? 'bg-success-500' : 'bg-warning-500'
+                }`}
+              />
+              <span className="text-sm text-gray-700">
+                {connectionState === 'connected' ? t('remote.connected') : t('remote.connecting')}
+              </span>
+              {peerCount > 0 && (
+                <span className="text-xs text-gray-500">
+                  ({t('remote.peers', { count: peerCount })})
+                </span>
+              )}
+            </div>
+          )}
+        </BrandDialogBody>
+
+        <BrandDialogFooter>
           {isActive ? (
             <BrandButton variant="outline" onClick={handleDisconnect}>
-              Disconnect
+              {t('remote.disconnect')}
             </BrandButton>
           ) : (
             <>
               <BrandButton variant="outline" onClick={onClose} disabled={loading}>
-                Cancel
+                {t('remote.cancel')}
               </BrandButton>
               <BrandButton onClick={handleCreate} disabled={loading}>
-                {loading ? 'Creating...' : 'Create Session'}
+                {loading ? t('remote.connecting') : t('remote.createSession')}
               </BrandButton>
             </>
           )}
-        </div>
+        </BrandDialogFooter>
       </BrandDialogContent>
     </BrandDialog>
   )

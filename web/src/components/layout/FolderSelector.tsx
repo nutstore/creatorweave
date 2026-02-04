@@ -126,7 +126,7 @@ export function FolderSelector() {
         onClick={handleToggle}
         disabled={isSelecting}
         className={cn(
-          'flex h-9 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5',
+          'flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1',
           'text-xs font-normal text-secondary',
           'transition-colors hover:bg-primary-50 focus:outline-none',
           isSelecting && 'cursor-wait opacity-70'

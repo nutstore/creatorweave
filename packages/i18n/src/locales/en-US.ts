@@ -85,11 +85,25 @@ export const enUS = {
 
   remote: {
     title: 'Remote Control',
+    label: 'Remote',
     host: 'HOST',
     remote: 'REMOTE',
     disconnect: 'Disconnect',
     showQrCode: 'Show QR Code',
     waitingForRemote: 'Waiting for remote device...',
+    // Remote Control Panel
+    relayServer: 'Relay Server',
+    scanToConnect: 'Scan with mobile to connect',
+    scanHint: 'Scan QR code or open link on mobile device',
+    copySessionId: 'Copy session ID',
+    copied: 'Copied!',
+    clickToCreate: 'Click "Create Session" to generate QR code',
+    connected: 'Connected',
+    connecting: 'Connecting...',
+    peers: '{count} peer(s)',
+    createSession: 'Create Session',
+    cancel: 'Cancel',
+    direct: 'Direct',
   },
 
   session: {

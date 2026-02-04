@@ -48,7 +48,7 @@ export const RemoteBadge: React.FC = () => {
       <>
         <button
           onClick={() => setPanelOpen(true)}
-          className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-accent"
+          className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-colors hover:bg-accent"
           title={t('remote.title')}
           data-testid={TEST_IDS.inactive}
         >
@@ -56,7 +56,7 @@ export const RemoteBadge: React.FC = () => {
             className={`h-2 w-2 rounded-full ${connectionDotColor}`}
             data-testid={TEST_IDS.connectionDot}
           />
-          <span>Remote</span>
+          <span>{t('remote.label')}</span>
         </button>
         <RemoteControlPanel open={panelOpen} onClose={() => setPanelOpen(false)} />
       </>
@@ -69,7 +69,7 @@ export const RemoteBadge: React.FC = () => {
   return (
     <>
       <div
-        className="flex items-center rounded-md border px-3 py-1.5 text-sm"
+        className="flex items-center rounded-md border px-3 py-1.5 text-xs"
         data-testid={TEST_IDS.active}
       >
         {/* ==================== Status area ==================== */}

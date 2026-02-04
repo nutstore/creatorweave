@@ -91,11 +91,25 @@ export const zhCN = {
   // 远程控制
   remote: {
     title: '远程控制',
+    label: '远程',
     host: 'HOST',
     remote: 'REMOTE',
-    disconnect: 'Disconnect',
+    disconnect: '断开连接',
     showQrCode: '显示二维码',
     waitingForRemote: '等待远程设备连接...',
+    // Remote Control Panel
+    relayServer: '中继服务器',
+    scanToConnect: '使用手机扫描连接',
+    scanHint: '扫描二维码或在手机设备上打开链接',
+    copySessionId: '复制会话 ID',
+    copied: '已复制',
+    clickToCreate: '点击"创建会话"生成二维码',
+    connected: '已连接',
+    connecting: '连接中...',
+    peers: '{count} 个设备',
+    createSession: '创建会话',
+    cancel: '取消',
+    direct: '直连',
   },
 
   // 会话管理
