@@ -1,12 +1,18 @@
 /**
  * Skill Matcher - matches skills to conversation context.
  *
- * Scoring algorithm:
- * - Keyword match: 50% weight
- * - Tag match: 20% weight
- * - Category inference: 30% weight
+ * @deprecated This module contains the old full-content injection logic.
+ * It has been replaced by the on-demand loading approach in skill-injection.ts.
  *
- * Returns skills sorted by score, above a threshold.
+ * Old behavior: Injected full skill content into system prompt (MAX_INJECTED_SKILLS = 3)
+ * New behavior: Inject only metadata, LLM calls read_skill tool on-demand
+ *
+ * The new approach uses:
+ * - matchSkillsForRecommendation() in skill-injection.ts for lightweight matching
+ * - buildAvailableSkillsBlock() in skill-injection.ts for metadata-only injection
+ * - read_skill tool for on-demand content loading
+ *
+ * @see skill-injection.ts for the new implementation
  */
 
 import type { Skill, SkillMatch, SkillMatchContext } from './skill-types'

@@ -10,6 +10,7 @@ import type {
   SkillMetadata,
   SkillSource,
   SkillCategory,
+  SkillResource,
 } from '../../skills/skill-types'
 import { parseJSON, toJSON, boolToInt, intToBool } from '../sqlite-database'
 
@@ -31,6 +32,18 @@ interface SkillRow {
   enabled: number // BOOLEAN (0 or 1)
   created_at: number
   updated_at: number
+}
+
+// Resource row type
+interface ResourceRow {
+  id: string
+  skill_id: string
+  resource_path: string
+  resource_type: string
+  content: string
+  content_type: string | null
+  size: number
+  created_at: number
 }
 
 //=============================================================================
@@ -57,6 +70,28 @@ export class SkillRepository {
     const db = getSQLiteDB()
     const row = await db.queryFirst<SkillRow>('SELECT * FROM skills WHERE id = ?', [id])
     return row ? this.rowToSkill(row) : null
+  }
+
+  /**
+   * Find skill by name (case-insensitive)
+   */
+  async findByName(name: string): Promise<StoredSkill | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<SkillRow>('SELECT * FROM skills WHERE LOWER(name) = LOWER(?)', [
+      name,
+    ])
+    return row ? this.rowToSkill(row) : null
+  }
+
+  /**
+   * Get all enabled skill names (for tool enum generation)
+   */
+  async getEnabledSkillNames(): Promise<string[]> {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<{ name: string }>(
+      'SELECT name FROM skills WHERE enabled = 1 ORDER BY name'
+    )
+    return rows.map((r) => r.name)
   }
 
   /**
@@ -245,6 +280,126 @@ export class SkillRepository {
       enabled: intToBool(row.enabled),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    }
+  }
+
+  //=============================================================================
+  // Resource Methods (for on-demand loading)
+  //=============================================================================
+
+  /**
+   * Get all resources for a skill
+   */
+  async getResources(skillId: string): Promise<SkillResource[]> {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<ResourceRow>(
+      'SELECT * FROM skill_resources WHERE skill_id = ? ORDER BY resource_type, resource_path',
+      [skillId]
+    )
+    return rows.map((row) => this.rowToResource(row))
+  }
+
+  /**
+   * Get a specific resource by skill ID and resource path
+   */
+  async getResource(skillId: string, resourcePath: string): Promise<SkillResource | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<ResourceRow>(
+      'SELECT * FROM skill_resources WHERE skill_id = ? AND resource_path = ?',
+      [skillId, resourcePath]
+    )
+    return row ? this.rowToResource(row) : null
+  }
+
+  /**
+   * Get a resource by its composite ID
+   */
+  async getResourceById(resourceId: string): Promise<SkillResource | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<ResourceRow>('SELECT * FROM skill_resources WHERE id = ?', [
+      resourceId,
+    ])
+    return row ? this.rowToResource(row) : null
+  }
+
+  /**
+   * Save a resource (insert or update)
+   */
+  async saveResource(resource: SkillResource): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute(
+      `INSERT INTO skill_resources (id, skill_id, resource_path, resource_type, content, content_type, size, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         content = excluded.content,
+         content_type = excluded.content_type,
+         size = excluded.size`,
+      [
+        resource.id,
+        resource.skillId,
+        resource.resourcePath,
+        resource.resourceType,
+        resource.content,
+        resource.contentType,
+        resource.size,
+        resource.createdAt,
+      ]
+    )
+  }
+
+  /**
+   * Delete a resource
+   */
+  async deleteResource(resourceId: string): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute('DELETE FROM skill_resources WHERE id = ?', [resourceId])
+  }
+
+  /**
+   * Delete all resources for a skill
+   */
+  async deleteResourcesForSkill(skillId: string): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute('DELETE FROM skill_resources WHERE skill_id = ?', [skillId])
+  }
+
+  /**
+   * Get resource count for a skill
+   */
+  async getResourceCount(skillId: string): Promise<number> {
+    const db = getSQLiteDB()
+    const result = await db.queryFirst<{ count: number }>(
+      'SELECT COUNT(*) as count FROM skill_resources WHERE skill_id = ?',
+      [skillId]
+    )
+    return result?.count || 0
+  }
+
+  /**
+   * Get total resource size for a skill
+   */
+  async getTotalResourceSize(skillId: string): Promise<number> {
+    const db = getSQLiteDB()
+    const result = await db.queryFirst<{ total: number }>(
+      'SELECT SUM(size) as total FROM skill_resources WHERE skill_id = ?',
+      [skillId]
+    )
+    return result?.total || 0
+  }
+
+  /**
+   * Convert database row to SkillResource
+   */
+  private rowToResource(row: ResourceRow): SkillResource {
+    return {
+      id: row.id,
+      skillId: row.skill_id,
+      resourcePath: row.resource_path,
+      resourceType: row.resource_type as SkillResource['resourceType'],
+      content: row.content,
+      contentType: row.content_type || 'text/plain',
+      size: row.size,
+      createdAt: row.created_at,
     }
   }
 }

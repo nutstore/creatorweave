@@ -89,7 +89,49 @@ export interface SkillMatchContext {
   recentTopics?: string[]
 }
 
-/** IndexedDB schema version */
-export const SKILLS_DB_NAME = 'bfosa-skills'
-export const SKILLS_DB_VERSION = 1
-export const SKILLS_STORE_NAME = 'skills'
+/** SQLite schema version for skills table ( incremented when schema changes ) */
+export const SKILLS_SCHEMA_VERSION = 2
+
+// ============================================================================
+// On-Demand Loading Types
+// ============================================================================
+
+/** Resource type in skill directory */
+export type ResourceType = 'reference' | 'script' | 'asset'
+
+/** Skill resource file (references/, scripts/, assets/) */
+export interface SkillResource {
+  id: string // Format: {skill_id}:{resource_path}
+  skillId: string
+  resourcePath: string // Relative path: "references/api-docs.md"
+  resourceType: ResourceType
+  content: string // File content
+  contentType: string // MIME type
+  size: number // Byte size
+  createdAt: number
+}
+
+/** Skill match metadata only (for available_skills block) */
+export interface SkillMatchMetadata {
+  skill: SkillMetadata
+  score: number
+  matchFactors: {
+    keywordScore: number
+    tagScore: number
+    categoryScore: number
+  }
+}
+
+/** Tool execution context for skill tools */
+export interface SkillToolContext {
+  skillManager: any // SkillManager instance (avoid circular import)
+  skillStorage: typeof import('./skill-storage')
+}
+
+/** Resource limits for safety */
+export const RESOURCE_LIMITS = {
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+  MAX_RESOURCES_PER_SKILL: 50,
+  MAX_TOTAL_SIZE: 20 * 1024 * 1024, // 20MB
+  LOAD_TIMEOUT: 3000, // 3 seconds
+} as const

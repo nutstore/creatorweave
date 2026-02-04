@@ -4,7 +4,7 @@
  * Uses SQLite for skill storage instead of IndexedDB.
  */
 
-import type { StoredSkill, Skill, SkillMetadata } from './skill-types'
+import type { StoredSkill, Skill, SkillMetadata, SkillResource } from './skill-types'
 import { getSkillRepository } from '@/sqlite'
 
 let initPromise: Promise<void> | null = null
@@ -125,4 +125,81 @@ export function skillToMetadata(skill: StoredSkill): SkillMetadata {
     createdAt: skill.createdAt,
     updatedAt: skill.updatedAt,
   }
+}
+
+//=============================================================================
+// Resource Methods (for on-demand loading)
+//=============================================================================
+
+/** Get all resources for a skill */
+export async function getSkillResources(skillId: string): Promise<SkillResource[]> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return await repo.getResources(skillId)
+}
+
+/** Get a specific resource by skill ID and resource path */
+export async function getSkillResource(
+  skillId: string,
+  resourcePath: string
+): Promise<SkillResource | undefined> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return (await repo.getResource(skillId, resourcePath)) || undefined
+}
+
+/** Get a resource by its composite ID */
+export async function getResourceById(resourceId: string): Promise<SkillResource | undefined> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return (await repo.getResourceById(resourceId)) || undefined
+}
+
+/** Save a resource (insert or update) */
+export async function saveSkillResource(resource: SkillResource): Promise<void> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  await repo.saveResource(resource)
+}
+
+/** Delete a resource */
+export async function deleteSkillResource(resourceId: string): Promise<void> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  await repo.deleteResource(resourceId)
+}
+
+/** Delete all resources for a skill */
+export async function deleteSkillResources(skillId: string): Promise<void> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  await repo.deleteResourcesForSkill(skillId)
+}
+
+/** Get resource count for a skill */
+export async function getSkillResourceCount(skillId: string): Promise<number> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return await repo.getResourceCount(skillId)
+}
+
+/** Get total resource size for a skill */
+export async function getSkillResourceTotalSize(skillId: string): Promise<number> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return await repo.getTotalResourceSize(skillId)
+}
+
+/** Get skill by name (case-insensitive) - for skill tools */
+export async function getSkillByName(name: string): Promise<StoredSkill | undefined> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return (await repo.findByName(name)) || undefined
+}
+
+/** Get all enabled skill names - for tool enum generation */
+export async function getAllEnabledSkillNames(): Promise<string[]> {
+  await ensureInitialized()
+  const repo = getSkillRepository()
+  return await repo.getEnabledSkillNames()
 }

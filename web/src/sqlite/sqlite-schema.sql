@@ -51,6 +51,25 @@ CREATE TABLE IF NOT EXISTS skills (
 CREATE INDEX IF NOT EXISTS idx_skills_category ON skills(category);
 CREATE INDEX IF NOT EXISTS idx_skills_source ON skills(source);
 CREATE INDEX IF NOT EXISTS idx_skills_enabled ON skills(enabled);
+CREATE INDEX IF NOT EXISTS idx_skills_name_lower ON skills(lower(name));
+
+-- ============================================================================
+-- Skill Resources Table (references/, scripts/, assets/ files)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS skill_resources (
+    id TEXT PRIMARY KEY,               -- {skill_id}:{resource_path}
+    skill_id TEXT NOT NULL,
+    resource_path TEXT NOT NULL,       -- Relative path: "references/api-docs.md"
+    resource_type TEXT NOT NULL,       -- 'reference' | 'script' | 'asset'
+    content TEXT NOT NULL,
+    content_type TEXT,                 -- MIME type
+    size INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+    FOREIGN KEY (skill_id) REFERENCES skills(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_skill_resources_skill_id ON skill_resources(skill_id);
+CREATE INDEX IF NOT EXISTS idx_skill_resources_type ON skill_resources(resource_type);
 
 -- ============================================================================
 -- Plugins Table

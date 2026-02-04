@@ -16,6 +16,15 @@ import { grepDefinition, grepExecutor } from './tools/grep.tool'
 import { listFilesDefinition, listFilesExecutor } from './tools/list-files.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 
+// Import skill tools
+import {
+  generateReadSkillTool,
+  readSkillExecutor,
+  readSkillResourceDefinition,
+  readSkillResourceExecutor,
+} from '@/skills/skill-tools'
+import { getAllEnabledSkillNames } from '@/skills/skill-storage'
+
 export class ToolRegistry {
   private tools = new Map<string, ToolEntry>()
 
@@ -92,6 +101,36 @@ export class ToolRegistry {
     return this.unregister(`wasm_plugin_${pluginId}`)
   }
 
+  //=============================================================================
+  // Skill Tools
+  //=============================================================================
+
+  /**
+   * Register or update skill tools
+   * The read_skill tool has a dynamic enum of enabled skill names
+   */
+  async registerSkillTools(): Promise<void> {
+    // Get current enabled skill names for the enum
+    const enabledSkillNames = await getAllEnabledSkillNames()
+
+    // Generate read_skill tool with dynamic enum
+    const readSkillDefinition = generateReadSkillTool(enabledSkillNames)
+
+    // Register read_skill (will update if already exists)
+    this.register(readSkillDefinition, readSkillExecutor)
+
+    // Register read_skill_resource (static definition)
+    this.register(readSkillResourceDefinition, readSkillResourceExecutor)
+  }
+
+  /**
+   * Unregister skill tools
+   */
+  unregisterSkillTools(): void {
+    this.unregister('read_skill')
+    this.unregister('read_skill_resource')
+  }
+
   /** Register all currently loaded plugins */
   async registerLoadedPlugins(): Promise<void> {
     try {
@@ -111,11 +150,26 @@ export class ToolRegistry {
 
 /** Singleton instance */
 let instance: ToolRegistry | null = null
+let skillToolsInitPromise: Promise<void> | null = null
 
 export function getToolRegistry(): ToolRegistry {
   if (!instance) {
     instance = new ToolRegistry()
     instance.registerBuiltins()
+    // Skill tools will be registered asynchronously
+    skillToolsInitPromise = instance.registerSkillTools().catch((err) => {
+      console.error('[ToolRegistry] Failed to register skill tools:', err)
+    })
   }
   return instance
+}
+
+/**
+ * Wait for skill tools to be registered
+ * Call this if you need to ensure skill tools are available
+ */
+export async function awaitSkillTools(): Promise<void> {
+  if (skillToolsInitPromise) {
+    await skillToolsInitPromise
+  }
 }

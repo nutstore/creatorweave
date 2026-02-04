@@ -13,4 +13,15 @@ export {
   toggleSkill,
   getEnabledSkills,
   getSkillsByCategory,
+  // Resource methods
+  getSkillResources,
+  getSkillResource,
+  getResourceById,
+  saveSkillResource,
+  deleteSkillResource,
+  deleteSkillResources,
+  getSkillResourceCount,
+  getSkillResourceTotalSize,
+  getSkillByName,
+  getAllEnabledSkillNames,
 } from './skill-storage.sqlite'
