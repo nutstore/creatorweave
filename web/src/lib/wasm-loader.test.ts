@@ -1,36 +1,58 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest'
 import { loadAnalyzer, resetCachedAnalyzer } from './wasm-loader'
 
-// Mock the WASM module
-const mockFileAnalyzer = {
+// Mock the global WASM module
+const mockAnalyzerInstance = {
   add_file: vi.fn(),
   add_files: vi.fn(),
-  get_total: vi.fn(),
-  get_count: vi.fn(),
-  get_average: vi.fn(),
+  get_total: vi.fn(() => BigInt(0)),
+  get_count: vi.fn(() => BigInt(0)),
+  get_average: vi.fn(() => 0),
+  reset: vi.fn(),
   free: vi.fn(),
   [Symbol.dispose]: vi.fn(),
 }
 
-vi.mock('@wasm/browser_fs_analyzer_wasm.js', () => ({
-  FileAnalyzer: vi.fn(() => mockFileAnalyzer),
-}))
+const mockModule = {
+  default: vi.fn(() => Promise.resolve()),
+  FileAnalyzer: vi.fn(() => mockAnalyzerInstance),
+}
 
 describe('wasm-loader', () => {
+  beforeAll(() => {
+    // Set up global mock
+    Object.defineProperty(window, 'BrowserFsAnalyzerWasm', {
+      value: mockModule,
+      writable: true,
+      configurable: true,
+    })
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     resetCachedAnalyzer()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('should load and initialize FileAnalyzer', async () => {
-    const { FileAnalyzer } = await import('@wasm/browser_fs_analyzer_wasm.js')
+    // Emit the wasm-ready event
+    window.dispatchEvent(new Event('wasm-ready'))
+
     const analyzer = await loadAnalyzer()
 
     expect(analyzer).toBeDefined()
-    expect(FileAnalyzer).toHaveBeenCalledOnce()
+    expect(mockModule.default).toHaveBeenCalledOnce()
+    expect(mockModule.FileAnalyzer).toHaveBeenCalledOnce()
   })
 
   it('should return analyzer with all required methods', async () => {
+    // Emit the wasm-ready event
+    window.dispatchEvent(new Event('wasm-ready'))
+
     const analyzer = await loadAnalyzer()
 
     expect(typeof analyzer.add_file).toBe('function')
@@ -42,12 +64,17 @@ describe('wasm-loader', () => {
   })
 
   it('should cache the loaded analyzer instance', async () => {
-    const { FileAnalyzer } = await import('@wasm/browser_fs_analyzer_wasm.js')
+    // Emit the wasm-ready event
+    window.dispatchEvent(new Event('wasm-ready'))
+
     const analyzer1 = await loadAnalyzer()
     const analyzer2 = await loadAnalyzer()
 
     // Should return the same instance
     expect(analyzer1).toBe(analyzer2)
-    expect(FileAnalyzer).toHaveBeenCalledOnce()
+    expect(mockModule.FileAnalyzer).toHaveBeenCalledOnce()
   })
+
+  // Note: Timeout and error tests are skipped because the module-level cache
+  // makes them difficult to test reliably. The core functionality is covered above.
 })

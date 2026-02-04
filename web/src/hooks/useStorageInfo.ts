@@ -1,12 +1,16 @@
 /**
  * useStorageInfo Hook
  *
- * Hook for accessing OPFS storage information and session storage breakdown.
+ * Hook for accessing storage information and session storage breakdown.
+ * Now uses SQLite for session metadata and stats, while OPFS utilities
+ * provide browser storage quota information.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useSessionStore } from '@/store/session.store'
 import type { SessionWithStats } from '@/store/session.store'
+import { getSessionRepository } from '@/sqlite'
+import type { Session } from '@/sqlite/repositories/session.repository'
 import { getSessionManager } from '@/opfs/session'
 import {
   getStorageEstimate,
@@ -69,7 +73,25 @@ export interface UseStorageInfoResult {
 }
 
 /**
- * Hook for accessing OPFS storage information
+ * Convert Session from SQLite to SessionWithStats format
+ */
+function sqliteSessionToWithStats(session: Session): SessionWithStats {
+  return {
+    id: session.id,
+    name: session.name,
+    createdAt: session.createdAt,
+    lastActiveAt: session.lastAccessedAt,
+    cacheSize: session.cacheSize,
+    pendingCount: session.pendingCount,
+    undoCount: session.undoCount,
+    modifiedFiles: session.modifiedFiles,
+    status: session.status,
+  }
+}
+
+/**
+ * Hook for accessing storage information
+ * Uses SQLite for session metadata, OPFS utilities for storage quota
  */
 export function useStorageInfo(): UseStorageInfoResult {
   // Use selector to only subscribe to sessions, not entire store
@@ -93,7 +115,31 @@ export function useStorageInfo(): UseStorageInfoResult {
   }, [sessions])
 
   /**
-   * Calculate session sizes in batches to avoid blocking the main thread
+   * Load sessions from SQLite (fallback to OPFS if needed)
+   */
+  const loadSessionsFromSQLite = async (): Promise<SessionWithStats[]> => {
+    try {
+      const repo = getSessionRepository()
+      const sqliteSessions = await repo.findAllSessions()
+
+      if (sqliteSessions.length > 0) {
+        // Use SQLite data
+        return sqliteSessions.map(sqliteSessionToWithStats)
+      }
+    } catch (e) {
+      console.warn(
+        '[useStorageInfo] Failed to load sessions from SQLite, falling back to store:',
+        e
+      )
+    }
+
+    // Fallback to store data
+    return sessionsRef.current
+  }
+
+  /**
+   * Calculate session sizes using OPFS directory traversal
+   * This is still needed because file content is stored in OPFS
    */
   const calculateSessionSizes = async (
     sessionsList: SessionWithStats[],
@@ -102,24 +148,24 @@ export function useStorageInfo(): UseStorageInfoResult {
     const manager = await getSessionManager()
     const results: Map<string, SessionStorageInfo> = new Map()
 
-    // Initialize results with placeholder data
+    // Initialize results with SQLite data (fast)
     for (const session of sessionsList) {
       results.set(session.id, {
         id: session.id,
         name: session.name,
-        cacheSize: 0,
-        cacheSizeFormatted: '计算中...',
+        cacheSize: session.cacheSize || 0,
+        cacheSizeFormatted: session.cacheSize ? formatBytes(session.cacheSize) : '计算中...',
         pendingCount: session.pendingCount,
         undoCount: session.undoCount,
         lastActiveAt: session.lastActiveAt || 0,
       })
     }
 
-    // Update UI with placeholder data first
+    // Update UI with initial data
     setSessionStorageList(Array.from(results.values()))
 
-    // Process sessions in batches
-    const BATCH_SIZE = 1 // Process one at a time to avoid blocking
+    // Process sessions in batches to calculate actual OPFS size
+    const BATCH_SIZE = 1
     for (let i = 0; i < sessionsList.length; i += BATCH_SIZE) {
       if (signal.aborted) break
 
@@ -129,32 +175,35 @@ export function useStorageInfo(): UseStorageInfoResult {
         if (signal.aborted) break
 
         try {
-          const workspace = await manager.getSession(session.id)
-          if (workspace) {
-            const sessionDir = await manager.sessionsRoot?.getDirectoryHandle(session.id, {
-              create: false,
-            })
+          const sessionDir = await manager.sessionsRoot?.getDirectoryHandle(session.id, {
+            create: false,
+          })
 
-            let cacheSize = 0
-            if (sessionDir) {
-              cacheSize = await getSessionSize(sessionDir)
+          let cacheSize = 0
+          if (sessionDir) {
+            cacheSize = await getSessionSize(sessionDir)
+
+            // Update SQLite with new cache size
+            try {
+              const repo = getSessionRepository()
+              await repo.updateSessionStats(session.id, { cacheSize })
+            } catch (e) {
+              console.warn('[useStorageInfo] Failed to update cache size in SQLite:', e)
             }
-
-            const info: SessionStorageInfo = {
-              id: session.id,
-              name: session.name,
-              cacheSize,
-              cacheSizeFormatted: formatBytes(cacheSize),
-              pendingCount: session.pendingCount,
-              undoCount: session.undoCount,
-              lastActiveAt: session.lastActiveAt || 0,
-            }
-
-            results.set(session.id, info)
-
-            // Update UI incrementally
-            setSessionStorageList(Array.from(results.values()))
           }
+
+          const info: SessionStorageInfo = {
+            id: session.id,
+            name: session.name,
+            cacheSize,
+            cacheSizeFormatted: formatBytes(cacheSize),
+            pendingCount: session.pendingCount,
+            undoCount: session.undoCount,
+            lastActiveAt: session.lastActiveAt || 0,
+          }
+
+          results.set(session.id, info)
+          setSessionStorageList(Array.from(results.values()))
         } catch (e) {
           console.error(`Failed to get size for session ${session.id}:`, e)
           results.set(session.id, {
@@ -187,7 +236,7 @@ export function useStorageInfo(): UseStorageInfoResult {
     setError(null)
 
     try {
-      // Get overall storage estimate
+      // Get overall storage estimate (browser API, includes OPFS + IndexedDB)
       const estimate = await getStorageEstimate()
       if (estimate) {
         setStorage({
@@ -200,20 +249,20 @@ export function useStorageInfo(): UseStorageInfoResult {
         })
       }
 
-      // Use ref to get latest sessions
-      const sessionsList = sessionsRef.current
+      // Load sessions from SQLite (or fallback to store)
+      const sessionsList = await loadSessionsFromSQLite()
       let sessionInfo: SessionStorageInfo[]
 
       if (includeSessionSizes) {
-        // Calculate sizes in batches to avoid blocking
+        // Calculate actual OPFS sizes in batches
         sessionInfo = await calculateSessionSizes(sessionsList, abortControllerRef.current.signal)
       } else {
-        // Quick mode: just use session data without calculating sizes
+        // Quick mode: use SQLite data without OPFS size calculation
         sessionInfo = sessionsList.map((session) => ({
           id: session.id,
           name: session.name,
-          cacheSize: 0,
-          cacheSizeFormatted: '-',
+          cacheSize: session.cacheSize || 0,
+          cacheSizeFormatted: session.cacheSize ? formatBytes(session.cacheSize) : '-',
           pendingCount: session.pendingCount,
           undoCount: session.undoCount,
           lastActiveAt: session.lastActiveAt || 0,
@@ -258,25 +307,53 @@ export function useStorageInfo(): UseStorageInfoResult {
       refresh(true)
     }
     // If only session properties changed (like activeSessionId, pendingCount), don't recalculate sizes
-  }, [sessionCount]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionCount, refresh])
 
-  const cleanupOldSessions = useCallback(async (days: number): Promise<number> => {
-    const manager = await getSessionManager()
-    return await manager.cleanupOldSessions(days)
-  }, [])
+  const cleanupOldSessions = useCallback(
+    async (days: number): Promise<number> => {
+      const repo = getSessionRepository()
+      const manager = await getSessionManager()
+
+      // Find inactive sessions from SQLite
+      const inactiveSessions = await repo.findInactiveSessions(days)
+      let cleanedCount = 0
+
+      for (const session of inactiveSessions) {
+        try {
+          // Delete from OPFS
+          await manager.deleteSession(session.id)
+          // Delete from SQLite (cascade deletes related records)
+          await repo.deleteSession(session.id)
+          cleanedCount++
+        } catch (e) {
+          console.error(`Failed to delete session ${session.id}:`, e)
+        }
+      }
+
+      // Refresh after cleanup
+      await refresh()
+
+      return cleanedCount
+    },
+    [refresh]
+  )
 
   const clearAllCache = useCallback(async (): Promise<void> => {
+    const repo = getSessionRepository()
     const manager = await getSessionManager()
-    const allSessions = manager.getAllSessions()
+
+    // Get all sessions from SQLite
+    const allSessions = await repo.findAllSessions()
 
     for (const session of allSessions) {
       try {
-        const workspace = await manager.getSession(session.sessionId)
+        // Clear OPFS workspace
+        const workspace = await manager.getSession(session.id)
         if (workspace) {
           await workspace.clear()
         }
       } catch (e) {
-        console.error(`Failed to clear session ${session.sessionId}:`, e)
+        console.error(`Failed to clear session ${session.id}:`, e)
       }
     }
 

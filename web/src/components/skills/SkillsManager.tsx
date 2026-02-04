@@ -126,8 +126,8 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
 
   return (
     <>
-      <BrandDialog open={open} onOpenChange={onClose} modal={false}>
-        <BrandDialogContent className="flex max-h-[600px] !w-[800px] flex-col overflow-hidden p-0">
+      <BrandDialog open={open} onOpenChange={onClose}>
+        <BrandDialogContent className="flex max-h-[600px] max-w-2xl flex-col overflow-hidden p-0">
           {/* Header */}
           <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 px-6">
             <h2 className="text-lg font-semibold text-gray-900">{t('skills.title')}</h2>

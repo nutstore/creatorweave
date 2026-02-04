@@ -304,6 +304,9 @@ importers:
       '@browser-fs-analyzer/ui':
         specifier: workspace:*
         version: link:../packages/ui
+      '@sqlite.org/sqlite-wasm':
+        specifier: 3.51.2-build6
+        version: 3.51.2-build6
       '@types/qrcode.react':
         specifier: ^1.0.5
         version: 1.0.5
@@ -1900,6 +1903,10 @@ packages:
 
   '@socket.io/component-emitter@3.1.2':
     resolution: {integrity: sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==}
+
+  '@sqlite.org/sqlite-wasm@3.51.2-build6':
+    resolution: {integrity: sha512-5ibsgipkqcLINZ5qNSp5KfrtL6KwiNVtwBksNO6zhTghhLmEf3/u1sPoAkgH5RzuLpMw7zi50IWgkZ0WhfqpaA==}
+    engines: {node: '>=22'}
 
   '@storybook/addon-actions@8.6.14':
     resolution: {integrity: sha512-mDQxylxGGCQSK7tJPkD144J8jWh9IU9ziJMHfB84PKpI/V5ZgqMDnpr2bssTrUaGDqU5e1/z8KcRF+Melhs9pQ==}
@@ -6214,6 +6221,8 @@ snapshots:
   '@shikijs/vscode-textmate@10.0.2': {}
 
   '@socket.io/component-emitter@3.1.2': {}
+
+  '@sqlite.org/sqlite-wasm@3.51.2-build6': {}
 
   '@storybook/addon-actions@8.6.14(storybook@8.6.15(prettier@3.8.1))':
     dependencies:

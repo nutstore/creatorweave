@@ -1,4 +1,12 @@
 export const jaJP = {
+  // 应用
+  app: {
+    productName: 'BFOSA',
+    initializing: '初期化中...',
+    loadProgress: '読み込み進捗',
+    preparing: '準備中...',
+  },
+
   // 通用
   common: {
     save: '保存',
@@ -75,6 +83,30 @@ export const jaJP = {
     delete: '削除',
     enabled: '有効',
     disabled: '無効',
+    empty: 'スキルがありません',
+    // スキルカテゴリ
+    categories: {
+      codeReview: 'コードレビュー',
+      testing: 'テスト',
+      debugging: 'デバッグ',
+      refactoring: 'リファクタリング',
+      documentation: 'ドキュメント',
+      security: 'セキュリティ',
+      performance: 'パフォーマンス',
+      architecture: 'アーキテクチャ',
+      general: '汎用',
+    },
+    // プロジェクトスキル発見ダイアログ
+    projectDialog: {
+      title: 'プロジェクトスキルを発見',
+      description: 'プロジェクトで {count} 個のスキルを発見しました。ワークスペースに読み込みますか？',
+      selectAll: 'すべて選択',
+      deselectAll: '選択解除',
+      selected: '選択済み',
+      load: '読み込み',
+      loadAll: 'すべて読み込み',
+      skip: 'スキップ',
+    },
   },
 
   // 远程控制

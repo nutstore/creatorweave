@@ -143,8 +143,8 @@ const RemoteDialogContent = React.forwardRef<
 RemoteDialogContent.displayName = "RemoteDialogContent"
 
 const RemoteDialog = React.forwardRef<
-  React.ElementRef<typeof BrandDialog>,
-  React.ComponentPropsWithoutRef<typeof BrandDialog> & RemoteDialogProps
+  HTMLDivElement,
+  Omit<RemoteDialogProps, 'open'> & { open?: boolean; onOpenChange?: (open: boolean) => void }
 >(({ open, onOpenChange, ...props }, ref) => {
   return (
     <BrandDialog open={open} onOpenChange={onOpenChange}>

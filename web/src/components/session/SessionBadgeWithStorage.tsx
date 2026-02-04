@@ -14,6 +14,7 @@ import React, { useState, useCallback } from 'react'
 import { Clock, RotateCcw, HardDrive, Trash2, Check, Sparkles } from 'lucide-react'
 import { useSessionStore } from '@/store/session.store'
 import { useStorageInfo } from '@/hooks/useStorageInfo'
+import { useSQLiteMode } from '@/hooks/useSQLiteMode'
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
 import { BrandButton, BrandBadge } from '@browser-fs-analyzer/ui'
 import { cn } from '@/lib/utils'
@@ -58,23 +59,31 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
     cleanupOldSessions,
     clearAllCache,
   } = useStorageInfo()
+  const { isOPFS } = useSQLiteMode()
 
   // Determine status color
   const getStatusColor = (): string => {
-    if (sessionError) return 'bg-danger-500'
-    if (!initialized) return 'bg-warning-500'
-    return 'bg-success-500'
+    // Error state has highest priority
+    if (sessionError) return 'bg-red-500'
+    // Still initializing
+    if (!initialized) return 'bg-yellow-500'
+    // If initialized and OPFS mode, show green dot
+    // If memory mode, don't show dot (data is ephemeral)
+    return isOPFS ? 'bg-green-500' : ''
   }
 
   // Get progress bar color based on usage percentage
   const getProgressColor = (percent: number): string => {
-    if (percent < 70) return 'bg-success-500'
-    if (percent < 80) return 'bg-warning-500'
+    if (percent < 70) return 'bg-green-500'
+    if (percent < 80) return 'bg-yellow-500'
     if (percent < 95) return 'bg-orange-500'
-    return 'bg-danger-500'
+    return 'bg-red-500'
   }
 
   const statusColor = getStatusColor()
+
+  // Whether to show the status dot
+  const showStatusDot = Boolean(sessionError || !initialized || isOPFS)
 
   // Handle session switch
   const handleSwitch = useCallback(
@@ -151,9 +160,11 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
     <div className="relative">
       <BrandButton iconButton variant="ghost" onClick={() => setOpen(!open)} title="存储空间">
         <HardDrive className="h-5 w-5" />
-        {/* Status dot */}
-        <span className={cn('absolute right-0.5 top-0.5 h-2 w-2 rounded-full', statusColor)} />
       </BrandButton>
+      {/* Status dot: sibling element to avoid overflow clipping */}
+      {showStatusDot && (
+        <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusColor)} />
+      )}
 
       {open && <SessionDropdown />}
     </div>

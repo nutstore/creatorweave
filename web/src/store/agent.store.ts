@@ -83,7 +83,8 @@ export const useAgentStore = create<AgentState>()(
     setDirectoryHandle: (handle) => {
       set((state) => {
         state.directoryHandle = handle
-        state.directoryName = handle?.name || null
+        // Treat empty string as null (some browsers return empty name)
+        state.directoryName = handle?.name && handle.name.trim() ? handle.name : null
       })
       persistHandle(handle).catch(console.error)
 
@@ -109,7 +110,8 @@ export const useAgentStore = create<AgentState>()(
         if (granted) {
           set((state) => {
             state.directoryHandle = handle
-            state.directoryName = handle.name
+            // Treat empty string as null (some browsers return empty name)
+            state.directoryName = handle.name && handle.name.trim() ? handle.name : null
           })
         }
       } catch {

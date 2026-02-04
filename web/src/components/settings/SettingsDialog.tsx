@@ -5,8 +5,9 @@
 
 import { useState, useEffect, forwardRef } from 'react'
 import { Eye, EyeOff, Check, Settings, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
-import { saveApiKey, loadApiKey } from '@/security/api-key-store'
+import { saveApiKey, loadApiKey, deleteApiKey } from '@/security/api-key-store'
 import { LLM_PROVIDER_CONFIGS } from '@/agent/providers/types'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { useT } from '@/i18n'
@@ -60,19 +61,42 @@ const SettingsDialogContent = forwardRef<
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [hasLoadedKey, setHasLoadedKey] = useState(false) // Track if key was loaded from storage
 
-  // Load existing API key on mount
+  // Load existing API key on mount and update hasApiKey status
+  // Note: We don't display the actual key for security, only show a placeholder
   useEffect(() => {
     loadApiKey(providerType).then((key) => {
-      if (key) setApiKey(key)
+      if (key) {
+        // Don't set the actual key in the input field for security
+        // User can click to reveal if needed, but we don't auto-load it
+        setHasApiKey(true)
+        setHasLoadedKey(true)
+      } else {
+        setHasApiKey(false)
+        setHasLoadedKey(false)
+      }
     })
-  }, [providerType])
+  }, [providerType, setHasApiKey])
 
   const handleSaveKey = async () => {
-    if (!apiKey.trim()) return
-    await saveApiKey(providerType, apiKey.trim())
+    const trimmedKey = apiKey.trim()
+
+    if (!trimmedKey) {
+      // Empty key means delete/unset the API key
+      await deleteApiKey(providerType)
+      setHasApiKey(false)
+      setHasLoadedKey(false)
+      toast.success('API Key 已清空')
+      return
+    }
+
+    await saveApiKey(providerType, trimmedKey)
     setHasApiKey(true)
+    setHasLoadedKey(true)
     setSaved(true)
+    // Clear the input field after saving for security
+    setApiKey('')
     setTimeout(() => setSaved(false), 2000)
   }
 
@@ -82,8 +106,16 @@ const SettingsDialogContent = forwardRef<
     const config = LLM_PROVIDER_CONFIGS[provider]
     setModelName(config.modelName)
     setApiKey('')
+    setHasLoadedKey(false)
+    // Check if this provider has a key configured (don't load the actual key)
     loadApiKey(provider).then((key) => {
-      if (key) setApiKey(key)
+      if (key) {
+        setHasApiKey(true)
+        setHasLoadedKey(true)
+      } else {
+        setHasApiKey(false)
+        setHasLoadedKey(false)
+      }
     })
   }
 
@@ -136,7 +168,11 @@ const SettingsDialogContent = forwardRef<
                 type={showKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder={t('settings.apiKeyPlaceholder')}
+                placeholder={
+                  hasLoadedKey && !apiKey
+                    ? '••••••••••••• (已配置，如需更新请输入新 Key)'
+                    : t('settings.apiKeyPlaceholder')
+                }
                 className="h-10 pr-10"
               />
               <button
@@ -208,7 +244,7 @@ const SettingsDialog = forwardRef<
 >(({ open, onOpenChange, ...props }, ref) => {
   return (
     <BrandDialog open={open} onOpenChange={onOpenChange}>
-      <SettingsDialogContent ref={ref} {...props} />
+      <SettingsDialogContent ref={ref as React.RefObject<HTMLDivElement>} {...props} />
     </BrandDialog>
   )
 })

@@ -1,11 +1,12 @@
 /**
- * Session Store - manages OPFS session workspaces
+ * Session Store - manages session workspaces
  *
- * Integrates with SessionManager to provide session lifecycle management:
- * - Create session for new conversations
- * - Switch between sessions
- * - Delete sessions
- * - Track current session state (pending count, undo count)
+ * Now uses SQLite for metadata and OPFS for file operations:
+ * - Session metadata stored in SQLite (fast, queryable)
+ * - File content remains in OPFS (browser-native storage)
+ * - Dual-write strategy ensures data consistency during migration
+ *
+ * @module session.store
  */
 
 import { create } from 'zustand'
@@ -13,6 +14,8 @@ import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import type { SessionMetadata } from '@/opfs/types/opfs-types'
 import { getSessionManager, SessionWorkspace } from '@/opfs/session'
+import { getSessionRepository } from '@/sqlite'
+import type { Session } from '@/sqlite/repositories/session.repository'
 
 // Enable Immer Map/Set support
 enableMapSet()
@@ -60,6 +63,23 @@ export interface SessionWithStats extends SessionMetadata {
 }
 
 /**
+ * Convert SQLite Session to SessionWithStats
+ */
+function sqliteSessionToWithStats(session: Session): SessionWithStats {
+  return {
+    id: session.id,
+    name: session.name,
+    createdAt: session.createdAt,
+    lastActiveAt: session.lastAccessedAt,
+    cacheSize: session.cacheSize,
+    pendingCount: session.pendingCount,
+    undoCount: session.undoCount,
+    modifiedFiles: session.modifiedFiles,
+    status: session.status,
+  }
+}
+
+/**
  * Session store state
  */
 interface SessionState {
@@ -86,22 +106,22 @@ interface SessionState {
 
   // Actions
 
-  /** Initialize the store (load sessions from OPFS) */
+  /** Initialize the store (load sessions from SQLite, fallback to OPFS) */
   initialize: () => Promise<void>
 
-  /** Create a new session */
+  /** Create a new session (writes to both SQLite and OPFS) */
   createSession: (id: string, rootDirectory: string, name?: string) => Promise<SessionMetadata>
 
   /** Switch to a different session */
   switchSession: (id: string) => Promise<void>
 
-  /** Delete a session */
+  /** Delete a session (deletes from both SQLite and OPFS) */
   deleteSession: (id: string) => Promise<void>
 
   /** Update session name */
   updateSessionName: (id: string, name: string) => Promise<void>
 
-  /** Refresh all sessions from OPFS */
+  /** Refresh all sessions from SQLite */
   refreshSessions: () => Promise<void>
 
   /** Update current session counts (pending/undo) */
@@ -125,21 +145,42 @@ export const useSessionStore = create<SessionState>()(
       set({ isLoading: true, error: null })
 
       try {
+        const repo = getSessionRepository()
         const manager = await getSessionManager()
 
-        // Get all session metadata
-        const internalSessions = manager.getAllSessions()
+        // Try to load from SQLite first
+        let sessions: SessionWithStats[] = []
+        let loadedFromSQLite = false
 
-        // Get conversation titles for better session names
-        const { useConversationStore } = await import('./conversation.store')
-        const conversations = useConversationStore.getState().conversations
-        const convTitles = new Map(conversations.map((c) => [c.id, c.title]))
+        try {
+          const sqliteSessions = await repo.findAllSessions()
+          if (sqliteSessions.length > 0) {
+            sessions = sqliteSessions.map(sqliteSessionToWithStats)
+            loadedFromSQLite = true
+          }
+        } catch (sqliteError) {
+          console.warn(
+            '[SessionStore] Failed to load from SQLite, falling back to OPFS:',
+            sqliteError
+          )
+        }
 
-        // Enrich with stats from workspaces
-        const sessions: SessionWithStats[] = []
-        for (const meta of internalSessions) {
-          const workspace = await manager.getSession(meta.sessionId)
-          if (workspace) {
+        // Fallback: migrate from OPFS if SQLite is empty
+        if (!loadedFromSQLite) {
+          console.log('[SessionStore] No sessions in SQLite, migrating from OPFS...')
+
+          // Get conversation titles for better session names
+          const { useConversationStore } = await import('./conversation.store')
+          const conversations = useConversationStore.getState().conversations
+          const convTitles = new Map(conversations.map((c) => [c.id, c.title]))
+
+          // Get all session metadata from OPFS
+          const internalSessions = manager.getAllSessions()
+
+          for (const meta of internalSessions) {
+            const workspace = await manager.getSession(meta.sessionId)
+            if (!workspace) continue
+
             // Use fallback strategy for session name
             const sessionName = getSessionDisplayName(meta, convTitles)
 
@@ -149,6 +190,25 @@ export const useSessionStore = create<SessionState>()(
               if (convTitle) {
                 await manager.updateSessionName(meta.sessionId, convTitle)
               }
+            }
+
+            // Create session in SQLite
+            try {
+              await repo.createSession({
+                id: meta.sessionId,
+                rootDirectory: meta.rootDirectory,
+                name: sessionName,
+                status: 'active',
+                cacheSize: 0,
+                pendingCount: workspace.pendingCount,
+                undoCount: workspace.undoCount,
+                modifiedFiles: 0,
+              })
+            } catch (createError) {
+              console.warn(
+                `[SessionStore] Failed to create session ${meta.sessionId} in SQLite:`,
+                createError
+              )
             }
 
             sessions.push({
@@ -190,8 +250,23 @@ export const useSessionStore = create<SessionState>()(
       set({ isLoading: true, error: null })
 
       try {
+        const repo = getSessionRepository()
         const manager = await getSessionManager()
+
+        // Create OPFS workspace
         const workspace = await manager.createSession(rootDirectory, id)
+
+        // Create SQLite record
+        await repo.createSession({
+          id,
+          rootDirectory,
+          name: name || rootDirectory.split('/').pop() || id,
+          status: 'active',
+          cacheSize: 0,
+          pendingCount: workspace.pendingCount,
+          undoCount: workspace.undoCount,
+          modifiedFiles: 0,
+        })
 
         const newSession: SessionWithStats = {
           id,
@@ -232,18 +307,21 @@ export const useSessionStore = create<SessionState>()(
       }
 
       // Capture target conversation ID before async operations to avoid race condition
-      // We'll switch to this specific ID regardless of what happens during await
       const targetConversationId = id
 
       set({ isLoading: true, error: null })
 
       try {
+        const repo = getSessionRepository()
         const manager = await getSessionManager()
         const workspace = await manager.getSession(id)
 
         if (!workspace) {
           throw new Error(`Session ${id} not found`)
         }
+
+        // Update last access time in SQLite
+        await repo.updateSessionAccessTime(id)
 
         // Update session metadata
         set((state) => {
@@ -279,8 +357,14 @@ export const useSessionStore = create<SessionState>()(
       set({ isLoading: true, error: null })
 
       try {
+        const repo = getSessionRepository()
         const manager = await getSessionManager()
+
+        // Delete from OPFS
         await manager.deleteSession(id)
+
+        // Delete from SQLite (cascade deletes related records)
+        await repo.deleteSession(id)
 
         let newActiveId: string | null = null
 
@@ -319,10 +403,12 @@ export const useSessionStore = create<SessionState>()(
       set({ isLoading: true, error: null })
 
       try {
-        // Note: Session name is stored in the session metadata
-        // For now, we just update local state
-        // TODO: Persist to OPFS session metadata
+        const repo = getSessionRepository()
 
+        // Update in SQLite
+        await repo.updateSessionName(id, name)
+
+        // Update local state
         set((state) => {
           const session = state.sessions.find((s) => s.id === id)
           if (session) {
@@ -350,9 +436,16 @@ export const useSessionStore = create<SessionState>()(
 
       try {
         const manager = await getSessionManager()
+        const repo = getSessionRepository()
         const workspace = await manager.getSession(activeSessionId)
 
         if (workspace) {
+          // Update counts in SQLite
+          await repo.updateSessionStats(activeSessionId, {
+            pendingCount: workspace.pendingCount,
+            undoCount: workspace.undoCount,
+          })
+
           set((state) => {
             state.currentPendingCount = workspace.pendingCount
             state.currentUndoCount = workspace.undoCount

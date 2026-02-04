@@ -1,27 +1,44 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import { sqlitePlugin } from './src/sqlite/vite-plugin-sqlite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
-  plugins: [react()],
+  plugins: [
+    react(),
+    sqlitePlugin(), // SQLite WASM support for @sqlite.org/sqlite-wasm (set verbose: true for debugging)
+  ],
   define: {
     'process.env': {},
   },
   worker: {
     format: 'es',
     plugins: () => [react()],
+    // Note: COOP/COEP headers for workers are set by vite-plugin-sqlite middleware
+    // Vite doesn't support worker.headers directly - headers must be set via server middleware
   },
+
+  // Configure handling of WASM assets for @sqlite.org/sqlite-wasm
+  assetsInclude: ['**/*.wasm'],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Configure handling of WASM assets for @sqlite.org/sqlite-wasm
+  assetsInclude: ['**/*.wasm'],
   server: {
     host: '0.0.0.0', // Listen on all interfaces for mobile access
     port: 5173,
     open: true,
+    headers: {
+      // Required for @sqlite.org/sqlite-wasm OPFS VFS support
+      // See: https://sqlite.org/wasm/doc/trunk/persistence.md
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    },
   },
   build: {
     outDir: 'dist',
@@ -37,7 +54,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: [],
+    exclude: ['@sqlite.org/sqlite-wasm'],
   },
   test: {
     environment: 'happy-dom',

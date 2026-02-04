@@ -15,6 +15,22 @@ export const zhCN = {
     copied: '已复制',
   },
 
+  // 应用初始化
+  app: {
+    initializing: '正在初始化...',
+    preparing: '正在准备...',
+    loadProgress: '加载进度',
+    firstLoadHint: '首次加载可能需要几秒钟时间',
+    productName: 'Browser FS Analyzer',
+    initComplete: '初始化完成',
+    initFailed: '初始化失败',
+    sessionStorageOnly: '数据仅在当前会话保存，刷新后将丢失',
+    localStorageMode: '使用本地存储模式',
+    migrationInProgress: '正在迁移数据',
+    migrationComplete: '数据迁移完成',
+    conversationsMigrated: '{count} 个对话',
+  },
+
   // 顶部导航
   topbar: {
     productName: 'BFOSA',
@@ -86,6 +102,29 @@ export const zhCN = {
     enabled: '已启用',
     disabled: '已禁用',
     empty: '暂无技能',
+    // 技能分类
+    categories: {
+      codeReview: '代码审查',
+      testing: '测试',
+      debugging: '调试',
+      refactoring: '重构',
+      documentation: '文档',
+      security: '安全',
+      performance: '性能',
+      architecture: '架构',
+      general: '通用',
+    },
+    // 项目技能发现对话框
+    projectDialog: {
+      title: '发现项目技能',
+      description: '在项目中发现了 {count} 个技能，是否加载到工作区？',
+      selectAll: '全选',
+      deselectAll: '取消全选',
+      selected: '已选',
+      load: '加载',
+      loadAll: '加载全部',
+      skip: '跳过',
+    },
   },
 
   // 远程控制

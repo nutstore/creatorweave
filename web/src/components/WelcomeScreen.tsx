@@ -68,7 +68,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
             onKeyDown={handleKeyDown}
             placeholder={hasApiKey ? t('welcome.placeholder') : t('welcome.placeholderNoKey')}
             rows={3}
-            className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 pr-12 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-300"
+            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 pr-12 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-1"
             disabled={!hasApiKey}
           />
           <button
@@ -88,10 +88,10 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
             <button
               type="button"
               onClick={handleSelectFolder}
-              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700"
+              className="flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-normal text-secondary transition-colors hover:bg-primary-50 focus:outline-none"
             >
-              <FolderOpen className="h-3.5 w-3.5" />
-              {t('welcome.openLocalFolder')}
+              <FolderOpen className="h-[14px] w-[14px]" />
+              {t('folderSelector.openFolder')}
             </button>
           )}
         </div>

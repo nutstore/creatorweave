@@ -233,7 +233,7 @@ export function ConversationView({
                 <div className="inline-block rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500 shadow-sm">
                   <span className="flex items-center gap-1">
                     <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-primary-400"
+                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
                       style={{ animationDelay: '0ms' }}
                     />
                     <span
@@ -241,7 +241,7 @@ export function ConversationView({
                       style={{ animationDelay: '160ms' }}
                     />
                     <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-primary-600"
+                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
                       style={{ animationDelay: '320ms' }}
                     />
                   </span>
@@ -267,7 +267,7 @@ export function ConversationView({
               (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
             }
             rows={1}
-            className="max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary-300"
+            className="focus:border-primary-300 focus:ring-primary-300 max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
             disabled={isProcessing || !hasApiKey}
           />
           {isProcessing ? (

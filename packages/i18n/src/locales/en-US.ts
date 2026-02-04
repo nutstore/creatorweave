@@ -14,6 +14,22 @@ export const enUS = {
     copied: 'Copied',
   },
 
+  // App Initialization
+  app: {
+    initializing: 'Initializing...',
+    preparing: 'Preparing...',
+    loadProgress: 'Load Progress',
+    firstLoadHint: 'First load may take a few seconds',
+    productName: 'Browser FS Analyzer',
+    initComplete: 'Initialization complete',
+    initFailed: 'Initialization failed',
+    sessionStorageOnly: 'Data is saved for current session only, will be lost on refresh',
+    localStorageMode: 'Using local storage mode',
+    migrationInProgress: 'Migrating data',
+    migrationComplete: 'Migration complete',
+    conversationsMigrated: '{count} conversations',
+  },
+
   topbar: {
     productName: 'BFOSA',
     openFolder: 'Open Folder',
@@ -81,6 +97,29 @@ export const enUS = {
     enabled: 'Enabled',
     disabled: 'Disabled',
     empty: 'No skills',
+    // Skill categories
+    categories: {
+      codeReview: 'Code Review',
+      testing: 'Testing',
+      debugging: 'Debugging',
+      refactoring: 'Refactoring',
+      documentation: 'Documentation',
+      security: 'Security',
+      performance: 'Performance',
+      architecture: 'Architecture',
+      general: 'General',
+    },
+    // Project Skills Discovery Dialog
+    projectDialog: {
+      title: 'Project Skills Discovered',
+      description: 'Discovered {count} skill(s) in the project. Load them into the workspace?',
+      selectAll: 'Select All',
+      deselectAll: 'Deselect All',
+      selected: 'Selected',
+      load: 'Load',
+      loadAll: 'Load All',
+      skip: 'Skip',
+    },
   },
 
   remote: {

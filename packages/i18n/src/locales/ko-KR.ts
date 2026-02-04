@@ -1,4 +1,12 @@
 export const koKR = {
+  // 应用
+  app: {
+    productName: 'BFOSA',
+    initializing: '초기화 중...',
+    loadProgress: '로딩 진행률',
+    preparing: '준비 중...',
+  },
+
   // 通用
   common: {
     save: '저장',
@@ -75,6 +83,30 @@ export const koKR = {
     delete: '삭제',
     enabled: '활성화됨',
     disabled: '비활성화됨',
+    empty: '스킬 없음',
+    // 스킬 카테고리
+    categories: {
+      codeReview: '코드 리뷰',
+      testing: '테스트',
+      debugging: '디버깅',
+      refactoring: '리팩터링',
+      documentation: '문서화',
+      security: '보안',
+      performance: '성능',
+      architecture: '아키텍처',
+      general: '일반',
+    },
+    // 프로젝트 스킬 발견 다이얼로그
+    projectDialog: {
+      title: '프로젝트 스킬 발견',
+      description: '프로젝트에서 {count}개의 스킬을 발견했습니다. 워크스페이스에 로드하시겠습니까?',
+      selectAll: '모두 선택',
+      deselectAll: '선택 해제',
+      selected: '선택됨',
+      load: '로드',
+      loadAll: '모두 로드',
+      skip: '건너뛰기',
+    },
   },
 
   // 远程控制

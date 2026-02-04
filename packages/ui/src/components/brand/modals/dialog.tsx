@@ -13,7 +13,18 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-const BrandDialog = DialogPrimitive.Root
+export interface BrandDialogProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> {
+  /** Modal mode - when false, allows interaction with elements outside the dialog. Default: false */
+  modal?: boolean
+}
+
+const BrandDialog = React.forwardRef<
+  unknown,
+  BrandDialogProps
+>(({ modal = false, ...props }, _ref) => (
+  <DialogPrimitive.Root modal={modal} {...props} />
+))
+BrandDialog.displayName = "BrandDialog"
 
 const BrandDialogTrigger = DialogPrimitive.Trigger
 
@@ -36,18 +47,32 @@ const BrandDialogOverlay = React.forwardRef<
 ))
 BrandDialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+interface BrandDialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** Whether to show overlay. Default: true */
+  showOverlay?: boolean
+}
+
 const BrandDialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  BrandDialogContentProps
+>(({ className, children, showOverlay = true, ...props }, ref) => (
   <BrandDialogPortal>
-    <BrandDialogOverlay />
+    {showOverlay && (
+      <div
+        className="fixed inset-0 z-overlay bg-black/50 pointer-events-none"
+        aria-hidden="true"
+      />
+    )}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         "fixed left-[50%] top-[50%] z-modal w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border border-gray-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
+      onPointerDownOutside={(e) => {
+        // Allow clicks to pass through to underlying elements
+        e.preventDefault()
+      }}
       {...props}
     >
       {children}

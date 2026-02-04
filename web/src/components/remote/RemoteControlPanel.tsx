@@ -198,7 +198,7 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
             <div className="flex items-center justify-center gap-2 rounded-md bg-gray-50 px-3 py-2">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  connectionState === 'connected' ? 'bg-success-500' : 'bg-warning-500'
+                  connectionState === 'connected' ? 'bg-green-500' : 'bg-yellow-500'
                 }`}
               />
               <span className="text-sm text-gray-700">

@@ -27,6 +27,8 @@ interface SkillsState {
   loaded: boolean
   /** Loading state */
   loading: boolean
+  /** Error state - prevents retry loop on persistent errors */
+  error: string | null
 
   // Actions
   loadSkills: () => Promise<void>
@@ -37,6 +39,7 @@ interface SkillsState {
   getFullSkill: (id: string) => Promise<Skill | null>
   getEnabledSkills: () => Promise<Skill[]>
   getSkillsByCategory: (category: SkillCategory) => Promise<Skill[]>
+  clearError: () => void
 }
 
 type SkillsStateWithImmer = SkillsState & {
@@ -49,9 +52,18 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
     skills: [],
     loaded: false,
     loading: false,
+    error: null,
 
     loadSkills: async () => {
-      if (get().loading) return
+      const state = get()
+      // Prevent retry if already loading or if there was a previous error
+      if (state.loading) return
+      if (state.error) {
+        console.warn(
+          '[SkillsStore] Not loading skills - previous error exists. Call clearError() to retry.'
+        )
+        return
+      }
       set({ loading: true })
       try {
         console.log('[SkillsStore] loadSkills: starting')
@@ -68,15 +80,17 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
           '[SkillsStore] Skill IDs:',
           metadata.map((s) => s.id)
         )
-        set({ skills: metadata, loaded: true, loading: false })
+        set({ skills: metadata, loaded: true, loading: false, error: null })
         console.log(
           '[SkillsStore] loadSkills: complete, store now has',
           get().skills.length,
           'skills'
         )
       } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error)
         console.error('[SkillsStore] loadSkills error:', error)
-        set({ loading: false })
+        // Set error state to prevent retry loop
+        set({ loading: false, error: errorMsg })
       }
     },
 
@@ -148,6 +162,10 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
 
     getSkillsByCategory: async (category) => {
       return storage.getSkillsByCategory(category)
+    },
+
+    clearError: () => {
+      set({ error: null })
     },
   }))
 )

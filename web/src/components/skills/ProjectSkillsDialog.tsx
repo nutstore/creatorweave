@@ -7,11 +7,16 @@
 
 import { useState, useCallback } from 'react'
 import { Check, FolderOpen, Sparkles } from 'lucide-react'
-import { DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import {
+  BrandDialog,
+  BrandDialogContent,
+  BrandDialogTitle,
+  BrandButton,
+} from '@browser-fs-analyzer/ui'
 import { Badge } from '@/components/ui/badge'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 interface ProjectSkillsDialogProps {
   /** Whether the dialog is open */
@@ -27,27 +32,15 @@ interface ProjectSkillsDialogProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  'code-review': 'bg-purple-50 text-purple-700 border-purple-200',
-  testing: 'bg-green-50 text-green-700 border-green-200',
-  debugging: 'bg-red-50 text-red-700 border-red-200',
-  refactoring: 'bg-orange-50 text-orange-700 border-orange-200',
-  documentation: 'bg-blue-50 text-blue-700 border-blue-200',
-  security: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  performance: 'bg-pink-50 text-pink-700 border-pink-200',
-  architecture: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-  general: 'bg-gray-50 text-gray-700 border-gray-200',
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  'code-review': '代码审查',
-  testing: '测试',
-  debugging: '调试',
-  refactoring: '重构',
-  documentation: '文档',
-  security: '安全',
-  performance: '性能',
-  architecture: '架构',
-  general: '通用',
+  'code-review': 'bg-primary-50 text-primary-600 border-primary-200',
+  testing: 'bg-success-50 text-success-text border-success-200',
+  debugging: 'bg-danger-50 text-danger border-danger-200',
+  refactoring: 'bg-warning-50 text-warning border-warning-200',
+  documentation: 'bg-secondary text-text-secondary border-gray-200',
+  security: 'bg-danger-50 text-danger border-danger-200',
+  performance: 'bg-primary-50 text-primary-600 border-primary-200',
+  architecture: 'bg-primary-50 text-primary-600 border-primary-200',
+  general: 'bg-secondary text-text-secondary border-gray-200',
 }
 
 export function ProjectSkillsDialog({
@@ -57,6 +50,7 @@ export function ProjectSkillsDialog({
   onSkip,
   onOpenChange,
 }: ProjectSkillsDialogProps) {
+  const t = useT()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const isOpen = useCallback(
@@ -110,90 +104,113 @@ export function ProjectSkillsDialog({
     return id
   }, [])
 
+  // Get localized category label
+  const getCategoryLabel = useCallback(
+    (category: string) => {
+      const labels: Record<string, string> = {
+        'code-review': t('skills.categories.codeReview'),
+        testing: t('skills.categories.testing'),
+        debugging: t('skills.categories.debugging'),
+        refactoring: t('skills.categories.refactoring'),
+        documentation: t('skills.categories.documentation'),
+        security: t('skills.categories.security'),
+        performance: t('skills.categories.performance'),
+        architecture: t('skills.categories.architecture'),
+        general: t('skills.categories.general'),
+      }
+      return labels[category] || category
+    },
+    [t]
+  )
+
   if (skills.length === 0) return null
 
   return (
-    <DialogContent
-      open={open}
-      onOpenChange={isOpen}
-      className="flex max-w-md flex-col overflow-hidden p-0"
-    >
-      {/* Header */}
-      <div className="border-b border-neutral-100 bg-gradient-to-r from-amber-50 to-orange-50 px-6 py-5">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <DialogTitle className="px-0 text-base font-semibold text-neutral-900">
-              发现项目技能
-            </DialogTitle>
-            <p className="mt-1 text-xs leading-relaxed text-neutral-600">
-              在项目中发现了 <span className="font-semibold text-amber-600">{skills.length}</span>{' '}
-              个技能，是否加载到工作区？
-            </p>
+    <BrandDialog open={open} onOpenChange={isOpen}>
+      <BrandDialogContent className="flex max-w-md flex-col overflow-hidden p-0">
+        {/* Header */}
+        <div className="border-b border-gray-100 bg-gradient-to-r from-primary-50 to-primary-100 px-6 py-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+              <Sparkles className="h-5 w-5 text-primary-600" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <BrandDialogTitle className="px-0 text-base font-semibold text-gray-900">
+                {t('skills.projectDialog.title')}
+              </BrandDialogTitle>
+              <p className="mt-1 text-xs leading-relaxed text-gray-600">
+                {t('skills.projectDialog.description', { count: skills.length })}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Select All Bar */}
-      <div className="flex items-center justify-between border-b border-neutral-100 bg-white px-6 py-2.5">
-        <button
-          type="button"
-          onClick={toggleAll}
-          className="flex items-center gap-2 text-sm text-neutral-600 transition-colors hover:text-neutral-900"
-        >
-          <div
-            className={cn(
-              'flex h-4 w-4 items-center justify-center rounded border transition-colors',
-              isAllSelected
-                ? 'border-primary-600 bg-primary-600 text-white'
-                : isIndeterminate
-                  ? 'border-primary-600 bg-primary-600 text-white'
-                  : 'border-neutral-300 bg-white hover:border-primary-400'
-            )}
+        {/* Select All Bar */}
+        <div className="flex items-center justify-between border-b border-gray-100 bg-white px-6 py-2.5">
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="flex items-center gap-2 text-sm text-gray-600 transition-colors hover:text-gray-900 focus:outline-none"
           >
-            {isAllSelected ? (
-              <Check className="h-3 w-3" />
-            ) : isIndeterminate ? (
-              <div className="h-2 w-2 rounded-full bg-white" />
-            ) : null}
-          </div>
-          {isAllSelected ? '取消全选' : '全选'}
-        </button>
-        <span className="text-xs text-neutral-400">
-          已选 <span className="font-medium text-neutral-600">{selectedIds.size}</span> /{' '}
-          {skills.length}
-        </span>
-      </div>
+            <div
+              className={cn(
+                'flex h-4 w-4 items-center justify-center rounded border transition-colors',
+                isAllSelected
+                  ? 'border-primary-600 bg-primary-600 text-white'
+                  : isIndeterminate
+                    ? 'border-primary-600 bg-primary-600 text-white'
+                    : 'hover:border-primary-400 border-gray-300 bg-white'
+              )}
+            >
+              {isAllSelected ? (
+                <Check className="h-3 w-3" />
+              ) : isIndeterminate ? (
+                <div className="h-2 w-2 rounded-full bg-white" />
+              ) : null}
+            </div>
+            {isAllSelected
+              ? t('skills.projectDialog.deselectAll')
+              : t('skills.projectDialog.selectAll')}
+          </button>
+          <span className="text-xs text-gray-400">
+            {t('skills.projectDialog.selected')}{' '}
+            <span className="font-medium text-gray-600">{selectedIds.size}</span> / {skills.length}
+          </span>
+        </div>
 
-      {/* Skill List */}
-      <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
-        {skills.map((skill) => (
-          <SkillListItem
-            key={skill.id}
-            skill={skill}
-            selected={selectedIds.has(skill.id)}
-            onToggle={() => toggleSkill(skill.id)}
-            getPath={getSkillPath}
-          />
-        ))}
-      </div>
+        {/* Skill List */}
+        <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+          {skills.map((skill) => (
+            <SkillListItem
+              key={skill.id}
+              skill={skill}
+              selected={selectedIds.has(skill.id)}
+              onToggle={() => toggleSkill(skill.id)}
+              getPath={getSkillPath}
+              getCategoryLabel={(cat) => getCategoryLabel(cat)}
+            />
+          ))}
+        </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-end gap-2 border-t border-neutral-100 bg-neutral-50 px-6 py-3">
-        <Button
-          variant="ghost"
-          onClick={handleSkip}
-          className="text-neutral-600 hover:bg-neutral-200 hover:text-neutral-900"
-        >
-          跳过
-        </Button>
-        <Button onClick={handleConfirm} disabled={selectedIds.size === 0} className="min-w-[90px]">
-          {selectedIds.size === skills.length ? '加载全部' : `加载 ${selectedIds.size}`}
-        </Button>
-      </div>
-    </DialogContent>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50 px-6 py-3">
+          <BrandButton variant="outline" onClick={handleSkip}>
+            {t('skills.projectDialog.skip')}
+          </BrandButton>
+          <BrandButton
+            onClick={handleConfirm}
+            disabled={selectedIds.size === 0}
+            className="min-w-[90px]"
+          >
+            {selectedIds.size === 0
+              ? t('skills.projectDialog.load')
+              : selectedIds.size === skills.length
+                ? t('skills.projectDialog.loadAll')
+                : `${t('skills.projectDialog.load')} ${selectedIds.size}`}
+          </BrandButton>
+        </div>
+      </BrandDialogContent>
+    </BrandDialog>
   )
 }
 
@@ -202,16 +219,23 @@ interface SkillListItemProps {
   selected: boolean
   onToggle: () => void
   getPath: (id: string) => string
+  getCategoryLabel: (category: string) => string
 }
 
-function SkillListItem({ skill, selected, onToggle, getPath }: SkillListItemProps) {
+function SkillListItem({
+  skill,
+  selected,
+  onToggle,
+  getPath,
+  getCategoryLabel,
+}: SkillListItemProps) {
   return (
     <label
       className={cn(
         'group relative flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition-all',
         selected
-          ? 'border-amber-300 bg-amber-50/50'
-          : 'border-neutral-200 bg-white hover:border-amber-200 hover:shadow-md'
+          ? 'border-primary-300 bg-primary-50/50'
+          : 'hover:border-primary-200 border-gray-200 bg-white hover:shadow-md'
       )}
     >
       {/* Custom Checkbox */}
@@ -220,8 +244,8 @@ function SkillListItem({ skill, selected, onToggle, getPath }: SkillListItemProp
           className={cn(
             'flex h-5 w-5 items-center justify-center rounded-lg border-2 transition-all',
             selected
-              ? 'border-amber-500 bg-amber-500'
-              : 'border-neutral-300 bg-white group-hover:border-amber-400'
+              ? 'border-primary-600 bg-primary-600'
+              : 'group-hover:border-primary-400 border-gray-300 bg-white'
           )}
         >
           {selected && <Check className="h-3.5 w-3.5 text-white" />}
@@ -232,12 +256,7 @@ function SkillListItem({ skill, selected, onToggle, getPath }: SkillListItemProp
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <h4
-            className={cn(
-              'text-sm font-semibold',
-              selected ? 'text-neutral-900' : 'text-neutral-800'
-            )}
-          >
+          <h4 className={cn('text-sm font-semibold', selected ? 'text-gray-900' : 'text-gray-800')}>
             {skill.name}
           </h4>
           <Badge
@@ -247,18 +266,18 @@ function SkillListItem({ skill, selected, onToggle, getPath }: SkillListItemProp
               CATEGORY_COLORS[skill.category] || CATEGORY_COLORS.general
             )}
           >
-            {CATEGORY_LABELS[skill.category] || skill.category}
+            {getCategoryLabel(skill.category)}
           </Badge>
         </div>
         <p
           className={cn(
             'mt-1.5 line-clamp-2 text-xs leading-relaxed',
-            selected ? 'text-neutral-600' : 'text-neutral-500'
+            selected ? 'text-gray-600' : 'text-gray-500'
           )}
         >
           {skill.description}
         </p>
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-neutral-400">
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-400">
           <FolderOpen className="h-3.5 w-3.5" />
           <span className="font-mono">{getPath(skill.id)}</span>
         </div>

@@ -9,6 +9,24 @@
       content="Browser-based File System Analyzer - Analyze local folders with WebAssembly"
     />
     <title>Browser FS Analyzer</title>
+    <!-- COOP/COEP headers for SharedArrayBuffer and OPFS VFS support -->
+    <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
+    <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
+    <!-- COOP/COEP Diagnostic Tool - 仅开发环境加载 -->
+    <script type="module">
+      if (import.meta.env.DEV) {
+        window.addEventListener('load', () => {
+          // Expose diagnostic function globally
+          window.diagnoseCoopCoep = () => {
+            fetch('/diagnose-coop-coep.js')
+              .then(r => r.text())
+              .then(code => eval(code))
+              .catch(() => console.error('Failed to load diagnostic tool'))
+          }
+          console.log('💡 Run diagnoseCoopCoep() in console to check COOP/COEP status')
+        })
+      }
+    </script>
     <!-- React Grab - 仅开发环境加载 -->
     <script type="module">
       if (import.meta.env.DEV) {

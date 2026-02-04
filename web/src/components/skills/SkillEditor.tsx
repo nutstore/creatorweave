@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, Eye, EyeOff, Save, FileCode, ChevronDown } from 'lucide-react'
-import { DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { BrandDialog, BrandDialogContent, BrandDialogTitle } from '@browser-fs-analyzer/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -193,100 +193,101 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
     : CATEGORY_COLORS.gray
 
   return (
-    <DialogContent
+    <BrandDialog
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) onClose()
       }}
-      className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0"
     >
-      {/* Gradient Header */}
-      <div className="border-b border-neutral-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-start gap-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
-              <FileCode className="h-5 w-5 text-blue-500" />
+      <BrandDialogContent className="flex max-h-[90vh] max-w-4xl flex-col overflow-hidden p-0">
+        {/* Gradient Header */}
+        <div className="border-b border-neutral-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm">
+                <FileCode className="h-5 w-5 text-blue-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <BrandDialogTitle className="px-0 text-base font-semibold text-neutral-900">
+                  {skill ? '编辑技能' : '新建技能'}
+                </BrandDialogTitle>
+                <p className="mt-1 text-xs text-neutral-600">
+                  {skill ? '修改现有技能的配置和内容' : '创建自定义技能，扩展 AI 能力'}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="px-0 text-base font-semibold text-neutral-900">
-                {skill ? '编辑技能' : '新建技能'}
-              </DialogTitle>
-              <p className="mt-1 text-xs text-neutral-600">
-                {skill ? '修改现有技能的配置和内容' : '创建自定义技能，扩展 AI 能力'}
-              </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(!showPreview)}
+                className="bg-white/80 backdrop-blur-sm hover:bg-white"
+              >
+                {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPreview ? '编辑' : '预览'}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-white/50">
+                <X className="h-4 w-4" />
+              </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto">
+          {!showPreview ? (
+            <EditForm
+              name={name}
+              setName={setName}
+              description={description}
+              setDescription={setDescription}
+              category={category}
+              setCategory={setCategory}
+              tags={tags}
+              setTags={setTags}
+              keywords={keywords}
+              setKeywords={setKeywords}
+              fileExtensions={fileExtensions}
+              setFileExtensions={setFileExtensions}
+              instruction={instruction}
+              setInstruction={setInstruction}
+              examples={examples}
+              setExamples={setExamples}
+              templates={templates}
+              setTemplates={setTemplates}
+            />
+          ) : (
+            <PreviewPanel content={previewContent()} />
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50 px-6 py-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn('border-2', categoryColorClass)}>
+              {currentCategory?.label || '未分类'}
+            </Badge>
+            <span className="text-xs text-neutral-400">{skill ? '编辑模式' : '新建模式'}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowPreview(!showPreview)}
-              className="bg-white/80 backdrop-blur-sm hover:bg-white"
-            >
-              {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              {showPreview ? '编辑' : '预览'}
+            <Button variant="outline" onClick={onClose} className="bg-white hover:bg-neutral-100">
+              取消
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-white/50">
-              <X className="h-4 w-4" />
+            <Button onClick={handleSave} disabled={isSaving}>
+              <Save className="mr-1.5 h-4 w-4" />
+              {isSaving ? '保存中...' : '保存'}
             </Button>
           </div>
         </div>
-      </div>
-
-      {/* Error Alert */}
-      {error && (
-        <div className="mx-6 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      {/* Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        {!showPreview ? (
-          <EditForm
-            name={name}
-            setName={setName}
-            description={description}
-            setDescription={setDescription}
-            category={category}
-            setCategory={setCategory}
-            tags={tags}
-            setTags={setTags}
-            keywords={keywords}
-            setKeywords={setKeywords}
-            fileExtensions={fileExtensions}
-            setFileExtensions={setFileExtensions}
-            instruction={instruction}
-            setInstruction={setInstruction}
-            examples={examples}
-            setExamples={setExamples}
-            templates={templates}
-            setTemplates={setTemplates}
-          />
-        ) : (
-          <PreviewPanel content={previewContent()} />
-        )}
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between border-t border-neutral-100 bg-neutral-50 px-6 py-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className={cn('border-2', categoryColorClass)}>
-            {currentCategory?.label || '未分类'}
-          </Badge>
-          <span className="text-xs text-neutral-400">{skill ? '编辑模式' : '新建模式'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={onClose} className="bg-white hover:bg-neutral-100">
-            取消
-          </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
-            <Save className="mr-1.5 h-4 w-4" />
-            {isSaving ? '保存中...' : '保存'}
-          </Button>
-        </div>
-      </div>
-    </DialogContent>
+      </BrandDialogContent>
+    </BrandDialog>
   )
 }
 

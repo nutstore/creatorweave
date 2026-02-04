@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react'
-import { Settings, Sparkles, Wrench } from 'lucide-react'
+import { Settings, Sparkles, Wrench, KeyRound } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
@@ -47,27 +47,15 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
           {/* Folder Selector */}
           <FolderSelector />
 
-          {/* API Key status */}
+          {/* API Key status - consistent button style */}
           {!hasApiKey && (
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              className="flex h-9 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning-bg focus:outline-none"
+              className="hover:bg-warning-100 focus:ring-warning-500 inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
             >
-              <span className="flex h-[14px] w-[14px] items-center justify-center">
-                <svg
-                  className="h-[14px] w-[14px]"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                  <line x1="12" y1="9" x2="12" y2="13" />
-                  <line x1="12" y1="17" x2="12.01" y2="17" />
-                </svg>
-              </span>
-              {t('topbar.noApiKey')}
+              <KeyRound className="h-4 w-4" />
+              <span>{t('topbar.noApiKey')}</span>
             </button>
           )}
 

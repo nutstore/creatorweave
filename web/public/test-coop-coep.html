@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>COOP/COEP Test</title>
+</head>
+<body>
+  <h1>COOP/COEP Test</h1>
+  <div id="results"></div>
+  <script type="module">
+    const results = document.getElementById('results');
+
+    // Main thread diagnostics
+    results.innerHTML += '<h2>Main Thread</h2>';
+    results.innerHTML += `<p>typeof SharedArrayBuffer: ${typeof SharedArrayBuffer}</p>`;
+    results.innerHTML += `<p>crossOriginIsolated: ${self.crossOriginIsolated}</p>`;
+
+    // Create a test worker
+    const workerCode = `
+      console.log('[Test Worker] crossOriginIsolated:', self.crossOriginIsolated);
+      console.log('[Test Worker] typeof SharedArrayBuffer:', typeof SharedArrayBuffer);
+      postMessage({
+        crossOriginIsolated: self.crossOriginIsolated,
+        typeof SharedArrayBuffer: typeof SharedArrayBuffer
+      });
+    `;
+
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = (e) => {
+      results.innerHTML += '<h2>Worker Thread (Blob)</h2>';
+      results.innerHTML += `<p>typeof SharedArrayBuffer: ${e.data.typeofSharedArrayBuffer}</p>`;
+      results.innerHTML += `<p>crossOriginIsolated: ${e.data.crossOriginIsolated}</p>`;
+    };
+
+    // Test module worker
+    try {
+      const moduleWorker = new Worker(new URL('./src/sqlite/sqlite-worker.ts', import.meta.url), { type: 'module' });
+      moduleWorker.onmessage = (e) => {
+        if (e.data.type === 'init') {
+          results.innerHTML += '<h2>Module Worker (sqlite-worker.ts)</h2>';
+          results.innerHTML += '<p>Worker initialized - check console for diagnostics</p>';
+        }
+      };
+      moduleWorker.postMessage({ type: 'init', schemaSQL: 'SELECT 1;' });
+    } catch (err) {
+      results.innerHTML += `<p>Module worker error: ${err.message}</p>`;
+    }
+  </script>
+</body>
+</html>
