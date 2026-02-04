@@ -55,35 +55,28 @@ const SettingsDialogContent = forwardRef<
     setTemperature,
     setMaxTokens,
     setHasApiKey,
+    invalidateApiKeyCache,
   } = useSettingsStore()
   const t = useT()
 
   const [apiKey, setApiKey] = useState('')
   const [showKey, setShowKey] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [hasLoadedKey, setHasLoadedKey] = useState(false) // Track if key was loaded from storage
-  const [isLoadingKey, setIsLoadingKey] = useState(false) // Track loading state
+  const [hasExistingKey, setHasExistingKey] = useState(false) // 数据库中是否已有 key
+  const [isLoadingKey, setIsLoadingKey] = useState(false)
 
   // Load existing API key on mount and when dialog opens
-  // Note: We don't display the actual key for security, only show a placeholder
+  // We don't display the actual key for security
   useEffect(() => {
     setIsLoadingKey(true)
     loadApiKey(providerType)
       .then((key) => {
-        if (key) {
-          // Don't set the actual key in the input field for security
-          // User can click to reveal if needed, but we don't auto-load it
-          setHasApiKey(true)
-          setHasLoadedKey(true)
-        } else {
-          setHasApiKey(false)
-          setHasLoadedKey(true) // Mark as loaded even if no key
-        }
+        const exists = !!key
+        setHasExistingKey(exists)
+        setHasApiKey(exists)
       })
       .catch((error) => {
         console.error('[SettingsDialog] Failed to load API key:', error)
-        // Still mark as loaded to avoid infinite loading state
-        setHasLoadedKey(true)
       })
       .finally(() => {
         setIsLoadingKey(false)
@@ -97,15 +90,17 @@ const SettingsDialogContent = forwardRef<
       // Empty key means delete/unset the API key
       await deleteApiKey(providerType)
       setHasApiKey(false)
-      setHasLoadedKey(false)
+      setHasExistingKey(false)
+      invalidateApiKeyCache(providerType)
       toast.success('API Key 已清空')
       return
     }
 
     await saveApiKey(providerType, trimmedKey)
     setHasApiKey(true)
-    setHasLoadedKey(true)
+    setHasExistingKey(true)
     setSaved(true)
+    invalidateApiKeyCache(providerType)
     // Clear the input field after saving for security
     setApiKey('')
     setTimeout(() => setSaved(false), 2000)
@@ -116,23 +111,18 @@ const SettingsDialogContent = forwardRef<
     setProviderType(provider)
     const config = LLM_PROVIDER_CONFIGS[provider]
     setModelName(config.modelName)
-    setApiKey('')
-    setHasLoadedKey(false)
+    setApiKey('') // Clear input when switching provider
     setIsLoadingKey(true)
-    // Check if this provider has a key configured (don't load the actual key)
+
+    // Check if new provider has a key
     loadApiKey(provider)
       .then((key) => {
-        if (key) {
-          setHasApiKey(true)
-          setHasLoadedKey(true)
-        } else {
-          setHasApiKey(false)
-          setHasLoadedKey(true) // Mark as loaded even if no key
-        }
+        const exists = !!key
+        setHasExistingKey(exists)
+        setHasApiKey(exists)
       })
       .catch((error) => {
         console.error('[SettingsDialog] Failed to load API key:', error)
-        setHasLoadedKey(true) // Mark as loaded to avoid infinite loading
       })
       .finally(() => {
         setIsLoadingKey(false)
@@ -191,8 +181,8 @@ const SettingsDialogContent = forwardRef<
                 placeholder={
                   isLoadingKey
                     ? '加载中...'
-                    : hasLoadedKey && !apiKey
-                      ? '••••••••••••• (已配置，如需更新请输入新 Key)'
+                    : hasExistingKey && !apiKey
+                      ? '••••••••••••• (已配置，输入新 Key 可更新)'
                       : t('settings.apiKeyPlaceholder')
                 }
                 className="h-10 pr-10"

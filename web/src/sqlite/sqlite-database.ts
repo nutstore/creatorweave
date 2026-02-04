@@ -141,6 +141,10 @@ class SQLiteWorkerClient {
   private dbMode: 'opfs' | 'memory' | null = null
   private schemaSQL: string = '' // Store schema for recovery
   private recovering = false // Recovery in progress flag
+  private recoveryCount = 0 // Track number of recovery attempts for diagnostics
+  private lastRecoveryTime = 0 // Track when last recovery occurred
+  private readonly RECOVERY_COOLDOWN = 5000 // Minimum 5 seconds between recoveries
+  private readonly MAX_RECOVERIES_PER_HOUR = 5 // Prevent excessive recovery attempts
 
   async initialize(): Promise<void> {
     if (this.initialized) return
@@ -158,19 +162,8 @@ class SQLiteWorkerClient {
 
     this.initPromise = (async () => {
       try {
-        // Diagnostic: Check main thread crossOriginIsolated state
-        console.log('[SQLite] Main thread diagnostics:')
-        console.log('[SQLite]  - typeof SharedArrayBuffer:', typeof SharedArrayBuffer)
-        console.log(
-          '[SQLite]  - SharedArrayBuffer available:',
-          typeof SharedArrayBuffer !== 'undefined'
-        )
-        console.log('[SQLite]  - crossOriginIsolated:', self.crossOriginIsolated)
-
         // Wait for crossOriginIsolated to be true before creating worker
-        // This is needed because some browsers don't set the flag immediately
         if (!self.crossOriginIsolated) {
-          console.log('[SQLite] Waiting for crossOriginIsolated to be true...')
           const maxWait = 5000 // 5 seconds max
           const startTime = Date.now()
           while (!self.crossOriginIsolated && Date.now() - startTime < maxWait) {
@@ -180,12 +173,8 @@ class SQLiteWorkerClient {
             console.warn(
               '[SQLite] crossOriginIsolated is still false after waiting. OPFS VFS may not work.'
             )
-          } else {
-            console.log('[SQLite] crossOriginIsolated is now true')
           }
         }
-
-        console.log('[SQLite] Initializing worker with OPFS VFS support...')
 
         // Use the separate worker file instead of inline blob worker
         // Blob workers cannot resolve bare import specifiers like @sqlite.org/sqlite-wasm
@@ -202,17 +191,22 @@ class SQLiteWorkerClient {
             this.pendingRequests.delete(response.id)
 
             if (response.error) {
-              // Check if this is a CANTOPEN error that might be recoverable
-              if (
-                response.error.includes('CANTOPEN') ||
-                response.error.includes('GetSyncHandleError')
-              ) {
-                console.warn('[SQLite] Database open error, attempting recovery...')
+              // Check if this is a recoverable database error
+              const isGetSyncHandleError = response.error.includes('GetSyncHandleError')
+              const isCantOpen = response.error.includes('CANTOPEN')
+
+              if (isGetSyncHandleError || isCantOpen) {
+                const errorType = isGetSyncHandleError
+                  ? 'GetSyncHandleError (stale handle)'
+                  : 'CANTOPEN'
+                console.warn(`[SQLite] Database error: ${errorType}. Attempting recovery...`)
+
                 // Try to recover and retry the request
+                // Note: handleRecovery now tries reconnection first before deleting
                 this.handleRecovery()
                   .then(() => {
                     // Retry the original request after recovery
-                    this.retryRequest(response.id, response.type)
+                    this.retryRequest(response.id)
                   })
                   .catch((recoveryError) => {
                     console.error('[SQLite] Recovery failed:', recoveryError)
@@ -271,12 +265,10 @@ class SQLiteWorkerClient {
         this.schemaSQL = schemaSQL
 
         // Initialize the worker with extended timeout
-        // SQLite WASM can take a while to load on first run
         await this.sendRequest<unknown>({ type: 'init', schemaSQL }, 120000) // 2 minutes
 
         this.initialized = true
         this.initializing = false
-        console.log('[SQLite] Worker initialized successfully')
       } catch (error) {
         console.error('[SQLite] Failed to initialize worker:', error)
         this.initPromise = null
@@ -374,6 +366,11 @@ class SQLiteWorkerClient {
 
   /**
    * Handle database recovery when CANTOPEN errors occur
+   *
+   * Recovery strategy with cooldown and limits:
+   * 1. Check cooldown period to prevent rapid successive recoveries
+   * 2. Check recovery count to detect chronic issues
+   * 3. Send recover request to worker (which tries reconnection first)
    */
   private async handleRecovery(): Promise<void> {
     if (this.recovering) {
@@ -384,11 +381,34 @@ class SQLiteWorkerClient {
       return
     }
 
+    // Check cooldown period
+    const now = Date.now()
+    const timeSinceLastRecovery = now - this.lastRecoveryTime
+    if (timeSinceLastRecovery < this.RECOVERY_COOLDOWN) {
+      const waitTime = this.RECOVERY_COOLDOWN - timeSinceLastRecovery
+      console.warn(`[SQLite] Recovery cooldown active, waiting ${waitTime}ms...`)
+      await new Promise((resolve) => setTimeout(resolve, waitTime))
+    }
+
+    // Check recovery count - prevent excessive recovery attempts
+    const oneHourAgo = now - 3600000
+    if (this.lastRecoveryTime > oneHourAgo && this.recoveryCount >= this.MAX_RECOVERIES_PER_HOUR) {
+      console.error(
+        `[SQLite] Too many recovery attempts (${this.recoveryCount} in the last hour). ` +
+          'This may indicate a chronic issue. Please refresh the page or check browser console.'
+      )
+      throw new Error('Excessive recovery attempts detected. Please refresh the page.')
+    }
+
     this.recovering = true
-    console.log('[SQLite] Starting database recovery...')
+    this.recoveryCount++
+    this.lastRecoveryTime = Date.now()
+
+    console.log(`[SQLite] Starting database recovery (attempt #${this.recoveryCount})...`)
 
     try {
       // Send recover request to worker
+      // Note: Worker now tries reconnection first before deleting database
       await this.sendRequest<void>({
         type: 'recover',
         schemaSQL: this.schemaSQL,
@@ -403,14 +423,29 @@ class SQLiteWorkerClient {
     }
   }
 
+  /** Get recovery statistics for diagnostics */
+  getRecoveryStats(): {
+    count: number
+    lastRecoveryTime: number
+    lastRecoveryDate: Date | null
+    cooldownRemaining: number
+  } {
+    const now = Date.now()
+    const cooldownRemaining = Math.max(0, this.RECOVERY_COOLDOWN - (now - this.lastRecoveryTime))
+    return {
+      count: this.recoveryCount,
+      lastRecoveryTime: this.lastRecoveryTime,
+      lastRecoveryDate: this.lastRecoveryTime > 0 ? new Date(this.lastRecoveryTime) : null,
+      cooldownRemaining,
+    }
+  }
+
   /**
    * Retry a request after recovery
    */
-  private retryRequest(id: string, type: string): void {
+  private retryRequest(id: string): void {
     const pending = this.pendingRequests.get(id)
     if (!pending || !pending.request) return
-
-    console.log(`[SQLite] Retrying request ${type} after recovery...`)
 
     // Resend the original request
     this.worker!.postMessage({ ...pending.request, id })
@@ -568,6 +603,19 @@ class SQLiteDatabaseManager {
   getMode(): 'opfs' | 'memory' | null {
     return this.workerClient?.getMode() ?? null
   }
+
+  /**
+   * Get recovery statistics for diagnostics
+   * Useful for debugging database connection issues
+   */
+  getRecoveryStats(): {
+    count: number
+    lastRecoveryTime: number
+    lastRecoveryDate: Date | null
+    cooldownRemaining: number
+  } | null {
+    return this.workerClient?.getRecoveryStats() ?? null
+  }
 }
 
 //=============================================================================
@@ -599,10 +647,25 @@ export async function resetSQLiteDB(): Promise<void> {
   window.location.reload()
 }
 
-// Make reset function available globally for debugging
+/**
+ * Get SQLite recovery statistics for diagnostics
+ * Call this from browser console: window.__getSQLiteRecoveryStats()
+ */
+export function getSQLiteRecoveryStats(): {
+  count: number
+  lastRecoveryTime: number
+  lastRecoveryDate: Date | null
+  cooldownRemaining: number
+} | null {
+  return getSQLiteDB().getRecoveryStats()
+}
+
+// Make functions available globally for debugging
 if (typeof window !== 'undefined') {
   // @ts-ignore
   window.__resetSQLiteDB = resetSQLiteDB
+  // @ts-ignore
+  window.__getSQLiteRecoveryStats = getSQLiteRecoveryStats
 }
 
 /**

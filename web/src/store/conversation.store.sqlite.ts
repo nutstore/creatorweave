@@ -115,6 +115,10 @@ interface ConversationState {
   // Follow-up suggestions (not persisted) - per conversation
   suggestedFollowUps: Map<string, string>
 
+  // Track which conversations have active UI components (not persisted)
+  // Used to prevent state updates after component unmount
+  mountedConversations: Set<string>
+
   // Computed
   activeConversation: () => Conversation | null
 
@@ -131,6 +135,11 @@ interface ConversationState {
   updateMessages: (conversationId: string, messages: Message[]) => void
   deleteConversation: (id: string) => void
   updateTitle: (id: string, title: string) => void
+
+  // Mount tracking actions
+  mountConversation: (id: string) => void
+  unmountConversation: (id: string) => void
+  isConversationMounted: (id: string) => boolean
 
   // Agent runtime actions
   runAgent: (
@@ -172,6 +181,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     agentLoops: new Map(),
     streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
+    mountedConversations: new Set(),
 
     activeConversation: () => {
       const { conversations, activeConversationId } = get()
@@ -195,6 +205,23 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       return conversations
         .filter((c) => c.status !== 'idle' && c.status !== 'error')
         .map((c) => c.id)
+    },
+
+    // Mount tracking actions
+    mountConversation: (id: string) => {
+      set((state) => {
+        state.mountedConversations.add(id)
+      })
+    },
+
+    unmountConversation: (id: string) => {
+      set((state) => {
+        state.mountedConversations.delete(id)
+      })
+    },
+
+    isConversationMounted: (id: string) => {
+      return get().mountedConversations.has(id)
     },
 
     loadFromDB: async () => {
@@ -322,7 +349,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const userMessages = conv.messages.filter((m) => m.role === 'user')
             if (userMessages.length === 1) {
               const newTitle = truncateTitle(message.content)
-              console.log('[conversation.store] Auto-updating title:', conv.title, '→', newTitle)
               conv.title = newTitle
             }
           }
@@ -350,7 +376,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const firstUserMessage = messages.find((m) => m.role === 'user')
             if (firstUserMessage?.content) {
               const newTitle = truncateTitle(firstUserMessage.content)
-              console.log('[conversation.store] Auto-updating title:', conv.title, '→', newTitle)
               conv.title = newTitle
             }
           }
@@ -506,8 +531,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           })
         }
 
+        // Helper to check if conversation is still mounted before state updates
+        const isMounted = () => get().mountedConversations.has(conversationId)
+
         const resultMessages = await agentLoop.run(currentMessages, {
           onMessageStart: () => {
+            if (!isMounted()) return
             // Reset accumulators for new message
             fullContentAccumulator = ''
             fullReasoningAccumulator = ''
@@ -524,6 +553,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onReasoningStart: () => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) {
@@ -534,10 +564,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             emitThinkingStart()
           },
           onReasoningDelta: (delta: string) => {
+            if (!isMounted()) return
             reasoningQueue.add('reasoning', delta)
             emitThinkingDelta(delta)
           },
           onReasoningComplete: (reasoning: string) => {
+            if (!isMounted()) return
             reasoningQueue.flushNow()
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
@@ -549,6 +581,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onContentStart: () => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) {
@@ -558,9 +591,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onContentDelta: (delta: string) => {
+            if (!isMounted()) return
             contentQueue.add('content', delta)
           },
           onContentComplete: (content: string) => {
+            if (!isMounted()) return
             contentQueue.flushNow()
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
@@ -572,6 +607,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onToolCallStart: (tc: ToolCall) => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) {
@@ -587,24 +623,37 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onToolCallDelta: (_index: number, argsDelta: string) => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) c.streamingToolArgs += argsDelta
             })
           },
           onToolCallComplete: (_tc: ToolCall, _result: string) => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) c.currentToolCall = null
             })
           },
           onMessagesUpdated: (msgs: Message[]) => {
+            if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) c.messages = msgs
             })
           },
           onComplete: async (msgs: Message[]) => {
+            if (!isMounted()) {
+              // Cleanup resources even if unmounted
+              reasoningQueue.flushNow()
+              contentQueue.flushNow()
+              cleanupQueues()
+              set((state) => {
+                state.agentLoops.delete(conversationId)
+              })
+              return
+            }
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
@@ -634,6 +683,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           },
           onError: (err: Error) => {
+            if (!isMounted()) {
+              // Cleanup resources even if unmounted
+              reasoningQueue.flushNow()
+              contentQueue.flushNow()
+              cleanupQueues()
+              set((state) => {
+                state.agentLoops.delete(conversationId)
+              })
+              return
+            }
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()

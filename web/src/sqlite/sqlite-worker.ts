@@ -109,8 +109,12 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 }
 
 /**
- * Recover from database errors by recreating the database
- * This is called when SQLITE_CANTOPEN or similar errors occur
+ * Recover from database errors by attempting reconnection first
+ * This is called when SQLITE_CANTOPEN or GetSyncHandleError errors occur
+ *
+ * Recovery strategy (in order of preference):
+ * 1. Try to reconnect to existing database (handles stale file handles)
+ * 2. Only if reconnection fails, delete and recreate
  */
 async function handleRecover() {
   console.warn('[SQLite Worker] Attempting database recovery...')
@@ -125,7 +129,27 @@ async function handleRecover() {
     db = null
   }
 
-  // Try to delete the corrupted database file
+  // Step 1: Try to reconnect to existing database first
+  // This handles GetSyncHandleError from stale file handles without data loss
+  if (sqlite3 && sqlite3.opfs) {
+    try {
+      console.log('[SQLite Worker] Attempting to reconnect to existing database...')
+      db = new sqlite3.oo1.OpfsDb(DB_NAME)
+      dbMode = 'opfs'
+      console.log('[SQLite Worker] Successfully reconnected to existing database - no data loss')
+      return
+    } catch (reconnectError) {
+      const errorMsg =
+        reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+      console.warn('[SQLite Worker] Reconnection failed:', errorMsg)
+      // Only proceed to deletion if reconnection truly fails
+    }
+  }
+
+  // Step 2: Only delete if reconnection failed
+  // This indicates actual database corruption, not just a stale handle
+  console.warn('[SQLite Worker] Database appears corrupted, will delete and recreate')
+
   try {
     if (sqlite3 && sqlite3.opfs && sqlite3.opfs.deleteDatabase) {
       await sqlite3.opfs.deleteDatabase(DB_NAME)
@@ -135,20 +159,25 @@ async function handleRecover() {
     console.warn('[SQLite Worker] Could not delete old database:', e)
   }
 
-  // Recreate database
+  // Step 3: Recreate database from scratch
   await handleInit(savedSchemaSQL)
-  console.log('[SQLite Worker] Database recovered')
+  console.log('[SQLite Worker] Database recovered (recreated)')
 }
 
 async function handleInit(schemaSQL: string) {
-  // Diagnostic logging for OPFS/SharedArrayBuffer availability
-  console.log('[SQLite Worker] Environment diagnostics:')
-  console.log('[SQLite Worker]  - typeof SharedArrayBuffer:', typeof SharedArrayBuffer)
-  console.log(
-    '[SQLite Worker]  - SharedArrayBuffer available:',
-    typeof SharedArrayBuffer !== 'undefined'
-  )
-  console.log('[SQLite Worker]  - crossOriginIsolated:', self.crossOriginIsolated)
+  // Wait for crossOriginIsolated to be true before initializing SQLite
+  if (!self.crossOriginIsolated) {
+    const maxWait = 5000 // 5 seconds max
+    const startTime = Date.now()
+    while (!self.crossOriginIsolated && Date.now() - startTime < maxWait) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    if (!self.crossOriginIsolated) {
+      console.warn(
+        '[SQLite Worker] crossOriginIsolated still false after waiting. OPFS VFS may not work.'
+      )
+    }
+  }
 
   // Initialize SQLite WASM module
   // @ts-ignore - sqlite3InitModule types are incomplete
@@ -157,19 +186,12 @@ async function handleInit(schemaSQL: string) {
     printErr: (msg: string) => console.error('[SQLite Worker]', msg),
   })
 
-  console.log('[SQLite Worker] SQLite module initialized')
-  console.log('[SQLite Worker]  - sqlite3.version:', sqlite3?.version)
-  console.log('[SQLite Worker]  - sqlite3.opfs exists:', 'opfs' in (sqlite3 || {}))
-  console.log('[SQLite Worker]  - sqlite3.opfs value:', sqlite3?.opfs)
-
   // Check if OPFS is available
   if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs) {
-    console.log('[SQLite Worker] OPFS is available, creating OpfsDb...')
     db = new sqlite3.oo1.OpfsDb(DB_NAME)
     dbMode = 'opfs'
-    console.log('[SQLite Worker] OpfsDb created at:', db?.filename)
   } else {
-    console.warn('[SQLite Worker] OPFS is not available, falling back to in-memory database')
+    console.warn('[SQLite Worker] OPFS not available, falling back to in-memory database')
     console.warn('[SQLite Worker] Possible causes:')
     console.warn('[SQLite Worker]  - COOP/COEP headers not set correctly')
     console.warn(
@@ -182,13 +204,15 @@ async function handleInit(schemaSQL: string) {
 
   // Initialize schema
   db.exec(schemaSQL)
-  console.log('[SQLite Worker] Schema initialized')
 }
 
 function handleQueryAll(sql: string, params: unknown[]): unknown[] {
-  if (!db) throw new Error('Database not initialized')
+  if (!db) {
+    throw new Error('Database not initialized')
+  }
 
   // Check if database connection is still valid
+  // This helps catch stale file handles before they cause errors
   try {
     // Simple check: try to get the filename
     const filename = db.filename
@@ -197,7 +221,23 @@ function handleQueryAll(sql: string, params: unknown[]): unknown[] {
     }
   } catch (e) {
     console.error('[SQLite Worker] Database connection check failed:', e)
-    throw new Error('Database connection is no longer valid. Please reload the page.')
+
+    // Try to reconnect before failing
+    if (sqlite3 && sqlite3.opfs && savedSchemaSQL) {
+      try {
+        console.log('[SQLite Worker] Attempting automatic reconnection...')
+        db = new sqlite3.oo1.OpfsDb(DB_NAME)
+        dbMode = 'opfs'
+        console.log('[SQLite Worker] Automatic reconnection successful')
+      } catch (reconnectError) {
+        console.error('[SQLite Worker] Automatic reconnection failed:', reconnectError)
+        throw new Error(
+          'Database connection is no longer valid and reconnection failed. Please reload the page.'
+        )
+      }
+    } else {
+      throw new Error('Database connection is no longer valid. Please reload the page.')
+    }
   }
 
   const rows: unknown[] = []
@@ -224,7 +264,38 @@ function handleQueryFirst(sql: string, params: unknown[]): unknown | null {
 }
 
 function handleExecute(sql: string, params: unknown[]): void {
-  if (!db) throw new Error('Database not initialized')
+  if (!db) {
+    throw new Error('Database not initialized')
+  }
+
+  // Check if database connection is still valid before executing
+  // This helps catch stale file handles before they cause errors
+  try {
+    const filename = db.filename
+    if (!filename) {
+      throw new Error('Database connection invalid: no filename')
+    }
+  } catch (e) {
+    console.error('[SQLite Worker] Database connection check failed:', e)
+
+    // Try to reconnect before failing
+    if (sqlite3 && sqlite3.opfs && savedSchemaSQL) {
+      try {
+        console.log('[SQLite Worker] Attempting automatic reconnection...')
+        db = new sqlite3.oo1.OpfsDb(DB_NAME)
+        dbMode = 'opfs'
+        console.log('[SQLite Worker] Automatic reconnection successful')
+      } catch (reconnectError) {
+        console.error('[SQLite Worker] Automatic reconnection failed:', reconnectError)
+        throw new Error(
+          'Database connection is no longer valid and reconnection failed. Please reload the page.'
+        )
+      }
+    } else {
+      throw new Error('Database connection is no longer valid. Please reload the page.')
+    }
+  }
+
   db.exec({ sql, bind: params })
 }
 

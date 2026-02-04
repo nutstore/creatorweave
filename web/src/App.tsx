@@ -9,7 +9,6 @@ import { attemptReconnect } from '@/store/remote.store'
 import { useSessionStore } from '@/store/session.store'
 import { initStorage, setupAutoSave } from '@/storage'
 import { useT } from '@/i18n'
-import { loadApiKey } from '@/security/api-key-store'
 
 function App() {
   const [isSupportedBrowser, setIsSupportedBrowser] = useState(true)
@@ -126,11 +125,10 @@ function App() {
       attemptReconnect()
 
       // Check if API key is already stored in SQLite
+      // Use the store's checkHasApiKey method for proper caching
       try {
         const { useSettingsStore } = await import('@/store/settings.store')
-        const currentProviderType = useSettingsStore.getState().providerType
-        const existingKey = await loadApiKey(currentProviderType)
-        useSettingsStore.getState().setHasApiKey(!!existingKey)
+        await useSettingsStore.getState().checkHasApiKey()
       } catch (err) {
         console.error('[App] Failed to check API key:', err)
       }

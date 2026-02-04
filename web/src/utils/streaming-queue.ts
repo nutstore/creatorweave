@@ -18,6 +18,7 @@ export class StreamingQueue {
   private rafId: number | null = null
   private callback: UpdateCallback
   private isScheduled = false
+  private destroyed = false
 
   constructor(callback: UpdateCallback) {
     this.callback = callback
@@ -26,8 +27,11 @@ export class StreamingQueue {
   /**
    * Add delta to buffer
    * Does not update immediately, waits for next RAF callback
+   * Silently ignores adds after destroy() is called
    */
   add(key: string, delta: string): void {
+    if (this.destroyed) return
+
     const current = this.buffer.get(key) || ''
     this.buffer.set(key, current + delta)
 
@@ -47,7 +51,7 @@ export class StreamingQueue {
   private flush(): void {
     this.isScheduled = false
 
-    if (this.buffer.size === 0) {
+    if (this.destroyed || this.buffer.size === 0) {
       return
     }
 
@@ -73,8 +77,10 @@ export class StreamingQueue {
 
   /**
    * Cleanup resources
+   * Prevents any further callbacks or updates
    */
   destroy(): void {
+    this.destroyed = true
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId)
       this.rafId = null

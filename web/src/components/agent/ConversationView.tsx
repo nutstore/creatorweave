@@ -10,6 +10,7 @@ import { Send, StopCircle, MessageSquare, Bot } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { groupMessagesIntoTurns } from './group-messages'
@@ -46,8 +47,34 @@ export function ConversationView({
   const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
   const getSuggestedFollowUp = useConversationStore((s) => s.getSuggestedFollowUp)
   const clearSuggestedFollowUp = useConversationStore((s) => s.clearSuggestedFollowUp)
+  const mountConversation = useConversationStore((s) => s.mountConversation)
+  const unmountConversation = useConversationStore((s) => s.unmountConversation)
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
+
+  // Must be declared before useEffect that uses it
+  const initialMessageHandled = useRef(false)
+  const convId = activeConversationId
+  const isRunning = convId ? isConversationRunning(convId) : false
+
+  // Mount/unmount tracking - prevents state updates after component unmounts
+  useEffect(() => {
+    if (convId) {
+      mountConversation(convId)
+    }
+    return () => {
+      if (convId) {
+        // Unmount first to prevent further state updates
+        unmountConversation(convId)
+        // Then cancel if still running
+        if (isConversationRunning(convId)) {
+          cancelAgent(convId)
+        }
+      }
+    }
+    // Only depend on convId - we don't want to re-run when other functions change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convId])
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -72,12 +99,6 @@ export function ConversationView({
     }
     return new Map<string, string>()
   }, [activeConversation, buildToolResultsMap])
-
-  // Handle initial message from WelcomeScreen (one-shot).
-  // The conversation is already created by WorkspaceLayout before this component mounts.
-  const initialMessageHandled = useRef(false)
-  const convId = activeConversationId
-  const isRunning = convId ? isConversationRunning(convId) : false
 
   // Get follow-up suggestion for current conversation
   const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
@@ -176,122 +197,133 @@ export function ConversationView({
   }, [activeConversation?.messages])
 
   return (
-    <div className="flex h-full flex-col bg-white">
-      {/* Messages area */}
-      <div className="custom-scrollbar flex-1 overflow-y-auto">
-        <div className="px-4 py-4">
-          {activeConversation?.messages.length === 0 && !isProcessing && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center text-neutral-400">
-                <MessageSquare className="mx-auto mb-2 h-8 w-8" />
-                <p className="text-sm">输入消息开始对话</p>
+    <ErrorBoundary
+      onError={(error) => {
+        console.error('[ConversationView] Error:', error)
+        // Reset conversation state on error
+        if (convId) {
+          const { resetConversationState } = useConversationStore.getState()
+          resetConversationState(convId)
+        }
+      }}
+    >
+      <div className="flex h-full flex-col bg-white">
+        {/* Messages area */}
+        <div className="custom-scrollbar flex-1 overflow-y-auto">
+          <div className="px-4 py-4">
+            {activeConversation?.messages.length === 0 && !isProcessing && (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center text-neutral-400">
+                  <MessageSquare className="mx-auto mb-2 h-8 w-8" />
+                  <p className="text-sm">输入消息开始对话</p>
+                </div>
               </div>
+            )}
+
+            <div className="mx-auto max-w-3xl space-y-4">
+              {turns.map((turn, idx) =>
+                turn.type === 'user' ? (
+                  <MessageBubble key={turn.message.id} message={turn.message} />
+                ) : (
+                  <AssistantTurnBubble
+                    key={turn.messages[0].id}
+                    turn={turn}
+                    toolResults={toolResults}
+                    isProcessing={isProcessing}
+                    isWaiting={false}
+                    streamingState={
+                      // Only pass streaming state to the last assistant turn when processing
+                      isProcessing && idx === turns.length - 1 ? streamingState : undefined
+                    }
+                    streamingContent={
+                      // Pass streaming content to the last assistant turn when processing
+                      isProcessing && idx === turns.length - 1 ? streamingContentMessage : undefined
+                    }
+                    currentToolCall={
+                      // Pass current tool call to the last assistant turn when in tool_calling phase
+                      isProcessing && idx === turns.length - 1 && status === 'tool_calling'
+                        ? activeConversation?.currentToolCall
+                        : undefined
+                    }
+                    streamingToolArgs={
+                      // Pass streaming tool args to the last assistant turn when in tool_calling phase
+                      isProcessing && idx === turns.length - 1 && status === 'tool_calling'
+                        ? activeConversation?.streamingToolArgs
+                        : undefined
+                    }
+                  />
+                )
+              )}
+
+              {/* Pending indicator - show when waiting for response and no assistant turn yet */}
+              {isProcessing && status === 'pending' && (
+                <div className="flex gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+                    <Bot className="h-4 w-4" />
+                  </div>
+                  <div className="inline-block rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500 shadow-sm">
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
+                        style={{ animationDelay: '0ms' }}
+                      />
+                      <span
+                        className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
+                        style={{ animationDelay: '160ms' }}
+                      />
+                      <span
+                        className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
+                        style={{ animationDelay: '320ms' }}
+                      />
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-          )}
+          </div>
+        </div>
 
-          <div className="mx-auto max-w-3xl space-y-4">
-            {turns.map((turn, idx) =>
-              turn.type === 'user' ? (
-                <MessageBubble key={turn.message.id} message={turn.message} />
-              ) : (
-                <AssistantTurnBubble
-                  key={turn.messages[0].id}
-                  turn={turn}
-                  toolResults={toolResults}
-                  isProcessing={isProcessing}
-                  isWaiting={false}
-                  streamingState={
-                    // Only pass streaming state to the last assistant turn when processing
-                    isProcessing && idx === turns.length - 1 ? streamingState : undefined
-                  }
-                  streamingContent={
-                    // Pass streaming content to the last assistant turn when processing
-                    isProcessing && idx === turns.length - 1 ? streamingContentMessage : undefined
-                  }
-                  currentToolCall={
-                    // Pass current tool call to the last assistant turn when in tool_calling phase
-                    isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                      ? activeConversation?.currentToolCall
-                      : undefined
-                  }
-                  streamingToolArgs={
-                    // Pass streaming tool args to the last assistant turn when in tool_calling phase
-                    isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                      ? activeConversation?.streamingToolArgs
-                      : undefined
-                  }
-                />
-              )
+        {/* Input area */}
+        <div className="border-t border-neutral-200 bg-white px-4 py-3">
+          <div className="mx-auto flex max-w-3xl items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                suggestedFollowUp ||
+                (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
+              }
+              rows={1}
+              className="focus:border-primary-300 focus:ring-primary-300 max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
+              disabled={isProcessing || !hasApiKey}
+            />
+            {isProcessing ? (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
+                title="停止"
+              >
+                <StopCircle className="h-4 w-4" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
+                className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
+                title="发送"
+              >
+                <Send className="h-4 w-4" />
+              </button>
             )}
-
-            {/* Pending indicator - show when waiting for response and no assistant turn yet */}
-            {isProcessing && status === 'pending' && (
-              <div className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
-                  <Bot className="h-4 w-4" />
-                </div>
-                <div className="inline-block rounded-2xl bg-neutral-50 px-4 py-3 text-sm text-neutral-500 shadow-sm">
-                  <span className="flex items-center gap-1">
-                    <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
-                      style={{ animationDelay: '0ms' }}
-                    />
-                    <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
-                      style={{ animationDelay: '160ms' }}
-                    />
-                    <span
-                      className="h-2 w-2 animate-bounce rounded-full bg-primary-500"
-                      style={{ animationDelay: '320ms' }}
-                    />
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
           </div>
         </div>
       </div>
-
-      {/* Input area */}
-      <div className="border-t border-neutral-200 bg-white px-4 py-3">
-        <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={
-              suggestedFollowUp ||
-              (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
-            }
-            rows={1}
-            className="focus:border-primary-300 focus:ring-primary-300 max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
-            disabled={isProcessing || !hasApiKey}
-          />
-          {isProcessing ? (
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
-              title="停止"
-            >
-              <StopCircle className="h-4 w-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
-              className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
-              title="发送"
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+    </ErrorBoundary>
   )
 }

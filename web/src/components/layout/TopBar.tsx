@@ -14,7 +14,7 @@
 
 import { useState } from 'react'
 import { Settings, Sparkles, Wrench, KeyRound } from 'lucide-react'
-import { useSettingsStore } from '@/store/settings.store'
+import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
@@ -30,7 +30,7 @@ interface TopBarProps {
 
 export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { hasApiKey } = useSettingsStore()
+  const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
 
   return (
