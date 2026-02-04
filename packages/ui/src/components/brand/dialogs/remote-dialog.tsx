@@ -48,7 +48,7 @@ const RemoteDialogContent = React.forwardRef<
   ...props
 }, ref) => {
   return (
-    <BrandDialogContent ref={ref} className="w-[448px] rounded-xl p-0 gap-0" {...props}>
+    <BrandDialogContent ref={ref} className="max-w-[448px] rounded-xl p-0 gap-0" {...props}>
       {/* Header */}
       <BrandDialogHeader className="h-14 px-6 border-b border-gray-200">
         <div className="flex items-center gap-2.5">

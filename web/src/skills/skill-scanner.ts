@@ -5,6 +5,7 @@
  * - .claude/skills/ and subdirectories (recursively)
  * - .skills/ and subdirectories (recursively)
  *
+ * Only scans files named SKILL.md (not other .md files).
  * These are loaded as 'project' source skills.
  */
 
@@ -25,7 +26,7 @@ export async function scanProjectSkills(
   const skillDirs = [['.claude', 'skills'], ['.skills']]
 
   console.log(
-    '[SkillScanner] Scanning directories (recursively):',
+    '[SkillScanner] Scanning directories for SKILL.md files:',
     skillDirs.map((d) => d.join('/'))
   )
 
@@ -38,10 +39,10 @@ export async function scanProjectSkills(
       continue
     }
 
-    console.log(`[SkillScanner] Found directory: ${dirPath}, scanning recursively...`)
+    console.log(`[SkillScanner] Found directory: ${dirPath}, scanning for SKILL.md...`)
 
     try {
-      await scanDirectoryRecursive(dirHandle, dirPath, skills, errors)
+      await scanDirectoryForSkillMd(dirHandle, dirPath, skills, errors)
     } catch (e) {
       errors.push(
         `Failed to read directory ${dirPath}: ${e instanceof Error ? e.message : String(e)}`
@@ -55,9 +56,10 @@ export async function scanProjectSkills(
 }
 
 /**
- * Recursively scan a directory for .md skill files.
+ * Recursively scan a directory for SKILL.md files.
+ * Only processes files named exactly "SKILL.md" (case-insensitive).
  */
-async function scanDirectoryRecursive(
+async function scanDirectoryForSkillMd(
   dirHandle: FileSystemDirectoryHandle,
   currentPath: string,
   skills: Skill[],
@@ -65,14 +67,14 @@ async function scanDirectoryRecursive(
 ): Promise<void> {
   for await (const [name, entry] of dirHandle.entries()) {
     const entryPath = `${currentPath}/${name}`
-    const isMd = name.endsWith('.md')
+    const isSkillMd = name.toUpperCase() === 'SKILL.MD'
 
     if (entry.kind === 'directory') {
       // Recursively scan subdirectories
       const subDirHandle = await dirHandle.getDirectoryHandle(name)
-      await scanDirectoryRecursive(subDirHandle, entryPath, skills, errors)
-    } else if (entry.kind === 'file' && isMd) {
-      console.log(`[SkillScanner] Found skill file: ${entryPath}`)
+      await scanDirectoryForSkillMd(subDirHandle, entryPath, skills, errors)
+    } else if (entry.kind === 'file' && isSkillMd) {
+      console.log(`[SkillScanner] Found SKILL.md: ${entryPath}`)
 
       try {
         const file = await entry.getFile()
@@ -80,10 +82,11 @@ async function scanDirectoryRecursive(
         const result = parseSkillMd(content, 'project')
 
         if (result.skill) {
-          // Prefix ID with project source and full path
-          result.skill.id = `project:${currentPath}/${name}`
+          // Prefix ID with project source and full path (excluding SKILL.md)
+          const dirPath = currentPath
+          result.skill.id = `project:${dirPath}`
           skills.push(result.skill)
-          console.log(`[SkillScanner] Parsed skill: ${result.skill.name}`)
+          console.log(`[SkillScanner] Parsed skill: ${result.skill.name} (${result.skill.id})`)
         } else if (result.error) {
           errors.push(`${entryPath}: ${result.error}`)
         }

@@ -130,6 +130,7 @@ export {
   BrandAccordionTrigger,
   BrandAccordionContent,
 } from './accordions/accordion'
+export type { BrandAccordionTriggerProps } from './accordions/accordion'
 
 // ========== Avatars ==========
 export {

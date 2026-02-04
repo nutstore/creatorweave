@@ -8,18 +8,21 @@
  * - Added SessionBadge to show OPFS session status
  * Phase 4 Integration:
  * - Added i18n support
+ * Phase 5 Integration:
+ * - Replaced inline folder button with FolderSelector component
  */
 
 import { useState } from 'react'
-import { FolderOpen, Settings, Sparkles, Wrench } from 'lucide-react'
-import { useAgentStore } from '@/store/agent.store'
+import { Settings, Sparkles, Wrench } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
-import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
+import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { SessionBadgeWithStorage } from '@/components/session'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
+import { FolderSelector } from './FolderSelector'
 import { useT } from '@/i18n'
+import { BrandButton } from '@browser-fs-analyzer/ui'
 
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
@@ -27,67 +30,51 @@ interface TopBarProps {
 
 export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const { directoryHandle, directoryName, setDirectoryHandle } = useAgentStore()
   const { hasApiKey } = useSettingsStore()
   const t = useT()
 
-  const handleSelectFolder = async () => {
-    try {
-      const handle = await selectFolderReadWrite()
-      setDirectoryHandle(handle)
-    } catch (error) {
-      if (error instanceof Error && error.message === 'User cancelled') return
-      console.error('Failed to select folder:', error)
-    }
-  }
-
   return (
     <>
-      <header className="flex h-12 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-4">
+      <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-gray-200 bg-background px-4">
         {/* Left: Logo + Name */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Sparkles className="h-5 w-5 text-primary-600" />
-          <span className="text-sm font-semibold text-neutral-900">{t('topbar.productName')}</span>
+          <span className="text-base font-medium text-primary">{t('topbar.productName')}</span>
         </div>
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* Folder */}
-          {directoryHandle ? (
-            <button
-              type="button"
-              onClick={handleSelectFolder}
-              className="flex h-9 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-              title={t('topbar.switchFolder')}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
-              <FolderOpen className="h-4 w-4 text-neutral-500" />
-              <span className="max-w-[120px] truncate">{directoryName}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSelectFolder}
-              className="hover:border-primary-200 active:border-primary-300 flex h-9 items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600 transition-colors hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 active:bg-primary-100"
-            >
-              <FolderOpen className="h-4 w-4" />
-              {t('topbar.openFolder')}
-            </button>
-          )}
+          {/* Folder Selector */}
+          <FolderSelector />
 
           {/* API Key status */}
           {!hasApiKey && (
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
-              className="rounded-md px-2 py-1 text-xs text-amber-600 hover:bg-amber-50"
+              className="flex h-9 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-3 py-1.5 text-xs font-medium text-warning hover:bg-warning-bg focus:outline-none"
             >
+              <span className="flex h-[14px] w-[14px] items-center justify-center">
+                <svg
+                  className="h-[14px] w-[14px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </span>
               {t('topbar.noApiKey')}
             </button>
           )}
 
           {/* Remote */}
-          <RemoteBadge />
+          <RemoteBadgeErrorBoundary>
+            <RemoteBadge />
+          </RemoteBadgeErrorBoundary>
 
           {/* Session - OPFS session status with storage dropdown */}
           <SessionBadgeWithStorage compact />
@@ -96,24 +83,22 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
           <LanguageSwitcher />
 
           {/* Skills */}
-          <button
-            type="button"
+          <BrandButton
+            iconButton
             onClick={onSkillsManagerOpen}
-            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
             title={t('topbar.skillsManagement')}
           >
-            <Wrench className="h-4 w-4" />
-          </button>
+            <Wrench className="h-[14px] w-[14px]" />
+          </BrandButton>
 
           {/* Settings */}
-          <button
-            type="button"
+          <BrandButton
+            iconButton
             onClick={() => setSettingsOpen(true)}
-            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
             title={t('topbar.settings')}
           >
-            <Settings className="h-4 w-4" />
-          </button>
+            <Settings className="h-[14px] w-[14px]" />
+          </BrandButton>
         </div>
       </header>
 

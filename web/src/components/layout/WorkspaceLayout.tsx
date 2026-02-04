@@ -53,6 +53,7 @@ export function WorkspaceLayout() {
   const [projectSkills, setProjectSkills] = useState<SkillMetadata[]>([])
   const [showProjectSkillsDialog, setShowProjectSkillsDialog] = useState(false)
   const skillsStore = useSkillsStore()
+  const skillsLoaded = useSkillsStore((s) => s.loaded) // Reactive state
 
   // File preview state (push-squeeze panel)
   const [previewFilePath, setPreviewFilePath] = useState<string | null>(null)
@@ -93,13 +94,23 @@ export function WorkspaceLayout() {
 
   const handleProjectSkillsConfirm = useCallback(
     async (selectedIds: string[]) => {
+      console.log('[WorkspaceLayout] Loading skills:', selectedIds)
       // Load selected skills into the skills store
       for (const id of selectedIds) {
         const skill = projectSkills.find((s) => s.id === id)
         if (skill) {
+          console.log('[WorkspaceLayout] Saving skill to store:', {
+            id: skill.id,
+            name: skill.name,
+          })
           await skillsStore.addSkill(skill as any)
+          console.log(
+            '[WorkspaceLayout] Skill saved, current store skills:',
+            skillsStore.skills.map((s) => s.id)
+          )
         }
       }
+      console.log('[WorkspaceLayout] All skills saved, closing dialog')
       setShowProjectSkillsDialog(false)
       setProjectSkills([])
     },
@@ -113,14 +124,16 @@ export function WorkspaceLayout() {
 
   // Initialize skills on mount
   useEffect(() => {
-    if (!skillsStore.loaded) {
+    if (!skillsLoaded) {
       skillsStore.loadSkills()
     }
-  }, [skillsStore])
+  }, [skillsLoaded, skillsStore])
 
   // Scan project skills when directoryHandle changes
+  // Must wait for skillsLoaded to be true, otherwise cannot properly filter loaded skills
   useEffect(() => {
     if (!directoryHandle) return
+    if (!skillsLoaded) return
 
     const scanForSkills = async () => {
       try {
@@ -133,12 +146,24 @@ export function WorkspaceLayout() {
         }
 
         if (result.skills.length > 0) {
+          // Filter out skills that already exist in store
+          const existingIds = new Set(skillsStore.skills.map((s) => s.id))
+          const newSkills = result.skills.filter((s) => !existingIds.has(s.id))
+
           console.log(
             '[WorkspaceLayout] Found skills:',
-            result.skills.map((s) => s.name)
+            result.skills.map((s) => ({ id: s.id, name: s.name }))
           )
-          setProjectSkills(result.skills)
-          setShowProjectSkillsDialog(true)
+          console.log('[WorkspaceLayout] Already loaded skill IDs:', Array.from(existingIds))
+          console.log(
+            '[WorkspaceLayout] New skills (not loaded yet):',
+            newSkills.map((s) => ({ id: s.id, name: s.name }))
+          )
+
+          if (newSkills.length > 0) {
+            setProjectSkills(newSkills)
+            setShowProjectSkillsDialog(true)
+          }
         } else {
           console.log(
             '[WorkspaceLayout] No project skills found (checked .claude/skills/ and .skills/)'
@@ -150,7 +175,7 @@ export function WorkspaceLayout() {
     }
 
     scanForSkills()
-  }, [directoryHandle])
+  }, [directoryHandle, skillsLoaded])
 
   // ESC key to close preview
   useEffect(() => {
@@ -298,7 +323,7 @@ export function WorkspaceLayout() {
           {showPreview && (
             <>
               <div
-                className="w-1 shrink-0 cursor-col-resize bg-neutral-200 hover:bg-primary-300 active:bg-primary-400"
+                className="hover:bg-primary-300 active:bg-primary-400 w-1 shrink-0 cursor-col-resize bg-neutral-200"
                 onMouseDown={handleDividerDragStart}
               />
               <div

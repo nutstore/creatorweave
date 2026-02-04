@@ -1,3 +1,7 @@
+/**
+ * Brand Accordion Components
+ */
+
 import * as React from "react"
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { ChevronDown } from "lucide-react"
@@ -18,9 +22,12 @@ const BrandAccordionItem = React.forwardRef<
 ))
 BrandAccordionItem.displayName = "BrandAccordionItem"
 
+export interface BrandAccordionTriggerProps
+  extends React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger> {}
+
 const BrandAccordionTrigger = React.forwardRef<
   React.ElementRef<typeof AccordionPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
+  BrandAccordionTriggerProps
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Header className="flex">
     <AccordionPrimitive.Trigger

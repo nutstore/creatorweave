@@ -4,13 +4,25 @@
  * Displays all skills grouped by source (project/user/builtin)
  * with search, filter, and management actions.
  * Phase 4: Added i18n support
+ * Phase 5: Refactored to use brand components
  */
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Plus, Search, RefreshCw, FolderOpen, User, Building, ChevronDown } from 'lucide-react'
-import { DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Plus, Search, RefreshCw, FolderOpen, User, Building, X, Inbox } from 'lucide-react'
+import {
+  BrandDialog,
+  BrandDialogContent,
+  BrandDialogClose,
+  BrandButton,
+  BrandInput,
+  BrandAccordion,
+  BrandAccordionItem,
+  BrandAccordionTrigger,
+  BrandAccordionContent,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from '@browser-fs-analyzer/ui'
 import { SkillCard } from './SkillCard'
 import { SkillEditor } from './SkillEditor'
 import { useSkillsStore } from '@/store/skills.store'
@@ -56,7 +68,7 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
         (s) =>
           s.name.toLowerCase().includes(query) ||
           s.description.toLowerCase().includes(query) ||
-          s.tags.some((t) => t.toLowerCase().includes(query))
+          s.tags.some((tag) => tag.toLowerCase().includes(query))
       )
     }
 
@@ -114,195 +126,178 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
 
   return (
     <>
-      <DialogContent
-        open={open}
-        onOpenChange={onClose}
-        className="flex max-h-[85vh] max-w-3xl flex-col overflow-hidden"
-      >
-        <DialogHeader className="border-b border-neutral-100 pb-4">
-          <DialogTitle className="text-base font-semibold text-neutral-900">
-            {t('skills.title')}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Search & Filter Bar */}
-        <div className="flex items-center gap-3 py-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-            <Input
-              placeholder={t('skills.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-9 bg-neutral-50 pl-9"
-            />
+      <BrandDialog open={open} onOpenChange={onClose} modal={false}>
+        <BrandDialogContent className="flex max-h-[600px] !w-[800px] flex-col overflow-hidden p-0">
+          {/* Header */}
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 px-6">
+            <h2 className="text-lg font-semibold text-gray-900">{t('skills.title')}</h2>
+            <BrandDialogClose className="text-gray-400 hover:text-gray-600">
+              <X className="h-5 w-5" />
+            </BrandDialogClose>
           </div>
-          <div className="flex items-center overflow-hidden rounded-lg border border-neutral-200">
-            <FilterTab active={filterType === 'all'} onClick={() => setFilterType('all')}>
-              {t('skills.filterAll')}{' '}
-              <span className="ml-1 text-neutral-400">({skillsStore.skills.length})</span>
-            </FilterTab>
-            <FilterTab active={filterType === 'enabled'} onClick={() => setFilterType('enabled')}>
-              {t('skills.filterEnabled')}
-            </FilterTab>
-            <FilterTab active={filterType === 'disabled'} onClick={() => setFilterType('disabled')}>
-              {t('skills.filterDisabled')}
-            </FilterTab>
-          </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={handleRefresh}
-            disabled={refreshing}
-            title={t('common.refresh')}
-            className="h-9 w-9"
-          >
-            <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-          </Button>
-        </div>
 
-        {/* Skills List */}
-        <div className="custom-scrollbar -mx-6 flex-1 overflow-y-auto">
-          <div className="space-y-4 px-6">
-            {/* Project Skills */}
-            {projectSkills.length > 0 && (
-              <SkillGroup
-                title={t('skills.projectSkills')}
-                icon={<FolderOpen className="h-4 w-4 text-neutral-500" />}
-                skills={projectSkills}
-                onToggle={handleToggle}
-                onEdit={handleEdit}
-                isReadOnly
+          {/* Search & Filter Bar */}
+          <div className="flex shrink-0 items-center gap-3 border-b border-gray-200 px-6 py-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <BrandInput
+                placeholder={t('skills.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="!h-9 !py-2 pl-9"
               />
-            )}
-
-            {/* User Skills */}
-            <SkillGroup
-              title={t('skills.mySkills')}
-              icon={<User className="h-4 w-4 text-neutral-500" />}
-              skills={userSkills}
-              onToggle={handleToggle}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-            />
-
-            {/* Builtin Skills */}
-            <SkillGroup
-              title={t('skills.builtinSkills')}
-              icon={<Building className="h-4 w-4 text-neutral-500" />}
-              skills={builtinSkills}
-              onToggle={handleToggle}
-              onEdit={handleEdit}
-              isReadOnly
-            />
+            </div>
+            <Tabs value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+              <TabsList variant="segment" className="h-9">
+                <TabsTrigger variant="segment" value="all" className="text-sm">
+                  {t('skills.filterAll')} ({skillsStore.skills.length})
+                </TabsTrigger>
+                <TabsTrigger variant="segment" value="enabled" className="text-sm">
+                  {t('skills.filterEnabled')}
+                </TabsTrigger>
+                <TabsTrigger variant="segment" value="disabled" className="text-sm">
+                  {t('skills.filterDisabled')}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <BrandButton
+              iconButton
+              onClick={handleRefresh}
+              disabled={refreshing}
+              title={t('common.refresh')}
+            >
+              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+            </BrandButton>
           </div>
-        </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-neutral-100 pt-4">
-          <span className="text-sm text-neutral-500">
-            <span className="font-medium text-neutral-700">
-              {skillsStore.skills.filter((s) => s.enabled).length}
+          {/* Skills List - scrollable */}
+          <div className="custom-scrollbar min-h-[400px] flex-1 overflow-y-auto px-6 py-4">
+            <BrandAccordion type="multiple" defaultValue={['user', 'builtin', 'project']}>
+              {/* Project Skills */}
+              <BrandAccordionItem value="project">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <FolderOpen className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {t('skills.projectSkills')}
+                    </span>
+                    <span className="text-xs text-gray-400">({projectSkills.length})</span>
+                  </div>
+                </BrandAccordionTrigger>
+                <BrandAccordionContent className="pb-0 pt-0">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                    {projectSkills.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
+                        <p className="text-sm">暂无项目技能</p>
+                      </div>
+                    ) : (
+                      projectSkills.map((skill) => (
+                        <SkillCard
+                          key={skill.id}
+                          skill={skill}
+                          isReadOnly
+                          onToggle={handleToggle}
+                          onEdit={handleEdit}
+                        />
+                      ))
+                    )}
+                  </div>
+                </BrandAccordionContent>
+              </BrandAccordionItem>
+
+              {/* User Skills */}
+              <BrandAccordionItem value="user">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {t('skills.mySkills')}
+                    </span>
+                    <span className="text-xs text-gray-400">({userSkills.length})</span>
+                  </div>
+                </BrandAccordionTrigger>
+                <BrandAccordionContent className="pb-0 pt-0">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                    {userSkills.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
+                        <p className="text-sm">暂无自定义技能</p>
+                      </div>
+                    ) : (
+                      userSkills.map((skill) => (
+                        <SkillCard
+                          key={skill.id}
+                          skill={skill}
+                          onToggle={handleToggle}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                        />
+                      ))
+                    )}
+                  </div>
+                </BrandAccordionContent>
+              </BrandAccordionItem>
+
+              {/* Builtin Skills */}
+              <BrandAccordionItem value="builtin">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <Building className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700">
+                      {t('skills.builtinSkills')}
+                    </span>
+                    <span className="text-xs text-gray-400">({builtinSkills.length})</span>
+                  </div>
+                </BrandAccordionTrigger>
+                <BrandAccordionContent className="pb-0 pt-0">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                    {builtinSkills.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
+                        <p className="text-sm">暂无内置技能</p>
+                      </div>
+                    ) : (
+                      builtinSkills.map((skill) => (
+                        <SkillCard
+                          key={skill.id}
+                          skill={skill}
+                          isReadOnly
+                          onToggle={handleToggle}
+                          onEdit={handleEdit}
+                        />
+                      ))
+                    )}
+                  </div>
+                </BrandAccordionContent>
+              </BrandAccordionItem>
+            </BrandAccordion>
+          </div>
+
+          {/* Footer */}
+          <div className="flex h-16 shrink-0 items-center justify-between border-t border-gray-200 px-6">
+            <span className="text-sm text-gray-500">
+              <span className="font-medium text-gray-700">
+                {skillsStore.skills.filter((s) => s.enabled).length}
+              </span>
+              {' / '}
+              {skillsStore.skills.length} {t('skills.enabled').toLowerCase()}
             </span>
-            {' / '}
-            {skillsStore.skills.length} {t('skills.filterEnabled')}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={onClose} className="h-9">
-              {t('common.close')}
-            </Button>
-            <Button onClick={handleCreateNew} className="h-9">
-              <Plus className="mr-1.5 h-4 w-4" />
-              {t('skills.createNew')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <BrandButton variant="outline" onClick={onClose}>
+                {t('common.close')}
+              </BrandButton>
+              <BrandButton onClick={handleCreateNew}>
+                <Plus className="mr-1.5 h-4 w-4" />
+                {t('skills.createNew')}
+              </BrandButton>
+            </div>
           </div>
-        </div>
-      </DialogContent>
+        </BrandDialogContent>
+      </BrandDialog>
 
       {/* Skill Editor Dialog */}
       <SkillEditor skill={editingSkill} open={editorOpen} onClose={handleEditorClose} />
     </>
-  )
-}
-
-interface SkillGroupProps {
-  title: string
-  icon: React.ReactNode
-  skills: SkillMetadata[]
-  onToggle: (id: string, enabled: boolean) => void
-  onEdit: (skill: SkillMetadata) => void
-  onDelete?: (id: string) => void
-  isReadOnly?: boolean
-}
-
-function SkillGroup({
-  title,
-  icon,
-  skills,
-  onToggle,
-  onEdit,
-  onDelete,
-  isReadOnly,
-}: SkillGroupProps) {
-  const [collapsed, setCollapsed] = useState(false)
-
-  if (skills.length === 0) return null
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-neutral-200">
-      <button
-        type="button"
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex w-full items-center justify-between bg-neutral-50 px-4 py-2.5 transition-colors hover:bg-neutral-100"
-      >
-        <div className="flex items-center gap-2">
-          {icon}
-          <span className="text-sm font-medium text-neutral-700">{title}</span>
-          <span className="text-xs text-neutral-400">({skills.length})</span>
-        </div>
-        <ChevronDown
-          className={cn('h-4 w-4 text-neutral-400 transition-transform', collapsed && '-rotate-90')}
-        />
-      </button>
-
-      {!collapsed && (
-        <div className="space-y-2 bg-white p-3">
-          {skills.map((skill) => (
-            <SkillCard
-              key={skill.id}
-              skill={skill}
-              isReadOnly={isReadOnly}
-              onToggle={onToggle}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function FilterTab({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean
-  children: React.ReactNode
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'border-r border-neutral-200 px-3 py-1.5 text-sm transition-colors last:border-r-0',
-        active
-          ? 'bg-neutral-100 font-medium text-neutral-900'
-          : 'text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700'
-      )}
-    >
-      {children}
-    </button>
   )
 }

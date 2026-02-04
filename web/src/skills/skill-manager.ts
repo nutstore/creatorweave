@@ -44,15 +44,28 @@ export class SkillManager {
 
   private async _doInitialize(): Promise<void> {
     try {
+      console.log(
+        '[SkillManager] _doInitialize: starting, seeding',
+        BUILTIN_SKILLS.length,
+        'builtin skills'
+      )
       // Seed builtin skills if they don't exist yet
       for (const builtin of BUILTIN_SKILLS) {
         const existing = await storage.getSkillById(builtin.id)
         if (!existing) {
+          console.log('[SkillManager] Saving builtin skill:', builtin.id)
           await storage.saveSkill(builtin, '')
+        } else {
+          console.log('[SkillManager] Builtin skill already exists:', builtin.id)
         }
       }
 
       await this.refreshCache()
+      console.log(
+        '[SkillManager] _doInitialize: complete, cached',
+        this.cachedSkills.length,
+        'skills'
+      )
       this._initialized = true
     } catch (error) {
       console.error('[SkillManager] Initialization failed:', error)
