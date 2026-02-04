@@ -221,6 +221,9 @@
   .bg-warning-bg {
     background-color: hsl(var(--warning-bg));
   }
+  .bg-hover {
+    background-color: hsl(var(--bg-hover));
+  }
 
   /* Border colors */
   .border-danger {

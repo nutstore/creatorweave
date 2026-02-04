@@ -7,16 +7,20 @@
  * - 🔴 Red = error
  *
  * Click to open storage panel
- * Phase 5: Refactored to use brand components
+ * Refactored to use brand components
  */
 
 import React, { useState, useCallback } from 'react'
-import { Clock, RotateCcw, HardDrive, Trash2, Check, Sparkles } from 'lucide-react'
+import { Clock, RotateCcw, HardDrive, Trash2, Check, Sparkles, Info } from 'lucide-react'
 import { useSessionStore } from '@/store/session.store'
 import { useStorageInfo } from '@/hooks/useStorageInfo'
 import { useSQLiteMode } from '@/hooks/useSQLiteMode'
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
-import { BrandButton, BrandBadge } from '@browser-fs-analyzer/ui'
+import {
+  BrandButton,
+  BrandBadge,
+  BrandSelectSeparator,
+} from '@browser-fs-analyzer/ui'
 import { cn } from '@/lib/utils'
 
 export interface SessionBadgeWithStorageProps {
@@ -40,6 +44,21 @@ const STORAGE_STATUS_LABELS: Record<StorageStatus, string> = {
   critical: '严重不足',
 }
 
+/** Progress color based on usage percentage */
+const getProgressColor = (percent: number): string => {
+  if (percent < 70) return 'bg-emerald-500'
+  if (percent < 80) return 'bg-amber-500'
+  if (percent < 95) return 'bg-orange-500'
+  return 'bg-danger'
+}
+
+/** Status dot color class */
+const getStatusDotColor = (hasError: boolean, isInitialized: boolean, isOPFS: boolean): string => {
+  if (hasError) return 'bg-danger'
+  if (!isInitialized) return 'bg-amber-500'
+  return isOPFS ? 'bg-emerald-500' : ''
+}
+
 export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = () => {
   const [open, setOpen] = useState(false)
 
@@ -61,28 +80,8 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
   } = useStorageInfo()
   const { isOPFS } = useSQLiteMode()
 
-  // Determine status color
-  const getStatusColor = (): string => {
-    // Error state has highest priority
-    if (sessionError) return 'bg-red-500'
-    // Still initializing
-    if (!initialized) return 'bg-yellow-500'
-    // If initialized and OPFS mode, show green dot
-    // If memory mode, don't show dot (data is ephemeral)
-    return isOPFS ? 'bg-green-500' : ''
-  }
-
-  // Get progress bar color based on usage percentage
-  const getProgressColor = (percent: number): string => {
-    if (percent < 70) return 'bg-green-500'
-    if (percent < 80) return 'bg-yellow-500'
-    if (percent < 95) return 'bg-orange-500'
-    return 'bg-red-500'
-  }
-
-  const statusColor = getStatusColor()
-
-  // Whether to show the status dot
+  // Status dot color
+  const statusDotColor = getStatusDotColor(!!sessionError, initialized, isOPFS)
   const showStatusDot = Boolean(sessionError || !initialized || isOPFS)
 
   // Handle session switch
@@ -163,7 +162,7 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
       </BrandButton>
       {/* Status dot: sibling element to avoid overflow clipping */}
       {showStatusDot && (
-        <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusColor)} />
+        <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusDotColor)} />
       )}
 
       {open && <SessionDropdown />}
@@ -177,42 +176,44 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
         <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
 
         {/* Dropdown menu */}
-        <div className="absolute right-0 top-full z-20 mt-1 w-80 rounded-md border border-gray-200 bg-white shadow-lg">
+        <div className="absolute right-0 top-full z-20 mt-1 w-80 rounded-lg border border-gray-200 bg-white shadow-lg">
           {/* Header - Current session */}
-          <div className="border-b border-gray-200 px-4 py-3">
+          <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">当前会话</span>
+              <span className="text-xs font-medium text-tertiary">当前会话</span>
               {currentSession && (
-                <span className="text-xs font-medium text-primary-600">{currentSession.name}</span>
+                <span className="text-xs font-semibold text-primary-600">{currentSession.name}</span>
               )}
             </div>
           </div>
 
+          <BrandSelectSeparator />
+
           {/* Storage overview */}
-          <div className="border-b border-gray-200 px-4 py-3">
-            <div className="mb-2 flex items-center gap-2 text-xs font-medium text-gray-700">
+          <div className="px-4 py-3">
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-secondary">
               <HardDrive className="h-3.5 w-3.5" />
               <span>存储空间 (浏览器配额)</span>
-              {storageLoading && <span className="text-gray-400">加载中...</span>}
+              {storageLoading && <span className="text-muted">加载中...</span>}
             </div>
 
             {storage && (
               <>
-                {/* Progress bar */}
-                <div className="mb-2">
-                  <div className="mb-1 flex items-center justify-between text-[10px] text-gray-500">
+                {/* Progress bar using BrandProgress */}
+                <div className="mb-3">
+                  <div className="mb-1.5 flex items-center justify-between text-[10px] text-tertiary">
                     <span>
                       {storage.usageFormatted} / {storage.quotaFormatted}
                     </span>
-                    <span>{storage.usagePercent.toFixed(1)}%</span>
+                    <span className="font-medium">{storage.usagePercent.toFixed(1)}%</span>
                   </div>
-                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                     <div
                       className={cn(
-                        'h-full rounded-full transition-all',
+                        'h-full rounded-full transition-all duration-300',
                         getProgressColor(storage.usagePercent)
                       )}
-                      style={{ width: `${Math.min(storage.usagePercent, 100)}%` }}
+                      style={{ width: `${Math.max(storage.usagePercent, 2)}%` }}
                     />
                   </div>
                 </div>
@@ -237,28 +238,33 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
                     </button>
                   </div>
                   {/* Explanatory note */}
-                  <p className="text-[9px] leading-tight text-gray-400">
-                    配额是浏览器允许的上限，不等于实际剩余空间。写入时若超出实际空间会报错。
-                  </p>
+                  <div className="flex items-start gap-1.5 text-[9px] leading-tight text-muted">
+                    <Info className="h-2.5 w-2.5 shrink-0 mt-0.5" />
+                    <p>
+                      配额是浏览器允许的上限，不等于实际剩余空间。写入时若超出实际空间会报错。
+                    </p>
+                  </div>
                 </div>
               </>
             )}
 
             {!storage && !storageLoading && (
-              <p className="text-[10px] text-gray-400">无法获取存储信息</p>
+              <p className="text-[10px] text-muted">无法获取存储信息</p>
             )}
           </div>
+
+          <BrandSelectSeparator />
 
           {/* Session list */}
           <div className="custom-scrollbar max-h-60 overflow-y-auto">
             <div className="px-4 py-2">
-              <span className="text-xs font-medium text-gray-700">
+              <span className="text-xs font-semibold text-secondary">
                 所有会话 ({sessions.length})
               </span>
             </div>
 
             {storageSessions.length === 0 ? (
-              <div className="px-4 py-4 text-center text-xs text-gray-400">暂无会话</div>
+              <div className="px-4 py-4 text-center text-xs text-muted">暂无会话</div>
             ) : (
               <ul>
                 {storageSessions.map((session) => {
@@ -270,8 +276,8 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
                     <li
                       key={session.id}
                       className={cn(
-                        'flex items-center gap-2 px-4 py-2 hover:bg-gray-50',
-                        isActive && 'bg-primary-50'
+                        'flex items-center gap-2 px-4 py-2 transition-colors',
+                        isActive ? 'bg-primary-50' : 'hover:bg-gray-50'
                       )}
                     >
                       {/* Active indicator */}
@@ -285,10 +291,10 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
                         className="flex flex-1 flex-col items-start text-left"
                       >
                         <div className="flex w-full items-center gap-2">
-                          <span className="truncate text-xs font-medium text-gray-700">
+                          <span className="truncate text-xs font-medium text-primary">
                             {session.name}
                           </span>
-                          <span className="ml-auto text-[10px] text-gray-400">
+                          <span className="ml-auto text-[10px] text-muted">
                             {session.cacheSizeFormatted}
                           </span>
                         </div>
@@ -309,14 +315,14 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
                             <BrandBadge
                               type="tag"
                               color="blue"
-                              className="!gap-0.5 !border-blue-200 !px-1.5 !py-0 !text-[10px]"
+                              className="!gap-0.5 !px-1.5 !py-0 !text-[10px]"
                             >
                               <RotateCcw className="h-2.5 w-2.5" />
                               {session.undoCount}
                             </BrandBadge>
                           )}
                           {!hasPending && !hasUndo && (
-                            <span className="text-[10px] text-gray-400">无变更</span>
+                            <span className="text-[10px] text-muted">无变更</span>
                           )}
                         </div>
                       </button>
@@ -326,7 +332,7 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
                         <button
                           type="button"
                           onClick={(e) => handleDelete(e, session.id)}
-                          className="shrink-0 rounded p-1 text-gray-400 hover:bg-danger-bg hover:text-danger"
+                          className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
                           title="删除会话"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -339,13 +345,15 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
             )}
           </div>
 
+          <BrandSelectSeparator />
+
           {/* Footer - Actions */}
-          <div className="border-t border-gray-200 px-4 py-2">
+          <div className="px-4 py-2">
             <div className="space-y-1">
               <button
                 type="button"
                 onClick={handleCleanup}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-gray-600 hover:bg-gray-50"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-gray-50"
                 title="删除 30 天未活跃的会话缓存（不影响对话记录）"
               >
                 <Sparkles className="h-3.5 w-3.5" />
@@ -354,14 +362,14 @@ export const SessionBadgeWithStorage: React.FC<SessionBadgeWithStorageProps> = (
               <button
                 type="button"
                 onClick={handleClearAll}
-                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-danger hover:bg-danger-bg"
+                className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-danger transition-colors hover:bg-danger-bg"
                 title="清空所有会话的文件缓存和撤销历史（不影响对话记录）"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 清空所有缓存
               </button>
               {/* Help text */}
-              <p className="px-1 text-[9px] leading-tight text-gray-400">
+              <p className="px-1 text-[9px] leading-tight text-muted">
                 注：以上操作仅清理缓存数据，不影响对话记录
               </p>
             </div>

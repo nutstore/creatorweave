@@ -1,6 +1,13 @@
 /**
- * FileTreePanel - lazily-loaded file tree with expand-on-click.
- * Uses FileSystemDirectoryHandle to list directory contents on demand.
+ * FileTreePanel - File tree component using brand design system
+ *
+ * Design Specifications:
+ * - Font: text-xs (12px) for tree items
+ * - Spacing: py-1.5 (6px vertical padding), px-3 (12px horizontal padding)
+ * - Border radius: rounded-md (6px)
+ * - Colors: Uses brand semantic colors (primary, secondary, danger, etc.)
+ * - Hover state: bg-hover (hsl(var(--bg-hover)))
+ * - Selected state: bg-primary-50 text-primary-700
  *
  * Phase 3 Integration:
  * - Shows file modification status from OPFS pending changes
@@ -9,6 +16,7 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
+import { BrandButton, BrandBadge } from '@browser-fs-analyzer/ui'
 import { formatBytes } from '@/lib/utils'
 import { useOPFSStore } from '@/store/opfs.store'
 import type { PendingChange } from '@/opfs/types/opfs-types'
@@ -59,21 +67,32 @@ function getFileIcon(name: string): string {
   return iconMap[ext || ''] || ''
 }
 
-/** Pending status indicator */
+/** Pending status badge using brand badge component */
 function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
   if (!type) return null
 
-  const colors = {
-    create: 'bg-green-500',
-    modify: 'bg-amber-500',
-    delete: 'bg-red-500',
+  const variantMap = {
+    create: 'success' as const,
+    modify: 'warning' as const,
+    delete: 'error' as const,
+  }
+
+  const labelMap = {
+    create: '新建',
+    modify: '修改',
+    delete: '删除',
   }
 
   return (
-    <span
-      className={`h-2 w-2 rounded-full ${colors[type]}`}
-      title={`待${type === 'create' ? '创建' : type === 'modify' ? '修改' : '删除'}`}
-    />
+    <BrandBadge
+      type="badge"
+      variant={variantMap[type]}
+      shape="pill"
+      className="h-4 min-w-4 px-1 text-[10px]"
+      title={`待${labelMap[type]}`}
+    >
+      {labelMap[type][0]}
+    </BrandBadge>
   )
 }
 
@@ -100,10 +119,10 @@ function TreeNodeRow({
 
   return (
     <div
-      className={`flex cursor-pointer items-center gap-1 px-2 py-[3px] text-xs hover:bg-neutral-100 ${
-        selected ? 'bg-primary-50 text-primary-700' : 'text-neutral-700'
+      className={`group flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-3 text-xs transition-colors ${
+        selected ? 'bg-primary-50 text-primary-700' : 'hover:bg-hover text-secondary'
       }`}
-      style={{ paddingLeft: `${indent + 4}px` }}
+      style={{ paddingLeft: `${indent + 12}px` }}
       onClick={isDir ? onToggle : onClick}
       title={node.path}
     >
@@ -111,9 +130,9 @@ function TreeNodeRow({
       {isDir ? (
         <span className="flex h-4 w-4 shrink-0 items-center justify-center">
           {expanded ? (
-            <ChevronDown className="h-3 w-3 text-neutral-400" />
+            <ChevronDown className="text-tertiary h-3.5 w-3.5 transition-transform" />
           ) : (
-            <ChevronRight className="h-3 w-3 text-neutral-400" />
+            <ChevronRight className="text-tertiary h-3.5 w-3.5 transition-transform" />
           )}
         </span>
       ) : (
@@ -123,22 +142,22 @@ function TreeNodeRow({
       {/* Icon */}
       {isDir ? (
         expanded ? (
-          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warning" />
         ) : (
-          <Folder className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+          <Folder className="h-3.5 w-3.5 shrink-0 text-warning" />
         )
       ) : (
         <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[10px] leading-none">
-          {getFileIcon(node.name) || <File className="h-3.5 w-3.5 text-neutral-400" />}
+          {getFileIcon(node.name) || <File className="text-tertiary h-3.5 w-3.5" />}
         </span>
       )}
 
       {/* Name */}
-      <span className="min-w-0 truncate">{node.name}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
 
       {/* Size for files */}
       {!isDir && node.size !== undefined && node.size > 0 && (
-        <span className="ml-auto shrink-0 text-[10px] text-neutral-400">
+        <span className="text-tertiary shrink-0 text-[10px] tabular-nums">
           {formatBytes(node.size)}
         </span>
       )}
@@ -380,7 +399,7 @@ export function FileTreePanel({
   if (!directoryHandle) {
     return (
       <div className="flex h-full items-center justify-center p-4">
-        <p className="text-center text-xs text-neutral-400">
+        <p className="text-tertiary text-center text-xs">
           选择项目文件夹后
           <br />
           文件树将显示在这里
@@ -392,27 +411,20 @@ export function FileTreePanel({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5">
-        <span className="truncate text-xs font-medium text-neutral-600">
+      <div className="border-subtle flex items-center justify-between border-b px-3 py-2">
+        <span className="truncate text-xs font-semibold text-primary">
           {rootName || directoryHandle.name}
         </span>
-        <button
-          type="button"
-          onClick={() => {
-            loadRoot(true)
-          }}
-          className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-          title="刷新"
-        >
-          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <BrandButton iconButton variant="ghost" onClick={() => loadRoot(true)} title="刷新">
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+        </BrandButton>
       </div>
 
       {/* Tree */}
       <div className="custom-scrollbar flex-1 overflow-y-auto">
-        <div className="py-1">
+        <div className="px-2 py-2">
           {loading && rootNodes.length === 0 ? (
-            <div className="p-3 text-center text-xs text-neutral-400">加载中...</div>
+            <div className="text-tertiary p-4 text-center text-xs">加载中...</div>
           ) : (
             <TreeBranch
               nodes={rootNodes}
