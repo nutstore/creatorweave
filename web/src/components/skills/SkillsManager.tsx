@@ -187,9 +187,9 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
                 <BrandAccordionContent className="pb-0 pt-0">
                   <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
                     {projectSkills.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
-                        <p className="text-sm">暂无项目技能</p>
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                        <Inbox className="h-4 w-4 opacity-50" />
+                        <p className="text-xs">{t('skills.empty')}</p>
                       </div>
                     ) : (
                       projectSkills.map((skill) => (
@@ -220,9 +220,9 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
                 <BrandAccordionContent className="pb-0 pt-0">
                   <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
                     {userSkills.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
-                        <p className="text-sm">暂无自定义技能</p>
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                        <Inbox className="h-4 w-4 opacity-50" />
+                        <p className="text-xs">{t('skills.empty')}</p>
                       </div>
                     ) : (
                       userSkills.map((skill) => (
@@ -253,9 +253,9 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
                 <BrandAccordionContent className="pb-0 pt-0">
                   <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
                     {builtinSkills.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-                        <Inbox className="mb-2 h-10 w-10 opacity-50" />
-                        <p className="text-sm">暂无内置技能</p>
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                        <Inbox className="h-4 w-4 opacity-50" />
+                        <p className="text-xs">{t('skills.empty')}</p>
                       </div>
                     ) : (
                       builtinSkills.map((skill) => (

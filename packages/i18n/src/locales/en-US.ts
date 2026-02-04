@@ -23,6 +23,16 @@ export const enUS = {
     skillsManagement: 'Skills',
   },
 
+  // Folder Selector
+  folderSelector: {
+    openFolder: 'Select Folder',
+    switchFolder: 'Switch Folder',
+    releaseHandle: 'Release Handle',
+    copyPath: 'Copy Folder Name',
+    permissionDenied: 'Permission denied',
+    selectionFailed: 'Selection failed',
+  },
+
   settings: {
     title: 'Settings',
     llmProvider: 'LLM Provider',
@@ -70,6 +80,7 @@ export const enUS = {
     delete: 'Delete',
     enabled: 'Enabled',
     disabled: 'Disabled',
+    empty: 'No skills',
   },
 
   remote: {

@@ -25,6 +25,16 @@ export const zhCN = {
     skillsManagement: '技能管理',
   },
 
+  // 文件夹选择器
+  folderSelector: {
+    openFolder: '选择文件夹',
+    switchFolder: '切换文件夹',
+    releaseHandle: '释放文件夹句柄',
+    copyPath: '复制文件夹名称',
+    permissionDenied: '权限被拒绝',
+    selectionFailed: '选择失败',
+  },
+
   // 设置对话框
   settings: {
     title: '设置',
@@ -75,6 +85,7 @@ export const zhCN = {
     delete: '删除',
     enabled: '已启用',
     disabled: '已禁用',
+    empty: '暂无技能',
   },
 
   // 远程控制
