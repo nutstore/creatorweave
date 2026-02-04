@@ -2,6 +2,8 @@
 
 Unified SQLite WASM-based storage system for Browser FOS Analyzer.
 
+> **💡 新开发者**: 建议先阅读 [存储架构设计文档](../storage/ARCHITECTURE.md) 了解整体存储设计。
+
 ## Overview
 
 This module replaces multiple IndexedDB databases with a single SQLite database for better query capabilities, transaction support, and data integrity.

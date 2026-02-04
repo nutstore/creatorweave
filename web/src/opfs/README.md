@@ -4,6 +4,8 @@
 
 OPFS (Origin Private File System) Session System 是一个多会话文件管理工作区架构，为每个对话（Conversation）提供独立的文件缓存、待同步队列和撤销历史。
 
+> **💡 新开发者**: 建议先阅读 [存储架构设计文档](../storage/ARCHITECTURE.md) 了解整体存储设计。
+
 ### 设计目标
 
 - **会话隔离**: 每个对话的文件操作完全隔离，互不影响
