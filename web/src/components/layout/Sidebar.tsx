@@ -204,17 +204,18 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
         style={{ width }}
       >
         {/* Collapse button */}
-        <div className="border-subtle flex items-center justify-between border-b bg-white px-3 py-2">
-          <span className="text-tertiary text-[11px] font-semibold uppercase tracking-wider">
+        <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1">
+          <span className="text-tertiary text-[10px] font-semibold uppercase tracking-wider">
             对话
           </span>
           <BrandButton
             iconButton
             variant="ghost"
+            className="h-6 w-6"
             onClick={() => setCollapsed(true)}
             title="折叠侧栏"
           >
-            <PanelLeftClose className="h-3.5 w-3.5" />
+            <PanelLeftClose className="h-3 w-3" />
           </BrandButton>
         </div>
 
@@ -226,22 +227,22 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
           <div className="p-2">
             <BrandButton
               variant="outline"
-              className="w-full justify-start gap-2"
+              className="h-7 w-full justify-start gap-1.5 px-2 text-xs"
               onClick={() => createNew()}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-3 w-3" />
               新对话
             </BrandButton>
           </div>
 
-          <div className="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-2 pb-2">
+          <div className="custom-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
             {conversations.map((conv) => {
               const isRunning = isConversationRunning(conv.id)
               const isActive = conv.id === activeConversationId
               return (
                 <div
                   key={conv.id}
-                  className={`group flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors ${
+                  className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors ${
                     isActive
                       ? 'bg-primary-50 font-semibold text-primary-700'
                       : 'hover:bg-hover text-secondary'
@@ -250,7 +251,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
                 >
                   {/* Running status indicator */}
                   {isRunning && (
-                    <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-warning" />
+                    <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{conv.title}</span>
                   <BrandButton
@@ -274,10 +275,13 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
         {/* Vertical drag divider (only when resources are visible) */}
         {hasResources && (
           <div
-            className="bg-subtle hover:bg-primary-200 active:bg-primary-300 h-1 shrink-0 cursor-row-resize transition-colors"
+            className="group relative flex h-2 shrink-0 cursor-row-resize items-center justify-center bg-gray-50/50 transition-colors hover:bg-gray-100/80"
             onMouseDown={handleVerticalDragStart}
             title="拖动调整高度"
-          />
+          >
+            {/* 中心圆点 */}
+            <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-gray-300 transition-colors" />
+          </div>
         )}
 
         {/* Resource tabs (only when folder is selected) */}
@@ -287,29 +291,29 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
             style={{ height: `${100 - conversationRatio}%` }}
           >
             {/* Tab buttons */}
-            <div className="border-subtle flex items-center gap-1 border-b px-2 py-2">
+            <div className="border-subtle flex items-center gap-0.5 border-b px-1.5 py-1">
               <BrandButton
                 variant={resourceTab === 'files' ? 'secondary' : 'ghost'}
-                className="gap-1.5 px-3 py-1.5"
+                className="h-7 gap-1 px-2 py-1 text-xs"
                 onClick={() => setResourceTab('files')}
               >
-                <FolderTree className="h-3.5 w-3.5" />
+                <FolderTree className="h-3 w-3" />
                 文件
               </BrandButton>
               <BrandButton
                 variant={resourceTab === 'plugins' ? 'secondary' : 'ghost'}
-                className="gap-1.5 px-3 py-1.5"
+                className="h-7 gap-1 px-2 py-1 text-xs"
                 onClick={() => setResourceTab('plugins')}
               >
-                <Puzzle className="h-3.5 w-3.5" />
+                <Puzzle className="h-3 w-3" />
                 插件
               </BrandButton>
               <BrandButton
                 variant={resourceTab === 'changes' ? 'secondary' : 'ghost'}
-                className="gap-1.5 px-3 py-1.5"
+                className="h-7 gap-1 px-2 py-1 text-xs"
                 onClick={() => setResourceTab('changes')}
               >
-                <History className="h-3.5 w-3.5" />
+                <History className="h-3 w-3" />
                 变更
               </BrandButton>
             </div>
@@ -345,9 +349,13 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
 
       {/* Horizontal drag divider (sidebar width) */}
       <div
-        className="hover:bg-primary-200 active:bg-primary-300 w-1 shrink-0 cursor-col-resize bg-transparent transition-colors"
+        className="group relative flex w-2 shrink-0 cursor-col-resize flex-col items-center justify-center bg-gray-50/50 transition-colors hover:bg-gray-100/80"
         onMouseDown={handleDragStart}
-      />
+        title="拖动调整宽度"
+      >
+        {/* 中心圆点 */}
+        <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-gray-300 transition-colors" />
+      </div>
     </>
   )
 }
