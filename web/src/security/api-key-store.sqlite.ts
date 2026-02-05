@@ -1,8 +1,6 @@
 /**
  * Encrypted API Key storage using Web Crypto API + SQLite.
  * Keys are encrypted with a device-derived key before storage.
- *
- * SQLite version replacing IndexedDB.
  */
 
 import { getApiKeyRepository, initSQLiteDB } from '@/sqlite'

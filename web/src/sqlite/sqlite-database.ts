@@ -73,7 +73,7 @@ export interface ApiKeyRow {
   updated_at: number
 }
 
-export interface SessionRow {
+export interface WorkspaceRow {
   id: string
   root_directory: string
   name: string
@@ -88,7 +88,7 @@ export interface SessionRow {
 
 export interface FileMetadataRow {
   id: string
-  session_id: string
+  workspace_id: string
   path: string
   mtime: number
   size: number
@@ -100,7 +100,7 @@ export interface FileMetadataRow {
 
 export interface PendingChangeRow {
   id: string
-  session_id: string
+  workspace_id: string
   path: string
   type: 'create' | 'modify' | 'delete'
   fs_mtime: number
@@ -110,7 +110,7 @@ export interface PendingChangeRow {
 
 export interface UndoRecordRow {
   id: string
-  session_id: string
+  workspace_id: string
   path: string
   type: 'create' | 'modify' | 'delete'
   old_content_path: string | null

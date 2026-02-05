@@ -46,7 +46,7 @@ export interface InitStorageResult {
     skills: number
     plugins: number
     apiKeys: number
-    sessions: number
+    workspaces: number
   }
   error?: string
 }
@@ -93,7 +93,7 @@ export function canUseOPFSVFS(): boolean {
 //=============================================================================
 
 let currentStorageMode: StorageMode = 'sqlite-opfs'
-let storageInitPromise: Promise<InitStorageResult> | null = null
+let storageInitPromise: Promise<InitStorageResult> | undefined = undefined
 
 /**
  * Get the current storage mode
@@ -118,7 +118,7 @@ export function getStorageMode(): StorageMode {
  */
 export async function initStorage(options: InitStorageOptions = {}): Promise<InitStorageResult> {
   // StrictMode guard: return existing promise if already initializing
-  if (storageInitPromise) {
+  if (storageInitPromise !== undefined) {
     return storageInitPromise
   }
 
@@ -175,7 +175,7 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
           current: 0,
           details: 'Migration failed: ' + migrationResult.error,
         })
-        storageInitPromise = null // Allow retry on migration failure
+        storageInitPromise = undefined // Allow retry on migration failure
         return {
           success: false,
           migrated: false,
@@ -201,7 +201,7 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
           skills: migrationResult.skills,
           plugins: migrationResult.plugins,
           apiKeys: migrationResult.apiKeys,
-          sessions: migrationResult.sessions,
+          workspaces: migrationResult.workspaces,
         },
       }
     } catch (error) {
@@ -236,7 +236,7 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
         current: 0,
         details: 'Initialization failed: ' + errorMsg,
       })
-      storageInitPromise = null // Allow retry on failure
+      storageInitPromise = undefined // Allow retry on failure
       return {
         success: false,
         migrated: false,

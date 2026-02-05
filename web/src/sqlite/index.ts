@@ -1,12 +1,12 @@
 /**
  * SQLite Storage Module
  *
- * Unified SQLite WASM-based storage replacing IndexedDB for:
+ * Unified SQLite WASM-based storage for:
  * - Conversations (chat history)
  * - Skills (skill definitions)
  * - Plugins (WASM plugin metadata)
  * - API Keys (encrypted)
- * - Sessions (OPFS workspace metadata)
+ * - Workspaces (OPFS workspace metadata)
  *
  * FileSystemDirectoryHandle still uses IndexedDB (requires structured clone).
  *
@@ -20,7 +20,7 @@ export type {
   SkillRow,
   PluginRow,
   ApiKeyRow,
-  SessionRow,
+  WorkspaceRow,
   FileMetadataRow,
   PendingChangeRow,
   UndoRecordRow,
@@ -39,14 +39,14 @@ export type { StoredConversation } from './repositories/conversation.repository'
 export { SkillRepository, getSkillRepository } from './repositories/skill.repository'
 export type { StoredSkill, SkillMetadata } from '@/skills/skill-types'
 
-export { SessionRepository, getSessionRepository } from './repositories/session.repository'
+export { WorkspaceRepository, getWorkspaceRepository } from './repositories/workspace.repository'
 export type {
-  Session,
+  Workspace,
   FileMetadata,
   PendingChange,
   UndoRecord,
-  SessionStats,
-} from './repositories/session.repository'
+  WorkspaceStats,
+} from './repositories/workspace.repository'
 
 export { ApiKeyRepository, getApiKeyRepository } from './repositories/api-key.repository'
 

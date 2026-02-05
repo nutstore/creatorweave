@@ -17,7 +17,7 @@ import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import type { SessionMetadata } from '@/opfs/types/opfs-types'
 import { getSessionManager, SessionWorkspace } from '@/opfs/session'
-import { getSessionRepository, type Session } from '@/sqlite/repositories/session.repository'
+import { getWorkspaceRepository, type Workspace } from '@/sqlite/repositories/workspace.repository'
 
 // Enable Immer Map/Set support
 enableMapSet()
@@ -62,9 +62,9 @@ export interface WorkspaceWithStats extends SessionMetadata {
 }
 
 /**
- * Convert SQLite Session to WorkspaceWithStats
+ * Convert SQLite Workspace to WorkspaceWithStats
  */
-function sqliteSessionToWorkspaceStats(session: Session): WorkspaceWithStats {
+function sqliteSessionToWorkspaceStats(session: Workspace): WorkspaceWithStats {
   return {
     id: session.id,
     name: session.name,
@@ -144,7 +144,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
         const manager = await getSessionManager()
 
         // Try to load from SQLite first
@@ -152,7 +152,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         let loadedFromSQLite = false
 
         try {
-          const sqliteSessions = await repo.findAllSessions()
+          const sqliteSessions = await repo.findAllWorkspaces()
           if (sqliteSessions.length > 0) {
             workspaces = sqliteSessions.map(sqliteSessionToWorkspaceStats)
             loadedFromSQLite = true
@@ -196,7 +196,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             // Create workspace in SQLite
             try {
-              await repo.createSession({
+              await repo.createWorkspace({
                 id: meta.sessionId,
                 rootDirectory: meta.rootDirectory,
                 name: workspaceName,
@@ -252,14 +252,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
         const manager = await getSessionManager()
 
         // Create OPFS workspace
         const workspace = await manager.createSession(rootDirectory, id)
 
         // Create SQLite record
-        await repo.createSession({
+        await repo.createWorkspace({
           id,
           rootDirectory,
           name: name || rootDirectory.split('/').pop() || id,
@@ -314,11 +314,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
         const manager = await getSessionManager()
 
         // Check if workspace exists in SQLite first
-        const sessionRecord = await repo.findSessionById(id)
+        const sessionRecord = await repo.findWorkspaceById(id)
 
         // If workspace doesn't exist in SQLite, it might be a new conversation
         // that hasn't had its workspace created yet - just return silently
@@ -337,7 +337,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           console.warn(
             `[WorkspaceStore] Workspace ${id} exists in database but OPFS workspace missing. Cleaning up orphaned record.`
           )
-          await repo.deleteSession(id)
+          await repo.deleteWorkspace(id)
 
           // Remove from state if present
           set((state) => {
@@ -351,7 +351,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         }
 
         // Update last access time in SQLite
-        await repo.updateSessionAccessTime(id)
+        await repo.updateWorkspaceAccessTime(id)
 
         // Update workspace metadata
         set((state) => {
@@ -387,14 +387,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
         const manager = await getSessionManager()
 
         // Delete from OPFS
         await manager.deleteSession(id)
 
         // Delete from SQLite (cascade deletes related records)
-        await repo.deleteSession(id)
+        await repo.deleteWorkspace(id)
 
         let newActiveId: string | null = null
 
@@ -433,10 +433,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       set({ isLoading: true, error: null })
 
       try {
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
 
         // Update in SQLite
-        await repo.updateSessionName(id, name)
+        await repo.updateWorkspaceName(id, name)
 
         // Update local state
         set((state) => {
@@ -466,12 +466,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
       try {
         const manager = await getSessionManager()
-        const repo = getSessionRepository()
+        const repo = getWorkspaceRepository()
         const workspace = await manager.getSession(activeWorkspaceId)
 
         if (workspace) {
           // Update counts in SQLite
-          await repo.updateSessionStats(activeWorkspaceId, {
+          await repo.updateWorkspaceStats(activeWorkspaceId, {
             pendingCount: workspace.pendingCount,
             undoCount: workspace.undoCount,
           })

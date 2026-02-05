@@ -9,7 +9,7 @@ import { initSQLiteDB, getSQLiteDB } from './sqlite-database'
 import { getConversationRepository } from './repositories/conversation.repository'
 import { getSkillRepository } from './repositories/skill.repository'
 import { getPluginRepository } from './repositories/plugin.repository'
-import { getSessionRepository } from './repositories/session.repository'
+import { getWorkspaceRepository } from './repositories/workspace.repository'
 import { getApiKeyRepository } from './repositories/api-key.repository'
 import type { StoredSkill } from '@/skills/skill-types'
 
@@ -39,7 +39,7 @@ export async function getMigrationStatus(): Promise<{
     skills: number
     plugins: number
     api_keys: number
-    sessions: number
+    workspaces: number
   }
 } | null> {
   const state = await getMigrationState()
@@ -55,7 +55,7 @@ export async function getMigrationStatus(): Promise<{
       skills: state.skills_migrated,
       plugins: state.plugins_migrated,
       api_keys: state.api_keys_migrated,
-      sessions: state.sessions_migrated,
+      workspaces: state.workspaces_migrated,
     },
   }
 }
@@ -422,10 +422,10 @@ async function migrateApiKeys(onProgress?: MigrationProgressCallback): Promise<n
 }
 
 /**
- * Migrate OPFS session metadata to SQLite
+ * Migrate OPFS workspace metadata to SQLite
  */
-async function migrateSessions(onProgress?: MigrationProgressCallback): Promise<number> {
-  onProgress?.({ step: 'sessions', total: 1, current: 0, details: 'Reading OPFS sessions...' })
+async function migrateWorkspaces(onProgress?: MigrationProgressCallback): Promise<number> {
+  onProgress?.({ step: 'workspaces', total: 1, current: 0, details: 'Reading OPFS workspaces...' })
 
   try {
     const opfsRoot = await navigator.storage.getDirectory()
@@ -447,13 +447,18 @@ async function migrateSessions(onProgress?: MigrationProgressCallback): Promise<
       status: 'active' | 'archived'
     }>
 
-    onProgress?.({ step: 'sessions', total: sessions.length, current: 0, details: 'Migrating...' })
+    onProgress?.({
+      step: 'workspaces',
+      total: sessions.length,
+      current: 0,
+      details: 'Migrating...',
+    })
 
-    const repo = getSessionRepository()
+    const repo = getWorkspaceRepository()
     let count = 0
 
     for (const session of sessions) {
-      await repo.createSession({
+      await repo.createWorkspace({
         id: session.sessionId,
         rootDirectory: session.rootDirectory,
         name: session.name,
@@ -465,7 +470,7 @@ async function migrateSessions(onProgress?: MigrationProgressCallback): Promise<
       })
       count++
       onProgress?.({
-        step: 'sessions',
+        step: 'workspaces',
         total: sessions.length,
         current: count,
         details: `Migrated ${count}/${sessions.length}`,
@@ -474,7 +479,7 @@ async function migrateSessions(onProgress?: MigrationProgressCallback): Promise<
 
     return count
   } catch (error) {
-    console.warn('[Migration] No existing sessions found:', error)
+    console.warn('[Migration] No existing workspaces found:', error)
     return 0
   }
 }
@@ -492,7 +497,7 @@ interface MigrationState {
   skills_migrated: number
   plugins_migrated: number
   api_keys_migrated: number
-  sessions_migrated: number
+  workspaces_migrated: number
 }
 
 /**
@@ -510,7 +515,7 @@ async function getMigrationState(): Promise<MigrationState | null> {
       skills_migrated: number
       plugins_migrated: number
       api_keys_migrated: number
-      sessions_migrated: number
+      workspaces_migrated: number
     }>('SELECT * FROM idb_migration_state WHERE singleton_id = 0')
 
     if (!row) return null
@@ -524,7 +529,7 @@ async function getMigrationState(): Promise<MigrationState | null> {
       skills_migrated: row.skills_migrated,
       plugins_migrated: row.plugins_migrated,
       api_keys_migrated: row.api_keys_migrated,
-      sessions_migrated: row.sessions_migrated,
+      workspaces_migrated: row.workspaces_migrated,
     }
   } catch {
     return null
@@ -572,9 +577,9 @@ async function updateMigrationState(updates: Partial<MigrationState>): Promise<v
     fields.push('api_keys_migrated = ?')
     values.push(updates.api_keys_migrated)
   }
-  if (updates.sessions_migrated !== undefined) {
-    fields.push('sessions_migrated = ?')
-    values.push(updates.sessions_migrated)
+  if (updates.workspaces_migrated !== undefined) {
+    fields.push('workspaces_migrated = ?')
+    values.push(updates.workspaces_migrated)
   }
 
   if (fields.length > 0) {
@@ -598,7 +603,7 @@ async function rollbackMigration(_state: MigrationState): Promise<void> {
   await db.execute('DELETE FROM skills')
   await db.execute('DELETE FROM plugins')
   await db.execute('DELETE FROM api_keys')
-  await db.execute('DELETE FROM sessions')
+  await db.execute('DELETE FROM workspaces')
 
   // Reset migration state
   await updateMigrationState({
@@ -634,7 +639,7 @@ export interface MigrationResult {
   skills: number
   plugins: number
   apiKeys: number
-  sessions: number
+  workspaces: number
   success: boolean
   rolled_back?: boolean
   error?: string
@@ -652,7 +657,7 @@ export async function runMigration(
     skills: 0,
     plugins: 0,
     apiKeys: 0,
-    sessions: 0,
+    workspaces: 0,
     success: false,
   }
 
@@ -680,7 +685,7 @@ export async function runMigration(
         skills: state!.skills_migrated,
         plugins: state!.plugins_migrated,
         apiKeys: state!.api_keys_migrated,
-        sessions: state!.sessions_migrated,
+        workspaces: state!.workspaces_migrated,
         success: true,
       }
     }
@@ -708,8 +713,8 @@ export async function runMigration(
     result.apiKeys = await migrateApiKeys(onProgress)
     await updateMigrationState({ api_keys_migrated: result.apiKeys })
 
-    result.sessions = await migrateSessions(onProgress)
-    await updateMigrationState({ sessions_migrated: result.sessions })
+    result.workspaces = await migrateWorkspaces(onProgress)
+    await updateMigrationState({ workspaces_migrated: result.workspaces })
 
     // Mark migration as completed
     await updateMigrationState({
@@ -747,7 +752,7 @@ export async function runMigration(
       skills: 0,
       plugins: 0,
       apiKeys: 0,
-      sessions: 0,
+      workspaces: 0,
       success: false,
       rolled_back: true,
       error: errorMsg,

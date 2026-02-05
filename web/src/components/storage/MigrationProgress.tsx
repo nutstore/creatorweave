@@ -180,7 +180,7 @@ export function MigrationProgress() {
               <li>• 技能: {result.skills}</li>
               <li>• 插件: {result.plugins}</li>
               <li>• API 密钥: {result.apiKeys}</li>
-              <li>• 会话: {result.sessions}</li>
+              <li>• 会话: {result.workspaces}</li>
             </ul>
           </div>
         )}

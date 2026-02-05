@@ -1,8 +1,8 @@
 /**
- * Conversation Store - SQLite Version
+ * Conversation Store
  *
  * Manages chat history with per-conversation AgentLoop instances.
- * Uses SQLite for persistence instead of IndexedDB.
+ * Uses SQLite for persistence.
  *
  * Runtime state (status, streaming content, etc.) is stored per-conversation
  * and not persisted to SQLite.

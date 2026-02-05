@@ -9,8 +9,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import type { WorkspaceWithStats } from '@/store/workspace.store'
-import { getSessionRepository } from '@/sqlite'
-import type { Session } from '@/sqlite/repositories/session.repository'
+import { getWorkspaceRepository } from '@/sqlite'
+import type { Workspace } from '@/sqlite/repositories/workspace.repository'
 import { getSessionManager } from '@/opfs/session'
 import {
   getStorageEstimate,
@@ -100,7 +100,7 @@ export interface UseStorageInfoResult {
 /**
  * Convert Session from SQLite to WorkspaceWithStats format
  */
-function sqliteSessionToWithStats(session: Session): WorkspaceWithStats {
+function sqliteSessionToWithStats(session: Workspace): WorkspaceWithStats {
   return {
     id: session.id,
     name: session.name,
@@ -144,8 +144,8 @@ export function useStorageInfo(): UseStorageInfoResult {
    */
   const loadSessionsFromSQLite = async (): Promise<WorkspaceWithStats[]> => {
     try {
-      const repo = getSessionRepository()
-      const sqliteSessions = await repo.findAllSessions()
+      const repo = getWorkspaceRepository()
+      const sqliteSessions = await repo.findAllWorkspaces()
 
       if (sqliteSessions.length > 0) {
         // Use SQLite data
@@ -210,8 +210,8 @@ export function useStorageInfo(): UseStorageInfoResult {
 
             // Update SQLite with new cache size
             try {
-              const repo = getSessionRepository()
-              await repo.updateSessionStats(session.id, { cacheSize })
+              const repo = getWorkspaceRepository()
+              await repo.updateWorkspaceStats(session.id, { cacheSize })
             } catch (e) {
               console.warn('[useStorageInfo] Failed to update cache size in SQLite:', e)
             }
@@ -336,11 +336,11 @@ export function useStorageInfo(): UseStorageInfoResult {
 
   const cleanupOldSessions = useCallback(
     async (days: number): Promise<number> => {
-      const repo = getSessionRepository()
+      const repo = getWorkspaceRepository()
       const manager = await getSessionManager()
 
       // Find inactive sessions from SQLite
-      const inactiveSessions = await repo.findInactiveSessions(days)
+      const inactiveSessions = await repo.findInactiveWorkspaces(days)
       let cleanedCount = 0
 
       for (const session of inactiveSessions) {
@@ -365,11 +365,11 @@ export function useStorageInfo(): UseStorageInfoResult {
   )
 
   const clearAllCache = useCallback(async (): Promise<void> => {
-    const repo = getSessionRepository()
+    const repo = getWorkspaceRepository()
     const manager = await getSessionManager()
 
     // Get all sessions from SQLite
-    const allSessions = await repo.findAllSessions()
+    const allSessions = await repo.findAllWorkspaces()
 
     for (const session of allSessions) {
       try {
@@ -392,16 +392,16 @@ export function useStorageInfo(): UseStorageInfoResult {
    */
   const getCleanupPreview = useCallback(
     async (scope: CleanupScope, days: number = 30): Promise<CleanupPreview | null> => {
-      const repo = getSessionRepository()
+      const repo = getWorkspaceRepository()
 
-      let sessionsToClean: Session[]
+      let sessionsToClean: Workspace[]
 
       if (scope === 'old') {
         // Get inactive sessions
-        sessionsToClean = await repo.findInactiveSessions(days)
+        sessionsToClean = await repo.findInactiveWorkspaces(days)
       } else {
         // Get all sessions
-        sessionsToClean = await repo.findAllSessions()
+        sessionsToClean = await repo.findAllWorkspaces()
       }
 
       if (sessionsToClean.length === 0) {
@@ -439,15 +439,15 @@ export function useStorageInfo(): UseStorageInfoResult {
    */
   const executeCleanup = useCallback(
     async (scope: CleanupScope, days: number = 30): Promise<number> => {
-      const repo = getSessionRepository()
+      const repo = getWorkspaceRepository()
       const manager = await getSessionManager()
 
-      let sessionsToClean: Session[]
+      let sessionsToClean: Workspace[]
 
       if (scope === 'old') {
-        sessionsToClean = await repo.findInactiveSessions(days)
+        sessionsToClean = await repo.findInactiveWorkspaces(days)
       } else {
-        sessionsToClean = await repo.findAllSessions()
+        sessionsToClean = await repo.findAllWorkspaces()
       }
 
       let cleanedCount = 0

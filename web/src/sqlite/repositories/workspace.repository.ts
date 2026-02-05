@@ -1,19 +1,19 @@
 /**
- * Session Repository
+ * Workspace Repository
  *
- * SQLite-based storage for OPFS session metadata
+ * SQLite-based storage for OPFS workspace metadata
  * (Actual file content still stored in OPFS directories)
  */
 
 import {
   getSQLiteDB,
-  type SessionRow,
+  type WorkspaceRow,
   type FileMetadataRow,
   type PendingChangeRow,
   type UndoRecordRow,
 } from '../sqlite-database'
 
-export interface Session {
+export interface Workspace {
   id: string
   rootDirectory: string
   name: string
@@ -28,7 +28,7 @@ export interface Session {
 
 export interface FileMetadata {
   id: string
-  sessionId: string
+  workspaceId: string
   path: string
   mtime: number
   size: number
@@ -40,7 +40,7 @@ export interface FileMetadata {
 
 export interface PendingChange {
   id: string
-  sessionId: string
+  workspaceId: string
   path: string
   type: 'create' | 'modify' | 'delete'
   fsMtime: number
@@ -50,7 +50,7 @@ export interface PendingChange {
 
 export interface UndoRecord {
   id: string
-  sessionId: string
+  workspaceId: string
   path: string
   type: 'create' | 'modify' | 'delete'
   oldContentPath?: string
@@ -59,8 +59,8 @@ export interface UndoRecord {
   undone: boolean
 }
 
-export interface SessionStats {
-  sessionId: string
+export interface WorkspaceStats {
+  workspaceId: string
   fileCount: number
   totalFileSize: number
   pendingCount: number
@@ -68,212 +68,213 @@ export interface SessionStats {
 }
 
 //=============================================================================
-// Session Repository
+// Workspace Repository
 //=============================================================================
 
-export class SessionRepository {
+export class WorkspaceRepository {
   //===========================================================================
-  // Session Operations
+  // Workspace Operations
   //===========================================================================
 
   /**
-   * Get all sessions
+   * Get all workspaces
    */
-  async findAllSessions(): Promise<Session[]> {
+  async findAllWorkspaces(): Promise<Workspace[]> {
     const db = getSQLiteDB()
-    const rows = await db.queryAll<SessionRow>(
-      'SELECT * FROM sessions ORDER BY last_accessed_at DESC'
+    const rows = await db.queryAll<WorkspaceRow>(
+      'SELECT * FROM workspaces ORDER BY last_accessed_at DESC'
     )
-    return rows.map((row) => this.rowToSession(row))
+    return rows.map((row) => this.rowToWorkspace(row))
   }
 
   /**
-   * Find session by ID
+   * Find workspace by ID
    */
-  async findSessionById(id: string): Promise<Session | null> {
+  async findWorkspaceById(id: string): Promise<Workspace | null> {
     const db = getSQLiteDB()
-    const row = await db.queryFirst<SessionRow>('SELECT * FROM sessions WHERE id = ?', [id])
-    return row ? this.rowToSession(row) : null
+    const row = await db.queryFirst<WorkspaceRow>('SELECT * FROM workspaces WHERE id = ?', [id])
+    return row ? this.rowToWorkspace(row) : null
   }
 
   /**
-   * Find session by root directory
+   * Find workspace by root directory
    */
-  async findSessionByRootDirectory(rootDirectory: string): Promise<Session | null> {
+  async findWorkspaceByRootDirectory(rootDirectory: string): Promise<Workspace | null> {
     const db = getSQLiteDB()
-    const row = await db.queryFirst<SessionRow>('SELECT * FROM sessions WHERE root_directory = ?', [
-      rootDirectory,
-    ])
-    return row ? this.rowToSession(row) : null
-  }
-
-  /**
-   * Get active session
-   */
-  async findActiveSession(): Promise<Session | null> {
-    const db = getSQLiteDB()
-    const row = await db.queryFirst<SessionRow>(
-      `SELECT s.* FROM sessions s
-       JOIN active_session a ON s.id = a.session_id
-       WHERE s.status = 'active'`
+    const row = await db.queryFirst<WorkspaceRow>(
+      'SELECT * FROM workspaces WHERE root_directory = ?',
+      [rootDirectory]
     )
-    return row ? this.rowToSession(row) : null
+    return row ? this.rowToWorkspace(row) : null
   }
 
   /**
-   * Create a new session
+   * Get active workspace
    */
-  async createSession(session: Omit<Session, 'createdAt' | 'lastAccessedAt'>): Promise<void> {
+  async findActiveWorkspace(): Promise<Workspace | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<WorkspaceRow>(
+      `SELECT w.* FROM workspaces w
+       JOIN active_workspace a ON w.id = a.workspace_id
+       WHERE w.status = 'active'`
+    )
+    return row ? this.rowToWorkspace(row) : null
+  }
+
+  /**
+   * Create a new workspace
+   */
+  async createWorkspace(workspace: Omit<Workspace, 'createdAt' | 'lastAccessedAt'>): Promise<void> {
     const db = getSQLiteDB()
     const now = Date.now()
-    const newSession: Session = {
-      ...session,
+    const newWorkspace: Workspace = {
+      ...workspace,
       createdAt: now,
       lastAccessedAt: now,
     }
 
     await db.execute(
-      `INSERT INTO sessions (id, root_directory, name, status, cache_size, pending_count, undo_count, modified_files, created_at, last_accessed_at)
+      `INSERT INTO workspaces (id, root_directory, name, status, cache_size, pending_count, undo_count, modified_files, created_at, last_accessed_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        newSession.id,
-        newSession.rootDirectory,
-        newSession.name,
-        newSession.status,
-        newSession.cacheSize,
-        newSession.pendingCount,
-        newSession.undoCount,
-        newSession.modifiedFiles,
-        newSession.createdAt,
-        newSession.lastAccessedAt,
+        newWorkspace.id,
+        newWorkspace.rootDirectory,
+        newWorkspace.name,
+        newWorkspace.status,
+        newWorkspace.cacheSize,
+        newWorkspace.pendingCount,
+        newWorkspace.undoCount,
+        newWorkspace.modifiedFiles,
+        newWorkspace.createdAt,
+        newWorkspace.lastAccessedAt,
       ]
     )
   }
 
   /**
-   * Update session
+   * Update workspace
    */
-  async updateSession(session: Session): Promise<void> {
+  async updateWorkspace(workspace: Workspace): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `UPDATE sessions
+      `UPDATE workspaces
        SET root_directory = ?, name = ?, status = ?, cache_size = ?, pending_count = ?,
            undo_count = ?, modified_files = ?, last_accessed_at = ?
        WHERE id = ?`,
       [
-        session.rootDirectory,
-        session.name,
-        session.status,
-        session.cacheSize,
-        session.pendingCount,
-        session.undoCount,
-        session.modifiedFiles,
-        session.lastAccessedAt,
-        session.id,
+        workspace.rootDirectory,
+        workspace.name,
+        workspace.status,
+        workspace.cacheSize,
+        workspace.pendingCount,
+        workspace.undoCount,
+        workspace.modifiedFiles,
+        workspace.lastAccessedAt,
+        workspace.id,
       ]
     )
   }
 
   /**
-   * Update session name
+   * Update workspace name
    */
-  async updateSessionName(id: string, name: string): Promise<void> {
+  async updateWorkspaceName(id: string, name: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('UPDATE sessions SET name = ? WHERE id = ?', [name, id])
+    await db.execute('UPDATE workspaces SET name = ? WHERE id = ?', [name, id])
   }
 
   /**
-   * Update session root directory
+   * Update workspace root directory
    */
-  async updateSessionRootDirectory(id: string, rootDirectory: string): Promise<void> {
+  async updateWorkspaceRootDirectory(id: string, rootDirectory: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('UPDATE sessions SET root_directory = ? WHERE id = ?', [rootDirectory, id])
+    await db.execute('UPDATE workspaces SET root_directory = ? WHERE id = ?', [rootDirectory, id])
   }
 
   /**
-   * Update session status
+   * Update workspace status
    */
-  async updateSessionStatus(id: string, status: 'active' | 'archived'): Promise<void> {
+  async updateWorkspaceStatus(id: string, status: 'active' | 'archived'): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('UPDATE sessions SET status = ? WHERE id = ?', [status, id])
+    await db.execute('UPDATE workspaces SET status = ? WHERE id = ?', [status, id])
   }
 
   /**
-   * Update session access time
+   * Update workspace access time
    */
-  async updateSessionAccessTime(id: string): Promise<void> {
+  async updateWorkspaceAccessTime(id: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('UPDATE sessions SET last_accessed_at = ? WHERE id = ?', [Date.now(), id])
+    await db.execute('UPDATE workspaces SET last_accessed_at = ? WHERE id = ?', [Date.now(), id])
   }
 
   /**
-   * Set active session
+   * Set active workspace
    */
-  async setActiveSession(sessionId: string): Promise<void> {
+  async setActiveWorkspace(workspaceId: string): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `INSERT INTO active_session (singleton_id, session_id, last_modified)
+      `INSERT INTO active_workspace (singleton_id, workspace_id, last_modified)
        VALUES (0, ?, ?)
-       ON CONFLICT(singleton_id) DO UPDATE SET session_id = excluded.session_id, last_modified = excluded.last_modified`,
-      [sessionId, Date.now()]
+       ON CONFLICT(singleton_id) DO UPDATE SET workspace_id = excluded.workspace_id, last_modified = excluded.last_modified`,
+      [workspaceId, Date.now()]
     )
   }
 
   /**
-   * Clear active session
+   * Clear active workspace
    */
-  async clearActiveSession(): Promise<void> {
+  async clearActiveWorkspace(): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM active_session WHERE singleton_id = 0')
+    await db.execute('DELETE FROM active_workspace WHERE singleton_id = 0')
   }
 
   /**
-   * Delete session
+   * Delete workspace
    */
-  async deleteSession(id: string): Promise<void> {
+  async deleteWorkspace(id: string): Promise<void> {
     const db = getSQLiteDB()
     // Cascade delete will handle related records
-    await db.execute('DELETE FROM sessions WHERE id = ?', [id])
-    // Also clear active session if this was the active one
-    await db.execute('DELETE FROM active_session WHERE session_id = ?', [id])
+    await db.execute('DELETE FROM workspaces WHERE id = ?', [id])
+    // Also clear active workspace if this was the active one
+    await db.execute('DELETE FROM active_workspace WHERE workspace_id = ?', [id])
   }
 
   /**
-   * Get session count
+   * Get workspace count
    */
-  async getSessionCount(): Promise<number> {
+  async getWorkspaceCount(): Promise<number> {
     const db = getSQLiteDB()
-    const row = await db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM sessions')
+    const row = await db.queryFirst<{ count: number }>('SELECT COUNT(*) as count FROM workspaces')
     return row?.count || 0
   }
 
   /**
-   * Get session stats
+   * Get workspace stats
    */
-  async getSessionStats(sessionId: string): Promise<SessionStats | null> {
+  async getWorkspaceStats(workspaceId: string): Promise<WorkspaceStats | null> {
     const db = getSQLiteDB()
 
     const fileCountRow = await db.queryFirst<{ count: number }>(
-      'SELECT COUNT(*) as count FROM file_metadata WHERE session_id = ?',
-      [sessionId]
+      'SELECT COUNT(*) as count FROM file_metadata WHERE workspace_id = ?',
+      [workspaceId]
     )
     const fileSizeRow = await db.queryFirst<{ total: number }>(
-      'SELECT SUM(size) as total FROM file_metadata WHERE session_id = ?',
-      [sessionId]
+      'SELECT SUM(size) as total FROM file_metadata WHERE workspace_id = ?',
+      [workspaceId]
     )
     const pendingRow = await db.queryFirst<{ count: number }>(
-      'SELECT COUNT(*) as count FROM pending_changes WHERE session_id = ?',
-      [sessionId]
+      'SELECT COUNT(*) as count FROM pending_changes WHERE workspace_id = ?',
+      [workspaceId]
     )
     const undoRow = await db.queryFirst<{ count: number }>(
-      'SELECT COUNT(*) as count FROM undo_records WHERE session_id = ? AND undone = 0',
-      [sessionId]
+      'SELECT COUNT(*) as count FROM undo_records WHERE workspace_id = ? AND undone = 0',
+      [workspaceId]
     )
 
     if (!fileCountRow) return null
 
     return {
-      sessionId,
+      workspaceId,
       fileCount: fileCountRow.count,
       totalFileSize: fileSizeRow?.total || 0,
       pendingCount: pendingRow?.count || 0,
@@ -286,13 +287,13 @@ export class SessionRepository {
   //===========================================================================
 
   /**
-   * Get all file metadata for a session
+   * Get all file metadata for a workspace
    */
-  async findFileMetadataBySession(sessionId: string): Promise<FileMetadata[]> {
+  async findFileMetadataByWorkspace(workspaceId: string): Promise<FileMetadata[]> {
     const db = getSQLiteDB()
     const rows = await db.queryAll<FileMetadataRow>(
-      'SELECT * FROM file_metadata WHERE session_id = ? ORDER BY path',
-      [sessionId]
+      'SELECT * FROM file_metadata WHERE workspace_id = ? ORDER BY path',
+      [workspaceId]
     )
     return rows.map((row) => this.rowToFileMetadata(row))
   }
@@ -300,11 +301,11 @@ export class SessionRepository {
   /**
    * Find file metadata by path
    */
-  async findFileMetadata(sessionId: string, path: string): Promise<FileMetadata | null> {
+  async findFileMetadata(workspaceId: string, path: string): Promise<FileMetadata | null> {
     const db = getSQLiteDB()
     const row = await db.queryFirst<FileMetadataRow>(
-      'SELECT * FROM file_metadata WHERE session_id = ? AND path = ?',
-      [sessionId, path]
+      'SELECT * FROM file_metadata WHERE workspace_id = ? AND path = ?',
+      [workspaceId, path]
     )
     return row ? this.rowToFileMetadata(row) : null
   }
@@ -315,9 +316,9 @@ export class SessionRepository {
   async saveFileMetadata(metadata: FileMetadata): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `INSERT INTO file_metadata (id, session_id, path, mtime, size, content_type, hash, created_at, updated_at)
+      `INSERT INTO file_metadata (id, workspace_id, path, mtime, size, content_type, hash, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(session_id, path) DO UPDATE SET
+       ON CONFLICT(workspace_id, path) DO UPDATE SET
          mtime = excluded.mtime,
          size = excluded.size,
          content_type = excluded.content_type,
@@ -325,7 +326,7 @@ export class SessionRepository {
          updated_at = excluded.updated_at`,
       [
         metadata.id,
-        metadata.sessionId,
+        metadata.workspaceId,
         metadata.path,
         metadata.mtime,
         metadata.size,
@@ -340,20 +341,20 @@ export class SessionRepository {
   /**
    * Delete file metadata
    */
-  async deleteFileMetadata(sessionId: string, path: string): Promise<void> {
+  async deleteFileMetadata(workspaceId: string, path: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM file_metadata WHERE session_id = ? AND path = ?', [
-      sessionId,
+    await db.execute('DELETE FROM file_metadata WHERE workspace_id = ? AND path = ?', [
+      workspaceId,
       path,
     ])
   }
 
   /**
-   * Delete all file metadata for a session
+   * Delete all file metadata for a workspace
    */
-  async deleteAllFileMetadata(sessionId: string): Promise<void> {
+  async deleteAllFileMetadata(workspaceId: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM file_metadata WHERE session_id = ?', [sessionId])
+    await db.execute('DELETE FROM file_metadata WHERE workspace_id = ?', [workspaceId])
   }
 
   //===========================================================================
@@ -361,13 +362,13 @@ export class SessionRepository {
   //===========================================================================
 
   /**
-   * Get all pending changes for a session
+   * Get all pending changes for a workspace
    */
-  async findPendingChangesBySession(sessionId: string): Promise<PendingChange[]> {
+  async findPendingChangesByWorkspace(workspaceId: string): Promise<PendingChange[]> {
     const db = getSQLiteDB()
     const rows = await db.queryAll<PendingChangeRow>(
-      'SELECT * FROM pending_changes WHERE session_id = ? ORDER BY timestamp',
-      [sessionId]
+      'SELECT * FROM pending_changes WHERE workspace_id = ? ORDER BY timestamp',
+      [workspaceId]
     )
     return rows.map((row) => this.rowToPendingChange(row))
   }
@@ -378,7 +379,7 @@ export class SessionRepository {
   async savePendingChange(change: PendingChange): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `INSERT INTO pending_changes (id, session_id, path, type, fs_mtime, agent_message_id, timestamp)
+      `INSERT INTO pending_changes (id, workspace_id, path, type, fs_mtime, agent_message_id, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          path = excluded.path,
@@ -388,7 +389,7 @@ export class SessionRepository {
          timestamp = excluded.timestamp`,
       [
         change.id,
-        change.sessionId,
+        change.workspaceId,
         change.path,
         change.type,
         change.fsMtime,
@@ -407,11 +408,11 @@ export class SessionRepository {
   }
 
   /**
-   * Delete all pending changes for a session
+   * Delete all pending changes for a workspace
    */
-  async deleteAllPendingChanges(sessionId: string): Promise<void> {
+  async deleteAllPendingChanges(workspaceId: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM pending_changes WHERE session_id = ?', [sessionId])
+    await db.execute('DELETE FROM pending_changes WHERE workspace_id = ?', [workspaceId])
   }
 
   //===========================================================================
@@ -419,17 +420,17 @@ export class SessionRepository {
   //===========================================================================
 
   /**
-   * Get all undo records for a session
+   * Get all undo records for a workspace
    */
-  async findUndoRecordsBySession(
-    sessionId: string,
+  async findUndoRecordsByWorkspace(
+    workspaceId: string,
     includeUndone: boolean = false
   ): Promise<UndoRecord[]> {
     const db = getSQLiteDB()
     const sql = includeUndone
-      ? 'SELECT * FROM undo_records WHERE session_id = ? ORDER BY timestamp DESC'
-      : 'SELECT * FROM undo_records WHERE session_id = ? AND undone = 0 ORDER BY timestamp DESC'
-    const rows = await db.queryAll<UndoRecordRow>(sql, [sessionId])
+      ? 'SELECT * FROM undo_records WHERE workspace_id = ? ORDER BY timestamp DESC'
+      : 'SELECT * FROM undo_records WHERE workspace_id = ? AND undone = 0 ORDER BY timestamp DESC'
+    const rows = await db.queryAll<UndoRecordRow>(sql, [workspaceId])
     return rows.map((row) => this.rowToUndoRecord(row))
   }
 
@@ -439,7 +440,7 @@ export class SessionRepository {
   async saveUndoRecord(record: UndoRecord): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `INSERT INTO undo_records (id, session_id, path, type, old_content_path, new_content_path, timestamp, undone)
+      `INSERT INTO undo_records (id, workspace_id, path, type, old_content_path, new_content_path, timestamp, undone)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          path = excluded.path,
@@ -449,7 +450,7 @@ export class SessionRepository {
          undone = excluded.undone`,
       [
         record.id,
-        record.sessionId,
+        record.workspaceId,
         record.path,
         record.type,
         record.oldContentPath || null,
@@ -477,11 +478,11 @@ export class SessionRepository {
   }
 
   /**
-   * Delete all undo records for a session
+   * Delete all undo records for a workspace
    */
-  async deleteAllUndoRecords(sessionId: string): Promise<void> {
+  async deleteAllUndoRecords(workspaceId: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM undo_records WHERE session_id = ?', [sessionId])
+    await db.execute('DELETE FROM undo_records WHERE workspace_id = ?', [workspaceId])
   }
 
   //===========================================================================
@@ -489,30 +490,30 @@ export class SessionRepository {
   //===========================================================================
 
   /**
-   * Get all session stats (for session list display)
+   * Get all workspace stats (for workspace list display)
    */
-  async getAllSessionStats(): Promise<SessionStats[]> {
+  async getAllWorkspaceStats(): Promise<WorkspaceStats[]> {
     const db = getSQLiteDB()
     const rows = await db.queryAll<{
-      session_id: string
+      workspace_id: string
       file_count: number
       total_file_size: number
       pending_count: number
       undo_count: number
     }>(
       `SELECT
-        s.id as session_id,
+        w.id as workspace_id,
         COUNT(DISTINCT f.id) as file_count,
         COALESCE(SUM(f.size), 0) as total_file_size,
-        s.pending_count as pending_count,
-        s.undo_count as undo_count
-       FROM sessions s
-       LEFT JOIN file_metadata f ON f.session_id = s.id
-       GROUP BY s.id
-       ORDER BY s.last_accessed_at DESC`
+        w.pending_count as pending_count,
+        w.undo_count as undo_count
+       FROM workspaces w
+       LEFT JOIN file_metadata f ON f.workspace_id = w.id
+       GROUP BY w.id
+       ORDER BY w.last_accessed_at DESC`
     )
     return rows.map((row) => ({
-      sessionId: row.session_id,
+      workspaceId: row.workspace_id,
       fileCount: row.file_count,
       totalFileSize: row.total_file_size,
       pendingCount: row.pending_count,
@@ -521,34 +522,34 @@ export class SessionRepository {
   }
 
   /**
-   * Find active sessions
+   * Find active workspaces
    */
-  async findActiveSessions(): Promise<Session[]> {
+  async findActiveWorkspaces(): Promise<Workspace[]> {
     const db = getSQLiteDB()
-    const rows = await db.queryAll<SessionRow>(
-      "SELECT * FROM sessions WHERE status = 'active' ORDER BY last_accessed_at DESC"
+    const rows = await db.queryAll<WorkspaceRow>(
+      "SELECT * FROM workspaces WHERE status = 'active' ORDER BY last_accessed_at DESC"
     )
-    return rows.map((row) => this.rowToSession(row))
+    return rows.map((row) => this.rowToWorkspace(row))
   }
 
   /**
-   * Find inactive sessions (not accessed for specified days)
+   * Find inactive workspaces (not accessed for specified days)
    */
-  async findInactiveSessions(days: number): Promise<Session[]> {
+  async findInactiveWorkspaces(days: number): Promise<Workspace[]> {
     const db = getSQLiteDB()
     const cutoffTime = Date.now() - days * 24 * 60 * 60 * 1000
-    const rows = await db.queryAll<SessionRow>(
-      'SELECT * FROM sessions WHERE last_accessed_at < ? ORDER BY last_accessed_at ASC',
+    const rows = await db.queryAll<WorkspaceRow>(
+      'SELECT * FROM workspaces WHERE last_accessed_at < ? ORDER BY last_accessed_at ASC',
       [cutoffTime]
     )
-    return rows.map((row) => this.rowToSession(row))
+    return rows.map((row) => this.rowToWorkspace(row))
   }
 
   /**
-   * Batch update session stats (for synchronization)
+   * Batch update workspace stats (for synchronization)
    */
-  async updateSessionStats(
-    sessionId: string,
+  async updateWorkspaceStats(
+    workspaceId: string,
     stats: {
       cacheSize?: number
       pendingCount?: number
@@ -579,18 +580,18 @@ export class SessionRepository {
 
     if (updates.length === 0) return
 
-    values.push(sessionId)
-    await db.execute(`UPDATE sessions SET ${updates.join(', ')} WHERE id = ?`, values)
+    values.push(workspaceId)
+    await db.execute(`UPDATE workspaces SET ${updates.join(', ')} WHERE id = ?`, values)
   }
 
   /**
-   * Archive old sessions (mark as archived instead of deleting)
+   * Archive old workspaces (mark as archived instead of deleting)
    */
-  async archiveInactiveSessions(days: number): Promise<number> {
+  async archiveInactiveWorkspaces(days: number): Promise<number> {
     const db = getSQLiteDB()
     const cutoffTime = Date.now() - days * 24 * 60 * 60 * 1000
     await db.execute(
-      "UPDATE sessions SET status = 'archived' WHERE last_accessed_at < ? AND status = 'active'",
+      "UPDATE workspaces SET status = 'archived' WHERE last_accessed_at < ? AND status = 'active'",
       [cutoffTime]
     )
     // Query to get count of affected rows
@@ -602,7 +603,7 @@ export class SessionRepository {
   // Helpers
   //===========================================================================
 
-  private rowToSession(row: SessionRow): Session {
+  private rowToWorkspace(row: WorkspaceRow): Workspace {
     return {
       id: row.id,
       rootDirectory: row.root_directory,
@@ -620,7 +621,7 @@ export class SessionRepository {
   private rowToFileMetadata(row: FileMetadataRow): FileMetadata {
     return {
       id: row.id,
-      sessionId: row.session_id,
+      workspaceId: row.workspace_id,
       path: row.path,
       mtime: row.mtime,
       size: row.size,
@@ -634,7 +635,7 @@ export class SessionRepository {
   private rowToPendingChange(row: PendingChangeRow): PendingChange {
     return {
       id: row.id,
-      sessionId: row.session_id,
+      workspaceId: row.workspace_id,
       path: row.path,
       type: row.type,
       fsMtime: row.fs_mtime,
@@ -646,7 +647,7 @@ export class SessionRepository {
   private rowToUndoRecord(row: UndoRecordRow): UndoRecord {
     return {
       id: row.id,
-      sessionId: row.session_id,
+      workspaceId: row.workspace_id,
       path: row.path,
       type: row.type,
       oldContentPath: row.old_content_path || undefined,
@@ -661,11 +662,11 @@ export class SessionRepository {
 // Singleton Instance
 //=============================================================================
 
-let sessionRepoInstance: SessionRepository | null = null
+let workspaceRepoInstance: WorkspaceRepository | null = null
 
-export function getSessionRepository(): SessionRepository {
-  if (!sessionRepoInstance) {
-    sessionRepoInstance = new SessionRepository()
+export function getWorkspaceRepository(): WorkspaceRepository {
+  if (!workspaceRepoInstance) {
+    workspaceRepoInstance = new WorkspaceRepository()
   }
-  return sessionRepoInstance
+  return workspaceRepoInstance
 }

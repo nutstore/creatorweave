@@ -1,7 +1,5 @@
 /**
  * Skill Storage - SQLite persistence for skills.
- *
- * Uses SQLite for skill storage instead of IndexedDB.
  */
 
 import type { StoredSkill, Skill, SkillMetadata, SkillResource } from './skill-types'

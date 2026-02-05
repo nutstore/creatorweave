@@ -115,10 +115,10 @@ CREATE TABLE IF NOT EXISTS encryption_metadata (
 );
 
 -- ============================================================================
--- Sessions Table (OPFS workspace metadata)
+-- Workspaces Table (OPFS workspace metadata)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS sessions (
-    id TEXT PRIMARY KEY,            -- Session ID (matches conversation.id)
+CREATE TABLE IF NOT EXISTS workspaces (
+    id TEXT PRIMARY KEY,            -- Workspace ID (matches conversation.id)
     root_directory TEXT NOT NULL UNIQUE,  -- OPFS path like /conversations/{id}
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',  -- 'active' | 'archived'
@@ -130,25 +130,25 @@ CREATE TABLE IF NOT EXISTS sessions (
     last_accessed_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
 );
 
-CREATE INDEX IF NOT EXISTS idx_sessions_root_directory ON sessions(root_directory);
-CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
-CREATE INDEX IF NOT EXISTS idx_sessions_last_accessed ON sessions(last_accessed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_workspaces_root_directory ON workspaces(root_directory);
+CREATE INDEX IF NOT EXISTS idx_workspaces_status ON workspaces(status);
+CREATE INDEX IF NOT EXISTS idx_workspaces_last_accessed ON workspaces(last_accessed_at DESC);
 
--- Active session tracking
-CREATE TABLE IF NOT EXISTS active_session (
+-- Active workspace tracking
+CREATE TABLE IF NOT EXISTS active_workspace (
     singleton_id INTEGER PRIMARY KEY DEFAULT 0,
-    session_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE SET NULL
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
 );
 
 -- Ensure only one row for singleton
 -- Note: Only check singleton_id value, let PRIMARY KEY handle duplicates via INSERT OR IGNORE
-CREATE TRIGGER IF NOT EXISTS active_session_singleton
-    BEFORE INSERT ON active_session
+CREATE TRIGGER IF NOT EXISTS active_workspace_singleton
+    BEFORE INSERT ON active_workspace
     WHEN NEW.singleton_id != 0
     BEGIN
-        SELECT RAISE(ABORT, 'Only one active session allowed with singleton_id=0');
+        SELECT RAISE(ABORT, 'Only one active workspace allowed with singleton_id=0');
     END;
 
 -- ============================================================================
@@ -156,7 +156,7 @@ CREATE TRIGGER IF NOT EXISTS active_session_singleton
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS file_metadata (
     id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     path TEXT NOT NULL,
     mtime INTEGER NOT NULL,
     size INTEGER NOT NULL,
@@ -164,27 +164,27 @@ CREATE TABLE IF NOT EXISTS file_metadata (
     hash TEXT,                        -- Optional content hash
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_file_metadata_session_path ON file_metadata(session_id, path);
-CREATE INDEX IF NOT EXISTS idx_file_metadata_session_id ON file_metadata(session_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_file_metadata_workspace_path ON file_metadata(workspace_id, path);
+CREATE INDEX IF NOT EXISTS idx_file_metadata_workspace_id ON file_metadata(workspace_id);
 
 -- ============================================================================
 -- Pending Changes Table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS pending_changes (
     id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     path TEXT NOT NULL,
     type TEXT NOT NULL,              -- 'create' | 'modify' | 'delete'
     fs_mtime INTEGER NOT NULL,       -- Real file modification time
     agent_message_id TEXT,           -- Associated Agent message ID
     timestamp INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_pending_changes_session_id ON pending_changes(session_id);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_workspace_id ON pending_changes(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON pending_changes(timestamp);
 
 -- ============================================================================
@@ -192,17 +192,17 @@ CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON pending_changes(time
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS undo_records (
     id TEXT PRIMARY KEY,
-    session_id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
     path TEXT NOT NULL,
     type TEXT NOT NULL,              -- 'create' | 'modify' | 'delete'
     old_content_path TEXT,           -- Path to old content in OPFS
     new_content_path TEXT,           -- Path to new content in OPFS
     timestamp INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     undone INTEGER NOT NULL DEFAULT 0,  -- BOOLEAN
-    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_undo_records_session_id ON undo_records(session_id);
+CREATE INDEX IF NOT EXISTS idx_undo_records_workspace_id ON undo_records(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_undo_records_timestamp ON undo_records(timestamp);
 
 -- ============================================================================
@@ -227,7 +227,7 @@ CREATE TABLE IF NOT EXISTS idb_migration_state (
     skills_migrated INTEGER DEFAULT 0,
     plugins_migrated INTEGER DEFAULT 0,
     api_keys_migrated INTEGER DEFAULT 0,
-    sessions_migrated INTEGER DEFAULT 0
+    workspaces_migrated INTEGER DEFAULT 0
 );
 
 -- Ensure only one row for singleton
@@ -246,31 +246,31 @@ INSERT OR IGNORE INTO idb_migration_state (singleton_id, status) VALUES (0, 'pen
 -- Views for Common Queries
 -- ============================================================================
 
--- Active session with full info
-CREATE VIEW IF NOT EXISTS v_active_session AS
-    SELECT s.*, a.last_modified as active_since
-    FROM sessions s
-    JOIN active_session a ON s.id = a.session_id
-    WHERE s.status = 'active';
+-- Active workspace with full info
+CREATE VIEW IF NOT EXISTS v_active_workspace AS
+    SELECT w.*, a.last_modified as active_since
+    FROM workspaces w
+    JOIN active_workspace a ON w.id = a.workspace_id
+    WHERE w.status = 'active';
 
--- Sessions with file counts
-CREATE VIEW IF NOT EXISTS v_session_stats AS
+-- Workspaces with file counts
+CREATE VIEW IF NOT EXISTS v_workspace_stats AS
     SELECT
-        s.id,
-        s.name,
-        s.status,
-        s.root_directory,
-        s.created_at,
-        s.last_accessed_at,
+        w.id,
+        w.name,
+        w.status,
+        w.root_directory,
+        w.created_at,
+        w.last_accessed_at,
         COUNT(DISTINCT fm.id) as file_count,
         SUM(fm.size) as total_file_size,
         COUNT(DISTINCT pc.id) as pending_count,
         COUNT(DISTINCT ur.id) as undo_count
-    FROM sessions s
-    LEFT JOIN file_metadata fm ON s.id = fm.session_id
-    LEFT JOIN pending_changes pc ON s.id = pc.session_id
-    LEFT JOIN undo_records ur ON s.id = ur.session_id AND ur.undone = 0
-    GROUP BY s.id;
+    FROM workspaces w
+    LEFT JOIN file_metadata fm ON w.id = fm.workspace_id
+    LEFT JOIN pending_changes pc ON w.id = pc.workspace_id
+    LEFT JOIN undo_records ur ON w.id = ur.workspace_id AND ur.undone = 0
+    GROUP BY w.id;
 
 -- ============================================================================
 -- Triggers for Automatic Timestamps
