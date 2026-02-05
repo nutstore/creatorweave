@@ -53,6 +53,9 @@ export { ApiKeyRepository, getApiKeyRepository } from './repositories/api-key.re
 export { PluginRepository, getPluginRepository } from './repositories/plugin.repository'
 export type { StoredPlugin } from './repositories/plugin.repository'
 
+export { MCPRepository, getMCPRepository } from './repositories/mcp.repository'
+export type { StoredMCPServer } from './repositories/mcp.repository'
+
 // Migration utilities
 export { runMigration, needsMigration } from './migration'
 export type { MigrationProgress, MigrationResult, MigrationProgressCallback } from './migration'

@@ -2,7 +2,7 @@
  * Agent Loop - orchestrates the LLM conversation with tool calling.
  *
  * Flow:
- * 1. User message → inject skills into system prompt
+ * 1. User message → inject skills and MCP services into system prompt
  * 2. ContextManager trims to token window
  * 3. Call LLM (streaming) with tools
  * 4. If tool_calls → execute tools → append results → loop
@@ -20,6 +20,7 @@ import { ContextManager } from './context-manager'
 import { ToolRegistry } from './tool-registry'
 import { getSkillManager } from '@/skills/skill-manager'
 import type { SkillMatchContext } from '@/skills/skill-types'
+import { getMCPManager } from '@/mcp'
 
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = `You are a powerful AI assistant running in the browser with full access to the user's local project files through tools.
@@ -105,19 +106,40 @@ export class AgentLoop {
     this.contextManager.setSystemPrompt(prompt)
   }
 
-  /** Inject matching skills into the system prompt based on conversation context */
-  private injectSkills(messages: Message[]): void {
-    // Extract user message for matching (use the last user message)
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
-    if (!lastUserMsg) return
+  /** Inject matching skills and MCP services into the system prompt */
+  private async injectEnhancements(messages: Message[]): Promise<void> {
+    // Start with base system prompt
+    let enhancedPrompt = this.baseSystemPrompt
 
-    const context: SkillMatchContext = {
-      userMessage: lastUserMsg.content || '',
+    // Inject MCP services block
+    try {
+      const mcpManager = getMCPManager()
+      await mcpManager.initialize()
+
+      // Use MCPManager's built-in method
+      const mcpBlock = mcpManager.getAvailableMCPServicesBlock()
+      if (mcpBlock) {
+        enhancedPrompt += '\n\n' + mcpBlock
+      }
+    } catch (error) {
+      console.warn('[AgentLoop] Failed to inject MCP services:', error)
     }
 
-    const skillManager = getSkillManager()
-    const enhanced = skillManager.getEnhancedSystemPrompt(this.baseSystemPrompt, context)
-    this.contextManager.setSystemPrompt(enhanced)
+    // Extract user message for skill matching (use the last user message)
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
+    if (lastUserMsg) {
+      const context: SkillMatchContext = {
+        userMessage: lastUserMsg.content || '',
+      }
+
+      const skillManager = getSkillManager()
+      const skillsBlock = skillManager.getEnhancedSystemPrompt('', context)
+      if (skillsBlock) {
+        enhancedPrompt += skillsBlock
+      }
+    }
+
+    this.contextManager.setSystemPrompt(enhancedPrompt)
   }
 
   /** Cancel the current agent loop */
@@ -135,8 +157,8 @@ export class AgentLoop {
     // Start with input messages (keep as immutable, use concat to add new messages)
     let allMessages = messages
 
-    // Inject matching skills into system prompt
-    this.injectSkills(messages)
+    // Inject matching skills and MCP services into system prompt
+    await this.injectEnhancements(messages)
 
     try {
       for (let iteration = 0; iteration < this.maxIterations; iteration++) {

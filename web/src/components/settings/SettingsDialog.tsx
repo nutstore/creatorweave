@@ -17,9 +17,11 @@ import {
   BrandDialogContent,
   BrandDialogHeader,
   BrandDialogTitle,
+  BrandDialogBody,
 } from '@browser-fs-analyzer/ui'
 import { BrandInput } from '@browser-fs-analyzer/ui'
 import { BrandSlider } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@browser-fs-analyzer/ui'
 import {
   BrandSelect,
   BrandSelectContent,
@@ -117,22 +119,20 @@ const SettingsDialogContent = forwardRef<
   }
 
   return (
-    <BrandDialogContent ref={ref} className="w-[448px] gap-0 rounded-xl p-0" {...props}>
-      {/* Header */}
-      <BrandDialogHeader className="h-14 border-b border-gray-200 px-6">
+    <BrandDialogContent ref={ref} className="w-[440px]" showOverlay={true} {...props}>
+      <BrandDialogHeader>
         <div className="flex items-center gap-2.5">
           <Settings className="h-[18px] w-[18px] text-primary-600" />
-          <BrandDialogTitle className="text-base font-semibold text-primary">
-            {t('settings.title')}
-          </BrandDialogTitle>
+          <BrandDialogTitle>{t('settings.title')}</BrandDialogTitle>
         </div>
-        <BrandDialogClose className="text-gray-400 hover:text-gray-600">
-          <X className="h-5 w-5" />
+        <BrandDialogClose asChild>
+          <button className="text-tertiary transition-colors hover:text-primary">
+            <X className="h-5 w-5" />
+          </button>
         </BrandDialogClose>
       </BrandDialogHeader>
 
-      {/* Body */}
-      <div className="space-y-5 px-6 py-6">
+      <BrandDialogBody>
         {/* Provider Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium text-primary">{t('settings.llmProvider')}</label>
@@ -175,13 +175,9 @@ const SettingsDialogContent = forwardRef<
                 {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={handleSaveKey}
-              className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
+            <BrandButton variant="primary" onClick={handleSaveKey}>
               {saved ? <Check className="h-4 w-4" /> : t('settings.save')}
-            </button>
+            </BrandButton>
           </div>
           <p className="text-xs text-muted">{t('settings.apiKeyNote')}</p>
         </div>
@@ -224,7 +220,7 @@ const SettingsDialogContent = forwardRef<
             className="h-10"
           />
         </div>
-      </div>
+      </BrandDialogBody>
     </BrandDialogContent>
   )
 })

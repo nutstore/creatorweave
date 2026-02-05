@@ -173,23 +173,26 @@ export function ConversationView({
   const status = activeConversation?.status || 'idle'
   const isProcessing = isRunning
 
-  // Build streaming state for the last message when processing
-  const streamingState = useMemo(() => {
-    if (!activeConversation || !isProcessing) return undefined
-    return {
-      reasoning: activeConversation.isReasoningStreaming,
-      content: activeConversation.isContentStreaming,
-    }
-  }, [activeConversation, isProcessing])
+  // Build streaming state for the last message when processing (direct calculation for streaming performance)
+  const streamingState =
+    !activeConversation || !isProcessing
+      ? undefined
+      : {
+          reasoning: activeConversation.isReasoningStreaming,
+          content: activeConversation.isContentStreaming,
+        }
 
-  // When processing, we have streaming content/reasoning that should be displayed
-  const streamingContentMessage = useMemo(() => {
-    if (!activeConversation || !isProcessing) return undefined
-    const reasoning = activeConversation.completedReasoning || activeConversation.streamingReasoning
-    const content = activeConversation.completedContent || activeConversation.streamingContent
-    if (!reasoning && !content) return undefined
-    return { reasoning, content }
-  }, [activeConversation, isProcessing])
+  // When processing, we have streaming content/reasoning that should be displayed (direct calculation for streaming performance)
+  const streamingContentMessage =
+    !activeConversation || !isProcessing
+      ? undefined
+      : (() => {
+          const reasoning =
+            activeConversation.completedReasoning || activeConversation.streamingReasoning
+          const content = activeConversation.completedContent || activeConversation.streamingContent
+          if (!reasoning && !content) return undefined
+          return { reasoning, content }
+        })()
 
   const turns = useMemo(() => {
     const messages = activeConversation?.messages || []

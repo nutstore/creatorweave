@@ -13,9 +13,10 @@
  */
 
 import { useState } from 'react'
-import { Settings, Sparkles, Wrench, KeyRound } from 'lucide-react'
+import { Settings, Sparkles, Wrench, KeyRound, Server } from 'lucide-react'
 import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { MCPSettingsDialog } from '@/components/mcp'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { ConversationStorageBadge } from '@/components/session'
@@ -30,6 +31,7 @@ interface TopBarProps {
 
 export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [mcpSettingsOpen, setMcpSettingsOpen] = useState(false)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
 
@@ -79,6 +81,11 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
             <Wrench className="h-[14px] w-[14px]" />
           </BrandButton>
 
+          {/* MCP Settings */}
+          <BrandButton iconButton onClick={() => setMcpSettingsOpen(true)} title="MCP 服务配置">
+            <Server className="h-[14px] w-[14px]" />
+          </BrandButton>
+
           {/* Settings */}
           <BrandButton
             iconButton
@@ -91,6 +98,7 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
       </header>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <MCPSettingsDialog open={mcpSettingsOpen} onOpenChange={setMcpSettingsOpen} />
     </>
   )
 }

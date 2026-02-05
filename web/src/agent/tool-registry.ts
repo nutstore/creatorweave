@@ -102,6 +102,36 @@ export class ToolRegistry {
   }
 
   //=============================================================================
+  // MCP Tools
+  //=============================================================================
+
+  /**
+   * Register MCP tools from all connected MCP servers
+   */
+  async registerMCPTools(): Promise<number> {
+    try {
+      const { registerAllMCPTools } = await import('@/mcp')
+      return await registerAllMCPTools(undefined)
+    } catch (error) {
+      console.error('[ToolRegistry] Failed to register MCP tools:', error)
+      return 0
+    }
+  }
+
+  /**
+   * Unregister all MCP tools
+   */
+  unregisterMCPTools(): number {
+    try {
+      const { unregisterAllMCPTools } = require('@/mcp')
+      return unregisterAllMCPTools(undefined)
+    } catch (error) {
+      console.error('[ToolRegistry] Failed to unregister MCP tools:', error)
+      return 0
+    }
+  }
+
+  //=============================================================================
   // Skill Tools
   //=============================================================================
 

@@ -226,8 +226,8 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
         >
           <div className="p-2">
             <BrandButton
-              variant="outline"
-              className="h-7 w-full justify-start gap-1.5 px-2 text-xs"
+              variant="ghost"
+              className="h-7 w-full justify-start gap-1.5 bg-muted px-2 text-xs"
               onClick={() => createNew()}
             >
               <Plus className="h-3 w-3" />

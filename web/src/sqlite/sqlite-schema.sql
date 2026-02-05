@@ -273,6 +273,31 @@ CREATE VIEW IF NOT EXISTS v_workspace_stats AS
     GROUP BY w.id;
 
 -- ============================================================================
+-- MCP Servers Table (Model Context Protocol server configurations)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS mcp_servers (
+    id TEXT PRIMARY KEY,               -- User-defined memorable ID (e.g., "excel-analyzer")
+    name TEXT NOT NULL,                -- Display name
+    description TEXT,                  -- Optional description
+    url TEXT NOT NULL,                 -- Server URL
+    transport TEXT NOT NULL DEFAULT 'sse',  -- 'stdio' | 'streamable_http' | 'sse'
+    enabled INTEGER NOT NULL DEFAULT 1,   -- BOOLEAN (0 or 1)
+    token TEXT,                        -- Optional Bearer token
+    timeout INTEGER NOT NULL DEFAULT 30000,  -- Timeout in milliseconds
+    retry_count INTEGER DEFAULT 3,     -- Retry count
+    retry_delay INTEGER DEFAULT 1000,  -- Retry delay in milliseconds
+    type TEXT NOT NULL DEFAULT 'user',  -- 'builtin' | 'user' | 'project'
+    env TEXT,                          -- JSON object with environment variables
+    session_id TEXT,                   -- Optional MCP-Session-Id
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_type ON mcp_servers(type);
+CREATE INDEX IF NOT EXISTS idx_mcp_servers_transport ON mcp_servers(transport);
+
+-- ============================================================================
 -- Triggers for Automatic Timestamps
 -- ============================================================================
 -- Applications should explicitly set updated_at when updating records.
