@@ -239,3 +239,76 @@ export class MCPToolExecutionError extends MCPError {
     this.name = 'MCPToolExecutionError'
   }
 }
+
+//=============================================================================
+// MCP Tasks Types (MCP Tasks Specification - Nov 2025)
+//=============================================================================
+
+export type MCPTaskStatus = 'working' | 'completed' | 'failed' | 'cancelled'
+
+export interface MCPTaskInfo {
+  taskId: string
+  status: MCPTaskStatus
+  createdAt: string
+  lastUpdatedAt: string
+  /** Suggested poll interval in milliseconds */
+  pollInterval?: number
+  /** Human-readable status message */
+  statusMessage?: string
+  /** Optional TTL for task result storage */
+  ttl?: number
+}
+
+export interface MCPTaskResultResponse {
+  result?: MCPToolCallResult
+  error?: {
+    code: string
+    message: string
+  }
+  status?: MCPTaskInfo
+}
+
+//=============================================================================
+// SEP-1306: Binary Mode Elicitation for File Uploads
+//=============================================================================
+
+export type ElicitationMode = 'form' | 'url' | 'binary'
+
+export interface FileSchemaProperty {
+  type: 'file'
+  title?: string
+  description?: string
+  accept?: string[] // MIME types or extensions like [".xlsx", ".csv"]
+  maxSize?: number
+  multiple?: boolean
+  required?: boolean
+}
+
+export interface ElicitationSchema {
+  type: 'object'
+  properties: Record<string, unknown>
+  required?: string[]
+}
+
+export interface UploadEndpoint {
+  url: string
+  method: 'POST' | 'PUT'
+  uploadId: string
+}
+
+export interface BinaryElicitation {
+  mode: 'binary'
+  message: string
+  requestedSchema: ElicitationSchema
+  uploadEndpoints: Record<string, UploadEndpoint>
+}
+
+export interface FileMetadata {
+  name: string
+  size: number
+  mimeType: string
+  uploadId: string
+  // Additional fields for tool usage
+  file_id?: string
+  download_url?: string
+}

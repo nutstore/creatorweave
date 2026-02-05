@@ -375,7 +375,7 @@ export class MCPClientService {
 
   /**
    * Get final task result using the MCP Tasks /tasks/result endpoint
-   * This blocks until the task reaches a terminal status
+   * Implements client-side polling based on pollInterval from server
    */
   private async getTaskResult(
     server: MCPServerConfig,
@@ -383,31 +383,58 @@ export class MCPClientService {
     onProgress?: (status: string, message?: string) => void
   ): Promise<MCPToolCallResult> {
     const baseUrl = server.url.replace(/\/mcp?$/, '')
+    const DEFAULT_POLL_INTERVAL = 2000 // 2 seconds
+    const MAX_POLL_TIME = 300000 // 5 minutes max
 
-    // Notify we're waiting for task completion
-    onProgress?.('waiting', `Waiting for task ${taskId} to complete...`)
+    const startTime = Date.now()
 
-    // Poll /tasks/result which blocks until completion
-    const response = await fetch(`${baseUrl}/tasks/result`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(server.token && { Authorization: `Bearer ${server.token}` }),
-      },
-      body: JSON.stringify({ taskId }),
-    })
+    while (Date.now() - startTime < MAX_POLL_TIME) {
+      // Poll /tasks/result - returns immediately with current status
+      const response = await fetch(`${baseUrl}/tasks/result`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(server.token && { Authorization: `Bearer ${server.token}` }),
+        },
+        body: JSON.stringify({ taskId }),
+      })
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: Failed to get task result`)
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: Failed to get task result`)
+      }
+
+      const data = await response.json()
+
+      // Check if task returned an error
+      if (data.error) {
+        throw new Error(data.error.message || 'Task failed')
+      }
+
+      // Check if we have the final result
+      if (data.result) {
+        return data.result as MCPToolCallResult
+      }
+
+      // Task still in progress - get pollInterval and wait
+      if (data.status) {
+        const { status, statusMessage, pollInterval } = data.status as {
+          status: string
+          statusMessage?: string
+          pollInterval?: number
+        }
+
+        onProgress?.(status, statusMessage)
+
+        // Wait based on server's pollInterval (in ms), or use default
+        const waitTime = pollInterval || DEFAULT_POLL_INTERVAL
+        await new Promise((resolve) => setTimeout(resolve, waitTime))
+      } else {
+        // Unexpected response format
+        throw new Error('Unexpected response from server: missing status and result')
+      }
     }
 
-    const data = await response.json()
-
-    if (data.error) {
-      throw new Error(data.error.message || 'Task failed')
-    }
-
-    return data.result as MCPToolCallResult
+    throw new Error('Task result timeout after 5 minutes')
   }
 
   /**

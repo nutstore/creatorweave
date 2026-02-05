@@ -31,7 +31,6 @@ Available built-in tools:
 - file_read: Read file contents by path
 - file_write: Write/create files (auto-creates directories)
 - file_edit: Apply text replacements to files
-- file_upload: Upload a file to MCP server for external analysis (returns download_url)
 - glob: Search for files by pattern (e.g. "**/*.ts")
 - grep: Search file contents with regex
 - list_files: List directory structure as a tree
@@ -40,7 +39,7 @@ When the user asks about files, code, or their project:
 1. Use list_files or glob to discover the project structure
 2. Use file_read to read relevant files
 3. Use grep to search for specific patterns
-4. For external file analysis (e.g., Excel analysis via MCP): use file_upload first to get a download_url
+4. For MCP tools that need file access (e.g., Excel analysis): the system will automatically prompt for file upload when needed
 5. ALWAYS call the appropriate tool - never guess or refuse
 
 Always read files before editing them. Be concise and helpful.`
@@ -72,6 +71,19 @@ export interface AgentCallbacks {
   onComplete?: (messages: Message[]) => void
   /** Called on error */
   onError?: (error: Error) => void
+  /**
+   * Called when SEP-1306 binary elicitation is detected
+   * The agent loop will be paused; caller should handle file upload
+   * and resume the agent with the file metadata as a tool result.
+   */
+  onElicitation?: (elicitation: {
+    mode: 'binary'
+    message: string
+    toolName: string
+    args: Record<string, unknown>
+    serverId: string
+    toolCallId: string
+  }) => void
 }
 
 export interface AgentLoopConfig {
@@ -340,6 +352,44 @@ export class AgentLoop {
 
           try {
             const result = await this.toolRegistry.execute(tc.function.name, args, this.toolContext)
+
+            // SEP-1306: Check for binary elicitation in tool result
+            let elicitationData: {
+              mode: 'binary'
+              message: string
+              toolName: string
+              args: Record<string, unknown>
+              serverId: string
+            } | null = null
+            try {
+              const parsedResult = JSON.parse(result)
+              if (parsedResult._elicitation && parsedResult._elicitation.mode === 'binary') {
+                elicitationData = parsedResult._elicitation
+              }
+            } catch {
+              // Not JSON, not an elicitation response
+            }
+
+            // If elicitation detected, notify callback and exit loop
+            if (elicitationData && callbacks?.onElicitation) {
+              // Add assistant message with tool call
+              const assistantMsg = createAssistantMessage(null, [tc], undefined, null)
+              allMessages = produce(allMessages, (draft) => {
+                draft.push(assistantMsg)
+              })
+              callbacks?.onMessagesUpdated?.(allMessages)
+
+              // Call elicitation callback - caller should handle file upload
+              // and resume the agent loop with file metadata
+              // Include toolCallId so the handler can create proper tool result message
+              callbacks.onElicitation({
+                ...elicitationData,
+                toolCallId: tc.id,
+              })
+              callbacks?.onComplete?.(allMessages)
+              return allMessages
+            }
+
             callbacks?.onToolCallComplete?.(tc, result)
 
             const toolResult: ToolResult = {

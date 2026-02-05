@@ -53,6 +53,7 @@ export type WorkerResponse =
 let sqlite3: any = null
 let db: any = null
 let dbMode: 'opfs' | 'memory' = 'memory'
+let poolUtil: any = null // Store poolUtil for opfs-sahpool VFS
 
 // Handle messages from main thread
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
@@ -132,27 +133,27 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
  * 2. If that fails, throw error asking user to refresh (data is safe in OPFS)
  */
 async function handleRecover() {
-  console.warn('[SQLite Worker] Attempting database recovery...')
-
   // Close existing database if open
   if (db) {
     try {
       db.close()
     } catch (e) {
-      console.warn('[SQLite Worker] Error closing database during recovery:', e)
+      // Ignore close errors during recovery
     }
     db = null
   }
 
   // Step 1: Try to reconnect to existing database
   // opfs-sahpool can often recover from stale handles without needing refresh
-  if (sqlite3 && sqlite3.opfs && sqlite3.opfs.OpfsSaPool) {
+  if (poolUtil || typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
     try {
-      console.log('[SQLite Worker] Attempting to reconnect to opfs-sahpool database...')
-      // Reopen using the pool VFS
-      db = new sqlite3.oo1.DB(DB_NAME, 'ct', { vfs: SAHPOOL_NAME })
+      // Use the stored poolUtil if available, otherwise reinitialize
+      if (!poolUtil) {
+        poolUtil = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+      }
+      // Use OpfsSAHPoolDb to reopen the database
+      db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
       dbMode = 'opfs'
-      console.log('[SQLite Worker] Successfully reconnected - no data loss')
 
       // Verify connection works
       db.exec({ sql: 'SELECT 1', returnValue: 'resultRows' })
@@ -160,9 +161,8 @@ async function handleRecover() {
       // Run migrations after reconnection to ensure schema is up-to-date
       try {
         await initializeSchema(db)
-        console.log('[SQLite Worker] Schema migrations completed after reconnection')
       } catch (schemaError) {
-        console.warn('[SQLite Worker] Schema migration warning after reconnection:', schemaError)
+        console.warn('[SQLite Worker] Schema migration warning:', schemaError)
         // Continue - reconnection succeeded, migrations are idempotent
       }
 
@@ -170,7 +170,6 @@ async function handleRecover() {
     } catch (reconnectError) {
       const errorMsg =
         reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
-      console.warn('[SQLite Worker] Reconnection failed:', errorMsg)
 
       // Check error type to determine safe action
       const isCorrupted = errorMsg.includes('malformed') || errorMsg.includes('corruption')
@@ -230,11 +229,6 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     while (!self.crossOriginIsolated && Date.now() - startTime < maxWait) {
       await new Promise((resolve) => setTimeout(resolve, 50))
     }
-    if (!self.crossOriginIsolated) {
-      console.warn(
-        '[SQLite Worker] crossOriginIsolated still false after waiting. OPFS VFS may not work.'
-      )
-    }
   }
 
   // Initialize SQLite WASM module
@@ -244,43 +238,34 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     printErr: (msg: string) => console.error('[SQLite Worker]', msg),
   })
 
-  // Use opfs-sahpool VFS for better performance and reliability
-  if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs && sqlite3.opfs.OpfsSaPool) {
+  // Try to use opfs-sahpool VFS for better performance and reliability
+  // @ts-ignore - installOpfsSAHPoolVfs types are incomplete
+  if (typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
     try {
-      console.log('[SQLite Worker] Initializing opfs-sahpool VFS...')
-      // @ts-ignore - OpfsSaPool types are incomplete
-      await sqlite3.opfs.OpfsSaPool.poolVfs(POOL_CONFIG)
-      console.log('[SQLite Worker] opfs-sahpool VFS initialized:', SAHPOOL_NAME)
-
-      // Open database using the pool VFS
-      db = new sqlite3.oo1.DB(DB_NAME, 'ct', { vfs: SAHPOOL_NAME })
+      poolUtil = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+      // Use the OpfsSAHPoolDb constructor from poolUtil
+      // @ts-ignore - OpfsSAHPoolDb types are incomplete
+      db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
       dbMode = 'opfs'
-      console.log('[SQLite Worker] Database opened with opfs-sahpool VFS')
     } catch (error) {
-      console.error('[SQLite Worker] Failed to initialize opfs-sahpool:', error)
-      // Fallback to in-memory
-      db = new sqlite3!.oo1.DB(':memory:', 'ct')
-      dbMode = 'memory'
-      console.warn('[SQLite Worker] Fell back to in-memory database')
+      // Fallback to regular opfs VFS
+      db = new sqlite3!.oo1.OpfsDb(DB_NAME)
+      dbMode = 'opfs'
+      poolUtil = null
     }
+  } else if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs) {
+    // opfs-sahpool not available, use regular opfs VFS
+    db = new sqlite3.oo1.OpfsDb(DB_NAME)
+    dbMode = 'opfs'
   } else {
     console.warn('[SQLite Worker] OPFS not available, falling back to in-memory database')
-    console.warn('[SQLite Worker] Possible causes:')
-    console.warn('[SQLite Worker]  - COOP/COEP headers not set correctly')
-    console.warn(
-      '[SQLite Worker]  - SharedArrayBuffer not available (requires cross-origin isolation)'
-    )
-    console.warn('[SQLite Worker]  - Browser does not support OPFS VFS')
-    console.warn('[SQLite Worker]  - OpfsSaPool not available (sqlite-wasm version too old)')
     db = new sqlite3!.oo1.DB(':memory:', 'ct')
     dbMode = 'memory'
   }
 
   // Initialize schema using the migration system
-  console.log('[SQLite Worker] Initializing database schema...')
   try {
     await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
-    console.log('[SQLite Worker] Database initialization complete')
   } catch (error) {
     console.error('[SQLite Worker] Database initialization failed:', error)
     throw error
@@ -316,20 +301,14 @@ function handleQueryAll(sql: string, params: unknown[]): unknown[] {
       throw new Error('Database connection invalid: no filename')
     }
   } catch (e) {
-    console.error('[SQLite Worker] Database connection check failed:', e)
-
     // Try to reconnect using opfs-sahpool
-    if (sqlite3 && sqlite3.opfs && sqlite3.opfs.OpfsSaPool) {
+    if (poolUtil) {
       try {
-        console.log('[SQLite Worker] Attempting automatic reconnection with opfs-sahpool...')
-        db = new sqlite3.oo1.DB(DB_NAME, 'ct', { vfs: SAHPOOL_NAME })
+        db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
         dbMode = 'opfs'
-        console.log('[SQLite Worker] Automatic reconnection successful')
       } catch (reconnectError) {
-        console.error('[SQLite Worker] Automatic reconnection failed:', reconnectError)
-        throw new Error(
-          'DATABASE_INACCESSIBLE: Database connection is no longer valid and reconnection failed. Please refresh the page to restore access. Your data is safe.'
-        )
+        console.error('[SQLite Worker] Reconnection failed:', reconnectError)
+        throw new Error('DATABASE_INACCESSIBLE: Database connection lost. Please refresh the page.')
       }
     } else {
       throw new Error('Database connection is no longer valid. Please reload the page.')
@@ -372,20 +351,14 @@ function handleExecute(sql: string, params: unknown[]): void {
       throw new Error('Database connection invalid: no filename')
     }
   } catch (e) {
-    console.error('[SQLite Worker] Database connection check failed:', e)
-
     // Try to reconnect using opfs-sahpool
-    if (sqlite3 && sqlite3.opfs && sqlite3.opfs.OpfsSaPool) {
+    if (poolUtil) {
       try {
-        console.log('[SQLite Worker] Attempting automatic reconnection with opfs-sahpool...')
-        db = new sqlite3.oo1.DB(DB_NAME, 'ct', { vfs: SAHPOOL_NAME })
+        db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
         dbMode = 'opfs'
-        console.log('[SQLite Worker] Automatic reconnection successful')
       } catch (reconnectError) {
-        console.error('[SQLite Worker] Automatic reconnection failed:', reconnectError)
-        throw new Error(
-          'DATABASE_INACCESSIBLE: Database connection is no longer valid and reconnection failed. Please refresh the page to restore access. Your data is safe.'
-        )
+        console.error('[SQLite Worker] Reconnection failed:', reconnectError)
+        throw new Error('DATABASE_INACCESSIBLE: Database connection lost. Please refresh the page.')
       }
     } else {
       throw new Error('Database connection is no longer valid. Please reload the page.')

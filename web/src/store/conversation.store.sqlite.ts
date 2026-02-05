@@ -21,6 +21,7 @@ import {
   emitError,
 } from '@/streaming-bus'
 import { useWorkspaceStore } from './workspace.store'
+import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
 
 // Default conversation name when title is not available
 const DEFAULT_CONVERSATION_NAME = '对话'
@@ -638,6 +639,125 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) c.currentToolCall = null
             })
+          },
+          // SEP-1306: Handle binary elicitation for file uploads
+          onElicitation: async (elicitation: any) => {
+            if (!isMounted()) return
+            console.log('[conversation.store] SEP-1306 elicitation:', elicitation)
+
+            try {
+              // Get the server config for auth token
+              const mcpManager = (await import('@/mcp/mcp-manager')).getMCPManager()
+              await mcpManager.initialize()
+              const server = mcpManager.getServer(elicitation.serverId)
+
+              if (!server) {
+                throw new Error(`MCP server not found: ${elicitation.serverId}`)
+              }
+
+              const authToken = server?.token
+
+              // Show file picker and upload via ElicitationHandler
+              // The elicitation object contains full BinaryElicitation data from the server
+              const handler = getElicitationHandler()
+              const metadata = await handler.handleBinaryElicitation(
+                {
+                  mode: elicitation.mode,
+                  message: elicitation.message,
+                  requestedSchema: elicitation.requestedSchema || {
+                    type: 'object',
+                    properties: {},
+                  },
+                  uploadEndpoints: elicitation.uploadEndpoints || {},
+                },
+                {
+                  // Pass tool args for OPFS file lookup (priority)
+                  toolArgs: elicitation.args,
+                  // Pass directory handle for OPFS access
+                  directoryHandle,
+                },
+                authToken
+              )
+
+              // Add tool result message with the file metadata
+              // This completes the pending tool call with the upload result
+              // IMPORTANT: Tell the LLM to retry with the new download_url using natural language
+              const { createToolMessage } = await import('@/agent/message-types')
+
+              // Get the file field name from uploadEndpoints (dynamic, not hardcoded)
+              const uploadEndpoints = elicitation.uploadEndpoints || {}
+              const fileFieldName = Object.keys(uploadEndpoints)[0] || 'file'
+
+              // Extract original args excluding the file field (we'll replace it)
+              const originalArgs = { ...(elicitation.args || {}) }
+              delete originalArgs[fileFieldName]
+
+              // Build natural language instruction for LLM to retry
+              let retryInstruction = `文件已上传成功。请重新调用 ${elicitation.toolName} 工具，使用以下参数：\n\n`
+              retryInstruction += `{\n`
+              retryInstruction += `  "${fileFieldName}": {\n`
+              retryInstruction += `    "download_url": "${metadata.download_url}",\n`
+              retryInstruction += `    "file_id": "${metadata.file_id}"\n`
+              retryInstruction += `  }`
+
+              // Add other original args (like question)
+              for (const [key, value] of Object.entries(originalArgs)) {
+                retryInstruction += `,\n  "${key}": ${JSON.stringify(value)}`
+              }
+              retryInstruction += `\n}`
+
+              const toolResultMsg = createToolMessage({
+                toolCallId: elicitation.toolCallId || 'unknown',
+                name: elicitation.toolName,
+                content: retryInstruction,
+              })
+
+              get().addMessage(conversationId, toolResultMsg)
+
+              // Resume agent loop with the tool result
+              // First, manually clean up the previous agentLoop state
+              set((state) => {
+                const c = state.conversations.find((c) => c.id === conversationId)
+                if (c) {
+                  c.status = 'idle'
+                  c.error = null
+                }
+                state.agentLoops.delete(conversationId)
+              })
+
+              // Now start a new agent loop with the updated messages
+              await get().runAgent(
+                conversationId,
+                providerType,
+                modelName,
+                maxTokens,
+                directoryHandle
+              )
+            } catch (error) {
+              console.error('[conversation.store] Elicitation failed:', error)
+              const errorMsg = error instanceof Error ? error.message : String(error)
+
+              // Add tool result with error
+              const { createToolMessage } = await import('@/agent/message-types')
+              const errorResultMsg = createToolMessage({
+                toolCallId: elicitation.toolCallId || 'unknown',
+                name: elicitation.toolName,
+                content: JSON.stringify({
+                  error: `文件上传失败: ${errorMsg}`,
+                }),
+              })
+              get().addMessage(conversationId, errorResultMsg)
+
+              set((state) => {
+                const c = state.conversations.find((c) => c.id === conversationId)
+                if (c) {
+                  c.status = 'error'
+                  c.error = errorMsg
+                }
+                state.agentLoops.delete(conversationId)
+              })
+              emitError(errorMsg)
+            }
           },
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isMounted()) return

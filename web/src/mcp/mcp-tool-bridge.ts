@@ -71,10 +71,24 @@ export function mcpToolToToolDefinition(
 //=============================================================================
 
 /**
+ * SEP-1306: Check if a tool result contains binary elicitation
+ */
+function hasBinaryElicitation(result: unknown): result is { _meta: { elicitation: any } } {
+  if (!result || typeof result !== 'object') {
+    return false
+  }
+  const r = result as any
+  // FastMCP wraps result in an extra layer
+  const actualResult = r.result || r
+  return actualResult?._meta?.elicitation?.mode === 'binary'
+}
+
+/**
  * Create a ToolExecutor for an MCP tool
  *
- * Supports MCP Tasks - automatically handles long-running operations
- * and returns the final result.
+ * Supports:
+ * - MCP Tasks: automatically handles long-running operations
+ * - SEP-1306: binary mode elicitation for file uploads
  */
 export function createMCPToolExecutor(serverId: string, toolName: string): ToolExecutor {
   return async (args: Record<string, unknown>, _context: ToolContext): Promise<string> => {
@@ -82,7 +96,6 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 
     // Optional progress callback for MCP Tasks
     const onProgress = (status: string, message?: string) => {
-      // Log progress updates
       console.log(
         `[MCPToolExecutor] ${serverId}:${toolName} - ${status}${message ? ': ' + message : ''}`
       )
@@ -90,6 +103,28 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 
     try {
       const result = await manager.executeTool(serverId, toolName, args, onProgress)
+
+      // SEP-1306: Check for binary elicitation
+      if (hasBinaryElicitation(result)) {
+        const r = result as any
+        const actualResult = r.result || r
+        const elicitation = actualResult._meta.elicitation
+
+        // Return special response that signals the UI to handle file upload
+        // Include full elicitation data for the handler
+        return JSON.stringify(
+          {
+            _elicitation: {
+              ...elicitation, // Include requestedSchema, uploadEndpoints, etc.
+              toolName: `${serverId}:${toolName}`,
+              args,
+              serverId,
+            },
+          },
+          null,
+          2
+        )
+      }
 
       // Format the result for the LLM
       if (typeof result === 'string') {

@@ -11,7 +11,6 @@ import { fileWriteDefinition, fileWriteExecutor } from './tools/file-write.tool'
 import { fileEditDefinition, fileEditExecutor } from './tools/file-edit.tool'
 import { fileBatchWriteDefinition, fileBatchWriteExecutor } from './tools/file-batch.tool'
 import { fileSyncDefinition, fileSyncExecutor } from './tools/file-sync.tool'
-import { fileUploadDefinition, fileUploadExecutor } from './tools/file-upload.tool'
 import { globDefinition, globExecutor } from './tools/glob.tool'
 import { grepDefinition, grepExecutor } from './tools/grep.tool'
 import { listFilesDefinition, listFilesExecutor } from './tools/list-files.tool'
@@ -85,7 +84,6 @@ export class ToolRegistry {
     this.register(fileEditDefinition, fileEditExecutor)
     this.register(fileBatchWriteDefinition, fileBatchWriteExecutor)
     this.register(fileSyncDefinition, fileSyncExecutor)
-    this.register(fileUploadDefinition, fileUploadExecutor)
     this.register(globDefinition, globExecutor)
     this.register(grepDefinition, grepExecutor)
     this.register(listFilesDefinition, listFilesExecutor)
