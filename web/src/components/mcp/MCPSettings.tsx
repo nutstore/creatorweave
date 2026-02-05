@@ -10,7 +10,6 @@ import {
   Plus,
   Trash2,
   Edit,
-  Check,
   X,
   RefreshCw,
   Circle,
@@ -20,6 +19,8 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Power,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getMCPManager } from '@/mcp'
@@ -69,7 +70,6 @@ export function MCPSettings() {
   const [servers, setServers] = useState<MCPServerItem[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [testing, setTesting] = useState<string | null>(null)
 
   // Form state
   const [showAddForm, setShowAddForm] = useState(false)
@@ -266,38 +266,6 @@ export function MCPSettings() {
     } catch (error) {
       console.error('[MCPSettings] Failed to toggle server:', error)
       toast.error('更新状态失败')
-    }
-  }
-
-  const handleTestConnection = async (serverId: string) => {
-    setTesting(serverId)
-    try {
-      // Try to connect (will reinitialize and discover tools)
-      await mcpManager.connect(serverId)
-
-      // Refresh statuses
-      await loadServers()
-
-      toast.success('连接成功')
-    } catch (error) {
-      console.error('[MCPSettings] Connection test failed:', error)
-
-      // Update with error status
-      setServers((prev) =>
-        prev.map((s) =>
-          s.id === serverId
-            ? {
-                ...s,
-                connectionStatus: 'error',
-                error: error instanceof Error ? error.message : '连接失败',
-              }
-            : s
-        )
-      )
-
-      toast.error('连接失败：' + (error instanceof Error ? error.message : '未知错误'))
-    } finally {
-      setTesting(null)
     }
   }
 
@@ -542,34 +510,66 @@ export function MCPSettings() {
           {servers.map((server) => (
             <div
               key={server.id}
-              className={`group rounded-lg border p-3 transition-colors ${
+              className={`group relative rounded-lg border transition-all ${
                 !server.enabled
                   ? 'border-gray-100 bg-gray-50 opacity-60'
-                  : 'hover:border-primary-300 border-gray-200 bg-white'
+                  : 'hover:border-primary-200 border-gray-200 bg-white hover:bg-primary-50/30'
               }`}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 p-3">
+                {/* 状态指示灯 - 左侧固定 */}
+                <div className="flex items-center gap-2">
+                  <ConnectionIcon status={server.connectionStatus} />
+                  {/* 电源开关按钮 - 状态和控制一体 */}
+                  <button
+                    onClick={() => handleToggleEnabled(server.id, !server.enabled)}
+                    className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
+                      server.enabled
+                        ? 'bg-success/10 text-success hover:bg-success/20'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    }`}
+                    title={server.enabled ? '点击禁用' : '点击启用'}
+                  >
+                    <Power
+                      className="h-3.5 w-3.5"
+                      fill={server.enabled ? 'currentColor' : 'none'}
+                    />
+                  </button>
+                </div>
+
                 {/* Info */}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <ConnectionIcon status={server.connectionStatus} />
-                    <h4 className="truncate text-sm font-medium text-primary">{server.name}</h4>
+                    <h4
+                      className={`truncate text-sm font-medium ${!server.enabled ? 'text-tertiary' : 'text-primary'}`}
+                    >
+                      {server.name}
+                    </h4>
                     {server.type === 'builtin' && (
                       <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
                         内置
+                      </span>
+                    )}
+                    {!server.enabled && (
+                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                        已禁用
                       </span>
                     )}
                   </div>
 
                   <div className="mt-1 space-y-0.5">
                     {server.description && (
-                      <p className="text-xs text-secondary">{server.description}</p>
+                      <p
+                        className={`text-xs ${!server.enabled ? 'text-tertiary' : 'text-secondary'}`}
+                      >
+                        {server.description}
+                      </p>
                     )}
                     <p className="text-tertiary break-all font-mono text-xs">{server.url}</p>
 
                     {/* Connection details */}
                     <div className="text-tertiary flex items-center gap-3 text-xs">
-                      <span>• {TRANSPORT_LABELS[server.transport as TransportType]}</span>
+                      <span>{TRANSPORT_LABELS[server.transport as TransportType]}</span>
                       {server.tools && server.tools.length > 0 && (
                         <span>• {server.tools.length} 个工具</span>
                       )}
@@ -578,27 +578,13 @@ export function MCPSettings() {
                   </div>
                 </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1">
-                  {/* Test connection */}
-                  <button
-                    onClick={() => handleTestConnection(server.id)}
-                    disabled={testing === server.id || !server.enabled}
-                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:text-primary disabled:opacity-50"
-                    title="测试连接"
-                  >
-                    {testing === server.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </button>
-
+                {/* Actions - hover 时显示 */}
+                <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                   {/* Edit */}
                   <button
                     onClick={() => openEditForm(server)}
-                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:text-primary"
-                    title="编辑"
+                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-gray-100 hover:text-primary"
+                    title="编辑配置"
                   >
                     <Edit className="h-4 w-4" />
                   </button>
@@ -606,24 +592,21 @@ export function MCPSettings() {
                   {/* Delete */}
                   <button
                     onClick={() => handleDelete(server.id)}
-                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:text-danger"
-                    title="删除"
+                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-danger/10 hover:text-danger"
+                    title="删除服务器"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-
-                  {/* Enable/Disable */}
-                  <button
-                    onClick={() => handleToggleEnabled(server.id, !server.enabled)}
-                    className={`text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:text-primary ${
-                      server.enabled ? 'text-success' : 'text-muted'
-                    }`}
-                    title={server.enabled ? '禁用' : '启用'}
-                  >
-                    {server.enabled ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                  </button>
                 </div>
               </div>
+
+              {/* 连接状态提示条 */}
+              {server.connectionStatus === 'error' && server.error && (
+                <div className="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-danger/10 px-2 py-1">
+                  <CircleX className="h-3 w-3 text-danger" />
+                  <span className="text-xs text-danger">{server.error}</span>
+                </div>
+              )}
             </div>
           ))}
         </div>

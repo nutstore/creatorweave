@@ -495,11 +495,17 @@ export class MCPManager {
 
   /**
    * Execute a tool on a specific server
+   *
+   * @param serverId - The MCP server ID
+   * @param toolName - The tool name
+   * @param args - Tool arguments
+   * @param onProgress - Optional callback for task progress updates (for MCP Tasks)
    */
   async executeTool(
     serverId: string,
     toolName: string,
-    args: Record<string, unknown> = {}
+    args: Record<string, unknown> = {},
+    onProgress?: (status: string, message?: string) => void
   ): Promise<unknown> {
     const server = this.connectionCache.get(serverId)
     if (!server?.config) {
@@ -513,10 +519,14 @@ export class MCPManager {
     console.log(`[MCPManager] Executing ${serverId}:${toolName}`)
 
     try {
-      const result = await this.client.executeTool(serverId, {
-        name: toolName,
-        arguments: args,
-      })
+      const result = await this.client.executeTool(
+        serverId,
+        {
+          name: toolName,
+          arguments: args,
+        },
+        onProgress
+      )
 
       return result
     } catch (error) {
@@ -533,7 +543,8 @@ export class MCPManager {
    */
   async executeToolByFullName(
     fullToolName: string,
-    args: Record<string, unknown> = {}
+    args: Record<string, unknown> = {},
+    onProgress?: (status: string, message?: string) => void
   ): Promise<unknown> {
     const [serverId, ...toolNameParts] = fullToolName.split(':')
     const toolName = toolNameParts.join(':')
@@ -542,7 +553,7 @@ export class MCPManager {
       throw new Error(`Invalid tool name format: ${fullToolName}. Expected: serverId:toolName`)
     }
 
-    return this.executeTool(serverId, toolName, args)
+    return this.executeTool(serverId, toolName, args, onProgress)
   }
 
   //===========================================================================

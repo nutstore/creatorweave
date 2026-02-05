@@ -15,7 +15,8 @@
  */
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { ChevronRight, ChevronDown, File, Folder, FolderOpen, RefreshCw } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw } from 'lucide-react'
+import { Icon } from '@iconify/react'
 import { BrandButton, BrandBadge } from '@browser-fs-analyzer/ui'
 import { formatBytes } from '@/lib/utils'
 import { useOPFSStore } from '@/store/opfs.store'
@@ -39,32 +40,91 @@ interface FileTreePanelProps {
   selectedPath?: string | null
 }
 
-/** Icon by file extension */
-function getFileIcon(name: string): string {
+/** Icon name by file extension (using vscode-icons) */
+function getFileIconName(name: string, kind: 'file' | 'directory'): string {
+  if (kind === 'directory') {
+    return 'vscode-icons:folder-type-open'
+  }
+
   const ext = name.split('.').pop()?.toLowerCase()
   const iconMap: Record<string, string> = {
-    ts: '🟦',
-    tsx: '⚛️',
-    js: '🟨',
-    jsx: '⚛️',
-    rs: '🦀',
-    py: '🐍',
-    go: '🔵',
-    json: '📋',
-    md: '📝',
-    css: '🎨',
-    scss: '🎨',
-    html: '🌐',
-    svg: '🖼️',
-    png: '🖼️',
-    jpg: '🖼️',
-    toml: '⚙️',
-    yaml: '⚙️',
-    yml: '⚙️',
-    lock: '🔒',
-    wasm: '⚡',
+    // Code files
+    ts: 'vscode-icons:file-type-ts',
+    tsx: 'vscode-icons:file-type-tsreact',
+    js: 'vscode-icons:file-type-js',
+    jsx: 'vscode-icons:file-type-react',
+    mjs: 'vscode-icons:file-type-js-official',
+    cjs: 'vscode-icons:file-type-js',
+
+    // Other languages
+    rs: 'vscode-icons:file-type-rust',
+    go: 'vscode-icons:file-type-go',
+    py: 'vscode-icons:file-type-python',
+    java: 'vscode-icons:file-type-java',
+    cpp: 'vscode-icons:file-type-cpp',
+    c: 'vscode-icons:file-type-c',
+    cs: 'vscode-icons:file-type-csharp',
+    php: 'vscode-icons:file-type-php',
+    rb: 'vscode-icons:file-type-ruby',
+    swift: 'vscode-icons:file-type-swift',
+    kt: 'vscode-icons:file-type-kotlin',
+    dart: 'vscode-icons:file-type-dart',
+
+    // Web
+    html: 'vscode-icons:file-type-html',
+    css: 'vscode-icons:file-type-css',
+    scss: 'vscode-icons:file-type-scss',
+    less: 'vscode-icons:file-type-less',
+    svg: 'vscode-icons:file-type-svg',
+    xml: 'vscode-icons:file-type-xml',
+
+    // Data & Config
+    json: 'vscode-icons:file-type-json',
+    yaml: 'vscode-icons:file-type-yaml',
+    yml: 'vscode-icons:file-type-yaml',
+    toml: 'vscode-icons:file-type-toml',
+    ini: 'vscode-icons:file-type-ini',
+    env: 'vscode-icons:file-type-env',
+
+    // Docs
+    md: 'vscode-icons:file-type-md',
+    txt: 'vscode-icons:file-type-txt',
+    pdf: 'vscode-icons:file-type-pdf2',
+    doc: 'vscode-icons:file-type-word',
+    docx: 'vscode-icons:file-type-word2',
+    ppt: 'vscode-icons:file-type-powerpoint',
+    pptx: 'vscode-icons:file-type-powerpoint2',
+    xls: 'vscode-icons:file-type-excel',
+    xlsx: 'vscode-icons:file-type-excel2',
+    csv: 'vscode-icons:file-type-csv',
+
+    // Images
+    png: 'vscode-icons:file-type-png',
+    jpg: 'vscode-icons:file-type-jpg',
+    jpeg: 'vscode-icons:file-type-jpg',
+    gif: 'vscode-icons:file-type-gif',
+    webp: 'vscode-icons:file-type-webp',
+    ico: 'vscode-icons:file-type-ico',
+    bmp: 'vscode-icons:file-type-bmp',
+
+    // Archives
+    zip: 'vscode-icons:file-type-zip',
+    gz: 'vscode-icons:file-type-zip',
+    tar: 'vscode-icons:file-type-zip',
+    rar: 'vscode-icons:file-type-zip',
+    '7z': 'vscode-icons:file-type-zip',
+
+    // Build & Lock
+    lock: 'vscode-icons:file-type-lock',
+    wasm: 'vscode-icons:file-type-wasm',
+
+    // Git & CI
+    git: 'vscode-icons:file-type-git',
+    gitignore: 'vscode-icons:file-type-git',
+    dockerfile: 'vscode-icons:file-type-docker',
   }
-  return iconMap[ext || ''] || ''
+
+  return iconMap[ext || ''] || 'vscode-icons:file-type-default'
 }
 
 /** Pending status badge using brand badge component */
@@ -147,8 +207,8 @@ function TreeNodeRow({
           <Folder className="h-3.5 w-3.5 shrink-0 text-warning" />
         )
       ) : (
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center text-[10px] leading-none">
-          {getFileIcon(node.name) || <File className="text-tertiary h-3.5 w-3.5" />}
+        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+          <Icon icon={getFileIconName(node.name, 'file')} className="h-3.5 w-3.5 shrink-0" />
         </span>
       )}
 
@@ -252,7 +312,16 @@ export function FileTreePanel({
   }, [pendingChanges])
 
   /** Hidden files to exclude from file tree */
-  const HIDDEN_PATTERNS = [/^\.DS_Store$/, /^\.AppleDouble$/, /^\.LSOverride$/, /^._/]
+  const HIDDEN_PATTERNS = [
+    /^\.DS_Store$/, // macOS .DS_Store
+    /^\.AppleDouble$/, // macOS .AppleDouble
+    /^\.LSOverride$/, // macOS .LSOverride
+    /^\._/, // macOS resource fork files (._filename) - 修复: 转义点
+    /^\.git$/, // .git directory
+    /^\.svn$/, // .svn directory
+    /^\.hg$/, // .hg directory
+    /^node_modules$/, // node_modules directory
+  ]
 
   /** Check if a file/directory name should be hidden */
   function isHidden(name: string): boolean {
@@ -263,18 +332,27 @@ export function FileTreePanel({
   const loadChildren = useCallback(
     async (dirHandle: FileSystemDirectoryHandle, parentPath: string): Promise<TreeNode[]> => {
       const children: TreeNode[] = []
+      const allEntries: string[] = []
+
       for await (const entry of dirHandle.entries()) {
         const [name, handle] = entry
+        allEntries.push(name)
+
         // Skip hidden files like .DS_Store
-        if (isHidden(name)) continue
+        if (isHidden(name)) {
+          console.log('[FileTree] Skipping hidden file:', name)
+          continue
+        }
         const path = parentPath ? `${parentPath}/${name}` : name
 
         if (handle.kind === 'file') {
           const fileHandle = handle as FileSystemFileHandle
           try {
             const file = await fileHandle.getFile()
+            console.log('[FileTree] Loaded file:', name, 'size:', file.size, 'type:', file.type)
             children.push({ name, path, kind: 'file', size: file.size, handle: fileHandle })
-          } catch {
+          } catch (err) {
+            console.warn('[FileTree] Failed to get file details for:', name, err)
             children.push({ name, path, kind: 'file', handle: fileHandle })
           }
         } else {
@@ -288,6 +366,14 @@ export function FileTreePanel({
           })
         }
       }
+
+      console.log(`[FileTree] Directory ${parentPath || '(root)'}:`, {
+        totalEntries: allEntries.length,
+        afterHiddenFilter: children.length,
+        allEntries: allEntries.sort(),
+        resultNames: children.map((c) => c.name).sort(),
+      })
+
       return children
     },
     []

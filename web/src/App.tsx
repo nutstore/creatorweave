@@ -4,6 +4,7 @@ import { isSupported } from '@/services/fsAccess.service'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'
 import { StorageLoading } from '@/components/StorageLoading'
+import { DatabaseRefreshDialog } from '@/components/DatabaseRefreshDialog'
 import { useAgentStore } from '@/store/agent.store'
 import { attemptReconnect } from '@/store/remote.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -16,6 +17,7 @@ function App() {
   const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined)
   const [storageError, setStorageError] = useState<string | null>(null)
   const [canResetDatabase, setCanResetDatabase] = useState(false)
+  const [isDatabaseInaccessible, setIsDatabaseInaccessible] = useState(false)
   const restoreDirectoryHandle = useAgentStore((s) => s.restoreDirectoryHandle)
   const initializeWorkspaces = useWorkspaceStore((s) => s.initialize)
   const t = useT() // i18n hook
@@ -90,6 +92,13 @@ function App() {
                     details.includes('cantopen') ||
                     details.includes('database')
 
+                  // Check for DATABASE_INACCESSIBLE error (OPFS handle staleness)
+                  if (details.includes('database_inaccessible')) {
+                    console.error('[App] Database inaccessible - showing refresh dialog')
+                    setIsDatabaseInaccessible(true)
+                    return
+                  }
+
                   if (isCorruption) {
                     setStorageError(progress.details)
                     setCanResetDatabase(true)
@@ -124,6 +133,13 @@ function App() {
           // Storage initialization failed completely
           const errorMsg = result.error || t('app.initFailed')
 
+          // Check if this is a DATABASE_INACCESSIBLE error (OPFS handle staleness)
+          if (errorMsg.toLowerCase().includes('database_inaccessible')) {
+            console.error('[App] Database inaccessible - showing refresh dialog')
+            setIsDatabaseInaccessible(true)
+            return
+          }
+
           // Check if this is a database error that might need reset
           const isDatabaseError =
             errorMsg.toLowerCase().includes('database') ||
@@ -146,6 +162,13 @@ function App() {
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         console.error('[App] Failed to initialize storage:', error)
+
+        // Check if this is a DATABASE_INACCESSIBLE error (OPFS handle staleness)
+        if (errorMsg.toLowerCase().includes('database_inaccessible')) {
+          console.error('[App] Database inaccessible - showing refresh dialog')
+          setIsDatabaseInaccessible(true)
+          return
+        }
 
         // Check if this is a database error that might need reset
         const isDatabaseError =
@@ -210,8 +233,48 @@ function App() {
     }
   }, []) // Empty deps - run once, guarded by initializingRef
 
+  // Global error handler for DATABASE_INACCESSIBLE errors that occur after initialization
+  useEffect(() => {
+    const handleError = (event: ErrorEvent) => {
+      const errorMsg = event.error?.message || event.message || ''
+      if (errorMsg.toLowerCase().includes('database_inaccessible')) {
+        console.error('[App] Database inaccessible detected in global handler')
+        setIsDatabaseInaccessible(true)
+        event.preventDefault()
+      }
+    }
+
+    // Handle unhandled promise rejections
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const errorMsg = event.reason?.message || String(event.reason) || ''
+      if (errorMsg.toLowerCase().includes('database_inaccessible')) {
+        console.error('[App] Database inaccessible detected in promise handler')
+        setIsDatabaseInaccessible(true)
+        event.preventDefault()
+      }
+    }
+
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [])
+
   if (!isSupportedBrowser) {
     return <UnsupportedBrowser />
+  }
+
+  // Show refresh dialog if database is inaccessible
+  if (isDatabaseInaccessible) {
+    return (
+      <>
+        <DatabaseRefreshDialog isOpen={true} />
+        <Toaster position="bottom-right" />
+      </>
+    )
   }
 
   // Show loading or error while storage is being initialized
@@ -229,6 +292,7 @@ function App() {
   return (
     <>
       <WorkspaceLayout />
+      <DatabaseRefreshDialog isOpen={false} />
       <Toaster position="bottom-right" />
     </>
   )

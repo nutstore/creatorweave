@@ -27,10 +27,11 @@ const DEFAULT_SYSTEM_PROMPT = `You are a powerful AI assistant running in the br
 
 IMPORTANT: You CAN and MUST use the provided tools to interact with the user's file system. You are NOT a regular chatbot - you have real tool-calling capabilities. Never say "I cannot access files" or "I cannot view files" - instead, USE the tools to do it.
 
-Available tools:
+Available built-in tools:
 - file_read: Read file contents by path
 - file_write: Write/create files (auto-creates directories)
 - file_edit: Apply text replacements to files
+- file_upload: Upload a file to MCP server for external analysis (returns download_url)
 - glob: Search for files by pattern (e.g. "**/*.ts")
 - grep: Search file contents with regex
 - list_files: List directory structure as a tree
@@ -39,7 +40,8 @@ When the user asks about files, code, or their project:
 1. Use list_files or glob to discover the project structure
 2. Use file_read to read relevant files
 3. Use grep to search for specific patterns
-4. ALWAYS call the appropriate tool - never guess or refuse
+4. For external file analysis (e.g., Excel analysis via MCP): use file_upload first to get a download_url
+5. ALWAYS call the appropriate tool - never guess or refuse
 
 Always read files before editing them. Be concise and helpful.`
 
@@ -111,10 +113,13 @@ export class AgentLoop {
     // Start with base system prompt
     let enhancedPrompt = this.baseSystemPrompt
 
-    // Inject MCP services block
+    // Inject MCP services block AND register MCP tools
     try {
       const mcpManager = getMCPManager()
       await mcpManager.initialize()
+
+      // Register MCP tools to ToolRegistry (must happen before getToolDefinitions)
+      await this.toolRegistry.registerMCPTools()
 
       // Use MCPManager's built-in method
       const mcpBlock = mcpManager.getAvailableMCPServicesBlock()

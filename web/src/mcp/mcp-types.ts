@@ -86,6 +86,11 @@ export interface MCPToolDefinition {
   name: string
   description?: string
   inputSchema: MCPToolInputSchema
+  /** Execution hints for the tool */
+  execution?: {
+    /** Whether this tool requires/supports task augmentation */
+    taskSupport?: 'required' | 'optional'
+  }
   /** Optional server metadata */
   _serverId?: string
 }

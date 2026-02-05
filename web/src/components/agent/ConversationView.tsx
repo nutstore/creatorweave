@@ -165,10 +165,29 @@ export function ConversationView({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      // 检测是否处于输入法状态，如果是则不发送消息
+      if (e.nativeEvent.isComposing) {
+        return
+      }
       e.preventDefault()
       handleSend()
     }
   }
+
+  // 自动调整 textarea 高度
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = inputRef.current
+    if (textarea) {
+      textarea.style.height = 'auto'
+      const newHeight = Math.min(textarea.scrollHeight, 4 * 24) // 4 行，每行约 24px
+      textarea.style.height = `${newHeight}px`
+    }
+  }, [])
+
+  // 输入时自动调整高度
+  useEffect(() => {
+    adjustTextareaHeight()
+  }, [input, adjustTextareaHeight])
 
   const status = activeConversation?.status || 'idle'
   const isProcessing = isRunning
@@ -300,8 +319,8 @@ export function ConversationView({
                 suggestedFollowUp ||
                 (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
               }
-              rows={1}
-              className="focus:border-primary-300 focus:ring-primary-300 max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
+              style={{ height: '38px', maxHeight: '96px' }}
+              className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
               disabled={isProcessing || !hasApiKey}
             />
             {isProcessing ? (

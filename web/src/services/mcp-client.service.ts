@@ -212,6 +212,15 @@ export class MCPClientService {
       _serverId: serverId,
     }))
 
+    // Log tools that support MCP Tasks
+    const taskSupportedTools = tools.filter((t) => t.execution?.taskSupport)
+    if (taskSupportedTools.length > 0) {
+      console.log(
+        `[MCPClient] Found ${taskSupportedTools.length} tools with MCP Tasks support:`,
+        taskSupportedTools.map((t) => `${t.name} (${t.execution?.taskSupport})`)
+      )
+    }
+
     // Update connection status with tools
     const status = this.connections.get(serverId)
     if (status) {
@@ -249,10 +258,174 @@ export class MCPClientService {
   // Tool Execution
   //===========================================================================
 
+  //===========================================================================
+  // MCP Tasks Support
+  //===========================================================================
+
   /**
-   * Execute a tool call on a specific server
+   * Check if a tool result contains a task ID (MCP Tasks augmentation)
+   *
+   * Handles two response formats:
+   * 1. Direct object with taskId/status
+   * 2. TextContent with JSON string containing taskId/status
    */
-  async executeTool(serverId: string, toolCall: MCPToolCallRequest): Promise<MCPToolCallResult> {
+  private isTaskResult(result: unknown): result is { taskId: string; status: string } {
+    if (typeof result !== 'object' || result === null) {
+      console.log('[MCPClient] isTaskResult: not an object or null')
+      return false
+    }
+
+    const r = result as any
+
+    // Handle FastMCP wrapping: { result: { content: [...] } }
+    // FastMCP wraps CallToolResult in an extra "result" layer
+    const actualResult = r.result || r
+
+    // Direct format: { taskId, status, ... }
+    if ('taskId' in actualResult && 'status' in actualResult) {
+      const isValid =
+        typeof actualResult.taskId === 'string' && typeof actualResult.status === 'string'
+      console.log(`[MCPClient] isTaskResult: direct format check - ${isValid}`)
+      return isValid
+    }
+
+    // TextContent format: { content: [{ type: "text", text: "{\"taskId\":\"...\",...}" }] }
+    if ('content' in actualResult && Array.isArray(actualResult.content)) {
+      const textContent = actualResult.content[0]
+      console.log('[MCPClient] isTaskResult: checking TextContent format', {
+        contentType: textContent?.type,
+      })
+      if (textContent?.type === 'text' && typeof textContent.text === 'string') {
+        try {
+          const parsed = JSON.parse(textContent.text)
+          const hasTaskFields = 'taskId' in parsed && 'status' in parsed
+          console.log(`[MCPClient] isTaskResult: TextContent parsed - ${hasTaskFields}`, parsed)
+          return hasTaskFields
+        } catch (e) {
+          console.log('[MCPClient] isTaskResult: failed to parse TextContent', e)
+          return false
+        }
+      }
+    }
+
+    console.log('[MCPClient] isTaskResult: no matching format', Object.keys(actualResult))
+    return false
+  }
+
+  /**
+   * Extract task info from a task-augmented result
+   */
+  private extractTaskInfo(result: any): { taskId: string; status: string; statusMessage?: string } {
+    // Handle FastMCP wrapping: { result: { content: [...] } }
+    const actualResult = result.result || result
+
+    // Direct format
+    if (actualResult.taskId && actualResult.status) {
+      return actualResult
+    }
+
+    // TextContent format
+    if (actualResult.content?.[0]?.type === 'text') {
+      try {
+        return JSON.parse(actualResult.content[0].text)
+      } catch {
+        throw new Error('Failed to parse task result')
+      }
+    }
+
+    throw new Error('Invalid task result format')
+  }
+
+  /**
+   * Poll for task status using the MCP Tasks /tasks/get endpoint
+   */
+  private async getTaskStatus(
+    server: MCPServerConfig,
+    taskId: string
+  ): Promise<{
+    taskId: string
+    status: string
+    statusMessage?: string
+    createdAt: string
+    lastUpdatedAt: string
+  }> {
+    const baseUrl = server.url.replace(/\/mcp?$/, '')
+
+    const response = await fetch(`${baseUrl}/tasks/get`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(server.token && { Authorization: `Bearer ${server.token}` }),
+      },
+      body: JSON.stringify({ taskId }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: Failed to get task status`)
+    }
+
+    const data = await response.json()
+
+    if (data.error) {
+      throw new Error(data.error.message || 'Failed to get task status')
+    }
+
+    return data.result
+  }
+
+  /**
+   * Get final task result using the MCP Tasks /tasks/result endpoint
+   * This blocks until the task reaches a terminal status
+   */
+  private async getTaskResult(
+    server: MCPServerConfig,
+    taskId: string,
+    onProgress?: (status: string, message?: string) => void
+  ): Promise<MCPToolCallResult> {
+    const baseUrl = server.url.replace(/\/mcp?$/, '')
+
+    // Notify we're waiting for task completion
+    onProgress?.('waiting', `Waiting for task ${taskId} to complete...`)
+
+    // Poll /tasks/result which blocks until completion
+    const response = await fetch(`${baseUrl}/tasks/result`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(server.token && { Authorization: `Bearer ${server.token}` }),
+      },
+      body: JSON.stringify({ taskId }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: Failed to get task result`)
+    }
+
+    const data = await response.json()
+
+    if (data.error) {
+      throw new Error(data.error.message || 'Task failed')
+    }
+
+    return data.result as MCPToolCallResult
+  }
+
+  /**
+   * Execute a tool with automatic MCP Tasks handling
+   *
+   * If the tool returns a taskId, this method will poll for status
+   * and return the final result automatically.
+   *
+   * @param serverId - The MCP server ID
+   * @param toolCall - The tool call request
+   * @param onProgress - Optional callback for progress updates
+   * @returns The final tool result (after task completion if applicable)
+   */
+  async executeTool(
+    serverId: string,
+    toolCall: MCPToolCallRequest,
+    onProgress?: (status: string, message?: string) => void
+  ): Promise<MCPToolCallResult> {
     const server = this.servers.get(serverId)
     if (!server) {
       throw new MCPConnectionError(serverId, `Server not found: ${serverId}`)
@@ -263,8 +436,51 @@ export class MCPClientService {
       throw new MCPConnectionError(serverId, `Server not connected: ${serverId}`)
     }
 
+    // Check if tool declares task support (from discovery)
+    const tool = status.tools?.find((t) => t.name === toolCall.name)
+    const taskSupport = tool?.execution?.taskSupport
+
+    // Auto-add task parameter for tools that support/require it
+    let finalToolCall = toolCall
+    if (taskSupport === 'required' || taskSupport === 'optional') {
+      // Wrap arguments with task parameter for MCP Tasks
+      finalToolCall = {
+        ...toolCall,
+        arguments: {
+          ...toolCall.arguments,
+          task: { ttl: 300000 }, // 5 minute timeout
+        },
+      }
+      console.log(
+        `[MCPClient] Auto-enabled task mode for ${toolCall.name} (taskSupport=${taskSupport})`
+      )
+    }
+
     try {
-      const result = await this.sendRequest<MCPToolCallResult>(server, 'tools/call', toolCall)
+      const result = await this.sendRequest<MCPToolCallResult>(server, 'tools/call', finalToolCall)
+
+      // Check if this is a task-augmented response
+      if (this.isTaskResult(result)) {
+        const taskResult = this.extractTaskInfo(result)
+
+        console.log(`[MCPClient] Task created: ${taskResult.taskId}, status: ${taskResult.status}`)
+
+        if (onProgress) {
+          onProgress(taskResult.status, taskResult.statusMessage)
+        }
+
+        // Wait for task completion and get final result
+        const finalResult = await this.getTaskResult(server, taskResult.taskId, onProgress)
+
+        this.emit({
+          type: 'tool:executed',
+          serverId,
+          data: { toolName: toolCall.name, result: finalResult, taskId: taskResult.taskId },
+          timestamp: Date.now(),
+        })
+
+        return finalResult
+      }
 
       this.emit({
         type: 'tool:executed',
@@ -278,6 +494,87 @@ export class MCPClientService {
       const errorMessage = error instanceof Error ? error.message : String(error)
       throw new MCPToolExecutionError(serverId, toolCall.name, errorMessage)
     }
+  }
+
+  /**
+   * Execute a tool and return immediately with taskId if it's a long-running task
+   *
+   * This is the "fire and forget" mode - useful when you want to start
+   * a task and poll for status separately.
+   *
+   * @param serverId - The MCP server ID
+   * @param toolCall - The tool call request
+   * @returns The tool result (may contain taskId)
+   */
+  async executeToolAsync(
+    serverId: string,
+    toolCall: MCPToolCallRequest
+  ): Promise<{ result: MCPToolCallResult; taskId?: string }> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new MCPConnectionError(serverId, `Server not found: ${serverId}`)
+    }
+
+    const status = this.connections.get(serverId)
+    if (status?.state !== 'connected') {
+      throw new MCPConnectionError(serverId, `Server not connected: ${serverId}`)
+    }
+
+    const result = await this.sendRequest<MCPToolCallResult>(server, 'tools/call', toolCall)
+
+    // Check if this is a task-augmented response
+    if (this.isTaskResult(result)) {
+      const taskResult = this.extractTaskInfo(result)
+      return { result, taskId: taskResult.taskId }
+    }
+
+    return { result }
+  }
+
+  /**
+   * Poll for task status (for async tool execution)
+   *
+   * @param serverId - The MCP server ID
+   * @param taskId - The task ID to poll
+   * @returns Current task status
+   */
+  async pollTaskStatus(
+    serverId: string,
+    taskId: string
+  ): Promise<{
+    taskId: string
+    status: string
+    statusMessage?: string
+    createdAt: string
+    lastUpdatedAt: string
+  }> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new MCPConnectionError(serverId, `Server not found: ${serverId}`)
+    }
+
+    return this.getTaskStatus(server, taskId)
+  }
+
+  /**
+   * Get the final result of a completed task
+   *
+   * @param serverId - The MCP server ID
+   * @param taskId - The task ID
+   * @param onProgress - Optional callback for progress updates during polling
+   * @returns The final tool result
+   */
+  async getTaskResultById(
+    serverId: string,
+    taskId: string,
+    onProgress?: (status: string, message?: string) => void
+  ): Promise<MCPToolCallResult> {
+    const server = this.servers.get(serverId)
+    if (!server) {
+      throw new MCPConnectionError(serverId, `Server not found: ${serverId}`)
+    }
+
+    return this.getTaskResult(server, taskId, onProgress)
   }
 
   /**
@@ -400,6 +697,10 @@ export class MCPClientService {
       }
 
       console.log(`[MCPClient] ← ${server.id} ${method}:`, data.result)
+      // Log the full response for debugging task detection
+      if (method === 'tools/call') {
+        console.log('[MCPClient] Full tools/call response:', JSON.stringify(data, null, 2))
+      }
 
       return data.result as T
     } catch (error) {

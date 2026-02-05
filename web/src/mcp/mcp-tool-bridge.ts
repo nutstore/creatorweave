@@ -72,13 +72,24 @@ export function mcpToolToToolDefinition(
 
 /**
  * Create a ToolExecutor for an MCP tool
+ *
+ * Supports MCP Tasks - automatically handles long-running operations
+ * and returns the final result.
  */
 export function createMCPToolExecutor(serverId: string, toolName: string): ToolExecutor {
   return async (args: Record<string, unknown>, _context: ToolContext): Promise<string> => {
     const manager = getMCPManager()
 
+    // Optional progress callback for MCP Tasks
+    const onProgress = (status: string, message?: string) => {
+      // Log progress updates
+      console.log(
+        `[MCPToolExecutor] ${serverId}:${toolName} - ${status}${message ? ': ' + message : ''}`
+      )
+    }
+
     try {
-      const result = await manager.executeTool(serverId, toolName, args)
+      const result = await manager.executeTool(serverId, toolName, args, onProgress)
 
       // Format the result for the LLM
       if (typeof result === 'string') {
@@ -132,24 +143,27 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 /**
  * Register all tools from an MCP server to the ToolRegistry
  */
-export function registerServerTools(
+export async function registerServerTools(
   serverId: string,
   tools: MCPToolDefinition[],
   serverConfig?: MCPServerConfig,
   registry?: { register(definition: ToolDefinition, executor: ToolExecutor): void }
-): void {
+): Promise<void> {
   // Lazy import to avoid circular dependency
   const reg =
     registry ||
-    (() => {
-      const { getToolRegistry } = require('../agent/tool-registry')
+    (async () => {
+      const { getToolRegistry } = await import('../agent/tool-registry')
       return getToolRegistry()
     })()
+
+  // Await the registry if it's a promise
+  const resolvedReg = await reg
 
   for (const tool of tools) {
     const definition = mcpToolToToolDefinition(serverId, tool, serverConfig)
     const executor = createMCPToolExecutor(serverId, tool.name)
-    reg.register(definition, executor)
+    resolvedReg.register(definition, executor)
 
     console.log(`[MCPToolBridge] Registered tool: ${definition.function.name}`)
   }
@@ -158,22 +172,25 @@ export function registerServerTools(
 /**
  * Unregister all tools from an MCP server
  */
-export function unregisterServerTools(
+export async function unregisterServerTools(
   serverId: string,
   toolNames: string[],
   registry?: { unregister(name: string): boolean }
-): void {
+): Promise<void> {
   // Lazy import to avoid circular dependency
   const reg =
     registry ||
-    (() => {
-      const { getToolRegistry } = require('../agent/tool-registry')
+    (async () => {
+      const { getToolRegistry } = await import('../agent/tool-registry')
       return getToolRegistry()
     })()
 
+  // Await the registry if it's a promise
+  const resolvedReg = await reg
+
   for (const toolName of toolNames) {
     const fullToolName = `${serverId}:${toolName}`
-    reg.unregister(fullToolName)
+    resolvedReg.unregister(fullToolName)
     console.log(`[MCPToolBridge] Unregistered tool: ${fullToolName}`)
   }
 }
@@ -186,41 +203,83 @@ export function unregisterServerTools(
  * Register all available MCP tools from the MCPManager to the ToolRegistry
  *
  * This function:
- * 1. Gets all connected servers from MCPManager
- * 2. Discovers tools from each server (or uses cached tools)
- * 3. Registers each tool with the ToolRegistry
+ * 1. Initializes MCP manager
+ * 2. Connects to all enabled MCP servers
+ * 3. Discovers tools from each server
+ * 4. Registers each tool with the ToolRegistry
  */
 export async function registerAllMCPTools(registry?: {
   register(definition: ToolDefinition, executor: ToolExecutor): void
 }): Promise<number> {
   const manager = getMCPManager()
 
-  // Get all connected servers with their tools
-  const allTools = manager.getAllTools()
-  const allServers = manager.getAllServers()
+  // Initialize manager (loads servers from storage)
+  await manager.initialize()
+
+  // Get all enabled servers
+  const enabledServers = manager.getEnabledServers()
+  console.log(
+    `[MCPToolBridge] Found ${enabledServers.length} enabled servers`,
+    enabledServers.map((s) => ({ id: s.id, name: s.name, url: s.url }))
+  )
 
   let totalRegistered = 0
 
-  for (const [serverId, tools] of allTools) {
-    const serverConfig = allServers.find((s) => s.id === serverId)
+  for (const server of enabledServers) {
+    try {
+      console.log(`[MCPToolBridge] Connecting to ${server.id} at ${server.url}...`)
 
-    // Register each tool
-    for (const tool of tools) {
-      const definition = mcpToolToToolDefinition(serverId, tool, serverConfig)
-      const executor = createMCPToolExecutor(serverId, tool.name)
+      // Connect to server (this also auto-discovers tools)
+      await manager.connect(server.id)
 
-      if (registry) {
-        registry.register(definition, executor)
-      } else {
-        const { getToolRegistry } = require('../agent/tool-registry')
-        getToolRegistry().register(definition, executor)
+      // Get the discovered tools
+      const status = manager.getConnectionStatus(server.id)
+      const tools = status?.tools
+
+      console.log(`[MCPToolBridge] Connection status for ${server.id}:`, {
+        state: status?.state,
+        toolsCount: tools?.length || 0,
+        toolNames: tools?.map((t) => t.name) || [],
+      })
+
+      if (!tools || tools.length === 0) {
+        console.warn(`[MCPToolBridge] No tools discovered for ${server.id}`)
+        continue
       }
 
-      totalRegistered++
+      // Get the ToolRegistry instance
+      const { getToolRegistry } = await import('../agent/tool-registry')
+      const toolReg = registry || getToolRegistry()
+
+      // Register each tool
+      for (const tool of tools) {
+        const toolName = `${server.id}:${tool.name}`
+        const definition = mcpToolToToolDefinition(server.id, tool, server)
+        const executor = createMCPToolExecutor(server.id, tool.name)
+
+        toolReg.register(definition, executor)
+        totalRegistered++
+
+        console.log(`[MCPToolBridge] ✓ Registered tool: ${toolName}`)
+      }
+
+      console.log(`[MCPToolBridge] Registered ${tools.length} tools from ${server.id}`)
+    } catch (error) {
+      console.error(`[MCPToolBridge] Failed to register tools from ${server.id}:`, error)
+      // Continue with other servers even if one fails
     }
   }
 
-  console.log(`[MCPToolBridge] Registered ${totalRegistered} MCP tools`)
+  console.log(`[MCPToolBridge] Registered ${totalRegistered} MCP tools total`)
+
+  // Verify registration
+  const { getToolRegistry } = await import('../agent/tool-registry')
+  const allTools = getToolRegistry().getToolDefinitions()
+  const mcpTools = allTools.filter((t) => t.function.name.includes(':'))
+  console.log(
+    `[MCPToolBridge] ToolRegistry now has ${mcpTools.length} MCP tools:`,
+    mcpTools.map((t) => t.function.name)
+  )
 
   return totalRegistered
 }
@@ -228,7 +287,9 @@ export async function registerAllMCPTools(registry?: {
 /**
  * Unregister all MCP tools from the ToolRegistry
  */
-export function unregisterAllMCPTools(registry?: { unregister(name: string): boolean }): number {
+export async function unregisterAllMCPTools(registry?: {
+  unregister(name: string): boolean
+}): Promise<number> {
   const manager = getMCPManager()
   const allTools = manager.getAllTools()
 
@@ -241,7 +302,7 @@ export function unregisterAllMCPTools(registry?: { unregister(name: string): boo
       if (registry) {
         registry.unregister(fullToolName)
       } else {
-        const { getToolRegistry } = require('../agent/tool-registry')
+        const { getToolRegistry } = await import('../agent/tool-registry')
         getToolRegistry().unregister(fullToolName)
       }
 
@@ -284,12 +345,8 @@ export async function syncMCPTools(registry?: {
   // We track this by checking for tools with the ":" separator (our naming convention)
   const currentToolNames = new Set<string>()
 
-  const reg =
-    registry ||
-    (() => {
-      const { getToolRegistry } = require('../agent/tool-registry')
-      return getToolRegistry()
-    })()
+  const { getToolRegistry } = await import('../agent/tool-registry')
+  const reg = registry || getToolRegistry()
 
   for (const definition of reg.getToolDefinitions?.() || []) {
     const name = definition.function.name
