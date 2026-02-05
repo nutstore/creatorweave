@@ -90,7 +90,7 @@ export async function runPendingMigrations(
   // Report initial progress
   onProgress?.({
     step: 'migration',
-    details: `数据库升级 (${currentVersion} → ${pendingMigrations[pendingMigrations.length - 1].version})`,
+    details: `Database upgrade (${currentVersion} → ${pendingMigrations[pendingMigrations.length - 1].version})`,
     current: 0,
     total: pendingMigrations.length,
   })
@@ -103,7 +103,7 @@ export async function runPendingMigrations(
       // Report progress for each migration
       onProgress?.({
         step: 'migration',
-        details: `执行迁移 v${migration.version}: ${migration.name}`,
+        details: `Running migration v${migration.version}: ${migration.name}`,
         current: executed + 1,
         total: pendingMigrations.length,
       })
@@ -123,7 +123,7 @@ export async function runPendingMigrations(
       console.error(`[SQLite Migration] Failed v${migration.version}:`, error)
       onProgress?.({
         step: 'error',
-        details: `迁移失败: v${migration.version} - ${error}`,
+        details: `Migration failed: v${migration.version} - ${error}`,
         current: executed,
         total: pendingMigrations.length,
       })
@@ -136,7 +136,7 @@ export async function runPendingMigrations(
   // Report completion
   onProgress?.({
     step: 'migration',
-    details: `数据库升级完成 (v${finalVersion})`,
+    details: `Database upgrade complete (v${finalVersion})`,
     current: pendingMigrations.length,
     total: pendingMigrations.length,
   })
@@ -157,7 +157,7 @@ export async function initializeSchema(
   // Report schema initialization start
   onProgress?.({
     step: 'init',
-    details: '初始化数据库结构...',
+    details: 'Initializing database schema...',
     current: 0,
     total: 1,
   })
@@ -172,7 +172,7 @@ export async function initializeSchema(
   // Report completion
   onProgress?.({
     step: 'complete',
-    details: '数据库就绪',
+    details: 'Database ready',
     current: 1,
     total: 1,
   })
