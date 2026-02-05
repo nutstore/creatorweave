@@ -14,7 +14,7 @@
  */
 
 // Core database manager
-export { SQLiteDatabaseManager, getSQLiteDB, initSQLiteDB } from './sqlite-database'
+export { SQLiteDatabaseManager, getSQLiteDB, initSQLiteDB, resetSQLiteDB } from './sqlite-database'
 export type {
   ConversationRow,
   SkillRow,

@@ -14,12 +14,27 @@ function App() {
   const [isSupportedBrowser, setIsSupportedBrowser] = useState(true)
   const [isStorageReady, setIsStorageReady] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined)
+  const [storageError, setStorageError] = useState<string | null>(null)
+  const [canResetDatabase, setCanResetDatabase] = useState(false)
   const restoreDirectoryHandle = useAgentStore((s) => s.restoreDirectoryHandle)
   const initializeSessions = useSessionStore((s) => s.initialize)
   const t = useT() // i18n hook
 
   // StrictMode guard - track if async init has already completed
   const initCompleteRef = useRef(false)
+
+  /**
+   * Handle database reset - deletes the database and reloads the page
+   */
+  async function handleResetDatabase() {
+    try {
+      const { resetSQLiteDB } = await import('@/sqlite')
+      await resetSQLiteDB()
+    } catch (error) {
+      console.error('[App] Failed to reset database:', error)
+      toast.error('重置数据库失败，请手动刷新页面')
+    }
+  }
 
   useEffect(() => {
     // Skip if already completed (from previous StrictMode render)
@@ -66,7 +81,22 @@ function App() {
                 break
               case 'warning':
               case 'error':
-                // Keep the details from progress
+                // Check if this is a database corruption error that needs reset
+                if (progress.step === 'error' && progress.details) {
+                  const details = progress.details.toLowerCase()
+                  const isCorruption =
+                    details.includes('corrupt') ||
+                    details.includes('malformed') ||
+                    details.includes('cantopen') ||
+                    details.includes('database')
+
+                  if (isCorruption) {
+                    setStorageError(progress.details)
+                    setCanResetDatabase(true)
+                  } else {
+                    setStorageError(progress.details)
+                  }
+                }
                 break
             }
           },
@@ -93,17 +123,48 @@ function App() {
         } else {
           // Storage initialization failed completely
           const errorMsg = result.error || t('app.initFailed')
-          toast.error(errorMsg, { id: 'storage-init', duration: 10000 })
 
-          // Still allow app to run - user can see what's wrong
+          // Check if this is a database error that might need reset
+          const isDatabaseError =
+            errorMsg.toLowerCase().includes('database') ||
+            errorMsg.toLowerCase().includes('sqlite') ||
+            errorMsg.toLowerCase().includes('corrupt')
+
+          if (isDatabaseError) {
+            setStorageError(errorMsg)
+            setCanResetDatabase(true)
+          } else {
+            setStorageError(errorMsg)
+          }
+
+          toast.error(errorMsg, { id: 'storage-init', duration: 10000 })
           console.error('[App] Storage initialization failed:', errorMsg)
+
+          // Don't proceed with initialization on storage failure
+          return
         }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         console.error('[App] Failed to initialize storage:', error)
 
-        // Even on catastrophic failure, allow app to run
+        // Check if this is a database error that might need reset
+        const isDatabaseError =
+          errorMsg.toLowerCase().includes('database') ||
+          errorMsg.toLowerCase().includes('sqlite') ||
+          errorMsg.toLowerCase().includes('corrupt') ||
+          errorMsg.toLowerCase().includes('migration failed')
+
+        if (isDatabaseError) {
+          setStorageError(errorMsg)
+          setCanResetDatabase(true)
+        } else {
+          setStorageError(errorMsg)
+        }
+
         toast.error(`存储初始化错误: ${errorMsg}`, { id: 'storage-init' })
+
+        // Don't proceed with initialization on storage failure
+        return
       }
 
       // Set up auto-save on page unload
@@ -153,9 +214,16 @@ function App() {
     return <UnsupportedBrowser />
   }
 
-  // Show loading while storage is being initialized
+  // Show loading or error while storage is being initialized
   if (!isStorageReady) {
-    return <StorageLoading progress={loadingProgress} />
+    return (
+      <StorageLoading
+        progress={loadingProgress}
+        error={storageError}
+        canReset={canResetDatabase}
+        onReset={handleResetDatabase}
+      />
+    )
   }
 
   return (

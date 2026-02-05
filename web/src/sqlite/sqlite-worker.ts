@@ -6,12 +6,13 @@
  */
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
+import { initializeSchema } from './migrations/index'
 
 const DB_NAME = '/bfosa-unified.sqlite'
 
 // Worker message types
 export type WorkerRequest =
-  | { type: 'init'; schemaSQL: string; id?: string }
+  | { type: 'init'; schemaSQL?: string; id?: string; reportProgress?: boolean }
   | { type: 'queryAll'; sql: string; params: unknown[]; id: string }
   | { type: 'queryFirst'; sql: string; params: unknown[]; id: string }
   | { type: 'execute'; sql: string; params: unknown[]; id: string }
@@ -20,7 +21,7 @@ export type WorkerRequest =
   | { type: 'rollback'; id: string }
   | { type: 'close'; id: string }
   | { type: 'getMode'; id: string }
-  | { type: 'recover'; schemaSQL: string; id: string }
+  | { type: 'recover'; id: string }
 
 // Worker response types (used for type safety in message handling)
 export type WorkerResponse =
@@ -34,11 +35,11 @@ export type WorkerResponse =
   | { type: 'close'; id: string; error?: string }
   | { type: 'getMode'; id: string; mode: 'opfs' | 'memory'; error?: string }
   | { type: 'recover'; id: string; success: boolean; error?: string }
+  | { type: 'migrationProgress'; step: string; details: string; current: number; total: number }
 
 let sqlite3: any = null
 let db: any = null
 let dbMode: 'opfs' | 'memory' = 'memory'
-let savedSchemaSQL: string = '' // Store schema for recovery
 
 // Handle messages from main thread
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
@@ -48,8 +49,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     switch (type) {
       case 'init':
-        savedSchemaSQL = e.data.schemaSQL
-        await handleInit(e.data.schemaSQL)
+        // schemaSQL parameter is ignored - we use the migration system instead
+        await handleInit(e.data.reportProgress, id)
         postMessage({ type: 'init', id, success: true, mode: dbMode })
         break
 
@@ -112,9 +113,11 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
  * Recover from database errors by attempting reconnection first
  * This is called when SQLITE_CANTOPEN or GetSyncHandleError errors occur
  *
- * Recovery strategy (in order of preference):
+ * IMPORTANT: This will NEVER delete an existing database to prevent data loss.
+ * Recovery strategy:
  * 1. Try to reconnect to existing database (handles stale file handles)
- * 2. Only if reconnection fails, delete and recreate
+ * 2. If reconnection fails with "not found", create new database
+ * 3. If database exists but is corrupted, throw error (don't auto-delete user data)
  */
 async function handleRecover() {
   console.warn('[SQLite Worker] Attempting database recovery...')
@@ -137,34 +140,72 @@ async function handleRecover() {
       db = new sqlite3.oo1.OpfsDb(DB_NAME)
       dbMode = 'opfs'
       console.log('[SQLite Worker] Successfully reconnected to existing database - no data loss')
+
+      // Run migrations after reconnection to ensure schema is up-to-date
+      try {
+        await initializeSchema(db)
+        console.log('[SQLite Worker] Schema migrations completed after reconnection')
+      } catch (schemaError) {
+        console.warn('[SQLite Worker] Schema migration warning after reconnection:', schemaError)
+        // Continue - reconnection succeeded, migrations are idempotent
+      }
+
       return
     } catch (reconnectError) {
       const errorMsg =
         reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
       console.warn('[SQLite Worker] Reconnection failed:', errorMsg)
-      // Only proceed to deletion if reconnection truly fails
+
+      // Check error type to determine safe action
+      const isCorrupted = errorMsg.includes('malformed') || errorMsg.includes('corruption')
+      const isNotFound =
+        errorMsg.includes('unable to open') ||
+        errorMsg.includes('CANTOPEN') ||
+        errorMsg.includes('no such file')
+
+      if (isCorrupted) {
+        // Database exists but is corrupted - DON'T auto-delete
+        console.error(
+          '[SQLite Worker] Database exists but appears corrupted. Auto-recovery disabled to prevent data loss.'
+        )
+        throw new Error(
+          'Database corrupted. Please reset manually using window.__resetSQLiteDB() if needed.'
+        )
+      }
+
+      if (!isNotFound) {
+        // Unknown error - don't risk deleting
+        console.error('[SQLite Worker] Unknown database error:', errorMsg)
+        throw reconnectError
+      }
+
+      // Database doesn't exist - safe to create new one
+      console.log('[SQLite Worker] Database does not exist, creating new one...')
     }
   }
 
-  // Step 2: Only delete if reconnection failed
-  // This indicates actual database corruption, not just a stale handle
-  console.warn('[SQLite Worker] Database appears corrupted, will delete and recreate')
+  // Step 2: Create new database (only reached if database didn't exist)
+  // First initialize SQLite module and create connection
+  // @ts-ignore - sqlite3InitModule types are incomplete
+  sqlite3 = await sqlite3InitModule({
+    print: (msg: string) => console.log('[SQLite Worker]', msg),
+    printErr: (msg: string) => console.error('[SQLite Worker]', msg),
+  })
 
-  try {
-    if (sqlite3 && sqlite3.opfs && sqlite3.opfs.deleteDatabase) {
-      await sqlite3.opfs.deleteDatabase(DB_NAME)
-      console.log('[SQLite Worker] Old database deleted')
-    }
-  } catch (e) {
-    console.warn('[SQLite Worker] Could not delete old database:', e)
+  if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs) {
+    db = new sqlite3.oo1.OpfsDb(DB_NAME)
+    dbMode = 'opfs'
+  } else {
+    db = new sqlite3!.oo1.DB(':memory:', 'ct')
+    dbMode = 'memory'
   }
 
-  // Step 3: Recreate database from scratch
-  await handleInit(savedSchemaSQL)
-  console.log('[SQLite Worker] Database recovered (recreated)')
+  // Then run migrations on the new database
+  await initializeSchema(db)
+  console.log('[SQLite Worker] New database created with migrations')
 }
 
-async function handleInit(schemaSQL: string) {
+async function handleInit(reportProgress = false, _id: string = 'init') {
   // Wait for crossOriginIsolated to be true before initializing SQLite
   if (!self.crossOriginIsolated) {
     const maxWait = 5000 // 5 seconds max
@@ -202,8 +243,33 @@ async function handleInit(schemaSQL: string) {
     dbMode = 'memory'
   }
 
-  // Initialize schema
-  db.exec(schemaSQL)
+  // Initialize schema using the migration system
+  // This will:
+  // 1. Execute base schema (CREATE TABLE IF NOT EXISTS)
+  // 2. Run any pending migrations in order
+  console.log('[SQLite Worker] Initializing database with migration system...')
+  try {
+    await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
+    console.log('[SQLite Worker] Database initialization complete')
+  } catch (error) {
+    console.error('[SQLite Worker] Database initialization failed:', error)
+    throw error
+  }
+}
+
+/**
+ * Create a progress reporter function that sends messages back to main thread
+ */
+function createProgressReporter() {
+  return (progress: { step: string; details: string; current: number; total: number }) => {
+    postMessage({
+      type: 'migrationProgress',
+      step: progress.step,
+      details: progress.details,
+      current: progress.current,
+      total: progress.total,
+    } as WorkerResponse)
+  }
 }
 
 function handleQueryAll(sql: string, params: unknown[]): unknown[] {
@@ -223,7 +289,7 @@ function handleQueryAll(sql: string, params: unknown[]): unknown[] {
     console.error('[SQLite Worker] Database connection check failed:', e)
 
     // Try to reconnect before failing
-    if (sqlite3 && sqlite3.opfs && savedSchemaSQL) {
+    if (sqlite3 && sqlite3.opfs) {
       try {
         console.log('[SQLite Worker] Attempting automatic reconnection...')
         db = new sqlite3.oo1.OpfsDb(DB_NAME)
@@ -279,7 +345,7 @@ function handleExecute(sql: string, params: unknown[]): void {
     console.error('[SQLite Worker] Database connection check failed:', e)
 
     // Try to reconnect before failing
-    if (sqlite3 && sqlite3.opfs && savedSchemaSQL) {
+    if (sqlite3 && sqlite3.opfs) {
       try {
         console.log('[SQLite Worker] Attempting automatic reconnection...')
         db = new sqlite3.oo1.OpfsDb(DB_NAME)

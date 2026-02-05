@@ -132,7 +132,8 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
   storageInitPromise = (async () => {
     try {
       // Initialize SQLite (worker will determine actual OPFS availability)
-      await initSQLiteDB()
+      // Pass migration progress callback to receive database migration updates
+      await initSQLiteDB(onProgress)
 
       // Update mode based on actual worker state
       // The worker will use OpfsDb if available, or in-memory DB as fallback

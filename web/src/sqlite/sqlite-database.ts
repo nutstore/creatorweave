@@ -16,7 +16,6 @@
  * @see https://github.com/sqlite/sqlite-wasm
  */
 
-import schemaSQL from './sqlite-schema.sql?raw'
 import type { WorkerRequest, WorkerResponse } from './sqlite-worker'
 
 //=============================================================================
@@ -139,14 +138,26 @@ class SQLiteWorkerClient {
   private requestId = 0
   private initializing = false // Guard for StrictMode double init
   private dbMode: 'opfs' | 'memory' | null = null
-  private schemaSQL: string = '' // Store schema for recovery
   private recovering = false // Recovery in progress flag
   private recoveryCount = 0 // Track number of recovery attempts for diagnostics
   private lastRecoveryTime = 0 // Track when last recovery occurred
   private readonly RECOVERY_COOLDOWN = 5000 // Minimum 5 seconds between recoveries
   private readonly MAX_RECOVERIES_PER_HOUR = 5 // Prevent excessive recovery attempts
+  private onMigrationProgress?: (progress: {
+    step: string
+    details: string
+    current: number
+    total: number
+  }) => void
 
-  async initialize(): Promise<void> {
+  async initialize(
+    onMigrationProgress?: (progress: {
+      step: string
+      details: string
+      current: number
+      total: number
+    }) => void
+  ): Promise<void> {
     if (this.initialized) return
     if (this.initPromise) return this.initPromise
     if (this.initializing) {
@@ -185,6 +196,20 @@ class SQLiteWorkerClient {
         // Set up message handler
         this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
           const response = e.data
+
+          // Handle migration progress messages (not tied to a specific request)
+          if (response.type === 'migrationProgress') {
+            const progress = response as {
+              type: 'migrationProgress'
+              step: string
+              details: string
+              current: number
+              total: number
+            }
+            this.onMigrationProgress?.(progress)
+            return
+          }
+
           const pending = this.pendingRequests.get(response.id)
 
           if (pending) {
@@ -261,11 +286,15 @@ class SQLiteWorkerClient {
           error.preventDefault()
         }
 
-        // Store schema for recovery
-        this.schemaSQL = schemaSQL
+        // Store migration progress callback
+        this.onMigrationProgress = onMigrationProgress
 
         // Initialize the worker with extended timeout
-        await this.sendRequest<unknown>({ type: 'init', schemaSQL }, 120000) // 2 minutes
+        // Note: schemaSQL is no longer passed - migration system imports it directly
+        await this.sendRequest<unknown>(
+          { type: 'init', reportProgress: !!onMigrationProgress },
+          120000
+        ) // 2 minutes
 
         this.initialized = true
         this.initializing = false
@@ -409,9 +438,9 @@ class SQLiteWorkerClient {
     try {
       // Send recover request to worker
       // Note: Worker now tries reconnection first before deleting database
+      // The migration system handles schema initialization
       await this.sendRequest<void>({
         type: 'recover',
-        schemaSQL: this.schemaSQL,
         id: `recover-${Date.now()}`,
       })
       console.log('[SQLite] Database recovery completed')
@@ -472,7 +501,14 @@ class SQLiteDatabaseManager {
     return SQLiteDatabaseManager.instance
   }
 
-  async initialize(): Promise<void> {
+  async initialize(
+    onMigrationProgress?: (progress: {
+      step: string
+      details: string
+      current: number
+      total: number
+    }) => void
+  ): Promise<void> {
     if (this.initialized) return
     if (this.initPromise) return this.initPromise
     if (this.initializing) {
@@ -490,7 +526,7 @@ class SQLiteDatabaseManager {
         if (!this.workerClient) {
           this.workerClient = new SQLiteWorkerClient()
         }
-        await this.workerClient.initialize()
+        await this.workerClient.initialize(onMigrationProgress)
         this.initialized = true
         this.initializing = false
       } catch (error) {
@@ -632,8 +668,15 @@ export function getSQLiteDB(): SQLiteDatabaseManager {
 /**
  * Initialize SQLite database
  */
-export async function initSQLiteDB(): Promise<void> {
-  return getSQLiteDB().initialize()
+export async function initSQLiteDB(
+  onMigrationProgress?: (progress: {
+    step: string
+    details: string
+    current: number
+    total: number
+  }) => void
+): Promise<void> {
+  return getSQLiteDB().initialize(onMigrationProgress)
 }
 
 /**
