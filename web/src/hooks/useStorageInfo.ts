@@ -7,8 +7,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useSessionStore } from '@/store/session.store'
-import type { SessionWithStats } from '@/store/session.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
+import type { WorkspaceWithStats } from '@/store/workspace.store'
 import { getSessionRepository } from '@/sqlite'
 import type { Session } from '@/sqlite/repositories/session.repository'
 import { getSessionManager } from '@/opfs/session'
@@ -21,10 +21,10 @@ import {
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
 
 /** Session storage information */
-export interface SessionStorageInfo {
-  /** Session ID */
+export interface WorkspaceStorageInfo {
+  /** Workspace ID */
   id: string
-  /** Session name */
+  /** Workspace name */
   name: string
   /** Cache size in bytes */
   cacheSize: number
@@ -79,8 +79,8 @@ export type CleanupScope = 'old' | 'all'
 export interface UseStorageInfoResult {
   /** Storage information */
   storage: StorageInfo | null
-  /** Per-session storage breakdown */
-  sessions: SessionStorageInfo[]
+  /** Per-workspace storage breakdown */
+  sessions: WorkspaceStorageInfo[]
   /** Loading state */
   loading: boolean
   /** Error message */
@@ -98,9 +98,9 @@ export interface UseStorageInfoResult {
 }
 
 /**
- * Convert Session from SQLite to SessionWithStats format
+ * Convert Session from SQLite to WorkspaceWithStats format
  */
-function sqliteSessionToWithStats(session: Session): SessionWithStats {
+function sqliteSessionToWithStats(session: Session): WorkspaceWithStats {
   return {
     id: session.id,
     name: session.name,
@@ -119,30 +119,30 @@ function sqliteSessionToWithStats(session: Session): SessionWithStats {
  * Uses SQLite for session metadata, OPFS utilities for storage quota
  */
 export function useStorageInfo(): UseStorageInfoResult {
-  // Use selector to only subscribe to sessions, not entire store
-  const sessions = useSessionStore((state) => state.sessions)
+  // Use selector to only subscribe to workspaces, not entire store
+  const workspaces = useWorkspaceStore((state) => state.workspaces)
   const [storage, setStorage] = useState<StorageInfo | null>(null)
-  const [sessionStorageList, setSessionStorageList] = useState<SessionStorageInfo[]>([])
+  const [sessionStorageList, setSessionStorageList] = useState<WorkspaceStorageInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Use refs to store latest values without causing re-renders
-  const sessionsRef = useRef<SessionWithStats[]>(sessions)
+  const sessionsRef = useRef<WorkspaceWithStats[]>(workspaces)
   const sessionIdsRef = useRef<string>('')
   const hasLoadedRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const prevSessionCountRef = useRef(0)
-  const sessionCount = sessions.length
+  const sessionCount = workspaces.length
 
   // Keep sessionsRef updated
   useEffect(() => {
-    sessionsRef.current = sessions
-  }, [sessions])
+    sessionsRef.current = workspaces
+  }, [workspaces])
 
   /**
-   * Load sessions from SQLite (fallback to OPFS if needed)
+   * Load workspaces from SQLite (fallback to OPFS if needed)
    */
-  const loadSessionsFromSQLite = async (): Promise<SessionWithStats[]> => {
+  const loadSessionsFromSQLite = async (): Promise<WorkspaceWithStats[]> => {
     try {
       const repo = getSessionRepository()
       const sqliteSessions = await repo.findAllSessions()
@@ -163,26 +163,26 @@ export function useStorageInfo(): UseStorageInfoResult {
   }
 
   /**
-   * Calculate session sizes using OPFS directory traversal
+   * Calculate workspace sizes using OPFS directory traversal
    * This is still needed because file content is stored in OPFS
    */
   const calculateSessionSizes = async (
-    sessionsList: SessionWithStats[],
+    sessionsList: WorkspaceWithStats[],
     signal: AbortSignal
-  ): Promise<SessionStorageInfo[]> => {
+  ): Promise<WorkspaceStorageInfo[]> => {
     const manager = await getSessionManager()
-    const results: Map<string, SessionStorageInfo> = new Map()
+    const results: Map<string, WorkspaceStorageInfo> = new Map()
 
     // Initialize results with SQLite data (fast)
-    for (const session of sessionsList) {
-      results.set(session.id, {
-        id: session.id,
-        name: session.name,
-        cacheSize: session.cacheSize || 0,
-        cacheSizeFormatted: session.cacheSize ? formatBytes(session.cacheSize) : '计算中...',
-        pendingCount: session.pendingCount,
-        undoCount: session.undoCount,
-        lastActiveAt: session.lastActiveAt || 0,
+    for (const workspace of sessionsList) {
+      results.set(workspace.id, {
+        id: workspace.id,
+        name: workspace.name,
+        cacheSize: workspace.cacheSize || 0,
+        cacheSizeFormatted: workspace.cacheSize ? formatBytes(workspace.cacheSize) : '计算中...',
+        pendingCount: workspace.pendingCount,
+        undoCount: workspace.undoCount,
+        lastActiveAt: workspace.lastActiveAt || 0,
       })
     }
 
@@ -217,7 +217,7 @@ export function useStorageInfo(): UseStorageInfoResult {
             }
           }
 
-          const info: SessionStorageInfo = {
+          const info: WorkspaceStorageInfo = {
             id: session.id,
             name: session.name,
             cacheSize,
@@ -274,9 +274,9 @@ export function useStorageInfo(): UseStorageInfoResult {
         })
       }
 
-      // Load sessions from SQLite (or fallback to store)
+      // Load workspaces from SQLite (or fallback to store)
       const sessionsList = await loadSessionsFromSQLite()
-      let sessionInfo: SessionStorageInfo[]
+      let sessionInfo: WorkspaceStorageInfo[]
 
       if (includeSessionSizes) {
         // Calculate actual OPFS sizes in batches
@@ -309,10 +309,10 @@ export function useStorageInfo(): UseStorageInfoResult {
     }
   }, [])
 
-  // Single useEffect for mount and session count changes
+  // Single useEffect for mount and workspace count changes
   useEffect(() => {
-    const currentSessionIds = sessions
-      .map((s) => s.id)
+    const currentSessionIds = workspaces
+      .map((w) => w.id)
       .sort()
       .join(',')
 
@@ -430,7 +430,9 @@ export function useStorageInfo(): UseStorageInfoResult {
         hasUnsavedChanges: totalPending > 0,
         sessionNames,
       }
-    }, [])
+    },
+    []
+  )
 
   /**
    * Execute cleanup with specified scope

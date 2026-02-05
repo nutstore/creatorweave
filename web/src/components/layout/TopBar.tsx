@@ -18,7 +18,7 @@ import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
-import { SessionBadgeWithStorage } from '@/components/session'
+import { ConversationStorageBadge } from '@/components/session'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { FolderSelector } from './FolderSelector'
 import { useT } from '@/i18n'
@@ -64,8 +64,8 @@ export function TopBar({ onSkillsManagerOpen }: TopBarProps) {
             <RemoteBadge />
           </RemoteBadgeErrorBoundary>
 
-          {/* Session - OPFS session status with storage dropdown */}
-          <SessionBadgeWithStorage compact />
+          {/* Conversation Storage - OPFS workspace status with storage dropdown */}
+          <ConversationStorageBadge compact />
 
           {/* Language Switcher */}
           <LanguageSwitcher />

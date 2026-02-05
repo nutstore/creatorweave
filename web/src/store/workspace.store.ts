@@ -1,12 +1,15 @@
 /**
- * Session Store - manages session workspaces
+ * Workspace Store - manages conversation workspaces
  *
- * Now uses SQLite for metadata and OPFS for file operations:
- * - Session metadata stored in SQLite (fast, queryable)
+ * This replaces the old Session Store.
+ * Each conversation has an associated workspace for file operations.
+ *
+ * Architecture:
+ * - Workspace metadata stored in SQLite (fast, queryable)
  * - File content remains in OPFS (browser-native storage)
- * - Dual-write strategy ensures data consistency during migration
+ * - Workspace ID matches Conversation ID (1:1 relationship)
  *
- * @module session.store
+ * @module workspace.store
  */
 
 import { create } from 'zustand'
@@ -14,20 +17,16 @@ import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import type { SessionMetadata } from '@/opfs/types/opfs-types'
 import { getSessionManager, SessionWorkspace } from '@/opfs/session'
-import { getSessionRepository } from '@/sqlite'
-import type { Session } from '@/sqlite/repositories/session.repository'
+import { getSessionRepository, type Session } from '@/sqlite/repositories/session.repository'
 
 // Enable Immer Map/Set support
 enableMapSet()
 
-/** Default conversation name when title is not available */
-export const DEFAULT_CONVERSATION_NAME = '对话'
-
 /**
- * Session metadata shape from SessionManager (matches InternalSessionMetadata)
+ * Workspace metadata shape from SessionManager (matches InternalSessionMetadata)
  */
-interface SessionManagerMetadata {
-  sessionId: string
+interface WorkspaceManagerMetadata {
+  workspaceId: string
   rootDirectory: string
   name: string
   createdAt: number
@@ -35,27 +34,27 @@ interface SessionManagerMetadata {
 }
 
 /**
- * Get display name for a session with fallback strategy
- * Priority: stored name > conversation title > directory name > session ID
+ * Get display name for a workspace with fallback strategy
+ * Priority: stored name > conversation title > directory name > workspace ID
  */
-export function getSessionDisplayName(
-  meta: SessionManagerMetadata,
+export function getWorkspaceDisplayName(
+  meta: WorkspaceManagerMetadata,
   convTitles: Map<string, string>
 ): string {
   if (meta.name) {
     return meta.name
   }
-  const convTitle = convTitles.get(meta.sessionId)
+  const convTitle = convTitles.get(meta.workspaceId)
   if (convTitle) {
     return convTitle
   }
-  return meta.rootDirectory.split('/').pop() || meta.sessionId
+  return meta.rootDirectory.split('/').pop() || meta.workspaceId
 }
 
 /**
- * Extended session metadata with runtime statistics
+ * Extended workspace metadata with runtime statistics
  */
-export interface SessionWithStats extends SessionMetadata {
+export interface WorkspaceWithStats extends SessionMetadata {
   /** Number of pending changes */
   pendingCount: number
   /** Number of undo records */
@@ -63,9 +62,9 @@ export interface SessionWithStats extends SessionMetadata {
 }
 
 /**
- * Convert SQLite Session to SessionWithStats
+ * Convert SQLite Session to WorkspaceWithStats
  */
-function sqliteSessionToWithStats(session: Session): SessionWithStats {
+function sqliteSessionToWorkspaceStats(session: Session): WorkspaceWithStats {
   return {
     id: session.id,
     name: session.name,
@@ -80,22 +79,22 @@ function sqliteSessionToWithStats(session: Session): SessionWithStats {
 }
 
 /**
- * Session store state
+ * Workspace store state
  */
-interface SessionState {
-  /** Current active session ID */
-  activeSessionId: string | null
+interface WorkspaceState {
+  /** Current active workspace ID (matches active conversation ID) */
+  activeWorkspaceId: string | null
 
-  /** All session metadata with stats */
-  sessions: SessionWithStats[]
+  /** All workspace metadata with stats */
+  workspaces: WorkspaceWithStats[]
 
-  /** Current session's pending count (for quick access) */
+  /** Current workspace's pending count (for quick access) */
   currentPendingCount: number
 
-  /** Current session's undo count (for quick access) */
+  /** Current workspace's undo count (for quick access) */
   currentUndoCount: number
 
-  /** Whether sessions are being loaded/modified */
+  /** Whether workspaces are being loaded/modified */
   isLoading: boolean
 
   /** Error message if any operation failed */
@@ -106,35 +105,35 @@ interface SessionState {
 
   // Actions
 
-  /** Initialize the store (load sessions from SQLite, fallback to OPFS) */
+  /** Initialize the store (load workspaces from SQLite, fallback to OPFS) */
   initialize: () => Promise<void>
 
-  /** Create a new session (writes to both SQLite and OPFS) */
-  createSession: (id: string, rootDirectory: string, name?: string) => Promise<SessionMetadata>
+  /** Create a new workspace (writes to both SQLite and OPFS) */
+  createWorkspace: (id: string, rootDirectory: string, name?: string) => Promise<SessionMetadata>
 
-  /** Switch to a different session */
-  switchSession: (id: string) => Promise<void>
+  /** Switch to a different workspace */
+  switchWorkspace: (id: string) => Promise<void>
 
-  /** Delete a session (deletes from both SQLite and OPFS) */
-  deleteSession: (id: string) => Promise<void>
+  /** Delete a workspace (deletes from both SQLite and OPFS) */
+  deleteWorkspace: (id: string) => Promise<void>
 
-  /** Update session name */
-  updateSessionName: (id: string, name: string) => Promise<void>
+  /** Update workspace name */
+  updateWorkspaceName: (id: string, name: string) => Promise<void>
 
-  /** Refresh all sessions from SQLite */
-  refreshSessions: () => Promise<void>
+  /** Refresh all workspaces from SQLite */
+  refreshWorkspaces: () => Promise<void>
 
-  /** Update current session counts (pending/undo) */
+  /** Update current workspace counts (pending/undo) */
   updateCurrentCounts: () => Promise<void>
 
   /** Clear error state */
   clearError: () => void
 }
 
-export const useSessionStore = create<SessionState>()(
+export const useWorkspaceStore = create<WorkspaceState>()(
   immer((set, get) => ({
-    activeSessionId: null,
-    sessions: [],
+    activeWorkspaceId: null,
+    workspaces: [],
     currentPendingCount: 0,
     currentUndoCount: 0,
     isLoading: false,
@@ -149,40 +148,43 @@ export const useSessionStore = create<SessionState>()(
         const manager = await getSessionManager()
 
         // Try to load from SQLite first
-        let sessions: SessionWithStats[] = []
+        let workspaces: WorkspaceWithStats[] = []
         let loadedFromSQLite = false
 
         try {
           const sqliteSessions = await repo.findAllSessions()
           if (sqliteSessions.length > 0) {
-            sessions = sqliteSessions.map(sqliteSessionToWithStats)
+            workspaces = sqliteSessions.map(sqliteSessionToWorkspaceStats)
             loadedFromSQLite = true
           }
         } catch (sqliteError) {
           console.warn(
-            '[SessionStore] Failed to load from SQLite, falling back to OPFS:',
+            '[WorkspaceStore] Failed to load from SQLite, falling back to OPFS:',
             sqliteError
           )
         }
 
         // Fallback: migrate from OPFS if SQLite is empty
         if (!loadedFromSQLite) {
-          console.log('[SessionStore] No sessions in SQLite, migrating from OPFS...')
+          console.log('[WorkspaceStore] No workspaces in SQLite, migrating from OPFS...')
 
-          // Get conversation titles for better session names
+          // Get conversation titles for better workspace names
           const { useConversationStore } = await import('./conversation.store')
           const conversations = useConversationStore.getState().conversations
           const convTitles = new Map(conversations.map((c) => [c.id, c.title]))
 
-          // Get all session metadata from OPFS
+          // Get all workspace metadata from OPFS
           const internalSessions = manager.getAllSessions()
 
           for (const meta of internalSessions) {
             const workspace = await manager.getSession(meta.sessionId)
             if (!workspace) continue
 
-            // Use fallback strategy for session name
-            const sessionName = getSessionDisplayName(meta, convTitles)
+            // Use fallback strategy for workspace name
+            const workspaceName = getWorkspaceDisplayName(
+              { workspaceId: meta.sessionId, ...meta },
+              convTitles
+            )
 
             // Update the metadata if name was missing and we found a conversation title
             if (!meta.name) {
@@ -192,12 +194,12 @@ export const useSessionStore = create<SessionState>()(
               }
             }
 
-            // Create session in SQLite
+            // Create workspace in SQLite
             try {
               await repo.createSession({
                 id: meta.sessionId,
                 rootDirectory: meta.rootDirectory,
-                name: sessionName,
+                name: workspaceName,
                 status: 'active',
                 cacheSize: 0,
                 pendingCount: workspace.pendingCount,
@@ -206,14 +208,14 @@ export const useSessionStore = create<SessionState>()(
               })
             } catch (createError) {
               console.warn(
-                `[SessionStore] Failed to create session ${meta.sessionId} in SQLite:`,
+                `[WorkspaceStore] Failed to create workspace ${meta.sessionId} in SQLite:`,
                 createError
               )
             }
 
-            sessions.push({
+            workspaces.push({
               id: meta.sessionId,
-              name: sessionName,
+              name: workspaceName,
               createdAt: meta.createdAt,
               lastActiveAt: meta.lastAccessedAt,
               cacheSize: 0,
@@ -225,19 +227,19 @@ export const useSessionStore = create<SessionState>()(
           }
         }
 
-        // Set first session as active if none active
-        const activeId = sessions.length > 0 ? sessions[0].id : null
+        // Set first workspace as active if none active
+        const activeId = workspaces.length > 0 ? workspaces[0].id : null
 
         set({
-          sessions,
-          activeSessionId: activeId,
-          currentPendingCount: activeId ? sessions[0]?.pendingCount || 0 : 0,
-          currentUndoCount: activeId ? sessions[0]?.undoCount || 0 : 0,
+          workspaces,
+          activeWorkspaceId: activeId,
+          currentPendingCount: activeId ? workspaces[0]?.pendingCount || 0 : 0,
+          currentUndoCount: activeId ? workspaces[0]?.undoCount || 0 : 0,
           isLoading: false,
           initialized: true,
         })
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to initialize sessions'
+        const message = e instanceof Error ? e.message : 'Failed to initialize workspaces'
         set({
           error: message,
           isLoading: false,
@@ -246,7 +248,7 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    createSession: async (id, rootDirectory, name) => {
+    createWorkspace: async (id, rootDirectory, name) => {
       set({ isLoading: true, error: null })
 
       try {
@@ -268,7 +270,7 @@ export const useSessionStore = create<SessionState>()(
           modifiedFiles: 0,
         })
 
-        const newSession: SessionWithStats = {
+        const newWorkspace: WorkspaceWithStats = {
           id,
           name: name || rootDirectory.split('/').pop() || id,
           createdAt: Date.now(),
@@ -281,16 +283,16 @@ export const useSessionStore = create<SessionState>()(
         }
 
         set((state) => {
-          state.sessions.unshift(newSession)
-          state.activeSessionId = id
+          state.workspaces.unshift(newWorkspace)
+          state.activeWorkspaceId = id
           state.currentPendingCount = workspace.pendingCount
           state.currentUndoCount = workspace.undoCount
           state.isLoading = false
         })
 
-        return newSession
+        return newWorkspace
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to create session'
+        const message = e instanceof Error ? e.message : 'Failed to create workspace'
         set({
           error: message,
           isLoading: false,
@@ -299,9 +301,9 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    switchSession: async (id) => {
+    switchWorkspace: async (id) => {
       // Avoid redundant call if already active
-      const currentActiveId = get().activeSessionId
+      const currentActiveId = get().activeWorkspaceId
       if (currentActiveId === id) {
         return
       }
@@ -315,12 +317,12 @@ export const useSessionStore = create<SessionState>()(
         const repo = getSessionRepository()
         const manager = await getSessionManager()
 
-        // Check if session exists in SQLite first
+        // Check if workspace exists in SQLite first
         const sessionRecord = await repo.findSessionById(id)
 
-        // If session doesn't exist in SQLite, it might be a new conversation
-        // that hasn't had its session created yet - just return silently
-        // The session will be created when the agent loop starts
+        // If workspace doesn't exist in SQLite, it might be a new conversation
+        // that hasn't had its workspace created yet - just return silently
+        // The workspace will be created when the agent loop starts
         if (!sessionRecord) {
           set({ isLoading: false })
           return
@@ -330,16 +332,18 @@ export const useSessionStore = create<SessionState>()(
         const workspace = await manager.getSession(id)
 
         if (!workspace) {
-          // Session exists in SQLite but not in OPFS - data inconsistency
+          // Workspace exists in SQLite but not in OPFS - data inconsistency
           // Clean up the orphaned SQLite record and clear from state
-          console.warn(`[session.store] Session ${id} exists in database but OPFS workspace missing. Cleaning up orphaned record.`)
+          console.warn(
+            `[WorkspaceStore] Workspace ${id} exists in database but OPFS workspace missing. Cleaning up orphaned record.`
+          )
           await repo.deleteSession(id)
 
           // Remove from state if present
           set((state) => {
-            state.sessions = state.sessions.filter((s) => s.id !== id)
-            if (state.activeSessionId === id) {
-              state.activeSessionId = null
+            state.workspaces = state.workspaces.filter((w) => w.id !== id)
+            if (state.activeWorkspaceId === id) {
+              state.activeWorkspaceId = null
             }
             state.isLoading = false
           })
@@ -349,19 +353,19 @@ export const useSessionStore = create<SessionState>()(
         // Update last access time in SQLite
         await repo.updateSessionAccessTime(id)
 
-        // Update session metadata
+        // Update workspace metadata
         set((state) => {
-          const sessionIndex = state.sessions.findIndex((s) => s.id === id)
-          if (sessionIndex >= 0) {
-            state.sessions[sessionIndex].lastActiveAt = Date.now()
+          const workspaceIndex = state.workspaces.findIndex((w) => w.id === id)
+          if (workspaceIndex >= 0) {
+            state.workspaces[workspaceIndex].lastActiveAt = Date.now()
           }
-          state.activeSessionId = id
+          state.activeWorkspaceId = id
           state.currentPendingCount = workspace.pendingCount
           state.currentUndoCount = workspace.undoCount
           state.isLoading = false
         })
 
-        // Also switch the active conversation to match the session
+        // Also switch the active conversation to match the workspace
         const { useConversationStore } = await import('./conversation.store')
         // Only call setActive if conversation is different (avoid circular call)
         // Check against captured target to avoid race condition
@@ -370,7 +374,7 @@ export const useSessionStore = create<SessionState>()(
           await convStore.setActive(targetConversationId)
         }
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to switch session'
+        const message = e instanceof Error ? e.message : 'Failed to switch workspace'
         set({
           error: message,
           isLoading: false,
@@ -379,7 +383,7 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    deleteSession: async (id) => {
+    deleteWorkspace: async (id) => {
       set({ isLoading: true, error: null })
 
       try {
@@ -395,14 +399,14 @@ export const useSessionStore = create<SessionState>()(
         let newActiveId: string | null = null
 
         set((state) => {
-          // First, filter to get remaining sessions
-          const remaining = state.sessions.filter((s) => s.id !== id)
-          state.sessions = remaining
+          // First, filter to get remaining workspaces
+          const remaining = state.workspaces.filter((w) => w.id !== id)
+          state.workspaces = remaining
 
-          // If deleted session was active, clear active or switch to another
-          if (state.activeSessionId === id) {
+          // If deleted workspace was active, clear active or switch to another
+          if (state.activeWorkspaceId === id) {
             newActiveId = remaining.length > 0 ? remaining[0].id : null
-            state.activeSessionId = newActiveId
+            state.activeWorkspaceId = newActiveId
             state.currentPendingCount = remaining.length > 0 ? remaining[0]?.pendingCount || 0 : 0
             state.currentUndoCount = remaining.length > 0 ? remaining[0]?.undoCount || 0 : 0
           }
@@ -410,13 +414,13 @@ export const useSessionStore = create<SessionState>()(
           state.isLoading = false
         })
 
-        // Also switch the active conversation to match the new session
+        // Also switch the active conversation to match the new workspace
         if (newActiveId !== null) {
           const { useConversationStore } = await import('./conversation.store')
           await useConversationStore.getState().setActive(newActiveId)
         }
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to delete session'
+        const message = e instanceof Error ? e.message : 'Failed to delete workspace'
         set({
           error: message,
           isLoading: false,
@@ -425,7 +429,7 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    updateSessionName: async (id, name) => {
+    updateWorkspaceName: async (id, name) => {
       set({ isLoading: true, error: null })
 
       try {
@@ -436,14 +440,14 @@ export const useSessionStore = create<SessionState>()(
 
         // Update local state
         set((state) => {
-          const session = state.sessions.find((s) => s.id === id)
-          if (session) {
-            session.name = name
+          const workspace = state.workspaces.find((w) => w.id === id)
+          if (workspace) {
+            workspace.name = name
           }
           state.isLoading = false
         })
       } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : 'Failed to update session name'
+        const message = e instanceof Error ? e.message : 'Failed to update workspace name'
         set({
           error: message,
           isLoading: false,
@@ -452,22 +456,22 @@ export const useSessionStore = create<SessionState>()(
       }
     },
 
-    refreshSessions: async () => {
+    refreshWorkspaces: async () => {
       await get().initialize()
     },
 
     updateCurrentCounts: async () => {
-      const { activeSessionId } = get()
-      if (!activeSessionId) return
+      const { activeWorkspaceId } = get()
+      if (!activeWorkspaceId) return
 
       try {
         const manager = await getSessionManager()
         const repo = getSessionRepository()
-        const workspace = await manager.getSession(activeSessionId)
+        const workspace = await manager.getSession(activeWorkspaceId)
 
         if (workspace) {
           // Update counts in SQLite
-          await repo.updateSessionStats(activeSessionId, {
+          await repo.updateSessionStats(activeWorkspaceId, {
             pendingCount: workspace.pendingCount,
             undoCount: workspace.undoCount,
           })
@@ -476,11 +480,11 @@ export const useSessionStore = create<SessionState>()(
             state.currentPendingCount = workspace.pendingCount
             state.currentUndoCount = workspace.undoCount
 
-            // Also update session in list
-            const session = state.sessions.find((s) => s.id === activeSessionId)
-            if (session) {
-              session.pendingCount = workspace.pendingCount
-              session.undoCount = workspace.undoCount
+            // Also update workspace in list
+            const w = state.workspaces.find((w) => w.id === activeWorkspaceId)
+            if (w) {
+              w.pendingCount = workspace.pendingCount
+              w.undoCount = workspace.undoCount
             }
           })
         }
@@ -497,16 +501,19 @@ export const useSessionStore = create<SessionState>()(
 )
 
 /**
- * Hook to get the current active session workspace
+ * Get the current active workspace
  */
-export async function getActiveSessionWorkspace(): Promise<
-  { workspace: SessionWorkspace; sessionId: string } | undefined
+export async function getActiveWorkspace(): Promise<
+  { workspace: SessionWorkspace; workspaceId: string } | undefined
 > {
-  const { activeSessionId } = useSessionStore.getState()
-  if (!activeSessionId) return undefined
+  const { activeWorkspaceId } = useWorkspaceStore.getState()
+  if (!activeWorkspaceId) return undefined
 
   const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeSessionId)
+  const workspace = await manager.getSession(activeWorkspaceId)
 
-  return workspace ? { workspace, sessionId: activeSessionId } : undefined
+  return workspace ? { workspace, workspaceId: activeWorkspaceId } : undefined
 }
+
+// Export types
+export type { WorkspaceState }

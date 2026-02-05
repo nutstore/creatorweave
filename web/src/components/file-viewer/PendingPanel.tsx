@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useOPFSStore } from '@/store/opfs.store'
-import { useSessionStore } from '@/store/session.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { Clock, FilePlus, FileEdit, FileX, RefreshCw, Check, X, AlertCircle } from 'lucide-react'
 import type { PendingChange } from '@/opfs/types/opfs-types'
 
@@ -72,7 +72,7 @@ export function PendingPanel({
   onSyncComplete?: (result: { success: number; failed: number; skipped: number }) => void
 }) {
   const { getPendingChanges, syncPendingChanges, isLoading } = useOPFSStore()
-  const { activeSessionId, currentPendingCount } = useSessionStore()
+  const { activeWorkspaceId, currentPendingCount } = useWorkspaceStore()
 
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{
@@ -109,13 +109,13 @@ export function PendingPanel({
   const hasPending = pendingChanges.length > 0
   const canSync = directoryHandle && hasPending && !syncing && !isLoading
 
-  // No active session
-  if (!activeSessionId) {
+  // No active workspace
+  if (!activeWorkspaceId) {
     return (
       <div className="flex h-full items-center justify-center p-4">
         <div className="flex flex-col items-center gap-2 text-center">
           <AlertCircle className="h-8 w-8 text-neutral-300" />
-          <p className="text-xs text-neutral-400">无活动会话</p>
+          <p className="text-xs text-neutral-400">无活动对话</p>
         </div>
       </div>
     )

@@ -20,7 +20,10 @@ import {
   emitComplete,
   emitError,
 } from '@/streaming-bus'
-import { useSessionStore, DEFAULT_CONVERSATION_NAME } from './session.store'
+import { useWorkspaceStore } from './workspace.store'
+
+// Default conversation name when title is not available
+const DEFAULT_CONVERSATION_NAME = '对话'
 import { StreamingQueue } from '../utils/streaming-queue'
 
 // Enable Immer Map/Set support
@@ -269,12 +272,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
 
         // Refresh the session store
-        const sessionStore = useSessionStore.getState()
-        await sessionStore.refreshSessions()
+        const workspaceStore = useWorkspaceStore.getState()
+        await workspaceStore.refreshWorkspaces()
 
         // Switch to active session if exists
         if (activeId) {
-          await sessionStore.switchSession(activeId).catch((e) => {
+          await workspaceStore.switchWorkspace(activeId).catch((e) => {
             console.error('[conversation.store] Failed to switch to active session:', e)
           })
         }
@@ -313,11 +316,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
       persistConversation(conversation).catch(console.error)
 
-      useSessionStore
+      useWorkspaceStore
         .getState()
-        .createSession(conversation.id, `/conversations/${conversation.id}`, title || '新对话')
+        .createWorkspace(conversation.id, `/conversations/${conversation.id}`, title || '新对话')
         .catch((e) => {
-          console.error('[conversation.store] Failed to create session workspace:', e)
+          console.error('[conversation.store] Failed to create workspace:', e)
         })
 
       return conversation
@@ -329,9 +332,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
 
       if (id) {
-        const sessionStore = useSessionStore.getState()
-        if (sessionStore.activeSessionId !== id) {
-          sessionStore.switchSession(id).catch((e) => {
+        const workspaceStore = useWorkspaceStore.getState()
+        if (workspaceStore.activeWorkspaceId !== id) {
+          workspaceStore.switchWorkspace(id).catch((e) => {
             console.error('[conversation.store] Failed to switch session workspace:', e)
           })
         }
@@ -407,11 +410,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
       deleteConversationFromDB(id).catch(console.error)
 
-      useSessionStore
+      useWorkspaceStore
         .getState()
-        .deleteSession(id)
+        .deleteWorkspace(id)
         .catch((e) => {
-          console.error('[conversation.store] Failed to delete session workspace:', e)
+          console.error('[conversation.store] Failed to delete workspace:', e)
         })
     },
 

@@ -6,7 +6,7 @@ import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'
 import { StorageLoading } from '@/components/StorageLoading'
 import { useAgentStore } from '@/store/agent.store'
 import { attemptReconnect } from '@/store/remote.store'
-import { useSessionStore } from '@/store/session.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { initStorage, setupAutoSave } from '@/storage'
 import { useT } from '@/i18n'
 
@@ -17,7 +17,7 @@ function App() {
   const [storageError, setStorageError] = useState<string | null>(null)
   const [canResetDatabase, setCanResetDatabase] = useState(false)
   const restoreDirectoryHandle = useAgentStore((s) => s.restoreDirectoryHandle)
-  const initializeSessions = useSessionStore((s) => s.initialize)
+  const initializeWorkspaces = useWorkspaceStore((s) => s.initialize)
   const t = useT() // i18n hook
 
   // StrictMode guard - track if async init has already completed
@@ -175,11 +175,11 @@ function App() {
       // Restore directory handle
       restoreDirectoryHandle()
 
-      // Initialize OPFS session store
+      // Initialize workspaces
       try {
-        await initializeSessions()
+        await initializeWorkspaces()
       } catch (err) {
-        console.error('[App] Failed to initialize session store:', err)
+        console.error('[App] Failed to initialize workspaces:', err)
       }
 
       // Attempt to reconnect to previous remote session

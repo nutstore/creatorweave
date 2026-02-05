@@ -9,7 +9,7 @@
  */
 
 import React, { useCallback, useMemo } from 'react'
-import { useSessionStore } from '@/store/session.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { Clock, RotateCcw, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 
@@ -21,20 +21,20 @@ export interface SessionBadgeProps {
 }
 
 export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = false }) => {
-  const { activeSessionId, sessions, currentPendingCount, currentUndoCount, initialized } =
-    useSessionStore()
+  const { activeWorkspaceId, workspaces, currentPendingCount, currentUndoCount, initialized } =
+    useWorkspaceStore()
   const t = useT()
 
-  // Get current session info
-  const currentSession = useMemo(() => {
-    if (!activeSessionId) return null
-    return sessions.find((s) => s.id === activeSessionId)
-  }, [activeSessionId, sessions])
+  // Get current workspace info
+  const currentWorkspace = useMemo(() => {
+    if (!activeWorkspaceId) return null
+    return workspaces.find((w) => w.id === activeWorkspaceId)
+  }, [activeWorkspaceId, workspaces])
 
   const displayName = useMemo(() => {
-    if (!currentSession) return t('session.notInitialized')
-    return currentSession.name || activeSessionId?.slice(0, 8) || t('session.unknownSession')
-  }, [currentSession, activeSessionId, t])
+    if (!currentWorkspace) return t('session.notInitialized')
+    return currentWorkspace.name || activeWorkspaceId?.slice(0, 8) || t('session.unknownSession')
+  }, [currentWorkspace, activeWorkspaceId, t])
 
   const hasPending = currentPendingCount > 0
   const hasUndo = currentUndoCount > 0
@@ -53,8 +53,8 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
     )
   }
 
-  // No active session
-  if (!activeSessionId || !currentSession) {
+  // No active workspace
+  if (!activeWorkspaceId || !currentWorkspace) {
     return (
       <div className="flex items-center gap-2 text-xs text-neutral-400">
         <AlertCircle className="h-3.5 w-3.5" />

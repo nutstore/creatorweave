@@ -112,21 +112,21 @@ interface OPFSState {
  * Helper to get active session workspace
  */
 async function getActiveWorkspace() {
-  const { useSessionStore } = await import('./session.store')
-  const activeSessionId = useSessionStore.getState().activeSessionId
+  const { useWorkspaceStore } = await import('./workspace.store')
+  const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
 
-  if (!activeSessionId) {
-    throw new Error('No active session')
+  if (!activeWorkspaceId) {
+    throw new Error('No active workspace')
   }
 
   const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeSessionId)
+  const workspace = await manager.getSession(activeWorkspaceId)
 
   if (!workspace) {
-    throw new Error(`Session ${activeSessionId} not found`)
+    throw new Error(`Workspace ${activeWorkspaceId} not found`)
   }
 
-  return { workspace, sessionId: activeSessionId }
+  return { workspace, workspaceId: activeWorkspaceId }
 }
 
 /**
@@ -174,15 +174,15 @@ export const useOPFSStore = create<OPFSState>()(
 
     initialize: async () => {
       try {
-        const { sessionId } = await getActiveWorkspace()
+        const { workspaceId } = await getActiveWorkspace()
 
-        // Load initial state from session
+        // Load initial state from workspace
         const manager = await getSessionManager()
-        const workspace = await manager.getSession(sessionId)
+        const workspace = await manager.getSession(workspaceId)
 
         if (workspace) {
           set({
-            sessionId,
+            sessionId: workspaceId,
             pendingChanges: workspace.getPendingChanges(),
             undoRecords: workspace.getUndoRecords(),
             cachedPaths: workspace.getCachedPaths(),
@@ -231,9 +231,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to write file'
 
@@ -264,9 +264,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to delete file'
         set({ error: message, isLoading: false })
@@ -295,9 +295,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
 
         return result
       } catch (e) {
@@ -329,9 +329,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to undo'
         set({ error: message, isLoading: false })
@@ -353,9 +353,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to redo'
         set({ error: message, isLoading: false })
@@ -378,9 +378,9 @@ export const useOPFSStore = create<OPFSState>()(
           state.isLoading = false
         })
 
-        // Update session store counts
-        const { useSessionStore } = await import('./session.store')
-        useSessionStore.getState().updateCurrentCounts()
+        // Update workspace store counts
+        const { useWorkspaceStore } = await import('./workspace.store')
+        useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to clear session'
         set({ error: message, isLoading: false })
@@ -398,10 +398,10 @@ export const useOPFSStore = create<OPFSState>()(
 
     refresh: async () => {
       try {
-        const { workspace, sessionId: newSessionId } = await getActiveWorkspace()
+        const { workspace, workspaceId: newWorkspaceId } = await getActiveWorkspace()
 
         set((state) => {
-          state.sessionId = newSessionId
+          state.sessionId = newWorkspaceId
           state.pendingChanges = workspace.getPendingChanges()
           state.undoRecords = workspace.getUndoRecords()
           state.cachedPaths = workspace.getCachedPaths()

@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { useSessionStore } from '@/store/session.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { ChevronDown, Check, Clock, RotateCcw, Trash2, Plus } from 'lucide-react'
 
 export interface SessionSwitcherProps {
@@ -27,55 +27,56 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
   showDelete = false,
 }) => {
   const [open, setOpen] = useState(false)
-  const { activeSessionId, sessions, switchSession, deleteSession, isLoading } = useSessionStore()
+  const { activeWorkspaceId, workspaces, switchWorkspace, deleteWorkspace, isLoading } =
+    useWorkspaceStore()
 
-  // Sort sessions: active first, then by lastActiveAt
-  const sortedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      if (a.id === activeSessionId) return -1
-      if (b.id === activeSessionId) return 1
+  // Sort workspaces: active first, then by lastActiveAt
+  const sortedWorkspaces = useMemo(() => {
+    return [...workspaces].sort((a, b) => {
+      if (a.id === activeWorkspaceId) return -1
+      if (b.id === activeWorkspaceId) return 1
       return (b.lastActiveAt || 0) - (a.lastActiveAt || 0)
     })
-  }, [sessions, activeSessionId])
+  }, [workspaces, activeWorkspaceId])
 
   const handleSwitch = useCallback(
-    async (sessionId: string) => {
+    async (workspaceId: string) => {
       try {
-        await switchSession(sessionId)
-        onSessionSwitch?.(sessionId)
+        await switchWorkspace(workspaceId)
+        onSessionSwitch?.(workspaceId)
         setOpen(false)
       } catch (error) {
-        console.error('[SessionSwitcher] Failed to switch session:', error)
+        console.error('[SessionSwitcher] Failed to switch workspace:', error)
       }
     },
-    [switchSession, onSessionSwitch]
+    [switchWorkspace, onSessionSwitch]
   )
 
   const handleDelete = useCallback(
-    async (e: React.MouseEvent, sessionId: string) => {
+    async (e: React.MouseEvent, workspaceId: string) => {
       e.stopPropagation() // Prevent triggering switch
 
-      if (!confirm('确定要删除此会话吗？所有缓存、待同步和撤销记录将被删除。')) {
+      if (!confirm('确定要删除此对话的缓存吗？所有文件缓存、待同步和撤销记录将被删除。')) {
         return
       }
 
       try {
-        await deleteSession(sessionId)
+        await deleteWorkspace(workspaceId)
       } catch (error) {
-        console.error('[SessionSwitcher] Failed to delete session:', error)
+        console.error('[SessionSwitcher] Failed to delete workspace:', error)
       }
     },
-    [deleteSession]
+    [deleteWorkspace]
   )
 
-  const activeSession = useMemo(() => {
-    return sessions.find((s) => s.id === activeSessionId)
-  }, [sessions, activeSessionId])
+  const activeWorkspace = useMemo(() => {
+    return workspaces.find((w) => w.id === activeWorkspaceId)
+  }, [workspaces, activeWorkspaceId])
 
   const displayName = useMemo(() => {
-    if (!activeSession) return '选择会话'
-    return activeSession.name || activeSessionId?.slice(0, 8) || '未知会话'
-  }, [activeSession, activeSessionId])
+    if (!activeWorkspace) return '选择对话'
+    return activeWorkspace.name || activeWorkspaceId?.slice(0, 8) || '未知对话'
+  }, [activeWorkspace, activeWorkspaceId])
 
   return (
     <div className="relative">
@@ -83,12 +84,12 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        disabled={isLoading || sessions.length === 0}
+        disabled={isLoading || workspaces.length === 0}
         className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
       >
         <span className="max-w-[120px] truncate text-neutral-700">{displayName}</span>
-        {sessions.length > 0 && (
-          <span className="text-xs text-neutral-400">({sessions.length})</span>
+        {workspaces.length > 0 && (
+          <span className="text-xs text-neutral-400">({workspaces.length})</span>
         )}
         <ChevronDown
           className={`h-4 w-4 text-neutral-400 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -106,43 +107,43 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
             {/* Header */}
             <div className="border-b border-neutral-100 px-3 py-2">
               <span className="text-xs font-medium text-neutral-600">
-                会话列表 ({sessions.length})
+                对话列表 ({workspaces.length})
               </span>
             </div>
 
-            {/* Session list */}
+            {/* Workspace list */}
             <div className="custom-scrollbar max-h-80 overflow-y-auto">
-              {sortedSessions.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-neutral-400">暂无会话</div>
+              {sortedWorkspaces.length === 0 ? (
+                <div className="px-3 py-4 text-center text-xs text-neutral-400">暂无对话</div>
               ) : (
                 <ul>
-                  {sortedSessions.map((session) => {
-                    const isActive = session.id === activeSessionId
-                    const hasPending = session.pendingCount > 0
-                    const hasUndo = session.undoCount > 0
+                  {sortedWorkspaces.map((workspace) => {
+                    const isActive = workspace.id === activeWorkspaceId
+                    const hasPending = workspace.pendingCount > 0
+                    const hasUndo = workspace.undoCount > 0
 
                     return (
                       <li
-                        key={session.id}
+                        key={workspace.id}
                         className={`flex items-center gap-2 px-3 py-2 hover:bg-neutral-50 ${
                           isActive ? 'bg-primary-50' : ''
                         }`}
                       >
-                        {/* Session selector */}
+                        {/* Workspace selector */}
                         <button
                           type="button"
-                          onClick={() => handleSwitch(session.id)}
+                          onClick={() => handleSwitch(workspace.id)}
                           className="flex flex-1 items-center gap-2 text-left"
                         >
                           {/* Active indicator */}
                           {isActive && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
                           {!isActive && <span className="h-4 w-4 shrink-0" />}
 
-                          {/* Session info */}
+                          {/* Workspace info */}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate text-xs font-medium text-neutral-700">
-                                {session.name || session.id.slice(0, 8)}
+                                {workspace.name || workspace.id.slice(0, 8)}
                               </span>
                             </div>
 
@@ -152,10 +153,10 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                               {hasPending && (
                                 <span
                                   className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 text-[10px] text-amber-700"
-                                  title={`${session.pendingCount} 个待同步`}
+                                  title={`${workspace.pendingCount} 个待同步`}
                                 >
                                   <Clock className="h-2.5 w-2.5" />
-                                  {session.pendingCount}
+                                  {workspace.pendingCount}
                                 </span>
                               )}
 
@@ -163,10 +164,10 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                               {hasUndo && (
                                 <span
                                   className="flex items-center gap-0.5 rounded-full bg-blue-100 px-1.5 text-[10px] text-blue-700"
-                                  title={`${session.undoCount} 个可撤销`}
+                                  title={`${workspace.undoCount} 个可撤销`}
                                 >
                                   <RotateCcw className="h-2.5 w-2.5" />
-                                  {session.undoCount}
+                                  {workspace.undoCount}
                                 </span>
                               )}
 
@@ -182,9 +183,9 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                         {showDelete && !isActive && (
                           <button
                             type="button"
-                            onClick={(e) => handleDelete(e, session.id)}
+                            onClick={(e) => handleDelete(e, workspace.id)}
                             className="shrink-0 rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-500"
-                            title="删除会话"
+                            title="删除对话缓存"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -204,7 +205,7 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                   className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  新建会话
+                  新建对话
                 </button>
               </div>
             )}

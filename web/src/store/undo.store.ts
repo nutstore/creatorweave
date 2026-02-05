@@ -51,42 +51,42 @@ export const useUndoStore = create<UndoState>()((set, get) => {
     refresh: async () => {
       const manager = await getSessionManager()
 
-      // Get current session ID from session store
+      // Get current workspace ID from workspace store
       // Import here to avoid circular dependency
-      const { useSessionStore } = await import('./session.store')
-      const activeSessionId = useSessionStore.getState().activeSessionId
+      const { useWorkspaceStore } = await import('./workspace.store')
+      const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
 
-      if (!activeSessionId) {
+      if (!activeWorkspaceId) {
         set({ undoRecords: [], currentSessionId: null })
         return
       }
 
-      const workspace = await manager.getSession(activeSessionId)
+      const workspace = await manager.getSession(activeWorkspaceId)
       if (workspace) {
         const records = workspace.getUndoRecords()
         set({
           undoRecords: records,
-          currentSessionId: activeSessionId,
+          currentSessionId: activeWorkspaceId,
           activeCount: records.filter((r) => !r.undone).length,
         })
       } else {
-        set({ undoRecords: [], currentSessionId: activeSessionId, activeCount: 0 })
+        set({ undoRecords: [], currentSessionId: activeWorkspaceId, activeCount: 0 })
       }
     },
 
     undo: async (recordId: string) => {
       const manager = await getSessionManager()
-      const { useSessionStore } = await import('./session.store')
-      const activeSessionId = useSessionStore.getState().activeSessionId
+      const { useWorkspaceStore } = await import('./workspace.store')
+      const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
 
-      if (!activeSessionId) {
-        console.warn('[undo.store] No active session')
+      if (!activeWorkspaceId) {
+        console.warn('[undo.store] No active workspace')
         return false
       }
 
-      const workspace = await manager.getSession(activeSessionId)
+      const workspace = await manager.getSession(activeWorkspaceId)
       if (!workspace) {
-        console.warn('[undo.store] Session not found:', activeSessionId)
+        console.warn('[undo.store] Workspace not found:', activeWorkspaceId)
         return false
       }
 
@@ -100,8 +100,8 @@ export const useUndoStore = create<UndoState>()((set, get) => {
           activeCount: records.filter((r) => !r.undone).length,
         })
 
-        // Also update session store counts
-        useSessionStore.getState().updateCurrentCounts()
+        // Also update workspace store counts
+        useWorkspaceStore.getState().updateCurrentCounts()
 
         return true
       } catch (e) {
@@ -112,17 +112,17 @@ export const useUndoStore = create<UndoState>()((set, get) => {
 
     redo: async (recordId: string) => {
       const manager = await getSessionManager()
-      const { useSessionStore } = await import('./session.store')
-      const activeSessionId = useSessionStore.getState().activeSessionId
+      const { useWorkspaceStore } = await import('./workspace.store')
+      const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
 
-      if (!activeSessionId) {
-        console.warn('[undo.store] No active session')
+      if (!activeWorkspaceId) {
+        console.warn('[undo.store] No active workspace')
         return false
       }
 
-      const workspace = await manager.getSession(activeSessionId)
+      const workspace = await manager.getSession(activeWorkspaceId)
       if (!workspace) {
-        console.warn('[undo.store] Session not found:', activeSessionId)
+        console.warn('[undo.store] Workspace not found:', activeWorkspaceId)
         return false
       }
 
@@ -136,8 +136,8 @@ export const useUndoStore = create<UndoState>()((set, get) => {
           activeCount: records.filter((r) => !r.undone).length,
         })
 
-        // Also update session store counts
-        useSessionStore.getState().updateCurrentCounts()
+        // Also update workspace store counts
+        useWorkspaceStore.getState().updateCurrentCounts()
 
         return true
       } catch (e) {

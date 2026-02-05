@@ -3,9 +3,9 @@
  */
 
 export { SessionBadge } from './SessionBadge'
-export { SessionBadgeWithStorage } from './SessionBadgeWithStorage'
+export { ConversationStorageBadge } from './SessionBadgeWithStorage'
 export { SessionSwitcher } from './SessionSwitcher'
 
 export type { SessionBadgeProps } from './SessionBadge'
-export type { SessionBadgeWithStorageProps } from './SessionBadgeWithStorage'
+export type { ConversationStorageBadgeProps } from './SessionBadgeWithStorage'
 export type { SessionSwitcherProps } from './SessionSwitcher'
