@@ -30,7 +30,7 @@ const TEST_IDS = {
 
 export const RemoteBadge: React.FC = () => {
   const [panelOpen, setPanelOpen] = useState(false)
-  const { role, error, encryptionError, closeSession, clearError } = useRemoteStore()
+  const { role, error, encryptionError, peerCount, closeSession, clearError } = useRemoteStore()
   const t = useT()
 
   // Use extracted hooks
@@ -85,13 +85,12 @@ export const RemoteBadge: React.FC = () => {
             <span className={encryptionConfig.color}>{encryptionConfig.icon}</span>
           </span>
 
-          {/* 3. Role badge */}
-          <span
-            className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-foreground"
-            data-testid={TEST_IDS.roleBadge}
-          >
-            {role === 'host' ? t('remote.host') : t('remote.remote')}
-          </span>
+          {/* 3. Remote peer count (only show when there are remote devices) */}
+          {peerCount > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {t('remote.peers', { count: peerCount - 1 })}
+            </span>
+          )}
         </div>
 
         {/* ==================== Separator ==================== */}

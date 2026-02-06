@@ -207,9 +207,9 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
               <span className="text-sm text-gray-700">
                 {connectionState === 'connected' ? t('remote.connected') : t('remote.connecting')}
               </span>
-              {peerCount > 0 && (
+              {peerCount > 1 && (
                 <span className="text-xs text-gray-500">
-                  ({t('remote.peers', { count: peerCount })})
+                  ({t('remote.peers', { count: peerCount - 1 })})
                 </span>
               )}
             </div>
