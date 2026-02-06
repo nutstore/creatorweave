@@ -11,6 +11,7 @@
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
+import { toast } from 'sonner'
 import type { Conversation, Message, ToolCall, ConversationStatus } from '@/agent/message-types'
 import { createConversation } from '@/agent/message-types'
 import {
@@ -315,7 +316,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         state.conversations.unshift(conversation)
         state.activeConversationId = conversation.id
       })
-      persistConversation(conversation).catch(console.error)
+      persistConversation(conversation).catch((error) => {
+        console.error('[conversation.store] Failed to persist new conversation:', error)
+        toast.error('对话保存失败，刷新页面后可能丢失')
+      })
 
       useWorkspaceStore
         .getState()
@@ -359,7 +363,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
       })
       const conv = get().conversations.find((c) => c.id === conversationId)
-      if (conv) persistConversation(conv).catch(console.error)
+      if (conv)
+        persistConversation(conv).catch((error) => {
+          console.error('[conversation.store] Failed to persist conversation on addMessage:', error)
+          toast.error('消息保存失败')
+        })
     },
 
     updateMessages: (conversationId, messages) => {
@@ -386,7 +394,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
       })
       const conv = get().conversations.find((c) => c.id === conversationId)
-      if (conv) persistConversation(conv).catch(console.error)
+      if (conv)
+        persistConversation(conv).catch((error) => {
+          console.error(
+            '[conversation.store] Failed to persist conversation on updateMessages:',
+            error
+          )
+          toast.error('消息更新保存失败')
+        })
     },
 
     deleteConversation: (id) => {
@@ -409,7 +424,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         state.suggestedFollowUps.delete(id)
         state.streamingQueues.delete(id)
       })
-      deleteConversationFromDB(id).catch(console.error)
+      deleteConversationFromDB(id).catch((error) => {
+        console.error('[conversation.store] Failed to delete conversation from DB:', error)
+        toast.error('对话删除失败，请刷新页面后重试')
+      })
 
       useWorkspaceStore
         .getState()
@@ -428,7 +446,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
       })
       const conv = get().conversations.find((c) => c.id === id)
-      if (conv) persistConversation(conv).catch(console.error)
+      if (conv)
+        persistConversation(conv).catch((error) => {
+          console.error(
+            '[conversation.store] Failed to persist conversation on updateTitle:',
+            error
+          )
+          toast.error('标题修改保存失败')
+        })
     },
 
     // Agent runtime actions
@@ -791,7 +816,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
             emitComplete()
             const finalConv = get().conversations.find((c) => c.id === conversationId)
-            if (finalConv) persistConversation(finalConv).catch(console.error)
+            if (finalConv)
+              persistConversation(finalConv).catch((error) => {
+                console.error(
+                  '[conversation.store] Failed to persist conversation on complete:',
+                  error
+                )
+                toast.error('对话保存失败，部分内容可能丢失')
+              })
 
             try {
               const apiKey = await apiKeyRepo.load(providerType)
@@ -849,7 +881,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.streamingQueues.delete(conversationId)
         })
         const finalConv = get().conversations.find((c) => c.id === conversationId)
-        if (finalConv) persistConversation(finalConv).catch(console.error)
+        if (finalConv)
+          persistConversation(finalConv).catch((err) => {
+            console.error(
+              '[conversation.store] Failed to persist conversation on stream error:',
+              err
+            )
+            toast.error('对话保存失败，部分内容可能丢失')
+          })
       } catch (error) {
         const queues = get().streamingQueues.get(conversationId)
         if (queues) {

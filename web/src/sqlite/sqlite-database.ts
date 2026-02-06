@@ -709,6 +709,88 @@ if (typeof window !== 'undefined') {
   window.__resetSQLiteDB = resetSQLiteDB
   // @ts-ignore
   window.__getSQLiteRecoveryStats = getSQLiteRecoveryStats
+  // @ts-ignore
+  window.__getSQLiteMode = () => getSQLiteDB().getMode()
+  // @ts-ignore
+  window.__checkSQLiteHealth = async () => {
+    try {
+      const db = getSQLiteDB()
+      await db.queryFirst('SELECT 1')
+      return { healthy: true, mode: db.getMode() }
+    } catch (error) {
+      return { healthy: false, error: (error as Error).message }
+    }
+  }
+  // @ts-ignore
+  window.__listSQLiteTables = async () => {
+    try {
+      const db = getSQLiteDB()
+      const rows = await db.queryAll("SELECT name FROM sqlite_master WHERE type='table'")
+      return rows.map((r: any) => r.name)
+    } catch (error) {
+      return `Error: ${(error as Error).message}`
+    }
+  }
+  // @ts-ignore
+  window.__checkDataIntegrity = async () => {
+    try {
+      const db = getSQLiteDB()
+
+      // Get table counts
+      const tables = await db.queryAll<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+      )
+
+      const recordCounts: Record<string, number> = {}
+      let totalRecords = 0
+
+      for (const table of tables) {
+        try {
+          const result = await db.queryFirst<{ count: number }>(
+            `SELECT COUNT(*) as count FROM ${table.name}`
+          )
+          const count = result?.count || 0
+          recordCounts[table.name] = count
+          totalRecords += count
+        } catch (e) {
+          recordCounts[table.name] = -1 // Error querying this table
+        }
+      }
+
+      return {
+        healthy: totalRecords > 0,
+        tableCount: tables.length,
+        totalRecords,
+        recordCounts,
+        warning:
+          totalRecords === 0
+            ? 'Database schema exists but contains NO DATA! This may indicate data loss.'
+            : undefined,
+      }
+    } catch (error) {
+      return {
+        healthy: false,
+        error: (error as Error).message,
+      }
+    }
+  }
+
+  // SQL Logging control
+  // @ts-ignore
+  window.__enableSQLiteSQLLogging = (enabled = true) => {
+    try {
+      const db = getSQLiteDB()
+      // @ts-ignore - access internal worker
+      db.worker!.postMessage({ type: 'setSQLLogging', enabled })
+      console.log(`[SQLite] SQL logging ${enabled ? 'ENABLED' : 'DISABLED'}`)
+    } catch (error) {
+      console.error('[SQLite] Failed to set SQL logging:', error)
+    }
+  }
+
+  console.log(
+    '[SQLite] Diagnostic functions available: window.__resetSQLiteDB(), window.__getSQLiteRecoveryStats(), window.__getSQLiteMode(), window.__checkSQLiteHealth(), window.__listSQLiteTables(), window.__checkDataIntegrity(), window.__enableSQLiteSQLLogging()'
+  )
 }
 
 /**

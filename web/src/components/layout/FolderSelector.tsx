@@ -13,7 +13,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { FolderOpen, ChevronDown, Copy, RefreshCw } from 'lucide-react'
+import { FolderOpen, ChevronDown, Copy, RefreshCw, Loader2 } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { useT } from '@/i18n'
@@ -23,7 +23,7 @@ type MenuState = 'closed' | 'open' | 'selecting'
 
 export function FolderSelector() {
   const t = useT()
-  const { directoryHandle, directoryName, setDirectoryHandle } = useAgentStore()
+  const { directoryHandle, directoryName, setDirectoryHandle, isRestoringHandle } = useAgentStore()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [menuState, setMenuState] = useState<MenuState>('closed')
@@ -96,6 +96,16 @@ export function FolderSelector() {
 
   // Button content
   const renderButtonContent = () => {
+    // Show loading spinner when restoring handle
+    if (isRestoringHandle) {
+      return (
+        <>
+          <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" />
+          <span className="text-xs font-normal text-secondary">恢复中...</span>
+        </>
+      )
+    }
+
     if (directoryHandle && directoryName) {
       return (
         <>
@@ -124,12 +134,12 @@ export function FolderSelector() {
       <button
         type="button"
         onClick={handleToggle}
-        disabled={isSelecting}
+        disabled={isSelecting || isRestoringHandle}
         className={cn(
           'flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1',
           'text-xs font-normal text-secondary',
           'transition-colors hover:bg-primary-50 focus:outline-none',
-          isSelecting && 'cursor-wait opacity-70'
+          (isSelecting || isRestoringHandle) && 'cursor-wait opacity-70'
         )}
         title={directoryName ? t('folderSelector.switchFolder') : t('folderSelector.openFolder')}
       >
@@ -143,7 +153,7 @@ export function FolderSelector() {
           <button
             type="button"
             onClick={handleSelectFolder}
-            disabled={isSelecting}
+            disabled={isSelecting || isRestoringHandle}
             className={cn(
               'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
               'hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50'

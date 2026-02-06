@@ -23,6 +23,16 @@ const POOL_CONFIG = {
   mxPages: 256 * 1024, // 1GB pool size
 }
 
+// SQL Logging - controlled via window.__enableSQLiteSQLLogging()
+let enableSQLLogging = false
+
+// Diagnostic tracking
+let initCount = 0
+let poolInitCount = 0
+
+// Track if we've seen data before (to detect data loss)
+let hasSeenData = false
+
 // Worker message types
 export type WorkerRequest =
   | { type: 'init'; schemaSQL?: string; id?: string; reportProgress?: boolean }
@@ -35,6 +45,7 @@ export type WorkerRequest =
   | { type: 'close'; id: string }
   | { type: 'getMode'; id: string }
   | { type: 'recover'; id: string }
+  | { type: 'setSQLLogging'; enabled: boolean; id?: string }
 
 // Worker response types (used for type safety in message handling)
 export type WorkerResponse =
@@ -48,6 +59,7 @@ export type WorkerResponse =
   | { type: 'close'; id: string; error?: string }
   | { type: 'getMode'; id: string; mode: 'opfs' | 'memory'; error?: string }
   | { type: 'recover'; id: string; success: boolean; error?: string }
+  | { type: 'setSQLLogging'; id: string; enabled: boolean; error?: string }
   | { type: 'migrationProgress'; step: string; details: string; current: number; total: number }
 
 let sqlite3: any = null
@@ -116,6 +128,12 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       case 'getMode':
         postMessage({ type: 'getMode', id, mode: dbMode })
         break
+
+      case 'setSQLLogging':
+        enableSQLLogging = e.data.enabled
+        console.log(`[SQLite Worker] SQL logging ${enableSQLLogging ? 'ENABLED' : 'DISABLED'}`)
+        postMessage({ type: 'setSQLLogging', id, enabled: enableSQLLogging })
+        break
     }
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
@@ -133,10 +151,14 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
  * 2. If that fails, throw error asking user to refresh (data is safe in OPFS)
  */
 async function handleRecover() {
+  const recoverId = `recover-${Date.now()}`
+  console.log(`[SQLite Worker] ${recoverId}: Starting database recovery...`)
+
   // Close existing database if open
   if (db) {
     try {
       db.close()
+      console.log(`[SQLite Worker] ${recoverId}: Closed existing database`)
     } catch (e) {
       // Ignore close errors during recovery
     }
@@ -149,7 +171,14 @@ async function handleRecover() {
     try {
       // Use the stored poolUtil if available, otherwise reinitialize
       if (!poolUtil) {
+        console.warn(`[SQLite Worker] ${recoverId}: poolUtil was null, reinitializing...`)
+        poolInitCount++
         poolUtil = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+        console.log(
+          `[SQLite Worker] ${recoverId}: Created NEW pool during recovery (count: ${poolInitCount})`
+        )
+      } else {
+        console.log(`[SQLite Worker] ${recoverId}: Reusing existing poolUtil`)
       }
       // Use OpfsSAHPoolDb to reopen the database
       db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
@@ -157,6 +186,7 @@ async function handleRecover() {
 
       // Verify connection works
       db.exec({ sql: 'SELECT 1', returnValue: 'resultRows' })
+      console.log(`[SQLite Worker] ${recoverId}: Successfully reopened existing database`)
 
       // Run migrations after reconnection to ensure schema is up-to-date
       try {
@@ -166,10 +196,13 @@ async function handleRecover() {
         // Continue - reconnection succeeded, migrations are idempotent
       }
 
+      console.log(`[SQLite Worker] ${recoverId}: Recovery SUCCESS`)
       return
     } catch (reconnectError) {
       const errorMsg =
         reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+
+      console.error(`[SQLite Worker] ${recoverId}: Reconnection FAILED:`, errorMsg)
 
       // Check error type to determine safe action
       const isCorrupted = errorMsg.includes('malformed') || errorMsg.includes('corruption')
@@ -222,6 +255,10 @@ async function handleRecover() {
 }
 
 async function handleInit(reportProgress = false, _id: string = 'init') {
+  initCount++
+  const initId = `init-${initCount}-${Date.now()}`
+  console.log(`[SQLite Worker] ${initId}: Starting initialization...`)
+
   // Wait for crossOriginIsolated to be true before initializing SQLite
   if (!self.crossOriginIsolated) {
     const maxWait = 5000 // 5 seconds max
@@ -242,12 +279,86 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
   // @ts-ignore - installOpfsSAHPoolVfs types are incomplete
   if (typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
     try {
+      const isNewPool = !poolUtil
+      if (isNewPool) {
+        poolInitCount++
+        console.log(
+          `[SQLite Worker] ${initId}: Creating NEW opfs-sahpool (count: ${poolInitCount})`
+        )
+      } else {
+        console.log(`[SQLite Worker] ${initId}: Reusing existing opfs-sahpool`)
+      }
       poolUtil = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+
       // Use the OpfsSAHPoolDb constructor from poolUtil
+      // 'ct' flag = create-if-not-exists, truncate-if-does (opens existing or creates new)
       // @ts-ignore - OpfsSAHPoolDb types are incomplete
       db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'ct')
       dbMode = 'opfs'
+
+      // Check if database was newly created or opened existing
+      let tableCount = 0
+      try {
+        const stmt = db.prepare('SELECT COUNT(*) as count FROM sqlite_master')
+        if (stmt.step()) {
+          const result = stmt.get({}) as { count: number }
+          tableCount = result.count
+          console.log(
+            `[SQLite Worker] ${initId}: Database OPENED (existing) - tables: ${tableCount}`
+          )
+        }
+        stmt.finalize()
+      } catch (e) {
+        // If query fails, database might be newly created with no schema yet
+        console.log(`[SQLite Worker] ${initId}: Database likely NEW (schema not yet initialized)`)
+      }
+
+      // Additional check: verify actual data exists in key tables
+      if (tableCount > 0) {
+        try {
+          const stmt = db.prepare(
+            'SELECT (SELECT COUNT(*) FROM conversations) + (SELECT COUNT(*) FROM workspaces) as total_rows'
+          )
+          if (stmt.step()) {
+            const result = stmt.get({}) as { total_rows: number }
+            const totalRows = result.total_rows
+
+            if (totalRows > 0) {
+              hasSeenData = true
+              console.log(
+                `[SQLite Worker] ${initId}: Data check - ${totalRows} rows found (conversations + workspaces)`
+              )
+            } else {
+              console.warn(
+                `[SQLite Worker] ${initId}: ⚠️ Database exists but is EMPTY! Schema present but no data.`
+              )
+
+              // If we've seen data before but now it's gone, that's data loss!
+              if (hasSeenData) {
+                console.error(
+                  `[SQLite Worker] ${initId}: 🚨 DATA LOSS DETECTED! Previous session had data, but database is now empty.`
+                )
+                console.error(
+                  `[SQLite Worker] ${initId}: This may indicate opfs-sahpool handle staleness or OPFS data cleanup by browser.`
+                )
+                console.error(
+                  `[SQLite Worker] ${initId}: Consider checking browser storage settings or using a more persistent storage method.`
+                )
+              }
+            }
+          }
+          stmt.finalize()
+        } catch (e) {
+          console.log(
+            `[SQLite Worker] ${initId}: Could not check data existence (tables may not exist yet)`
+          )
+        }
+      }
     } catch (error) {
+      console.warn(
+        `[SQLite Worker] ${initId}: opfs-sahpool failed, falling back to regular OPFS:`,
+        error
+      )
       // Fallback to regular opfs VFS
       db = new sqlite3!.oo1.OpfsDb(DB_NAME)
       dbMode = 'opfs'
@@ -255,6 +366,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     }
   } else if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs) {
     // opfs-sahpool not available, use regular opfs VFS
+    console.log(`[SQLite Worker] ${initId}: Using regular OPFS VFS`)
     db = new sqlite3.oo1.OpfsDb(DB_NAME)
     dbMode = 'opfs'
   } else {
@@ -290,6 +402,13 @@ function createProgressReporter() {
 function handleQueryAll(sql: string, params: unknown[]): unknown[] {
   if (!db) {
     throw new Error('Database not initialized')
+  }
+
+  // SQL logging (dev only)
+  if (enableSQLLogging) {
+    const sqlPreview = sql.slice(0, 100)
+    const paramsStr = params.length > 0 ? JSON.stringify(params).slice(0, 50) : ''
+    console.log(`[SQLite SQL] QUERY ${sqlPreview}${sql.length > 100 ? '...' : ''}`, paramsStr || '')
   }
 
   // Check if database connection is still valid
@@ -341,6 +460,13 @@ function handleQueryFirst(sql: string, params: unknown[]): unknown | null {
 function handleExecute(sql: string, params: unknown[]): void {
   if (!db) {
     throw new Error('Database not initialized')
+  }
+
+  // SQL logging (dev only)
+  if (enableSQLLogging) {
+    const sqlPreview = sql.slice(0, 100)
+    const paramsStr = params.length > 0 ? JSON.stringify(params).slice(0, 50) : ''
+    console.log(`[SQLite SQL] EXEC ${sqlPreview}${sql.length > 100 ? '...' : ''}`, paramsStr || '')
   }
 
   // Check if database connection is still valid before executing

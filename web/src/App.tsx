@@ -120,15 +120,6 @@ function App() {
           } else {
             toast.success(t('app.initComplete'), { id: 'storage-init' })
           }
-
-          if (result.migrated && result.migrationResult) {
-            console.log('[App] Migration complete:', result.migrationResult)
-            const { conversations } = result.migrationResult
-            toast.success(
-              t('app.migrationComplete') +
-                `: ${t('app.conversationsMigrated', { count: conversations })}`
-            )
-          }
         } else {
           // Storage initialization failed completely
           const errorMsg = result.error || t('app.initFailed')
@@ -195,8 +186,8 @@ function App() {
 
       if (!mounted) return
 
-      // Restore directory handle
-      restoreDirectoryHandle()
+      // Restore directory handle (await to ensure it completes before UI renders)
+      await restoreDirectoryHandle()
 
       // Initialize workspaces
       try {

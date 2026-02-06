@@ -8,3 +8,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+// Development mode flag (defined in vite.config.ts)
+declare const __DEV__: boolean

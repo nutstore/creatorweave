@@ -60,7 +60,7 @@ function formatCellValue(value: unknown, type: ColumnType = 'text', _format?: st
 
     case 'badge':
       const badgeColor = getBadgeColor(String(value))
-      return `<span class="px-2 py-1 rounded text-xs font-medium ${badgeColor}">${value}</span>`
+      return `<span class="px-2 py-1 rounded text-xs font-medium ${badgeColor}">${escapeHtml(String(value))}</span>`
 
     case 'progress':
       const progress = typeof value === 'number' ? value : parseFloat(String(value)) || 0

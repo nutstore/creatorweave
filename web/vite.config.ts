@@ -12,6 +12,7 @@ export default defineConfig({
   ],
   define: {
     'process.env': {},
+    __DEV__: process.env.NODE_ENV !== 'production' ? 'true' : 'false',
   },
   worker: {
     format: 'es',

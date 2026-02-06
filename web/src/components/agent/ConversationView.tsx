@@ -7,6 +7,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Send, StopCircle, MessageSquare, Bot } from 'lucide-react'
+import { toast } from 'sonner'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -116,7 +117,7 @@ export function ConversationView({
     if (!text) return
 
     if (!hasApiKey) {
-      // TODO: Show error message
+      toast.error('请先在设置中配置 API Key')
       return
     }
 
