@@ -50,6 +50,15 @@ import {
   data_summary_executor,
 } from './data-visualization.tool'
 
+import {
+  analyze_code,
+  analyze_code_executor,
+  find_patterns,
+  find_patterns_executor,
+  refactor_suggestions,
+  refactor_suggestions_executor,
+} from './code-analysis.tool'
+
 // ============================================================================
 // User Persona Types
 // ============================================================================
@@ -255,6 +264,44 @@ export const NEW_TOOL_REGISTRY: Record<
       complexity: 'beginner',
     },
   },
+
+  // ==================== Code Analysis ====================
+  analyze_code: {
+    definition: analyze_code,
+    executor: analyze_code_executor,
+    metadata: {
+      name: 'analyze_code',
+      description: 'Analyze code complexity, quality, and security issues',
+      personas: ['developer'],
+      category: 'code-analysis',
+      tags: ['analysis', 'complexity', 'security', 'code-quality'],
+      complexity: 'intermediate',
+    },
+  },
+  find_patterns: {
+    definition: find_patterns,
+    executor: find_patterns_executor,
+    metadata: {
+      name: 'find_patterns',
+      description: 'Find anti-patterns, design patterns, code smells, and security risks',
+      personas: ['developer'],
+      category: 'code-analysis',
+      tags: ['patterns', 'anti-pattern', 'code-smell', 'security'],
+      complexity: 'intermediate',
+    },
+  },
+  refactor_suggestions: {
+    definition: refactor_suggestions,
+    executor: refactor_suggestions_executor,
+    metadata: {
+      name: 'refactor_suggestions',
+      description: 'Get refactoring suggestions for code improvement',
+      personas: ['developer'],
+      category: 'code-analysis',
+      tags: ['refactor', 'improve', 'code-quality'],
+      complexity: 'beginner',
+    },
+  },
 }
 
 // ============================================================================
@@ -338,6 +385,10 @@ export const PERSONA_TOOL_RECOMMENDATIONS: Record<UserPersona, string[]> = {
     'batch_edit',
     'javascript_exec',
     'python_exec',
+    // New tools
+    'analyze_code',
+    'find_patterns',
+    'refactor_suggestions',
   ],
   'data-analyst': [
     // From existing tools
