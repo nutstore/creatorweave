@@ -31,6 +31,7 @@ import {
   FileJson,
   FileSpreadsheet,
   Image,
+  FileType,
 } from 'lucide-react'
 import type { Command } from './CommandPalette'
 
@@ -231,6 +232,43 @@ export function buildEnhancedCommands(handlers: CommandHandlers): Command[] {
       icon: <Image className="h-4 w-4" />,
       keywords: ['export', 'chart', 'image', 'png', 'picture'],
       handler: () => handlers.onSendMessage('Export the current chart as a PNG image.'),
+    },
+    {
+      id: 'export-pdf',
+      label: 'Export as PDF',
+      description: 'Export report to PDF format',
+      category: COMMAND_CATEGORIES.DATA_ANALYST,
+      icon: <FileType className="h-4 w-4" />,
+      keywords: ['export', 'pdf', 'document', 'report'],
+      handler: () =>
+        handlers.onSendMessage('Export the current analysis or report as a PDF document.'),
+    },
+    {
+      id: 'export-code-review-pdf',
+      label: 'Export Code Review as PDF',
+      description: 'Export code review results to PDF',
+      category: COMMAND_CATEGORIES.DEVELOPER,
+      icon: <FileType className="h-4 w-4" />,
+      keywords: ['export', 'pdf', 'code', 'review', 'report'],
+      handler: () => handlers.onSendMessage('Export the code review results as a PDF report.'),
+    },
+    {
+      id: 'export-test-report-pdf',
+      label: 'Export Test Report as PDF',
+      description: 'Export test generation results to PDF',
+      category: COMMAND_CATEGORIES.DEVELOPER,
+      icon: <FileType className="h-4 w-4" />,
+      keywords: ['export', 'pdf', 'test', 'report'],
+      handler: () => handlers.onSendMessage('Export the test generation results as a PDF report.'),
+    },
+    {
+      id: 'export-project-analysis-pdf',
+      label: 'Export Project Analysis as PDF',
+      description: 'Export project analysis to PDF',
+      category: COMMAND_CATEGORIES.DEVELOPER,
+      icon: <FileType className="h-4 w-4" />,
+      keywords: ['export', 'pdf', 'project', 'analysis', 'report'],
+      handler: () => handlers.onSendMessage('Export the project analysis summary as a PDF report.'),
     },
 
     // ========== Student ==========
