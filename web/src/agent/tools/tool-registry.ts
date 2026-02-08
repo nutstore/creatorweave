@@ -59,6 +59,15 @@ import {
   refactor_suggestions_executor,
 } from './code-analysis.tool'
 
+import {
+  convert_format,
+  convert_format_executor,
+  aggregate_data,
+  aggregate_data_executor,
+  transform_data,
+  transform_data_executor,
+} from './utility-tools.tool'
+
 // ============================================================================
 // User Persona Types
 // ============================================================================
@@ -299,6 +308,45 @@ export const NEW_TOOL_REGISTRY: Record<
       personas: ['developer'],
       category: 'code-analysis',
       tags: ['refactor', 'improve', 'code-quality'],
+      complexity: 'beginner',
+    },
+  },
+
+  // ==================== Utility Tools ====================
+  convert_format: {
+    definition: convert_format,
+    executor: convert_format_executor,
+    metadata: {
+      name: 'convert_format',
+      description: 'Convert data between formats (JSON, CSV, Markdown)',
+      personas: ['data-analyst', 'office-worker', 'developer'],
+      category: 'utility',
+      tags: ['convert', 'format', 'transform'],
+      complexity: 'beginner',
+    },
+  },
+  aggregate_data: {
+    definition: aggregate_data,
+    executor: aggregate_data_executor,
+    metadata: {
+      name: 'aggregate_data',
+      description:
+        'Aggregate data with group-by and statistics (sum, avg, min, max, count, unique)',
+      personas: ['data-analyst', 'office-worker'],
+      category: 'utility',
+      tags: ['aggregate', 'group', 'statistics'],
+      complexity: 'intermediate',
+    },
+  },
+  transform_data: {
+    definition: transform_data,
+    executor: transform_data_executor,
+    metadata: {
+      name: 'transform_data',
+      description: 'Transform data (rename, filter, select, drop columns)',
+      personas: ['data-analyst', 'office-worker'],
+      category: 'utility',
+      tags: ['transform', 'columns', 'filter'],
       complexity: 'beginner',
     },
   },

@@ -1,9 +1,9 @@
 ---
 active: true
-iteration: 2
+iteration: 1
 max_iterations: 100
 completion_promise: "COMPLETE"
-started_at: "2026-02-07T16:56:02Z"
+started_at: "2026-02-08T00:17:56Z"
 ---
 
 项目愿景

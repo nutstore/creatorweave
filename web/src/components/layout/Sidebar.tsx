@@ -317,7 +317,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden" data-tour="file-tree">
               {resourceTab === 'files' && (
                 <FileTreePanel
                   directoryHandle={directoryHandle}

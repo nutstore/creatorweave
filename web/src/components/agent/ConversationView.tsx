@@ -246,7 +246,7 @@ export function ConversationView({
     >
       {shouldUseThreadedView ? (
         // Use ConversationPanel with thread support
-        <div className="flex h-full flex-col">
+        <div className="flex h-full flex-col" data-tour="conversations">
           <ConversationPanel
             conversationId={convId!}
             toolResults={toolResults}

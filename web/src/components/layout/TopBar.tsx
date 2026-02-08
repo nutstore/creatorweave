@@ -90,7 +90,12 @@ export function TopBar({
           </BrandButton>
 
           {/* Tools Panel */}
-          <BrandButton iconButton onClick={onToolsPanelOpen} title="Available Tools">
+          <BrandButton
+            iconButton
+            onClick={onToolsPanelOpen}
+            title="Available Tools"
+            data-tour="tools"
+          >
             <List className="h-[14px] w-[14px]" />
           </BrandButton>
 
@@ -104,6 +109,7 @@ export function TopBar({
             iconButton
             onClick={onSkillsManagerOpen}
             title={t('topbar.skillsManagement')}
+            data-tour="skills"
           >
             <Wrench className="h-[14px] w-[14px]" />
           </BrandButton>
