@@ -65,11 +65,17 @@ export const zhCN = {
     maxTokens: '最大输出 Tokens',
 
     providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google',
+      groq: 'Groq',
+      mistral: 'Mistral',
       glm: '智谱 GLM',
       'glm-coding': '智谱 GLM (Coding)',
       kimi: 'Kimi (Moonshot)',
       minimax: 'MiniMax',
       qwen: '通义千问 (Qwen)',
+      custom: '自定义 (OpenAI 兼容)',
     },
   },
 

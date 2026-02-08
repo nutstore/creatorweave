@@ -47,11 +47,17 @@ export const jaJP = {
     maxTokens: '最大出力トークン数',
 
     providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google',
+      groq: 'Groq',
+      mistral: 'Mistral',
       glm: 'Zhipu GLM',
       'glm-coding': 'Zhipu GLM (Coding)',
       kimi: 'Kimi (Moonshot)',
       minimax: 'MiniMax',
       qwen: 'Qwen',
+      custom: 'カスタム (OpenAI 互換)',
     },
   },
 

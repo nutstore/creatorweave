@@ -62,11 +62,17 @@ export const enUS = {
     maxTokens: 'Max Tokens',
 
     providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google',
+      groq: 'Groq',
+      mistral: 'Mistral',
       glm: 'Zhipu GLM',
       'glm-coding': 'Zhipu GLM (Coding)',
       kimi: 'Kimi (Moonshot)',
       minimax: 'MiniMax',
       qwen: 'Qwen',
+      custom: 'Custom (OpenAI Compatible)',
     },
   },
 

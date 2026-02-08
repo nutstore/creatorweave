@@ -47,11 +47,17 @@ export const koKR = {
     maxTokens: '최대 출력 토큰 수',
 
     providers: {
+      openai: 'OpenAI',
+      anthropic: 'Anthropic',
+      google: 'Google',
+      groq: 'Groq',
+      mistral: 'Mistral',
       glm: 'Zhipu GLM',
       'glm-coding': 'Zhipu GLM (Coding)',
       kimi: 'Kimi (Moonshot)',
       minimax: 'MiniMax',
       qwen: 'Qwen',
+      custom: '커스텀 (OpenAI 호환)',
     },
   },
 

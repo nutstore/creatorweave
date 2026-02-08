@@ -10,7 +10,7 @@ import type { Message } from './message-types'
 import type { LLMProviderType } from '@/agent/providers/types'
 
 /** Flash model configs for each provider type */
-const FLASH_MODEL_CONFIGS: Record<LLMProviderType, { model: string; baseURL: string }> = {
+const FLASH_MODEL_CONFIGS: Partial<Record<LLMProviderType, { model: string; baseURL: string }>> = {
   glm: {
     model: 'glm-4-flash',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
@@ -30,6 +30,26 @@ const FLASH_MODEL_CONFIGS: Record<LLMProviderType, { model: string; baseURL: str
   qwen: {
     model: 'qwen-turbo',
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  },
+  openai: {
+    model: 'gpt-4o-mini',
+    baseURL: 'https://api.openai.com/v1',
+  },
+  anthropic: {
+    model: 'claude-3-5-haiku-20241022',
+    baseURL: 'https://api.anthropic.com/v1',
+  },
+  google: {
+    model: 'gemini-2.0-flash',
+    baseURL: 'https://generativelanguage.googleapis.com/v1beta',
+  },
+  groq: {
+    model: 'llama-3.3-70b-versatile',
+    baseURL: 'https://api.groq.com/openai/v1',
+  },
+  mistral: {
+    model: 'mistral-medium-latest',
+    baseURL: 'https://api.mistral.ai/v1',
   },
 }
 
@@ -115,6 +135,10 @@ export async function generateFollowUp(
     if (lastMessage.role === 'user') return null
 
     const config = FLASH_MODEL_CONFIGS[providerType]
+    if (!config) {
+      console.warn(`[follow-up-generator] No flash model config for provider: ${providerType}`)
+      return null
+    }
 
     // Create provider with flash model config
     const provider = new GLMProvider({
