@@ -585,3 +585,65 @@ export interface GitRestoreResult {
   /** What was restored */
   staging: 'staged' | 'working-tree' | 'both'
 }
+
+/**
+ * Options for gitMerge operation
+ */
+export interface GitMergeOptions {
+  /** Target branch to merge into current branch */
+  theirs: string
+  /** Current branch (for strategy) */
+  ours?: string
+  /** Whether to create a merge commit */
+  commit?: boolean
+  /** Commit message for the merge */
+  message?: string
+  /** Author for the merge commit */
+  author?: { name: string; email: string }
+  /** Prevent fast-forward merge */
+  noFF?: boolean
+  /** Squash merge (create one commit) */
+  squash?: boolean
+}
+
+/**
+ * Result of gitMerge operation
+ */
+export interface GitMergeResult {
+  /** Whether merge was successful */
+  success: boolean
+  /** Whether this was a fast-forward merge */
+  fastForward?: boolean
+  /** Whether merge resulted in conflicts */
+  hasConflicts: boolean
+  /** List of conflicted files */
+  conflicts?: string[]
+  /** Commit SHA (if commit was created) */
+  commitSha?: string
+  /** Abbreviated commit SHA */
+  shortSha?: string
+  /** Merge message */
+  message?: string
+  /** Source branch that was merged */
+  sourceBranch?: string
+  /** Target branch */
+  targetBranch?: string
+}
+
+/**
+ * Git merge status information
+ */
+export interface GitMergeStatus {
+  /** Whether a merge is in progress */
+  isMerging: boolean
+  /** Current merge head (if merging) */
+  mergeHead?: string
+  /** List of conflicted files */
+  conflicts?: string[]
+  /** Number of conflicted files */
+  conflictCount: number
+  /** Whether merge was aborted */
+  aborted?: boolean
+  /** Last merge message */
+  lastMessage?: string
+}

@@ -62,6 +62,9 @@ export type {
   GitDiscardChangesResult,
   GitRestoreOptions,
   GitRestoreResult,
+  GitMergeOptions,
+  GitMergeResult,
+  GitMergeStatus,
 } from './types'
 
 // Utils
@@ -123,3 +126,12 @@ export {
   gitRestore,
   gitResetWorkingDir,
 } from './commands/gitCheckout'
+export {
+  gitMerge,
+  gitMergeAbort,
+  gitMergeStatus,
+  gitIsMerging,
+  gitSquashMerge,
+  gitRebaseMerge,
+  gitMergeBase,
+} from './commands/gitMerge'
