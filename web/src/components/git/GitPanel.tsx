@@ -1,3 +1,13 @@
+/**
+ * GitPanel component with staging area and commit functionality
+ *
+ * Provides git operations panel with:
+ * - Commit history view with SHA copy
+ * - File status with staging/unstaging
+ * - Staging area management
+ * - Commit message form with stage all/unstage all actions
+ */
+
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -13,6 +23,12 @@ import {
   Edit,
   FileText,
   Folder,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Copy,
+  Clock,
+  Square,
 } from 'lucide-react'
 
 /**
@@ -64,7 +80,7 @@ export interface GitDiffFile {
 /**
  * Tab types for GitPanel
  */
-export type GitTabType = 'log' | 'status' | 'diff'
+export type GitTabType = 'log' | 'status' | 'staged'
 
 /**
  * GitPanel component props
@@ -77,9 +93,17 @@ export interface GitPanelProps {
   currentTab?: GitTabType
   isLoading?: boolean
   error?: string | null
+  // Staging callbacks
   onTabChange?: (tab: GitTabType) => void
   onRefresh?: () => void
   onFileClick?: (file: GitFileStatus | GitDiffFile) => void
+  onStageFile?: (file: GitFileStatus) => void
+  onUnstageFile?: (file: GitFileStatus) => void
+  onStageAll?: () => void
+  onUnstageAll?: () => void
+  onCommit?: (message: string) => void
+  // Commit SHA copy handler
+  onCopySha?: (sha: string) => void
   className?: string
 }
 
@@ -122,19 +146,58 @@ function getStatusIcon(status: GitFileStatus['status']): React.ReactNode {
 }
 
 /**
- * Commit list item component
+ * Commit list item component with SHA copy functionality
  */
-function CommitItem({ commit }: { commit: GitCommitEntry }) {
+function CommitItem({
+  commit,
+  onCopy,
+}: {
+  commit: GitCommitEntry
+  onCopy?: (sha: string) => void
+}) {
+  const [copied, setCopied] = React.useState(false)
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    await navigator.clipboard.writeText(commit.hash)
+    onCopy?.(commit.hash)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
-    <div className="flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50">
+    <div
+      className="flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          handleCopy(e as unknown as React.MouseEvent)
+        }
+      }}
+    >
       <div className="mt-0.5 rounded-full bg-primary/10 p-1.5">
         <GitCommit className="h-4 w-4 text-primary" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-            {commit.shortHash}
-          </code>
+          <button
+            className={cn(
+              'group flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs transition-colors',
+              'hover:bg-primary/10 active:scale-[0.98]',
+              copied && 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+            )}
+            onClick={handleCopy}
+            aria-label={`Copy SHA ${commit.shortHash}`}
+          >
+            <span>{commit.shortHash}</span>
+            <Copy
+              className={cn(
+                'h-3 w-3 opacity-0 transition-opacity',
+                copied || 'group-hover:opacity-50'
+              )}
+            />
+          </button>
           {commit.refs && commit.refs.length > 0 && (
             <div className="flex gap-1">
               {commit.refs.map((ref) => (
@@ -149,8 +212,11 @@ function CommitItem({ commit }: { commit: GitCommitEntry }) {
           )}
         </div>
         <p className="mt-1 truncate text-sm font-medium">{commit.subject}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {commit.author} • {commit.authorDate}
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          <span>
+            {commit.author} • {commit.authorDate}
+          </span>
         </p>
       </div>
       <ChevronRight className="mt-2 h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -159,9 +225,21 @@ function CommitItem({ commit }: { commit: GitCommitEntry }) {
 }
 
 /**
- * File status item component
+ * File status item component with staging controls
  */
-function FileStatusItem({ file, onClick }: { file: GitFileStatus; onClick?: () => void }) {
+function FileStatusItem({
+  file,
+  onClick,
+  onStage,
+  onUnstage,
+  isStagingMode = false,
+}: {
+  file: GitFileStatus
+  onClick?: () => void
+  onStage?: () => void
+  onUnstage?: () => void
+  isStagingMode?: boolean
+}) {
   return (
     <div
       className={cn(
@@ -179,6 +257,30 @@ function FileStatusItem({ file, onClick }: { file: GitFileStatus; onClick?: () =
         }
       }}
     >
+      {/* Staging checkbox */}
+      {isStagingMode && (
+        <button
+          className={cn(
+            'flex h-6 w-6 items-center justify-center rounded-md border-2 transition-colors',
+            'touch-manipulation active:scale-95',
+            file.staged
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-muted-foreground/30 hover:border-primary'
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (file.staged) {
+              onUnstage?.()
+            } else {
+              onStage?.()
+            }
+          }}
+          aria-label={file.staged ? `Unstage ${file.path}` : `Stage ${file.path}`}
+        >
+          {file.staged && <Check className="h-4 w-4" />}
+        </button>
+      )}
+
       <div
         className={cn(
           'rounded-md p-1.5',
@@ -214,48 +316,6 @@ function FileStatusItem({ file, onClick }: { file: GitFileStatus; onClick?: () =
           <p className="mt-0.5 truncate text-xs text-muted-foreground">{file.oldPath}</p>
         )}
       </div>
-    </div>
-  )
-}
-
-/**
- * Diff file component
- */
-function DiffFileItem({ file, onClick }: { file: GitDiffFile; onClick?: () => void }) {
-  return (
-    <div
-      className="flex cursor-pointer items-center gap-3 rounded-lg p-3 transition-colors hover:bg-accent/50 active:bg-accent/70"
-      onClick={onClick}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onClick?.()
-        }
-      }}
-    >
-      <div className="rounded-md bg-purple-100 p-1.5 text-purple-700 dark:bg-purple-900 dark:text-purple-300">
-        <GitMerge className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="truncate text-sm font-medium">
-            {file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
-          </span>
-        </div>
-        <div className="mt-1 flex items-center gap-3 text-xs">
-          {file.binary ? (
-            <span className="text-muted-foreground">Binary file</span>
-          ) : (
-            <>
-              <span className="text-green-600 dark:text-green-400">+{file.additions}</span>
-              <span className="text-red-600 dark:text-red-400">-{file.deletions}</span>
-            </>
-          )}
-        </div>
-      </div>
-      <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
     </div>
   )
 }
@@ -301,28 +361,199 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
 }
 
 /**
- * GitPanel component - displays git operations panel with Log, Status, and Diff tabs
+ * Staging panel component with staged/unstaged file sections
+ */
+function StagingPanel({
+  stagedFiles,
+  unstagedFiles,
+  onStageFile,
+  onUnstageFile,
+  onStageAll,
+  onUnstageAll,
+  onFileClick,
+}: {
+  stagedFiles: GitFileStatus[]
+  unstagedFiles: GitFileStatus[]
+  onStageFile?: (file: GitFileStatus) => void
+  onUnstageFile?: (file: GitFileStatus) => void
+  onStageAll?: () => void
+  onUnstageAll?: () => void
+  onFileClick?: (file: GitFileStatus) => void
+}) {
+  const hasChanges = stagedFiles.length > 0 || unstagedFiles.length > 0
+
+  if (!hasChanges) {
+    return <EmptyState message="No changes to stage" />
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Staged files section */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Check className="h-4 w-4 text-green-600" />
+            <span className="text-sm font-medium">Staged ({stagedFiles.length})</span>
+          </div>
+          {unstagedFiles.length > 0 && onUnstageAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={onUnstageAll}
+            >
+              <ArrowLeft className="mr-1 h-3 w-3" />
+              Unstage All
+            </Button>
+          )}
+        </div>
+        {stagedFiles.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">No staged files</p>
+        ) : (
+          stagedFiles.map((file, index) => (
+            <FileStatusItem
+              key={`${file.path}-${index}`}
+              file={file}
+              isStagingMode={true}
+              onStage={() => onStageFile?.(file)}
+              onUnstage={() => onUnstageFile?.(file)}
+              onClick={() => onFileClick?.(file)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Unstaged files section */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Square className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm font-medium">Unstaged ({unstagedFiles.length})</span>
+          </div>
+          {unstagedFiles.length > 0 && onStageAll && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs text-muted-foreground"
+              onClick={onStageAll}
+            >
+              <ArrowRight className="mr-1 h-3 w-3" />
+              Stage All
+            </Button>
+          )}
+        </div>
+        {unstagedFiles.length === 0 ? (
+          <p className="py-4 text-center text-xs text-muted-foreground">No unstaged files</p>
+        ) : (
+          unstagedFiles.map((file, index) => (
+            <FileStatusItem
+              key={`${file.path}-${index}`}
+              file={file}
+              isStagingMode={true}
+              onStage={() => onStageFile?.(file)}
+              onUnstage={() => onUnstageFile?.(file)}
+              onClick={() => onFileClick?.(file)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Commit form component with message input and commit button
+ */
+function CommitForm({
+  onCommit,
+  disabled,
+}: {
+  onCommit?: (message: string) => void
+  disabled?: boolean
+}) {
+  const [message, setMessage] = React.useState('')
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null)
+
+  const handleSubmit = () => {
+    if (message.trim()) {
+      onCommit?.(message.trim())
+      setMessage('')
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      handleSubmit()
+    }
+  }
+
+  return (
+    <div className="border-t bg-muted/30 p-3">
+      <textarea
+        ref={textareaRef}
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder="Commit message..."
+        className={cn(
+          'min-h-[60px] w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm',
+          'placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+        )}
+        disabled={disabled}
+        aria-label="Commit message"
+      />
+      <div className="mt-2 flex items-center justify-end gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled || !message.trim()}
+          onClick={() => setMessage('')}
+        >
+          Cancel
+        </Button>
+        <Button size="sm" disabled={disabled || !message.trim()} onClick={handleSubmit}>
+          <GitCommit className="mr-1.5 h-3.5 w-3.5" />
+          Commit
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * GitPanel component - displays git operations panel with Log, Status, and Staged tabs
  */
 export function GitPanel({
   repoPath,
   commits = [],
   fileStatuses = [],
-  diffs = [],
+  diffs: _diffs = [],
   currentTab = 'log',
   isLoading = false,
   error = null,
   onTabChange,
   onRefresh,
   onFileClick,
+  onStageFile,
+  onUnstageFile,
+  onStageAll,
+  onUnstageAll,
+  onCommit,
+  onCopySha,
   className,
 }: GitPanelProps) {
   const tabs: { id: GitTabType; label: string; icon: React.ReactNode }[] = [
     { id: 'log', label: 'Log', icon: <GitCommit className="h-4 w-4" /> },
     { id: 'status', label: 'Status', icon: <FileText className="h-4 w-4" /> },
-    { id: 'diff', label: 'Diff', icon: <GitMerge className="h-4 w-4" /> },
+    { id: 'staged', label: 'Staged', icon: <Check className="h-4 w-4" /> },
   ]
 
   const [activeTab, setActiveTab] = React.useState<GitTabType>(currentTab)
+
+  // Separate files into staged and unstaged for staging panel
+  const stagedFiles = fileStatuses.filter((f) => f.staged)
+  const unstagedFiles = fileStatuses.filter((f) => !f.staged)
 
   React.useEffect(() => {
     setActiveTab(currentTab)
@@ -400,7 +631,9 @@ export function GitPanel({
                   {commits.length === 0 ? (
                     <EmptyState message="No commits found" />
                   ) : (
-                    commits.map((commit) => <CommitItem key={commit.hash} commit={commit} />)
+                    commits.map((commit) => (
+                      <CommitItem key={commit.hash} commit={commit} onCopy={onCopySha} />
+                    ))
                   )}
                 </div>
               )}
@@ -422,25 +655,26 @@ export function GitPanel({
                 </div>
               )}
 
-              {/* Diff tab content */}
-              {activeTab === 'diff' && (
-                <div className="space-y-1">
-                  {diffs.length === 0 ? (
-                    <EmptyState message="No diff available" />
-                  ) : (
-                    diffs.map((file) => (
-                      <DiffFileItem
-                        key={file.path}
-                        file={file}
-                        onClick={() => onFileClick?.(file)}
-                      />
-                    ))
-                  )}
-                </div>
+              {/* Staged tab content with staging panel */}
+              {activeTab === 'staged' && (
+                <StagingPanel
+                  stagedFiles={stagedFiles}
+                  unstagedFiles={unstagedFiles}
+                  onStageFile={onStageFile}
+                  onUnstageFile={onUnstageFile}
+                  onStageAll={onStageAll}
+                  onUnstageAll={onUnstageAll}
+                  onFileClick={onFileClick}
+                />
               )}
             </>
           )}
         </div>
+
+        {/* Commit form - only visible in staged tab when commit callback is provided */}
+        {activeTab === 'staged' && onCommit && (
+          <CommitForm onCommit={onCommit} disabled={isLoading || stagedFiles.length === 0} />
+        )}
       </CardContent>
     </Card>
   )
