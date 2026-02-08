@@ -75,6 +75,15 @@ import {
   transform_data_executor,
 } from './utility-tools.tool'
 
+import {
+  generate_markdown_docs,
+  generate_markdown_docs_executor,
+  generate_single_doc,
+  generate_single_doc_executor,
+  extract_docs,
+  extract_docs_executor,
+} from './doc-generation/doc-generation.tool'
+
 // ============================================================================
 // User Persona Types
 // ============================================================================
@@ -383,6 +392,44 @@ export const NEW_TOOL_REGISTRY: Record<
       complexity: 'beginner',
     },
   },
+
+  // ==================== Documentation Generation ====================
+  generate_markdown_docs: {
+    definition: generate_markdown_docs,
+    executor: generate_markdown_docs_executor,
+    metadata: {
+      name: 'generate_markdown_docs',
+      description: 'Generate Markdown documentation from JSDoc comments in source code',
+      personas: ['developer'],
+      category: 'documentation',
+      tags: ['documentation', 'markdown', 'jsdoc', 'api'],
+      complexity: 'beginner',
+    },
+  },
+  generate_single_doc: {
+    definition: generate_single_doc,
+    executor: generate_single_doc_executor,
+    metadata: {
+      name: 'generate_single_doc',
+      description: 'Generate documentation for a single function, class, or interface',
+      personas: ['developer'],
+      category: 'documentation',
+      tags: ['documentation', 'markdown', 'jsdoc', 'single'],
+      complexity: 'beginner',
+    },
+  },
+  extract_docs: {
+    definition: extract_docs,
+    executor: extract_docs_executor,
+    metadata: {
+      name: 'extract_docs',
+      description: 'Extract and parse JSDoc documentation items from source code',
+      personas: ['developer'],
+      category: 'documentation',
+      tags: ['documentation', 'jsdoc', 'extract', 'parse'],
+      complexity: 'beginner',
+    },
+  },
 }
 
 // ============================================================================
@@ -472,6 +519,10 @@ export const PERSONA_TOOL_RECOMMENDATIONS: Record<UserPersona, string[]> = {
     'refactor_suggestions',
     'code_review',
     'batch_code_review',
+    // Documentation tools
+    'generate_markdown_docs',
+    'generate_single_doc',
+    'extract_docs',
   ],
   'data-analyst': [
     // From existing tools
