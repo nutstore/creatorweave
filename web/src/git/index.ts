@@ -55,6 +55,13 @@ export type {
   GitBranchDeleteOptions,
   GitBranchRenameOptions,
   GitBranchResult,
+  GitCheckoutOptions,
+  GitCheckoutResult,
+  GitSwitchOptions,
+  GitDiscardChangesOptions,
+  GitDiscardChangesResult,
+  GitRestoreOptions,
+  GitRestoreResult,
 } from './types'
 
 // Utils
@@ -108,3 +115,11 @@ export {
   gitBranchCount,
   validateBranchName,
 } from './commands/gitBranch'
+export {
+  gitCheckout,
+  gitSwitch,
+  gitDiscardChanges,
+  gitDiscardAllChanges,
+  gitRestore,
+  gitResetWorkingDir,
+} from './commands/gitCheckout'

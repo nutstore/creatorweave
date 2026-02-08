@@ -499,3 +499,89 @@ export interface GitBranchResult {
   /** Previous name (for rename) */
   previousName?: string
 }
+
+/**
+ * Options for gitCheckout operation
+ */
+export interface GitCheckoutOptions {
+  /** Branch to checkout (required for branch checkout) */
+  branch?: string
+  /** File path to checkout (required for file checkout) */
+  filepath?: string
+  /** Create branch if it doesn't exist */
+  createBranch?: boolean
+  /** Force checkout (discard local changes) */
+  force?: boolean
+  /** Source commit/branch to restore from (for file checkout) */
+  source?: string
+}
+
+/**
+ * Result of gitCheckout operation
+ */
+export interface GitCheckoutResult {
+  /** Type of checkout performed */
+  type: 'branch' | 'file'
+  /** Branch name (if branch checkout) */
+  branch?: string
+  /** File path (if file checkout) */
+  filepath?: string
+  /** Whether checkout was forced */
+  forced?: boolean
+}
+
+/**
+ * Options for gitSwitch operation (safer branch switching)
+ */
+export interface GitSwitchOptions {
+  /** Branch to switch to */
+  branch: string
+  /** Create branch if it doesn't exist */
+  createBranch?: boolean
+  /** Discard local changes when switching */
+  discardChanges?: boolean
+}
+
+/**
+ * Options for gitDiscardChanges operation
+ */
+export interface GitDiscardChangesOptions {
+  /** File paths to discard changes for */
+  filepaths: string[]
+  /** Also discard staged changes */
+  discardStaged?: boolean
+}
+
+/**
+ * Options for gitRestore operation
+ */
+export interface GitRestoreOptions {
+  /** File path to restore */
+  filepath: string
+  /** Source to restore from: branch, commit SHA, or staging area */
+  source?: string
+  /** What to restore: 'staged', 'working-tree', or 'both' */
+  staging?: 'staged' | 'working-tree' | 'both'
+}
+
+/**
+ * Result of gitDiscardChanges operation
+ */
+export interface GitDiscardChangesResult {
+  /** Files that were discarded */
+  discarded: string[]
+  /** Files that failed to discard */
+  errors: Array<{ filepath: string; error: string }>
+}
+
+/**
+ * Result of gitRestore operation
+ */
+export interface GitRestoreResult {
+  /** File path that was restored */
+  filepath: string
+  /** Source it was restored from */
+  source: string
+  /** What was restored */
+  staging: 'staged' | 'working-tree' | 'both'
+}
