@@ -282,6 +282,13 @@ function App() {
     window.addEventListener('touchstart', handleFirstInteraction, { once: true })
   }, [])
 
+  // Set up offline queue monitoring
+  useEffect(() => {
+    import('@/store/offline-queue.store').then(({ setupOfflineMonitoring }) => {
+      return setupOfflineMonitoring()
+    })
+  }, [])
+
   // Responsive layout detection - must be called before any conditional returns
   const isMobile = useMobile()
 

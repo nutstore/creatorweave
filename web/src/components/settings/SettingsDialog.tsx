@@ -22,10 +22,12 @@ import {
   Trash2,
   ExternalLink,
   Check,
+  Wifi,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
+import { OfflineQueue } from '@/components/mobile/OfflineQueue'
 import {
   BrandDialog,
   BrandDialogClose,
@@ -41,7 +43,7 @@ import { getSessionStateManager } from '@/remote/session-state-serialization'
 // Types
 // =============================================================================
 
-type SettingsTab = 'llm' | 'sync'
+type SettingsTab = 'llm' | 'sync' | 'offline'
 
 interface SessionSyncMetadata {
   syncId: string
@@ -671,6 +673,7 @@ const SettingsDialogContent = forwardRef<
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'llm', label: t('settings.title') || 'LLM 设置', icon: <Settings className="h-4 w-4" /> },
     { id: 'sync', label: '跨设备同步', icon: <Cloud className="h-4 w-4" /> },
+    { id: 'offline', label: '离线任务', icon: <Wifi className="h-4 w-4" /> },
   ]
 
   return (
@@ -721,6 +724,13 @@ const SettingsDialogContent = forwardRef<
           {activeTab === 'sync' && (
             <div className="py-2 pr-2">
               <SyncPanel deviceId={deviceId} browserInfo={browserInfo} />
+            </div>
+          )}
+
+          {/* Offline Queue Tab */}
+          {activeTab === 'offline' && (
+            <div className="py-2 pr-2">
+              <OfflineQueue />
             </div>
           )}
         </div>
