@@ -5,6 +5,7 @@
  * - E2E encryption key exchange (public key relay)
  * - Session management (host + remote)
  * - Message relay (bidirectional, encrypted)
+ * - Cross-device session sync (upload/download)
  * - Ping/pong heartbeat
  * - Reconnection support
  * - Peer state tracking
@@ -13,6 +14,9 @@
 import express from 'express'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+
+// Import session sync routes
+import sessionSyncRoutes from './routes/session-sync.js'
 
 // ============================================================================
 // Types (from remote-protocol.ts)
@@ -108,6 +112,9 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString()
   })
 })
+
+// Session Sync API routes
+app.use('/api', sessionSyncRoutes)
 
 // Join session - redirect to mobile-web
 const MOBILE_WEB_URL = process.env.MOBILE_WEB_URL || 'http://localhost:3002'
