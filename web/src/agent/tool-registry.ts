@@ -64,6 +64,9 @@ import {
 } from '@/skills/skill-tools'
 import { getAllEnabledSkillNames } from '@/skills/skill-storage'
 
+// Import test generation tool
+import { test_generation, test_generation_executor } from './tools/test-generation.tool'
+
 export class ToolRegistry {
   private tools = new Map<string, ToolEntry>()
 
@@ -164,6 +167,8 @@ export class ToolRegistry {
     // Code review tools
     this.register(code_review, code_review_executor)
     this.register(batch_code_review, batch_code_review_executor)
+    // Test generation tool
+    this.register(test_generation, test_generation_executor)
   }
 
   /** Register a WASM plugin as an Agent tool */
