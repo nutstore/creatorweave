@@ -1,7 +1,7 @@
 /**
- * AgentLoop 单元测试
+ * AgentLoop Unit Tests
  *
- * 测试目标覆盖率：85%
+ * Target coverage: 85%
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -16,6 +16,29 @@ vi.mock('@/skills/skill-manager', () => ({
   getSkillManager: vi.fn(() => ({
     getEnhancedSystemPrompt: vi.fn((prompt: string) => prompt),
   })),
+}))
+
+// Mock intelligence-coordinator
+vi.mock('../intelligence-coordinator', () => ({
+  getIntelligenceCoordinator: vi.fn(() => ({
+    enhanceSystemPrompt: vi.fn((prompt: string) => Promise.resolve({ systemPrompt: prompt })),
+    quickDetectProjectType: vi.fn(() => Promise.resolve({ type: 'typescript' })),
+  })),
+}))
+
+// Mock MCP manager
+vi.mock('@/mcp', () => ({
+  getMCPManager: vi.fn(() => ({
+    initialize: vi.fn(() => Promise.resolve()),
+    registerMCPTools: vi.fn(() => Promise.resolve()),
+    getAvailableMCPServicesBlock: vi.fn(() => ''),
+  })),
+}))
+
+// Mock prefetch - use vi.fn() created outside mock
+const mockTriggerPrefetch = vi.fn(() => Promise.resolve())
+vi.mock('../prefetch', () => ({
+  triggerPrefetch: mockTriggerPrefetch,
 }))
 
 // ============================================================================
