@@ -35,10 +35,9 @@ vi.mock('@/mcp', () => ({
   })),
 }))
 
-// Mock prefetch - use vi.fn() created outside mock
-const mockTriggerPrefetch = vi.fn(() => Promise.resolve())
+// Mock prefetch module
 vi.mock('../prefetch', () => ({
-  triggerPrefetch: mockTriggerPrefetch,
+  triggerPrefetch: vi.fn(() => Promise.resolve()),
 }))
 
 // ============================================================================

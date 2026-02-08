@@ -46,29 +46,7 @@ global.indexedDB = indexedDBMock as any
 global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
 global.URL.revokeObjectURL = vi.fn()
 
-// =============================================================================
-// Mock Prefetch Module - Must be before importing AgentLoop
-// =============================================================================
-
-// Create mock prefetch functions before any imports
-const mockPrefetch = vi.fn(() => Promise.resolve())
-
-vi.mock('../agent/prefetch', () => ({
-  triggerPrefetch: mockPrefetch,
-  createPrefetchCache: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    invalidate: vi.fn(),
-    clear: vi.fn(),
-  })),
-  createFilePredictor: vi.fn(() => ({
-    predict: vi.fn(),
-    train: vi.fn(),
-    clear: vi.fn(),
-  })),
-}))
-
-// Set default test timeout
+// Set default test timeout for long-running tests
 beforeEach(() => {
   vi.setConfig({ testTimeout: 30000 })
 })
