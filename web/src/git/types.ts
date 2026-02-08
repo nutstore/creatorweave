@@ -647,3 +647,101 @@ export interface GitMergeStatus {
   /** Last merge message */
   lastMessage?: string
 }
+
+/**
+ * Options for gitFetch operation
+ */
+export interface GitFetchOptions {
+  /** Remote name or URL (default: 'origin') */
+  remote?: string
+  /** Branch to fetch (fetches all if not specified) */
+  branch?: string
+  /** Fetch tags */
+  tags?: boolean
+  /** Fetch all remotes */
+  all?: boolean
+  /** Prune stale remote-tracking references */
+  prune?: boolean
+  /** Depth for shallow fetch */
+  depth?: number
+}
+
+/**
+ * Result of gitFetch operation
+ */
+export interface GitFetchResult {
+  /** Whether fetch was successful */
+  success: boolean
+  /** Fetched refs */
+  fetched: string[]
+  /** Pruned refs (if prune was enabled) */
+  pruned?: string[]
+  /** Any errors that occurred */
+  errors: Array<{ ref?: string; error: string }>
+}
+
+/**
+ * Options for gitPush operation
+ */
+export interface GitPushOptions {
+  /** Remote name or URL (default: 'origin') */
+  remote?: string
+  /** Branch to push (default: current branch) */
+  branch?: string
+  /** Force push */
+  force?: boolean
+  /** Push tags */
+  tags?: boolean
+  /** Push all branches */
+  all?: boolean
+  /** Delete remote branch after push */
+  delete?: boolean
+  /** Set upstream tracking */
+  setUpstream?: boolean
+}
+
+/**
+ * Result of gitPush operation
+ */
+export interface GitPushResult {
+  /** Whether push was successful */
+  success: boolean
+  /** Pushed refs */
+  pushed: string[]
+  /** Any errors that occurred */
+  errors: Array<{ ref?: string; error: string }>
+}
+
+/**
+ * Options for gitPull operation
+ */
+export interface GitPullOptions {
+  /** Remote name or URL (default: 'origin') */
+  remote?: string
+  /** Branch to pull from (default: upstream of current branch) */
+  branch?: string
+  /** Rebase instead of merge */
+  rebase?: boolean
+  /** Commit message for merge commit */
+  message?: string
+  /** Author for the commit */
+  author?: { name: string; email: string }
+}
+
+/**
+ * Result of gitPull operation
+ */
+export interface GitPullResult {
+  /** Whether pull was successful */
+  success: boolean
+  /** Whether this was a fast-forward */
+  fastForward?: boolean
+  /** Whether there were conflicts */
+  hasConflicts: boolean
+  /** Conflicted files (if any) */
+  conflicts?: string[]
+  /** Updated branches */
+  updates: Array<{ branch: string; from: string; to: string }>
+  /** Commit SHA if merge/rebase created a commit */
+  commitSha?: string
+}

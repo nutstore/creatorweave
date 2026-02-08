@@ -65,6 +65,12 @@ export type {
   GitMergeOptions,
   GitMergeResult,
   GitMergeStatus,
+  GitFetchOptions,
+  GitFetchResult,
+  GitPushOptions,
+  GitPushResult,
+  GitPullOptions,
+  GitPullResult,
 } from './types'
 
 // Utils
@@ -135,3 +141,11 @@ export {
   gitRebaseMerge,
   gitMergeBase,
 } from './commands/gitMerge'
+export {
+  gitFetch,
+  gitPush,
+  gitPull,
+  gitRemoteList,
+  gitRemoteAdd,
+  gitRemoteRemove,
+} from './commands/gitRemote'
