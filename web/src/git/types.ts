@@ -405,3 +405,97 @@ export interface GitCommitResult {
   /** GPG signature (if present) */
   signature?: string
 }
+
+/**
+ * Git branch information
+ */
+export interface GitBranch {
+  /** Branch name (e.g., 'main', 'feature/new-feature') */
+  name: string
+  /** Full reference name (e.g., 'refs/heads/main') */
+  ref: string
+  /** Commit SHA that the branch points to */
+  sha: string
+  /** Abbreviated commit SHA (7 characters) */
+  shortSha: string
+  /** Whether this is the current branch (HEAD) */
+  isCurrent: boolean
+  /** Whether this is a remote branch */
+  isRemote: boolean
+  /** Remote name (if remote branch) */
+  remote?: string
+  /** Upstream branch (if tracking a remote branch) */
+  upstream?: string
+  /** Whether the branch is ahead of upstream */
+  ahead?: number
+  /** Whether the branch is behind upstream */
+  behind?: number
+  /** Whether the branch has local commits not pushed */
+  hasLocalCommits?: boolean
+}
+
+/**
+ * Git branch list options
+ */
+export interface GitBranchListOptions {
+  /** Include remote branches */
+  includeRemote?: boolean
+  /** Include current branch info */
+  includeCurrent?: boolean
+  /** Sort order: 'name' | 'date' */
+  sort?: 'name' | 'date'
+}
+
+/**
+ * Git branch create options
+ */
+export interface GitBranchCreateOptions {
+  /** Branch name to create */
+  name: string
+  /** Starting point (branch name, tag, or commit SHA) */
+  startPoint?: string
+  /** Force creation even if branch exists */
+  force?: boolean
+  /** Create orphan branch (no parent) */
+  orphan?: boolean
+}
+
+/**
+ * Git branch delete options
+ */
+export interface GitBranchDeleteOptions {
+  /** Branch name to delete */
+  name: string
+  /** Force delete even if branch is not fully merged */
+  force?: boolean
+  /** Delete remote branch if set */
+  remote?: boolean
+  /** Remote name (if deleting remote branch) */
+  remoteName?: string
+}
+
+/**
+ * Git branch rename options
+ */
+export interface GitBranchRenameOptions {
+  /** Current branch name */
+  oldName: string
+  /** New branch name */
+  newName: string
+  /** Force rename even if newName branch exists */
+  force?: boolean
+}
+
+/**
+ * Result of gitBranch operation
+ */
+export interface GitBranchResult {
+  /** Branch name */
+  name: string
+  /** Full reference */
+  ref: string
+  /** Commit SHA */
+  sha: string
+  /** Previous name (for rename) */
+  previousName?: string
+}

@@ -6,11 +6,11 @@
  * This module provides:
  * - Type definitions for Git operations
  * - Filesystem abstraction using LightningFS
- * - Commands: log, status, diff, commit
+ * - Commands: log, status, diff, commit, branch
  *
  * Usage:
  * ```typescript
- * import { initGitFs, gitLog, gitStatus, gitDiff, gitCommit } from './git'
+ * import { initGitFs, gitLog, gitStatus, gitDiff, gitCommit, gitBranchList, gitGetCurrentBranch } from './git'
  *
  * // Initialize the filesystem
  * const fs = await initGitFs()
@@ -20,6 +20,8 @@
  * const statusResult = await gitStatus(fs, '/path/to/repo')
  * const diffResult = await gitDiff(fs, '/path/to/repo')
  * const commitResult = await gitCommit(fs, '/path/to/repo', { message: 'feat: new feature' })
+ * const branchListResult = await gitBranchList(fs, '/path/to/repo')
+ * const currentBranch = await gitGetCurrentBranch(fs, '/path/to/repo')
  * ```
  */
 
@@ -47,6 +49,12 @@ export type {
   GitAddResult,
   GitCommitOptions,
   GitCommitResult,
+  GitBranch,
+  GitBranchListOptions,
+  GitBranchCreateOptions,
+  GitBranchDeleteOptions,
+  GitBranchRenameOptions,
+  GitBranchResult,
 } from './types'
 
 // Utils
@@ -89,3 +97,14 @@ export {
   gitCommitWithSignature,
   gitInitialCommit,
 } from './commands/gitCommit'
+export {
+  gitGetCurrentBranch,
+  gitBranchList,
+  gitBranchCreate,
+  gitBranchDelete,
+  gitBranchRename,
+  gitBranchExists,
+  gitBranchInfo,
+  gitBranchCount,
+  validateBranchName,
+} from './commands/gitBranch'
