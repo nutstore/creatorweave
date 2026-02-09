@@ -129,16 +129,21 @@ export class PythonExecutor {
    *
    * @param options - Execution options
    * @returns Promise resolving to execution result
+   *
+   * Note: Pyodide automatically loads packages from import statements in your code.
+   * Packages like pandas, numpy, matplotlib, openpyxl, etc. will be loaded automatically.
    */
   async execute(options: {
     /** Python code to execute */
     code: string
-    /** Optional files to inject into /mnt */
+    /** Optional files to inject into /mnt (only used when not using mountDir) */
     files?: FileRef[]
-    /** Optional packages to load (pandas, numpy, matplotlib, openpyxl) */
-    packages?: string[]
     /** Execution timeout in milliseconds (default: 30000) */
     timeout?: number
+    /** Optional directory handle to mount at /mnt (File System Access API) */
+    mountDir?: FileSystemDirectoryHandle
+    /** Whether to sync changes back to native filesystem after execution */
+    syncFs?: boolean
   }): Promise<ExecuteResult> {
     // Ensure worker is initialized
     this.ensureWorker()
@@ -152,14 +157,15 @@ export class PythonExecutor {
       type: 'execute',
       code: options.code,
       files: options.files || [],
-      packages: options.packages || [],
       timeout: options.timeout || DEFAULT_TIMEOUT,
+      mountDir: options.mountDir,
+      syncFs: options.syncFs,
     }
 
     logger(`Executing Python code (id: ${id})`)
     logger(`  Code length: ${options.code.length} bytes`)
     logger(`  Files: ${options.files?.length || 0}`)
-    logger(`  Packages: ${options.packages?.join(', ') || 'none'}`)
+    logger(`  Mount dir: ${options.mountDir?.name || 'none'}`)
     logger(`  Timeout: ${formatTime(options.timeout || DEFAULT_TIMEOUT)}`)
 
     // Create promise for response
@@ -254,6 +260,122 @@ export class PythonExecutor {
    */
   getPendingCount(): number {
     return this.pendingRequests.size
+  }
+
+  //=============================================================================
+  // Native Directory Mounting (mountNativeFS)
+  //=============================================================================
+
+  /**
+   * Mount a directory to /mnt using mountNativeFS
+   * Uses File System Access API (showDirectoryPicker)
+   *
+   * @returns Promise resolving to { handle: FileSystemDirectoryHandle } or undefined if cancelled
+   */
+  async selectAndMountDir(): Promise<{ handle: FileSystemDirectoryHandle } | undefined> {
+    // Check if File System Access API is available
+    if (typeof window.showDirectoryPicker !== 'function') {
+      throw new Error('File System Access API is not supported in this browser')
+    }
+
+    try {
+      const handle = await window.showDirectoryPicker()
+      await this.mountDir(handle)
+      return { handle }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return undefined
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Mount a directory handle to /mnt
+   * @param dirHandle - FileSystemDirectoryHandle from showDirectoryPicker
+   */
+  async mountDir(dirHandle: FileSystemDirectoryHandle): Promise<void> {
+    this.ensureWorker()
+
+    const id = generateId()
+
+    logger(`Mounting directory: ${dirHandle.name}`)
+
+    const responsePromise = new Promise<{
+      success: boolean
+      result: { success: boolean; error?: string }
+    }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error('Mount request timeout'))
+      }, 30000) as unknown as number
+
+      this.pendingRequests.set(id, {
+        resolve: (/** @type {any} */ res) => {
+          clearTimeout(timeout)
+          resolve(res)
+        },
+        reject,
+        timeout,
+      })
+    })
+
+    this.worker!.postMessage({
+      id,
+      type: 'mount',
+      dirHandle,
+    })
+
+    const response = await responsePromise
+
+    if (!response.result.success) {
+      throw new Error(response.result.error || 'Mount failed')
+    }
+
+    logger(`Directory mounted: ${dirHandle.name}`)
+  }
+
+  /**
+   * Sync changes back to the native filesystem
+   */
+  async sync(): Promise<void> {
+    this.ensureWorker()
+
+    const id = generateId()
+
+    logger('Syncing filesystem...')
+
+    const responsePromise = new Promise<{
+      success: boolean
+      result: { success: boolean; error?: string }
+    }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error('Sync request timeout'))
+      }, 30000) as unknown as number
+
+      this.pendingRequests.set(id, {
+        resolve: (/** @type {any} */ res) => {
+          clearTimeout(timeout)
+          resolve(res)
+        },
+        reject,
+        timeout,
+      })
+    })
+
+    this.worker!.postMessage({
+      id,
+      type: 'sync',
+    })
+
+    const response = await responsePromise
+
+    if (!response.result.success) {
+      throw new Error(response.result.error || 'Sync failed')
+    }
+
+    logger('Filesystem synced')
   }
 }
 

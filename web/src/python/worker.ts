@@ -5,6 +5,8 @@
  * Features:
  * - Lazy loads Pyodide from local bundle on first use
  * - Creates /mnt directory for file operations
+ * - Mounts native directories via mountNativeFS (File System Access API)
+ * - Syncs changes back to native filesystem
  * - Automatic package loading via loadPackagesFromImports
  * - Captures stdout/stderr for print output
  * - Handles matplotlib image output
@@ -34,12 +36,16 @@
  */
 
 /**
- * @typedef {Object} ExecuteRequest
+ * @typedef {Object} MountRequest
  * @property {string} id
- * @property {'execute'} type
- * @property {string} code
- * @property {FileRef[]} [files]
- * @property {number} [timeout]
+ * @property {'mount'} type
+ * @property {FileSystemDirectoryHandle} dirHandle
+ */
+
+/**
+ * @typedef {Object} SyncRequest
+ * @property {string} id
+ * @property {'sync'} type
  */
 
 /**
@@ -63,6 +69,9 @@ let pyodide = null
 
 /** @type {Promise<any>} */
 let pyodideReadyPromise = null
+
+/** @type {any} NativeFS handle for syncing changes back */
+let nativefs = null
 
 // Stdout/stderr capture
 /** @type {string[]} */
@@ -96,20 +105,23 @@ async function initPyodide() {
   return pyodideReadyPromise
 }
 
-self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
-  const { id, type, code, files = [], timeout = 30000 } = e.data
+self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
+  const { id, type } = e.data
 
-  if (type !== 'execute') {
-    sendResponse(id, {
-      success: false,
-      result: {
-        success: false,
-        executionTime: 0,
-        error: `Unknown message type: ${type}`,
-      },
-    })
+  // Handle 'mount' type - mount a directory to /mnt
+  if (type === 'mount') {
+    await handleMount(id, e.data.dirHandle)
     return
   }
+
+  // Handle 'sync' type - sync changes back to native filesystem
+  if (type === 'sync') {
+    await handleSync(id)
+    return
+  }
+
+  // Handle 'execute' type - run Python code
+  const { code, files = [], timeout = 30000, mountDir, syncFs } = e.data
 
   const startTime = performance.now()
 
@@ -119,21 +131,32 @@ self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
       pyodide = await initPyodide()
     }
 
-    // Ensure /mnt directory exists
-    if (!pyodide.FS.analyzePath('/mnt').exists) {
-      pyodide.FS.mkdir('/mnt')
+    // Handle mountDir if provided (mountNativeFS)
+    if (mountDir) {
+      await handleMountInternal(mountDir)
+    } else {
+      // Ensure /mnt directory exists for regular file injection
+      if (!pyodide.FS.analyzePath('/mnt').exists) {
+        pyodide.FS.mkdir('/mnt')
+      }
+
+      // Inject files into /mnt
+      await injectFiles(files, pyodide)
     }
 
     // Auto-load packages based on imports in the code
     await pyodide.loadPackagesFromImports(code)
 
-    // Inject files into /mnt
-    await injectFiles(files, pyodide)
-
     // Execute code with timeout
     const result = await executeWithTimeout(pyodide, code, timeout)
 
     const executionTime = performance.now() - startTime
+
+    // Sync changes back to native filesystem if requested
+    if (syncFs && nativefs) {
+      await nativefs.syncfs()
+      console.log('[Pyodide Worker] Synced changes back to native filesystem')
+    }
 
     // Collect output files
     const outputFiles = await collectOutputFiles(pyodide)
@@ -172,6 +195,91 @@ self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
         executionTime,
         error: errorMessage,
       },
+    })
+  }
+}
+
+//=============================================================================
+// Native Directory Mounting (mountNativeFS)
+//=============================================================================
+
+/**
+ * Handle mount request from main thread
+ * @param {string} id - Request ID for response
+ * @param {FileSystemDirectoryHandle} dirHandle - Directory handle to mount
+ */
+async function handleMount(id, dirHandle) {
+  try {
+    await handleMountInternal(dirHandle)
+    self.postMessage({
+      id,
+      success: true,
+      result: { success: true },
+    })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('[Pyodide Worker] Mount failed:', errorMessage)
+    self.postMessage({
+      id,
+      success: false,
+      result: { success: false, error: errorMessage },
+    })
+  }
+}
+
+/**
+ * Internal mount implementation
+ * @param {FileSystemDirectoryHandle} dirHandle
+ */
+async function handleMountInternal(dirHandle) {
+  // Initialize Pyodide if needed
+  if (!pyodide) {
+    pyodide = await initPyodide()
+  }
+
+  // Check if FileSystem API is available
+  if (typeof pyodide.mountNativeFS !== 'function') {
+    throw new Error('mountNativeFS is not available in this Pyodide version')
+  }
+
+  // Remove existing /mnt if it exists
+  if (pyodide.FS.analyzePath('/mnt').exists) {
+    try {
+      pyodide.FS.rmdir('/mnt')
+    } catch {
+      // Ignore if directory has contents
+    }
+  }
+
+  // Mount the directory
+  console.log(`[Pyodide Worker] Mounting directory: ${dirHandle.name}`)
+  nativefs = pyodide.mountNativeFS('/mnt', dirHandle)
+  console.log('[Pyodide Worker] Directory mounted successfully')
+}
+
+/**
+ * Handle sync request from main thread
+ * @param {string} id - Request ID for response
+ */
+async function handleSync(id) {
+  try {
+    if (!nativefs) {
+      throw new Error('No mounted filesystem to sync')
+    }
+    await nativefs.syncfs()
+    console.log('[Pyodide Worker] Filesystem synced successfully')
+    self.postMessage({
+      id,
+      success: true,
+      result: { success: true },
+    })
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('[Pyodide Worker] Sync failed:', errorMessage)
+    self.postMessage({
+      id,
+      success: false,
+      result: { success: false, error: errorMessage },
     })
   }
 }

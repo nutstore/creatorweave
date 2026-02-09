@@ -174,7 +174,6 @@ if (typeof window !== 'undefined') {
     return executorInstance.execute({
       code,
       files: convertedFiles as any,
-      packages: options?.packages,
       timeout: options?.timeout,
     })
   }
