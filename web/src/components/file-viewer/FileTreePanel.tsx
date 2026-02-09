@@ -12,10 +12,15 @@
  * Phase 3 Integration:
  * - Shows file modification status from OPFS pending changes
  * - Displays pending indicators (create/modify/delete) next to files
+ *
+ * Context Menu:
+ * - Right-click on any node shows context menu
+ * - "Copy Path" action copies file/directory path to clipboard
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw } from 'lucide-react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy } from 'lucide-react'
 import { Icon } from '@iconify/react'
 import { BrandButton, BrandBadge } from '@browser-fs-analyzer/ui'
 import { formatBytes } from '@/lib/utils'
@@ -156,7 +161,15 @@ function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
   )
 }
 
-/** Single tree node row */
+/** Global context menu close event name */
+const CONTEXT_MENU_CLOSE_EVENT = 'file-tree-close-context-menu'
+
+/** Emit event to close all context menus */
+function closeAllContextMenus() {
+  document.dispatchEvent(new CustomEvent(CONTEXT_MENU_CLOSE_EVENT))
+}
+
+/** Single tree node row with custom context menu */
 function TreeNodeRow({
   node,
   depth,
@@ -174,55 +187,126 @@ function TreeNodeRow({
   onToggle: () => void
   onClick: () => void
 }) {
+  const [contextMenuOpen, setContextMenuOpen] = useState(false)
+  const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
+  const rowRef = useRef<HTMLDivElement>(null)
   const isDir = node.kind === 'directory'
   const indent = depth * 16
 
+  /** Handle right-click to show context menu */
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    // Close all other context menus first
+    closeAllContextMenus()
+    setContextMenuPos({ x: e.clientX, y: e.clientY })
+    setContextMenuOpen(true)
+  }
+
+  /** Close context menu */
+  const handleCloseMenu = () => {
+    setContextMenuOpen(false)
+  }
+
+  /** Copy path to clipboard */
+  const handleCopyPath = async () => {
+    try {
+      await navigator.clipboard.writeText(node.path)
+      console.log('[FileTree] Copied path:', node.path)
+    } catch (error) {
+      console.error('[FileTree] Failed to copy path:', error)
+    }
+    handleCloseMenu()
+  }
+
+  /** Listen for close event from other nodes */
+  useEffect(() => {
+    const handleCloseEvent = () => {
+      setContextMenuOpen(false)
+    }
+    document.addEventListener(CONTEXT_MENU_CLOSE_EVENT, handleCloseEvent)
+    return () => document.removeEventListener(CONTEXT_MENU_CLOSE_EVENT, handleCloseEvent)
+  }, [])
+
+  /** Click outside to close menu */
+  useEffect(() => {
+    if (!contextMenuOpen) return
+    const handleClick = (e: MouseEvent) => {
+      if (rowRef.current && !rowRef.current.contains(e.target as Node)) {
+        handleCloseMenu()
+      }
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [contextMenuOpen])
+
   return (
-    <div
-      className={`group flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-3 text-xs transition-colors ${
-        selected ? 'bg-primary-50 text-primary-700' : 'hover:bg-hover text-secondary'
-      }`}
-      style={{ paddingLeft: `${indent + 4}px` }}
-      onClick={isDir ? onToggle : onClick}
-      title={node.path}
-    >
-      {/* Expand/collapse arrow (directories only) */}
-      {isDir && (
-        <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-          {expanded ? (
-            <ChevronDown className="text-tertiary h-3.5 w-3.5 transition-transform" />
+    <>
+      <div
+        ref={rowRef}
+        className={`group flex cursor-pointer items-center gap-2 rounded-md py-1.5 pr-3 text-xs transition-colors ${
+          selected ? 'bg-primary-50 text-primary-700' : 'hover:bg-hover text-secondary'
+        }`}
+        style={{ paddingLeft: `${indent + 4}px` }}
+        onClick={isDir ? onToggle : onClick}
+        onContextMenu={handleContextMenu}
+        title={node.path}
+      >
+        {/* Expand/collapse arrow (directories only) */}
+        {isDir && (
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+            {expanded ? (
+              <ChevronDown className="text-tertiary h-3.5 w-3.5 transition-transform" />
+            ) : (
+              <ChevronRight className="text-tertiary h-3.5 w-3.5 transition-transform" />
+            )}
+          </span>
+        )}
+
+        {/* Icon */}
+        {isDir ? (
+          expanded ? (
+            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warning" />
           ) : (
-            <ChevronRight className="text-tertiary h-3.5 w-3.5 transition-transform" />
-          )}
-        </span>
-      )}
-
-      {/* Icon */}
-      {isDir ? (
-        expanded ? (
-          <FolderOpen className="h-3.5 w-3.5 shrink-0 text-warning" />
+            <Folder className="h-3.5 w-3.5 shrink-0 text-warning" />
+          )
         ) : (
-          <Folder className="h-3.5 w-3.5 shrink-0 text-warning" />
-        )
-      ) : (
-        <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-          <Icon icon={getFileIconName(node.name, 'file')} className="h-3.5 w-3.5 shrink-0" />
-        </span>
-      )}
+          <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+            <Icon icon={getFileIconName(node.name, 'file')} className="h-3.5 w-3.5 shrink-0" />
+          </span>
+        )}
 
-      {/* Name */}
-      <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
+        {/* Name */}
+        <span className="min-w-0 flex-1 truncate font-medium">{node.name}</span>
 
-      {/* Size for files */}
-      {!isDir && node.size !== undefined && node.size > 0 && (
-        <span className="text-tertiary shrink-0 text-xs tabular-nums">
-          {formatBytes(node.size)}
-        </span>
-      )}
+        {/* Size for files */}
+        {!isDir && node.size !== undefined && node.size > 0 && (
+          <span className="text-tertiary shrink-0 text-xs tabular-nums">
+            {formatBytes(node.size)}
+          </span>
+        )}
 
-      {/* Pending status indicator */}
-      {!isDir && <PendingIndicator type={pendingType} />}
-    </div>
+        {/* Pending status indicator */}
+        {!isDir && <PendingIndicator type={pendingType} />}
+      </div>
+
+      {/* Context Menu Portal */}
+      {contextMenuOpen &&
+        createPortal(
+          <div
+            className="z-dropdown fixed min-w-[6rem] overflow-hidden rounded border bg-popover py-0.5 shadow-md"
+            style={{ left: contextMenuPos.x + 20, top: contextMenuPos.y }}
+          >
+            <button
+              className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
+              onClick={handleCopyPath}
+            >
+              <Copy className="h-3 w-3" />
+              <span>复制路径</span>
+            </button>
+          </div>,
+          document.body
+        )}
+    </>
   )
 }
 
