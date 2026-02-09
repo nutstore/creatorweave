@@ -60,8 +60,8 @@ export class PythonExecutor {
 
     logger('Initializing Pyodide worker...')
 
-    // Create worker from worker.ts file (classic mode for importScripts support)
-    this.worker = new Worker(new URL('./worker.ts', import.meta.url))
+    // Create worker from worker.ts file (ESM worker with dynamic import for pyodide)
+    this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
 
     // Set up message handler
     this.worker.onmessage = (e: MessageEvent<WorkerResponse>) => {

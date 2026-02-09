@@ -1,18 +1,18 @@
-// @ts-nocheck
+// @ts-nocheck - Worker file with dynamic imports cannot be fully typed
 /**
  * Pyodide Worker - Runs Python code in a separate thread using Pyodide
  *
  * Features:
- * - Lazy loads Pyodide from CDN on first use
+ * - Lazy loads Pyodide from local bundle on first use
  * - Creates /mnt directory for file operations
- * - Supports on-demand package loading (pandas, numpy, matplotlib, openpyxl)
+ * - Automatic package loading via loadPackagesFromImports
  * - Captures stdout/stderr for print output
  * - Handles matplotlib image output
  * - Supports file input/output from /mnt
  */
 
 //=============================================================================
-// Type Definitions (JSDoc for classic Worker)
+// Type Definitions
 //=============================================================================
 
 /**
@@ -39,7 +39,6 @@
  * @property {'execute'} type
  * @property {string} code
  * @property {FileRef[]} [files]
- * @property {string[]} [packages]
  * @property {number} [timeout]
  */
 
@@ -55,23 +54,15 @@
  * @property {string} [error]
  */
 
-/**
- * @typedef {Object} WorkerResponse
- * @property {string} id
- * @property {boolean} success
- * @property {ExecuteResult} result
- */
-
 //=============================================================================
 // Worker State
 //=============================================================================
 
 /** @type {any} */
 let pyodide = null
-/** @type {boolean} */
-let isInitialized = false
-/** @type {boolean} */
-let isInitializing = false
+
+/** @type {Promise<any>} */
+let pyodideReadyPromise = null
 
 // Stdout/stderr capture
 /** @type {string[]} */
@@ -79,16 +70,34 @@ let stdoutBuffer = []
 /** @type {string[]} */
 let stderrBuffer = []
 
-// Package management
-/** @type {Set<string>} */
-const LOADED_PACKAGES = new Set()
-
 //=============================================================================
 // Message Handler
 //=============================================================================
 
+/**
+ * Initialize Pyodide dynamically (works with classic workers)
+ */
+async function initPyodide() {
+  if (pyodideReadyPromise) return pyodideReadyPromise
+
+  pyodideReadyPromise = (async () => {
+    // Dynamic import for classic worker compatibility
+    const { loadPyodide } = await import('pyodide')
+
+    // Use CDN in development, local files in production
+    const isDev = import.meta.env?.DEV ?? false
+    const indexURL = isDev ? 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/' : '/assets/pyodide'
+
+    return loadPyodide({
+      indexURL,
+    })
+  })()
+
+  return pyodideReadyPromise
+}
+
 self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
-  const { id, type, code, files = [], packages = [], timeout = 30000 } = e.data
+  const { id, type, code, files = [], timeout = 30000 } = e.data
 
   if (type !== 'execute') {
     sendResponse(id, {
@@ -105,32 +114,32 @@ self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
   const startTime = performance.now()
 
   try {
-    // Lazy load Pyodide on first execution
-    if (!isInitialized) {
-      if (isInitializing) {
-        throw new Error('Pyodide is already being initialized, please wait')
-      }
-      await initializePyodide()
+    // Initialize Pyodide on first use
+    if (!pyodide) {
+      pyodide = await initPyodide()
     }
 
-    // Load requested packages
-    if (packages.length > 0) {
-      await loadPackages(packages)
+    // Ensure /mnt directory exists
+    if (!pyodide.FS.analyzePath('/mnt').exists) {
+      pyodide.FS.mkdir('/mnt')
     }
+
+    // Auto-load packages based on imports in the code
+    await pyodide.loadPackagesFromImports(code)
 
     // Inject files into /mnt
-    await injectFiles(files)
+    await injectFiles(files, pyodide)
 
     // Execute code with timeout
-    const result = await executeWithTimeout(code, timeout)
+    const result = await executeWithTimeout(pyodide, code, timeout)
 
     const executionTime = performance.now() - startTime
 
     // Collect output files
-    const outputFiles = await collectOutputFiles()
+    const outputFiles = await collectOutputFiles(pyodide)
 
     // Collect matplotlib images
-    const images = await collectMatplotlibImages()
+    const images = await collectMatplotlibImages(pyodide)
 
     // Get captured output
     const stdout = stdoutBuffer.join('\n')
@@ -168,85 +177,16 @@ self.onmessage = async (/** @type {MessageEvent<ExecuteRequest>} */ e) => {
 }
 
 //=============================================================================
-// Pyodide Initialization
-//=============================================================================
-
-/**
- * Initialize Pyodide from CDN
- * @returns {Promise<void>}
- */
-async function initializePyodide() {
-  if (isInitialized) return
-
-  isInitializing = true
-  console.log('[Pyodide Worker] Initializing Pyodide...')
-
-  try {
-    // Load Pyodide from CDN using importScripts (required for Worker context)
-    const pyodideUrl = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js'
-    // @ts-expect-error - importScripts is only available in Worker context
-    self.importScripts(pyodideUrl)
-
-    // Now loadPyodide is available globally
-    // @ts-expect-error - loadPyodide is loaded via importScripts
-    pyodide = await self.loadPyodide({
-      stdout: (/** @type {string} */ text) => stdoutBuffer.push(text),
-      stderr: (/** @type {string} */ text) => stderrBuffer.push(text),
-    })
-
-    // Create /mnt directory for file operations
-    pyodide.FS.mkdir('/mnt')
-    console.log('[Pyodide Worker] Created /mnt directory')
-
-    // Note: matplotlib is NOT pre-installed, will load when requested
-    isInitialized = true
-    console.log('[Pyodide Worker] Initialization complete')
-  } catch (error) {
-    console.error('[Pyodide Worker] Initialization failed:', error)
-    throw error
-  } finally {
-    isInitializing = false
-  }
-}
-
-//=============================================================================
-// Package Management
-//=============================================================================
-
-/**
- * Load Python packages
- * @param {string[]} packages
- * @returns {Promise<void>}
- */
-async function loadPackages(packages) {
-  const packagesToLoad = packages.filter((/** @type {string} */ pkg) => !LOADED_PACKAGES.has(pkg))
-
-  if (packagesToLoad.length === 0) return
-
-  console.log('[Pyodide Worker] Loading packages:', packagesToLoad)
-
-  try {
-    await pyodide.loadPackage(packagesToLoad)
-    packagesToLoad.forEach((/** @type {string} */ pkg) => LOADED_PACKAGES.add(pkg))
-    console.log('[Pyodide Worker] Packages loaded successfully')
-  } catch (error) {
-    console.error('[Pyodide Worker] Package loading failed:', error)
-    throw new Error(
-      `Failed to load packages: ${error instanceof Error ? error.message : String(error)}`
-    )
-  }
-}
-
-//=============================================================================
 // File Operations
 //=============================================================================
 
 /**
  * Inject files into Pyodide /mnt directory
  * @param {FileRef[]} files
+ * @param {any} pyodide
  * @returns {Promise<void>}
  */
-async function injectFiles(files) {
+async function injectFiles(files, pyodide) {
   if (files.length === 0) return
 
   console.log(
@@ -256,13 +196,8 @@ async function injectFiles(files) {
 
   for (const file of files) {
     try {
-      // Create file path
       const filePath = `/mnt/${file.name}`
-
-      // Convert ArrayBuffer to Uint8Array
       const data = new Uint8Array(file.content)
-
-      // Write file to Pyodide filesystem
       pyodide.FS.writeFile(filePath, data)
       console.log(`[Pyodide Worker] Injected file: ${file.name} (${data.length} bytes)`)
     } catch (error) {
@@ -274,11 +209,11 @@ async function injectFiles(files) {
 
 /**
  * Collect output files from /mnt directory
+ * @param {any} pyodide
  * @returns {Promise<FileOutput[]>}
  */
-async function collectOutputFiles() {
+async function collectOutputFiles(pyodide) {
   try {
-    // List files in /mnt
     const fileNames = pyodide.FS.readdir('/mnt').filter(
       (/** @type {string} */ name) => name !== '.' && name !== '..'
     )
@@ -307,24 +242,20 @@ async function collectOutputFiles() {
 }
 
 /**
- * Collect matplotlib images
+ * Collect matplotlib images from /mnt and in-memory figures
+ * @param {any} pyodide
  * @returns {Promise<ImageOutput[]>}
  */
-async function collectMatplotlibImages() {
+async function collectMatplotlibImages(pyodide) {
   try {
-    // Check if any matplotlib figures were saved
-    // First check /mnt for saved images (doesn't require matplotlib)
+    // Check /mnt for saved images
     const checkMntCode = `
 import os
-
 image_paths = []
-
-# Check /mnt for saved images
 if os.path.exists('/mnt'):
     for file in os.listdir('/mnt'):
         if file.endswith('.png') or file.endswith('.jpg') or file.endswith('.jpeg'):
             image_paths.append(f'/mnt/{file}')
-
 image_paths
 `
 
@@ -351,16 +282,14 @@ image_paths
       }
     }
 
-    // Try to collect in-memory figures only if matplotlib is loaded
-    if (LOADED_PACKAGES.has('matplotlib')) {
-      try {
-        const figureCode = `
+    // Try to collect in-memory matplotlib figures
+    try {
+      const figureCode = `
 import io
 import base64
 import matplotlib.pyplot as plt
 
 figure_data = []
-
 if len(plt.get_fignums()) > 0:
     for i, fig_num in enumerate(plt.get_fignums()):
         fig = plt.figure(fig_num)
@@ -370,21 +299,19 @@ if len(plt.get_fignums()) > 0:
         img_data = base64.b64encode(buf.read()).decode('utf-8')
         figure_data.append({'index': i, 'data': img_data})
     plt.close('all')
-
 figure_data
 `
-        /** @type {any} */
-        const figureData = await pyodide.runPythonAsync(figureCode)
+      /** @type {any} */
+      const figureData = await pyodide.runPythonAsync(figureCode)
 
-        for (const fig of figureData) {
-          images.push({
-            filename: `figure_${fig.index}.png`,
-            data: fig.data,
-          })
-        }
-      } catch (error) {
-        console.warn('[Pyodide Worker] Failed to collect in-memory figures:', error)
+      for (const fig of figureData) {
+        images.push({
+          filename: `figure_${fig.index}.png`,
+          data: fig.data,
+        })
       }
+    } catch {
+      // matplotlib not loaded or no figures
     }
 
     return images
@@ -399,14 +326,13 @@ figure_data
 //=============================================================================
 
 /**
- * Execute Python code with timeout
+ * Execute Python code with timeout and stdout/stderr capture
+ * @param {any} pyodide
  * @param {string} code
  * @param {number} timeout
  * @returns {Promise<unknown>}
  */
-async function executeWithTimeout(code, timeout) {
-  // Simple wrapper - just execute user code directly with stdout capture
-  // Errors will propagate and be caught by the outer try-catch
+async function executeWithTimeout(pyodide, code, timeout) {
   const wrapperCode = `
 import sys
 import io
@@ -433,7 +359,6 @@ stderr_value = sys.stderr.getvalue()
 sys.stdout = sys.__stdout__
 sys.stderr = sys.__stderr__
 
-# Return captured output as string
 stdout_value
 `
 
@@ -463,7 +388,7 @@ stdout_value
 /**
  * Send response to main thread
  * @param {string} id
- * @param {Omit<WorkerResponse, 'id'>} response
+ * @param {Omit<{id: string}, 'id'>} response
  */
 function sendResponse(id, response) {
   self.postMessage({

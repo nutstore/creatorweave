@@ -3,13 +3,17 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import { sqlitePlugin } from './src/sqlite/vite-plugin-sqlite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // https://vitejs.dev/config/
 export default defineConfig({
   base: './',
   plugins: [
     react(),
-    sqlitePlugin(), // SQLite WASM support for @sqlite.org/sqlite-wasm (set verbose: true for debugging)
+    sqlitePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['wasm/**/*.wasm', 'icon-*.png', 'icon.svg'],
@@ -155,7 +159,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    target: 'es2015',
+    target: 'es2020',
     sourcemap: true,
     rollupOptions: {
       output: {
@@ -167,7 +171,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm'],
+    exclude: ['@sqlite.org/sqlite-wasm', 'pyodide'],
   },
   test: {
     environment: 'happy-dom',

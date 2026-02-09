@@ -6,13 +6,23 @@
     "plugin:@typescript-eslint/recommended",
     "plugin:react-hooks/recommended"
   ],
-  "ignorePatterns": ["dist", ".eslintrc.json", "public/wasm/*.d.ts", "**/*.d.ts", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+  "ignorePatterns": [
+    "dist",
+    ".eslintrc.json",
+    "public/wasm/*.d.ts",
+    "**/*.d.ts",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.worker.ts"
+  ],
   "parser": "@typescript-eslint/parser",
   "plugins": ["react-refresh"],
   "rules": {
     "react-refresh/only-export-components": ["warn", { "allowConstantExport": true }],
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/ban-ts-comment": "off",
     "prefer-const": "error",
     "require-yield": "off"
   }

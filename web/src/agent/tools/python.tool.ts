@@ -28,57 +28,35 @@ export const pythonCodeDefinition: ToolDefinition = {
   type: 'function',
   function: {
     name: 'run_python_code',
-    description: `Execute Python code in the browser. Use for data analysis, computation, automation, or testing.
+    description: `Execute Python code in the browser using Pyodide.
 
-⚠️ CRITICAL WORKFLOW: Files MUST be discovered and specified BEFORE use.
-1. Use glob() to find files first
-2. Then call run_python_code with files parameter
-3. Python code reads from /mnt/{filename}
-
-Available packages: pandas, numpy, matplotlib, openpyxl (auto-detected from imports)
-
-Common use cases:
-- Data analysis: pandas for CSV/Excel processing
-- Visualization: matplotlib for charts and graphs
-- Numerical computing: numpy for calculations
-- File conversion: between CSV, Excel, JSON formats
-- Testing: validate code logic or algorithms
+IMPORTANT:
+1. Specify file paths in the files parameter that your code needs
+2. Pyodide auto-loads packages when you import them (pandas, numpy, matplotlib, etc.)
 
 Examples:
-- glob("**/data.csv") → run_python_code(code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())", files=[{path: "data.csv"}])
-- glob("**/report.xlsx") → run_python_code(code="import pandas as pd; df=pd.read_excel('/mnt/report.xlsx'); df.to_csv('/mnt/output.csv')", files=[{path: "report.xlsx"}])`,
+- Simple computation:
+  run_python_code(code="print(sum([1, 2, 3]))")
+
+- Data analysis with pandas:
+  run_python_code(code="import pandas as pd\\ndf = pd.read_csv('/mnt/data.csv')\\nprint(df.describe())", files: ["data.csv"])
+
+- Data visualization:
+  run_python_code(code="import matplotlib.pyplot as plt\\nplt.plot([1, 2, 3])\\nplt.savefig('/mnt/chart.png')")`,
     parameters: {
       type: 'object',
       properties: {
         code: {
           type: 'string',
-          description:
-            'Python code to execute. Access injected files via /mnt/{filename} (e.g., /mnt/sales.csv).',
+          description: 'Python code to execute. Access files via /mnt/{filename}.',
         },
-        packages: {
+        files: {
           type: 'array',
           items: {
             type: 'string',
           },
           description:
-            'Optional list of packages to load. Available: pandas, numpy, matplotlib, openpyxl. Auto-detected from imports if not specified.',
-          enum: ['pandas', 'numpy', 'matplotlib', 'openpyxl'],
-        },
-        files: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              path: {
-                type: 'string',
-                description:
-                  'Workspace file path from glob results (e.g., "data/input.csv"). Use exact path from glob() - do not guess.',
-              },
-            },
-            required: ['path'],
-          },
-          description:
-            'REQUIRED for file operations. List of {path: string} objects from glob results. Files are injected to /mnt/{filename}.',
+            'List of file paths to inject into /mnt. Code accesses them via /mnt/{filename}.',
         },
         timeout: {
           type: 'number',
@@ -96,12 +74,11 @@ Examples:
 
 export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
   const code = args.code as string
-  const packages = (args.packages as string[]) || []
-  const files = args.files as Array<{ path: string }> | undefined
+  const files = args.files as string[] | undefined
   const timeout = (args.timeout as number) || 30000
 
   if (!code || typeof code !== 'string') {
-    return JSON.stringify({ error: 'Code is required and must be a string' })
+    return JSON.stringify({ error: 'code is required and must be a string' })
   }
 
   if (code.length > 100000) {
@@ -120,88 +97,69 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
   if (mentionsMnt && (!files || files.length === 0)) {
     return JSON.stringify({
       error: 'Code references files in /mnt/ but no files parameter provided.',
-      hint: 'You MUST first use glob() to find the file, then pass it in the files parameter.',
-      example:
-        'Workflow: glob(pattern="**/*.xlsx") → run_python_code(code="...", files=[{path: "found/file.xlsx"}])',
+      hint: 'Pass file paths in the files array, e.g., files: ["data.csv"]',
     })
   }
 
   try {
     // Get active files if not explicitly specified
-    let activeFiles: CoreFileRef[] = []
-    try {
-      if (files && files.length > 0) {
-        // Load specific files
-        const { useAgentStore } = await import('@/store/agent.store')
-        const directoryHandle = useAgentStore.getState().directoryHandle
+    const activeFiles: CoreFileRef[] = []
+    if (files && files.length > 0) {
+      const { useAgentStore } = await import('@/store/agent.store')
+      const directoryHandle = useAgentStore.getState().directoryHandle
 
-        if (!directoryHandle) {
+      if (!directoryHandle) {
+        return JSON.stringify({
+          error: 'No directory selected. Please select a project folder first.',
+        })
+      }
+
+      const { useOPFSStore } = await import('@/store/opfs.store')
+      const { readFile } = useOPFSStore.getState()
+
+      for (const filePath of files) {
+        try {
+          const { content } = await readFile(filePath, directoryHandle)
+
+          // Convert content to FileRef format
+          let fileContent: string
+          if (typeof content === 'string') {
+            fileContent = content
+          } else if (content instanceof ArrayBuffer) {
+            const decoder = new TextDecoder('utf-8')
+            fileContent = decoder.decode(content)
+          } else {
+            const blob = content as Blob
+            fileContent = await blob.text()
+          }
+
+          activeFiles.push({
+            path: filePath,
+            name: filePath.split('/').pop() || filePath,
+            content: fileContent,
+            contentType: 'text',
+            size: fileContent.length,
+            source: 'filesystem',
+          })
+        } catch (error) {
+          console.warn(`[Python Tool] Failed to read file ${filePath}:`, error)
           return JSON.stringify({
-            error: 'No directory selected. Please select a project folder first.',
+            error: `Failed to read file: ${filePath}`,
+            hint: 'Verify the file path matches the glob result exactly.',
           })
         }
-
-        const { useOPFSStore } = await import('@/store/opfs.store')
-        const { readFile } = useOPFSStore.getState()
-
-        for (const fileSpec of files) {
-          try {
-            const { content } = await readFile(fileSpec.path, directoryHandle)
-
-            // Convert content to FileRef format
-            let fileContent: string
-            if (typeof content === 'string') {
-              fileContent = content
-            } else if (content instanceof ArrayBuffer) {
-              // Decode binary content as UTF-8
-              const decoder = new TextDecoder('utf-8')
-              fileContent = decoder.decode(content)
-            } else {
-              // Blob - read as text
-              const blob = content as Blob
-              fileContent = await blob.text()
-            }
-
-            activeFiles.push({
-              path: fileSpec.path,
-              name: fileSpec.path.split('/').pop() || fileSpec.path,
-              content: fileContent,
-              contentType: 'text',
-              size: fileContent.length,
-              source: 'filesystem',
-            })
-          } catch (error) {
-            console.warn(`[Python Tool] Failed to read file ${fileSpec.path}:`, error)
-            // Continue with other files
-          }
-        }
       }
-      // Note: If no files specified, no files are injected. Agent must explicitly specify files needed.
-    } catch (error) {
-      // If file loading fails, continue without files
-      console.warn('[Python Tool] Failed to load files:', error)
-      activeFiles = []
-    }
-
-    // Auto-detect packages if not explicitly provided
-    const finalPackages = packages.length > 0 ? packages : detectPackages(code)
-
-    if (finalPackages.length > 0) {
-      console.log('[Python Tool] Auto-detected packages:', finalPackages)
     }
 
     // Convert CoreFileRef to WorkerFileRef format for executor
     const workerFiles: WorkerFileRef[] = activeFiles.map((file) => {
-      // Convert content to ArrayBuffer
       let content: ArrayBuffer
       if (typeof file.content === 'string') {
         const encoder = new TextEncoder()
         const uint8Array = encoder.encode(file.content)
-        // Create a proper ArrayBuffer from Uint8Array
         content = new ArrayBuffer(uint8Array.length)
         new Uint8Array(content).set(uint8Array)
       } else if (file.content instanceof Uint8Array) {
-        // Create a proper ArrayBuffer copy
         content = new ArrayBuffer(file.content.length)
         new Uint8Array(content).set(file.content)
       } else {
@@ -214,11 +172,10 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
       }
     })
 
-    // Execute Python code
+    // Execute Python code (Pyodide auto-loads packages)
     const result = await pythonExecutor.execute({
       code,
       files: workerFiles,
-      packages: finalPackages,
       timeout,
     })
 
@@ -327,38 +284,4 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
       error: `Execution error: ${errorMessage}`,
     })
   }
-}
-
-//=============================================================================
-// Auto-package Detection Helper
-//=============================================================================
-
-/**
- * Auto-detect packages from import statements
- * This allows the Agent to omit the packages parameter
- */
-export function detectPackages(code: string): string[] {
-  const detected: string[] = []
-  const patterns: Record<string, RegExp[]> = {
-    pandas: [/\bimport\s+pandas\b/, /\bfrom\s+pandas\b/],
-    numpy: [/\bimport\s+numpy\b/, /\bfrom\s+numpy\b/, /\bimport\s+numpy\b/],
-    matplotlib: [
-      /\bimport\s+matplotlib\b/,
-      /\bfrom\s+matplotlib\b/,
-      /\bimport\s+matplotlib\.pyplot\b/,
-      /\bfrom\s+matplotlib\.pyplot\b/,
-    ],
-    openpyxl: [/\bimport\s+openpyxl\b/, /\bfrom\s+openpyxl\b/],
-  }
-
-  for (const [pkg, regexList] of Object.entries(patterns)) {
-    for (const regex of regexList) {
-      if (regex.test(code)) {
-        detected.push(pkg)
-        break
-      }
-    }
-  }
-
-  return detected
 }
