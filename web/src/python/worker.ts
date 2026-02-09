@@ -333,9 +333,18 @@ figure_data
  * @returns {Promise<unknown>}
  */
 async function executeWithTimeout(pyodide, code, timeout) {
+  // Auto-configure matplotlib for browser environment
+  const matplotlibSetup = `
+import matplotlib
+matplotlib.use('Agg')
+`
+
   const wrapperCode = `
 import sys
 import io
+
+# Configure matplotlib for browser
+${matplotlibSetup}
 
 # Capture output
 sys.stdout = io.StringIO()
