@@ -63,7 +63,7 @@ export function MessageBubble({
         </div>
 
         {/* Content */}
-        <div className="min-w-0 max-w-[80%] text-right">
+        <div className="min-w-0 max-w-[80%]">
           <div className="inline-block rounded-lg bg-primary-600 px-4 py-2 text-sm text-white">
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           </div>
