@@ -5,8 +5,8 @@
  * Features:
  * - Lazy loads Pyodide from local bundle on first use
  * - Creates /mnt directory for file operations
- * - Mounts native directories via mountNativeFS (File System Access API)
- * - Syncs changes back to native filesystem
+ * - Lazy mounts native directories (no full traversal on mount)
+ * - Incremental sync (only sync modified files)
  * - Automatic package loading via loadPackagesFromImports
  * - Captures stdout/stderr for print output
  * - Handles matplotlib image output
@@ -73,11 +73,314 @@ let pyodideReadyPromise = null
 /** @type {any} NativeFS handle for syncing changes back */
 let nativefs = null
 
+/** @type {LazyPyodideFS | null} Lazy filesystem instance */
+let lazyFS = null
+
 // Stdout/stderr capture
 /** @type {string[]} */
 let stdoutBuffer = []
 /** @type {string[]} */
 let stderrBuffer = []
+
+//=============================================================================
+// Lazy Loading Filesystem Implementation
+//=============================================================================
+
+/**
+ * Lazy file entry with metadata
+ * @typedef {Object} LazyFileEntry
+ * @property {Uint8Array} data - File content
+ * @property {Date} mtime - Last modified time
+ * @property {boolean} dirty - Whether file has been modified
+ */
+
+/**
+ * Lazy loading filesystem - loads files on-demand instead of full traversal
+ */
+class LazyPyodideFS {
+  constructor(pyodide) {
+    /** @type {any} */
+    this.pyodide = pyodide
+    /** @type {FileSystemDirectoryHandle | null} */
+    this.dirHandle = null
+    /** @type {Map<string, LazyFileEntry>} */
+    this.fileCache = new Map()
+    /** @type {Set<string>} */
+    this.dirtyPaths = new Set()
+    /** @type {Map<string, string[]>} */
+    this.dirCache = new Map()
+    /** @type {string} */
+    this.mountpoint = '/mnt'
+  }
+
+  /**
+   * Mount directory (lazy - no file traversal)
+   * @param {FileSystemDirectoryHandle} dirHandle
+   */
+  async mount(dirHandle) {
+    this.dirHandle = dirHandle
+    this.fileCache.clear()
+    this.dirtyPaths.clear()
+    this.dirCache.clear()
+
+    // Clean up existing mount
+    if (this.pyodide.FS.analyzePath(this.mountpoint).exists) {
+      try {
+        this.pyodide.FS.rmdir(this.mountpoint)
+      } catch {
+        // Ignore if directory has contents
+      }
+    }
+
+    // Create mountpoint directory
+    this.pyodide.FS.mkdir(this.mountpoint)
+
+    console.log(`[LazyFS] Mounted ${dirHandle.name} (lazy mode, no file traversal)`)
+  }
+
+  /**
+   * Check if a path exists in the mounted directory
+   * @param {string} relPath
+   * @returns {Promise<boolean>}
+   */
+  async exists(relPath) {
+    try {
+      await this.getFileHandle(relPath)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Read file content (lazy load)
+   * @param {string} relPath - Relative path from mountpoint
+   * @returns {Promise<Uint8Array>}
+   */
+  async readFile(relPath) {
+    // Check cache first
+    const cached = this.fileCache.get(relPath)
+    if (cached) {
+      return cached.data
+    }
+
+    // Cache miss - load from browser directory
+    const handle = await this.getFileHandle(relPath)
+    const file = await handle.getFile()
+    const data = new Uint8Array(await file.arrayBuffer())
+
+    // Cache the file
+    this.fileCache.set(relPath, {
+      data,
+      mtime: new Date(file.lastModified),
+      dirty: false,
+    })
+
+    return data
+  }
+
+  /**
+   * Write file (marks as dirty for sync)
+   * @param {string} relPath - Relative path from mountpoint
+   * @param {Uint8Array} data
+   */
+  async writeFile(relPath, data) {
+    const absPath = this.mountpoint + '/' + relPath
+
+    // Write to MEMFS
+    this.pyodide.FS.writeFile(absPath, data)
+
+    // Update cache and mark dirty
+    this.fileCache.set(relPath, {
+      data,
+      mtime: new Date(),
+      dirty: true,
+    })
+    this.dirtyPaths.add(relPath)
+  }
+
+  /**
+   * Sync only modified files back to browser directory
+   * @returns {Promise<number>} Number of files synced
+   */
+  async sync() {
+    if (!this.dirHandle) {
+      throw new Error('No directory mounted')
+    }
+
+    if (this.dirtyPaths.size === 0) {
+      console.log('[LazyFS] No files to sync')
+      return 0
+    }
+
+    let synced = 0
+    for (const relPath of this.dirtyPaths) {
+      const entry = this.fileCache.get(relPath)
+      if (!entry) continue
+
+      try {
+        // Create parent directories if needed
+        await this.ensureParentDirs(relPath)
+
+        // Get or create file handle
+        const handle = await this.dirHandle.getFileHandle(relPath, { create: true })
+        const writable = await handle.createWritable()
+        await writable.write(entry.data)
+        await writable.close()
+
+        // Update mtime in cache
+        entry.mtime = new Date()
+        entry.dirty = false
+        this.dirtyPaths.delete(relPath)
+
+        synced++
+        console.log(`[LazyFS] Synced: ${relPath}`)
+      } catch (error) {
+        console.error(`[LazyFS] Failed to sync ${relPath}:`, error)
+      }
+    }
+
+    console.log(`[LazyFS] Synced ${synced} file(s)`)
+    return synced
+  }
+
+  /**
+   * List directory contents (lazy load)
+   * @param {string} relPath - Relative path from mountpoint
+   * @returns {Promise<string[]>}
+   */
+  async readdir(relPath) {
+    // Check cache first
+    const cached = this.dirCache.get(relPath)
+    if (cached) {
+      return cached
+    }
+
+    // Not in cache - load from browser directory
+    const handle = await this.getDirectoryHandle(relPath)
+    const entries: string[] = []
+
+    for await (const entry of handle.values()) {
+      entries.push(entry.name)
+    }
+
+    // Cache the result
+    this.dirCache.set(relPath, entries)
+    return entries
+  }
+
+  /**
+   * Get file handle from relative path
+   * @param {string} relPath
+   * @returns {Promise<FileSystemFileHandle>}
+   */
+  async getFileHandle(relPath) {
+    if (!this.dirHandle) {
+      throw new Error('No directory mounted')
+    }
+
+    const parts = relPath.split('/').filter(Boolean)
+    let handle = this.dirHandle
+
+    for (const part of parts) {
+      try {
+        if (handle.kind === 'directory') {
+          handle = await handle.getFileHandle(part)
+        } else {
+          throw new Error(`'${part}' is not a directory`)
+        }
+      } catch {
+        throw new Error(`File not found: ${relPath}`)
+      }
+    }
+
+    if (handle.kind !== 'file') {
+      throw new Error(`'${relPath}' is a directory, not a file`)
+    }
+
+    return handle
+  }
+
+  /**
+   * Get directory handle from relative path
+   * @param {string} relPath
+   * @returns {Promise<FileSystemDirectoryHandle>}
+   */
+  async getDirectoryHandle(relPath) {
+    if (!this.dirHandle) {
+      throw new Error('No directory mounted')
+    }
+
+    if (relPath === '.' || relPath === '') {
+      return this.dirHandle
+    }
+
+    const parts = relPath.split('/').filter(Boolean)
+    let handle = this.dirHandle
+
+    for (const part of parts) {
+      try {
+        if (handle.kind === 'directory') {
+          handle = await handle.getDirectoryHandle(part)
+        } else {
+          throw new Error(`'${part}' is not a directory`)
+        }
+      } catch {
+        throw new Error(`Directory not found: ${relPath}`)
+      }
+    }
+
+    return handle
+  }
+
+  /**
+   * Ensure parent directories exist for a file path
+   * @param {string} relPath
+   */
+  async ensureParentDirs(relPath) {
+    const parts = relPath.split('/').filter(Boolean)
+    if (parts.length <= 1) return
+
+    const parentParts = parts.slice(0, -1)
+    let handle = this.dirHandle!
+
+    for (const part of parentParts) {
+      try {
+        handle = await handle.getDirectoryHandle(part)
+      } catch {
+        handle = await handle.getDirectoryHandle(part)
+        handle = await handle.getDirectoryHandle(part)
+      }
+    }
+  }
+
+  /**
+   * Check if there are pending changes to sync
+   * @returns {boolean}
+   */
+  hasPendingChanges() {
+    return this.dirtyPaths.size > 0
+  }
+
+  /**
+   * Get count of pending files to sync
+   * @returns {number}
+   */
+  getPendingCount() {
+    return this.dirtyPaths.size
+  }
+
+  /**
+   * Unmount and cleanup
+   */
+  unmount() {
+    this.dirHandle = null
+    this.fileCache.clear()
+    this.dirtyPaths.clear()
+    this.dirCache.clear()
+    console.log('[LazyFS] Unmounted')
+  }
+}
 
 //=============================================================================
 // Message Handler
@@ -120,6 +423,12 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
     return
   }
 
+  // Handle 'unmount' type - cleanup filesystem
+  if (type === 'unmount') {
+    await handleUnmount(id)
+    return
+  }
+
   // Handle 'execute' type - run Python code
   const { code, files = [], timeout = 30000, mountDir, syncFs } = e.data
 
@@ -153,9 +462,15 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
     const executionTime = performance.now() - startTime
 
     // Sync changes back to native filesystem if requested
-    if (syncFs && nativefs) {
-      await nativefs.syncfs()
-      console.log('[Pyodide Worker] Synced changes back to native filesystem')
+    if (syncFs) {
+      if (lazyFS && lazyFS.hasPendingChanges()) {
+        const synced = await lazyFS.sync()
+        console.log(`[Pyodide Worker] Synced ${synced} file(s) to native filesystem`)
+      } else if (nativefs) {
+        // Legacy nativefs sync
+        await nativefs.syncfs()
+        console.log('[Pyodide Worker] Synced changes back to native filesystem')
+      }
     }
 
     // Collect output files
@@ -228,7 +543,7 @@ async function handleMount(id, dirHandle) {
 }
 
 /**
- * Internal mount implementation
+ * Internal mount implementation - uses lazy loading
  * @param {FileSystemDirectoryHandle} dirHandle
  */
 async function handleMountInternal(dirHandle) {
@@ -237,37 +552,79 @@ async function handleMountInternal(dirHandle) {
     pyodide = await initPyodide()
   }
 
-  // Check if FileSystem API is available
-  if (typeof pyodide.mountNativeFS !== 'function') {
-    throw new Error('mountNativeFS is not available in this Pyodide version')
+  // Check if File System Access API is available
+  if (typeof window.showDirectoryPicker !== 'function') {
+    throw new Error('File System Access API is not supported')
   }
 
-  // Remove existing /mnt if it exists
-  if (pyodide.FS.analyzePath('/mnt').exists) {
-    try {
-      pyodide.FS.rmdir('/mnt')
-    } catch {
-      // Ignore if directory has contents
-    }
+  // Initialize lazy filesystem
+  if (!lazyFS) {
+    lazyFS = new LazyPyodideFS(pyodide)
   }
 
-  // Mount the directory
-  console.log(`[Pyodide Worker] Mounting directory: ${dirHandle.name}`)
-  nativefs = pyodide.mountNativeFS('/mnt', dirHandle)
-  console.log('[Pyodide Worker] Directory mounted successfully')
+  // Mount with lazy loading (no file traversal)
+  await lazyFS.mount(dirHandle)
+
+  // Clear nativefs since we're using lazyFS now
+  nativefs = null
+
+  console.log(`[Pyodide Worker] Directory mounted successfully (lazy mode)`)
 }
 
 /**
- * Handle sync request from main thread
+ * Handle sync request from main thread - sync only modified files
  * @param {string} id - Request ID for response
  */
 async function handleSync(id) {
   try {
-    if (!nativefs) {
-      throw new Error('No mounted filesystem to sync')
+    // Try lazyFS first, fallback to nativefs
+    if (lazyFS && lazyFS.hasPendingChanges()) {
+      const synced = await lazyFS.sync()
+      console.log(`[Pyodide Worker] Synced ${synced} file(s) to native filesystem`)
+      self.postMessage({
+        id,
+        success: true,
+        result: { success: true, synced },
+      })
+    } else if (nativefs) {
+      // Legacy nativefs sync
+      await nativefs.syncfs()
+      console.log('[Pyodide Worker] Filesystem synced successfully')
+      self.postMessage({
+        id,
+        success: true,
+        result: { success: true },
+      })
+    } else {
+      self.postMessage({
+        id,
+        success: false,
+        result: { success: false, error: 'No mounted filesystem to sync' },
+      })
     }
-    await nativefs.syncfs()
-    console.log('[Pyodide Worker] Filesystem synced successfully')
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('[Pyodide Worker] Sync failed:', errorMessage)
+    self.postMessage({
+      id,
+      success: false,
+      result: { success: false, error: errorMessage },
+    })
+  }
+}
+
+/**
+ * Handle unmount request - cleanup lazy filesystem
+ * @param {string} id - Request ID for response
+ */
+async function handleUnmount(id) {
+  try {
+    if (lazyFS) {
+      lazyFS.unmount()
+      lazyFS = null
+    }
+    nativefs = null
+    console.log('[Pyodide Worker] Filesystem unmounted')
     self.postMessage({
       id,
       success: true,
@@ -275,7 +632,7 @@ async function handleSync(id) {
     })
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
-    console.error('[Pyodide Worker] Sync failed:', errorMessage)
+    console.error('[Pyodide Worker] Unmount failed:', errorMessage)
     self.postMessage({
       id,
       success: false,

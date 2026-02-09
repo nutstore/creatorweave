@@ -88,4 +88,21 @@ export interface SyncRequest {
 export interface SyncResult {
   success: boolean
   error?: string
+  synced?: number
+}
+
+/**
+ * Unmount request type - for cleanup
+ */
+export interface UnmountRequest {
+  id: string
+  type: 'unmount'
+}
+
+/**
+ * Unmount result type
+ */
+export interface UnmountResult {
+  success: boolean
+  error?: string
 }

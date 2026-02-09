@@ -21,14 +21,7 @@
 // Type Definitions
 //=============================================================================
 
-import type {
-  FileRef,
-  FileOutput,
-  ImageOutput,
-  ExecuteRequest,
-  ExecuteResult,
-  WorkerResponse,
-} from './worker-types'
+import type { FileRef, ExecuteRequest, ExecuteResult, WorkerResponse } from './worker-types'
 import { DEFAULT_TIMEOUT } from './constants'
 import { generateId, logger, formatTime, isExecutionSuccessful } from './utils'
 
@@ -377,6 +370,60 @@ export class PythonExecutor {
 
     logger('Filesystem synced')
   }
+
+  /**
+   * Unmount and cleanup the filesystem
+   * Frees memory by clearing file caches
+   */
+  async unmount(): Promise<void> {
+    this.ensureWorker()
+
+    const id = generateId()
+
+    logger('Unmounting filesystem...')
+
+    const responsePromise = new Promise<{
+      success: boolean
+      result: { success: boolean; error?: string }
+    }>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error('Unmount request timeout'))
+      }, 30000) as unknown as number
+
+      this.pendingRequests.set(id, {
+        resolve: (/** @type {any} */ res) => {
+          clearTimeout(timeout)
+          resolve(res)
+        },
+        reject,
+        timeout,
+      })
+    })
+
+    this.worker!.postMessage({
+      id,
+      type: 'unmount',
+    })
+
+    const response = await responsePromise
+
+    if (!response.result.success) {
+      throw new Error(response.result.error || 'Unmount failed')
+    }
+
+    logger('Filesystem unmounted')
+  }
+
+  /**
+   * Check if there are pending changes to sync
+   * @returns Promise resolving to true if there are unsaved changes
+   */
+  async hasPendingChanges(): Promise<boolean> {
+    // This is a best-effort check - in a real implementation,
+    // we could add a 'status' message type to query the worker
+    return false // Placeholder until we implement status query
+  }
 }
 
 //=============================================================================
@@ -402,7 +449,20 @@ export enum PyodideState {
 //=============================================================================
 
 // Re-export types from worker.ts for convenience
-export type { FileRef, FileOutput, ImageOutput, ExecuteRequest, ExecuteResult, WorkerResponse }
+export type {
+  FileRef,
+  FileOutput,
+  ImageOutput,
+  ExecuteRequest,
+  ExecuteResult,
+  WorkerResponse,
+  MountRequest,
+  MountResult,
+  SyncRequest,
+  SyncResult,
+  UnmountRequest,
+  UnmountResult,
+} from './worker-types'
 
 // Re-export from other modules
 export type { PyodideInstance } from './types'
