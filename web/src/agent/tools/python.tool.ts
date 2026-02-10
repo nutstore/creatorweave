@@ -33,15 +33,19 @@ export const pythonCodeDefinition: ToolDefinition = {
 IMPORTANT:
 1. Specify file paths in the files parameter that your code needs
 2. Files can be a string array or object array: ["file.xlsx"] or [{path: "file.xlsx"}]
-3. Pyodide auto-loads packages when you import them (pandas, numpy, matplotlib, etc.)
-4. For matplotlib: set matplotlib.use('Agg') BEFORE creating figures to run in headless mode
+3. Built-in packages (pandas, numpy, matplotlib, openpyxl) auto-load when imported
+4. For other packages (scipy, scikit-learn, etc.), install via micropip first
+5. For matplotlib: set matplotlib.use('Agg') BEFORE creating figures to run in headless mode
 
 Examples:
 - Simple computation:
   run_python_code(code="print(sum([1, 2, 3]))")
 
-- Data analysis with pandas:
+- Data analysis with pandas (built-in):
   run_python_code(code="import pandas as pd\\ndf = pd.read_csv('/mnt/data.csv')\\nprint(df.describe())", files: ["data.csv"])
+
+- Install extra package then use:
+  run_python_code(code="import micropip\\nawait micropip.install('openpyxl')\\nimport pandas as pd\\ndf = pd.read_excel('/mnt/file.xlsx')\\nprint(df.head())", files: ["file.xlsx"])
 
 - Data visualization (headless mode):
   run_python_code(code="import matplotlib\\nmatplotlib.use('Agg')\\nimport matplotlib.pyplot as plt\\nplt.plot([1, 2, 3])\\nplt.savefig('/mnt/chart.png')", files: ["data.csv"])`,
