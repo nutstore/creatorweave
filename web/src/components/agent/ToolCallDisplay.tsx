@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import type { ToolCall } from '@/agent/message-types'
+import { CopyIconButton } from './CopyIconButton'
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall
@@ -68,7 +69,13 @@ export function ToolCallDisplay({
       {expanded && (
         <div className="border-t border-neutral-200 px-3 py-2">
           <div className="mb-2">
-            <div className="mb-1 text-xs font-medium text-neutral-500">参数</div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-neutral-500">参数</span>
+              <CopyIconButton
+                content={Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
+                title="复制参数"
+              />
+            </div>
             <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600">
               {Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
               {isStreaming && (
@@ -78,7 +85,13 @@ export function ToolCallDisplay({
           </div>
           {result && (
             <div>
-              <div className="mb-1 text-xs font-medium text-neutral-500">结果</div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-neutral-500">结果</span>
+                <CopyIconButton
+                  content={result.length > 2000 ? result + '\n...(truncated)' : result}
+                  title="复制结果"
+                />
+              </div>
               <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600">
                 {result.length > 2000 ? result.slice(0, 2000) + '\n...(truncated)' : result}
               </pre>
