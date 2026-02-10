@@ -476,9 +476,6 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
       }
     }
 
-    // Collect output files
-    const outputFiles = await collectOutputFiles(pyodide)
-
     // Collect matplotlib images
     const images = await collectMatplotlibImages(pyodide)
 
@@ -498,7 +495,6 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
         stdout: stdout || undefined,
         stderr: stderr || undefined,
         images: images.length > 0 ? images : undefined,
-        outputFiles: outputFiles.length > 0 ? outputFiles : undefined,
         executionTime,
       },
     })
@@ -672,40 +668,6 @@ async function injectFiles(files, pyodide) {
       console.error(`[Pyodide Worker] Failed to inject file ${file.name}:`, error)
       throw error
     }
-  }
-}
-
-/**
- * Collect output files from /mnt directory
- * @param {any} pyodide
- * @returns {Promise<FileOutput[]>}
- */
-async function collectOutputFiles(pyodide) {
-  try {
-    const fileNames = pyodide.FS.readdir('/mnt').filter(
-      (/** @type {string} */ name) => name !== '.' && name !== '..'
-    )
-
-    /** @type {FileOutput[]} */
-    const outputFiles = []
-
-    for (const fileName of fileNames) {
-      try {
-        const filePath = `/mnt/${fileName}`
-        const data = pyodide.FS.readFile(filePath)
-        outputFiles.push({
-          name: fileName,
-          content: data.buffer,
-        })
-      } catch (error) {
-        console.warn(`[Pyodide Worker] Failed to read output file ${fileName}:`, error)
-      }
-    }
-
-    return outputFiles
-  } catch (error) {
-    console.warn('[Pyodide Worker] Failed to collect output files:', error)
-    return []
   }
 }
 

@@ -28,14 +28,17 @@ export const pythonCodeDefinition: ToolDefinition = {
   type: 'function',
   function: {
     name: 'run_python_code',
-    description: `Execute Python code in the browser using Pyodide.
+    description: `Execute Python code in the browser using Pyodide (WebAssembly Python runtime).
+
+ENVIRONMENT: Runs in browser via WebAssembly, not a full Python environment.
+- Files are injected to /mnt directory
+- Built-in packages: pandas, numpy, matplotlib, openpyxl, pillow, etc.
+- For other packages: use micropip.install('package-name')
+- For matplotlib: set matplotlib.use('Agg') BEFORE creating figures (headless mode)
 
 IMPORTANT:
 1. Specify file paths in the files parameter that your code needs
 2. Files can be a string array or object array: ["file.xlsx"] or [{path: "file.xlsx"}]
-3. Built-in packages (pandas, numpy, matplotlib, openpyxl) auto-load when imported
-4. For other packages (scipy, scikit-learn, etc.), install via micropip first
-5. For matplotlib: set matplotlib.use('Agg') BEFORE creating figures to run in headless mode
 
 Examples:
 - Simple computation:
@@ -189,49 +192,6 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
       timeout,
     })
 
-    // Handle output files - save to workspace
-    if (result.outputFiles && result.outputFiles.length > 0) {
-      try {
-        // Get directory handle and workspace
-        const { useAgentStore } = await import('@/store/agent.store')
-        const { getSessionManager } = await import('@/opfs/session')
-        const { useWorkspaceStore } = await import('@/store/workspace.store')
-
-        const directoryHandle = useAgentStore.getState().directoryHandle
-        if (!directoryHandle) {
-          console.warn('[Python Tool] No directory handle, skipping output file bridging')
-        } else {
-          const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-          if (!activeWorkspaceId) {
-            console.warn('[Python Tool] No active workspace, skipping output file bridging')
-          } else {
-            const manager = await getSessionManager()
-            const workspace = await manager.getSession(activeWorkspaceId)
-            if (workspace) {
-              // Save each output file to workspace
-              for (const outputFile of result.outputFiles) {
-                try {
-                  // Pass ArrayBuffer directly to preserve binary files (images, Excel, etc.)
-                  await workspace.writeFile(outputFile.name, outputFile.content, directoryHandle)
-                  console.log(
-                    `[Python Tool] Saved output file: ${outputFile.name} (${outputFile.content.byteLength} bytes)`
-                  )
-                } catch (error) {
-                  console.error(
-                    `[Python Tool] Failed to save output file ${outputFile.name}:`,
-                    error
-                  )
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.warn('[Python Tool] Failed to bridge output files:', error)
-        // Continue - file bridging failure is not fatal
-      }
-    }
-
     // Format result for Agent
     if (!result.success) {
       return JSON.stringify({
@@ -247,7 +207,6 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
       stderr?: string
       result?: unknown
       images?: Array<{ filename: string; data: string }>
-      outputFiles?: Array<{ name: string; size: number }>
       executionTime: number
     } = {
       executionTime: result.executionTime,
@@ -267,15 +226,6 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
 
     if (result.images && result.images.length > 0) {
       response.images = result.images
-    }
-
-    if (result.outputFiles && result.outputFiles.length > 0) {
-      response.outputFiles = result.outputFiles.map(
-        (f: { name: string; content: ArrayBuffer }) => ({
-          name: f.name,
-          size: f.content.byteLength,
-        })
-      )
     }
 
     return JSON.stringify(response, null, 2)
