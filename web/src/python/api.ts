@@ -372,15 +372,15 @@ export class PythonExecutor {
   }
 
   /**
-   * Unmount and cleanup the filesystem
-   * Frees memory by clearing file caches
+   * Unmount directory and remove /mnt
+   * Called when user releases the folder
    */
   async unmount(): Promise<void> {
     this.ensureWorker()
 
     const id = generateId()
 
-    logger('Unmounting filesystem...')
+    logger('Unmounting filesystem and removing /mnt...')
 
     const responsePromise = new Promise<{
       success: boolean
@@ -412,7 +412,7 @@ export class PythonExecutor {
       throw new Error(response.result.error || 'Unmount failed')
     }
 
-    logger('Filesystem unmounted')
+    logger('Filesystem unmounted and /mnt removed')
   }
 
   /**
