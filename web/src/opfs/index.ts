@@ -62,6 +62,17 @@ export {
   getDirectoryPath,
 } from './utils/opfs-utils'
 
+// File reader for diff operations
+export {
+  readFileFromOPFS,
+  readFileFromNativeFS,
+  readFileFromOPFSWithMeta,
+  fileExistsInOPFS,
+  fileExistsInNativeFS,
+  readBinaryFileFromOPFS,
+  readBinaryFileFromNativeFS,
+} from './utils/file-reader'
+
 // Session
 export {
   SessionManager,

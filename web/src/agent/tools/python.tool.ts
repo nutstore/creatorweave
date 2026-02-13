@@ -19,7 +19,38 @@
 
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { pythonExecutor } from '@/python'
-import { getActiveWorkspace } from '@/store/workspace.store'
+import { getActiveWorkspace, useWorkspaceStore } from '@/store/workspace.store'
+
+//=============================================================================
+// Debounce Timer for Pending Changes Refresh
+//=============================================================================
+
+/** Timer for debouncing refreshPendingChanges calls */
+let pendingChangesRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Debounce interval in ms */
+const PENDING_CHANGES_DEBOUNCE_MS = 1000
+
+/**
+ * Debounced refresh of pending changes list
+ * Avoids refreshing too frequently after multiple Python executions
+ */
+function debouncedRefreshPendingChanges(): void {
+  // Clear existing timer
+  if (pendingChangesRefreshTimer) {
+    clearTimeout(pendingChangesRefreshTimer)
+  }
+
+  // Set new timer
+  pendingChangesRefreshTimer = setTimeout(async () => {
+    try {
+      await useWorkspaceStore.getState().refreshPendingChanges()
+      console.log('[Python Tool] Pending changes refreshed after Python execution')
+    } catch (error) {
+      console.warn('[Python Tool] Failed to refresh pending changes:', error)
+    }
+  }, PENDING_CHANGES_DEBOUNCE_MS)
+}
 
 //=============================================================================
 // Tool Definition
@@ -172,12 +203,19 @@ export const pythonCodeExecutor: ToolExecutor = async (args, _context) => {
 
     // Format result for Agent
     if (!result.success) {
+      // Refresh pending changes even on Python execution failure
+      // (user may have created/modified files before the error)
+      debouncedRefreshPendingChanges()
+
       return JSON.stringify({
         error: result.error || 'Execution failed',
         stderr: result.stderr,
         executionTime: result.executionTime,
       })
     }
+
+    // Refresh pending changes list after successful execution (debounced)
+    debouncedRefreshPendingChanges()
 
     const response = {
       stdout: result.stdout,

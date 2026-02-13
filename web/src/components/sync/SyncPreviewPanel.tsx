@@ -104,6 +104,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   const [selectedFile, setSelectedFile] = useState<FileChange | null>(null)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
+  
+  // Selection state for selective sync
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
 
   /**
    * Handle file selection from list
@@ -115,8 +118,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
   /**
    * Handle sync confirmation
+   * @param selectedPaths - Optional array of selected file paths to sync. If empty, sync all.
    */
-  const handleSync = useCallback(async () => {
+  const handleSync = useCallback(async (selectedPaths: string[] = []) => {
     if (!pendingChanges || isSyncing) return
 
     setIsSyncing(true)
@@ -136,10 +140,15 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         throw new Error('请先选择项目目录')
       }
 
+      // Determine which files to sync: selected items or all
+      const filesToSync = selectedPaths.length > 0
+        ? pendingChanges.changes.filter(c => selectedPaths.includes(c.path))
+        : pendingChanges.changes
+
       // Sync selected changes to Native FS
       const result = await workspace.syncToNative(
         nativeDir,
-        pendingChanges.changes
+        filesToSync
       )
 
       // Show sync result
@@ -155,6 +164,8 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       setSyncError(err instanceof Error ? err.message : '同步失败')
     } finally {
       setIsSyncing(false)
+      // Clear selection after sync
+      setSelectedItems(new Set())
     }
   }, [pendingChanges, isSyncing, clearChanges, onSync])
 
@@ -174,6 +185,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     clearChanges()
     setSelectedFile(null)
     setSyncError(null)
+    setSelectedItems(new Set())
   }, [clearChanges])
 
   /**
@@ -267,6 +279,8 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
             onClear={handleClear}
             onRemoveFile={handleRemoveFile}
             isSyncing={isSyncing}
+            selectedItems={selectedItems}
+            onSelectionChange={setSelectedItems}
           />
         </div>
       ) : (

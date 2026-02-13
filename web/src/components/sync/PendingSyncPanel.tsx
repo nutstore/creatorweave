@@ -155,8 +155,13 @@ export function PendingSyncPanel() {
         return
       }
 
+      // Determine which files to sync: selected items or all
+      const filesToSync = selectedItems.size > 0
+        ? pendingChanges.changes.filter(c => selectedItems.has(c.path))
+        : pendingChanges.changes
+
       // 执行同步
-      const result = await workspace.syncToNative(nativeDir, pendingChanges.changes)
+      const result = await workspace.syncToNative(nativeDir, filesToSync)
 
       if (result.failed > 0) {
         console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
@@ -178,7 +183,7 @@ export function PendingSyncPanel() {
     } finally {
       setIsSyncing(false)
     }
-  }, [pendingChanges, isSyncing, clearChanges])
+  }, [pendingChanges, isSyncing, clearChanges, selectedItems])
 
   // 没有待同步文件时显示空状态
   if (isEmpty) {
@@ -370,7 +375,7 @@ export function PendingSyncPanel() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4 4h.01M5 8h14a1 1 0 110-1 0" />
                 </svg>
-                {showSyncSuccess ? '完成!' : '同步全部'}
+                {showSyncSuccess ? '完成!' : selectedCount > 0 ? `同步选中 (${selectedCount})` : '同步全部'}
               </>
             )}
           </BrandButton>

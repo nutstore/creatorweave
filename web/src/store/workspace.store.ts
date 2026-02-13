@@ -18,6 +18,7 @@ import type { SessionMetadata, ChangeDetectionResult } from '@/opfs/types/opfs-t
 import { getSessionManager, SessionWorkspace } from '@/opfs/session'
 import { getWorkspaceRepository, type Workspace } from '@/sqlite/repositories/workspace.repository'
 import { requestDirectoryAccess, releaseDirectoryHandle } from '@/native-fs'
+import { toast } from 'sonner'
 
 /**
  * Workspace metadata shape from SessionManager (matches InternalSessionMetadata)
@@ -660,6 +661,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           // Show preview panel when changes are detected
           const hasChanges = changes && changes.changes.length > 0
           set({ pendingChanges: changes, showPreview: hasChanges })
+
+          // Show toast notification when changes are detected
+          if (hasChanges && changes) {
+            const changeCount = changes.changes.length
+            const message = changeCount === 1
+              ? '检测到 1 个文件变更，请查看同步预览'
+              : `检测到 ${changeCount} 个文件变更，请查看同步预览`
+
+            toast(message, {
+              action: {
+                label: '查看',
+                onClick: () => {
+                  set({ showPreview: true })
+                },
+              },
+              duration: 5000,
+            })
+          }
         },
 
         getPendingChanges: () => {

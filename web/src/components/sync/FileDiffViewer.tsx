@@ -7,9 +7,26 @@
  * Part of Phase 3: Sync Preview UI
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { type FileChange, type ChangeType } from '@/opfs/types/opfs-types'
 import { getActiveWorkspace } from '@/store/workspace.store'
+import {
+  readFileFromOPFS,
+  readFileFromNativeFS,
+} from '@/opfs'
+import { diffLines, type Change } from 'diff'
+
+type ViewMode = 'sideBySide' | 'inline'
+
+const STORAGE_KEY = 'fileDiffViewer-viewMode'
+
+/** Get initial view mode from localStorage */
+function getInitialViewMode(): ViewMode {
+  if (typeof window === 'undefined') return 'sideBySide'
+  const stored = localStorage.getItem(STORAGE_KEY)
+  if (stored === 'sideBySide' || stored === 'inline') return stored
+  return 'sideBySide'
+}
 
 interface FileDiffViewerProps {
   /** Selected file change to display */
@@ -52,6 +69,13 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
     loading: false,
     error: null,
   })
+  const [viewMode, setViewMode] = useState<ViewMode>(getInitialViewMode)
+
+  // Save preference to localStorage when view mode changes
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    localStorage.setItem(STORAGE_KEY, mode)
+  }
 
   // Load file contents when selection changes
   useEffect(() => {
@@ -69,24 +93,40 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
           throw new Error('未激活的工作区')
         }
 
-        // For Phase 3, we don't have access to real filesystem directory handle yet
-        // So we can only show placeholder content
-        let opfsContent: string | null = null
+        const { workspace, workspaceId } = activeWorkspace
+        const filePath = fileChange.path
 
+        // Read from OPFS
+        let opfsContent: string | null = null
         try {
           if (fileChange.type !== 'add') {
-            opfsContent = '[OPFS 内容 - 需要实现实际读取]'
+            opfsContent = await readFileFromOPFS(workspaceId, filePath)
           }
-        } catch {
+        } catch (err) {
+          console.warn('[FileDiffViewer] Failed to read OPFS content:', err)
           opfsContent = null
+        }
+
+        // Read from Native FS
+        let nativeContent: string | null = null
+        try {
+          if (fileChange.type !== 'delete') {
+            const nativeDir = await workspace.getNativeDirectoryHandle()
+            if (nativeDir) {
+              nativeContent = await readFileFromNativeFS(nativeDir, filePath)
+            } else {
+              // No directory handle - user needs to grant permission
+              nativeContent = '[需要选择项目目录以查看本机文件内容]'
+            }
+          }
+        } catch (err) {
+          console.warn('[FileDiffViewer] Failed to read native content:', err)
+          nativeContent = '[读取本机文件失败]'
         }
 
         setContent({
           opfs: opfsContent,
-          native:
-            fileChange.type === 'delete'
-              ? null
-              : '[本机文件系统内容 - 需要实际访问权限]',
+          native: nativeContent,
           loading: false,
           error: null,
         })
@@ -190,6 +230,49 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
 
   const color = getChangeTypeColor(fileChange.type)
 
+  // Compute diff for inline view
+  const diffResult = useMemo(() => {
+    if (!content.opfs || !content.native) return []
+    return diffLines(content.opfs, content.native)
+  }, [content.opfs, content.native])
+
+  /** Render inline diff view */
+  const renderInlineDiff = () => {
+    if (!content.opfs && !content.native) {
+      return (
+        <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+          无法比较
+        </div>
+      )
+    }
+
+    return (
+      <div className="font-mono text-sm">
+        {diffResult.map((part: Change, index: number) => {
+          const bgColor = part.added ? 'bg-green-50' : part.removed ? 'bg-red-50' : ''
+          const textColor = part.added ? 'text-green-700' : part.removed ? 'text-red-700' : 'text-gray-700'
+          const prefix = part.added ? '+ ' : part.removed ? '- ' : '  '
+          
+          return (
+            <div key={index} className={`flex ${bgColor}`}>
+              <span className="w-8 text-right text-gray-400 select-none pr-2 border-r border-gray-200">
+                {index + 1}
+              </span>
+              <span className={`flex-1 pl-3 whitespace-pre-wrap break-all ${textColor}`}>
+                {part.value.split('\n').map((line, lineIdx) => (
+                  <React.Fragment key={lineIdx}>
+                    {lineIdx > 0 && '\n'}
+                    {prefix}{line}
+                  </React.Fragment>
+                ))}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -212,52 +295,107 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
               {fileChange.size ? `${(fileChange.size / 1024).toFixed(1)} KB` : '-'}
             </p>
           </div>
+
+          {/* View Mode Toggle */}
+          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-200 p-1">
+            <button
+              onClick={() => handleViewModeChange('sideBySide')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'sideBySide'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              title="左右对比"
+            >
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+                左右
+              </span>
+            </button>
+            <button
+              onClick={() => handleViewModeChange('inline')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'inline'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+              title="行内对比"
+            >
+              <span className="flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                行内
+              </span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Diff Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* OPFS Version */}
-        <div className="flex-1 flex flex-col border-r border-gray-200">
-          <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
-            <h4 className="text-sm font-medium text-gray-700">
-              OPFS 版本
-              {fileChange.type === 'delete' && (
-                <span className="ml-2 text-xs text-red-600">(将被删除)</span>
-              )}
-            </h4>
-          </div>
-          <div className="flex-1 overflow-auto bg-white p-4">
-            {content.opfs !== null ? (
-              highlightCode(content.opfs)
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                {fileChange.type === 'add' ? '新文件' : '无内容'}
+        {viewMode === 'sideBySide' ? (
+          <>
+            {/* OPFS Version */}
+            <div className="flex-1 flex flex-col border-r border-gray-200">
+              <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
+                <h4 className="text-sm font-medium text-gray-700">
+                  OPFS 版本
+                  {fileChange.type === 'delete' && (
+                    <span className="ml-2 text-xs text-red-600">(将被删除)</span>
+                  )}
+                </h4>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="flex-1 overflow-auto bg-white p-4">
+                {content.opfs !== null ? (
+                  highlightCode(content.opfs)
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    {fileChange.type === 'add' ? '新文件' : '无法读取 OPFS 内容'}
+                  </div>
+                )}
+              </div>
+            </div>
 
-        {/* Native FS Version */}
-        <div className="flex-1 flex flex-col">
-          <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
-            <h4 className="text-sm font-medium text-gray-700">
-              本机文件系统
-              {fileChange.type === 'add' && (
-                <span className="ml-2 text-xs text-green-600">(将创建)</span>
-              )}
-            </h4>
-          </div>
-          <div className="flex-1 overflow-auto bg-white p-4">
-            {content.native !== null ? (
-              highlightCode(content.native)
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                {fileChange.type === 'delete' ? '文件不存在' : '无内容'}
+            {/* Native FS Version */}
+            <div className="flex-1 flex flex-col">
+              <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
+                <h4 className="text-sm font-medium text-gray-700">
+                  本机文件系统
+                  {fileChange.type === 'add' && (
+                    <span className="ml-2 text-xs text-green-600">(将创建)</span>
+                  )}
+                </h4>
               </div>
-            )}
+              <div className="flex-1 overflow-auto bg-white p-4">
+                {content.native !== null ? (
+                  highlightCode(content.native)
+                ) : (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    {fileChange.type === 'delete' ? '文件不存在' : '无法读取本机文件'}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          /* Inline Diff View */
+          <div className="flex-1 flex flex-col">
+            <div className="px-4 py-2 bg-gray-100 border-b border-gray-200">
+              <h4 className="text-sm font-medium text-gray-700">
+                差异对比
+                <span className="ml-2 text-xs text-gray-500">
+                  (绿色: 新增, 红色: 删除)
+                </span>
+              </h4>
+            </div>
+            <div className="flex-1 overflow-auto bg-white p-4">
+              {renderInlineDiff()}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

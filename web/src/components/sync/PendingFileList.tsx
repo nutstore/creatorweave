@@ -8,12 +8,21 @@
  * - hover 预览效果
  */
 
-import React, { useState, useCallback } from 'react'
-import { type ChangeDetectionResult, type FileChange } from '@/opfs/types/opfs-types'
+import React, { useState, useCallback, useMemo } from 'react'
+import { type ChangeDetectionResult, type FileChange, type ChangeType } from '@/opfs/types/opfs-types'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { BrandButton, BrandCheckbox } from '@browser-fs-analyzer/ui'
 import { Badge } from '@/components/ui/badge'
-import { Download, Trash2, X } from 'lucide-react'
+import { Download, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
+
+/** 分组类型定义 */
+type ChangeGroup = {
+  type: ChangeType
+  label: string
+  count: number
+  changes: FileChange[]
+  expanded: boolean
+}
 
 interface PendingFileListProps {
   /** Change detection result from workspace store */
@@ -23,13 +32,17 @@ interface PendingFileListProps {
   /** Currently selected file path */
   selectedPath?: string
   /** Callback when user requests sync */
-  onSync?: () => void
+  onSync?: (selectedPaths: string[]) => void
   /** Callback when user requests clear all */
   onClear?: () => void
   /** Callback when user removes a single file */
   onRemoveFile?: (path: string) => void
   /** Whether sync operation is in progress */
   isSyncing?: boolean
+  /** Currently selected items for sync (controlled) */
+  selectedItems?: Set<string>
+  /** Callback when selection changes */
+  onSelectionChange?: (selected: Set<string>) => void
 }
 
 export const PendingFileList: React.FC<PendingFileListProps> = ({
@@ -40,9 +53,76 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
   onClear,
   onRemoveFile,
   isSyncing = false,
+  selectedItems: externalSelectedItems,
+  onSelectionChange,
 }) => {
-  const [selectAll, setSelectAll] = useState(false)
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+  // Internal state for uncontrolled mode (backward compatibility)
+  const [internalSelectAll, setInternalSelectAll] = useState(false)
+  const [internalSelectedItems, setInternalSelectedItems] = useState<Set<string>>(new Set())
+  // 展开/折叠状态
+  const [groupExpanded, setGroupExpanded] = useState<Record<ChangeType, boolean>>({
+    add: true,
+    modify: true,
+    delete: true,
+  })
+
+  // 按变更类型分组
+  const groupedChanges = useMemo(() => {
+    const groups: ChangeGroup[] = []
+    
+    // 新增文件组
+    const addedChanges = changes.changes.filter(c => c.type === 'add')
+    if (addedChanges.length > 0) {
+      groups.push({
+        type: 'add',
+        label: '新增',
+        count: addedChanges.length,
+        changes: addedChanges,
+        expanded: groupExpanded.add,
+      })
+    }
+    
+    // 修改文件组
+    const modifiedChanges = changes.changes.filter(c => c.type === 'modify')
+    if (modifiedChanges.length > 0) {
+      groups.push({
+        type: 'modify',
+        label: '修改',
+        count: modifiedChanges.length,
+        changes: modifiedChanges,
+        expanded: groupExpanded.modify,
+      })
+    }
+    
+    // 删除文件组
+    const deletedChanges = changes.changes.filter(c => c.type === 'delete')
+    if (deletedChanges.length > 0) {
+      groups.push({
+        type: 'delete',
+        label: '删除',
+        count: deletedChanges.length,
+        changes: deletedChanges,
+        expanded: groupExpanded.delete,
+      })
+    }
+    
+    return groups
+  }, [changes.changes, groupExpanded])
+
+  // 切换分组展开/折叠
+  const toggleGroup = useCallback((type: ChangeType) => {
+    setGroupExpanded(prev => ({
+      ...prev,
+      [type]: !prev[type],
+    }))
+  }, [])
+
+  // Use external state if provided (controlled mode), otherwise use internal state
+  const isControlled = externalSelectedItems !== undefined && onSelectionChange !== undefined
+  const selectAll = isControlled 
+    ? externalSelectedItems.size === changes.changes.length
+    : internalSelectAll
+  const selectedItems = isControlled ? externalSelectedItems : internalSelectedItems
 
   // 计算选中的数量
   const selectedCount = selectedItems.size
@@ -50,28 +130,50 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
   // 处理单个文件选择/取消选择
   const handleToggleSelect = useCallback(
     (path: string) => {
-      const newSelected = new Set(selectedItems)
-      if (newSelected.has(path)) {
-        newSelected.delete(path)
+      if (isControlled && onSelectionChange) {
+        // Controlled mode: notify parent
+        const newSelected = new Set(selectedItems)
+        if (newSelected.has(path)) {
+          newSelected.delete(path)
+        } else {
+          newSelected.add(path)
+        }
+        onSelectionChange(newSelected)
       } else {
-        newSelected.add(path)
+        // Uncontrolled mode: update internal state
+        const newSelected = new Set(selectedItems)
+        if (newSelected.has(path)) {
+          newSelected.delete(path)
+        } else {
+          newSelected.add(path)
+        }
+        setInternalSelectedItems(newSelected)
+        setInternalSelectAll(newSelected.size === changes.changes.length - 1)
       }
-      setSelectedItems(newSelected)
-      setSelectAll(newSelected.size === changes.changes.length - 1)
     },
-    [selectedItems, changes.changes.length]
+    [selectedItems, changes.changes.length, isControlled, onSelectionChange]
   )
 
   // 处理全选/取消全选
   const handleToggleSelectAll = useCallback(() => {
     const newSelectAll = !selectAll
-    setSelectAll(newSelectAll)
-    if (newSelectAll) {
-      setSelectedItems(new Set(changes.changes.map((c) => c.path)))
+    if (isControlled && onSelectionChange) {
+      // Controlled mode
+      if (newSelectAll) {
+        onSelectionChange(new Set(changes.changes.map((c) => c.path)))
+      } else {
+        onSelectionChange(new Set())
+      }
     } else {
-      setSelectedItems(new Set())
+      // Uncontrolled mode
+      setInternalSelectAll(newSelectAll)
+      if (newSelectAll) {
+        setInternalSelectedItems(new Set(changes.changes.map((c) => c.path)))
+      } else {
+        setInternalSelectedItems(new Set())
+      }
     }
-  }, [selectAll, changes.changes])
+  }, [selectAll, changes.changes, isControlled, onSelectionChange])
 
   // 处理删除单个文件
   const handleRemoveFile = useCallback(
@@ -100,60 +202,91 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
         )}
       </div>
 
-      {/* 紧凑文件列表 */}
+      {/* 紧凑文件列表 - 按变更类型分组显示 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="divide-y divide-subtle/50">
-          {changes.changes.map((change, index) => {
-            const typeInfo = getChangeTypeInfo(change.type)
-            const isSelected = selectedItems.has(change.path) || change.path === selectedPath
-
+          {groupedChanges.map((group) => {
+            const typeInfo = getChangeTypeInfo(group.type)
+            
             return (
-              <div
-                key={`${change.path}-${index}`}
-                className={`group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-hover ${
-                  isSelected ? 'bg-primary-50/50' : ''
-                }`}
-              >
-                {/* 选择框 */}
-                <BrandCheckbox
-                  checked={isSelected}
-                  onCheckedChange={() => handleToggleSelect(change.path)}
-                  className="shrink-0"
-                />
-
-                {/* 文件图标 */}
-                <span className="text-tertiary flex-shrink-0">
-                  <FileIcon filename={change.path} className="w-4 h-4" />
-                </span>
-
-                {/* 文件名 */}
-                <span
-                  className="flex-1 text-sm text-primary truncate min-w-0 cursor-pointer"
-                  onClick={() => onSelectFile?.(change)}
-                  title={change.path}
+              <div key={group.type}>
+                {/* 分组标题 */}
+                <div
+                  className="flex items-center gap-2 px-3 py-2 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => toggleGroup(group.type)}
                 >
-                  {change.path.split('/').pop() || change.path}
-                </span>
+                  {/* 展开/折叠图标 */}
+                  {group.expanded ? (
+                    <ChevronDown className="w-4 h-4 text-tertiary" />
+                  ) : (
+                    <ChevronRight className="w-4 h-4 text-tertiary" />
+                  )}
+                  
+                  {/* 分组标签 */}
+                  <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>
+                    {typeInfo.label}
+                  </Badge>
+                  
+                  {/* 分组标题 */}
+                  <span className="text-sm font-medium text-primary">
+                    {group.label}
+                  </span>
+                  
+                  {/* 文件数量 */}
+                  <span className="text-xs text-secondary">
+                    ({group.count})
+                  </span>
+                </div>
 
-                {/* 变更类型徽标 */}
-                <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>
-                  {typeInfo.label}
-                </Badge>
+                {/* 分组内的文件列表 */}
+                {group.expanded && group.changes.map((change, index) => {
+                  const isSelected = selectedItems.has(change.path) || change.path === selectedPath
 
-                {/* 文件大小 */}
-                <span className="text-xs text-tertiary flex-shrink-0 w-16 text-right">
-                  {formatFileSize(change.size)}
-                </span>
+                  return (
+                    <div
+                      key={`${change.path}-${index}`}
+                      className={`group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-hover ${
+                        isSelected ? 'bg-primary-50/50' : ''
+                      }`}
+                    >
+                      {/* 选择框 */}
+                      <BrandCheckbox
+                        checked={isSelected}
+                        onCheckedChange={() => handleToggleSelect(change.path)}
+                        className="shrink-0 ml-6"
+                      />
 
-                {/* 删除按钮 */}
-                <BrandButton
-                  variant="ghost"
-                  onClick={(e) => handleRemoveFile(change.path, e as any)}
-                  className="shrink-0 text-tertiary hover:text-destructive p-1"
-                  title="从列表中移除"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </BrandButton>
+                      {/* 文件图标 */}
+                      <span className="text-tertiary flex-shrink-0">
+                        <FileIcon filename={change.path} className="w-4 h-4" />
+                      </span>
+
+                      {/* 文件名 */}
+                      <span
+                        className="flex-1 text-sm text-primary truncate min-w-0 cursor-pointer"
+                        onClick={() => onSelectFile?.(change)}
+                        title={change.path}
+                      >
+                        {change.path.split('/').pop() || change.path}
+                      </span>
+
+                      {/* 文件大小 */}
+                      <span className="text-xs text-tertiary flex-shrink-0 w-16 text-right">
+                        {formatFileSize(change.size)}
+                      </span>
+
+                      {/* 删除按钮 */}
+                      <BrandButton
+                        variant="ghost"
+                        onClick={(e) => handleRemoveFile(change.path, e as any)}
+                        className="shrink-0 text-tertiary hover:text-destructive p-1"
+                        title="从列表中移除"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </BrandButton>
+                    </div>
+                  )
+                })}
               </div>
             )
           })}
@@ -183,7 +316,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
           </BrandButton>
           <BrandButton
             variant="primary"
-            onClick={onSync}
+            onClick={() => onSync?.(Array.from(selectedItems))}
             disabled={isSyncing}
           >
             {isSyncing ? (
@@ -194,7 +327,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             ) : (
               <>
                 <Download className="w-4 h-4" />
-                同步全部
+                {hasSelection ? `同步选中 (${selectedCount})` : '同步全部'}
               </>
             )}
           </BrandButton>
