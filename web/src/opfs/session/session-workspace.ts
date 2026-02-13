@@ -21,6 +21,7 @@ import { ErrorCode } from '../types/opfs-types'
 import { SessionCacheManager } from './session-cache'
 import { SessionPendingManager } from './session-pending'
 import { SessionUndoStorage } from './session-undo'
+import { scanFilesInWorker } from '@/workers/diff-worker-manager'
 
 const SESSION_METADATA_FILE = 'session.json'
 const FILES_DIR = 'files'
@@ -667,8 +668,9 @@ export class SessionWorkspace {
     const existingPending = await this.pendingManager.getAll()
     const existingPaths = new Map(existingPending.map(p => [p.path, p]))
 
-    // 2. Scan current OPFS state (fresh scan, bypass cache)
-    const currentFiles = await this.scanFiles()
+    // 2. Scan current OPFS state using Worker (bypass cache)
+    const filesDir = await this.getFilesDir()
+    const currentFiles = await scanFilesInWorker(filesDir)
 
     // 3. Detect changes by comparing existing pending with current OPFS state
     const changes: FileChange[] = []
@@ -719,7 +721,7 @@ export class SessionWorkspace {
     // Update cache with fresh scan
     this.scanFilesCache = currentFiles
 
-    console.log('[SessionWorkspace] Pending changes refreshed:', {
+    console.log('[SessionWorkspace] Pending changes refreshed (via worker):', {
       changes: changes.length,
       added,
       modified,
