@@ -61,6 +61,13 @@ jobs:
           cd web
           npm ci
 
+      - name: Enforce import path convention
+        run: |
+          if git grep -nE "@(ui|i18n|encryption|conversation)(/|['\"])" -- '**/*.ts' '**/*.tsx' '**/*.js' '**/*.jsx' '**/*.mjs' '**/*.cjs'; then
+            echo "Short aliases (@ui/@i18n/@encryption/@conversation) are forbidden. Use @browser-fs-analyzer/*."
+            exit 1
+          fi
+
       - name: Run TypeScript type check
         run: |
           cd web

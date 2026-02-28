@@ -19,7 +19,7 @@ export function FileSearch() {
 
   // Track IME composition state
   const [isComposing, setIsComposing] = useState(false)
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Trigger search (with debounce)
   const triggerSearch = useCallback((value: string) => {

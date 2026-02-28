@@ -23,6 +23,30 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "warn",
     "@typescript-eslint/ban-ts-comment": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@ui",
+            "message": "Use @browser-fs-analyzer/ui"
+          },
+          {
+            "name": "@i18n",
+            "message": "Use @browser-fs-analyzer/i18n"
+          },
+          {
+            "name": "@encryption",
+            "message": "Use @browser-fs-analyzer/encryption"
+          },
+          {
+            "name": "@conversation",
+            "message": "Use @browser-fs-analyzer/conversation"
+          }
+        ],
+        "patterns": ["@ui/*", "@i18n/*", "@encryption/*", "@conversation/*"]
+      }
+    ],
     "prefer-const": "error",
     "require-yield": "off"
   }

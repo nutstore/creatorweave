@@ -112,7 +112,7 @@ function ConnectionProvider({ children }: AppConnectionProviderProps) {
   const sessionIdRef = useRef<string | null>(null)
 
   // Auto-reconnect state
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const RECONNECT_DELAY = 2000
 
