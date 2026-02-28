@@ -100,11 +100,13 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
           break
         case 'Enter':
           e.preventDefault()
-          const selected = flatCommands[selectedIndex]
-          if (selected) {
-            selected.handler()
-            onOpenChange(false)
-            setQuery('')
+          {
+            const selected = flatCommands[selectedIndex]
+            if (selected) {
+              selected.handler()
+              onOpenChange(false)
+              setQuery('')
+            }
           }
           break
         case 'Escape':

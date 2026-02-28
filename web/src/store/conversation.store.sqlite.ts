@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Conversation Store
  *
@@ -38,6 +39,14 @@ import { getApiKeyRepository } from '@/sqlite'
 import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
 import { generateFollowUp } from '@/agent/follow-up-generator'
 import { getConversationRepository, initSQLiteDB } from '@/sqlite'
+import {
+  createThread as createThreadUtil,
+  mergeThreads as mergeThreadsUtil,
+  deleteThread as deleteThreadUtil,
+  getNextThread,
+  getPreviousThread,
+  forkThread as forkThreadUtil,
+} from '@/agent/thread-utils'
 
 //=============================================================================
 // Persistence Functions (SQLite)
@@ -1086,7 +1095,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
     // Thread management actions
     createThread: (conversationId: string, messageId: string, title?: string) => {
-      const { createThread: createThreadUtil } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return
 
@@ -1119,7 +1127,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     mergeThreads: (conversationId: string, sourceThreadId: string, targetThreadId: string) => {
-      const { mergeThreads: mergeThreadsUtil } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return
 
@@ -1143,7 +1150,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     deleteThread: (conversationId: string, threadId: string) => {
-      const { deleteThread: deleteThreadUtil } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return
 
@@ -1182,7 +1188,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     navigateToNextThread: (conversationId: string) => {
-      const { getNextThread } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return null
 
@@ -1192,7 +1197,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     navigateToPreviousThread: (conversationId: string) => {
-      const { getPreviousThread } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return null
 
@@ -1218,7 +1222,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     forkThread: (conversationId: string, messageId: string, title?: string) => {
-      const { forkThread: forkThreadUtil } = require('@/agent/thread-utils')
       const conv = get().conversations.find((c) => c.id === conversationId)
       if (!conv) return
 

@@ -161,7 +161,7 @@ test.describe('Plugin Analysis Integration', () => {
 
     // Check that results panel has plugin result section
     // (In real scenario, would run analysis first)
-    const resultsPanel = page.locator('[data-testid="results-panel"], .results-panel')
+    page.locator('[data-testid="results-panel"], .results-panel')
     // Results only show after analysis completes
   })
 })

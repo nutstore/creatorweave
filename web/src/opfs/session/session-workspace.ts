@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Session Workspace
  *
@@ -507,7 +508,7 @@ export class SessionWorkspace {
       if (!parts[i]) continue
       try {
         currentDir = await currentDir.getDirectoryHandle(parts[i], { create: true })
-      } catch (err) {
+      } catch {
         throw new Error(`创建目录 ${parts[i]} 失败`)
       }
     }

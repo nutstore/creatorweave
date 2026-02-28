@@ -191,7 +191,7 @@ class FileReferenceExtractor {
       return null
     }
 
-    let normalized = path
+    const normalized = path
 
     // Resolve relative segments
     const parts = normalized.split('/')

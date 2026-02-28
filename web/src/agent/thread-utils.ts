@@ -134,7 +134,9 @@ export function mergeThreads(
 export function deleteThread(messages: Message[], threadId: string): Message[] {
   return messages.map((message) => {
     if (message.threadId === threadId) {
-      const { threadId, parentMessageId, ...rest } = message
+      const rest = { ...message }
+      delete rest.threadId
+      delete rest.parentMessageId
       return rest
     }
     return message

@@ -101,30 +101,6 @@ const PERSONAS: Persona[] = [
   },
 ]
 
-interface QuickAction {
-  id: string
-  text: string
-  textKey: string
-  icon: React.ElementType
-}
-
-// Note: QUICK_ACTIONS is reserved for future quick action implementations
-// @ts-expect-error - reserved for future use
-const QUICK_ACTIONS: QuickAction[] = [
-  {
-    id: 'folder',
-    text: 'Open Project Folder',
-    textKey: 'folderSelector.openFolder',
-    icon: FolderOpen,
-  },
-  {
-    id: 'capabilities',
-    text: 'View Capabilities',
-    textKey: 'welcome.viewCapabilities',
-    icon: Sparkles,
-  },
-]
-
 //=============================================================================
 // Component Props
 //=============================================================================

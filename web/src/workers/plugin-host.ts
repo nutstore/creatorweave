@@ -77,10 +77,6 @@ export function bfosa_report_progress(current: number, total: number): void {
 // Streaming Support
 //=============================================================================
 
-// Global state for streaming (in worker context)
-// @ts-ignore - DedicatedWorkerGlobalScope not in standard lib
-declare const self: any
-
 /**
  * Stream chunk storage for active streaming operations
  */

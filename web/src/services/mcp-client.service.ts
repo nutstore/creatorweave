@@ -40,6 +40,15 @@ const DEFAULT_CLIENT_INFO = {
 
 const DEFAULT_TIMEOUT = 30000 // 30 seconds
 
+type TaskInfo = { taskId: string; status: string; statusMessage?: string }
+type TaskResultLike = {
+  result?: unknown
+  taskId?: unknown
+  status?: unknown
+  statusMessage?: unknown
+  content?: unknown
+}
+
 //=============================================================================
 // MCP Client Service Class
 //=============================================================================
@@ -275,11 +284,13 @@ export class MCPClientService {
       return false
     }
 
-    const r = result as any
-
     // Handle FastMCP wrapping: { result: { content: [...] } }
     // FastMCP wraps CallToolResult in an extra "result" layer
-    const actualResult = r.result || r
+    const wrapped = result as TaskResultLike
+    const actualResult =
+      wrapped.result && typeof wrapped.result === 'object'
+        ? (wrapped.result as TaskResultLike)
+        : wrapped
 
     // Direct format: { taskId, status, ... }
     if ('taskId' in actualResult && 'status' in actualResult) {
@@ -290,15 +301,27 @@ export class MCPClientService {
     }
 
     // TextContent format: { content: [{ type: "text", text: "{\"taskId\":\"...\",...}" }] }
-    if ('content' in actualResult && Array.isArray(actualResult.content)) {
+    if (Array.isArray(actualResult.content)) {
       const textContent = actualResult.content[0]
       console.log('[MCPClient] isTaskResult: checking TextContent format', {
-        contentType: textContent?.type,
+        contentType:
+          textContent && typeof textContent === 'object'
+            ? (textContent as { type?: unknown }).type
+            : undefined,
       })
-      if (textContent?.type === 'text' && typeof textContent.text === 'string') {
+      if (
+        textContent &&
+        typeof textContent === 'object' &&
+        (textContent as { type?: unknown }).type === 'text' &&
+        typeof (textContent as { text?: unknown }).text === 'string'
+      ) {
         try {
-          const parsed = JSON.parse(textContent.text)
-          const hasTaskFields = 'taskId' in parsed && 'status' in parsed
+          const parsed = JSON.parse((textContent as { text: string }).text)
+          const hasTaskFields =
+            !!parsed &&
+            typeof parsed === 'object' &&
+            'taskId' in parsed &&
+            'status' in parsed
           console.log(`[MCPClient] isTaskResult: TextContent parsed - ${hasTaskFields}`, parsed)
           return hasTaskFields
         } catch (e) {
@@ -315,21 +338,46 @@ export class MCPClientService {
   /**
    * Extract task info from a task-augmented result
    */
-  private extractTaskInfo(result: any): { taskId: string; status: string; statusMessage?: string } {
+  private extractTaskInfo(result: unknown): TaskInfo {
     // Handle FastMCP wrapping: { result: { content: [...] } }
-    const actualResult = result.result || result
+    const wrapped = (typeof result === 'object' && result !== null ? result : {}) as TaskResultLike
+    const actualResult =
+      wrapped.result && typeof wrapped.result === 'object'
+        ? (wrapped.result as TaskResultLike)
+        : wrapped
 
     // Direct format
-    if (actualResult.taskId && actualResult.status) {
-      return actualResult
+    if (typeof actualResult.taskId === 'string' && typeof actualResult.status === 'string') {
+      return {
+        taskId: actualResult.taskId,
+        status: actualResult.status,
+        statusMessage:
+          typeof actualResult.statusMessage === 'string' ? actualResult.statusMessage : undefined,
+      }
     }
 
     // TextContent format
-    if (actualResult.content?.[0]?.type === 'text') {
-      try {
-        return JSON.parse(actualResult.content[0].text)
-      } catch {
-        throw new Error('Failed to parse task result')
+    if (Array.isArray(actualResult.content)) {
+      const first = actualResult.content[0]
+      if (
+        first &&
+        typeof first === 'object' &&
+        (first as { type?: unknown }).type === 'text' &&
+        typeof (first as { text?: unknown }).text === 'string'
+      ) {
+        try {
+          const parsed = JSON.parse((first as { text: string }).text) as Partial<TaskInfo>
+          if (typeof parsed.taskId === 'string' && typeof parsed.status === 'string') {
+            return {
+              taskId: parsed.taskId,
+              status: parsed.status,
+              statusMessage:
+                typeof parsed.statusMessage === 'string' ? parsed.statusMessage : undefined,
+            }
+          }
+        } catch {
+          throw new Error('Failed to parse task result')
+        }
       }
     }
 
@@ -768,9 +816,13 @@ export class MCPClientService {
     let result: T | null = null
 
     try {
-      while (true) {
+      let doneReading = false
+      while (!doneReading) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          doneReading = true
+          break
+        }
 
         buffer += decoder.decode(value, { stream: true })
 

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Python Execution Module - Pyodide integration for browser-based Python
  *
@@ -152,7 +153,7 @@ export { pythonExecutor } from './api'
 import { pythonExecutor as executorInstance } from './api'
 
 if (typeof window !== 'undefined') {
-  ;(window as any).pythonExecutor = executorInstance
+  (window as any).pythonExecutor = executorInstance
 
   // Convenience function for Agent tool integration
   // Note: Using loose file type to match FileRef interface expectations

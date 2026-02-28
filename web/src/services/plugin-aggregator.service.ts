@@ -7,6 +7,30 @@
 
 import type { FileOutput, PluginResult, ProcessingStatus } from '../types/plugin'
 
+type MetricsWithFileOutputs = {
+  fileOutputs?: unknown
+}
+
+type OutputEntry = {
+  path: string
+  name?: string
+  size?: number
+  status: 'Success' | 'Skipped' | 'Error'
+  data: unknown
+  error?: string
+}
+
+function isOutputEntry(value: unknown): value is OutputEntry {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.path === 'string' &&
+    (v.status === 'Success' || v.status === 'Skipped' || v.status === 'Error')
+  )
+}
+
 //=============================================================================
 // Types
 //=============================================================================
@@ -104,9 +128,12 @@ export class PluginResultAggregator {
       // In production, PluginResult would include a fileOutputs array
 
       if (result.metrics && typeof result.metrics === 'object') {
-        const metrics = result.metrics as any
-        if (metrics.fileOutputs && Array.isArray(metrics.fileOutputs)) {
+        const metrics = result.metrics as MetricsWithFileOutputs
+        if (Array.isArray(metrics.fileOutputs)) {
           for (const output of metrics.fileOutputs) {
+            if (!isOutputEntry(output)) {
+              continue
+            }
             if (!byFile.has(output.path)) {
               byFile.set(output.path, {
                 path: output.path,
@@ -175,15 +202,17 @@ export class PluginResultAggregator {
 
       case 'majority':
         // Group by data and find most common
-        const groups = new Map<string, number>()
-        for (const output of successful) {
-          const key = JSON.stringify(output.data)
-          groups.set(key, (groups.get(key) || 0) + 1)
+        {
+          const groups = new Map<string, number>()
+          for (const output of successful) {
+            const key = JSON.stringify(output.data)
+            groups.set(key, (groups.get(key) || 0) + 1)
+          }
+
+          const majorityKey = Array.from(groups.entries()).sort((a, b) => b[1] - a[1])[0][0]
+
+          return successful.find((o) => JSON.stringify(o.data) === majorityKey) || successful[0]
         }
-
-        const majorityKey = Array.from(groups.entries()).sort((a, b) => b[1] - a[1])[0][0]
-
-        return successful.find((o) => JSON.stringify(o.data) === majorityKey) || successful[0]
 
       default:
         return successful[0]

@@ -370,7 +370,7 @@ class MemoryStorage {
       const store = transaction.objectStore(STORE_NAME)
 
       // Build query
-      let results: MemoryEntry[] = []
+      const results: MemoryEntry[] = []
 
       // If filtering by type, use index
       let index: IDBIndex | null = null

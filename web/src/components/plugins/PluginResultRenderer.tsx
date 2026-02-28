@@ -31,6 +31,19 @@ export type UISchema =
   | { type: 'json'; collapsible?: boolean }
   | { type: 'chart'; chartType: 'bar' | 'line' | 'pie'; xKey: string; yKey: string }
 
+type PluginMetadataWithUISchema = PluginMetadata & {
+  ui_schema?: UISchema
+}
+
+type FileResultRow = {
+  path: string
+  name: string
+  output?: unknown
+  success: boolean
+  size: number
+  [key: string]: unknown
+}
+
 //=============================================================================
 // Formatters
 //=============================================================================
@@ -39,30 +52,34 @@ function formatCellValue(value: unknown, type: ColumnType = 'text', _format?: st
   if (value === null || value === undefined) return '-'
 
   switch (type) {
-    case 'number':
+    case 'number': {
       return typeof value === 'number'
         ? value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
         : String(value)
+    }
 
-    case 'bytes':
+    case 'bytes': {
       const bytes = typeof value === 'number' ? value : parseFloat(String(value)) || 0
       if (bytes === 0) return '0 B'
       const k = 1024
       const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
       const i = Math.floor(Math.log(bytes) / Math.log(k))
       return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`
+    }
 
-    case 'duration':
+    case 'duration': {
       const ms = typeof value === 'number' ? value : parseFloat(String(value)) || 0
       if (ms < 1000) return `${ms}ms`
       if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
       return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`
+    }
 
-    case 'badge':
+    case 'badge': {
       const badgeColor = getBadgeColor(String(value))
       return `<span class="px-2 py-1 rounded text-xs font-medium ${badgeColor}">${escapeHtml(String(value))}</span>`
+    }
 
-    case 'progress':
+    case 'progress': {
       const progress = typeof value === 'number' ? value : parseFloat(String(value)) || 0
       return `
         <div class="flex items-center gap-2">
@@ -72,6 +89,7 @@ function formatCellValue(value: unknown, type: ColumnType = 'text', _format?: st
           <span class="text-xs text-gray-600">${progress.toFixed(0)}%</span>
         </div>
       `
+    }
 
     case 'code':
       return `<code class="px-2 py-1 bg-gray-100 rounded text-sm font-mono">${escapeHtml(String(value))}</code>`
@@ -105,6 +123,11 @@ function escapeHtml(text: string): string {
   return div.innerHTML
 }
 
+function toDisplayString(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  return typeof value === 'string' ? value : String(value)
+}
+
 //=============================================================================
 // Renderers
 //=============================================================================
@@ -112,7 +135,7 @@ function escapeHtml(text: string): string {
 interface PluginResultRendererProps {
   pluginResult: PluginResultWithMetadata
   metadata?: PluginMetadata
-  fileResults?: Array<{ path: string; name: string; output?: any; success: boolean; size: number }>
+  fileResults?: FileResultRow[]
 }
 
 /**
@@ -124,8 +147,7 @@ export function PluginResultRenderer({
   fileResults,
 }: PluginResultRendererProps) {
   // Get UI schema from plugin metadata
-  // @ts-ignore - ui_schema is optional extension
-  const uiSchema = (metadata as any)?.ui_schema as UISchema | undefined
+  const uiSchema = (metadata as PluginMetadataWithUISchema | undefined)?.ui_schema
 
   // If no schema, fall back to automatic detection
   if (!uiSchema) {
@@ -205,14 +227,19 @@ function TableRenderer({
   fileResults,
 }: {
   schema: Extract<UISchema, { type: 'table' }>
-  fileResults?: any[]
+  fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
     return <p className="text-sm text-gray-500">No file results to display</p>
   }
 
-  const getNestedValue = (obj: any, key: string) => {
-    return key.split('.').reduce((o, k) => o?.[k], obj)
+  const getNestedValue = (obj: unknown, key: string): unknown => {
+    return key.split('.').reduce<unknown>((current, segment) => {
+      if (!current || typeof current !== 'object') {
+        return undefined
+      }
+      return (current as Record<string, unknown>)[segment]
+    }, obj)
   }
 
   return (
@@ -269,7 +296,7 @@ function CardsRenderer({
   fileResults,
 }: {
   schema: Extract<UISchema, { type: 'cards' }>
-  fileResults?: any[]
+  fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
     return <p className="text-sm text-gray-500">No file results to display</p>
@@ -278,8 +305,10 @@ function CardsRenderer({
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {fileResults.map((file, i) => {
-        const title = file[schema.titleKey] || file.name || 'Unnamed'
-        const subtitle = schema.subtitleKey ? file[schema.subtitleKey] : file.path
+        const title = toDisplayString(file[schema.titleKey] ?? file.name ?? 'Unnamed')
+        const subtitle = schema.subtitleKey
+          ? toDisplayString(file[schema.subtitleKey])
+          : toDisplayString(file.path)
         const metric = schema.metricKey ? file[schema.metricKey] : null
 
         return (
@@ -287,13 +316,13 @@ function CardsRenderer({
             <h4 className="truncate font-medium text-gray-900" title={title}>
               {title}
             </h4>
-            {subtitle && (
+            {subtitle.length > 0 && (
               <p className="truncate text-sm text-gray-500" title={subtitle}>
                 {subtitle}
               </p>
             )}
             {metric !== null && (
-              <p className="mt-2 text-lg font-semibold text-gray-900">{metric}</p>
+              <p className="mt-2 text-lg font-semibold text-gray-900">{toDisplayString(metric)}</p>
             )}
           </div>
         )
@@ -311,16 +340,17 @@ function KeyValueRenderer({
   data,
 }: {
   schema: Extract<UISchema, { type: 'key_value' }>
-  data?: any
+  data?: unknown
 }) {
-  if (!data || typeof data !== 'object') {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return <p className="text-sm text-gray-500">No metrics available</p>
   }
+  const metrics = data as Record<string, unknown>
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {schema.pairs.map(({ key, label, type = 'text' }) => {
-        const value = (data as any)[key]
+        const value = metrics[key]
         return (
           <div key={key} className="flex items-center gap-3 rounded-lg border bg-white p-3">
             <div className="flex-1">
@@ -338,7 +368,7 @@ function KeyValueRenderer({
 // Code Renderer
 //=============================================================================
 
-function CodeRenderer({ data }: { data: any }) {
+function CodeRenderer({ data }: { data: unknown }) {
   const code = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
 
   return (
@@ -352,7 +382,7 @@ function CodeRenderer({ data }: { data: any }) {
 // JSON Renderer
 //=============================================================================
 
-function JsonRenderer({ data, collapsible = true }: { data: any; collapsible?: boolean }) {
+function JsonRenderer({ data, collapsible = true }: { data: unknown; collapsible?: boolean }) {
   const json = JSON.stringify(data, null, 2)
 
   return (
@@ -376,7 +406,7 @@ function ChartRenderer({
   fileResults,
 }: {
   schema: Extract<UISchema, { type: 'chart' }>
-  fileResults?: any[]
+  fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
     return <p className="text-sm text-gray-500">No data to display</p>
@@ -393,8 +423,9 @@ function ChartRenderer({
     <div className="space-y-2">
       {fileResults.map((file, i) => {
         const label = String(file[schema.xKey] || file.name || `Item ${i}`)
-        const value = file[schema.yKey] || 0
-        const percent = maxValue > 0 ? (value / maxValue) * 100 : 0
+        const rawValue = file[schema.yKey]
+        const numericValue = typeof rawValue === 'number' ? rawValue : 0
+        const percent = maxValue > 0 ? (numericValue / maxValue) * 100 : 0
 
         return (
           <div key={i} className="flex items-center gap-3">
@@ -408,7 +439,7 @@ function ChartRenderer({
               />
             </div>
             <div className="w-16 flex-shrink-0 text-right text-sm font-medium text-gray-900">
-              {typeof value === 'number' ? value.toLocaleString() : value}
+              {typeof rawValue === 'number' ? rawValue.toLocaleString() : toDisplayString(rawValue)}
             </div>
           </div>
         )

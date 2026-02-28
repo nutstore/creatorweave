@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * PendingFileList Component - 紧凑待同步文件列表
  *

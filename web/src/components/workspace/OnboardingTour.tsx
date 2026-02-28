@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Onboarding Tour - first-time user walkthrough.
  *
@@ -95,21 +96,6 @@ export function OnboardingTour({
   const isLastStep = currentStepIndex === steps.length - 1
   const isFirstStep = currentStepIndex === 0
 
-  const handleNext = useCallback(() => {
-    if (isLastStep) {
-      handleComplete()
-    } else {
-      currentStep?.action?.()
-      setCurrentStepIndex((prev) => prev + 1)
-    }
-  }, [currentStep, isLastStep])
-
-  const handlePrevious = useCallback(() => {
-    if (!isFirstStep) {
-      setCurrentStepIndex((prev) => prev - 1)
-    }
-  }, [isFirstStep])
-
   const handleComplete = useCallback(() => {
     if (dontShowAgain) {
       setOnboardingCompleted(true)
@@ -118,6 +104,21 @@ export function OnboardingTour({
     setCurrentStepIndex(0)
     onComplete?.()
   }, [dontShowAgain, setOnboardingCompleted, onComplete])
+
+  const handleNext = useCallback(() => {
+    if (isLastStep) {
+      handleComplete()
+    } else {
+      currentStep?.action?.()
+      setCurrentStepIndex((prev) => prev + 1)
+    }
+  }, [currentStep, isLastStep, handleComplete])
+
+  const handlePrevious = useCallback(() => {
+    if (!isFirstStep) {
+      setCurrentStepIndex((prev) => prev - 1)
+    }
+  }, [isFirstStep])
 
   const handleSkip = useCallback(() => {
     if (dontShowAgain) {

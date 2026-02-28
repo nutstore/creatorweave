@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * WorkspaceLayout - main layout for the AI workbench.
  *
@@ -257,7 +258,7 @@ export function WorkspaceLayout() {
     }
 
     scanForSkills()
-  }, [directoryHandle, skillsLoaded])
+  }, [directoryHandle, skillsLoaded, skillsStore.skills])
 
   // Global keyboard shortcuts
   useEffect(() => {

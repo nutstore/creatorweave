@@ -197,7 +197,7 @@ export class PluginDispatcher {
  */
 export function filesToFileEntries(files: File[]): FileEntry[] {
   return files.map((file) => {
-    const path = (file as any).webkitRelativePath || file.name
+    const path = file.webkitRelativePath || file.name
     const extension = path.includes('.') ? path.slice(path.lastIndexOf('.')) : ''
 
     return {

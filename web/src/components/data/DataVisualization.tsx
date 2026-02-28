@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * DataVisualization - 数据可视化组件
  *
@@ -72,7 +73,6 @@ function ImageViewer({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="max-w-full overflow-auto rounded-lg border border-neutral-200 bg-white p-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={filename || 'Chart'} className="h-auto max-w-full" />
       </div>
       {filename && <p className="text-sm text-neutral-500">{filename}</p>}
@@ -235,34 +235,6 @@ function TableViewer({
         {displayData.length === 0 && (
           <div className="py-8 text-center text-neutral-500">No data found</div>
         )}
-      </div>
-    </div>
-  )
-}
-
-// Simple Bar Chart (fallback)
-// @ts-expect-error - reserved for future use as fallback chart
-function _SimpleBarChart({ data }: { data: ChartDataPoint[] }) {
-  const maxValue = Math.max(...data.map((d) => d.value), 1)
-
-  return (
-    <div className="w-full">
-      <div className="flex h-64 items-end gap-2">
-        {data.map((item, idx) => (
-          <div
-            key={idx}
-            className="group flex flex-1 flex-col items-center gap-2"
-            title={`${item.label}: ${item.value}`}
-          >
-            <div
-              className="w-full rounded-t-sm bg-primary-500 transition-all group-hover:bg-primary-600"
-              style={{ height: `${(item.value / maxValue) * 100}%` }}
-            />
-            <span className="w-full truncate text-center text-xs text-neutral-600">
-              {item.label}
-            </span>
-          </div>
-        ))}
       </div>
     </div>
   )

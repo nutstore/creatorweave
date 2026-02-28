@@ -232,9 +232,9 @@ async function readExcelFile(filePath: string, context: ToolContext): Promise<Ex
       }
     }
 
-    let worksheets: string[] = ['Sheet1']
+    const worksheets: string[] = ['Sheet1']
     let data: Record<string, unknown[][]> = {}
-    let sheetInfo: ExcelReadResult['sheetInfo'] = []
+    const sheetInfo: ExcelReadResult['sheetInfo'] = []
 
     // Check file extension
     const extension = filePath.split('.').pop()?.toLowerCase()
@@ -290,7 +290,7 @@ async function readExcelFile(filePath: string, context: ToolContext): Promise<Ex
       },
       sheetInfo,
     }
-  } catch (error) {
+  } catch {
     return {
       success: false,
       filename: filePath,
@@ -320,7 +320,7 @@ function analyzeExcelData(data: Record<string, unknown[][]>): ExcelAnalysisResul
 
   const columnStats: ExcelAnalysisResult['analysis']['columnStats'] = []
 
-  for (const [_sheetName, rows] of Object.entries(data)) {
+  for (const rows of Object.values(data)) {
     totalRows += rows.length
     const cols = rows[0]?.length || 0
     totalColumns = Math.max(totalColumns, cols)

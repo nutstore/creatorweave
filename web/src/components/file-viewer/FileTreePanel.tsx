@@ -27,6 +27,17 @@ import { formatBytes } from '@/lib/utils'
 import { useOPFSStore } from '@/store/opfs.store'
 import type { PendingChange } from '@/opfs/types/opfs-types'
 
+const HIDDEN_PATTERNS = [
+  /^\.DS_Store$/, // macOS .DS_Store
+  /^\.AppleDouble$/, // macOS .AppleDouble
+  /^\.LSOverride$/, // macOS .LSOverride
+  /^\._/, // macOS resource fork files (._filename)
+  /^\.git$/, // .git directory
+  /^\.svn$/, // .svn directory
+  /^\.hg$/, // .hg directory
+  /^node_modules$/, // node_modules directory
+]
+
 /** File tree node */
 interface TreeNode {
   name: string
@@ -393,22 +404,11 @@ export function FileTreePanel({
     return map
   }, [pendingChanges])
 
-  /** Hidden files to exclude from file tree */
-  const HIDDEN_PATTERNS = [
-    /^\.DS_Store$/, // macOS .DS_Store
-    /^\.AppleDouble$/, // macOS .AppleDouble
-    /^\.LSOverride$/, // macOS .LSOverride
-    /^\._/, // macOS resource fork files (._filename) - 修复: 转义点
-    /^\.git$/, // .git directory
-    /^\.svn$/, // .svn directory
-    /^\.hg$/, // .hg directory
-    /^node_modules$/, // node_modules directory
-  ]
-
   /** Check if a file/directory name should be hidden */
-  function isHidden(name: string): boolean {
-    return HIDDEN_PATTERNS.some((pattern) => pattern.test(name))
-  }
+  const isHidden = useCallback(
+    (name: string): boolean => HIDDEN_PATTERNS.some((pattern) => pattern.test(name)),
+    []
+  )
 
   /** Load children of a directory handle */
   const loadChildren = useCallback(
@@ -457,7 +457,7 @@ export function FileTreePanel({
 
       return children
     },
-    []
+    [isHidden]
   )
 
   /** Load root directory and optionally reload expanded paths */

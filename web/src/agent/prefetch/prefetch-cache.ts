@@ -13,8 +13,6 @@
  */
 
 import type { FileSystemDirectoryHandle } from '@/opfs/types/file-system-types'
-// @ts-expect-error - reserved for future OPFS integration
-import { getSessionManager } from '@/opfs'
 import type { FilePrediction } from './file-predictor'
 
 //=============================================================================

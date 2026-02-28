@@ -482,7 +482,7 @@ function findConcept(query: string): ConceptNode | null {
   }
 
   // Fuzzy match
-  for (const [_id, concept] of Object.entries(CONCEPT_KNOWLEDGE_BASE)) {
+  for (const concept of Object.values(CONCEPT_KNOWLEDGE_BASE)) {
     const name = concept.name.toLowerCase()
     const desc = concept.description.toLowerCase()
 

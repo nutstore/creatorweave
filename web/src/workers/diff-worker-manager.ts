@@ -225,7 +225,7 @@ class DiffWorkerManager {
       } as WorkerMessage)
 
       // Wait for SCAN_RESULT
-      let scanResult: WorkerResponse = await this.waitForResponse()
+      const scanResult: WorkerResponse = await this.waitForResponse()
 
       if (scanResult.type === 'ERROR') {
         throw new Error(scanResult.payload.error)
@@ -242,7 +242,7 @@ class DiffWorkerManager {
       }
 
       // Wait for CHANGE_RESULT
-      let changeResult: WorkerResponse = await this.waitForResponse()
+      const changeResult: WorkerResponse = await this.waitForResponse()
 
       if (changeResult.type === 'ERROR') {
         throw new Error(changeResult.payload.error)

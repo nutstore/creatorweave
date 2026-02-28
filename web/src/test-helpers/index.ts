@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * 测试工具函数库
  *
@@ -124,7 +125,8 @@ export function createMockStore<T extends object>(initialState: T) {
  * on('message', (data) => console.log(data))
  */
 export function createMockWorker() {
-  const handlers = new Map<string, Function[]>()
+  type WorkerHandler = (event: { data: unknown }) => void
+  const handlers = new Map<string, WorkerHandler[]>()
 
   const worker = {
     postMessage: vi.fn((data: any) => {
@@ -132,13 +134,13 @@ export function createMockWorker() {
       messageHandlers?.forEach((handler) => handler({ data }))
     }),
     terminate: vi.fn(),
-    addEventListener: vi.fn((event: string, handler: Function) => {
+    addEventListener: vi.fn((event: string, handler: WorkerHandler) => {
       if (!handlers.has(event)) {
         handlers.set(event, [])
       }
       handlers.get(event)!.push(handler)
     }),
-    removeEventListener: vi.fn((event: string, handler: Function) => {
+    removeEventListener: vi.fn((event: string, handler: WorkerHandler) => {
       const eventHandlers = handlers.get(event)
       if (eventHandlers) {
         const index = eventHandlers.indexOf(handler)
@@ -161,11 +163,11 @@ export function createMockWorker() {
   return {
     worker,
     postMessage: worker.postMessage,
-    on: (event: string, handler: Function) => {
-      worker.addEventListener(event, handler as EventListener)
+    on: (event: string, handler: WorkerHandler) => {
+      worker.addEventListener(event, handler)
     },
-    off: (event: string, handler: Function) => {
-      worker.removeEventListener(event, handler as EventListener)
+    off: (event: string, handler: WorkerHandler) => {
+      worker.removeEventListener(event, handler)
     },
     emit: worker._emit,
     clear: worker._clearHandlers,
@@ -249,16 +251,15 @@ export async function waitForElement<T>(
   const { timeout = 5000 } = options || {}
   const startTime = Date.now()
 
-  while (true) {
+  while (Date.now() - startTime <= timeout) {
     const element = getter()
     if (element != null) {
       return element
     }
-    if (Date.now() - startTime > timeout) {
-      throw new Error(`Element not found after ${timeout}ms`)
-    }
     await new Promise((resolve) => setTimeout(resolve, 10))
   }
+
+  throw new Error(`Element not found after ${timeout}ms`)
 }
 
 /**
@@ -304,7 +305,7 @@ export function renderStoreHook<T>(hook: () => T) {
       const state = result.current
       // 处理 Zustand store
       if (state && typeof state === 'object' && 'setState' in state) {
-        ;(state as any).setState(update)
+        (state as any).setState(update)
       }
     },
   }

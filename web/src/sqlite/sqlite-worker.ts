@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * SQLite Worker - Runs SQLite in a worker thread using opfs-sahpool VFS
  *
@@ -159,7 +160,7 @@ async function handleRecover() {
     try {
       db.close()
       console.log(`[SQLite Worker] ${recoverId}: Closed existing database`)
-    } catch (e) {
+    } catch {
       // Ignore close errors during recovery
     }
     db = null
@@ -308,7 +309,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
           )
         }
         stmt.finalize()
-      } catch (e) {
+      } catch {
         // If query fails, database might be newly created with no schema yet
         console.log(`[SQLite Worker] ${initId}: Database likely NEW (schema not yet initialized)`)
       }
@@ -348,7 +349,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
             }
           }
           stmt.finalize()
-        } catch (e) {
+        } catch {
           console.log(
             `[SQLite Worker] ${initId}: Could not check data existence (tables may not exist yet)`
           )
@@ -419,7 +420,7 @@ function handleQueryAll(sql: string, params: unknown[]): unknown[] {
     if (!filename) {
       throw new Error('Database connection invalid: no filename')
     }
-  } catch (e) {
+  } catch {
     // Try to reconnect using opfs-sahpool
     if (poolUtil) {
       try {
@@ -476,7 +477,7 @@ function handleExecute(sql: string, params: unknown[]): void {
     if (!filename) {
       throw new Error('Database connection invalid: no filename')
     }
-  } catch (e) {
+  } catch {
     // Try to reconnect using opfs-sahpool
     if (poolUtil) {
       try {

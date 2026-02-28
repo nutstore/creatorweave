@@ -394,24 +394,39 @@ export class PluginExecutorService {
 
     const settled = await Promise.allSettled(executions)
 
-    for (const outcome of settled) {
+    for (const [index, outcome] of settled.entries()) {
+      const plugin = plugins[index]
+      const pluginId = plugin?.id || 'unknown'
+
       if (outcome.status === 'fulfilled') {
         results.set(outcome.value.pluginId, outcome.value)
       } else {
-        // Handle failed plugin execution
-        const pluginId =
-          plugins.find((p) => p.id === (outcome.reason as any)?.pluginId)?.id || 'unknown'
+        const reason = outcome.reason
+        const message =
+          reason instanceof Error
+            ? reason.message
+            : typeof reason === 'object' &&
+                reason !== null &&
+                typeof (reason as { message?: unknown }).message === 'string'
+              ? (reason as { message: string }).message
+              : 'Unknown error'
+
+        const failedResult: PluginExecutionResult = {
+          pluginId,
+          metadata: {
+            name: plugin?.metadata.name || pluginId,
+            version: plugin?.metadata.version || 'unknown',
+          },
+          results: [],
+          summary: 'Execution failed',
+          duration: 0,
+          errors: [message],
+        }
 
         results.set(pluginId, {
           pluginId,
-          results: [],
-          summary: 'Execution failed',
-          filesProcessed: 0,
-          filesSkipped: 0,
-          filesWithErrors: 1,
-          metrics: {},
-          warnings: [outcome.reason?.message || 'Unknown error'],
-        } as any)
+          result: failedResult,
+        })
       }
     }
 

@@ -59,6 +59,15 @@ export interface MonitorConfig {
   warningThreshold: number // percentage of limit before warning
 }
 
+interface PerformanceMemory {
+  usedJSHeapSize?: number
+  jsHeapSizeLimit?: number
+}
+
+interface PerformanceWithMemory extends Performance {
+  memory?: PerformanceMemory
+}
+
 //=============================================================================
 // Plugin Monitor
 //=============================================================================
@@ -375,7 +384,7 @@ export class PluginMonitor {
    */
   private getViolations(pluginId: string): Violation[] {
     const metrics = this.metrics.get(pluginId)
-    return (metrics as any)?.violations || []
+    return metrics?.violations || []
   }
 }
 
@@ -447,8 +456,9 @@ export function isHealthy(report: MonitorReport): boolean {
  * @returns Memory usage in bytes or undefined
  */
 export function getMemoryUsage(): number | undefined {
-  if ('memory' in performance && (performance as any).memory) {
-    const memory = (performance as any).memory
+  const perf = performance as PerformanceWithMemory
+  if (perf.memory) {
+    const memory = perf.memory
     return memory.usedJSHeapSize || memory.jsHeapSizeLimit
   }
   return undefined

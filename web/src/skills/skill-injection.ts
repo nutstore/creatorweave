@@ -255,7 +255,7 @@ export function matchSkillsForRecommendation(
 
     let keywordScore = 0
     let tagScore = 0
-    let categoryScore = 0
+    const categoryScore = 0
 
     // Keyword matching
     for (const keyword of skill.triggers.keywords) {

@@ -175,14 +175,7 @@ export function useShortcut(shortcut: KeyboardShortcut) {
 
     const cleanup = registerShortcut(shortcut)
     return cleanup
-  }, [
-    shortcut.key,
-    shortcut.ctrlKey,
-    shortcut.metaKey,
-    shortcut.shiftKey,
-    shortcut.altKey,
-    shortcut.disabled,
-  ])
+  }, [shortcut])
 }
 
 /**

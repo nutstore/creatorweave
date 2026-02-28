@@ -247,7 +247,7 @@ export function QuickActionsPanel({
         const suggestions = []
 
         // Get top 3 tools across all categories
-        for (const [_category, tools] of Object.entries(allTools)) {
+        for (const tools of Object.values(allTools)) {
           for (const tool of tools.slice(0, 1)) {
             suggestions.push({
               id: tool.toolName,
@@ -504,7 +504,7 @@ export function QuickActionsPanel({
                       const coordinator = getIntelligenceCoordinator()
                       const allTools = coordinator.getAllTools()
                       const suggestions = []
-                      for (const [_category, tools] of Object.entries(allTools)) {
+                      for (const tools of Object.values(allTools)) {
                         for (const tool of tools.slice(0, 1)) {
                           suggestions.push({
                             id: tool.toolName,

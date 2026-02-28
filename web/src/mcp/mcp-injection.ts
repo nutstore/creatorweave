@@ -55,7 +55,7 @@ export async function buildAvailableMCPServicesBlock(
   // Ensure manager is initialized
   // (It should be initialized on app startup, but check just in case)
   try {
-    await (manager as any).initialize?.()
+    await manager.initialize()
   } catch {
     // May already be initialized
   }

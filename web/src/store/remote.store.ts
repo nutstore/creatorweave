@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Remote Store - Zustand store for remote control session state.
  */
@@ -804,7 +805,6 @@ export const useRemoteStore = create<RemoteState>()((set, get) => ({
  * Find a file entry by path in the file tree
  * @ts-expect-error - used internally for recursive search
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _findFileByPath(node: FileEntry | null, path: string): FileEntry | null {
   if (!node) return null
   if (node.path === path) return node

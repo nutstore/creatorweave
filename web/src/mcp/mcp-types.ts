@@ -160,7 +160,7 @@ export interface MCPClientCapabilities {
   roots?: {
     listChanged?: boolean
   }
-  sampling?: {}
+  sampling?: Record<string, never>
 }
 
 export interface MCPInitializeResult {
@@ -173,12 +173,12 @@ export interface MCPInitializeResult {
 }
 
 export interface MCPServerCapabilities {
-  tools?: {}
+  tools?: Record<string, never>
   resources?: {
     subscribe?: boolean
     listChanged?: boolean
   }
-  prompts?: {}
+  prompts?: Record<string, never>
 }
 
 export interface MCPToolsListResult {

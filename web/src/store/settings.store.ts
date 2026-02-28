@@ -12,8 +12,8 @@ import type { LLMProviderType } from '@/agent/providers/types'
 
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
-let apiKeyCache = new Map<string, boolean>()
-let apiKeyCachePromise: Map<string, Promise<boolean>> = new Map()
+const apiKeyCache = new Map<string, boolean>()
+const apiKeyCachePromise: Map<string, Promise<boolean>> = new Map()
 
 interface SettingsState {
   // LLM settings

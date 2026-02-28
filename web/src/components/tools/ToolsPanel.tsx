@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * ToolsPanel - Display available AI capabilities/tools
  *
@@ -17,24 +18,11 @@ import {
   Terminal,
   Zap,
 } from 'lucide-react'
-import { useT } from '@/i18n'
 import { getToolRegistry } from '@/agent/tool-registry'
 
 //=============================================================================
 // Types
 //=============================================================================
-
-// Note: ToolCategory type is reserved for future category-based filtering
-// @ts-expect-error - reserved for future category-based filtering
-interface ToolCategory {
-  id: string
-  name: string
-  nameKey: string
-  icon: React.ElementType
-  description: string
-  descriptionKey: string
-  tools: ToolInfo[]
-}
 
 interface ToolInfo {
   name: string
@@ -100,8 +88,6 @@ interface ToolsPanelProps {
 //=============================================================================
 
 export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
-  // @ts-expect-error - reserved for future i18n implementation
-  const _t = useT()
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['discovery']))
   const [selectedTool, setSelectedTool] = useState<ToolInfo | null>(null)

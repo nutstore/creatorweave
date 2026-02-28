@@ -143,6 +143,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
     loadContents()
   }, [fileChange])
 
+  // Compute diff for inline view
+  const diffResult = useMemo(() => {
+    if (!content.opfs || !content.native) return []
+    return diffLines(content.opfs, content.native)
+  }, [content.opfs, content.native])
+
   if (!fileChange) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center py-12 px-4">
@@ -229,12 +235,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
   }
 
   const color = getChangeTypeColor(fileChange.type)
-
-  // Compute diff for inline view
-  const diffResult = useMemo(() => {
-    if (!content.opfs || !content.native) return []
-    return diffLines(content.opfs, content.native)
-  }, [content.opfs, content.native])
 
   /** Render inline diff view */
   const renderInlineDiff = () => {

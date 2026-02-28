@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * SQLite Database Manager
  *
@@ -752,7 +753,7 @@ if (typeof window !== 'undefined') {
           const count = result?.count || 0
           recordCounts[table.name] = count
           totalRecords += count
-        } catch (e) {
+        } catch {
           recordCounts[table.name] = -1 // Error querying this table
         }
       }

@@ -5,7 +5,7 @@
  * Uses modular architecture for better maintainability.
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 
 // Types
 import type { PluginHTMLRendererProps } from './api/types'
@@ -99,14 +99,17 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
   // Build API context for handler
   // =============================================================================
 
-  const apiContext: APIHandlerContext = {
-    analysisData,
-    showToast: handleShowToast,
-    showConfirm,
-    resizeIframe,
-    toggleFullscreen,
-    sendResponse,
-  }
+  const apiContext: APIHandlerContext = useMemo(
+    () => ({
+      analysisData,
+      showToast: handleShowToast,
+      showConfirm,
+      resizeIframe,
+      toggleFullscreen,
+      sendResponse,
+    }),
+    [analysisData, handleShowToast, showConfirm, resizeIframe, toggleFullscreen, sendResponse]
+  )
 
   // =============================================================================
   // Handle messages from iframe
@@ -159,7 +162,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>${IFRAME_STYLES}</style>
           <style>${userStyles}</style>
-          <script>${generateBFSAAPIScript()}<\/script>
+          <script>${generateBFSAAPIScript()}</script>
         </head>
         <body>${bodyContent}</body>
       </html>
@@ -207,7 +210,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
           <button
             onClick={() => {
               const iframe = iframeRef.current
-              if (iframe) iframe.src = iframe.src // Force reload
+              iframe?.contentWindow?.location.reload() // Force reload
             }}
             className="text-xs text-gray-500 transition-colors hover:text-gray-700"
           >

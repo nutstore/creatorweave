@@ -80,7 +80,7 @@ export const fileBatchWriteExecutor: ToolExecutor = async (args, context) => {
     }> = []
 
     let createdCount = 0
-    let updatedCount = 0
+    const updatedCount = 0
     let errorCount = 0
 
     // Process each file

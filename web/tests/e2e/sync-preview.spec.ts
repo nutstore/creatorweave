@@ -51,7 +51,7 @@ test.describe('Sync Preview Feature', () => {
       // This could be a badge, icon, or panel
       
       // Check for common sync indicators
-      const pendingIndicator = page.locator('[data-testid="pending-sync-panel"], .pending-sync-panel, [data-testid="sync-badge"]')
+      page.locator('[data-testid="pending-sync-panel"], .pending-sync-panel, [data-testid="sync-badge"]')
       
       // If not visible, check for sync icon in sidebar
       const syncIcon = page.locator('.sidebar, [data-testid="sidebar"]').getByTitle(/同步|sync|pending/i)

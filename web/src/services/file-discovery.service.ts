@@ -29,6 +29,15 @@ interface RecentFileEntry extends FileEntry {
   accessCount: number
 }
 
+interface FileTreeNode {
+  path: string
+  name: string
+  type: 'file' | 'directory'
+  extension?: string
+  size?: number
+  modified?: number
+}
+
 // ============================================================================
 // Service
 // ============================================================================
@@ -195,7 +204,12 @@ class FileDiscoveryService {
     return Array.from(this.recentFiles.values())
       .sort((a, b) => b.lastAccessed - a.lastAccessed)
       .slice(0, this.maxRecentFiles)
-      .map(({ lastAccessed, accessCount, ...file }) => file)
+      .map((entry) => {
+        const { lastAccessed, accessCount, ...file } = entry
+        void lastAccessed
+        void accessCount
+        return file
+      })
   }
 
   /**
@@ -327,7 +341,7 @@ class FileDiscoveryService {
   /**
    * Convert filesystem store tree to FileEntry format
    */
-  convertToFileEntry(node: any): FileEntry {
+  convertToFileEntry(node: FileTreeNode): FileEntry {
     return {
       path: node.path,
       name: node.name,

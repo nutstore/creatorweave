@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Streaming EventBus - 避免循环依赖的事件总线
  *

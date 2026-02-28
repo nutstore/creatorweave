@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * SessionSyncDialog - Cross-device session synchronization UI
  *

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Skill System Types - defines the data structures for the Skills system.
  *

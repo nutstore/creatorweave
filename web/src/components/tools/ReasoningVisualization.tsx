@@ -38,16 +38,6 @@ interface ReasoningStep {
   icon?: React.ElementType
 }
 
-// Note: ToolCallInfo is defined but not directly used in the current implementation
-// It's kept for future enhancements to show detailed tool execution status
-// @ts-expect-error - reserved for future enhancements
-interface ToolCallInfo {
-  name: string
-  args: Record<string, unknown>
-  status: 'pending' | 'running' | 'complete' | 'error'
-  result?: string
-}
-
 interface ReasoningVisualizationProps {
   /** Current reasoning content */
   reasoning?: string
@@ -288,11 +278,9 @@ export function ReasoningVisualization({
       {/* Content */}
       <div className="space-y-3 p-4">
         {/* Reasoning steps */}
-        {steps.map((step, idx) => {
+        {steps.map((step) => {
           const Icon = step.icon || STEP_ICONS[step.type]
           const isExpanded = expandedSteps.has(step.id)
-          // @ts-expect-error - reserved for future styling
-          const _isLast = idx === steps.length - 1
 
           return (
             <div

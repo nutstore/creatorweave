@@ -21,12 +21,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
-import { useConversationStore } from '@/store/conversation.store'
 import { getIntelligenceCoordinator } from '@/agent/intelligence-coordinator'
-
-// Note: ToolRecommendation type is reserved for future enhancements
-// @ts-expect-error - reserved for future enhancements
-import type { ToolRecommendation } from '@/agent/tools/tool-recommendation'
 
 //=============================================================================
 // Types
@@ -70,9 +65,6 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
   const [projectType, setProjectType] = useState<string | null>(null)
 
   const { directoryHandle } = useAgentStore()
-  // Reserve activeConversationId for future implementation of conversation-aware suggestions
-  const { activeConversationId: _activeConversationId } = useConversationStore()
-
   const dropZoneRef = useRef<HTMLDivElement>(null)
 
   // Load project type on mount

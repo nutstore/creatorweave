@@ -226,7 +226,7 @@ function App() {
         toast.dismiss(toastId)
       }
     }
-  }, []) // Empty deps - run once, guarded by initializingRef
+  }, [initializeWorkspaces, t]) // Guarded by initializingRef; dependencies kept explicit
 
   // Global error handler for DATABASE_INACCESSIBLE errors that occur after initialization
   useEffect(() => {

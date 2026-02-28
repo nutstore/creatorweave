@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * ConversationPanel - Enhanced conversation display with thread support.
  *

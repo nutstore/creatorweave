@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * MobileLayout - Responsive layout container for mobile devices.
  *

@@ -57,6 +57,26 @@ export interface PluginResultEntry {
   metrics?: unknown
 }
 
+type BFSAApiMessage = {
+  id?: string
+  action?: string
+  data?: unknown
+  type?: string
+  pluginType?: string
+}
+
+type BFSAResponseSender = (data?: unknown, error?: string) => void
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function toToastType(value: unknown): ToastMessage['type'] {
+  return value === 'success' || value === 'warning' || value === 'error' ? value : 'info'
+}
+
 //=============================================================================
 // Shared Styles (injected into plugin iframe)
 //=============================================================================
@@ -712,6 +732,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   const [toastMessage, setToastMessage] = useState<ToastMessage | null>(null)
 
   // Handle messages from iframe
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // Verify source
@@ -739,13 +760,14 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
   }, [onAction, analysisData])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   // Handle API calls from iframe
-  const handleAPICall = (msg: any) => {
+  function handleAPICall(msg: BFSAApiMessage) {
     const { id, action, data } = msg
     const iframe = iframeRef.current
 
-    const sendResponse = (responseData?: any, error?: string) => {
+    const sendResponse: BFSAResponseSender = (responseData?: unknown, error?: string) => {
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(
           {
@@ -760,6 +782,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
     }
 
     // Dispatch action
+    if (typeof action !== 'string') {
+      sendResponse(undefined, 'Invalid action')
+      return
+    }
     const [category, method] = action.split('.')
 
     switch (category) {
@@ -785,8 +811,14 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
 
       // Events
       case 'event':
-        // Forward to parent
-        onAction?.(data.event, data.data)
+        {
+          const payload = asRecord(data)
+          const eventName = payload.event
+          // Forward to parent
+          if (typeof eventName === 'string') {
+            onAction?.(eventName, payload.data)
+          }
+        }
         sendResponse()
         break
 
@@ -800,9 +832,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   // UI Operations
   const handleUIOperation = (
     method: string,
-    data: any,
-    sendResponse: (data?: any, error?: string) => void
+    data: unknown,
+    sendResponse: BFSAResponseSender
   ) => {
+    const payload = asRecord(data)
     switch (method) {
       case 'fullscreen':
         // Toggle fullscreen on iframe
@@ -822,7 +855,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
         break
 
       case 'modal':
-        setModalContent({ content: data.content, options: data.options || {} })
+        setModalContent({
+          content: typeof payload.content === 'string' ? payload.content : '',
+          options: asRecord(payload.options),
+        })
         sendResponse()
         break
 
@@ -832,25 +868,33 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
         break
 
       case 'toast':
-        setToastMessage({ message: data.message, type: data.type || 'info' })
+        setToastMessage({
+          message: typeof payload.message === 'string' ? payload.message : '',
+          type: toToastType(payload.type),
+        })
         setTimeout(() => setToastMessage(null), 3000)
         sendResponse()
         break
 
-      case 'confirm':
+      case 'confirm': {
         // Simple confirm (in real app, use a nice dialog)
-        const confirmed = window.confirm(data.message)
+        const confirmed = window.confirm(typeof payload.message === 'string' ? payload.message : '')
         sendResponse({ confirmed })
         break
+      }
 
-      case 'prompt':
-        const value = window.prompt(data.message, data.defaultValue)
+      case 'prompt': {
+        const value = window.prompt(
+          typeof payload.message === 'string' ? payload.message : '',
+          typeof payload.defaultValue === 'string' ? payload.defaultValue : undefined
+        )
         sendResponse({ value })
         break
+      }
 
       case 'resize':
-        if (typeof data.height === 'number') {
-          setHeight(data.height)
+        if (typeof payload.height === 'number') {
+          setHeight(payload.height)
         }
         sendResponse()
         break
@@ -863,9 +907,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   // Data Operations
   const handleDataOperation = (
     method: string,
-    data: any,
-    sendResponse: (data?: any, error?: string) => void
+    data: unknown,
+    sendResponse: BFSAResponseSender
   ) => {
+    const payload = asRecord(data)
     switch (method) {
       case 'getAnalysisResult':
         sendResponse(analysisData || {})
@@ -877,24 +922,33 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
 
       case 'getFileContent':
         // In real app, load file content
-        sendResponse({ path: data.path, content: null })
+        sendResponse({
+          path: typeof payload.path === 'string' ? payload.path : '',
+          content: null,
+        })
         break
 
-      case 'getPluginResult':
+      case 'getPluginResult': {
         const pluginResult = analysisData?.pluginResults?.find(
-          (p: any) => p.pluginId === data.pluginId
+          (p) => p.pluginId === payload.pluginId
         )
         sendResponse(pluginResult || null)
         break
+      }
 
       case 'setItem':
-        localStorage.setItem(`bfsa_plugin_${data.key}`, JSON.stringify(data.value))
+        if (typeof payload.key === 'string') {
+          localStorage.setItem(`bfsa_plugin_${payload.key}`, JSON.stringify(payload.value))
+        }
         sendResponse()
         break
 
       case 'getItem':
         try {
-          const value = localStorage.getItem(`bfsa_plugin_${data.key}`)
+          const value =
+            typeof payload.key === 'string'
+              ? localStorage.getItem(`bfsa_plugin_${payload.key}`)
+              : null
           sendResponse(value ? JSON.parse(value) : null)
         } catch {
           sendResponse(null)
@@ -902,7 +956,9 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
         break
 
       case 'removeItem':
-        localStorage.removeItem(`bfsa_plugin_${data.key}`)
+        if (typeof payload.key === 'string') {
+          localStorage.removeItem(`bfsa_plugin_${payload.key}`)
+        }
         sendResponse()
         break
 
@@ -921,47 +977,56 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   // Export Operations
   const handleExportOperation = (
     method: string,
-    data: any,
-    sendResponse: (data?: any, error?: string) => void
+    data: unknown,
+    sendResponse: BFSAResponseSender
   ) => {
+    const payload = asRecord(data)
     switch (method) {
       case 'json':
         downloadFile(
-          data.filename || 'export.json',
-          JSON.stringify(data.data, null, 2),
+          typeof payload.filename === 'string' ? payload.filename : 'export.json',
+          JSON.stringify(payload.data, null, 2),
           'application/json'
         )
         sendResponse()
         break
 
-      case 'csv':
+      case 'csv': {
         // Simple CSV conversion
-        const csv = jsonToCSV(data.data)
-        downloadFile(data.filename || 'export.csv', csv, 'text/csv')
+        const csv = jsonToCSV(Array.isArray(payload.data) ? payload.data : [])
+        downloadFile(typeof payload.filename === 'string' ? payload.filename : 'export.csv', csv, 'text/csv')
         sendResponse()
         break
+      }
 
       case 'copy':
         navigator.clipboard
-          .writeText(String(data.text))
+          .writeText(String(payload.text ?? ''))
           .then(() => sendResponse({ success: true }))
           .catch(() => sendResponse(undefined, 'Failed to copy'))
         break
 
       case 'download':
-        downloadFile(data.filename, data.content, data.mimeType)
+        downloadFile(
+          typeof payload.filename === 'string' ? payload.filename : 'export.txt',
+          typeof payload.content === 'string' ? payload.content : String(payload.content ?? ''),
+          typeof payload.mimeType === 'string' ? payload.mimeType : 'text/plain'
+        )
         sendResponse()
         break
 
-      case 'print':
+      case 'print': {
         const printWindow = window.open('', '_blank')
         if (printWindow) {
-          printWindow.document.write('<html><body>' + data.content + '</body></html>')
+          printWindow.document.write(
+            '<html><body>' + String(payload.content ?? '') + '</body></html>'
+          )
           printWindow.document.close()
           printWindow.print()
         }
         sendResponse()
         break
+      }
 
       default:
         sendResponse(undefined, `Unknown export method: ${method}`)
@@ -971,9 +1036,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   // Plugin Operations
   const handlePluginOperation = (
     method: string,
-    data: any,
-    sendResponse: (data?: any, error?: string) => void
+    data: unknown,
+    sendResponse: BFSAResponseSender
   ) => {
+    const payload = asRecord(data)
     switch (method) {
       case 'getInfo':
         sendResponse({
@@ -989,7 +1055,10 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
 
       case 'request':
         // Forward to parent for plugin-to-plugin communication
-        onAction?.(`plugin.request:${data.pluginId}`, { action: data.action, data: data.data })
+        onAction?.(`plugin.request:${String(payload.pluginId ?? '')}`, {
+          action: payload.action,
+          data: payload.data,
+        })
         sendResponse()
         break
 
@@ -1010,7 +1079,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   }
 
   // Helper: Convert JSON to CSV
-  const jsonToCSV = (data: any[]): string => {
+  const jsonToCSV = (data: Array<Record<string, unknown>>): string => {
     if (!Array.isArray(data) || data.length === 0) return ''
     const headers = Object.keys(data[0])
     const rows = data.map((obj) => headers.map((h) => JSON.stringify(obj[h] ?? '')).join(','))
@@ -1034,7 +1103,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>${SHARED_STYLES}</style>
           <style>${userStyles}</style>
-          <script>${BFSA_API_SCRIPT('1.0.0', 'plugin-' + Date.now(), 'light')}<\/script>
+          <script>${BFSA_API_SCRIPT('1.0.0', 'plugin-' + Date.now(), 'light')}</script>
         </head>
         <body>${bodyContent}</body>
       </html>
@@ -1074,7 +1143,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
           <button
             onClick={() => {
               const iframe = iframeRef.current
-              if (iframe) iframe.src = iframe.src
+              iframe?.contentWindow?.location.reload()
             }}
             className="text-xs text-gray-500 hover:text-gray-700"
           >

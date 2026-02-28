@@ -337,7 +337,7 @@ function generateSuggestions(
   }
 
   if (language === 'python') {
-    if (/    {4,}/.test(code)) {
+    if (/ {3} {4,}/.test(code)) {
       suggestions.push({
         category: 'python-style',
         suggestion: 'Deep indentation detected (>4 levels). Consider refactoring.',

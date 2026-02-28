@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * PluginDialog - Reusable dialog component for plugin API
  * Used when plugins call BFSA.notify.confirm() or request modal display

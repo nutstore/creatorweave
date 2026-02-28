@@ -73,7 +73,7 @@ class PluginStorageService {
       // Worker is not serializable and must be recreated when needed
       return {
         metadata,
-        state: plugin.state as any,
+        state: plugin.state as PluginInstance['state'],
         loadedAt: plugin.loadedAt,
         worker: undefined, // Will be created when needed
       }
@@ -103,7 +103,7 @@ class PluginStorageService {
 
     return {
       metadata,
-      state: plugin.state as any,
+      state: plugin.state as PluginInstance['state'],
       loadedAt: plugin.loadedAt,
       worker: undefined,
     }

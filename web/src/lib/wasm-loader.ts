@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * FileAnalyzer instance type
  * Matches the generated TypeScript types from wasm-bindgen

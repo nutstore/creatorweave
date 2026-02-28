@@ -22,7 +22,7 @@ interface MCPSettingsDialogProps {
 const MCPSettingsDialogContent = forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BrandDialogContent>
->(({ className, ...props }, ref) => {
+>(({ ...props }, ref) => {
   return (
     <BrandDialogContent ref={ref} className="max-h-[85vh] w-[800px]" showOverlay={true} {...props}>
       <BrandDialogHeader>

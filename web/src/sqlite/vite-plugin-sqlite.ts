@@ -91,7 +91,6 @@ export function sqlitePlugin(options: SqlitePluginOptions = {}): Plugin {
 
     configurePreviewServer(server) {
       // Also apply headers in preview mode
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       server.middlewares.use((_req, res, next) => {
         setCoopCoepHeaders(res)
         next()

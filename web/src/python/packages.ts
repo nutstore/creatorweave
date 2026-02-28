@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Package Manager - Python package loading and dependency management
  *
@@ -180,7 +181,7 @@ export class PackageManager {
     const startTime = Date.now()
     const timeout = 30000 // 30 seconds max wait
 
-    while (true) {
+    while (Date.now() - startTime <= timeout) {
       // Check if all packages are loaded
       const allLoaded = packages.every((pkg) => this.loaded.has(pkg))
 
@@ -188,16 +189,13 @@ export class PackageManager {
         return
       }
 
-      // Check timeout
-      if (Date.now() - startTime > timeout) {
-        throw new Error(
-          `Timeout waiting for packages to load: ${packages.filter((p) => !this.loaded.has(p)).join(', ')}`
-        )
-      }
-
       // Wait a bit before checking again
       await new Promise((resolve) => setTimeout(resolve, 100))
     }
+
+    throw new Error(
+      `Timeout waiting for packages to load: ${packages.filter((p) => !this.loaded.has(p)).join(', ')}`
+    )
   }
 
   //=============================================================================

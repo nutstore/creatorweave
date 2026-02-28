@@ -10,6 +10,8 @@ import type {
   FileEntry,
   ExecutionProgress,
   AggregateResult,
+  PluginResult,
+  Plugin,
 } from '../../types/plugin'
 import { PluginDispatcher } from '../../services/plugin-dispatcher.service'
 import { PluginExecutorService } from '../../services/plugin-executor.service'
@@ -50,9 +52,12 @@ export function PluginExecutor({ plugins, files, onProgress, onComplete }: Plugi
     const startTime = Date.now()
 
     try {
-      const pluginsToExecute = loadedPlugins.filter((p) =>
-        selectedPlugins.has(p.metadata.id)
-      ) as any[]
+      const pluginsToExecute: Plugin[] = loadedPlugins
+        .filter((p) => selectedPlugins.has(p.metadata.id))
+        .map((p) => ({
+          id: p.metadata.id,
+          metadata: p.metadata,
+        }))
 
       const dispatcher = new PluginDispatcher()
       const executor = new PluginExecutorService()
@@ -73,8 +78,20 @@ export function PluginExecutor({ plugins, files, onProgress, onComplete }: Plugi
 
       // 3. Aggregate results
       const duration = Date.now() - startTime
-      // @ts-ignore - type mismatch between plugin result formats
-      const aggregated = aggregator.aggregate(results, files.length, duration) as any
+      const pluginResults = new Map<string, PluginResult>()
+      for (const [pluginId, execution] of results) {
+        const finalResult = execution.result.finalResult
+        pluginResults.set(pluginId, {
+          summary: finalResult?.summary || execution.result.summary,
+          filesProcessed: finalResult?.filesProcessed ?? 0,
+          filesSkipped: finalResult?.filesSkipped ?? 0,
+          filesWithErrors: finalResult?.filesWithErrors ?? execution.result.errors.length,
+          metrics: finalResult?.metrics ?? {},
+          warnings: finalResult?.warnings ?? execution.result.errors,
+        })
+      }
+
+      const aggregated = aggregator.aggregate(pluginResults, files.length, duration)
 
       onComplete?.(aggregated)
     } catch (error) {

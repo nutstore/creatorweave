@@ -295,7 +295,7 @@ export class PluginStreamService {
 
       const fileInput: FileInput = {
         name: file.name,
-        path: (file as any).webkitRelativePath || file.name,
+        path: file.webkitRelativePath || file.name,
         size: chunk.bytes,
         mimeType: file.type,
         lastModified: file.lastModified || 0,

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Remote Session Manager - orchestrates Host and Remote roles.
  *

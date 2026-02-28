@@ -89,7 +89,7 @@ export function PendingSyncPanel() {
       setSelectedItems(newSelected)
       setSelectAll(newSelected.size === pendingChanges.changes.length - 1)
     },
-    [selectedItems, pendingChanges?.changes.length]
+    [selectedItems, pendingChanges]
   )
 
   // 处理全选/取消全选 (必须在条件返回之前定义)
@@ -102,7 +102,7 @@ export function PendingSyncPanel() {
     } else {
       setSelectedItems(new Set())
     }
-  }, [selectAll, pendingChanges?.changes.length])
+  }, [selectAll, pendingChanges])
 
   // 处理删除单个文件 (必须在条件返回之前定义)
   const handleRemoveFile = useCallback(

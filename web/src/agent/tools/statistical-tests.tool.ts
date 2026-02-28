@@ -137,28 +137,6 @@ function tCDF(t: number, df: number): number {
   // Regularized incomplete beta approximation
   if (x < 0 || x > 1) return NaN
 
-  // Log beta function approximation
-  const logGamma = (z: number): number => {
-    if (z < 0.5) {
-      return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z)
-    }
-    z -= 1
-    const c = [
-      76.18009172947146, -86.50532032941677, 24.01409824083091, -1.231739572450155,
-      0.120865097386617e-2, -0.5395239384953e-5,
-    ]
-    let x = z
-    let y = z
-    let tmp = x + 5.5
-    tmp -= (x + 0.5) * Math.log(tmp)
-    let ser = 1.000000000190015
-    for (let j = 0; j < 6; j++) {
-      y += 1
-      ser += c[j] / y
-    }
-    return -tmp + Math.log((2.5066282746310005 * ser) / x)
-  }
-
   // Simplified regularized incomplete beta
   if (t < 0) {
     return 1 - tCDF(-t, df)

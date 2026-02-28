@@ -4,11 +4,8 @@
  * Provides automatic retry with different strategies based on error type.
  */
 
-// Note: ErrorCategory type reserved for future error classification enhancements
 import type { RetryStrategy } from './error-classifier'
 import { getErrorClassifier, getRetryDelay } from './error-classifier'
-// @ts-expect-error - reserved for future use
-import type { ErrorCategory } from './error-classifier'
 
 //=============================================================================
 // Types
@@ -93,7 +90,7 @@ export class RetryHandler {
     let lastError: Error | undefined
     let attempt = 0
 
-    while (true) {
+    while (attempt < 5) {
       attempt++
       try {
         const data = await fn()
@@ -118,6 +115,8 @@ export class RetryHandler {
         }
       }
     }
+
+    return { success: false, error: lastError, attempts: attempt }
   }
 
   /**

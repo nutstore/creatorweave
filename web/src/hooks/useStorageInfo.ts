@@ -332,7 +332,7 @@ export function useStorageInfo(): UseStorageInfoResult {
       refresh(true)
     }
     // If only session properties changed (like activeSessionId, pendingCount), don't recalculate sizes
-  }, [sessionCount, refresh])
+  }, [sessionCount, refresh, workspaces])
 
   const cleanupOldSessions = useCallback(
     async (days: number): Promise<number> => {

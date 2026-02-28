@@ -5,7 +5,7 @@
  * Allows adding, editing, deleting, and testing MCP server connections.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Plus,
   Trash2,
@@ -78,21 +78,7 @@ export function MCPSettings() {
   const [showToken, setShowToken] = useState(false)
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
 
-  // Load servers on mount
-  useEffect(() => {
-    loadServers()
-  }, [])
-
-  // Refresh connection statuses periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refreshConnectionStatuses()
-    }, 5000)
-
-    return () => clearInterval(interval)
-  }, [servers])
-
-  const loadServers = async () => {
+  const loadServers = useCallback(async () => {
     setLoading(true)
     try {
       await mcpManager.initialize()
@@ -117,9 +103,9 @@ export function MCPSettings() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [mcpManager])
 
-  const refreshConnectionStatuses = () => {
+  const refreshConnectionStatuses = useCallback(() => {
     setServers((prev) =>
       prev.map((server) => {
         const status = mcpManager.getConnectionStatus(server.id)
@@ -131,7 +117,21 @@ export function MCPSettings() {
         }
       })
     )
-  }
+  }, [mcpManager])
+
+  // Load servers on mount
+  useEffect(() => {
+    loadServers()
+  }, [loadServers])
+
+  // Refresh connection statuses periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshConnectionStatuses()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [servers, refreshConnectionStatuses])
 
   // Form handling
   const openAddForm = () => {

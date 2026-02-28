@@ -29,24 +29,7 @@ export function PluginUpload({ onUpload, accept = '.wasm' }: PluginUploadProps) 
     setDragging(false)
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    setDragging(false)
-
-    const file = e.dataTransfer.files[0]
-    if (file) {
-      await validateAndUpload(file)
-    }
-  }, [])
-
-  const handleChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      await validateAndUpload(file)
-    }
-  }, [])
-
-  const validateAndUpload = async (file: File) => {
+  const validateAndUpload = useCallback(async (file: File) => {
     setError(null)
 
     // Validate file extension
@@ -80,7 +63,24 @@ export function PluginUpload({ onUpload, accept = '.wasm' }: PluginUploadProps) 
       setError(err instanceof Error ? err.message : 'Upload failed')
       setUploading(false)
     }
-  }
+  }, [onUpload])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+
+    const file = e.dataTransfer.files[0]
+    if (file) {
+      await validateAndUpload(file)
+    }
+  }, [validateAndUpload])
+
+  const handleChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      await validateAndUpload(file)
+    }
+  }, [validateAndUpload])
 
   const handleClick = () => {
     fileInputRef.current?.click()

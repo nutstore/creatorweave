@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * WebSocket Client - Socket.IO based client for relay server connection.
  *

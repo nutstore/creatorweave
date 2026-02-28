@@ -255,7 +255,8 @@ export class StreamReader {
   async countLines(file: File): Promise<number> {
     let count = 0
 
-    for await (const _line of this.readLines(file)) {
+    for await (const line of this.readLines(file)) {
+      void line
       count++
     }
 

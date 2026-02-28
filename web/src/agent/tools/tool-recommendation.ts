@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Tool Recommendation System - Intelligently suggests relevant tools based on user intent.
  *

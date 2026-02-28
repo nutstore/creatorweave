@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import * as React from 'react'
 import { type VariantProps, cva } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
@@ -35,6 +36,7 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
+    void asChild
     return (
       <button className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
     )

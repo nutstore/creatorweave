@@ -34,6 +34,7 @@ import type {
 
 // Type alias for results containing binary elicitation
 type BinaryElicitationResult = { _meta: { elicitation: BinaryElicitation } }
+type WrappedResult = { result?: unknown; _meta?: { elicitation?: unknown } }
 
 // Type alias for Promise return types (avoid angle brackets in return position)
 type FileMetadataPromise = Promise<FileMetadata>
@@ -103,21 +104,28 @@ export interface ElicitationContext {
 }
 
 export class ElicitationHandler {
+  private unwrapResult(result: unknown): WrappedResult {
+    if (!result || typeof result !== 'object') {
+      return {}
+    }
+    const parsed = result as WrappedResult
+    const actual = parsed.result
+    return actual && typeof actual === 'object' ? (actual as WrappedResult) : parsed
+  }
+
   /**
    * Check if a tool response contains a binary elicitation request
    */
   hasBinaryElicitation(result: unknown): result is BinaryElicitationResult {
-    if (!result || typeof result !== 'object') {
-      return false
-    }
-
-    const r = result as any
-
-    // FastMCP wraps result in an extra layer
-    const actualResult = r.result || r
+    const actualResult = this.unwrapResult(result)
 
     // Check for _meta.elicitation with mode='binary'
-    return actualResult?._meta?.elicitation?.mode === 'binary'
+    const elicitation = actualResult._meta?.elicitation
+    return (
+      !!elicitation &&
+      typeof elicitation === 'object' &&
+      (elicitation as { mode?: unknown }).mode === 'binary'
+    )
   }
 
   /**
@@ -128,13 +136,16 @@ export class ElicitationHandler {
       return null
     }
 
-    const r = result as any
-    const actualResult = r.result || r
+    const actualResult = this.unwrapResult(result)
 
     // Get elicitation from either wrapper or direct
-    const elicitation = actualResult._meta?.elicitation || actualResult?._meta?.elicitation
+    const elicitation = actualResult._meta?.elicitation
 
-    if (elicitation.mode !== 'binary') {
+    if (
+      !elicitation ||
+      typeof elicitation !== 'object' ||
+      (elicitation as { mode?: unknown }).mode !== 'binary'
+    ) {
       return null
     }
 
@@ -251,7 +262,7 @@ export class ElicitationHandler {
 
     for (const [name, prop] of Object.entries(properties)) {
       if (prop && typeof prop === 'object') {
-        const propObj = prop as any
+        const propObj = prop as { type?: unknown; properties?: Record<string, unknown> }
 
         // Check if this is a file field:
         // 1. type='object' with download_url/file_id properties inside

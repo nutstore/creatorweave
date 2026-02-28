@@ -16,6 +16,36 @@ import type {
   PluginValidationResult,
 } from '../types/plugin'
 
+type LoadedWorkerPayload = {
+  metadata: PluginMetadata
+  wasmModule?: unknown
+}
+
+type PluginInstanceWithWasmModule = PluginInstance & {
+  wasmModule?: WebAssembly.Module
+}
+
+function getLoadedPayload(payload: unknown): LoadedWorkerPayload | null {
+  if (!payload || typeof payload !== 'object') {
+    return null
+  }
+  const parsed = payload as { metadata?: unknown; wasmModule?: unknown }
+  if (!parsed.metadata || typeof parsed.metadata !== 'object') {
+    return null
+  }
+  return {
+    metadata: parsed.metadata as PluginMetadata,
+    wasmModule: parsed.wasmModule,
+  }
+}
+
+function setWasmModule(instance: PluginInstance, wasmModule: unknown): void {
+  if (wasmModule instanceof WebAssembly.Module) {
+    const target = instance as PluginInstanceWithWasmModule
+    target.wasmModule = wasmModule
+  }
+}
+
 //=============================================================================
 // Plugin Loader Class
 //=============================================================================
@@ -80,8 +110,14 @@ export class PluginLoaderService {
         console.log('[PluginLoader] Worker message:', response.type)
 
         switch (response.type) {
-          case 'LOADED':
-            const receivedMetadata = (response.payload as { metadata: PluginMetadata }).metadata
+          case 'LOADED': {
+            const payload = getLoadedPayload(response.payload)
+            if (!payload) {
+              reject(new Error('Invalid LOADED payload from plugin worker'))
+              worker.removeEventListener('message', handler)
+              break
+            }
+            const receivedMetadata = payload.metadata
             console.log('[PluginLoader] Received metadata:', {
               id: receivedMetadata.id,
               name: receivedMetadata.name,
@@ -110,12 +146,12 @@ export class PluginLoaderService {
             }
             instance.metadata = receivedMetadata
             instance.state = 'Loaded'
-            // @ts-ignore - internal tracking
-            ;(instance as any).wasmModule = response.payload?.wasmModule
+            setWasmModule(instance, payload.wasmModule)
             console.log('[PluginLoader] Plugin loaded successfully:', receivedMetadata.id)
             resolve(instance.metadata)
             worker.removeEventListener('message', handler)
             break
+          }
 
           case 'ERROR':
             instance.state = 'Error'
@@ -231,8 +267,14 @@ export class PluginLoaderService {
         const response = event.data as PluginWorkerResponse
 
         switch (response.type) {
-          case 'LOADED':
-            const receivedMetadata = (response.payload as { metadata: PluginMetadata }).metadata
+          case 'LOADED': {
+            const payload = getLoadedPayload(response.payload)
+            if (!payload) {
+              reject(new Error('Invalid LOADED payload from plugin worker'))
+              worker.removeEventListener('message', handler)
+              break
+            }
+            const receivedMetadata = payload.metadata
             // Ensure resource_limits exists with defaults
             if (!receivedMetadata.resource_limits) {
               receivedMetadata.resource_limits = {
@@ -253,11 +295,11 @@ export class PluginLoaderService {
             }
             instance.metadata = receivedMetadata
             instance.state = 'Loaded'
-            // @ts-ignore - internal tracking
-            ;(instance as any).wasmModule = response.payload?.wasmModule
+            setWasmModule(instance, payload.wasmModule)
             resolve(instance.metadata)
             worker.removeEventListener('message', handler)
             break
+          }
 
           case 'ERROR':
             instance.state = 'Error'
@@ -370,7 +412,7 @@ export class PluginLoaderService {
         console.log('[PluginLoader] Execution response:', response.type)
 
         switch (response.type) {
-          case 'RESULT':
+          case 'RESULT': {
             const result = response.payload as { output: FileOutput }
             console.log(
               '[PluginLoader] Execution result:',
@@ -380,6 +422,7 @@ export class PluginLoaderService {
             resolve(result.output)
             instance.worker!.removeEventListener('message', handler)
             break
+          }
 
           case 'ERROR':
             console.error('[PluginLoader] Execution error:', response.error)
@@ -431,12 +474,13 @@ export class PluginLoaderService {
         const response = event.data as PluginWorkerResponse
 
         switch (response.type) {
-          case 'RESULT':
+          case 'RESULT': {
             const result = response.payload as { result: PluginResult }
             console.log('[PluginLoader] Finalization result:', result.result)
             resolve(result.result)
             instance.worker!.removeEventListener('message', handler)
             break
+          }
 
           case 'ERROR':
             console.error('[PluginLoader] Finalization error:', response.error)

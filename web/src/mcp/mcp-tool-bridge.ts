@@ -40,6 +40,27 @@ function convertMCPSchemaToToolSchema(mcpSchema: {
   }
 }
 
+type WrappedResult = {
+  result?: unknown
+  _meta?: {
+    elicitation?: unknown
+  }
+}
+
+type BinaryElicitationMeta = {
+  mode: 'binary'
+  [key: string]: unknown
+}
+
+function unwrapResult(result: unknown): WrappedResult {
+  if (!result || typeof result !== 'object') {
+    return {}
+  }
+  const parsed = result as WrappedResult
+  const actual = parsed.result
+  return actual && typeof actual === 'object' ? (actual as WrappedResult) : parsed
+}
+
 /**
  * Convert MCP tool definition to ToolRegistry ToolDefinition
  */
@@ -61,7 +82,9 @@ export function mcpToolToToolDefinition(
     function: {
       name: toolName,
       description,
-      parameters: convertMCPSchemaToToolSchema(mcpTool.inputSchema) as any,
+      parameters: convertMCPSchemaToToolSchema(
+        mcpTool.inputSchema
+      ) as unknown as ToolDefinition['function']['parameters'],
     },
   }
 }
@@ -73,14 +96,9 @@ export function mcpToolToToolDefinition(
 /**
  * SEP-1306: Check if a tool result contains binary elicitation
  */
-function hasBinaryElicitation(result: unknown): result is { _meta: { elicitation: any } } {
-  if (!result || typeof result !== 'object') {
-    return false
-  }
-  const r = result as any
-  // FastMCP wraps result in an extra layer
-  const actualResult = r.result || r
-  return actualResult?._meta?.elicitation?.mode === 'binary'
+function hasBinaryElicitation(result: unknown): result is WrappedResult {
+  const actualResult = unwrapResult(result)
+  return (actualResult._meta?.elicitation as BinaryElicitationMeta | undefined)?.mode === 'binary'
 }
 
 /**
@@ -106,16 +124,19 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 
       // SEP-1306: Check for binary elicitation
       if (hasBinaryElicitation(result)) {
-        const r = result as any
-        const actualResult = r.result || r
-        const elicitation = actualResult._meta.elicitation
+        const actualResult = unwrapResult(result)
+        const elicitation = actualResult._meta?.elicitation
+        const elicitationPayload =
+          elicitation && typeof elicitation === 'object'
+            ? (elicitation as Record<string, unknown>)
+            : {}
 
         // Return special response that signals the UI to handle file upload
         // Include full elicitation data for the handler
         return JSON.stringify(
           {
             _elicitation: {
-              ...elicitation, // Include requestedSchema, uploadEndpoints, etc.
+              ...elicitationPayload, // Include requestedSchema, uploadEndpoints, etc.
               toolName: `${serverId}:${toolName}`,
               args,
               serverId,

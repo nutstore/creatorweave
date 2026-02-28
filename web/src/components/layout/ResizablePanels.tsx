@@ -8,7 +8,7 @@
  * - State persistence
  */
 
-import { useState, useCallback, useRef, useEffect, ReactNode } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo, ReactNode } from 'react'
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
 
 //=============================================================================
@@ -93,8 +93,8 @@ export function ResizablePanels({
   const containerRef = useRef<HTMLDivElement>(null)
   const isDraggingRef = useRef(false)
 
-  const firstConfig: PanelConfig = firstPanel || { id: 'first' }
-  const secondConfig: PanelConfig = secondPanel || { id: 'second' }
+  const firstConfig: PanelConfig = useMemo(() => firstPanel || { id: 'first' }, [firstPanel])
+  const secondConfig: PanelConfig = useMemo(() => secondPanel || { id: 'second' }, [secondPanel])
 
   // Handle divider drag
   const handleDividerMouseDown = useCallback(
@@ -167,10 +167,6 @@ export function ResizablePanels({
   // Calculate actual sizes considering collapsed state
   const firstActualSize = firstPanelCollapsed ? 0 : firstPanelSize
   const secondActualSize = secondPanelCollapsed ? 0 : 100 - firstPanelSize
-  const availableSpace = 100 - firstActualSize - secondActualSize
-  // @ts-expect-error - reserved for future dynamic divider positioning
-  const dividerOffset =
-    firstActualSize > 0 ? firstActualSize : availableSpace > 0 ? 0 : firstPanelSize
 
   const isHorizontal = direction === 'horizontal'
 
