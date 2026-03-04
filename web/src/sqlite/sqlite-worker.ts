@@ -376,6 +376,51 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     dbMode = 'memory'
   }
 
+  // Check if database is empty but has tables (possible corrupted schema from previous truncation bug)
+  // If so, we need to drop all tables before reinitializing schema
+  let needsSchemaRecovery = false
+  try {
+    const tables = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    if (tables.length > 0 && tables[0].values.length > 0) {
+      // Check if tables are empty
+      const firstTable = tables[0].values[0][0] as string
+      const countResult = db.exec(`SELECT COUNT(*) FROM ${firstTable}`)
+      const count = countResult[0]?.values[0]?.[0] as number
+      if (count === 0) {
+        // Database has tables but is empty - likely corrupted from truncation bug
+        console.warn(`[SQLite Worker] ${initId}: Database has empty tables, recovering schema...`)
+        needsSchemaRecovery = true
+      }
+    }
+  } catch {
+    // Tables don't exist yet, will be created normally
+  }
+
+  // If schema recovery is needed, drop all tables before initializing
+  if (needsSchemaRecovery) {
+    try {
+      db.exec(`
+        DROP TABLE IF EXISTS conversations;
+        DROP TABLE IF EXISTS skills;
+        DROP TABLE IF EXISTS skill_resources;
+        DROP TABLE IF EXISTS plugins;
+        DROP TABLE IF EXISTS api_keys;
+        DROP TABLE IF EXISTS encryption_metadata;
+        DROP TABLE IF EXISTS workspaces;
+        DROP TABLE IF EXISTS file_metadata;
+        DROP TABLE IF EXISTS pending_changes;
+        DROP TABLE IF EXISTS undo_records;
+        DROP TABLE IF EXISTS projects;
+        DROP TABLE IF EXISTS active_project;
+        DROP TABLE IF EXISTS active_session;
+        DROP TABLE IF EXISTS migrations;
+      `)
+      console.log(`[SQLite Worker] ${initId}: Schema recovery complete - dropped all empty tables`)
+    } catch (dropError) {
+      console.warn(`[SQLite Worker] ${initId}: Failed to drop tables during recovery:`, dropError)
+    }
+  }
+
   // Initialize schema using the migration system
   try {
     await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
