@@ -7,7 +7,6 @@ import { MobileLayout } from '@/components/mobile'
 import { useMobile } from '@/components/mobile/useMobile'
 import { StorageLoading } from '@/components/StorageLoading'
 import { DatabaseRefreshDialog } from '@/components/DatabaseRefreshDialog'
-import { useAgentStore } from '@/store/agent.store'
 import { attemptReconnect } from '@/store/remote.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
@@ -313,12 +312,28 @@ function App() {
       const persisted = await requestPersistentStorage()
       console.log('[Storage] Persistent storage result:', persisted ? 'GRANTED ✅' : 'DENIED ❌')
 
-      // Also try to restore directory handle permission if pending
-      const { requestPendingHandlePermission, pendingHandle } = useAgentStore.getState()
-      if (pendingHandle) {
-        console.log('[Storage] Pending handle found, requesting permission...')
-        const granted = await requestPendingHandlePermission()
+      // Also try to restore directory handle permission if pending (from folder-access.store)
+      const { useFolderAccessStore } = await import('@/store/folder-access.store')
+      const folderState = useFolderAccessStore.getState()
+      const folderRecord = folderState.getRecord()
+
+      if (folderRecord?.status === 'needs_user_activation' && folderRecord.projectId) {
+        console.log('[Storage] Folder needs activation, requesting permission...')
+        const granted = await folderState.requestPermission(folderRecord.projectId)
         console.log('[Storage] Handle permission result:', granted ? 'GRANTED ✅' : 'DENIED ❌')
+
+        // Sync to agent.store after permission is restored
+        if (granted) {
+          const { useAgentStore } = await import('@/store/agent.store')
+          const updatedRecord = folderState.getRecord()
+          if (updatedRecord) {
+            useAgentStore.setState({
+              directoryHandle: updatedRecord.handle,
+              directoryName: updatedRecord.folderName,
+              pendingHandle: updatedRecord.persistedHandle,
+            })
+          }
+        }
       }
     }
 

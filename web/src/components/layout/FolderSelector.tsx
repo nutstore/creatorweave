@@ -11,66 +11,34 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { FolderOpen, ChevronDown, Copy, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
+import { useCurrentFolderAccess, useFolderAccessStore } from '@/store/folder-access.store'
 import { useAgentStore } from '@/store/agent.store'
-import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { useT } from '@/i18n'
 import { cn } from '@/lib/utils'
 
 type MenuState = 'closed' | 'open' | 'selecting'
 
-// IndexedDB helper to load handle
-async function loadHandleFromIndexedDB(): Promise<FileSystemDirectoryHandle | null> {
-  const DB_NAME = 'bfosa-dir-handle'
-  const STORE_NAME = 'handles'
-  const KEY = 'directory'
-
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1)
-    request.onupgradeneeded = () => {
-      const db = request.result
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME)
-      }
-    }
-    request.onsuccess = () => {
-      const db = request.result
-      const tx = db.transaction(STORE_NAME, 'readonly')
-      const store = tx.objectStore(STORE_NAME)
-      const req = store.get(KEY)
-      req.onsuccess = () => resolve(req.result || null)
-      req.onerror = () => reject(req.error)
-      db.close()
-    }
-    request.onerror = () => reject(request.error)
-  })
-}
-
 export function FolderSelector() {
   const t = useT()
-  const { directoryHandle, directoryName, setDirectoryHandle, isRestoringHandle } = useAgentStore()
+  const folderAccess = useCurrentFolderAccess()
   const containerRef = useRef<HTMLDivElement>(null)
 
   const [menuState, setMenuState] = useState<MenuState>('closed')
-  const [error, setError] = useState<string | null>(null)
-  const [pendingHandle, setPendingHandle] = useState<FileSystemDirectoryHandle | null>(null)
-  const [isRestoring, setIsRestoring] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const isMenuOpen = menuState === 'open'
-  const isSelecting = menuState === 'selecting'
+  const isSelecting = folderAccess.isRequesting
+  const isLoading = folderAccess.isChecking || folderAccess.isReleasing
 
-  // Pre-load handle from IndexedDB on mount (no user activation needed)
-  useEffect(() => {
-    loadHandleFromIndexedDB()
-      .then((handle) => {
-        console.log('[FolderSelector] Pre-loaded handle from IndexedDB:', handle?.name)
-        if (handle && !directoryHandle) {
-          setPendingHandle(handle)
-        }
-      })
-      .catch((err) => {
-        console.log('[FolderSelector] No handle in IndexedDB:', err)
-      })
-  }, [directoryHandle])
+  const {
+    pickDirectory,
+    requestPermission,
+    release,
+    folderName,
+    handle: directoryHandle,
+    projectId,
+    error,
+  } = folderAccess
 
   // Click outside to close menu
   useEffect(() => {
@@ -79,7 +47,7 @@ export function FolderSelector() {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setMenuState('closed')
-        setError(null)
+        setLocalError(null)
       }
     }
 
@@ -89,34 +57,37 @@ export function FolderSelector() {
 
   // Handle permission restore button click
   const handleRestorePermission = async () => {
-    if (!pendingHandle) return
+    if (!projectId || !folderAccess.isNeedsActivation) return
 
-    setIsRestoring(true)
     try {
-      console.log('[FolderSelector] Requesting permission for:', pendingHandle.name)
-      const result = await pendingHandle.requestPermission({ mode: 'readwrite' })
-      console.log('[FolderSelector] Permission result:', result)
+      console.log('[FolderSelector] Requesting permission for folder')
+      const granted = await requestPermission(projectId)
+      if (!granted) {
+        setLocalError('权限被拒绝')
+        return
+      }
 
-      if (result === 'granted') {
-        setDirectoryHandle(pendingHandle)
-        setPendingHandle(null)
-      } else {
-        setError('权限被拒绝')
+      // 同步到 agent.store
+      const folderRecord = useFolderAccessStore.getState().getRecord()
+      if (folderRecord) {
+        useAgentStore.setState({
+          directoryHandle: folderRecord.handle,
+          directoryName: folderRecord.folderName,
+          pendingHandle: folderRecord.persistedHandle,
+        })
       }
     } catch (err) {
       console.error('[FolderSelector] Permission request error:', err)
-      setError(err instanceof Error ? err.message : '权限请求失败')
-    } finally {
-      setIsRestoring(false)
+      setLocalError(err instanceof Error ? err.message : '权限请求失败')
     }
   }
 
   const handleToggle = () => {
-    if (isSelecting || isRestoring) return
+    if (isSelecting || isLoading) return
 
-    // If there's a pending handle, don't toggle menu
+    // If needs user activation, don't toggle menu
     // User should click the restore button instead
-    if (pendingHandle && !directoryHandle) {
+    if (folderAccess.isNeedsActivation) {
       return
     }
 
@@ -126,55 +97,76 @@ export function FolderSelector() {
     }
 
     setMenuState(isMenuOpen ? 'closed' : 'open')
-    setError(null)
+    setLocalError(null)
   }
 
   const handleSelectFolder = async () => {
+    if (!projectId) return
+
     setMenuState('selecting')
-    setError(null)
+    setLocalError(null)
 
     try {
-      const handle = await selectFolderReadWrite()
-      setDirectoryHandle(handle)
-      setMenuState('closed')
-    } catch (err) {
-      if (err instanceof Error) {
-        if (err.message === 'User cancelled') {
-          setMenuState(directoryHandle ? 'open' : 'closed')
-        } else {
-          setError(err.message)
-          setMenuState(directoryHandle ? 'open' : 'closed')
+      const success = await pickDirectory(projectId)
+
+      if (success) {
+        // 成功时同步状态并关闭菜单
+        const folderRecord = useFolderAccessStore.getState().getRecord()
+        if (folderRecord) {
+          useAgentStore.setState({
+            directoryHandle: folderRecord.handle,
+            directoryName: folderRecord.folderName,
+            pendingHandle: folderRecord.persistedHandle,
+          })
         }
+        setMenuState('closed')
+      } else {
+        // 用户取消或失败，保持菜单打开或恢复之前状态
+        setMenuState(directoryHandle ? 'open' : 'closed')
+        setLocalError('选择文件夹失败，请重试')
       }
+    } catch (err) {
+      console.error('[FolderSelector] Select folder error:', err)
+      setLocalError(err instanceof Error ? err.message : '选择文件夹失败')
+      setMenuState(directoryHandle ? 'open' : 'closed')
     }
   }
 
-  const handleRelease = () => {
-    setDirectoryHandle(null)
-    setPendingHandle(null)
+  const handleRelease = async () => {
+    if (!projectId) return
+
+    await release(projectId)
+
+    // 同步清空状态到 agent.store
+    useAgentStore.setState({
+      directoryHandle: null,
+      directoryName: null,
+      pendingHandle: null,
+    })
+
     setMenuState('closed')
-    setError(null)
+    setLocalError(null)
   }
 
   const handleCopyPath = async () => {
-    if (directoryName) {
-      await navigator.clipboard.writeText(directoryName)
+    if (folderName) {
+      await navigator.clipboard.writeText(folderName)
       setMenuState('closed')
     }
   }
 
   // Button content
   const renderButtonContent = () => {
-    if (isRestoring || isRestoringHandle) {
+    if (folderAccess.isChecking || isLoading) {
       return (
         <>
           <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" />
-          <span className="text-xs font-normal text-secondary">恢复中...</span>
+          <span className="text-xs font-normal text-secondary">加载中...</span>
         </>
       )
     }
 
-    if (pendingHandle && !directoryHandle) {
+    if (folderAccess.isNeedsActivation && !directoryHandle) {
       return (
         <>
           <AlertCircle className="h-[14px] w-[14px] text-warning" />
@@ -183,13 +175,13 @@ export function FolderSelector() {
       )
     }
 
-    if (directoryHandle && directoryName) {
+    if (directoryHandle && folderName) {
       return (
         <>
           <span className="h-1.5 w-1.5 rounded-full bg-success" />
           <FolderOpen className="h-[14px] w-[14px] text-primary-600" />
           <span className="max-w-[120px] truncate text-xs font-normal text-secondary">
-            {directoryName}
+            {folderName}
           </span>
           <ChevronDown
             className={cn('text-tertiary h-3 w-3 transition-transform', isMenuOpen && 'rotate-180')}
@@ -208,39 +200,39 @@ export function FolderSelector() {
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Restore permission button when there's a pending handle */}
-      {pendingHandle && !directoryHandle && (
+      {/* Restore permission button when needs activation */}
+      {folderAccess.isNeedsActivation && !directoryHandle && (
         <button
           type="button"
           onClick={handleRestorePermission}
-          disabled={isRestoring}
+          disabled={isSelecting}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border-2 border-amber-500 bg-amber-50 px-3 py-1',
             'text-xs font-medium text-amber-700',
             'transition-colors hover:bg-amber-100 focus:outline-none focus:ring-2 focus:ring-amber-500',
-            isRestoring && 'cursor-wait opacity-70'
+            isSelecting && 'cursor-wait opacity-70'
           )}
-          title={`恢复文件夹访问权限 (${pendingHandle.name})`}
+          title={`恢复文件夹访问权限 (${folderName || '未知'})`}
         >
           <AlertCircle className="h-[14px] w-[14px] text-amber-600" />
           <span>恢复权限</span>
-          <span className="text-amber-500">({pendingHandle.name})</span>
+          {folderName && <span className="text-amber-500">({folderName})</span>}
         </button>
       )}
 
       {/* Normal folder selector button when no pending handle */}
-      {(!pendingHandle || directoryHandle) && (
+      {(!folderAccess.isNeedsActivation || directoryHandle) && (
         <button
           type="button"
           onClick={handleToggle}
-          disabled={isSelecting || isRestoringHandle || isRestoring}
+          disabled={isSelecting || isLoading}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
             'transition-colors hover:bg-primary-50 focus:outline-none',
-            (isSelecting || isRestoringHandle || isRestoring) && 'cursor-wait opacity-70'
+            (isSelecting || isLoading) && 'cursor-wait opacity-70'
           )}
-          title={directoryName ? t('folderSelector.switchFolder') : t('folderSelector.openFolder')}
+          title={folderName ? t('folderSelector.switchFolder') : t('folderSelector.openFolder')}
         >
           {renderButtonContent()}
         </button>
@@ -253,7 +245,7 @@ export function FolderSelector() {
           <button
             type="button"
             onClick={handleSelectFolder}
-            disabled={isSelecting || isRestoringHandle}
+            disabled={isSelecting || isLoading}
             className={cn(
               'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
               'hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50'
@@ -276,7 +268,7 @@ export function FolderSelector() {
           )}
 
           {/* Copy path - only shown when folder is selected */}
-          {directoryHandle && directoryName && (
+          {directoryHandle && folderName && (
             <button
               type="button"
               onClick={handleCopyPath}
@@ -288,9 +280,9 @@ export function FolderSelector() {
           )}
 
           {/* Error message */}
-          {error && (
+          {(localError || error) && (
             <div className="mx-2 mt-1 rounded bg-danger-bg px-2 py-1 text-xs text-danger">
-              {error}
+              {localError || error}
             </div>
           )}
         </div>
