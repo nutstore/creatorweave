@@ -14,6 +14,7 @@
  */
 
 import { useRef, useEffect, useState } from 'react'
+import { useThemeStore } from '@/store/theme.store'
 
 //=============================================================================
 // Types
@@ -96,6 +97,19 @@ const SHARED_STYLES = `
     --bfsa-gray-600: #4b5563;
     --bfsa-gray-700: #374151;
     --bfsa-gray-900: #111827;
+    --bfsa-surface: #ffffff;
+  }
+
+  .dark {
+    --bfsa-gray-50: #111827;
+    --bfsa-gray-100: #1f2937;
+    --bfsa-gray-200: #374151;
+    --bfsa-gray-400: #9ca3af;
+    --bfsa-gray-500: #d1d5db;
+    --bfsa-gray-600: #e5e7eb;
+    --bfsa-gray-700: #f3f4f6;
+    --bfsa-gray-900: #f9fafb;
+    --bfsa-surface: #111827;
   }
 
   * { box-sizing: border-box; }
@@ -151,7 +165,7 @@ const SHARED_STYLES = `
 
   /* Card Component */
   .bfsa-card {
-    background: white;
+    background: var(--bfsa-surface);
     border: 1px solid var(--bfsa-gray-200);
     border-radius: 8px;
     padding: 16px;
@@ -244,7 +258,7 @@ const SHARED_STYLES = `
   .bfsa-btn-primary:hover { background: var(--bfsa-primary-hover); }
 
   .bfsa-btn-secondary {
-    background: white;
+    background: var(--bfsa-surface);
     border: 1px solid var(--bfsa-gray-200);
     color: var(--bfsa-gray-700);
   }
@@ -725,6 +739,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
 //=============================================================================
 
 export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPluginAPIProps) {
+  const resolvedTheme = useThemeStore((state) => state.resolvedTheme)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(result.height || 400)
   const [isReady, setIsReady] = useState(false)
@@ -1097,13 +1112,13 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
 
     return `
       <!DOCTYPE html>
-      <html>
+      <html class="${resolvedTheme}">
         <head>
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>${SHARED_STYLES}</style>
           <style>${userStyles}</style>
-          <script>${BFSA_API_SCRIPT('1.0.0', 'plugin-' + Date.now(), 'light')}</script>
+          <script>${BFSA_API_SCRIPT('1.0.0', 'plugin-' + Date.now(), resolvedTheme)}</script>
         </head>
         <body>${bodyContent}</body>
       </html>
@@ -1111,14 +1126,14 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50">
+    <div className="rounded-lg border border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-900">
       {/* Header bar */}
       {result.title && (
-        <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white px-4 py-2">
-          <span className="text-sm font-medium text-gray-700">{result.title}</span>
+        <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
+          <span className="text-sm font-medium text-gray-700 dark:text-neutral-200">{result.title}</span>
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isReady ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="text-xs text-gray-500">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
+            <span className="text-xs text-gray-500 dark:text-neutral-400">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
           </div>
         </div>
       )}
@@ -1128,15 +1143,15 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
         ref={iframeRef}
         srcDoc={buildIframeHTML()}
         sandbox="allow-scripts allow-same-origin allow-modals"
-        className="w-full bg-white"
+        className="w-full bg-white dark:bg-neutral-950"
         style={{ height: `${height}px`, minHeight: '200px' }}
         title="Plugin Output"
       />
 
       {/* Footer with controls */}
-      <div className="flex items-center justify-between rounded-b-lg border-t border-gray-200 bg-white px-4 py-2">
+      <div className="flex items-center justify-between rounded-b-lg border-t border-gray-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">BFSA API v1.0</span>
+          <span className="text-xs text-gray-400 dark:text-neutral-500">BFSA API v1.0</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1145,7 +1160,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload()
             }}
-            className="text-xs text-gray-500 hover:text-gray-700"
+            className="text-xs text-gray-500 hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
           >
             Refresh
           </button>
@@ -1155,23 +1170,23 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
       {/* Modal Overlay */}
       {modalContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl">
+          <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl dark:bg-neutral-900">
             <div className="flex items-center justify-between border-b p-4">
-              <h3 className="text-lg font-semibold">
+              <h3 className="text-lg font-semibold dark:text-neutral-100">
                 {modalContent.options.title || 'Plugin Modal'}
               </h3>
               <button
                 onClick={() => setModalContent(null)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
                 ✕
               </button>
             </div>
-            <div className="p-4" dangerouslySetInnerHTML={{ __html: modalContent.content }} />
+            <div className="p-4 dark:text-neutral-200" dangerouslySetInnerHTML={{ __html: modalContent.content }} />
             <div className="flex justify-end gap-2 border-t p-4">
               <button
                 onClick={() => setModalContent(null)}
-                className="rounded px-4 py-2 text-gray-700 hover:bg-gray-100"
+                className="rounded px-4 py-2 text-gray-700 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
               >
                 Close
               </button>

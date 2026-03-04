@@ -14,6 +14,13 @@ import { Settings, RotateCcw, Trash2, Keyboard, Monitor, X } from 'lucide-react'
 import {
   BrandDialog,
   BrandButton,
+  BrandSlider,
+  BrandSwitch,
+  BrandSelect,
+  BrandSelectValue,
+  BrandSelectTrigger,
+  BrandSelectContent,
+  BrandSelectItem,
   BrandDialogContent,
   BrandDialogHeader,
   BrandDialogTitle,
@@ -21,6 +28,7 @@ import {
 } from '@browser-fs-analyzer/ui'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useTheme } from '@/store/theme.store'
+import { useT } from '@/i18n'
 import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 
 type SettingsTab = 'layout' | 'display' | 'shortcuts' | 'data'
@@ -31,6 +39,7 @@ interface WorkspaceSettingsDialogProps {
 }
 
 export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSettingsDialogProps) {
+  const t = useT()
   const [activeTab, setActiveTab] = useState<SettingsTab>('layout')
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
 
@@ -53,40 +62,40 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
   const { setTheme, mode } = useTheme()
 
   const handleResetLayout = () => {
-    if (confirm('Reset panel sizes to default values?')) {
+    if (confirm(t('workspaceSettings.layout.resetLayoutConfirm'))) {
       resetPanelSizes()
     }
   }
 
   const handleResetAll = () => {
-    if (confirm('Reset all settings to default values?')) {
+    if (confirm(t('workspaceSettings.data.resetAllConfirm'))) {
       resetToDefaults()
     }
   }
 
   const handleClearRecentFiles = () => {
-    if (confirm('Clear all recent files history?')) {
+    if (confirm(t('workspaceSettings.data.clearRecentConfirm'))) {
       clearRecentFiles()
     }
   }
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'layout', label: 'Layout', icon: <Monitor className="h-4 w-4" /> },
-    { id: 'display', label: 'Display', icon: <Settings className="h-4 w-4" /> },
-    { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard className="h-4 w-4" /> },
-    { id: 'data', label: 'Data', icon: <Trash2 className="h-4 w-4" /> },
+    { id: 'layout', label: t('workspaceSettings.tabs.layout'), icon: <Monitor className="h-4 w-4" /> },
+    { id: 'display', label: t('workspaceSettings.tabs.display'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
+    { id: 'data', label: t('workspaceSettings.tabs.data'), icon: <Trash2 className="h-4 w-4" /> },
   ]
 
   return (
     <>
       <BrandDialog open={open} onOpenChange={onOpenChange}>
-        <BrandDialogContent className="max-w-4xl">
+        <BrandDialogContent className="max-w-4xl dark:border-neutral-700 dark:bg-neutral-900">
           <BrandDialogHeader>
-            <BrandDialogTitle>Workspace Settings</BrandDialogTitle>
+            <BrandDialogTitle>{t('workspaceSettings.title')}</BrandDialogTitle>
             <BrandDialogClose asChild>
               <button className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                 <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
+                <span className="sr-only">{t('workspaceSettings.close')}</span>
               </button>
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -119,53 +128,52 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Panel Sizes
+                      {t('workspaceSettings.layout.title')}
                     </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Adjust the size and position of workspace panels
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                      {t('workspaceSettings.layout.description')}
                     </p>
                   </div>
 
                   <div className="space-y-4">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Sidebar Width: {panelSizes.sidebarWidth}px
+                        {t('workspaceSettings.layout.sidebarWidth', { value: panelSizes.sidebarWidth })}
                       </label>
-                      <input
-                        type="range"
-                        min="200"
-                        max="400"
-                        value={panelSizes.sidebarWidth}
-                        onChange={(e) => setSidebarWidth(Number(e.target.value))}
-                        className="w-full"
+                      <BrandSlider
+                        min={200}
+                        max={400}
+                        step={1}
+                        value={[panelSizes.sidebarWidth]}
+                        onValueChange={(value) => setSidebarWidth(value[0])}
                       />
                     </div>
 
                     <div>
                       <label className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Conversation Area: {panelSizes.conversationRatio}%
+                        {t('workspaceSettings.layout.conversationArea', {
+                          value: panelSizes.conversationRatio,
+                        })}
                       </label>
-                      <input
-                        type="range"
-                        min="20"
-                        max="80"
-                        value={panelSizes.conversationRatio}
-                        onChange={(e) => setConversationRatio(Number(e.target.value))}
-                        className="w-full"
+                      <BrandSlider
+                        min={20}
+                        max={80}
+                        step={1}
+                        value={[panelSizes.conversationRatio]}
+                        onValueChange={(value) => setConversationRatio(value[0])}
                       />
                     </div>
 
                     <div>
                       <label className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Preview Panel: {panelSizes.previewRatio}%
+                        {t('workspaceSettings.layout.previewPanel', { value: panelSizes.previewRatio })}
                       </label>
-                      <input
-                        type="range"
-                        min="30"
-                        max="80"
-                        value={panelSizes.previewRatio}
-                        onChange={(e) => setPreviewRatio(Number(e.target.value))}
-                        className="w-full"
+                      <BrandSlider
+                        min={30}
+                        max={80}
+                        step={1}
+                        value={[panelSizes.previewRatio]}
+                        onValueChange={(value) => setPreviewRatio(value[0])}
                       />
                     </div>
                   </div>
@@ -173,7 +181,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                   <div className="border-subtle flex gap-2 border-t pt-4">
                     <BrandButton variant="outline" onClick={handleResetLayout}>
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset Layout
+                      {t('workspaceSettings.layout.resetLayout')}
                     </BrandButton>
                   </div>
                 </div>
@@ -184,10 +192,10 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Theme
+                      {t('workspaceSettings.display.themeTitle')}
                     </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Choose your preferred color scheme
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                      {t('workspaceSettings.display.themeDescription')}
                     </p>
                   </div>
 
@@ -202,72 +210,64 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                             : 'border-subtle hover:border-neutral-300 dark:hover:border-neutral-700'
                         }`}
                       >
-                        {themeMode}
+                        {t(`workspaceSettings.display.theme.${themeMode}`)}
                       </button>
                     ))}
                   </div>
 
                   <div className="border-subtle border-t pt-6">
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Editor Settings
+                      {t('workspaceSettings.display.editorTitle')}
                     </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Customize the code editor display
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                      {t('workspaceSettings.display.editorDescription')}
                     </p>
                   </div>
 
                   <div className="space-y-4">
                     <div>
                       <label className="mb-2 block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Font Size
+                        {t('workspaceSettings.display.fontSize')}
                       </label>
-                      <select
+                      <BrandSelect
                         value={display.fontSize}
-                        onChange={(e) =>
-                          setFontSize(e.target.value as 'small' | 'medium' | 'large')
+                        onValueChange={(value) =>
+                          setFontSize(value as 'small' | 'medium' | 'large')
                         }
-                        className="border-subtle w-full rounded-md border bg-white px-3 py-2 text-sm dark:bg-neutral-900"
                       >
-                        <option value="small">Small (12px)</option>
-                        <option value="medium">Medium (14px)</option>
-                        <option value="large">Large (16px)</option>
-                      </select>
+                        <BrandSelectTrigger className="border-subtle h-10 w-full rounded-md border">
+                          <BrandSelectValue />
+                        </BrandSelectTrigger>
+                        <BrandSelectContent>
+                          <BrandSelectItem value="small">{t('workspaceSettings.display.font.small')}</BrandSelectItem>
+                          <BrandSelectItem value="medium">{t('workspaceSettings.display.font.medium')}</BrandSelectItem>
+                          <BrandSelectItem value="large">{t('workspaceSettings.display.font.large')}</BrandSelectItem>
+                        </BrandSelectContent>
+                      </BrandSelect>
                     </div>
 
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Show Line Numbers
+                        {t('workspaceSettings.display.showLineNumbers')}
                       </label>
-                      <input
-                        type="checkbox"
+                      <BrandSwitch
                         checked={display.showLineNumbers}
-                        onChange={(e) => setShowLineNumbers(e.target.checked)}
-                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                        onCheckedChange={setShowLineNumbers}
                       />
                     </div>
 
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Word Wrap
+                        {t('workspaceSettings.display.wordWrap')}
                       </label>
-                      <input
-                        type="checkbox"
-                        checked={display.wordWrap}
-                        onChange={(e) => setWordWrap(e.target.checked)}
-                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                      />
+                      <BrandSwitch checked={display.wordWrap} onCheckedChange={setWordWrap} />
                     </div>
 
                     <div className="flex items-center justify-between">
                       <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Show Mini Map
+                        {t('workspaceSettings.display.showMiniMap')}
                       </label>
-                      <input
-                        type="checkbox"
-                        checked={display.showMiniMap}
-                        onChange={(e) => setShowMiniMap(e.target.checked)}
-                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-                      />
+                      <BrandSwitch checked={display.showMiniMap} onCheckedChange={setShowMiniMap} />
                     </div>
                   </div>
                 </div>
@@ -278,10 +278,10 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Keyboard Shortcuts
+                      {t('workspaceSettings.shortcuts.title')}
                     </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      View and customize keyboard shortcuts
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                      {t('workspaceSettings.shortcuts.description')}
                     </p>
                   </div>
 
@@ -289,26 +289,26 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                     <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
                       <div>
                         <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                          Show All Shortcuts
+                          {t('workspaceSettings.shortcuts.showAllTitle')}
                         </div>
-                        <div className="text-xs text-neutral-500">
-                          View the complete list of keyboard shortcuts
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {t('workspaceSettings.shortcuts.showAllDescription')}
                         </div>
                       </div>
                       <BrandButton variant="outline" onClick={() => setShowShortcutsHelp(true)}>
                         <Keyboard className="mr-2 h-4 w-4" />
-                        View
+                        {t('workspaceSettings.shortcuts.view')}
                       </BrandButton>
                     </div>
                   </div>
 
                   <div className="border-subtle rounded-md border bg-neutral-50 p-4 dark:bg-neutral-800">
                     <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                      <strong>Tip:</strong> Press{' '}
+                      <strong>{t('workspaceSettings.shortcuts.tipLabel')}</strong>{' '}
                       <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:bg-neutral-900">
-                        Ctrl/Cmd + K
+                        {t('workspaceSettings.shortcuts.tipCommand')}
                       </kbd>{' '}
-                      to open the command palette for quick access to all features.
+                      {t('workspaceSettings.shortcuts.tipSuffix')}
                     </p>
                   </div>
                 </div>
@@ -319,10 +319,10 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                      Data Management
+                      {t('workspaceSettings.data.title')}
                     </h3>
-                    <p className="mt-1 text-sm text-neutral-500">
-                      Manage workspace data and clear history
+                    <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                      {t('workspaceSettings.data.description')}
                     </p>
                   </div>
 
@@ -330,10 +330,12 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                     <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
                       <div>
                         <div className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                          Recent Files
+                          {t('workspaceSettings.data.recentFilesTitle')}
                         </div>
-                        <div className="text-xs text-neutral-500">
-                          {recentFiles.length} files in history
+                        <div className="text-xs text-neutral-500 dark:text-neutral-400">
+                          {t('workspaceSettings.data.recentFilesCount', {
+                            count: recentFiles.length,
+                          })}
                         </div>
                       </div>
                       <BrandButton
@@ -342,27 +344,27 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                         disabled={recentFiles.length === 0}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
-                        Clear
+                        {t('workspaceSettings.data.clear')}
                       </BrandButton>
                     </div>
 
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
                       <p className="text-sm text-amber-800 dark:text-amber-200">
-                        <strong>Warning:</strong> Clearing data cannot be undone. Make sure you want
-                        to permanently remove this information.
+                        <strong>{t('workspaceSettings.data.warningTitle')}</strong>{' '}
+                        {t('workspaceSettings.data.warningDescription')}
                       </p>
                     </div>
 
                     <div className="border-subtle border-t pt-4">
                       <h4 className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                        Reset All Settings
+                        {t('workspaceSettings.data.resetAllTitle')}
                       </h4>
-                      <p className="mb-3 text-xs text-neutral-500">
-                        Reset all workspace preferences to default values
+                      <p className="mb-3 text-xs text-neutral-500 dark:text-neutral-400">
+                        {t('workspaceSettings.data.resetAllDescription')}
                       </p>
                       <BrandButton variant="outline" onClick={handleResetAll}>
                         <RotateCcw className="mr-2 h-4 w-4" />
-                        Reset All
+                        {t('workspaceSettings.data.resetAll')}
                       </BrandButton>
                     </div>
                   </div>
@@ -374,7 +376,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
           {/* Footer */}
           <div className="border-subtle flex justify-end border-t px-6 py-4">
             <BrandButton variant="default" onClick={() => onOpenChange(false)}>
-              Done
+              {t('workspaceSettings.done')}
             </BrandButton>
           </div>
         </BrandDialogContent>

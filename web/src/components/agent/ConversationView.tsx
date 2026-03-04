@@ -266,7 +266,7 @@ export function ConversationView({
           />
 
           {/* Input area */}
-          <div className="border-t border-neutral-200 bg-white px-4 py-3">
+          <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="mx-auto flex max-w-3xl items-end gap-2">
               <textarea
                 ref={inputRef}
@@ -278,7 +278,7 @@ export function ConversationView({
                   (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
                 }
                 style={{ height: '38px', maxHeight: '96px' }}
-                className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
+                className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
                 disabled={isProcessing || !hasApiKey}
               />
               {isProcessing ? (
@@ -306,7 +306,7 @@ export function ConversationView({
         </div>
       ) : (
         // Original view without threads
-        <div className="flex h-full flex-col bg-white">
+        <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
           {/* Messages area */}
           <div className="custom-scrollbar flex-1 overflow-y-auto">
             <div className="px-4 py-4">
@@ -387,7 +387,7 @@ export function ConversationView({
           </div>
 
           {/* Input area */}
-          <div className="border-t border-neutral-200 bg-white px-4 py-3">
+          <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="mx-auto flex max-w-3xl items-end gap-2">
               <textarea
                 ref={inputRef}
@@ -399,7 +399,7 @@ export function ConversationView({
                   (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
                 }
                 style={{ height: '38px', maxHeight: '96px' }}
-                className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1"
+                className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus:outline-none focus:ring-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
                 disabled={isProcessing || !hasApiKey}
               />
               {isProcessing ? (

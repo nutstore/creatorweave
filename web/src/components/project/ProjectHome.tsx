@@ -260,7 +260,7 @@ export function ProjectHome({
   }
 
   return (
-    <div className="relative min-h-screen bg-neutral-50">
+    <div className="relative min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <style>{animationStyles}</style>
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-90"
@@ -271,7 +271,7 @@ export function ProjectHome({
         }}
       />
       <div className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
-        <header className="mb-6 rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm backdrop-blur relative overflow-hidden animate-fade-in-up">
+        <header className="mb-6 rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm backdrop-blur relative overflow-hidden animate-fade-in-up dark:border-neutral-700 dark:bg-neutral-900/80">
           {/* 装饰性渐变光晕 */}
           <div className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-br from-blue-400/10 to-purple-500/10 rounded-full blur-2xl" />
 
@@ -282,25 +282,25 @@ export function ProjectHome({
                   <ShieldCheck className="mr-1.5 h-3 w-3" />
                   数据仅本地处理
                 </BrandBadge>
-                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500">
+                <div className="text-xs uppercase tracking-[0.18em] text-neutral-500 dark:text-neutral-400">
                   Local Workspace
                 </div>
               </div>
-              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl">
+              <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 sm:text-4xl dark:text-neutral-100">
                 开始今天的工作
               </h1>
-              <p className="mt-2 max-w-3xl text-sm text-neutral-600 sm:text-base">
+              <p className="mt-2 max-w-3xl text-sm text-neutral-600 sm:text-base dark:text-neutral-300">
                 先决定下一步，再进入项目细节。支持创作、整理、开发与研究等多种工作流。
               </p>
             </div>
-            <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100">
+            <div className="hidden sm:flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100 dark:border-neutral-700 dark:from-neutral-800 dark:to-neutral-700">
               <Brain className="w-7 h-7 text-purple-500" />
             </div>
           </div>
         </header>
 
-        <section className="mb-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm animate-fade-in-up ph-duration-200 ph-delay-100">
-          <div className="mb-2 text-sm font-medium text-neutral-800">创建或打开 Project</div>
+        <section className="mb-6 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm animate-fade-in-up ph-duration-200 ph-delay-100 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="mb-2 text-sm font-medium text-neutral-800 dark:text-neutral-200">创建或打开 Project</div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <BrandInput
               id="project-name-input"
@@ -328,8 +328,8 @@ export function ProjectHome({
         </section>
 
         <section className="mb-6">
-          <div className="mb-3 text-sm font-medium text-neutral-700 animate-slide-in">继续上次工作</div>
-          <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md animate-fade-in-up ph-duration-200 ph-delay-200">
+          <div className="mb-3 text-sm font-medium text-neutral-700 animate-slide-in dark:text-neutral-300">继续上次工作</div>
+          <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md animate-fade-in-up ph-duration-200 ph-delay-200 dark:border-neutral-700 dark:bg-neutral-900">
             {currentProject ? (
               <>
                 <div className="mb-2 flex items-center gap-2">
@@ -342,8 +342,8 @@ export function ProjectHome({
                     </BrandBadge>
                   )}
                 </div>
-                <h2 className="text-xl font-semibold text-neutral-900">{currentProject.name}</h2>
-                <p className="mt-1 text-sm text-neutral-600">
+                <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">{currentProject.name}</h2>
+                <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
                   {formatRelativeTime(currentProject.updatedAt)} · 工作区{' '}
                   {projectStats[currentProject.id]?.workspaceCount || 0}
                 </p>
@@ -360,11 +360,11 @@ export function ProjectHome({
             ) : (
               <>
                 <div className="flex flex-col items-center justify-center py-4">
-                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 animate-pulse-slow">
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-neutral-100 animate-pulse-slow dark:bg-neutral-800">
                     <FolderPlus className="h-6 w-6 text-neutral-400" />
                   </div>
-                  <h2 className="text-lg font-semibold text-neutral-900">还没有项目</h2>
-                  <p className="mt-1 text-sm text-neutral-600 text-center">
+                  <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">还没有项目</h2>
+                  <p className="mt-1 text-sm text-neutral-600 text-center dark:text-neutral-400">
                     先创建一个 Project，后续就可以从这里一键继续。
                   </p>
                   <BrandButton
@@ -384,11 +384,11 @@ export function ProjectHome({
         <section>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <div className="text-sm font-medium text-neutral-700 animate-slide-in">最近项目</div>
-              <div className="flex rounded-lg bg-neutral-100 p-0.5 relative">
+              <div className="text-sm font-medium text-neutral-700 animate-slide-in dark:text-neutral-300">最近项目</div>
+              <div className="flex rounded-lg bg-neutral-100 p-0.5 relative dark:bg-neutral-800">
                 {/* 滑块背景 */}
                 <div
-                  className="absolute top-0.5 h-[calc(100%-4px)] rounded-md bg-white shadow-sm transition-all duration-300 ease-out"
+                  className="absolute top-0.5 h-[calc(100%-4px)] rounded-md bg-white shadow-sm transition-all duration-300 ease-out dark:bg-neutral-700"
                   style={{
                     width: 'calc(33.333% - 2px)',
                     left: statusFilter === 'all' ? '2px' : statusFilter === 'active' ? 'calc(33.333% + 1px)' : 'calc(66.666% + 1px)',
@@ -398,8 +398,8 @@ export function ProjectHome({
                   onClick={() => setStatusFilter('all')}
                   className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                     statusFilter === 'all'
-                      ? 'text-neutral-900'
-                      : 'text-neutral-600 hover:text-neutral-900'
+                      ? 'text-neutral-900 dark:text-neutral-100'
+                      : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
                   }`}
                 >
                   全部
@@ -408,8 +408,8 @@ export function ProjectHome({
                   onClick={() => setStatusFilter('active')}
                   className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                     statusFilter === 'active'
-                      ? 'text-neutral-900'
-                      : 'text-neutral-600 hover:text-neutral-900'
+                      ? 'text-neutral-900 dark:text-neutral-100'
+                      : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
                   }`}
                 >
                   活跃
@@ -418,8 +418,8 @@ export function ProjectHome({
                   onClick={() => setStatusFilter('archived')}
                   className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors ${
                     statusFilter === 'archived'
-                      ? 'text-neutral-900'
-                      : 'text-neutral-600 hover:text-neutral-900'
+                      ? 'text-neutral-900 dark:text-neutral-100'
+                      : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100'
                   }`}
                 >
                   已归档
@@ -435,11 +435,11 @@ export function ProjectHome({
           </div>
 
           {visibleProjects.length === 0 && (
-            <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center animate-fade-in-up ph-duration-300">
+            <div className="rounded-xl border border-dashed border-neutral-300 bg-white p-10 text-center animate-fade-in-up ph-duration-300 dark:border-neutral-700 dark:bg-neutral-900">
               <div className="mb-3 flex justify-center">
                 <SearchX className="h-10 w-10 text-neutral-300 animate-pulse-slow" />
               </div>
-              <p className="text-sm text-neutral-600">
+              <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 {search ? '没有匹配的项目，试试其他关键词。' : '暂无项目'}
               </p>
               {!search && projects.length === 0 && (
@@ -465,14 +465,14 @@ export function ProjectHome({
               return (
                 <div
                   key={project.id}
-                  className="group rounded-xl border border-neutral-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg animate-fade-in-up"
+                  className="group rounded-xl border border-neutral-200 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg animate-fade-in-up dark:border-neutral-700 dark:bg-neutral-900"
                   style={{
                     animationDelay: `${(index % 4) * 100}ms`,
                     animationFillMode: 'both',
                   }}
                 >
                   <div className="mb-3 flex items-center justify-between">
-                    <span className="text-base font-medium text-neutral-900">{project.name}</span>
+                    <span className="text-base font-medium text-neutral-900 dark:text-neutral-100">{project.name}</span>
                     <div className="flex items-center gap-2">
                       {isArchived && (
                         <BrandBadge variant="neutral" shape="pill">
@@ -486,10 +486,10 @@ export function ProjectHome({
                       )}
                     </div>
                   </div>
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     {formatRelativeTime(project.updatedAt)}
                   </p>
-                  <div className="mt-2 flex items-center gap-3 text-xs text-neutral-500">
+                  <div className="mt-2 flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
                     <span>工作区 {stats?.workspaceCount || 0}</span>
                     <span>
                       最近活跃{' '}
@@ -513,7 +513,7 @@ export function ProjectHome({
                           variant="ghost"
                           iconButton
                           disabled={isProjectActionPending || isActionSubmitting}
-                          className="transition-colors hover:bg-neutral-100"
+                          className="transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
                         >
                           <MoreVertical className="h-4 w-4" />
                         </BrandButton>

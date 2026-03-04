@@ -62,9 +62,9 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
   if (!changes || changes.changes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+        <div className="w-16 h-16 rounded-full bg-gray-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
           <svg
-            className="w-8 h-8 text-gray-400"
+            className="w-8 h-8 text-gray-400 dark:text-neutral-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -77,8 +77,8 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">无文件变更</h3>
-        <p className="text-sm text-gray-500 max-w-sm">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-neutral-100 mb-2">无文件变更</h3>
+        <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-sm">
           Python 执行后没有检测到文件系统变更
         </p>
       </div>
@@ -94,13 +94,13 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Summary Header */}
-      <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-gray-900">文件变更列表</h3>
-            <p className="text-xs text-gray-500 mt-1">{summaryText}</p>
+            <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-100">文件变更列表</h3>
+            <p className="text-xs text-gray-500 dark:text-neutral-400 mt-1">{summaryText}</p>
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 dark:text-neutral-400">
             总计: {totalChanges}
           </div>
         </div>
@@ -108,7 +108,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
 
       {/* File List */}
       <div className="flex-1 overflow-y-auto">
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-gray-100 dark:divide-neutral-800">
           {changes.changes.map((change, index) => {
             const style = getChangeTypeStyle(change.type)
             const isSelected = change.path === selectedPath
@@ -117,8 +117,8 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
               <button
                 key={`${change.path}-${index}`}
                 onClick={() => onSelectFile?.(change)}
-                className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors ${
-                  isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+                className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors ${
+                  isSelected ? 'bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500' : ''
                 }`}
                 aria-label={`查看 ${change.path} 的变更`}
               >
@@ -138,14 +138,14 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                     >
                       {style.label}
                     </span>
-                    <span className="text-xs text-gray-400">•</span>
-                    <span className="text-xs text-gray-500" title={change.path}>
+                    <span className="text-xs text-gray-400 dark:text-neutral-500">•</span>
+                    <span className="text-xs text-gray-500 dark:text-neutral-400" title={change.path}>
                       {change.path.length > 50
                         ? `...${change.path.slice(-47)}`
                         : change.path}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-neutral-400">
                     <span>大小: {formatFileSize(change.size)}</span>
                     {change.mtime && (
                       <>

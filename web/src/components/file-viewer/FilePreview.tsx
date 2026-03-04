@@ -198,7 +198,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
 
   if (!filePath) {
     return (
-      <div className="flex h-full items-center justify-center bg-white p-4">
+      <div className="flex h-full items-center justify-center bg-white p-4 dark:bg-neutral-950">
         <div className="text-center text-neutral-400">
           <FileText className="mx-auto mb-2 h-6 w-6" />
           <p className="text-xs">点击文件树中的文件进行预览</p>
@@ -211,21 +211,21 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   const isBinary = isBinaryExtension(filePath)
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5">
+      <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-700">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-xs font-medium text-neutral-700" title={filePath}>
+          <span className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200" title={filePath}>
             {fileName}
           </span>
-          <span className="shrink-0 text-[10px] text-neutral-400">{formatBytes(fileSize)}</span>
+          <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-500">{formatBytes(fileSize)}</span>
         </div>
         <div className="flex items-center gap-1">
           {content && (
             <button
               type="button"
               onClick={handleCopy}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               title="复制内容"
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
@@ -234,7 +234,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             title="关闭"
           >
             <X className="h-3 w-3" />

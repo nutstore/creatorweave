@@ -217,7 +217,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
 
   return (
     <div
-      className="flex h-full flex-col items-center justify-center bg-white px-4"
+      className="flex h-full flex-col items-center justify-center bg-white px-4 dark:bg-neutral-950"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -228,8 +228,8 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
           <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-50 to-primary-100 shadow-sm">
             <Sparkles className="h-7 w-7 text-primary-600" />
           </div>
-          <h1 className="mb-2 text-3xl font-semibold text-neutral-900">{t('welcome.title')}</h1>
-          <p className="text-base text-neutral-500">{t('welcome.tagline')}</p>
+          <h1 className="mb-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{t('welcome.title')}</h1>
+          <p className="text-base text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
         </div>
 
         {/* Personas Grid */}
@@ -245,7 +245,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
                 className={`flex flex-col items-start rounded-xl border-2 p-4 text-left transition-all ${
                   isSelected
                     ? persona.color + ' ring-2 ring-offset-2'
-                    : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100'
+                    : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800'
                 }`}
               >
                 <div
@@ -253,8 +253,8 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
                 >
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="mb-1 text-sm font-semibold text-neutral-900">{persona.title}</h3>
-                <p className="text-xs text-neutral-500">{persona.description}</p>
+                <h3 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{persona.title}</h3>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">{persona.description}</p>
               </button>
             )
           })}
@@ -262,15 +262,15 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
 
         {/* Example questions (based on selected persona) */}
         {selectedPersona && (
-          <div className="mb-6 rounded-xl bg-neutral-50 p-4">
-            <p className="mb-3 text-sm font-medium text-neutral-700">Try asking:</p>
+          <div className="mb-6 rounded-xl bg-neutral-50 p-4 dark:bg-neutral-900">
+            <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Try asking:</p>
             <div className="flex flex-wrap gap-2">
               {PERSONAS.find((p) => p.id === selectedPersona)?.examples.map((example, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleExampleClick(example.text)}
-                  className="hover:border-primary-300 flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
+                  className="hover:border-primary-300 flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 >
                   <span>{example.text}</span>
                   <ChevronRight className="h-3 w-3" />
@@ -297,22 +297,22 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             onKeyDown={handleKeyDown}
             placeholder={hasApiKey ? t('welcome.placeholder') : t('welcome.placeholderNoKey')}
             rows={3}
-            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-2"
+            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-2xl border border-neutral-200 bg-neutral-50 px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-2 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-800"
             disabled={!hasApiKey}
           />
 
           {/* Dropped files indicator */}
           {draggedFiles && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-neutral-200 bg-neutral-100 p-3">
+            <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-neutral-200 bg-neutral-100 p-3 dark:border-neutral-700 dark:bg-neutral-900">
               <div className="mb-2 flex items-center gap-2">
                 <Upload className="h-4 w-4 text-primary-600" />
-                <span className="text-sm font-medium text-neutral-700">
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
                   {draggedFiles.length} file{draggedFiles.length > 1 ? 's' : ''} ready
                 </span>
                 <button
                   type="button"
                   onClick={() => setDraggedFiles(null)}
-                  className="ml-auto text-neutral-400 hover:text-neutral-600"
+                  className="ml-auto text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
                 >
                   ×
                 </button>
@@ -323,14 +323,14 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
                   .map((file, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs text-neutral-600"
+                      className="flex items-center gap-1 rounded-lg bg-white px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300"
                     >
                       <span>{getFileTypeIcon(file.name)}</span>
                       <span className="max-w-[100px] truncate">{file.name}</span>
                     </div>
                   ))}
                 {draggedFiles.length > 5 && (
-                  <div className="rounded-lg bg-neutral-200 px-2 py-1 text-xs text-neutral-600">
+                  <div className="rounded-lg bg-neutral-200 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
                     +{draggedFiles.length - 5} more
                   </div>
                 )}
@@ -354,7 +354,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             <button
               type="button"
               onClick={handleSelectFolder}
-              className="flex h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-normal text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+              className="flex h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-normal text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               <FolderOpen className="h-4 w-4" />
               {t('folderSelector.openFolder')}
@@ -364,7 +364,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             type="button"
             onClick={() => setInput('What can you help me with?')}
             disabled={!hasApiKey}
-            className="flex h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-normal text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50"
+            className="flex h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-normal text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
             <Sparkles className="h-4 w-4" />
             {t('welcome.viewCapabilities') || 'View Capabilities'}
@@ -373,7 +373,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
 
         {/* Recent conversations hint */}
         {conversations.length > 0 && (
-          <p className="mt-8 text-center text-xs text-neutral-400">{t('welcome.recentHint')}</p>
+          <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('welcome.recentHint')}</p>
         )}
       </div>
     </div>

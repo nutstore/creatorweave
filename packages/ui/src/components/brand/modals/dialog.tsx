@@ -65,7 +65,7 @@ const BrandDialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-modal w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border border-gray-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "fixed left-[50%] top-[50%] z-modal w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border border-gray-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 dark:border-neutral-700 dark:bg-neutral-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       onPointerDownOutside={(e) => {
@@ -87,7 +87,7 @@ const BrandDialogHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-14 items-center justify-between px-5 border-b border-gray-200",
+      "flex h-14 items-center justify-between border-b border-gray-200 px-5 dark:border-neutral-700",
       className
     )}
     {...props}
@@ -114,7 +114,7 @@ const BrandDialogFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-16 items-center justify-end gap-3 px-5 border-t border-gray-200",
+      "flex h-16 items-center justify-end gap-3 border-t border-gray-200 px-5 dark:border-neutral-700",
       className
     )}
     {...props}
@@ -128,7 +128,7 @@ const BrandDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn("text-base font-semibold", className)}
+    className={cn("text-base font-semibold text-neutral-900 dark:text-neutral-100", className)}
     {...props}
   />
 ))

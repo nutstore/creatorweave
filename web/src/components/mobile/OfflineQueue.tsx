@@ -244,7 +244,7 @@ function CompactView({ onClick }: CompactViewProps) {
   return (
     <button
       onClick={() => onClick?.()}
-      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white p-3 transition-all hover:bg-slate-50"
+      className="flex w-full items-center justify-between rounded-lg border border-slate-200 bg-white p-3 transition-all hover:bg-slate-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
     >
       <div className="flex items-center gap-3">
         <div
@@ -260,7 +260,7 @@ function CompactView({ onClick }: CompactViewProps) {
           )}
         </div>
         <div className="text-left">
-          <p className="text-sm font-medium text-slate-900">{isOnline ? '在线' : '离线'}</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{isOnline ? '在线' : '离线'}</p>
           {totalPending > 0 && (
             <p className="text-xs text-slate-500">
               {counts.syncing > 0 && `同步中 ${counts.syncing}, `}
@@ -346,7 +346,7 @@ export function OfflineQueue({
   return (
     <div className={twMerge('flex flex-col gap-4', className)}>
       {/* Status Header */}
-      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4">
+      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex items-center gap-3">
           <div
             className={clsx(
@@ -361,10 +361,10 @@ export function OfflineQueue({
             )}
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-900">
+            <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">
               {isOnline ? '已连接网络' : '离线模式'}
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-500 dark:text-neutral-400">
               {isOnline ? '任务将自动同步' : '任务将在恢复网络后同步'}
             </p>
           </div>

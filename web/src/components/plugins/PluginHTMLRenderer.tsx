@@ -174,18 +174,18 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
   // =============================================================================
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-gray-50">
+    <div className="rounded-lg border border-gray-200 bg-gray-50 dark:border-neutral-700 dark:bg-neutral-900">
       {/* Header bar */}
       {result.title && (
-        <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white px-4 py-2">
-          <span className="text-sm font-medium text-gray-700">{result.title}</span>
+        <div className="flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
+          <span className="text-sm font-medium text-gray-700 dark:text-neutral-200">{result.title}</span>
           <div className="flex items-center gap-2">
             <div
               className={`h-2 w-2 rounded-full transition-colors ${
                 isReady ? 'bg-green-500' : 'bg-yellow-500'
               }`}
             />
-            <span className="text-xs text-gray-500">{isReady ? 'Ready' : 'Loading...'}</span>
+            <span className="text-xs text-gray-500 dark:text-neutral-400">{isReady ? 'Ready' : 'Loading...'}</span>
           </div>
         </div>
       )}
@@ -195,15 +195,15 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
         ref={iframeRef}
         srcDoc={buildIframeHTML()}
         sandbox="allow-scripts allow-same-origin"
-        className="w-full bg-white"
+        className="w-full bg-white dark:bg-neutral-950"
         style={{ height: `${height}px`, minHeight: '200px' }}
         title="Plugin Output"
       />
 
       {/* Footer with controls */}
-      <div className="flex items-center justify-between rounded-b-lg border-t border-gray-200 bg-white px-4 py-2">
+      <div className="flex items-center justify-between rounded-b-lg border-t border-gray-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400">BFSA API v2.0</span>
+          <span className="text-xs text-gray-400 dark:text-neutral-500">BFSA API v2.0</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload() // Force reload
             }}
-            className="text-xs text-gray-500 transition-colors hover:text-gray-700"
+            className="text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
           >
             Refresh
           </button>
@@ -223,7 +223,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
                 setHeight(result.height || 400)
               }
             }}
-            className="text-xs text-gray-500 transition-colors hover:text-gray-700"
+            className="text-xs text-gray-500 transition-colors hover:text-gray-700 dark:text-neutral-400 dark:hover:text-neutral-200"
           >
             Reset Size
           </button>

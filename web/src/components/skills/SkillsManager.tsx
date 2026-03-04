@@ -132,16 +132,16 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
         <BrandDialogContent className="flex max-h-[600px] max-w-2xl flex-col overflow-hidden p-0">
           {/* Header */}
           <BrandDialogHeader className="h-16 px-6">
-            <BrandDialogTitle className="text-lg font-semibold text-gray-900">
+            <BrandDialogTitle className="text-lg font-semibold text-gray-900 dark:text-neutral-100">
               {t('skills.title')}
             </BrandDialogTitle>
-            <BrandDialogClose className="text-gray-400 hover:text-gray-600">
+            <BrandDialogClose className="text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
 
           {/* Search & Filter Bar */}
-          <div className="flex shrink-0 items-center gap-3 border-b border-gray-200 px-6 py-4">
+          <div className="flex shrink-0 items-center gap-3 border-b border-gray-200 px-6 py-4 dark:border-neutral-700">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <BrandInput
@@ -179,19 +179,19 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
             <BrandAccordion type="multiple" defaultValue={['user', 'builtin', 'project']}>
               {/* Project Skills */}
               <BrandAccordionItem value="project">
-                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-neutral-800">
                   <div className="flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">
+                    <FolderOpen className="h-4 w-4 text-gray-500 dark:text-neutral-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                       {t('skills.projectSkills')}
                     </span>
-                    <span className="text-xs text-gray-400">({projectSkills.length})</span>
+                    <span className="text-xs text-gray-400 dark:text-neutral-500">({projectSkills.length})</span>
                   </div>
                 </BrandAccordionTrigger>
                 <BrandAccordionContent className="pb-0 pt-0">
-                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4 dark:bg-neutral-900/50">
                     {projectSkills.length === 0 ? (
-                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400 dark:text-neutral-500">
                         <Inbox className="h-4 w-4 opacity-50" />
                         <p className="text-xs">{t('skills.empty')}</p>
                       </div>
@@ -212,19 +212,19 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
 
               {/* User Skills */}
               <BrandAccordionItem value="user">
-                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-neutral-800">
                   <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">
+                    <User className="h-4 w-4 text-gray-500 dark:text-neutral-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                       {t('skills.mySkills')}
                     </span>
-                    <span className="text-xs text-gray-400">({userSkills.length})</span>
+                    <span className="text-xs text-gray-400 dark:text-neutral-500">({userSkills.length})</span>
                   </div>
                 </BrandAccordionTrigger>
                 <BrandAccordionContent className="pb-0 pt-0">
-                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4 dark:bg-neutral-900/50">
                     {userSkills.length === 0 ? (
-                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400 dark:text-neutral-500">
                         <Inbox className="h-4 w-4 opacity-50" />
                         <p className="text-xs">{t('skills.empty')}</p>
                       </div>
@@ -245,19 +245,19 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
 
               {/* Builtin Skills */}
               <BrandAccordionItem value="builtin">
-                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50">
+                <BrandAccordionTrigger className="rounded-t-lg px-4 py-3 hover:no-underline data-[state=open]:bg-gray-50 dark:data-[state=open]:bg-neutral-800">
                   <div className="flex items-center gap-2">
-                    <Building className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700">
+                    <Building className="h-4 w-4 text-gray-500 dark:text-neutral-400" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-neutral-300">
                       {t('skills.builtinSkills')}
                     </span>
-                    <span className="text-xs text-gray-400">({builtinSkills.length})</span>
+                    <span className="text-xs text-gray-400 dark:text-neutral-500">({builtinSkills.length})</span>
                   </div>
                 </BrandAccordionTrigger>
                 <BrandAccordionContent className="pb-0 pt-0">
-                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4">
+                  <div className="space-y-2 rounded-b-lg bg-gray-50/50 p-4 dark:bg-neutral-900/50">
                     {builtinSkills.length === 0 ? (
-                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400">
+                      <div className="flex items-center justify-center gap-2 py-2 text-gray-400 dark:text-neutral-500">
                         <Inbox className="h-4 w-4 opacity-50" />
                         <p className="text-xs">{t('skills.empty')}</p>
                       </div>
@@ -279,9 +279,9 @@ export function SkillsManager({ open, onClose }: SkillsManagerProps) {
           </div>
 
           {/* Footer */}
-          <div className="flex h-16 shrink-0 items-center justify-between border-t border-gray-200 px-6">
-            <span className="text-sm text-gray-500">
-              <span className="font-medium text-gray-700">
+          <div className="flex h-16 shrink-0 items-center justify-between border-t border-gray-200 px-6 dark:border-neutral-700">
+            <span className="text-sm text-gray-500 dark:text-neutral-400">
+              <span className="font-medium text-gray-700 dark:text-neutral-200">
                 {skillsStore.skills.filter((s) => s.enabled).length}
               </span>
               {' / '}

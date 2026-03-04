@@ -343,29 +343,29 @@ export function QuickActionsPanel({
       <div className="fixed inset-0 z-40 bg-black/20 transition-opacity" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed left-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-white shadow-xl">
+      <div className="fixed left-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-white shadow-xl dark:bg-neutral-900">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4 dark:border-neutral-700">
           <div>
-            <h2 className="text-lg font-semibold text-neutral-900">Quick Actions</h2>
-            <p className="text-sm text-neutral-500">Common tasks and shortcuts</p>
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Quick Actions</h2>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">Common tasks and shortcuts</p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+            className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-neutral-200 px-2">
+        <div className="flex border-b border-neutral-200 px-2 dark:border-neutral-700">
           <button
             onClick={() => setActiveTab('actions')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'actions'
                 ? 'border-b-2 border-primary-500 text-primary-600'
-                : 'text-neutral-600 hover:text-neutral-900'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100'
             }`}
           >
             <Zap className="h-4 w-4" />
@@ -376,7 +376,7 @@ export function QuickActionsPanel({
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'smart'
                 ? 'border-b-2 border-primary-500 text-primary-600'
-                : 'text-neutral-600 hover:text-neutral-900'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100'
             }`}
           >
             <Sparkles className="h-4 w-4" />
@@ -387,7 +387,7 @@ export function QuickActionsPanel({
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'upload'
                 ? 'border-b-2 border-primary-500 text-primary-600'
-                : 'text-neutral-600 hover:text-neutral-900'
+                : 'text-neutral-600 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100'
             }`}
           >
             <FolderOpen className="h-4 w-4" />
@@ -409,7 +409,7 @@ export function QuickActionsPanel({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search actions..."
-                    className="focus:border-primary-300 w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+                    className="focus:border-primary-300 w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
                   />
                 </div>
               </div>
@@ -425,8 +425,8 @@ export function QuickActionsPanel({
                       onClick={() => setSelectedCategory(cat.id as ActionCategory)}
                       className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-primary-100 text-primary-700'
-                          : 'text-neutral-600 hover:bg-neutral-100'
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
@@ -444,14 +444,14 @@ export function QuickActionsPanel({
                     <button
                       key={action.id}
                       onClick={() => handleActionClick(action)}
-                      className="hover:border-primary-300 flex w-full items-start gap-3 rounded-xl border border-neutral-200 p-3 text-left transition-colors hover:bg-primary-50/50"
+                      className="hover:border-primary-300 flex w-full items-start gap-3 rounded-xl border border-neutral-200 p-3 text-left transition-colors hover:bg-primary-50/50 dark:border-neutral-700 dark:hover:bg-primary-900/20"
                     >
-                      <div className="mt-0.5 rounded-lg bg-primary-50 p-2">
+                      <div className="mt-0.5 rounded-lg bg-primary-50 p-2 dark:bg-primary-900/20">
                         <Icon className="h-4 w-4 text-primary-600" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-neutral-900">{action.label}</p>
-                        <p className="mt-0.5 text-xs text-neutral-500">{action.description}</p>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{action.label}</p>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{action.description}</p>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 text-neutral-400" />
                     </button>
@@ -469,10 +469,10 @@ export function QuickActionsPanel({
                     {recentFiles.map((file, idx) => (
                       <button
                         key={idx}
-                        className="group flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-neutral-100"
+                        className="group flex w-full items-center gap-3 rounded-lg p-2 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
                       >
                         <Clock className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600" />
-                        <span className="truncate text-sm text-neutral-700">{file}</span>
+                        <span className="truncate text-sm text-neutral-700 dark:text-neutral-300">{file}</span>
                       </button>
                     ))}
                   </div>
@@ -486,9 +486,9 @@ export function QuickActionsPanel({
             <div className="p-4">
               {/* Project Type Badge */}
               {projectType && (
-                <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2">
+                <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 dark:bg-primary-950/20">
                   <Sparkles className="h-4 w-4 text-primary-600" />
-                  <span className="text-primary-900 text-sm font-medium">
+                  <span className="text-primary-900 dark:text-primary-200 text-sm font-medium">
                     {projectType.charAt(0).toUpperCase() + projectType.slice(1)} Project Detected
                   </span>
                 </div>
@@ -497,7 +497,7 @@ export function QuickActionsPanel({
               {/* Smart Suggestions */}
               <div className="mb-2">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-neutral-700">Suggested for You</h3>
+                  <h3 className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Suggested for You</h3>
                   <button
                     onClick={() => {
                       // Refresh suggestions
@@ -518,7 +518,7 @@ export function QuickActionsPanel({
                       }
                       setSmartSuggestions(suggestions)
                     }}
-                    className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+                    className="rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                     title="Refresh suggestions"
                   >
                     <TrendingUp className="h-4 w-4" />
@@ -556,8 +556,8 @@ export function QuickActionsPanel({
                         <Sparkles className="h-4 w-4 text-primary-600" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-neutral-900">{suggestion.title}</p>
-                        <p className="mt-0.5 text-xs text-neutral-500">{suggestion.description}</p>
+                        <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{suggestion.title}</p>
+                        <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">{suggestion.description}</p>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 text-neutral-400" />
                     </button>
@@ -579,10 +579,10 @@ export function QuickActionsPanel({
                         if (onStartConversation) onStartConversation(prompt)
                         onClose()
                       }}
-                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-neutral-100"
+                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
                     >
                       <Code className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-neutral-700">Analyze Types & Interfaces</span>
+                      <span className="text-sm text-neutral-700 dark:text-neutral-300">Analyze Types & Interfaces</span>
                     </button>
                     <button
                       onClick={() => {
@@ -590,10 +590,10 @@ export function QuickActionsPanel({
                         if (onStartConversation) onStartConversation(prompt)
                         onClose()
                       }}
-                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-neutral-100"
+                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
                     >
                       <Code className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-neutral-700">Find React Components</span>
+                      <span className="text-sm text-neutral-700 dark:text-neutral-300">Find React Components</span>
                     </button>
                   </div>
                 </div>
@@ -605,10 +605,10 @@ export function QuickActionsPanel({
           {activeTab === 'upload' && (
             <div className="p-4">
               {/* Folder Selection */}
-              <div className="mb-4 rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-6 text-center">
-                <FolderOpen className="mx-auto mb-3 h-10 w-10 text-neutral-400" />
-                <p className="mb-2 text-sm font-medium text-neutral-900">Select Project Folder</p>
-                <p className="mb-4 text-xs text-neutral-500">
+              <div className="mb-4 rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-6 text-center dark:border-neutral-700 dark:bg-neutral-800">
+                <FolderOpen className="mx-auto mb-3 h-10 w-10 text-neutral-400 dark:text-neutral-500" />
+                <p className="mb-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">Select Project Folder</p>
+                <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">
                   Choose a folder to analyze its contents
                 </p>
                 <button
@@ -631,9 +631,9 @@ export function QuickActionsPanel({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-neutral-200 bg-neutral-50 px-6 py-4">
-          <p className="text-center text-xs text-neutral-500">
-            Press <kbd className="rounded bg-neutral-200 px-1 py-0.5 font-mono">Cmd+K</kbd> to open
+        <div className="border-t border-neutral-200 bg-neutral-50 px-6 py-4 dark:border-neutral-700 dark:bg-neutral-800">
+          <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">
+            Press <kbd className="rounded bg-neutral-200 px-1 py-0.5 font-mono dark:bg-neutral-700">Cmd+K</kbd> to open
             quick actions
           </p>
         </div>

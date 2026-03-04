@@ -43,15 +43,15 @@ export function LanguageSwitcher() {
       </BrandButton>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[120px] whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           {(['zh-CN', 'en-US', 'ja-JP', 'ko-KR'] as Locale[]).map((key) => (
             <button
               key={key}
               type="button"
               onClick={() => handleSelect(key)}
               className={cn(
-                'flex w-full items-center justify-between gap-4 px-3 py-2 text-sm hover:bg-gray-50',
-                locale === key && 'bg-primary-50 text-primary-700'
+                'flex w-full items-center justify-between gap-4 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-neutral-800',
+                locale === key && 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
               )}
             >
               <span>{LOCALE_LABELS[key]}</span>

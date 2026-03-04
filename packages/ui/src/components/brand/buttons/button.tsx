@@ -10,14 +10,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-primary-600 text-white shadow-[0_1px_3px_0_rgba(13,148,136,0.3)] hover:bg-primary-700 font-semibold",
+          "bg-primary-600 text-white shadow-[0_1px_3px_0_rgba(13,148,136,0.3)] hover:bg-primary-700 dark:bg-primary-700 dark:text-primary-50 dark:shadow-[0_1px_3px_0_rgba(13,148,136,0.2)] dark:hover:bg-primary-600 font-semibold",
         secondary:
-          "bg-primary-50 text-primary-600 border border-gray-200 hover:bg-primary-100 font-semibold",
+          "border border-gray-200 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-neutral-700 dark:bg-primary-900/25 dark:text-primary-300 dark:hover:bg-primary-900/40 font-semibold",
         outline:
-          "bg-transparent border border-gray-200 text-primary hover:bg-gray-50 font-medium",
-        ghost: "gap-1.5 bg-transparent text-tertiary hover:bg-gray-100 hover:text-primary font-medium",
+          "border border-gray-200 bg-transparent text-primary hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 font-medium",
+        ghost:
+          "gap-1.5 bg-transparent text-tertiary hover:bg-gray-100 hover:text-primary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 font-medium",
         danger:
-          "bg-danger-bg text-danger border border-danger-border hover:opacity-90 font-semibold",
+          "border border-danger-border bg-danger-bg text-danger hover:opacity-90 dark:bg-danger-bg/25 dark:text-red-300 font-semibold",
       },
       size: {
         default: "h-10 px-5 text-sm",
@@ -38,14 +39,14 @@ const iconButtonVariants = cva(
     variants: {
       variant: {
         default:
-          "border border-gray-200 text-gray-700 hover:bg-gray-50",
+          "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800",
         primary:
-          "bg-primary-50 text-primary-600 border border-primary-600 hover:bg-primary-100",
+          "border border-primary-600 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-primary-700 dark:bg-primary-900/25 dark:text-primary-300 dark:hover:bg-primary-900/40",
         danger:
-          "bg-danger-bg text-danger border border-danger-border hover:opacity-90",
-        ghost: "text-tertiary hover:bg-gray-100",
+          "border border-danger-border bg-danger-bg text-danger hover:opacity-90 dark:bg-danger-bg/25 dark:text-red-300",
+        ghost: "text-tertiary hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800",
         disabled:
-          "bg-gray-100 text-muted cursor-not-allowed",
+          "cursor-not-allowed bg-gray-100 text-muted dark:bg-neutral-800 dark:text-neutral-500",
       },
     },
     defaultVariants: {

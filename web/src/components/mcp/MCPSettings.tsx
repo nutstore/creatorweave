@@ -310,8 +310,8 @@ export function MCPSettings() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-semibold text-primary">MCP 服务器</h3>
-          <p className="text-xs text-secondary">管理外部 MCP 服务连接</p>
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">MCP 服务器</h3>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">管理外部 MCP 服务连接</p>
         </div>
         <button
           onClick={loadServers}
@@ -326,7 +326,7 @@ export function MCPSettings() {
       {!showAddForm && (
         <button
           onClick={openAddForm}
-          className="hover:border-primary-300 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-secondary transition-colors hover:bg-primary-50"
+          className="hover:border-primary-300 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-secondary transition-colors hover:bg-primary-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
         >
           <Plus className="h-4 w-4" />
           添加 MCP 服务器
@@ -335,9 +335,9 @@ export function MCPSettings() {
 
       {/* Add/Edit Form */}
       {showAddForm && (
-        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4">
+        <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-primary">
+            <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
               {editingServer ? '编辑服务器' : '添加服务器'}
             </h4>
             <button onClick={closeForm} className="text-tertiary hover:text-danger">
@@ -348,15 +348,15 @@ export function MCPSettings() {
           <div className="space-y-3">
             {/* Server ID */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">服务器 ID *</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">服务器 ID *</label>
               <div className="relative">
                 <input
                   type="text"
                   value={formData.id}
                   onChange={(e) => setFormData({ ...formData, id: e.target.value })}
                   placeholder="如: excel-analyzer"
-                  className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none ${
-                    formErrors.id ? 'border-danger' : 'border-gray-200'
+                  className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:text-neutral-100 ${
+                    formErrors.id ? 'border-danger' : 'border-gray-200 dark:border-neutral-700'
                   }`}
                   disabled={!!editingServer}
                 />
@@ -369,14 +369,14 @@ export function MCPSettings() {
 
             {/* Name */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">显示名称 *</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">显示名称 *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="如: Excel 文档分析器"
-                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none ${
-                  formErrors.name ? 'border-danger' : 'border-gray-200'
+                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:text-neutral-100 ${
+                    formErrors.name ? 'border-danger' : 'border-gray-200 dark:border-neutral-700'
                 }`}
               />
               {formErrors.name && <p className="text-xs text-danger">{formErrors.name}</p>}
@@ -384,26 +384,26 @@ export function MCPSettings() {
 
             {/* Description */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">描述</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">描述</label>
               <input
                 type="text"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="服务器功能描述"
-                className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:border-neutral-700 dark:text-neutral-100"
               />
             </div>
 
             {/* URL */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">服务器 URL *</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">服务器 URL *</label>
               <input
                 type="text"
                 value={formData.url}
                 onChange={(e) => setFormData({ ...formData, url: e.target.value })}
                 placeholder="http://localhost:8080/mcp"
-                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none ${
-                  formErrors.url ? 'border-danger' : 'border-gray-200'
+                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:text-neutral-100 ${
+                    formErrors.url ? 'border-danger' : 'border-gray-200 dark:border-neutral-700'
                 }`}
               />
               {formErrors.url && <p className="text-xs text-danger">{formErrors.url}</p>}
@@ -411,13 +411,13 @@ export function MCPSettings() {
 
             {/* Transport Type */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">传输类型</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">传输类型</label>
               <select
                 value={formData.transport}
                 onChange={(e) =>
                   setFormData({ ...formData, transport: e.target.value as TransportType })
                 }
-                className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:border-neutral-700 dark:text-neutral-100"
               >
                 <option value="sse">SSE (Server-Sent Events)</option>
                 <option value="streamable_http">Streamable HTTP (实验性)</option>
@@ -426,14 +426,14 @@ export function MCPSettings() {
 
             {/* Token */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">认证 Token（可选）</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">认证 Token（可选）</label>
               <div className="relative">
                 <input
                   type={showToken ? 'text' : 'password'}
                   value={formData.token}
                   onChange={(e) => setFormData({ ...formData, token: e.target.value })}
                   placeholder="Bearer token"
-                  className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 pr-10 text-sm focus:border-primary-500 focus:outline-none"
+                  className="w-full rounded-md border border-gray-200 bg-transparent px-3 py-2 pr-10 text-sm focus:border-primary-500 focus:outline-none dark:border-neutral-700 dark:text-neutral-100"
                 />
                 <button
                   type="button"
@@ -447,7 +447,7 @@ export function MCPSettings() {
 
             {/* Timeout */}
             <div className="space-y-1">
-              <label className="text-xs font-medium text-primary">超时时间 (ms)</label>
+              <label className="text-xs font-medium text-neutral-700 dark:text-neutral-300">超时时间 (ms)</label>
               <input
                 type="number"
                 value={formData.timeout}
@@ -455,8 +455,8 @@ export function MCPSettings() {
                 min="1000"
                 max="300000"
                 step="1000"
-                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none ${
-                  formErrors.timeout ? 'border-danger' : 'border-gray-200'
+                className={`w-full rounded-md border bg-transparent px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:text-neutral-100 ${
+                  formErrors.timeout ? 'border-danger' : 'border-gray-200 dark:border-neutral-700'
                 }`}
               />
               {formErrors.timeout && <p className="text-xs text-danger">{formErrors.timeout}</p>}
@@ -466,7 +466,7 @@ export function MCPSettings() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={closeForm}
-                className="rounded-md border border-gray-200 px-4 py-2 text-sm text-secondary transition-colors hover:bg-gray-50"
+                className="rounded-md border border-gray-200 px-4 py-2 text-sm text-secondary transition-colors hover:bg-gray-50 dark:border-neutral-700 dark:hover:bg-neutral-800 dark:text-neutral-300"
               >
                 取消
               </button>
@@ -512,8 +512,8 @@ export function MCPSettings() {
               key={server.id}
               className={`group relative rounded-lg border transition-all ${
                 !server.enabled
-                  ? 'border-gray-100 bg-gray-50 opacity-60'
-                  : 'hover:border-primary-200 border-gray-200 bg-white hover:bg-primary-50/30'
+                  ? 'border-gray-100 bg-gray-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900/60'
+                  : 'hover:border-primary-200 border-gray-200 bg-white hover:bg-primary-50/30 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800'
               }`}
             >
               <div className="flex items-start gap-3 p-3">
@@ -526,7 +526,7 @@ export function MCPSettings() {
                     className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
                       server.enabled
                         ? 'bg-success/10 text-success hover:bg-success/20'
-                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700'
                     }`}
                     title={server.enabled ? '点击禁用' : '点击启用'}
                   >
@@ -546,12 +546,12 @@ export function MCPSettings() {
                       {server.name}
                     </h4>
                     {server.type === 'builtin' && (
-                      <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
+                      <span className="rounded bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
                         内置
                       </span>
                     )}
                     {!server.enabled && (
-                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+                      <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-neutral-700 dark:text-neutral-300">
                         已禁用
                       </span>
                     )}
@@ -583,7 +583,7 @@ export function MCPSettings() {
                   {/* Edit */}
                   <button
                     onClick={() => openEditForm(server)}
-                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-gray-100 hover:text-primary"
+                    className="text-tertiary flex h-8 w-8 items-center justify-center rounded-md transition-colors hover:bg-gray-100 hover:text-primary dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
                     title="编辑配置"
                   >
                     <Edit className="h-4 w-4" />

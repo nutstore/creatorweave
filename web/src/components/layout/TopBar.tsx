@@ -89,7 +89,7 @@ export function TopBar({
   return (
     <>
       <TooltipProvider delayDuration={200}>
-        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-gray-200 bg-background px-4">
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-gray-200 bg-background px-4 dark:border-neutral-700">
         {/* Left: Menu button (mobile) + Logo + Name */}
         <div className="flex items-center gap-2.5">
           {onBackToProjects && (
@@ -115,15 +115,15 @@ export function TopBar({
           {activeProjectName && (
             <div className="flex items-center gap-1">
               <ActionTooltip label={`项目：${activeProjectName}`}>
-                <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                   {activeProjectName}
                 </span>
               </ActionTooltip>
               {activeWorkspaceName && (
                 <>
-                  <span className="text-xs text-neutral-400">/</span>
+                  <span className="text-xs text-neutral-400 dark:text-neutral-500">/</span>
                   <ActionTooltip label={`工作区：${activeWorkspaceName}`}>
-                    <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                    <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                       {activeWorkspaceName}
                     </span>
                   </ActionTooltip>

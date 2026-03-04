@@ -39,10 +39,10 @@ export function ToolCallDisplay({
   const displayPath = typeof parsedArgs.path === 'string' ? parsedArgs.path : undefined
 
   return (
-    <div className="my-1 rounded border border-neutral-200 bg-neutral-50 text-sm">
+    <div className="my-1 rounded border border-neutral-200 bg-neutral-50 text-sm dark:border-neutral-700 dark:bg-neutral-800">
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-neutral-100"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700"
         onClick={() => setExpanded(!expanded)}
       >
         {expanded ? (
@@ -51,8 +51,8 @@ export function ToolCallDisplay({
           <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
         )}
         <Wrench className="h-3.5 w-3.5 text-neutral-500" />
-        <code className="font-medium text-neutral-700">{toolCall.function.name}</code>
-        {displayPath && <span className="truncate text-neutral-400">{displayPath}</span>}
+        <code className="font-medium text-neutral-700 dark:text-neutral-200">{toolCall.function.name}</code>
+        {displayPath && <span className="truncate text-neutral-400 dark:text-neutral-500">{displayPath}</span>}
         <span className="ml-auto">
           {isStreaming ? (
             <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
@@ -67,15 +67,15 @@ export function ToolCallDisplay({
       </button>
 
       {expanded && (
-        <div className="border-t border-neutral-200 px-3 py-2">
+        <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <div className="mb-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-neutral-500">参数</span>
+              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">参数</span>
               <CopyIconButton
                 content={Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
               />
             </div>
-            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600">
+            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
               {Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
               {isStreaming && (
                 <span className="inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
@@ -85,12 +85,12 @@ export function ToolCallDisplay({
           {result && (
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-500">结果</span>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">结果</span>
                 <CopyIconButton
                   content={result.length > 2000 ? result + '\n...(truncated)' : result}
                 />
               </div>
-              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600">
+              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
                 {result.length > 2000 ? result.slice(0, 2000) + '\n...(truncated)' : result}
               </pre>
             </div>

@@ -25,25 +25,25 @@ interface ErrorBoundaryState {
  */
 function DefaultFallback({ error, resetError }: { error: Error | null; resetError: () => void }) {
   return (
-    <div className="flex h-full items-center justify-center bg-neutral-50 px-4">
-      <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 shadow-sm">
+    <div className="flex h-full items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
+      <div className="max-w-md rounded-lg border border-red-200 bg-white p-6 shadow-sm dark:border-red-900 dark:bg-neutral-900">
         <div className="mb-4 flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
             <AlertCircle className="h-5 w-5" />
           </div>
-          <h3 className="text-lg font-semibold text-red-900">渲染错误</h3>
+          <h3 className="text-lg font-semibold text-red-900 dark:text-red-200">渲染错误</h3>
         </div>
 
-        <p className="mb-4 text-sm text-neutral-600">
+        <p className="mb-4 text-sm text-neutral-600 dark:text-neutral-300">
           组件渲染时发生错误。这可能是临时问题，请尝试刷新页面。
         </p>
 
         {error && (
           <details className="mb-4">
-            <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700">
+            <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
               错误详情
             </summary>
-            <pre className="mt-2 max-h-40 overflow-auto rounded bg-neutral-100 p-2 text-xs text-neutral-700">
+            <pre className="mt-2 max-h-40 overflow-auto rounded bg-neutral-100 p-2 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
               {error.message}
               {error.stack && `\n\n${error.stack}`}
             </pre>

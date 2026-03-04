@@ -229,7 +229,7 @@ export function FolderSelector() {
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
-            'transition-colors hover:bg-primary-50 focus:outline-none',
+            'transition-colors hover:bg-primary-50 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800',
             (isSelecting || isLoading) && 'cursor-wait opacity-70'
           )}
           title={folderName ? t('folderSelector.switchFolder') : t('folderSelector.openFolder')}
@@ -240,7 +240,7 @@ export function FolderSelector() {
 
       {/* Dropdown menu */}
       {isMenuOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-gray-200 bg-white py-1 shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           {/* Switch folder */}
           <button
             type="button"
@@ -248,7 +248,7 @@ export function FolderSelector() {
             disabled={isSelecting || isLoading}
             className={cn(
               'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
-              'hover:bg-gray-50 disabled:cursor-wait disabled:opacity-50'
+              'hover:bg-gray-50 dark:hover:bg-neutral-800 disabled:cursor-wait disabled:opacity-50'
             )}
           >
             <RefreshCw className={cn('h-4 w-4', isSelecting && 'animate-spin')} />
@@ -272,7 +272,7 @@ export function FolderSelector() {
             <button
               type="button"
               onClick={handleCopyPath}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-gray-50"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-gray-50 dark:hover:bg-neutral-800"
             >
               <Copy className="h-4 w-4" />
               <span>{t('folderSelector.copyPath')}</span>

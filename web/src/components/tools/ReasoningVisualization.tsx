@@ -240,7 +240,7 @@ export function ReasoningVisualization({
       style={{ maxHeight, overflow: 'auto' }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+      <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
         <div className="flex items-center gap-2">
           {status === 'thinking' || status === 'reasoning' ? (
             <Brain className="h-4 w-4 animate-pulse text-primary-600" />
@@ -251,7 +251,7 @@ export function ReasoningVisualization({
           ) : (
             <AlertCircle className="h-4 w-4 text-red-600" />
           )}
-          <span className="text-sm font-medium text-neutral-900">
+          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
             {status === 'thinking' || status === 'reasoning'
               ? 'Thinking...'
               : status === 'tool_calling'
@@ -288,7 +288,7 @@ export function ReasoningVisualization({
               className={`rounded-lg border ${
                 step.status === 'in_progress'
                   ? 'border-primary-300 bg-primary-50'
-                  : 'border-neutral-200 bg-white'
+                  : 'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900'
               } transition-colors`}
             >
               <button
@@ -317,13 +317,13 @@ export function ReasoningVisualization({
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-sm font-medium ${
-                      step.status === 'in_progress' ? 'text-primary-900' : 'text-neutral-900'
+                      step.status === 'in_progress' ? 'text-primary-900 dark:text-primary-200' : 'text-neutral-900 dark:text-neutral-100'
                     }`}
                   >
                     {step.title}
                   </p>
                   {step.description && isExpanded && (
-                    <p className="mt-1 text-xs text-neutral-600">{step.description}</p>
+                    <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-300">{step.description}</p>
                   )}
                 </div>
                 {step.details && (
@@ -339,8 +339,8 @@ export function ReasoningVisualization({
 
               {/* Expanded details */}
               {isExpanded && step.details && (
-                <div className="border-t border-neutral-100 px-3 pb-3 pt-2">
-                  <p className="whitespace-pre-wrap text-xs text-neutral-600">{step.details}</p>
+                <div className="border-t border-neutral-100 px-3 pb-3 pt-2 dark:border-neutral-700">
+                  <p className="whitespace-pre-wrap text-xs text-neutral-600 dark:text-neutral-300">{step.details}</p>
                 </div>
               )}
             </div>
@@ -349,22 +349,22 @@ export function ReasoningVisualization({
 
         {/* Current tool call */}
         {currentToolCallStep && currentToolCall && (
-          <div className="border-primary-300 rounded-lg border bg-primary-50 p-3">
+          <div className="border-primary-300 rounded-lg border bg-primary-50 p-3 dark:border-primary-900/40 dark:bg-primary-950/20">
             <div className="flex items-start gap-3">
-              <div className="rounded-full bg-primary-100 p-1">
+              <div className="rounded-full bg-primary-100 p-1 dark:bg-primary-900/30">
                 {(() => {
                   const Icon = getToolIcon(currentToolCall.name)
                   return <Icon className="h-3.5 w-3.5 animate-pulse text-primary-600" />
                 })()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-primary-900 text-sm font-medium">{currentToolCallStep.title}</p>
-                <p className="mt-1 text-xs text-primary-700">{currentToolCallStep.description}</p>
+                <p className="text-primary-900 text-sm font-medium dark:text-primary-200">{currentToolCallStep.title}</p>
+                <p className="mt-1 text-xs text-primary-700 dark:text-primary-300">{currentToolCallStep.description}</p>
 
                 {/* Tool args preview */}
                 {(streamingToolArgs || Object.keys(currentToolCall.args).length > 0) && (
-                  <div className="mt-2 rounded bg-white/50 p-2">
-                    <p className="font-mono text-xs text-primary-800">
+                  <div className="mt-2 rounded bg-white/50 p-2 dark:bg-neutral-900/60">
+                    <p className="font-mono text-xs text-primary-800 dark:text-primary-300">
                       {streamingToolArgs || JSON.stringify(currentToolCall.args, null, 2)}
                     </p>
                   </div>
@@ -407,7 +407,7 @@ export function InlineReasoning({ reasoning, isStreaming }: InlineReasoningProps
 
   return (
     <details
-      className={`group my-2 rounded-lg border ${isStreaming ? 'border-primary-300 bg-primary-50' : 'border-neutral-200 bg-neutral-50'}`}
+      className={`group my-2 rounded-lg border ${isStreaming ? 'border-primary-300 bg-primary-50 dark:border-primary-900/40 dark:bg-primary-950/20' : 'border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900'}`}
       open={isExpanded}
       onToggle={(e) => setIsExpanded(e.currentTarget.open)}
     >
@@ -415,15 +415,15 @@ export function InlineReasoning({ reasoning, isStreaming }: InlineReasoningProps
         <Brain
           className={`h-4 w-4 ${isStreaming ? 'animate-pulse text-primary-600' : 'text-neutral-500'}`}
         />
-        <span className={isStreaming ? 'text-primary-900 font-medium' : 'text-neutral-700'}>
+        <span className={isStreaming ? 'text-primary-900 font-medium dark:text-primary-200' : 'text-neutral-700 dark:text-neutral-300'}>
           {isStreaming ? 'Thinking...' : 'Thought Process'}
         </span>
         <ChevronRight
           className={`ml-auto h-4 w-4 text-neutral-400 transition-transform group-open:rotate-90`}
         />
       </summary>
-      <div className="border-t border-neutral-200 px-3 py-2">
-        <p className="whitespace-pre-wrap text-sm text-neutral-700">{reasoning}</p>
+      <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
+        <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">{reasoning}</p>
       </div>
     </details>
   )

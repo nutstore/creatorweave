@@ -102,7 +102,7 @@ export function DeveloperLayout({
   return (
     <div className="flex h-full">
       {/* Left Sidebar */}
-      <div className="w-64 flex-shrink-0 border-r border-neutral-200">{sidebar}</div>
+      <div className="w-64 flex-shrink-0 border-r border-neutral-200 dark:border-neutral-700">{sidebar}</div>
 
       {/* Main Content Area - Split vertically */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -115,7 +115,7 @@ export function DeveloperLayout({
           className="flex-1"
         >
           {/* Code Preview */}
-          <div className="h-full bg-white">{filePreview}</div>
+          <div className="h-full bg-white dark:bg-neutral-950">{filePreview}</div>
 
           {/* Terminal (optional) */}
           {terminal ? (
@@ -128,7 +128,7 @@ export function DeveloperLayout({
         </ResizablePanels>
 
         {/* Bottom: Conversation */}
-        <div className="h-80 border-t border-neutral-200">{conversation}</div>
+        <div className="h-80 border-t border-neutral-200 dark:border-neutral-700">{conversation}</div>
       </div>
     </div>
   )
@@ -150,7 +150,7 @@ export function AnalystLayout({ sidebar, conversation, dataView, chartView }: An
   return (
     <div className="flex h-full">
       {/* Left Sidebar */}
-      <div className="w-64 flex-shrink-0 border-r border-neutral-200">{sidebar}</div>
+      <div className="w-64 flex-shrink-0 border-r border-neutral-200 dark:border-neutral-700">{sidebar}</div>
 
       {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -163,20 +163,20 @@ export function AnalystLayout({ sidebar, conversation, dataView, chartView }: An
           className="flex-1"
         >
           {/* Data Table */}
-          <div className="h-full overflow-auto bg-white">{dataView}</div>
+          <div className="h-full overflow-auto bg-white dark:bg-neutral-950">{dataView}</div>
 
           {/* Chart */}
           {chartView ? (
-            <div className="h-full bg-neutral-50 p-4">{chartView}</div>
+            <div className="h-full bg-neutral-50 p-4 dark:bg-neutral-900">{chartView}</div>
           ) : (
-            <div className="flex h-full items-center justify-center bg-neutral-50 text-neutral-400">
+            <div className="flex h-full items-center justify-center bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-500">
               <span>Chart (coming soon)</span>
             </div>
           )}
         </ResizablePanels>
 
         {/* Bottom: Conversation */}
-        <div className="h-64 border-t border-neutral-200">{conversation}</div>
+        <div className="h-64 border-t border-neutral-200 dark:border-neutral-700">{conversation}</div>
       </div>
     </div>
   )
@@ -198,7 +198,7 @@ export function ReaderLayout({ sidebar, conversation, document, notes }: ReaderL
   return (
     <div className="flex h-full">
       {/* Left Sidebar */}
-      <div className="w-64 flex-shrink-0 border-r border-neutral-200">{sidebar}</div>
+      <div className="w-64 flex-shrink-0 border-r border-neutral-200 dark:border-neutral-700">{sidebar}</div>
 
       {/* Main Content Area */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -216,20 +216,20 @@ export function ReaderLayout({ sidebar, conversation, document, notes }: ReaderL
           className="flex-1"
         >
           {/* Document */}
-          <div className="h-full overflow-auto bg-white">{document}</div>
+          <div className="h-full overflow-auto bg-white dark:bg-neutral-950">{document}</div>
 
           {/* Notes */}
           {notes ? (
-            <div className="h-full overflow-auto bg-yellow-50 p-4">{notes}</div>
+            <div className="h-full overflow-auto bg-yellow-50 p-4 dark:bg-amber-950/20">{notes}</div>
           ) : (
-            <div className="flex h-full items-center justify-center bg-yellow-50 text-neutral-400">
+            <div className="flex h-full items-center justify-center bg-yellow-50 text-neutral-400 dark:bg-amber-950/20 dark:text-neutral-500">
               <span>Notes (coming soon)</span>
             </div>
           )}
         </ResizablePanels>
 
         {/* Bottom: Conversation */}
-        <div className="h-48 border-t border-neutral-200">{conversation}</div>
+        <div className="h-48 border-t border-neutral-200 dark:border-neutral-700">{conversation}</div>
       </div>
     </div>
   )

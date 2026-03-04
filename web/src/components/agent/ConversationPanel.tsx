@@ -166,12 +166,12 @@ export function ConversationPanel({
   const turns = groupMessagesIntoTurns(conversation.messages)
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
       {/* Thread navigation bar */}
       {threadIds.length > 0 && (
-        <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2">
+        <div className="border-b border-neutral-200 bg-neutral-50 px-4 py-2 dark:border-neutral-700 dark:bg-neutral-900">
           <div className="mx-auto flex max-w-3xl items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-neutral-600">
+            <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
               <GitBranch className="h-4 w-4" />
               <span>
                 {threadIds.length} 个线程
@@ -182,7 +182,7 @@ export function ConversationPanel({
               <button
                 type="button"
                 onClick={handlePreviousThread}
-                className="rounded-lg px-3 py-1 text-sm text-neutral-600 hover:bg-neutral-200"
+                className="rounded-lg px-3 py-1 text-sm text-neutral-600 hover:bg-neutral-200 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 title="上一个线程"
               >
                 上一个
@@ -190,7 +190,7 @@ export function ConversationPanel({
               <button
                 type="button"
                 onClick={handleNextThread}
-                className="rounded-lg px-3 py-1 text-sm text-neutral-600 hover:bg-neutral-200"
+                className="rounded-lg px-3 py-1 text-sm text-neutral-600 hover:bg-neutral-200 dark:text-neutral-300 dark:hover:bg-neutral-800"
                 title="下一个线程"
               >
                 下一个
@@ -223,12 +223,12 @@ export function ConversationPanel({
                   {/* Thread header */}
                   {!isMain && (
                     <div
-                      className="mb-2 flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2"
+                      className="mb-2 flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 dark:bg-neutral-900"
                       onClick={() => toggleThread(threadId)}
                     >
                       <button
                         type="button"
-                        className="flex items-center gap-1 text-sm font-medium text-neutral-700 hover:text-neutral-900"
+                        className="flex items-center gap-1 text-sm font-medium text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100"
                       >
                         {collapsed ? (
                           <ChevronRight className="h-4 w-4" />
@@ -236,7 +236,7 @@ export function ConversationPanel({
                           <ChevronDown className="h-4 w-4" />
                         )}
                         <span>{rootMessage?.content?.slice(0, 30) || 'Thread'}</span>
-                        <span className="text-xs text-neutral-500">
+                          <span className="text-xs text-neutral-500 dark:text-neutral-400">
                           ({stats.totalMessages} 条消息)
                         </span>
                       </button>
@@ -249,7 +249,7 @@ export function ConversationPanel({
                             e.stopPropagation()
                             handleCreateThread(rootMessage!.id)
                           }}
-                          className="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
+                          className="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                           title="创建线程"
                         >
                           <MessageSquarePlus className="h-3 w-3" />
@@ -260,7 +260,7 @@ export function ConversationPanel({
                             e.stopPropagation()
                             handleForkThread(rootMessage!.id)
                           }}
-                          className="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
+                          className="rounded p-1 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
                           title="分支线程"
                         >
                           <GitBranch className="h-3 w-3" />
@@ -272,7 +272,7 @@ export function ConversationPanel({
                   {/* Thread messages */}
                   {!collapsed && (
                     <div
-                      className={`space-y-4 ${!isMain ? 'ml-4 border-l-2 border-neutral-200 pl-4' : ''}`}
+                      className={`space-y-4 ${!isMain ? 'ml-4 border-l-2 border-neutral-200 pl-4 dark:border-neutral-700' : ''}`}
                     >
                       {messages.map((message, idx) => {
                         const turnIdx = turns.findIndex(

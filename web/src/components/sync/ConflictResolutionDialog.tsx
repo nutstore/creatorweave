@@ -169,9 +169,9 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
@@ -190,15 +190,15 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">文件冲突</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-neutral-100">文件冲突</h2>
+                <p className="text-sm text-gray-500 dark:text-neutral-400 mt-0.5">
                   {conflict.path} 在同步时发生冲突
                 </p>
               </div>
             </div>
             <button
               onClick={onCancel}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -214,15 +214,15 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           {/* Conflict metadata */}
           <div className="mt-4 flex items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-gray-500">OPFS 版本时间:</span>
-              <span className="font-medium text-gray-900">
+              <span className="text-gray-500 dark:text-neutral-400">OPFS 版本时间:</span>
+              <span className="font-medium text-gray-900 dark:text-neutral-100">
                 {formatTimestamp(conflict.opfsVersion.mtime)}
               </span>
             </div>
             {conflict.nativeVersion.mtime && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-500">本机版本时间:</span>
-                <span className="font-medium text-gray-900">
+                <span className="text-gray-500 dark:text-neutral-400">本机版本时间:</span>
+                <span className="font-medium text-gray-900 dark:text-neutral-100">
                   {formatTimestamp(conflict.nativeVersion.mtime)}
                 </span>
               </div>
@@ -235,7 +235,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
             {/* Resolution Options */}
             <div className="lg:col-span-1 space-y-3">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">选择解决方案</h3>
+              <h3 className="text-sm font-medium text-gray-700 dark:text-neutral-300 mb-3">选择解决方案</h3>
               {options.map((option) => (
                 <button
                   key={option.value}
@@ -243,7 +243,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                   className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
                     selectedOption === option.value
                       ? `border-${option.color}-500 bg-${option.color}-50`
-                      : 'border-gray-200 hover:border-gray-300 bg-white'
+                      : 'border-gray-200 hover:border-gray-300 dark:border-neutral-700 dark:hover:border-neutral-600 bg-white dark:bg-neutral-900'
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -257,7 +257,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                         className={`text-sm font-medium ${
                           selectedOption === option.value
                             ? `text-${option.color}-900`
-                            : 'text-gray-900'
+                            : 'text-gray-900 dark:text-neutral-100'
                         }`}
                       >
                         {option.label}
@@ -266,7 +266,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                         className={`text-xs mt-1 ${
                           selectedOption === option.value
                             ? `text-${option.color}-700`
-                            : 'text-gray-500'
+                            : 'text-gray-500 dark:text-neutral-400'
                         }`}
                       >
                         {option.description}
@@ -280,23 +280,23 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
             {/* Preview Panels */}
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* OPFS Version Preview */}
-              <div className="flex flex-col bg-gray-50 rounded-lg overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-200 bg-blue-50">
+              <div className="flex flex-col bg-gray-50 dark:bg-neutral-800 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-700 bg-blue-50 dark:bg-blue-950/30">
                   <h4 className="text-sm font-medium text-blue-900">
                     OPFS 版本
                   </h4>
                 </div>
-                <div className="flex-1 overflow-auto p-4 bg-white">
+                <div className="flex-1 overflow-auto p-4 bg-white dark:bg-neutral-900">
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : previewContent.opfs ? (
-                    <pre className="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">
+                    <pre className="text-xs text-gray-700 dark:text-neutral-300 whitespace-pre-wrap break-all font-mono">
                       {previewContent.opfs}
                     </pre>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    <div className="flex items-center justify-center h-full text-gray-400 dark:text-neutral-500 text-sm">
                       无内容
                     </div>
                   )}
@@ -304,23 +304,23 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               </div>
 
               {/* Native Version Preview */}
-              <div className="flex flex-col bg-gray-50 rounded-lg overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-200 bg-green-50">
+              <div className="flex flex-col bg-gray-50 dark:bg-neutral-800 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 border-b border-gray-200 dark:border-neutral-700 bg-green-50 dark:bg-green-950/30">
                   <h4 className="text-sm font-medium text-green-900">
                     本机版本
                   </h4>
                 </div>
-                <div className="flex-1 overflow-auto p-4 bg-white">
+                <div className="flex-1 overflow-auto p-4 bg-white dark:bg-neutral-900">
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
                     </div>
                   ) : previewContent.native ? (
-                    <pre className="text-xs text-gray-700 whitespace-pre-wrap break-all font-mono">
+                    <pre className="text-xs text-gray-700 dark:text-neutral-300 whitespace-pre-wrap break-all font-mono">
                       {previewContent.native}
                     </pre>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    <div className="flex items-center justify-center h-full text-gray-400 dark:text-neutral-500 text-sm">
                       {conflict.nativeVersion.exists ? '无内容' : '文件不存在'}
                     </div>
                   )}
@@ -330,7 +330,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           </div>
 
           {/* Conflict explanation */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <svg
                 className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"
@@ -346,10 +346,10 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                 />
               </svg>
               <div className="flex-1">
-                <h4 className="text-sm font-medium text-amber-900 mb-1">
+                <h4 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-1">
                   为什么会发生冲突？
                 </h4>
-                <p className="text-xs text-amber-800 leading-relaxed">
+                <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                   OPFS 中的文件在本机文件系统中也被修改了。系统检测到两个版本的修改时间不同，
                   需要您决定保留哪个版本。
                   {conflict.nativeVersion.exists
@@ -362,18 +362,18 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
           <div className="flex items-center justify-between">
             <button
               onClick={handleSkipAll}
-              className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-sm text-gray-600 hover:text-gray-900 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors"
             >
               跳过此冲突
             </button>
             <div className="flex items-center gap-3">
               <button
                 onClick={onCancel}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-all"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 rounded-lg hover:bg-gray-50 transition-all"
               >
                 取消
               </button>

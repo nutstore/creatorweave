@@ -85,9 +85,9 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
         type="button"
         onClick={() => setOpen(!open)}
         disabled={isLoading || workspaces.length === 0}
-        className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800"
       >
-        <span className="max-w-[120px] truncate text-neutral-700">{displayName}</span>
+        <span className="max-w-[120px] truncate text-neutral-700 dark:text-neutral-300">{displayName}</span>
         {workspaces.length > 0 && (
           <span className="text-xs text-neutral-400">({workspaces.length})</span>
         )}
@@ -103,10 +103,10 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} aria-hidden="true" />
 
           {/* Menu */}
-          <div className="absolute right-0 top-full z-20 mt-1 w-72 rounded-md border bg-white shadow-lg">
+          <div className="absolute right-0 top-full z-20 mt-1 w-72 rounded-md border bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
             {/* Header */}
-            <div className="border-b border-neutral-100 px-3 py-2">
-              <span className="text-xs font-medium text-neutral-600">
+            <div className="border-b border-neutral-100 px-3 py-2 dark:border-neutral-700">
+              <span className="text-xs font-medium text-neutral-600 dark:text-neutral-300">
                 对话列表 ({workspaces.length})
               </span>
             </div>
@@ -114,7 +114,7 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
             {/* Workspace list */}
             <div className="custom-scrollbar max-h-80 overflow-y-auto">
               {sortedWorkspaces.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-neutral-400">暂无对话</div>
+                <div className="px-3 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">暂无对话</div>
               ) : (
                 <ul>
                   {sortedWorkspaces.map((workspace) => {
@@ -125,8 +125,8 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                     return (
                       <li
                         key={workspace.id}
-                        className={`flex items-center gap-2 px-3 py-2 hover:bg-neutral-50 ${
-                          isActive ? 'bg-primary-50' : ''
+                        className={`flex items-center gap-2 px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800 ${
+                          isActive ? 'bg-primary-50 dark:bg-primary-950/30' : ''
                         }`}
                       >
                         {/* Workspace selector */}
@@ -142,7 +142,7 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                           {/* Workspace info */}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="truncate text-xs font-medium text-neutral-700">
+                              <span className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200">
                                 {workspace.name || workspace.id.slice(0, 8)}
                               </span>
                             </div>

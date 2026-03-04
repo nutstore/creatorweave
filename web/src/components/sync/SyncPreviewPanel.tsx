@@ -23,9 +23,9 @@ import { ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react'
 function EmptyState(): React.ReactNode {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-16 px-6">
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center mb-6 shadow-sm">
+      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 flex items-center justify-center mb-6 shadow-sm">
         <svg
-          className="w-10 h-10 text-blue-500"
+          className="w-10 h-10 text-blue-500 dark:text-blue-400"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -38,47 +38,47 @@ function EmptyState(): React.ReactNode {
           />
         </svg>
       </div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-3">准备同步</h2>
-      <p className="text-sm text-gray-500 max-w-md leading-relaxed">
+      <h2 className="text-xl font-semibold text-gray-900 dark:text-neutral-100 mb-3">准备同步</h2>
+      <p className="text-sm text-gray-500 dark:text-neutral-400 max-w-md leading-relaxed">
         执行 Python 代码后，检测到的文件系统变更将在此处显示。
         您可以预览变更详情，然后选择是否同步到本机文件系统。
       </p>
       <div className="mt-8 grid grid-cols-1 gap-4 max-w-sm">
-        <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-blue-600 dark:text-blue-300 text-sm font-medium">
             1
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-gray-900 mb-1">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-100 mb-1">
               执行 Python 代码
             </h3>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 dark:text-neutral-400">
               在 Agent 对话中执行 Python 文件操作代码
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-4 bg-indigo-50 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-indigo-50 dark:bg-indigo-950/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-300 text-sm font-medium">
             2
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-gray-900 mb-1">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-100 mb-1">
               预览文件变更
             </h3>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 dark:text-neutral-400">
               查看所有修改、新增和删除的文件
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-4 bg-purple-50 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center text-purple-600 dark:text-purple-300 text-sm font-medium">
             3
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-gray-900 mb-1">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-neutral-100 mb-1">
               确认并同步
             </h3>
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-600 dark:text-neutral-400">
               检查差异后，将变更同步到本机文件系统
             </p>
           </div>

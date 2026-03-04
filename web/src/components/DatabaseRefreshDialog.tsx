@@ -32,7 +32,7 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        className="mx-4 w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="mx-4 w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Warning Icon */}
@@ -56,8 +56,8 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
 
         {/* Header */}
         <div className="px-6 py-4 text-center">
-          <h3 className="text-xl font-bold text-neutral-900">数据库连接已断开</h3>
-          <p className="mt-2 text-sm text-neutral-500">Database Connection Lost</p>
+          <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">数据库连接已断开</h3>
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Database Connection Lost</p>
         </div>
 
         {/* Content */}
@@ -69,17 +69,17 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
             </p>
           </div>
 
-          <p className="mb-4 text-sm text-neutral-700">
+          <p className="mb-4 text-sm text-neutral-700 dark:text-neutral-300">
             <strong>您的对话数据是安全的！</strong>
             <br />
             数据存储在浏览器的 OPFS 中，只是暂时无法访问。
           </p>
 
-          <p className="text-sm text-neutral-600">刷新页面后将自动恢复数据库连接。</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">刷新页面后将自动恢复数据库连接。</p>
         </div>
 
         {/* Footer - Only refresh button, no cancel */}
-        <div className="bg-neutral-50 px-6 py-4">
+        <div className="bg-neutral-50 px-6 py-4 dark:bg-neutral-800">
           <button
             ref={buttonRef}
             onClick={handleRefresh}
@@ -88,7 +88,7 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
             刷新页面
             <span className="ml-2 text-sm opacity-80">(Refresh Page)</span>
           </button>
-          <p className="mt-3 text-center text-xs text-neutral-500">
+          <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
             此对话框无法关闭 - 请点击上方按钮刷新页面
           </p>
         </div>

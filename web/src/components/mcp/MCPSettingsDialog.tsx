@@ -24,14 +24,19 @@ const MCPSettingsDialogContent = forwardRef<
   React.ComponentPropsWithoutRef<typeof BrandDialogContent>
 >(({ ...props }, ref) => {
   return (
-    <BrandDialogContent ref={ref} className="max-h-[85vh] w-[800px]" showOverlay={true} {...props}>
+    <BrandDialogContent
+      ref={ref}
+      className="max-h-[85vh] w-[min(92vw,980px)] max-w-5xl dark:border-neutral-700 dark:bg-neutral-900"
+      showOverlay={true}
+      {...props}
+    >
       <BrandDialogHeader>
         <div className="flex items-center gap-2.5">
           <Server className="h-[18px] w-[18px] text-primary-600" />
           <BrandDialogTitle>MCP 服务配置</BrandDialogTitle>
         </div>
         <BrandDialogClose asChild>
-          <button className="text-tertiary transition-colors hover:text-primary">
+          <button className="text-tertiary transition-colors hover:text-primary dark:hover:text-neutral-200">
             <X className="h-5 w-5" />
           </button>
         </BrandDialogClose>

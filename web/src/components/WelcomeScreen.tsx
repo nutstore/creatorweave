@@ -49,15 +49,15 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center bg-white px-4">
+    <div className="flex h-full flex-col items-center justify-center bg-white px-4 dark:bg-neutral-950">
       <div className="w-full max-w-xl">
         {/* Logo & Tagline */}
         <div className="mb-10 text-center">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50">
             <Sparkles className="h-6 w-6 text-primary-600" />
           </div>
-          <h1 className="mb-2 text-2xl font-semibold text-neutral-900">{t('welcome.title')}</h1>
-          <p className="text-sm text-neutral-500">{t('welcome.tagline')}</p>
+          <h1 className="mb-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{t('welcome.title')}</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
         </div>
 
         {/* Input area */}
@@ -68,7 +68,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
             onKeyDown={handleKeyDown}
             placeholder={hasApiKey ? t('welcome.placeholder') : t('welcome.placeholderNoKey')}
             rows={3}
-            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 pr-12 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-1"
+            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 pr-12 text-sm text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:outline-none focus:ring-1 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-800"
             disabled={!hasApiKey}
           />
           <button
@@ -88,7 +88,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
             <button
               type="button"
               onClick={handleSelectFolder}
-              className="flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-normal text-secondary transition-colors hover:bg-primary-50 focus:outline-none"
+              className="flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1 text-xs font-normal text-secondary transition-colors hover:bg-primary-50 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               <FolderOpen className="h-[14px] w-[14px]" />
               {t('folderSelector.openFolder')}
@@ -98,7 +98,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
 
         {/* Recent conversations hint */}
         {conversations.length > 0 && (
-          <p className="mt-8 text-center text-xs text-neutral-400">{t('welcome.recentHint')}</p>
+          <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('welcome.recentHint')}</p>
         )}
       </div>
     </div>

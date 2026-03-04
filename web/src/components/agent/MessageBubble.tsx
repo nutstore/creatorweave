@@ -58,7 +58,7 @@ export function MessageBubble({
     return (
       <div className="flex flex-row-reverse gap-3">
         {/* Avatar */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
           <User className="h-4 w-4" />
         </div>
 
@@ -107,7 +107,7 @@ export function MessageBubble({
 
         {/* Content */}
         {hasContent && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
             <div className="prose-sm max-w-none break-words">
               <MarkdownContent content={message.content!} />
             </div>

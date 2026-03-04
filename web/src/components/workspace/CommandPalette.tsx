@@ -132,8 +132,8 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
 
   return (
     <BrandDialog open={open} onOpenChange={onOpenChange}>
-      <BrandDialogContent className="max-w-2xl">
-        <BrandDialogHeader>
+      <BrandDialogContent className="max-w-2xl dark:border-neutral-700 dark:bg-neutral-900">
+        <BrandDialogHeader className="dark:border-neutral-700">
           <BrandDialogTitle>
             <div className="flex items-center gap-2">
               <Terminal className="h-5 w-5 text-primary-600" />
@@ -142,10 +142,10 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
           </BrandDialogTitle>
         </BrandDialogHeader>
 
-        <BrandDialogBody className="space-y-4">
+        <BrandDialogBody className="space-y-4 text-neutral-900 dark:text-neutral-100">
           {/* Search input */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" />
             <input
               ref={inputRef}
               type="text"
@@ -153,7 +153,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="border-subtle w-full rounded-lg border bg-white px-4 py-2 pl-10 text-sm outline-none placeholder:text-neutral-400 focus:border-primary-500 dark:bg-neutral-900"
+              className="border-subtle w-full rounded-lg border bg-white px-4 py-2 pl-10 text-sm outline-none placeholder:text-neutral-400 focus:border-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
             />
           </div>
 
@@ -161,7 +161,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
           <div className="max-h-[60vh] overflow-y-auto">
             {Array.from(groupedCommands.entries()).map(([category, cmds], groupIndex) => (
               <div key={category} className={groupIndex > 0 ? 'mt-4' : ''}>
-                <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                <h3 className="mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                   {category}
                 </h3>
                 <div className="space-y-1">
@@ -179,7 +179,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
                             ? 'dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700'
                             : command.disabled
                               ? 'cursor-not-allowed opacity-50'
-                              : 'hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                              : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800'
                         }`}
                       >
                         {command.icon && <span className="flex-shrink-0">{command.icon}</span>}
@@ -188,7 +188,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
                             {command.label}
                           </div>
                           {command.description && (
-                            <div className="truncate text-xs text-neutral-500">
+                            <div className="truncate text-xs text-neutral-500 dark:text-neutral-400">
                               {command.description}
                             </div>
                           )}
@@ -201,29 +201,29 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
             ))}
 
             {filteredCommands.length === 0 && (
-              <div className="py-12 text-center text-sm text-neutral-400">
+              <div className="py-12 text-center text-sm text-neutral-400 dark:text-neutral-500">
                 No commands found for "{query}"
               </div>
             )}
           </div>
 
           {/* Footer hints */}
-          <div className="border-subtle flex items-center justify-between border-t pt-3 text-xs text-neutral-400">
+          <div className="border-subtle flex items-center justify-between border-t pt-3 text-xs text-neutral-400 dark:border-neutral-700 dark:text-neutral-500">
             <div className="flex gap-4">
               <span>
-                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:bg-neutral-900">
+                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   ↑↓
                 </kbd>{' '}
                 Navigate
               </span>
               <span>
-                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:bg-neutral-900">
+                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   Enter
                 </kbd>{' '}
                 Select
               </span>
               <span>
-                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:bg-neutral-900">
+                <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   Esc
                 </kbd>{' '}
                 Close

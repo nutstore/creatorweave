@@ -82,7 +82,7 @@ export function AssistantTurnBubble({
 
         {/* Waiting indicator - three bouncing dots */}
         {isWaiting && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
             <span className="flex items-center gap-1">
               <span
                 className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-400"
@@ -162,14 +162,14 @@ function StreamingContentSection({
   return (
     <>
       {/* Show divider if there's content above */}
-      <div className="border-t border-neutral-100" />
+      <div className="border-t border-neutral-100 dark:border-neutral-700" />
 
       {/* Reasoning */}
       {reasoning && <ReasoningSection reasoning={reasoning} streaming={isStreamingReasoning} />}
 
       {/* Content */}
       {content && (
-        <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+        <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
           <div className="prose-sm max-w-prose overflow-x-auto break-words">
             <MarkdownContent content={content} />
           </div>
@@ -199,7 +199,7 @@ function AssistantStep({
 
   return (
     <>
-      {showDivider && <div className="border-t border-neutral-100" />}
+      {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
       {/* Unified container for reasoning, content, and tool calls */}
       {(hasReasoning || hasContent || hasToolCalls) && (
@@ -209,7 +209,7 @@ function AssistantStep({
 
           {/* Content section */}
           {hasContent && (
-            <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200">
+            <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
               <div className="prose-sm max-w-prose overflow-x-auto break-words">
                 <MarkdownContent content={message.content!} />
               </div>

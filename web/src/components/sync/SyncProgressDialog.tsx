@@ -164,9 +164,9 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full mx-4">
+      <div className="bg-white dark:bg-neutral-900 rounded-xl shadow-2xl max-w-lg w-full mx-4">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-neutral-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {status === 'syncing' ? (
@@ -197,8 +197,8 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                 </div>
               )}
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">同步文件</h2>
-                <p className="text-sm text-gray-500 mt-0.5">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-neutral-100">同步文件</h2>
+                <p className="text-sm text-gray-500 dark:text-neutral-400 mt-0.5">
                   {getOverallStatus()}
                 </p>
               </div>
@@ -206,7 +206,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
             {status === 'syncing' && onCancel && (
               <button
                 onClick={onCancel}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -226,23 +226,23 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
           {/* Overall Progress */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-700 dark:text-neutral-200">
                 总体进度
               </span>
-              <span className="text-sm text-gray-500">
+              <span className="text-sm text-gray-500 dark:text-neutral-400">
                 {completed} / {total} 文件
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2 overflow-hidden">
               <div
                 className="bg-blue-600 h-full transition-all duration-300 ease-out"
                 style={{ width: `${overallProgress}%` }}
               />
             </div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-xs text-gray-500">{overallProgress.toFixed(0)}%</span>
+              <span className="text-xs text-gray-500 dark:text-neutral-400">{overallProgress.toFixed(0)}%</span>
               {estimatedTime && status === 'syncing' && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-neutral-400">
                   预计剩余: {formatTime(estimatedTime)}
                 </span>
               )}
@@ -251,7 +251,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
 
           {/* Current File Progress */}
           {currentFile && (
-            <div className="border border-gray-200 rounded-lg p-4">
+            <div className="border border-gray-200 dark:border-neutral-700 rounded-lg p-4">
               <div className="flex items-start gap-3">
                 <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-${getStatusInfo(currentFile.status).color}-100 flex items-center justify-center text-${getStatusInfo(currentFile.status).color}-600`}>
                   {getStatusInfo(currentFile.status).icon}
@@ -259,31 +259,31 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-2">
                     <h4
-                      className="text-sm font-medium text-gray-900 truncate"
+                      className="text-sm font-medium text-gray-900 dark:text-neutral-100 truncate"
                       title={currentFile.path}
                     >
                       {currentFile.path.length > 50
                         ? `...${currentFile.path.slice(-47)}`
                         : currentFile.path}
                     </h4>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-neutral-400">
                       {formatBytes(currentFile.transferred)} / {formatBytes(currentFile.total)}
                     </span>
                   </div>
                   {currentFile.status === 'syncing' && (
                     <div className="space-y-2">
-                      <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-1.5 overflow-hidden">
                         <div
                           className="bg-blue-600 h-full transition-all duration-100 ease-out"
                           style={{ width: `${currentFile.progress}%` }}
                         />
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-neutral-400">
                           {currentFile.progress.toFixed(0)}%
                         </span>
                         {estimatedTime && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-gray-500 dark:text-neutral-400">
                             剩余 {formatTime(estimatedTime)}
                           </span>
                         )}
@@ -291,8 +291,8 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                     </div>
                   )}
                   {currentFile.status === 'failed' && currentFile.error && (
-                    <div className="bg-red-50 border border-red-200 rounded p-2">
-                      <p className="text-xs text-red-700">{currentFile.error}</p>
+                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded p-2">
+                      <p className="text-xs text-red-700 dark:text-red-300">{currentFile.error}</p>
                     </div>
                   )}
                   {currentFile.status === 'completed' && (
@@ -317,14 +317,14 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
           {!currentFile && status === 'syncing' && (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-gray-500">准备同步...</p>
+              <p className="text-sm text-gray-500 dark:text-neutral-400">准备同步...</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
         {status !== 'syncing' && (
-          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="px-6 py-4 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800">
             <div className="flex justify-end">
               <button
                 onClick={onClose}

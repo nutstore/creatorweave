@@ -392,7 +392,7 @@ export function PendingSyncPanel() {
       {/* Clear Confirmation Dialog */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowClearConfirm(false)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-sm mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl max-w-sm mx-4 p-6 dark:bg-neutral-900" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-primary mb-2">确认清空</h3>
             <p className="text-sm text-secondary mb-4">
               确定要清空所有待同步文件吗？此操作无法撤销。

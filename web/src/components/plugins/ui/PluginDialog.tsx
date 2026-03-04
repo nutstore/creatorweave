@@ -70,21 +70,21 @@ export function PluginDialog({
     >
       <div
         ref={dialogRef}
-        className="mx-4 w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl"
+        className="mx-4 w-full max-w-md overflow-hidden rounded-lg bg-white shadow-xl dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-b border-neutral-200 px-6 py-4">
-          <h3 className="text-lg font-semibold text-neutral-900">{getTitle()}</h3>
+        <div className="border-b border-neutral-200 px-6 py-4 dark:border-neutral-700">
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{getTitle()}</h3>
         </div>
 
         {/* Content */}
         <div className="px-6 py-4">
-          <p className="whitespace-pre-wrap text-neutral-700">{message}</p>
+          <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{message}</p>
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 bg-neutral-50 px-6 py-4">
+        <div className="flex justify-end gap-3 bg-neutral-50 px-6 py-4 dark:bg-neutral-800">
           {type === 'confirm' && (
             <button onClick={() => onClose(false)} className="btn-secondary">
               {cancelText}

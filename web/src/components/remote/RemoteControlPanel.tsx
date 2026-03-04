@@ -121,7 +121,7 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
           <BrandDialogTitle className="text-base font-semibold">
             {t('remote.title')}
           </BrandDialogTitle>
-          <BrandDialogClose className="text-gray-400 hover:text-gray-600">
+          <BrandDialogClose className="text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300">
             <X className="h-5 w-5" />
           </BrandDialogClose>
         </BrandDialogHeader>
@@ -129,7 +129,7 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
         <BrandDialogBody className="gap-4">
           {/* Relay URL */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-600">
+            <label className="mb-1 block text-sm font-medium text-gray-600 dark:text-neutral-300">
               {t('remote.relayServer')}
             </label>
             <BrandInput
@@ -143,19 +143,19 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
           {/* QR Code display */}
           {hasSession ? (
             <div>
-              <label className="mb-2 block text-sm font-medium text-gray-600">
+              <label className="mb-2 block text-sm font-medium text-gray-600 dark:text-neutral-300">
                 {t('remote.scanToConnect')}
               </label>
-              <p className="mb-2 text-xs text-gray-500">{t('remote.scanHint')}</p>
+              <p className="mb-2 text-xs text-gray-500 dark:text-neutral-400">{t('remote.scanHint')}</p>
 
               {/* QR Code */}
-              <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-4">
+              <div className="flex justify-center rounded-lg border border-gray-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
                 <QRCodeCanvas value={joinUrl!} size={200} level="M" includeMargin={false} />
               </div>
 
               {/* Session ID with copy button */}
               <div className="mt-3 flex items-center justify-center gap-2">
-                <code className="font-mono text-sm text-gray-600">{sessionId}</code>
+                <code className="font-mono text-sm text-gray-600 dark:text-neutral-300">{sessionId}</code>
                 <BrandButton
                   iconButton
                   variant="default"
@@ -181,14 +181,14 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
                   href={mobileUrl!}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block break-all text-center text-xs text-gray-400 hover:text-gray-600"
+                  className="block break-all text-center text-xs text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300"
                 >
                   {t('remote.direct')}: {mobileUrl}
                 </a>
               </div>
             </div>
           ) : (
-            <div className="py-8 text-center text-sm text-gray-500">
+            <div className="py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
               {t('remote.clickToCreate')}
             </div>
           )}
@@ -198,17 +198,17 @@ export const RemoteControlPanel: React.FC<RemoteControlPanelProps> = ({ open, on
 
           {/* Connection status (when active) */}
           {isActive && (
-            <div className="flex items-center justify-center gap-2 rounded-md bg-gray-50 px-3 py-2">
+            <div className="flex items-center justify-center gap-2 rounded-md bg-gray-50 px-3 py-2 dark:bg-neutral-800">
               <span
                 className={`h-2 w-2 rounded-full ${
                   connectionState === 'connected' ? 'bg-green-500' : 'bg-yellow-500'
                 }`}
               />
-              <span className="text-sm text-gray-700">
+              <span className="text-sm text-gray-700 dark:text-neutral-200">
                 {connectionState === 'connected' ? t('remote.connected') : t('remote.connecting')}
               </span>
               {peerCount > 1 && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-neutral-400">
                   ({t('remote.peers', { count: peerCount - 1 })})
                 </span>
               )}

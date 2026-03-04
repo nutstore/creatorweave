@@ -72,14 +72,14 @@ function ImageViewer({
 }) {
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="max-w-full overflow-auto rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="max-w-full overflow-auto rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
         <img src={src} alt={filename || 'Chart'} className="h-auto max-w-full" />
       </div>
-      {filename && <p className="text-sm text-neutral-500">{filename}</p>}
+      {filename && <p className="text-sm text-neutral-500 dark:text-neutral-400">{filename}</p>}
       {onExport && (
         <button
           onClick={onExport}
-          className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+          className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
           <Download className="h-4 w-4" />
           Export Image
@@ -184,25 +184,25 @@ function TableViewer({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search table..."
-            className="focus:border-primary-300 w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
+            className="focus:border-primary-300 w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
           />
         </div>
-        <span className="text-sm text-neutral-500">
+        <span className="text-sm text-neutral-500 dark:text-neutral-400">
           {filteredSortedData.length} row{filteredSortedData.length !== 1 ? 's' : ''}
           {hasMore && ` (showing first 100)`}
         </span>
       </div>
 
       {/* Table */}
-      <div className="max-h-[400px] overflow-auto rounded-lg border border-neutral-200">
+      <div className="max-h-[400px] overflow-auto rounded-lg border border-neutral-200 dark:border-neutral-700">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-neutral-50">
+          <thead className="sticky top-0 bg-neutral-50 dark:bg-neutral-800">
             <tr>
               {tableColumns.map((column) => (
                 <th
                   key={column}
                   onClick={() => handleSort(column)}
-                  className="cursor-pointer select-none px-4 py-3 text-left font-medium text-neutral-700 transition-colors hover:bg-neutral-100"
+                  className="cursor-pointer select-none px-4 py-3 text-left font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
                 >
                   <div className="flex items-center gap-2">
                     <span>{column}</span>
@@ -220,11 +220,11 @@ function TableViewer({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-200">
+          <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
             {displayData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-neutral-50">
+              <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800">
                 {tableColumns.map((column) => (
-                  <td key={column} className="whitespace-nowrap px-4 py-3 text-neutral-700">
+                  <td key={column} className="whitespace-nowrap px-4 py-3 text-neutral-700 dark:text-neutral-300">
                     {String(row[column] ?? '')}
                   </td>
                 ))}
@@ -233,7 +233,7 @@ function TableViewer({
           </tbody>
         </table>
         {displayData.length === 0 && (
-          <div className="py-8 text-center text-neutral-500">No data found</div>
+          <div className="py-8 text-center text-neutral-500 dark:text-neutral-400">No data found</div>
         )}
       </div>
     </div>
@@ -295,7 +295,7 @@ function ChartBarChart({ data }: { data: ChartDataPoint[] }) {
       </div>
       <button
         onClick={handleExport}
-        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
         <Download className="h-4 w-4" />
         Export Chart
@@ -356,7 +356,7 @@ function ChartLineChart({ data }: { data: ChartDataPoint[] }) {
       </div>
       <button
         onClick={handleExport}
-        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
         <Download className="h-4 w-4" />
         Export Chart
@@ -422,7 +422,7 @@ function ChartPieChart({ data }: { data: ChartDataPoint[] }) {
       </div>
       <button
         onClick={handleExport}
-        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
         <Download className="h-4 w-4" />
         Export Chart
@@ -485,7 +485,7 @@ function ChartScatterChart({ data }: { data: ChartDataPoint[] }) {
       </div>
       <button
         onClick={handleExport}
-        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        className="flex items-center justify-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
       >
         <Download className="h-4 w-4" />
         Export Chart
@@ -501,9 +501,9 @@ function StatsViewer({ stats }: { stats: Record<string, number> }) {
       {Object.entries(stats).map(([key, value]) => (
         <div
           key={key}
-          className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-center"
+          className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-center dark:border-neutral-700 dark:bg-neutral-800"
         >
-          <p className="text-sm font-medium capitalize text-neutral-600">{key}</p>
+          <p className="text-sm font-medium capitalize text-neutral-600 dark:text-neutral-300">{key}</p>
           <p className="mt-1 text-2xl font-semibold text-primary-600">
             {typeof value === 'number' ? value.toLocaleString() : value}
           </p>
@@ -554,7 +554,7 @@ export function DataVisualization({ data, onClose, onExport }: DataVisualization
 
       default:
         return (
-          <div className="py-8 text-center text-neutral-500">
+          <div className="py-8 text-center text-neutral-500 dark:text-neutral-400">
             <BarChart3 className="mx-auto mb-4 h-12 w-12 text-neutral-300" />
             <p>Unsupported visualization type</p>
           </div>
@@ -564,22 +564,22 @@ export function DataVisualization({ data, onClose, onExport }: DataVisualization
 
   return (
     <div
-      className={`rounded-2xl bg-white shadow-xl ${
+      className={`rounded-2xl bg-white shadow-xl dark:bg-neutral-900 ${
         viewMode === 'fullscreen' ? 'fixed inset-4 z-50 flex flex-col' : ''
       }`}
     >
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+      <div className="flex items-center justify-between border-b border-neutral-200 px-6 py-4 dark:border-neutral-700">
         <div>
-          <h3 className="font-semibold text-neutral-900">{data.title || 'Data Visualization'}</h3>
-          <p className="mt-0.5 text-sm capitalize text-neutral-500">
+          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{data.title || 'Data Visualization'}</h3>
+          <p className="mt-0.5 text-sm capitalize text-neutral-500 dark:text-neutral-400">
             {data.type} {data.type === 'image' && data.imageFilename && `• ${data.imageFilename}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setViewMode(viewMode === 'embedded' ? 'fullscreen' : 'embedded')}
-            className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+            className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             title={viewMode === 'embedded' ? 'Fullscreen' : 'Exit fullscreen'}
           >
             <Maximize2 className="h-5 w-5" />
@@ -587,7 +587,7 @@ export function DataVisualization({ data, onClose, onExport }: DataVisualization
           {onClose && (
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+              className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             >
               <X className="h-5 w-5" />
             </button>

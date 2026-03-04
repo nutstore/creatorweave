@@ -312,7 +312,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
                 className={`h-6 w-6 ${isDragOver ? 'text-primary-600' : 'text-neutral-500'}`}
               />
             </div>
-            <p className="text-sm font-medium text-neutral-900">
+            <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
               {isDragOver ? 'Drop files here' : 'Drag files or click to upload'}
             </p>
             <p className="mt-1 text-xs text-neutral-500">Supports code, data, and document files</p>
@@ -327,7 +327,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
               <button
                 type="button"
                 onClick={handleSelectFolder}
-                className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
                 <Folder className="h-4 w-4" />
                 Select Folder
@@ -338,7 +338,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
           // Has items
           <div>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium text-neutral-900">
+              <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
                 {droppedItems.length} file{droppedItems.length > 1 ? 's' : ''} selected
               </p>
               <button
@@ -354,13 +354,13 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-3 rounded-lg bg-white p-3 shadow-sm"
+                    className="flex items-center gap-3 rounded-lg bg-white p-3 shadow-sm dark:bg-neutral-900"
                   >
                     <div className="rounded-lg bg-neutral-100 p-2">
                       <Icon className="h-4 w-4 text-neutral-600" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-neutral-900">{item.name}</p>
+                      <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{item.name}</p>
                       <p className="text-xs text-neutral-500">{formatFileSize(item.size)}</p>
                     </div>
                     <button
