@@ -418,6 +418,87 @@ describe('AgentLoop', () => {
       expect(callbacks.onToolCallComplete).toHaveBeenCalled()
     })
 
+    it('should emit tool result update before complete and before next tool execution starts', async () => {
+      const provider = createMockProvider()
+      let callCount = 0
+      // @ts-expect-error - Mock type compatibility
+      provider.chatStream = vi.fn(async function* () {
+        callCount++
+        if (callCount === 1) {
+          yield {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: 'call_1',
+                      function: { name: 'tool_a', arguments: '{}' },
+                    },
+                    {
+                      index: 1,
+                      id: 'call_2',
+                      function: { name: 'tool_b', arguments: '{}' },
+                    },
+                  ],
+                },
+                finish_reason: 'tool_calls',
+              },
+            ],
+          }
+        } else {
+          yield {
+            choices: [
+              {
+                delta: { content: 'Done!', role: 'assistant' },
+                finish_reason: 'stop',
+              },
+            ],
+          }
+        }
+      })
+
+      const events: string[] = []
+      const callbacks = {
+        onToolCallStart: (tc: any) => {
+          const phase = tc.function.arguments ? 'exec' : 'preview'
+          events.push(`start:${tc.id}:${phase}`)
+        },
+        onMessagesUpdated: (msgs: Message[]) => {
+          const last = msgs[msgs.length - 1]
+          if (last?.role === 'tool' && last.toolCallId) {
+            events.push(`msg:tool:${last.toolCallId}`)
+          }
+        },
+        onToolCallComplete: (tc: any) => {
+          events.push(`complete:${tc.id}`)
+        },
+      }
+
+      const loop = new AgentLoop({
+        provider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([createUserMessage('run tools')], callbacks)
+
+      const start1Exec = events.indexOf('start:call_1:exec')
+      const msg1 = events.indexOf('msg:tool:call_1')
+      const complete1 = events.indexOf('complete:call_1')
+      const start2Exec = events.indexOf('start:call_2:exec')
+      const msg2 = events.indexOf('msg:tool:call_2')
+      const complete2 = events.indexOf('complete:call_2')
+
+      expect(start1Exec).toBeGreaterThanOrEqual(0)
+      expect(msg1).toBeGreaterThan(start1Exec)
+      expect(complete1).toBeGreaterThan(msg1)
+      expect(start2Exec).toBeGreaterThan(complete1)
+      expect(msg2).toBeGreaterThan(start2Exec)
+      expect(complete2).toBeGreaterThan(msg2)
+    })
+
     it('should handle tool execution errors gracefully', async () => {
       const provider = createMockProvider()
       let callCount = 0
@@ -480,6 +561,77 @@ describe('AgentLoop', () => {
       // Find tool result message
       const toolResult = result.find((m) => m.role === 'tool')
       expect(toolResult?.content).toContain('Error')
+    })
+
+    it('should emit complete callback after tool error result is appended', async () => {
+      const provider = createMockProvider()
+      let callCount = 0
+      // @ts-expect-error - Mock type compatibility
+      provider.chatStream = vi.fn(async function* () {
+        callCount++
+        if (callCount === 1) {
+          yield {
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: 'call_err',
+                      function: { name: 'list_files', arguments: '{}' },
+                    },
+                  ],
+                },
+                finish_reason: 'tool_calls',
+              },
+            ],
+          }
+        } else {
+          yield {
+            choices: [
+              {
+                delta: { content: 'Done!', role: 'assistant' },
+                finish_reason: 'stop',
+              },
+            ],
+          }
+        }
+      })
+
+      const errorRegistry = {
+        getToolDefinitions: vi.fn(() => []),
+        hasTool: vi.fn(() => true),
+        execute: vi.fn(async () => {
+          throw new Error('Tool failed')
+        }),
+      } as any
+
+      const events: string[] = []
+      const callbacks = {
+        onMessagesUpdated: (msgs: Message[]) => {
+          const last = msgs[msgs.length - 1]
+          if (last?.role === 'tool' && last.toolCallId === 'call_err') {
+            events.push('msg:tool:error')
+          }
+        },
+        onToolCallComplete: (tc: any, result: string) => {
+          events.push(`complete:${tc.id}:${result.startsWith('Error:') ? 'error' : 'ok'}`)
+        },
+      }
+
+      const loop = new AgentLoop({
+        provider,
+        toolRegistry: errorRegistry,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([createUserMessage('list files')], callbacks)
+
+      const msgIdx = events.indexOf('msg:tool:error')
+      const completeIdx = events.indexOf('complete:call_err:error')
+      expect(msgIdx).toBeGreaterThanOrEqual(0)
+      expect(completeIdx).toBeGreaterThan(msgIdx)
     })
 
     it('should parse invalid tool arguments gracefully', async () => {

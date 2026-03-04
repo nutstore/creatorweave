@@ -690,8 +690,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c) {
                 c.status = 'tool_calling'
+                const isSameTool = c.currentToolCall?.id === tc.id
                 c.currentToolCall = tc
-                c.streamingToolArgs = ''
+                // Keep already streamed args when the same tool transitions
+                // from "stream preview" to actual execution.
+                if (!isSameTool) {
+                  c.streamingToolArgs = ''
+                }
               }
             })
             emitToolStart({
@@ -707,11 +712,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               if (c) c.streamingToolArgs += argsDelta
             })
           },
-          onToolCallComplete: (_tc: ToolCall, _result: string) => {
+          onToolCallComplete: (tc: ToolCall, _result: string) => {
             if (!isMounted()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) c.currentToolCall = null
+              if (c && c.currentToolCall?.id === tc.id) {
+                c.currentToolCall = null
+                c.streamingToolArgs = ''
+              }
             })
           },
           // SEP-1306: Handle binary elicitation for file uploads

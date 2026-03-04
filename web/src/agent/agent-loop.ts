@@ -488,8 +488,6 @@ export class AgentLoop {
               return allMessages
             }
 
-            callbacks?.onToolCallComplete?.(tc, result)
-
             // Phase 2: Extract file changes from Python tool result
             if (tc.function.name === 'run_python_code' && result) {
               try {
@@ -515,6 +513,7 @@ export class AgentLoop {
               draft.push(createToolMessage(toolResult))
             })
             callbacks?.onMessagesUpdated?.(allMessages)
+            callbacks?.onToolCallComplete?.(tc, result)
           } catch (toolError) {
             console.error(`[AgentLoop] Tool ${tc.function.name} failed:`, toolError)
             const errorMsg = toolError instanceof Error ? toolError.message : String(toolError)
@@ -527,6 +526,7 @@ export class AgentLoop {
               draft.push(createToolMessage(toolResult))
             })
             callbacks?.onMessagesUpdated?.(allMessages)
+            callbacks?.onToolCallComplete?.(tc, toolResult.content)
           }
         }
       }
