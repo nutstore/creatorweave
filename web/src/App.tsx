@@ -10,12 +10,80 @@ import { DatabaseRefreshDialog } from '@/components/DatabaseRefreshDialog'
 import { attemptReconnect } from '@/store/remote.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
+import { useConversationStore } from '@/store/conversation.store'
 import { initStorage, setupAutoSave } from '@/storage'
 import { requestPersistentStorage } from '@/opfs'
 import { useT } from '@/i18n'
 import { PWAUpdateBanner } from '@/pwa/PWAUpdateBanner'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { ProjectHome } from '@/components/project/ProjectHome'
+
+type AppRoute =
+  | { kind: 'projectsHome' }
+  | { kind: 'projectWorkspace'; projectId: string; workspaceId?: string }
+  | { kind: 'legacyWorkspace' }
+  | { kind: 'unknown' }
+
+function resolveRoute(pathname: string): AppRoute {
+  const normalized = pathname.replace(/\/+$/, '') || '/'
+
+  if (normalized === '/' || normalized === '/projects') {
+    return { kind: 'projectsHome' }
+  }
+
+  if (normalized === '/workspace') {
+    return { kind: 'legacyWorkspace' }
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments[0] !== 'projects' || !segments[1]) {
+    return { kind: 'unknown' }
+  }
+
+  const projectId = decodeURIComponent(segments[1])
+
+  if (segments.length === 2) {
+    return { kind: 'projectWorkspace', projectId }
+  }
+
+  if (segments.length === 3 && segments[2] === 'workspace') {
+    return { kind: 'projectWorkspace', projectId }
+  }
+
+  if (segments.length === 4 && segments[2] === 'workspaces' && segments[3]) {
+    return {
+      kind: 'projectWorkspace',
+      projectId,
+      workspaceId: decodeURIComponent(segments[3]),
+    }
+  }
+
+  if (segments.length === 4 && segments[2] === 'workspace' && segments[3]) {
+    return {
+      kind: 'projectWorkspace',
+      projectId,
+      workspaceId: decodeURIComponent(segments[3]),
+    }
+  }
+
+  return { kind: 'unknown' }
+}
+
+function toPath(route: AppRoute): string {
+  if (route.kind === 'projectsHome' || route.kind === 'unknown') {
+    return '/projects'
+  }
+
+  if (route.kind === 'legacyWorkspace') {
+    return '/workspace'
+  }
+
+  const encodedProjectId = encodeURIComponent(route.projectId)
+  if (route.workspaceId) {
+    return `/projects/${encodedProjectId}/workspaces/${encodeURIComponent(route.workspaceId)}`
+  }
+  return `/projects/${encodedProjectId}/workspace`
+}
 
 function App() {
   const [isSupportedBrowser, setIsSupportedBrowser] = useState(true)
@@ -24,7 +92,7 @@ function App() {
   const [storageError, setStorageError] = useState<string | null>(null)
   const [canResetDatabase, setCanResetDatabase] = useState(false)
   const [isDatabaseInaccessible, setIsDatabaseInaccessible] = useState(false)
-  const [showProjectHome, setShowProjectHome] = useState(true)
+  const [currentRoute, setCurrentRoute] = useState<AppRoute>(() => resolveRoute(window.location.pathname))
   const setActiveProject = useProjectStore((s) => s.setActiveProject)
   const createProject = useProjectStore((s) => s.createProject)
   const renameProject = useProjectStore((s) => s.renameProject)
@@ -34,6 +102,9 @@ function App() {
   const projectStats = useProjectStore((s) => s.projectStats)
   const projectLoading = useProjectStore((s) => s.isLoading)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
+  const activeConversationId = useConversationStore((s) => s.activeConversationId)
+  const conversations = useConversationStore((s) => s.conversations)
   const t = useT() // i18n hook
   const tRef = useRef(t)
   tRef.current = t
@@ -352,24 +423,178 @@ function App() {
 
   // Force entry to project cards on each app mount (helps with dev Fast Refresh state retention).
   useEffect(() => {
-    setShowProjectHome(true)
+    setCurrentRoute(resolveRoute(window.location.pathname))
   }, [])
 
   // Ensure app entry always starts from project cards after bootstrap completes.
   useEffect(() => {
     if (isStorageReady) {
-      setShowProjectHome(true)
+      setCurrentRoute(resolveRoute(window.location.pathname))
     }
   }, [isStorageReady])
+
+  useEffect(() => {
+    const handlePopstate = () => {
+      setCurrentRoute(resolveRoute(window.location.pathname))
+    }
+
+    window.addEventListener('popstate', handlePopstate)
+    return () => {
+      window.removeEventListener('popstate', handlePopstate)
+    }
+  }, [])
 
   // Responsive layout detection - must be called before any conditional returns
   const isMobile = useMobile()
   const activeProject = projects.find((project) => project.id === activeProjectId)
 
+  const activeConversation = activeConversationId
+    ? conversations.find((conversation) => conversation.id === activeConversationId)
+    : undefined
+
+  const navigateToRoute = (route: AppRoute, replace = false) => {
+    const path = toPath(route)
+    if (replace) {
+      window.history.replaceState(null, '', path)
+    } else {
+      window.history.pushState(null, '', path)
+    }
+    setCurrentRoute(route)
+  }
+
+  useEffect(() => {
+    if (!isStorageReady || projectLoading) return
+
+    let cancelled = false
+
+    const syncFromRoute = async () => {
+      if (currentRoute.kind === 'projectsHome') {
+        return
+      }
+
+      if (currentRoute.kind === 'unknown') {
+        navigateToRoute({ kind: 'projectsHome' }, true)
+        return
+      }
+
+      if (currentRoute.kind === 'legacyWorkspace') {
+        if (activeProjectId && activeWorkspaceId) {
+          navigateToRoute(
+            {
+              kind: 'projectWorkspace',
+              projectId: activeProjectId,
+              workspaceId: activeWorkspaceId,
+            },
+            true
+          )
+        } else if (activeProjectId) {
+          navigateToRoute({ kind: 'projectWorkspace', projectId: activeProjectId }, true)
+        } else {
+          navigateToRoute({ kind: 'projectsHome' }, true)
+        }
+        return
+      }
+
+      const { projectId, workspaceId } = currentRoute
+
+      const projectExists = projects.some((project) => project.id === projectId)
+      if (!projectExists) {
+        toast.error('项目不存在或已删除')
+        navigateToRoute({ kind: 'projectsHome' }, true)
+        return
+      }
+
+      if (activeProjectId !== projectId) {
+        const switched = await setActiveProject(projectId)
+        if (!switched) {
+          if (!cancelled) {
+            toast.error('切换项目失败，请稍后重试')
+            navigateToRoute({ kind: 'projectsHome' }, true)
+          }
+          return
+        }
+      }
+
+      if (cancelled) return
+
+      const scopedWorkspaceIds = useWorkspaceStore.getState().workspaces.map((workspace) => workspace.id)
+
+      if (!workspaceId) {
+        if (scopedWorkspaceIds.length > 0) {
+          const fallbackWorkspaceId = scopedWorkspaceIds[0]
+          navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId }, true)
+          if (useConversationStore.getState().activeConversationId !== fallbackWorkspaceId) {
+            await useConversationStore.getState().setActive(fallbackWorkspaceId)
+          }
+        }
+        return
+      }
+
+      if (scopedWorkspaceIds.includes(workspaceId)) {
+        if (useConversationStore.getState().activeConversationId !== workspaceId) {
+          await useConversationStore.getState().setActive(workspaceId)
+        }
+        return
+      }
+
+      if (scopedWorkspaceIds.length > 0) {
+        const fallbackWorkspaceId = scopedWorkspaceIds[0]
+        toast.error('工作区不存在或不属于当前项目，已切换到最近会话')
+        navigateToRoute(
+          { kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId },
+          true
+        )
+        if (useConversationStore.getState().activeConversationId !== fallbackWorkspaceId) {
+          await useConversationStore.getState().setActive(fallbackWorkspaceId)
+        }
+        return
+      }
+
+      toast.error('当前项目还没有工作区')
+      navigateToRoute({ kind: 'projectWorkspace', projectId }, true)
+    }
+
+    void syncFromRoute()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isStorageReady, projectLoading, currentRoute, projects, activeProjectId, activeWorkspaceId, setActiveProject])
+
+  useEffect(() => {
+    if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
+    if (!activeProjectId || !activeConversationId) return
+
+    const scopedWorkspaceIds = new Set(useWorkspaceStore.getState().workspaces.map((workspace) => workspace.id))
+    if (!scopedWorkspaceIds.has(activeConversationId)) return
+
+    const routePath = toPath({
+      kind: 'projectWorkspace',
+      projectId: activeProjectId,
+      workspaceId: activeConversationId,
+    })
+    if (window.location.pathname === routePath) return
+
+    navigateToRoute(
+      {
+        kind: 'projectWorkspace',
+        projectId: activeProjectId,
+        workspaceId: activeConversationId,
+      },
+      false
+    )
+  }, [isStorageReady, currentRoute.kind, activeProjectId, activeConversationId])
+
   const handleOpenProject = async (projectId: string) => {
     const ok = await setActiveProject(projectId)
     if (ok) {
-      setShowProjectHome(false)
+      const targetWorkspaceId = useWorkspaceStore.getState().workspaces[0]?.id
+      if (targetWorkspaceId) {
+        await useConversationStore.getState().setActive(targetWorkspaceId)
+        navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: targetWorkspaceId })
+      } else {
+        navigateToRoute({ kind: 'projectWorkspace', projectId })
+      }
     } else {
       toast.error('切换项目失败，请稍后重试')
     }
@@ -380,7 +605,7 @@ function App() {
     if (project) {
       const switched = await setActiveProject(project.id)
       if (switched) {
-        setShowProjectHome(false)
+        navigateToRoute({ kind: 'projectWorkspace', projectId: project.id })
         toast.success(`项目「${project.name}」已创建`)
       } else {
         toast.error('项目已创建，但切换失败，请手动重试')
@@ -445,12 +670,13 @@ function App() {
 
   const workspaceView = (
     <WorkspaceLayout
-      onBackToProjects={() => setShowProjectHome(true)}
+      onBackToProjects={() => navigateToRoute({ kind: 'projectsHome' })}
       projectName={activeProject?.name}
+      workspaceName={activeConversation?.title}
     />
   )
 
-  const rootView = showProjectHome ? (
+  const rootView = currentRoute.kind === 'projectsHome' ? (
     <ProjectHome
       projects={projects}
       projectStats={projectStats}

@@ -54,9 +54,10 @@ import { BrandButton } from '@browser-fs-analyzer/ui'
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
   projectName?: string
+  workspaceName?: string
 }
 
-export function WorkspaceLayout({ onBackToProjects, projectName }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }: WorkspaceLayoutProps) {
   const {
     activeConversationId,
     createNew,
@@ -464,6 +465,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName }: WorkspaceLayo
         onWorkspaceSettingsOpen={() => setShowWorkspaceSettings(true)}
         onBackToProjects={onBackToProjects}
         activeProjectName={projectName}
+        activeWorkspaceName={workspaceName}
         onMenuOpen={() => setIsSidebarOpen(true)}
         isMobile={isMobile}
       />

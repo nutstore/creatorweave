@@ -43,6 +43,7 @@ interface TopBarProps {
   onWorkspaceSettingsOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
+  activeWorkspaceName?: string
   /** Called when menu button is pressed on mobile */
   onMenuOpen?: () => void
   /** Whether the device is mobile */
@@ -56,6 +57,7 @@ export function TopBar({
   onWorkspaceSettingsOpen,
   onBackToProjects,
   activeProjectName,
+  activeWorkspaceName,
   onMenuOpen,
   isMobile,
 }: TopBarProps) {
@@ -82,9 +84,19 @@ export function TopBar({
           <Sparkles className="h-5 w-5 text-primary-600" />
           <span className="text-base font-medium text-primary">{t('topbar.productName')}</span>
           {activeProjectName && (
-            <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
-              {activeProjectName}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                {activeProjectName}
+              </span>
+              {activeWorkspaceName && (
+                <>
+                  <span className="text-xs text-neutral-400">/</span>
+                  <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                    {activeWorkspaceName}
+                  </span>
+                </>
+              )}
+            </div>
           )}
         </div>
 
