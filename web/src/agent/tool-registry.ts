@@ -13,7 +13,6 @@ import { fileReadDefinition, fileReadExecutor } from './tools/file-read.tool'
 import { fileWriteDefinition, fileWriteExecutor } from './tools/file-write.tool'
 import { fileEditDefinition, fileEditExecutor } from './tools/file-edit.tool'
 import { fileBatchWriteDefinition, fileBatchWriteExecutor } from './tools/file-batch.tool'
-import { fileSyncDefinition, fileSyncExecutor } from './tools/file-sync.tool'
 import { globDefinition, globExecutor } from './tools/glob.tool'
 import { searchTextDefinition, searchTextExecutor } from './tools/search-text.tool'
 import { listFilesDefinition, listFilesExecutor } from './tools/list-files.tool'
@@ -70,7 +69,6 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: fileWriteDefinition, executor: fileWriteExecutor },
   { definition: fileEditDefinition, executor: fileEditExecutor },
   { definition: fileBatchWriteDefinition, executor: fileBatchWriteExecutor },
-  { definition: fileSyncDefinition, executor: fileSyncExecutor },
   { definition: globDefinition, executor: globExecutor },
   { definition: searchTextDefinition, executor: searchTextExecutor },
   { definition: listFilesDefinition, executor: listFilesExecutor },
@@ -122,6 +120,11 @@ export class ToolRegistry {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<string> {
+    if (name === 'sync_to_disk') {
+      return JSON.stringify({
+        error: 'Tool "sync_to_disk" is temporarily disabled.',
+      })
+    }
     const entry = this.tools.get(name)
     if (!entry) {
       return JSON.stringify({ error: `Unknown tool: ${name}` })

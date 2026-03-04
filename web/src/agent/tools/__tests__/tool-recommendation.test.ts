@@ -252,12 +252,12 @@ describe('RecommendationEngine', () => {
       expect(pythonTool?.category).toBe('analysis')
     })
 
-    it('should expose registered sync tool name instead of legacy name', () => {
+    it('should not expose sync tool while it is disabled', () => {
       const allTools = engine.getAllTools()
       const syncTool = allTools.writing.find((t) => t.toolName === 'sync_to_disk')
       const legacySync = allTools.writing.find((t) => t.toolName === 'file_sync')
 
-      expect(syncTool).toBeDefined()
+      expect(syncTool).toBeUndefined()
       expect(legacySync).toBeUndefined()
     })
 

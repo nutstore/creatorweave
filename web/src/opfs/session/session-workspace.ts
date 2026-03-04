@@ -665,19 +665,25 @@ export class SessionWorkspace {
    * @returns Change detection result
    */
   async refreshPendingChanges(): Promise<ChangeDetectionResult> {
+    const normalizeComparePath = (p: string): string => {
+      // Worker scan keys are relative paths without leading slash.
+      // Pending records may include a leading "/" in some flows.
+      return p.startsWith('/') ? p.slice(1) : p
+    }
+
     // 1. Get current pending changes (from previous operations)
     const existingPending = await this.pendingManager.getAll()
-    const existingPaths = new Map(existingPending.map(p => [p.path, p]))
+    const existingPaths = new Map(existingPending.map((p) => [normalizeComparePath(p.path), p]))
 
     // 2. Scan current OPFS state using Worker (bypass cache)
     const filesDir = await this.getFilesDir()
     const currentFiles = await scanFilesInWorker(filesDir)
 
-    // 3. Detect changes by comparing existing pending with current OPFS state
-    const changes: FileChange[] = []
-    let added = 0
-    let modified = 0
-    let deleted = 0
+    // 3. Reconcile pending queue against current OPFS state
+    const detectedChanges: FileChange[] = []
+    let detectedAdded = 0
+    let detectedModified = 0
+    let detectedDeleted = 0
 
     // Check for new or modified files (in OPFS but not in pending, or different mtime)
     for (const [path, item] of currentFiles.entries()) {
@@ -686,47 +692,72 @@ export class SessionWorkspace {
       if (!pendingItem) {
         // New file in OPFS (not in pending.json) - add as created
         await this.pendingManager.markAsCreated(path)
-        changes.push({ type: 'add', path, size: item.size, mtime: item.mtime })
-        added++
+        detectedChanges.push({ type: 'add', path, size: item.size, mtime: item.mtime })
+        detectedAdded++
       } else if (pendingItem.type !== 'delete' && pendingItem.fsMtime !== item.mtime) {
         // File was modified after being added to pending - update mtime
         // Note: fsMtime will be set during sync, just update timestamp here
         await this.pendingManager.add(path) // This updates timestamp
-        changes.push({ type: 'modify', path, size: item.size, mtime: item.mtime })
-        modified++
+        detectedChanges.push({ type: 'modify', path, size: item.size, mtime: item.mtime })
+        detectedModified++
       }
       // If pending item is 'delete', file was restored - remove from pending
       else if (pendingItem.type === 'delete') {
         // File restored, remove delete record
-        const deleteRecordId = existingPending.find(p => p.path === path && p.type === 'delete')?.id
+        const deleteRecordId = existingPending.find(
+          (p) => normalizeComparePath(p.path) === path && p.type === 'delete'
+        )?.id
         if (deleteRecordId) {
           await this.pendingManager.remove(deleteRecordId)
         }
         // Now add as created/modified
         await this.pendingManager.markAsCreated(path)
-        changes.push({ type: 'add', path, size: item.size, mtime: item.mtime })
-        added++
+        detectedChanges.push({ type: 'add', path, size: item.size, mtime: item.mtime })
+        detectedAdded++
       }
     }
 
     // Check for deleted files (in pending but not in current OPFS scan)
     for (const pending of existingPending) {
-      if (pending.type !== 'delete' && !currentFiles.has(pending.path)) {
+      if (pending.type !== 'delete' && !currentFiles.has(normalizeComparePath(pending.path))) {
         // File was deleted, add delete record
         await this.pendingManager.markForDeletion(pending.path)
-        changes.push({ type: 'delete', path: pending.path })
-        deleted++
+        detectedChanges.push({ type: 'delete', path: pending.path })
+        detectedDeleted++
       }
     }
 
     // Update cache with fresh scan
     this.scanFilesCache = currentFiles
 
+    // IMPORTANT: UI pending panels expect the full pending snapshot, not just newly detected deltas.
+    const latestPending = await this.pendingManager.getAll()
+    const changes: FileChange[] = latestPending.map((pending) => {
+      if (pending.type === 'delete') {
+        return { type: 'delete', path: pending.path }
+      }
+      const file = currentFiles.get(normalizeComparePath(pending.path))
+      return {
+        type: pending.type === 'create' ? 'add' : 'modify',
+        path: pending.path,
+        size: file?.size,
+        mtime: file?.mtime,
+      }
+    })
+
+    const added = changes.filter((c) => c.type === 'add').length
+    const modified = changes.filter((c) => c.type === 'modify').length
+    const deleted = changes.filter((c) => c.type === 'delete').length
+
     console.log('[SessionWorkspace] Pending changes refreshed (via worker):', {
       changes: changes.length,
       added,
       modified,
       deleted,
+      detectedChanges: detectedChanges.length,
+      detectedAdded,
+      detectedModified,
+      detectedDeleted,
     })
 
     return { changes, added, modified, deleted }

@@ -229,14 +229,6 @@ const TOOL_METADATA: Record<
     description: 'Multiple file operations at once',
     baseExample: 'file_batch_write(files=[{path:"src/a.ts", content:"export {}"}])',
   },
-  sync_to_disk: {
-    name: 'sync_to_disk',
-    displayName: 'Sync To Disk',
-    category: 'writing',
-    intents: ['file-write', 'batch-operations'],
-    description: 'Sync pending workspace changes to disk',
-    baseExample: 'sync_to_disk(confirm=true)',
-  },
   search_text: {
     name: 'search_text',
     displayName: 'Search Text',

@@ -96,10 +96,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
         const { workspace, workspaceId } = activeWorkspace
         const filePath = fileChange.path
 
-        // Read from OPFS
+        // Read from OPFS (target state before sync)
         let opfsContent: string | null = null
         try {
-          if (fileChange.type !== 'add') {
+          // For add/modify, OPFS should contain the new content.
+          // For delete, OPFS content is expected to be absent.
+          if (fileChange.type !== 'delete') {
             opfsContent = await readFileFromOPFS(workspaceId, filePath)
           }
         } catch (err) {
@@ -107,10 +109,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
           opfsContent = null
         }
 
-        // Read from Native FS
+        // Read from Native FS (current on-disk state before sync)
         let nativeContent: string | null = null
         try {
-          if (fileChange.type !== 'delete') {
+          // For modify/delete, native should contain old content.
+          // For add, native content is expected to be absent.
+          if (fileChange.type !== 'add') {
             const nativeDir = await workspace.getNativeDirectoryHandle()
             if (nativeDir) {
               nativeContent = await readFileFromNativeFS(nativeDir, filePath)
@@ -357,7 +361,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
                   highlightCode(content.opfs)
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400 dark:text-neutral-500 text-sm">
-                    {fileChange.type === 'add' ? '新文件' : '无法读取 OPFS 内容'}
+                    {fileChange.type === 'delete' ? '文件已删除（OPFS 中无内容）' : '无法读取 OPFS 内容'}
                   </div>
                 )}
               </div>
@@ -378,7 +382,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
                   highlightCode(content.native)
                 ) : (
                   <div className="flex items-center justify-center h-full text-gray-400 dark:text-neutral-500 text-sm">
-                    {fileChange.type === 'delete' ? '文件不存在' : '无法读取本机文件'}
+                    {fileChange.type === 'add' ? '文件不存在（将创建）' : '无法读取本机文件'}
                   </div>
                 )}
               </div>

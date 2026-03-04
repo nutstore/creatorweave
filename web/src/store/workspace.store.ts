@@ -21,6 +21,9 @@ import { getProjectRepository } from '@/sqlite/repositories/project.repository'
 import { requestDirectoryAccess, releaseDirectoryHandle } from '@/native-fs'
 import { toast } from 'sonner'
 
+// De-duplicate concurrent pending-change scans across UI/tool triggers.
+let refreshPendingChangesInFlight: Promise<void> | null = null
+
 /**
  * Workspace metadata shape from SessionManager (matches InternalSessionMetadata)
  */
@@ -162,7 +165,7 @@ interface WorkspaceState {
    * Refresh pending changes - independent of Python tool execution
    * Scans OPFS and updates pendingChanges with any new/modified/deleted files
    */
-  refreshPendingChanges: () => Promise<void>
+  refreshPendingChanges: (silent?: boolean) => Promise<void>
 
   /** Get current pending changes */
   getPendingChanges: () => ChangeDetectionResult | null
@@ -624,31 +627,43 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set({ showPreview: false })
         },
 
-        refreshPendingChanges: async () => {
-          const activeWorkspace = await getActiveWorkspace()
-          if (!activeWorkspace) return
+        refreshPendingChanges: async (silent = false) => {
+          if (refreshPendingChangesInFlight) {
+            return refreshPendingChangesInFlight
+          }
 
-          const changes = await activeWorkspace.workspace.refreshPendingChanges()
-          // Show preview panel when changes are detected
-          const hasChanges = changes && changes.changes.length > 0
-          set({ pendingChanges: changes, showPreview: hasChanges })
+          refreshPendingChangesInFlight = (async () => {
+            const activeWorkspace = await getActiveWorkspace()
+            if (!activeWorkspace) return
 
-          // Show toast notification when changes are detected
-          if (hasChanges && changes) {
-            const changeCount = changes.changes.length
-            const message = changeCount === 1
-              ? '检测到 1 个文件变更，请查看同步预览'
-              : `检测到 ${changeCount} 个文件变更，请查看同步预览`
+            const changes = await activeWorkspace.workspace.refreshPendingChanges()
+            // Show preview panel when changes are detected
+            const hasChanges = changes && changes.changes.length > 0
+            set({ pendingChanges: changes, showPreview: hasChanges })
 
-            toast(message, {
-              action: {
-                label: '查看',
-                onClick: () => {
-                  set({ showPreview: true })
+            // Show toast notification when changes are detected
+            if (!silent && hasChanges && changes) {
+              const changeCount = changes.changes.length
+              const message = changeCount === 1
+                ? '检测到 1 个文件变更，请查看同步预览'
+                : `检测到 ${changeCount} 个文件变更，请查看同步预览`
+
+              toast(message, {
+                action: {
+                  label: '查看',
+                  onClick: () => {
+                    set({ showPreview: true })
+                  },
                 },
-              },
-              duration: 5000,
-            })
+                duration: 5000,
+              })
+            }
+          })()
+
+          try {
+            await refreshPendingChangesInFlight
+          } finally {
+            refreshPendingChangesInFlight = null
           }
         },
 

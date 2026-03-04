@@ -882,6 +882,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 toast.error('对话保存失败，部分内容可能丢失')
               })
 
+            // Ensure pending sync list is refreshed after each completed agent loop.
+            try {
+              const { useWorkspaceStore } = await import('@/store/workspace.store')
+              await useWorkspaceStore.getState().refreshPendingChanges(true)
+            } catch (error) {
+              console.warn('[conversation.store] Failed to refresh pending changes on complete:', error)
+            }
+
             try {
               const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
               if (apiKey) {

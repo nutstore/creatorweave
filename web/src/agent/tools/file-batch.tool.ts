@@ -21,7 +21,7 @@ export const fileBatchWriteDefinition: ToolDefinition = {
   function: {
     name: 'file_batch_write',
     description:
-      'Write multiple files at once. Creates files and any parent directories if they do not exist. All files are written to OPFS cache and marked as pending sync. Use sync_to_disk to write changes to the real filesystem. Returns summary of operations.',
+      'Write multiple files at once. Creates files and any parent directories if they do not exist. All files are written to OPFS cache and marked as pending sync. Returns summary of operations.',
     parameters: {
       type: 'object',
       properties: {

@@ -233,7 +233,9 @@ export const useOPFSStore = create<OPFSState>()(
 
         // Update workspace store counts
         const { useWorkspaceStore } = await import('./workspace.store')
-        useWorkspaceStore.getState().updateCurrentCounts()
+        await useWorkspaceStore.getState().updateCurrentCounts()
+        // Keep sync preview list in sync with OPFS writes (no toast spam).
+        await useWorkspaceStore.getState().refreshPendingChanges(true)
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to write file'
 
@@ -266,7 +268,9 @@ export const useOPFSStore = create<OPFSState>()(
 
         // Update workspace store counts
         const { useWorkspaceStore } = await import('./workspace.store')
-        useWorkspaceStore.getState().updateCurrentCounts()
+        await useWorkspaceStore.getState().updateCurrentCounts()
+        // Keep sync preview list in sync with OPFS deletes (no toast spam).
+        await useWorkspaceStore.getState().refreshPendingChanges(true)
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to delete file'
         set({ error: message, isLoading: false })
@@ -297,7 +301,9 @@ export const useOPFSStore = create<OPFSState>()(
 
         // Update workspace store counts
         const { useWorkspaceStore } = await import('./workspace.store')
-        useWorkspaceStore.getState().updateCurrentCounts()
+        await useWorkspaceStore.getState().updateCurrentCounts()
+        // Refresh preview list after disk sync to reflect cleared/remaining pending files.
+        await useWorkspaceStore.getState().refreshPendingChanges(true)
 
         return result
       } catch (e) {

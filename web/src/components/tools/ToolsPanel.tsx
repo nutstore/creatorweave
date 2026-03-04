@@ -52,7 +52,7 @@ const TOOL_CATEGORIES = [
     icon: FileSearch,
     description: 'Read, write, and edit files',
     descriptionKey: 'tools.categories.operations.description',
-    toolNames: ['file_read', 'file_write', 'file_edit', 'file_batch_write', 'sync_to_disk'],
+    toolNames: ['file_read', 'file_write', 'file_edit', 'file_batch_write'],
   },
   {
     id: 'code',

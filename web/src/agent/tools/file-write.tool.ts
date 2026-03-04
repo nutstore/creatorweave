@@ -18,7 +18,7 @@ export const fileWriteDefinition: ToolDefinition = {
   function: {
     name: 'file_write',
     description:
-      'Write content to a file. Creates the file and any parent directories if they do not exist. Overwrites existing content. Files are written to OPFS cache and marked as pending sync. Use sync_to_disk to write changes to the real filesystem. Returns confirmation or error.',
+      'Write content to a file. Creates the file and any parent directories if they do not exist. Overwrites existing content. Files are written to OPFS cache and marked as pending sync. Returns confirmation or error.',
     parameters: {
       type: 'object',
       properties: {

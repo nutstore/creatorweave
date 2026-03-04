@@ -75,12 +75,16 @@ export class SessionPendingManager {
   async add(path: string): Promise<void> {
     if (!this.initialized) await this.initialize()
 
-    const existing = this.findPendingByPath(path)
+    const existingEntry = this.findPendingEntryByPath(path)
     const now = Date.now()
 
-    if (existing) {
-      // Update existing record timestamp
-      existing.timestamp = now
+    if (existingEntry) {
+      const [id, existing] = existingEntry
+      // Replace with a new object (avoid mutating potentially frozen records).
+      this.pendingChanges.set(id, {
+        ...existing,
+        timestamp: now,
+      })
     } else {
       // Create new record
       this.pendingChanges.set(generateId('pending'), {
@@ -102,13 +106,17 @@ export class SessionPendingManager {
   async markForDeletion(path: string): Promise<void> {
     if (!this.initialized) await this.initialize()
 
-    const existing = this.findPendingByPath(path)
+    const existingEntry = this.findPendingEntryByPath(path)
     const now = Date.now()
 
-    if (existing) {
-      // Update to delete type
-      existing.type = 'delete'
-      existing.timestamp = now
+    if (existingEntry) {
+      const [id, existing] = existingEntry
+      // Replace with a new object (avoid mutating potentially frozen records).
+      this.pendingChanges.set(id, {
+        ...existing,
+        type: 'delete',
+        timestamp: now,
+      })
     } else {
       // Create delete record
       this.pendingChanges.set(generateId('pending'), {
@@ -149,7 +157,11 @@ export class SessionPendingManager {
    * Get all pending records
    */
   getAll(): PendingChange[] {
-    return Array.from(this.pendingChanges.values()).sort((a, b) => a.timestamp - b.timestamp)
+    // Return cloned objects so external state layers (e.g. Zustand + Immer)
+    // cannot freeze/mutate our internal map records by shared reference.
+    return Array.from(this.pendingChanges.values())
+      .map((change) => ({ ...change }))
+      .sort((a, b) => a.timestamp - b.timestamp)
   }
 
   /**
@@ -307,6 +319,18 @@ export class SessionPendingManager {
     for (const change of this.pendingChanges.values()) {
       if (change.path === path) {
         return change
+      }
+    }
+    return undefined
+  }
+
+  /**
+   * Find pending record entry [id, change] by path
+   */
+  private findPendingEntryByPath(path: string): [string, PendingChange] | undefined {
+    for (const entry of this.pendingChanges.entries()) {
+      if (entry[1].path === path) {
+        return entry
       }
     }
     return undefined
