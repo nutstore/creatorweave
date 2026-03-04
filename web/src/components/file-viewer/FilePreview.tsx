@@ -104,6 +104,66 @@ function isBinaryExtension(path: string): boolean {
   return binaryExts.has(ext)
 }
 
+/** Check if extension is likely text */
+function isTextExtension(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() || ''
+  const textExts = new Set([
+    'txt',
+    'md',
+    'mdx',
+    'json',
+    'jsonc',
+    'yaml',
+    'yml',
+    'toml',
+    'ini',
+    'env',
+    'xml',
+    'svg',
+    'html',
+    'htm',
+    'css',
+    'scss',
+    'less',
+    'js',
+    'jsx',
+    'mjs',
+    'cjs',
+    'ts',
+    'tsx',
+    'py',
+    'rs',
+    'go',
+    'java',
+    'kt',
+    'swift',
+    'c',
+    'cpp',
+    'h',
+    'hpp',
+    'sh',
+    'bash',
+    'zsh',
+    'sql',
+    'graphql',
+    'gql',
+    'php',
+    'rb',
+    'vue',
+    'svelte',
+    'lock',
+    'gitignore',
+    'editorconfig',
+  ])
+  return textExts.has(ext)
+}
+
+function isTextFile(path: string): boolean {
+  if (isBinaryExtension(path)) return false
+  if (isTextExtension(path)) return true
+  return false
+}
+
 const MAX_FILE_SIZE = 512 * 1024 // 512KB for syntax highlighting
 const MAX_PLAIN_SIZE = 2 * 1024 * 1024 // 2MB for plain text
 
@@ -137,8 +197,9 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         const file = await fileHandle!.getFile()
         setFileSize(file.size)
 
-        // Binary file
-        if (isBinaryExtension(filePath!)) {
+        // Extension-only file type detection
+        const textFile = isTextFile(filePath!)
+        if (!textFile) {
           setContent(null)
           setError(null)
           setLoading(false)
@@ -208,7 +269,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   }
 
   const fileName = filePath.split('/').pop() || filePath
-  const isBinary = isBinaryExtension(filePath)
+  const isBinary = content === null && !loading && !error
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-neutral-950">

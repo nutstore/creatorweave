@@ -29,6 +29,7 @@ import { useMobile } from '@/components/mobile/useMobile'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { ConversationView } from '@/components/agent/ConversationView'
+import { FilePreview } from '@/components/file-viewer/FilePreview'
 import { WelcomeScreenV2 } from '@/components/WelcomeScreenV2'
 import { SyncPreviewPanel } from '@/components/sync'
 import { SkillsManager } from '@/components/skills/SkillsManager'
@@ -74,6 +75,8 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const workspaceCount = projectWorkspaceIds.length
   const hidePreviewPanel = useWorkspaceStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
+  const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
 
   // Skills management state
   const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
@@ -331,6 +334,9 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           setToolsPanelOpen(false)
         } else if (skillsManagerOpen) {
           setSkillsManagerOpen(false)
+        } else if (selectedFilePath) {
+          setSelectedFilePath(null)
+          setSelectedFileHandle(null)
         }
       }
     }
@@ -344,6 +350,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
     quickActionsOpen,
     toolsPanelOpen,
     skillsManagerOpen,
+    selectedFilePath,
     panelState.sidebarCollapsed,
     setSidebarCollapsed,
     setActiveResourceTab,
@@ -450,10 +457,23 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
 
   const hasActiveConversation =
     !!activeConversationId && projectWorkspaceIds.includes(activeConversationId)
+  const showFilePreview = !!selectedFilePath && !!selectedFileHandle
+  const showRightPanel = showPreview || showFilePreview
+
   // Close preview panel (hide without clearing changes)
   const handleClosePreview = useCallback(() => {
     hidePreviewPanel()
   }, [hidePreviewPanel])
+
+  const handleCloseFilePreview = useCallback(() => {
+    setSelectedFilePath(null)
+    setSelectedFileHandle(null)
+  }, [])
+
+  const handleSidebarFileSelect = useCallback((path: string, handle: FileSystemFileHandle) => {
+    setSelectedFilePath(path)
+    setSelectedFileHandle(handle)
+  }, [])
 
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-950">
@@ -476,14 +496,16 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
         )}
 
         {/* Sidebar - hidden on mobile when closed */}
-        {(!isMobile || isSidebarOpen) && <Sidebar />}
+        {(!isMobile || isSidebarOpen) && (
+          <Sidebar onFileSelect={handleSidebarFileSelect} selectedFilePath={selectedFilePath} />
+        )}
 
         {/* Main area: conversation + optional sync preview panel */}
         <div ref={mainRef} className="flex flex-1 overflow-hidden">
           {/* Conversation / Welcome */}
           <main
             className="overflow-hidden"
-            style={{ width: showPreview ? `${100 - previewRatio}%` : '100%' }}
+            style={{ width: showRightPanel ? `${100 - previewRatio}%` : '100%' }}
           >
             {hasActiveConversation ? (
               <ConversationView
@@ -508,7 +530,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           </main>
 
           {/* Drag divider + Sync preview panel */}
-          {showPreview && (
+          {showRightPanel && (
             <>
               <div
                 className="hover:bg-primary-300 active:bg-primary-400 w-1 shrink-0 cursor-col-resize bg-neutral-200"
@@ -518,7 +540,15 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
                 className="overflow-hidden border-l border-neutral-200"
                 style={{ width: `${previewRatio}%` }}
               >
-                <SyncPreviewPanel onCancel={handleClosePreview} />
+                {showPreview ? (
+                  <SyncPreviewPanel onCancel={handleClosePreview} />
+                ) : (
+                  <FilePreview
+                    filePath={selectedFilePath}
+                    fileHandle={selectedFileHandle}
+                    onClose={handleCloseFilePreview}
+                  />
+                )}
               </div>
             </>
           )}
