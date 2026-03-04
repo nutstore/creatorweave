@@ -13,6 +13,7 @@ import {
   BrandDialogBody,
 } from '@browser-fs-analyzer/ui'
 import { MCPSettings } from './MCPSettings'
+import { useT } from '@/i18n'
 
 interface MCPSettingsDialogProps {
   open: boolean
@@ -23,6 +24,8 @@ const MCPSettingsDialogContent = forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BrandDialogContent>
 >(({ ...props }, ref) => {
+  const t = useT()
+
   return (
     <BrandDialogContent
       ref={ref}
@@ -33,7 +36,7 @@ const MCPSettingsDialogContent = forwardRef<
       <BrandDialogHeader>
         <div className="flex items-center gap-2.5">
           <Server className="h-[18px] w-[18px] text-primary-600" />
-          <BrandDialogTitle>MCP 服务配置</BrandDialogTitle>
+          <BrandDialogTitle>{t('mcp.dialog.title')}</BrandDialogTitle>
         </div>
         <BrandDialogClose asChild>
           <button className="text-tertiary transition-colors hover:text-primary dark:hover:text-neutral-200">

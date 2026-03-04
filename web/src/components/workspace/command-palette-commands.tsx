@@ -36,6 +36,8 @@ import {
 } from 'lucide-react'
 import type { Command } from './CommandPalette'
 
+type TranslateFn = (key: string, params?: Record<string, string | number>) => string
+
 // ============================================================================
 // Command Categories
 // ============================================================================
@@ -53,6 +55,21 @@ export const COMMAND_CATEGORIES = {
   HELP: 'Help',
 } as const
 
+type CategoryValue = (typeof COMMAND_CATEGORIES)[keyof typeof COMMAND_CATEGORIES]
+
+const CATEGORY_KEY_MAP: Record<CategoryValue, string> = {
+  [COMMAND_CATEGORIES.CONVERSATIONS]: 'conversations',
+  [COMMAND_CATEGORIES.FILES]: 'files',
+  [COMMAND_CATEGORIES.DEVELOPER]: 'developer',
+  [COMMAND_CATEGORIES.DATA_ANALYST]: 'dataAnalyst',
+  [COMMAND_CATEGORIES.STUDENT]: 'student',
+  [COMMAND_CATEGORIES.OFFICE]: 'office',
+  [COMMAND_CATEGORIES.VIEW]: 'view',
+  [COMMAND_CATEGORIES.TOOLS]: 'tools',
+  [COMMAND_CATEGORIES.SETTINGS]: 'settings',
+  [COMMAND_CATEGORIES.HELP]: 'help',
+}
+
 // ============================================================================
 // Command Builders
 // ============================================================================
@@ -60,8 +77,11 @@ export const COMMAND_CATEGORIES = {
 /**
  * Build all enhanced commands for the palette
  */
-export function buildEnhancedCommands(handlers: CommandHandlers): Command[] {
-  return [
+export function buildEnhancedCommands(
+  handlers: CommandHandlers,
+  options?: { t?: TranslateFn; enableLocalization?: boolean }
+): Command[] {
+  const commands: Command[] = [
     // ========== Conversations ==========
     {
       id: 'new-conversation',
@@ -402,6 +422,37 @@ export function buildEnhancedCommands(handlers: CommandHandlers): Command[] {
       handler: handlers.onShowShortcuts,
     },
   ]
+
+  if (!options?.enableLocalization || !options.t) {
+    return commands
+  }
+
+  const t = options.t
+  const translateOrDefault = (key: string, fallback: string): string => {
+    const translated = t(key)
+    return !translated || translated === key ? fallback : translated
+  }
+
+  return commands.map((command) => {
+    const categoryKey = command.category
+      ? CATEGORY_KEY_MAP[command.category as CategoryValue]
+      : undefined
+
+    return {
+      ...command,
+      label: translateOrDefault(`commandPalette.commands.${command.id}.label`, command.label),
+      description: command.description
+        ? translateOrDefault(
+            `commandPalette.commands.${command.id}.description`,
+            command.description
+          )
+        : command.description,
+      category:
+        command.category && categoryKey
+          ? translateOrDefault(`commandPalette.categories.${categoryKey}`, command.category)
+          : command.category,
+    }
+  })
 }
 
 // ============================================================================

@@ -49,8 +49,10 @@ import {
   type Command,
 } from '@/components/workspace'
 import { ExportPanel, useExport } from '@/components/export'
-import { initializeTheme } from '@/store/theme.store'
+import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { BrandButton } from '@browser-fs-analyzer/ui'
+import { MCPSettingsDialog } from '@/components/mcp'
+import { useLocale, useT } from '@/i18n'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -61,6 +63,7 @@ interface WorkspaceLayoutProps {
 export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }: WorkspaceLayoutProps) {
   const {
     activeConversationId,
+    conversations,
     createNew,
     setActive,
     runAgent,
@@ -101,6 +104,9 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
   const [showRecentFiles, setShowRecentFiles] = useState(false)
+  const [showMcpSettings, setShowMcpSettings] = useState(false)
+  const [locale] = useLocale()
+  const t = useT()
 
   // Export panel state
   const {
@@ -188,28 +194,32 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
       setActive(newConv.id)
     },
     onContinueLast: () => {
-      // TODO: Implement continue last conversation
-      console.log('[WorkspaceLayout] Continue last conversation')
+      if (conversations.length === 0) return
+      const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt)
+      const target = sorted.find((conv) => conv.id !== activeConversationId) || sorted[0]
+      void setActive(target.id)
     },
     // Files
     onOpenFile: () => {
-      // TODO: Implement file picker
-      console.log('[WorkspaceLayout] Open file')
+      setSidebarCollapsed(false)
+      setActiveResourceTab('files')
+      if (isMobile) {
+        setIsSidebarOpen(true)
+      }
     },
     onShowRecentFiles: () => setShowRecentFiles(true),
 
     // View
     onToggleSidebar: () => setSidebarCollapsed(!panelState.sidebarCollapsed),
     onToggleTheme: () => {
-      // TODO: Toggle theme
-      console.log('[WorkspaceLayout] Toggle theme')
+      const { mode, setTheme } = useThemeStore.getState()
+      setTheme(mode === 'dark' ? 'light' : 'dark')
     },
     // Tools
     onOpenSkills: handleSkillsManagerOpen,
     onOpenTools: () => setToolsPanelOpen(true),
     onOpenMCP: () => {
-      // TODO: Open MCP settings
-      console.log('[WorkspaceLayout] Open MCP')
+      setShowMcpSettings(true)
     },
     // Settings & Help
     onOpenSettings: () => setShowWorkspaceSettings(true),
@@ -220,6 +230,9 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
       setActive(conv.id)
       setPendingMessage(text)
     },
+  }, {
+    t,
+    enableLocalization: locale === 'zh-CN' || locale === 'en-US',
   })
 
   // Initialize skills on mount
@@ -579,7 +592,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
       {/* Phase 4: Command Palette */}
       <CommandPalette
         open={showCommandPalette}
-        onOpenChange={() => setShowCommandPalette(false)}
+        onOpenChange={setShowCommandPalette}
         commands={commands}
       />
 
@@ -640,6 +653,8 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           </div>
         </div>
       )}
+
+      <MCPSettingsDialog open={showMcpSettings} onOpenChange={setShowMcpSettings} />
     </div>
   )
 }

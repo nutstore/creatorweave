@@ -39,6 +39,13 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const tf = useCallback(
+    (key: string, fallback: string, params?: Record<string, string | number>) => {
+      const value = t(key, params)
+      return !value || value === key ? fallback : value
+    },
+    [t]
+  )
 
   // Filter commands by query
   const filteredCommands = useMemo(() => {
@@ -61,14 +68,14 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
   const groupedCommands = useMemo(() => {
     const groups = new Map<string, Command[]>()
     filteredCommands.forEach((command) => {
-      const category = command.category || 'General'
+      const category = command.category || tf('commandPalette.general', 'General')
       if (!groups.has(category)) {
         groups.set(category, [])
       }
       groups.get(category)!.push(command)
     })
     return groups
-  }, [filteredCommands])
+  }, [filteredCommands, tf])
 
   // Reset selection when query changes
   useEffect(() => {
@@ -81,6 +88,9 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
       setTimeout(() => {
         inputRef.current?.focus()
       }, 100)
+    } else {
+      setQuery('')
+      setSelectedIndex(0)
     }
   }, [open])
 
@@ -88,6 +98,15 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       const flatCommands = filteredCommands.filter((c) => !c.disabled)
+
+      if (flatCommands.length === 0) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          onOpenChange(false)
+          setQuery('')
+        }
+        return
+      }
 
       switch (e.key) {
         case 'ArrowDown':
@@ -137,7 +156,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
           <BrandDialogTitle>
             <div className="flex items-center gap-2">
               <Terminal className="h-5 w-5 text-primary-600" />
-              <span>Command Palette</span>
+              <span>{tf('commandPalette.title', 'Command Palette')}</span>
             </div>
           </BrandDialogTitle>
         </BrandDialogHeader>
@@ -149,7 +168,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
             <input
               ref={inputRef}
               type="text"
-              placeholder={t('commandPalette.placeholder') || 'Type a command or search...'}
+              placeholder={tf('commandPalette.placeholder', 'Type a command or search...')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -202,7 +221,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
 
             {filteredCommands.length === 0 && (
               <div className="py-12 text-center text-sm text-neutral-400 dark:text-neutral-500">
-                No commands found for "{query}"
+                {tf('commandPalette.noResults', 'No commands found for "{query}"', { query })}
               </div>
             )}
           </div>
@@ -214,19 +233,19 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
                 <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   ↑↓
                 </kbd>{' '}
-                Navigate
+                {tf('commandPalette.navigate', 'Navigate')}
               </span>
               <span>
                 <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   Enter
                 </kbd>{' '}
-                Select
+                {tf('commandPalette.select', 'Select')}
               </span>
               <span>
                 <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:border-neutral-600 dark:bg-neutral-800">
                   Esc
                 </kbd>{' '}
-                Close
+                {tf('commandPalette.close', 'Close')}
               </span>
             </div>
           </div>

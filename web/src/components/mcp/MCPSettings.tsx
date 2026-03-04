@@ -548,10 +548,10 @@ export function MCPSettings() {
               }`}
             >
               <div className="flex items-start gap-3 p-3">
-                {/* 状态指示灯 - 左侧固定 */}
+                {/* Status indicator - fixed on left */}
                 <div className="flex items-center gap-2">
                   <ConnectionIcon status={server.connectionStatus} />
-                  {/* 电源开关按钮 - 状态和控制一体 */}
+                  {/* Power toggle - combines status and control */}
                   <button
                     onClick={() => handleToggleEnabled(server.id, !server.enabled)}
                     className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
@@ -609,7 +609,7 @@ export function MCPSettings() {
                   </div>
                 </div>
 
-                {/* Actions - hover 时显示 */}
+                {/* Actions - shown on hover */}
                 <div className="flex items-center gap-1 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100">
                   {/* Edit */}
                   <button
@@ -631,7 +631,7 @@ export function MCPSettings() {
                 </div>
               </div>
 
-              {/* 连接状态提示条 */}
+              {/* Connection status hint bar */}
               {server.connectionStatus === 'error' && server.error && (
                 <div className="mx-3 mb-2 flex items-center gap-1.5 rounded-md bg-danger/10 px-2 py-1">
                   <CircleX className="h-3 w-3 text-danger" />

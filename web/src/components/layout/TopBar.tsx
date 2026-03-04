@@ -93,14 +93,14 @@ export function TopBar({
         {/* Left: Menu button (mobile) + Logo + Name */}
         <div className="flex items-center gap-2.5">
           {onBackToProjects && (
-            <ActionTooltip label="返回项目列表">
+            <ActionTooltip label={t('topbar.tooltips.backToProjects')}>
               <BrandButton iconButton onClick={onBackToProjects}>
                 <ArrowLeft className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
           )}
           {isMobile && (
-            <ActionTooltip label="菜单">
+            <ActionTooltip label={t('topbar.tooltips.menu')}>
               <BrandButton iconButton onClick={onMenuOpen} data-tour="menu">
                 <Menu className="h-[14px] w-[14px]" />
               </BrandButton>
@@ -114,7 +114,7 @@ export function TopBar({
           </ActionTooltip>
           {activeProjectName && (
             <div className="flex items-center gap-1">
-              <ActionTooltip label={`项目：${activeProjectName}`}>
+              <ActionTooltip label={t('topbar.projectLabel', { name: activeProjectName })}>
                 <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                   {activeProjectName}
                 </span>
@@ -122,7 +122,7 @@ export function TopBar({
               {activeWorkspaceName && (
                 <>
                   <span className="text-xs text-neutral-400 dark:text-neutral-500">/</span>
-                  <ActionTooltip label={`工作区：${activeWorkspaceName}`}>
+                  <ActionTooltip label={t('topbar.workspaceLabel', { name: activeWorkspaceName })}>
                     <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                       {activeWorkspaceName}
                     </span>
@@ -140,7 +140,7 @@ export function TopBar({
 
           {/* API Key status - consistent button style */}
           {!hasApiKey && (
-            <ActionTooltip label="打开 API Key 设置">
+            <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
               <button
                 type="button"
                 onClick={() => setSettingsOpen(true)}
@@ -169,35 +169,35 @@ export function TopBar({
           <div className="h-5 w-px bg-neutral-200" />
 
           {/* Workspace Settings (Phase 4) */}
-          <ActionTooltip label="工作区布局与偏好">
+          <ActionTooltip label={t('topbar.tooltips.workspaceSettings')}>
             <BrandButton iconButton onClick={onWorkspaceSettingsOpen}>
               <SlidersHorizontal className="h-[14px] w-[14px]" />
             </BrandButton>
           </ActionTooltip>
 
           {/* Tools Panel */}
-          <ActionTooltip label="工具面板">
+          <ActionTooltip label={t('topbar.tooltips.toolsPanel')}>
             <BrandButton iconButton onClick={onToolsPanelOpen} data-tour="tools">
               <List className="h-[14px] w-[14px]" />
             </BrandButton>
           </ActionTooltip>
 
           {/* Quick Actions / Command Palette (Phase 4) */}
-          <ActionTooltip label="命令面板 (Cmd/Ctrl+K)">
+          <ActionTooltip label={t('topbar.tooltips.commandPalette')}>
             <BrandButton iconButton onClick={onCommandPaletteOpen}>
               <Keyboard className="h-[14px] w-[14px]" />
             </BrandButton>
           </ActionTooltip>
 
           {/* Skills */}
-          <ActionTooltip label="技能管理">
+          <ActionTooltip label={t('topbar.tooltips.skillsManager')}>
             <BrandButton iconButton onClick={onSkillsManagerOpen} data-tour="skills">
               <Wrench className="h-[14px] w-[14px]" />
             </BrandButton>
           </ActionTooltip>
 
           {/* MCP Settings */}
-          <ActionTooltip label="MCP 服务配置">
+          <ActionTooltip label={t('topbar.tooltips.mcpSettings')}>
             <BrandButton iconButton onClick={() => setMcpSettingsOpen(true)}>
               <Server className="h-[14px] w-[14px]" />
             </BrandButton>
@@ -206,7 +206,7 @@ export function TopBar({
           <div className="h-5 w-px bg-neutral-200" />
 
           {/* Settings */}
-          <ActionTooltip label="应用设置">
+          <ActionTooltip label={t('topbar.tooltips.appSettings')}>
             <BrandButton iconButton onClick={() => setSettingsOpen(true)}>
               <Settings className="h-[14px] w-[14px]" />
             </BrandButton>

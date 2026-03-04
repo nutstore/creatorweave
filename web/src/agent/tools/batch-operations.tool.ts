@@ -17,7 +17,6 @@ import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { getUndoManager } from '@/undo/undo-manager'
 import { traverseDirectory } from '@/services/traversal.service'
-import { resolveFileHandle } from '@/services/fsAccess.service'
 import micromatch from 'micromatch'
 
 //=============================================================================

@@ -180,7 +180,6 @@ describe('RecommendationEngine', () => {
 
     it('should include file pattern in example', () => {
       const recommendations = engine.recommend('find useState in TSX files')
-      // @ts-expect-error - reserved for future assertions
       const searchTool = recommendations.find((r) => r.toolName === 'search_text')
 
       expect(recommendations.length).toBeGreaterThan(0)
