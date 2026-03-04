@@ -426,6 +426,53 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
   } catch (error) {
     console.error('[SQLite Worker] Database initialization failed:', error)
+
+    // If schema initialization fails, try to delete database and recreate from scratch
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('no such column') || errorMsg.includes('table') || errorMsg.includes('schema')) {
+      console.warn('[SQLite Worker] Schema error detected - attempting to delete and recreate database...')
+      try {
+        db.close()
+        db = null
+      } catch {}
+
+      // Try to delete the database file using OPFS API
+      try {
+        // @ts-ignore - opfs API
+        if (poolUtil && poolUtil.root) {
+          try {
+            // Try to get the file handle - if it exists, we'll recreate
+            await poolUtil.root.getFileHandle(DB_NAME)
+            console.warn('[SQLite Worker] Database file exists - will recreate')
+          } catch {}
+        }
+      } catch (deleteError) {
+        console.warn('[SQLite Worker] Failed to clean up database:', deleteError)
+      }
+
+      // Try one more time with a fresh database
+      console.log('[SQLite Worker] Attempting to recreate database from scratch...')
+      try {
+        // Close existing pool and create new one
+        if (poolUtil) {
+          // Force create new pool
+          poolUtil = null
+        }
+
+        // @ts-ignore
+        poolUtil = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+        db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'c')
+        dbMode = 'opfs'
+
+        // Try initializing schema again
+        await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
+        console.log('[SQLite Worker] Database recreated successfully!')
+        return
+      } catch (recreateError) {
+        console.error('[SQLite Worker] Failed to recreate database:', recreateError)
+      }
+    }
+
     throw error
   }
 }
