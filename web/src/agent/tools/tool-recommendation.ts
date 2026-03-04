@@ -221,21 +221,21 @@ const TOOL_METADATA: Record<
     description: 'Replace text in a file',
     baseExample: 'file_edit(path="config.ts", old_text="old", new_text="new")',
   },
-  file_batch: {
-    name: 'file_batch',
+  file_batch_write: {
+    name: 'file_batch_write',
     displayName: 'Batch Operations',
     category: 'batch',
     intents: ['batch-operations'],
     description: 'Multiple file operations at once',
-    baseExample: 'file_batch(operations=[...])',
+    baseExample: 'file_batch_write(files=[{path:"src/a.ts", content:"export {}"}])',
   },
-  file_sync: {
-    name: 'file_sync',
-    displayName: 'Sync File',
+  sync_to_disk: {
+    name: 'sync_to_disk',
+    displayName: 'Sync To Disk',
     category: 'writing',
     intents: ['file-write', 'batch-operations'],
-    description: 'Sync a file to workspace',
-    baseExample: 'file_sync(path="data.csv")',
+    description: 'Sync pending workspace changes to disk',
+    baseExample: 'sync_to_disk(confirm=true)',
   },
   grep: {
     name: 'grep',
@@ -485,7 +485,7 @@ export class RecommendationEngine {
   ): string {
     // Customize example based on detected file types
     if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'run_python_code') {
-      return `First find the file: glob(pattern="**/*.csv")\nThen analyze: run_python_code(code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())", files=[{path:"your/data.csv"}])`
+      return `First find the file: glob(pattern="**/*.csv")\nThen analyze: run_python_code(code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())", files=["your/data.csv"])`
     }
 
     if (analysis.fileTypeHints.includes('.tsx') && metadata.name === 'grep') {

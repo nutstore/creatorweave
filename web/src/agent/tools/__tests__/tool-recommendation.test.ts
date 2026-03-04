@@ -8,6 +8,7 @@ import {
   RecommendationEngine,
   getRecommendationEngine,
 } from '@/agent/tools/tool-recommendation'
+import { getBuiltinToolNames } from '@/agent/tool-registry'
 
 describe('IntentAnalyzer', () => {
   const analyzer = new IntentAnalyzer()
@@ -210,6 +211,15 @@ describe('RecommendationEngine', () => {
         expect(globTool.example.length).toBeGreaterThan(0)
       }
     })
+
+    it('should use string array format for run_python_code files example', () => {
+      const recommendations = engine.recommend('analyze sales.csv with python')
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
+
+      expect(pythonTool).toBeDefined()
+      expect(pythonTool?.example).toContain('files=["your/data.csv"]')
+      expect(pythonTool?.example).not.toContain('files=[{path:')
+    })
   })
 
   describe('all tools by category', () => {
@@ -238,6 +248,36 @@ describe('RecommendationEngine', () => {
 
       expect(pythonTool).toBeDefined()
       expect(pythonTool?.category).toBe('analysis')
+    })
+
+    it('should expose registered sync tool name instead of legacy name', () => {
+      const allTools = engine.getAllTools()
+      const syncTool = allTools.writing.find((t) => t.toolName === 'sync_to_disk')
+      const legacySync = allTools.writing.find((t) => t.toolName === 'file_sync')
+
+      expect(syncTool).toBeDefined()
+      expect(legacySync).toBeUndefined()
+    })
+
+    it('should expose registered batch write tool name instead of legacy name', () => {
+      const allTools = engine.getAllTools()
+      const batchTool = allTools.batch.find((t) => t.toolName === 'file_batch_write')
+      const legacyBatch = allTools.batch.find((t) => t.toolName === 'file_batch')
+
+      expect(batchTool).toBeDefined()
+      expect(legacyBatch).toBeUndefined()
+    })
+
+    it('should only recommend tools that exist in the built-in registry', () => {
+      const builtinToolNames = new Set(getBuiltinToolNames())
+      const allTools = engine.getAllTools()
+      const recommendedNames = Object.values(allTools)
+        .flat()
+        .map((tool) => tool.toolName)
+
+      for (const toolName of recommendedNames) {
+        expect(builtinToolNames.has(toolName)).toBe(true)
+      }
     })
   })
 })

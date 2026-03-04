@@ -67,6 +67,36 @@ import { getAllEnabledSkillNames } from '@/skills/skill-storage'
 // Import test generation tool
 import { test_generation, test_generation_executor } from './tools/test-generation.tool'
 
+const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
+  { definition: fileReadDefinition, executor: fileReadExecutor },
+  { definition: fileWriteDefinition, executor: fileWriteExecutor },
+  { definition: fileEditDefinition, executor: fileEditExecutor },
+  { definition: fileBatchWriteDefinition, executor: fileBatchWriteExecutor },
+  { definition: fileSyncDefinition, executor: fileSyncExecutor },
+  { definition: globDefinition, executor: globExecutor },
+  { definition: grepDefinition, executor: grepExecutor },
+  { definition: listFilesDefinition, executor: listFilesExecutor },
+  { definition: pythonCodeDefinition, executor: pythonCodeExecutor },
+  { definition: javascriptCodeDefinition, executor: javascriptCodeExecutor },
+  { definition: extractSymbolsDefinition, executor: extractSymbolsExecutor },
+  { definition: findReferencesDefinition, executor: findReferencesExecutor },
+  { definition: goToDefinitionDefinition, executor: goToDefinitionExecutor },
+  { definition: batchEditDefinition, executor: batchEditExecutor },
+  { definition: advancedSearchDefinition, executor: advancedSearchExecutor },
+  { definition: fileBatchReadDefinition, executor: fileBatchReadExecutor },
+  { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
+  { definition: generateChartDefinition, executor: generateChartExecutor },
+  { definition: filterDataDefinition, executor: filterDataExecutor },
+  { definition: aggregateDataDefinition, executor: aggregateDataExecutor },
+  { definition: code_review, executor: code_review_executor },
+  { definition: batch_code_review, executor: batch_code_review_executor },
+  { definition: test_generation, executor: test_generation_executor },
+]
+
+export function getBuiltinToolNames(): string[] {
+  return BUILTIN_TOOLS.map((tool) => tool.definition.function.name)
+}
+
 export class ToolRegistry {
   private tools = new Map<string, ToolEntry>()
 
@@ -141,34 +171,9 @@ export class ToolRegistry {
 
   /** Register all built-in tools */
   registerBuiltins(): void {
-    this.register(fileReadDefinition, fileReadExecutor)
-    this.register(fileWriteDefinition, fileWriteExecutor)
-    this.register(fileEditDefinition, fileEditExecutor)
-    this.register(fileBatchWriteDefinition, fileBatchWriteExecutor)
-    this.register(fileSyncDefinition, fileSyncExecutor)
-    this.register(globDefinition, globExecutor)
-    this.register(grepDefinition, grepExecutor)
-    this.register(listFilesDefinition, listFilesExecutor)
-    this.register(pythonCodeDefinition, pythonCodeExecutor)
-    this.register(javascriptCodeDefinition, javascriptCodeExecutor)
-    // Code intelligence tools
-    this.register(extractSymbolsDefinition, extractSymbolsExecutor)
-    this.register(findReferencesDefinition, findReferencesExecutor)
-    this.register(goToDefinitionDefinition, goToDefinitionExecutor)
-    // Batch operations tools
-    this.register(batchEditDefinition, batchEditExecutor)
-    this.register(advancedSearchDefinition, advancedSearchExecutor)
-    this.register(fileBatchReadDefinition, fileBatchReadExecutor)
-    // Data analysis tools
-    this.register(analyzeDataDefinition, analyzeDataExecutor)
-    this.register(generateChartDefinition, generateChartExecutor)
-    this.register(filterDataDefinition, filterDataExecutor)
-    this.register(aggregateDataDefinition, aggregateDataExecutor)
-    // Code review tools
-    this.register(code_review, code_review_executor)
-    this.register(batch_code_review, batch_code_review_executor)
-    // Test generation tool
-    this.register(test_generation, test_generation_executor)
+    for (const tool of BUILTIN_TOOLS) {
+      this.register(tool.definition, tool.executor)
+    }
   }
 
   /** Register a WASM plugin as an Agent tool */
