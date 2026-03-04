@@ -33,17 +33,17 @@ export const analyzeDataDefinition: ToolDefinition = {
     parameters: {
       type: 'object',
       properties: {
-        filePath: {
+        path: {
           type: 'string',
           description: 'Path to the data file (relative to project root)',
         },
-        fileType: {
+        file_type: {
           type: 'string',
           enum: ['csv', 'json'],
           description: 'Type of data file',
         },
       },
-      required: ['filePath', 'fileType'],
+      required: ['path', 'file_type'],
     },
   },
 }
@@ -52,7 +52,8 @@ export const analyzeDataExecutor: ToolExecutor = async (
   args: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> => {
-  const { filePath, fileType } = args as { filePath: string; fileType: 'csv' | 'json' }
+  const path = args.path as string
+  const fileType = args.file_type as 'csv' | 'json'
 
   if (!context.directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
@@ -62,7 +63,7 @@ export const analyzeDataExecutor: ToolExecutor = async (
     // Read file content
     let fileContent: string
     try {
-      const fileHandle = await getFileHandle(context.directoryHandle, filePath)
+      const fileHandle = await getFileHandle(context.directoryHandle, path)
       const file = await fileHandle.getFile()
       fileContent = await file.text()
     } catch (error) {
@@ -158,29 +159,29 @@ export const generateChartDefinition: ToolDefinition = {
     parameters: {
       type: 'object',
       properties: {
-        filePath: {
+        path: {
           type: 'string',
           description: 'Path to the data file (relative to project root)',
         },
-        fileType: {
+        file_type: {
           type: 'string',
           enum: ['csv', 'json'],
           description: 'Type of data file',
         },
-        chartType: {
+        chart_type: {
           type: 'string',
           enum: ['bar', 'line', 'pie', 'scatter'],
           description: 'Type of chart to generate',
         },
-        xAxis: {
+        x_axis: {
           type: 'string',
           description: 'Column name for X-axis (labels for bar/line/pie, numeric for scatter)',
         },
-        yAxis: {
+        y_axis: {
           type: 'string',
           description: 'Column name for Y-axis (values for bar/line/pie, numeric for scatter)',
         },
-        colorBy: {
+        color_by: {
           type: 'string',
           description: 'Optional column name to color data points by (for scatter charts)',
         },
@@ -189,7 +190,7 @@ export const generateChartDefinition: ToolDefinition = {
           description: 'Maximum number of data points to include (default: 50)',
         },
       },
-      required: ['filePath', 'fileType', 'chartType', 'xAxis', 'yAxis'],
+      required: ['path', 'file_type', 'chart_type', 'x_axis', 'y_axis'],
     },
   },
 }
@@ -199,20 +200,25 @@ export const generateChartExecutor: ToolExecutor = async (
   context: ToolContext
 ): Promise<string> => {
   const {
-    filePath,
-    fileType,
-    chartType,
-    xAxis,
-    yAxis,
+    path,
+    file_type,
+    chart_type,
+    x_axis,
+    y_axis,
     limit = 50,
   } = args as {
-    filePath: string
-    fileType: 'csv' | 'json'
-    chartType: 'bar' | 'line' | 'pie' | 'scatter'
-    xAxis: string
-    yAxis: string
+    path: string
+    file_type: 'csv' | 'json'
+    chart_type: 'bar' | 'line' | 'pie' | 'scatter'
+    x_axis: string
+    y_axis: string
     limit?: number
   }
+  const filePath = path
+  const fileType = file_type
+  const chartType = chart_type
+  const xAxis = x_axis
+  const yAxis = y_axis
 
   if (!context.directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
@@ -321,11 +327,11 @@ export const filterDataDefinition: ToolDefinition = {
     parameters: {
       type: 'object',
       properties: {
-        filePath: {
+        path: {
           type: 'string',
           description: 'Path to the data file (relative to project root)',
         },
-        fileType: {
+        file_type: {
           type: 'string',
           enum: ['csv', 'json'],
           description: 'Type of data file',
@@ -353,13 +359,13 @@ export const filterDataDefinition: ToolDefinition = {
             required: ['column', 'operator', 'value'],
           },
         },
-        exportFormat: {
+        export_format: {
           type: 'string',
           enum: ['json', 'csv'],
           description: 'Format to export filtered data (default: json)',
         },
       },
-      required: ['filePath', 'fileType', 'filters'],
+      required: ['path', 'file_type', 'filters'],
     },
   },
 }
@@ -369,16 +375,19 @@ export const filterDataExecutor: ToolExecutor = async (
   context: ToolContext
 ): Promise<string> => {
   const {
-    filePath,
-    fileType,
+    path,
+    file_type,
     filters,
-    exportFormat = 'json',
+    export_format,
   } = args as {
-    filePath: string
-    fileType: 'csv' | 'json'
+    path: string
+    file_type: 'csv' | 'json'
     filters: Array<{ column: string; operator: string; value: unknown }>
-    exportFormat?: 'json' | 'csv'
+    export_format?: 'json' | 'csv'
   }
+  const filePath = path
+  const fileType = file_type
+  const exportFormat = (export_format ?? 'json') as 'json' | 'csv'
 
   if (!context.directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
@@ -458,16 +467,16 @@ export const aggregateDataDefinition: ToolDefinition = {
     parameters: {
       type: 'object',
       properties: {
-        filePath: {
+        path: {
           type: 'string',
           description: 'Path to the data file (relative to project root)',
         },
-        fileType: {
+        file_type: {
           type: 'string',
           enum: ['csv', 'json'],
           description: 'Type of data file',
         },
-        groupBy: {
+        group_by: {
           type: 'string',
           description: 'Column name to group by',
         },
@@ -476,7 +485,7 @@ export const aggregateDataDefinition: ToolDefinition = {
           description: 'Aggregation functions for columns (e.g., {"value": "sum"})',
         },
       },
-      required: ['filePath', 'fileType', 'groupBy', 'aggregations'],
+      required: ['path', 'file_type', 'group_by', 'aggregations'],
     },
   },
 }
@@ -485,12 +494,15 @@ export const aggregateDataExecutor: ToolExecutor = async (
   args: Record<string, unknown>,
   context: ToolContext
 ): Promise<string> => {
-  const { filePath, fileType, groupBy, aggregations } = args as {
-    filePath: string
-    fileType: 'csv' | 'json'
-    groupBy: string
+  const { path, file_type, group_by, aggregations } = args as {
+    path: string
+    file_type: 'csv' | 'json'
+    group_by: string
     aggregations: Record<string, 'count' | 'sum' | 'avg' | 'min' | 'max'>
   }
+  const filePath = path
+  const fileType = file_type
+  const groupBy = group_by
 
   if (!context.directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })

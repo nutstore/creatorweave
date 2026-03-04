@@ -48,8 +48,8 @@ Bob,35,Chicago`
 
     const result = await analyzeDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
       },
       mockContext
     )
@@ -75,8 +75,8 @@ Bob,35,Chicago`
 
     const result = await analyzeDataExecutor(
       {
-        filePath: 'test.json',
-        fileType: 'json',
+        path: 'test.json',
+        file_type: 'json',
       },
       mockContext
     )
@@ -91,8 +91,8 @@ Bob,35,Chicago`
   it('should return error when no directory selected', async () => {
     const result = await analyzeDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
       },
       { directoryHandle: null }
     )
@@ -118,11 +118,11 @@ C,30`
 
     const result = await generateChartExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        chartType: 'bar',
-        xAxis: 'category',
-        yAxis: 'value',
+        path: 'test.csv',
+        file_type: 'csv',
+        chart_type: 'bar',
+        x_axis: 'category',
+        y_axis: 'value',
       },
       mockContext
     )
@@ -146,11 +146,11 @@ Mar,30`
 
     const result = await generateChartExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        chartType: 'line',
-        xAxis: 'month',
-        yAxis: 'value',
+        path: 'test.csv',
+        file_type: 'csv',
+        chart_type: 'line',
+        x_axis: 'month',
+        y_axis: 'value',
       },
       mockContext
     )
@@ -172,11 +172,11 @@ C,10`
 
     const result = await generateChartExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        chartType: 'pie',
-        xAxis: 'category',
-        yAxis: 'value',
+        path: 'test.csv',
+        file_type: 'csv',
+        chart_type: 'pie',
+        x_axis: 'category',
+        y_axis: 'value',
       },
       mockContext
     )
@@ -198,11 +198,11 @@ C,10`
 
     const result = await generateChartExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        chartType: 'scatter',
-        xAxis: 'x',
-        yAxis: 'y',
+        path: 'test.csv',
+        file_type: 'csv',
+        chart_type: 'scatter',
+        x_axis: 'x',
+        y_axis: 'y',
       },
       mockContext
     )
@@ -223,11 +223,11 @@ B,20`
 
     const result = await generateChartExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        chartType: 'bar',
-        xAxis: 'invalid_column',
-        yAxis: 'value',
+        path: 'test.csv',
+        file_type: 'csv',
+        chart_type: 'bar',
+        x_axis: 'invalid_column',
+        y_axis: 'value',
       },
       mockContext
     )
@@ -253,8 +253,8 @@ Bob,35,NYC`
 
     const result = await filterDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
         filters: [{ column: 'city', operator: 'eq', value: 'NYC' }],
       },
       mockContext
@@ -278,8 +278,8 @@ Bob,35`
 
     const result = await filterDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
         filters: [{ column: 'age', operator: 'gt', value: 30 }],
       },
       mockContext
@@ -302,8 +302,8 @@ Bob,35,NYC`
 
     const result = await filterDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
         filters: [
           { column: 'city', operator: 'eq', value: 'NYC' },
           { column: 'age', operator: 'gt', value: 30 },
@@ -329,10 +329,10 @@ Bob,35`
 
     const result = await filterDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
+        path: 'test.csv',
+        file_type: 'csv',
         filters: [{ column: 'age', operator: 'gt', value: 25 }],
-        exportFormat: 'csv',
+        export_format: 'csv',
       },
       mockContext
     )
@@ -359,9 +359,9 @@ B,30`
 
     const result = await aggregateDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        groupBy: 'category',
+        path: 'test.csv',
+        file_type: 'csv',
+        group_by: 'category',
         aggregations: { value: 'count' },
       },
       mockContext
@@ -385,9 +385,9 @@ B,30`
 
     const result = await aggregateDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        groupBy: 'category',
+        path: 'test.csv',
+        file_type: 'csv',
+        group_by: 'category',
         aggregations: { value: 'sum' },
       },
       mockContext
@@ -410,9 +410,9 @@ B,30`
 
     const result = await aggregateDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        groupBy: 'category',
+        path: 'test.csv',
+        file_type: 'csv',
+        group_by: 'category',
         aggregations: { value: 'avg' },
       },
       mockContext
@@ -435,9 +435,9 @@ B,30`
 
     const result = await aggregateDataExecutor(
       {
-        filePath: 'test.csv',
-        fileType: 'csv',
-        groupBy: 'category',
+        path: 'test.csv',
+        file_type: 'csv',
+        group_by: 'category',
         aggregations: {
           value_sum: 'sum',
           value_avg: 'avg',

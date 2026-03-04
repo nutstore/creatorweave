@@ -862,7 +862,7 @@ export class FingerprintScanner {
    * Get recommended tools for this project type
    */
   private getRecommendedTools(projectType: ProjectType, hasTypeScript: boolean): string[] {
-    const base = ['glob', 'file_read', 'grep']
+    const base = ['glob', 'file_read', 'search_text']
 
     const typeTools: Record<string, string[]> = {
       react: ['file_edit', 'file_batch'],
@@ -877,7 +877,7 @@ export class FingerprintScanner {
     const tools = [...base, ...(typeTools[projectType] || [])]
 
     if (hasTypeScript) {
-      tools.push('grep') // Useful for TypeScript code
+      tools.push('search_text') // Useful for TypeScript code
     }
 
     return [...new Set(tools)]

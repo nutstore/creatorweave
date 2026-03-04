@@ -34,7 +34,7 @@ export interface CodeReviewArgs {
   /** Categories to check */
   categories?: ('style' | 'performance' | 'security' | 'best-practice')[]
   /** Rule IDs to include (empty = all) */
-  ruleIds?: string[]
+  rule_ids?: string[]
 }
 
 export interface CodeReviewIssue {
@@ -775,7 +775,7 @@ export const code_review: ToolDefinition = {
           type: 'string',
           description: 'Source code to review',
         },
-        file: {
+        path: {
           type: 'string',
           description: 'File path for context (used for language detection)',
         },
@@ -804,13 +804,13 @@ export const code_review: ToolDefinition = {
           },
           description: 'Categories to check (all if not specified)',
         },
-        ruleIds: {
+        rule_ids: {
           type: 'array',
           items: { type: 'string' },
           description: 'Specific rule IDs to run (all if not specified)',
         },
       },
-      required: ['code', 'file'],
+      required: ['code', 'path'],
     },
   },
 }
@@ -829,7 +829,7 @@ export const batch_code_review: ToolDefinition = {
           items: {
             type: 'object',
             properties: {
-              file: { type: 'string', description: 'File path' },
+              path: { type: 'string', description: 'File path' },
               code: { type: 'string', description: 'Source code' },
               language: {
                 type: 'string',
@@ -849,7 +849,7 @@ export const batch_code_review: ToolDefinition = {
                 description: 'Programming language (auto-detected if not provided)',
               },
             },
-            required: ['file', 'code'],
+            required: ['path', 'code'],
           },
           description: 'Array of files to review',
         },
@@ -877,7 +877,7 @@ export const code_review_executor: ToolExecutor = async (
 ): Promise<string> => {
   try {
     const code = args.code as string
-    const file = (args.file as string) || 'unknown'
+    const file = (args.path as string) || 'unknown'
     const language = (args.language as string) || detectLanguage(file, code)
     const categories = args.categories as
       | ('style' | 'performance' | 'security' | 'best-practice')[]
@@ -903,7 +903,11 @@ export const batch_code_review_executor: ToolExecutor = async (
   _context: ToolContext
 ): Promise<string> => {
   try {
-    const files = args.files as Array<{ file: string; code: string; language?: string }>
+    const files = args.files as Array<{
+      path: string
+      code: string
+      language?: string
+    }>
     const categories = args.categories as
       | ('style' | 'performance' | 'security' | 'best-practice')[]
       | undefined
@@ -914,8 +918,9 @@ export const batch_code_review_executor: ToolExecutor = async (
     let totalSuggestions = 0
 
     for (const fileEntry of files) {
-      const language = fileEntry.language || detectLanguage(fileEntry.file, fileEntry.code)
-      const result = runReview(fileEntry.code, fileEntry.file, language, categories)
+      const filePath = fileEntry.path
+      const language = fileEntry.language || detectLanguage(filePath, fileEntry.code)
+      const result = runReview(fileEntry.code, filePath, language, categories)
       results.push(result)
       totalErrors += result.summary.errors
       totalWarnings += result.summary.warnings

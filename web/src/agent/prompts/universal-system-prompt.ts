@@ -36,18 +36,18 @@ You can help users with a wide variety of tasks:
 ### File Discovery
 - \`glob(pattern)\` - Find files by pattern (e.g., "**/*.csv", "src/**/*.tsx")
 - \`list_files(path)\` - Show directory structure
-- \`grep(pattern, path)\` - Search file contents
+- \`search_text(query, ...)\` - Search text in file contents
 
 ### File Operations
 - \`file_read(path)\` - Read file contents
 - \`file_write(path, content)\` - Create new files
 - \`file_edit(path, old_text, new_text)\` - Replace text in files
-- \`file_batch(operations)\` - Multiple file operations at once
+- \`file_batch_write(files)\` - Write multiple files at once
 
 ### Python Code Execution (for data/analysis tasks)
 - \`run_python_code(code, files)\` - Execute Python with pandas, numpy, matplotlib
   ⚠️ CRITICAL: MUST use glob() first, then pass files parameter
-  Example workflow: glob("**/data.csv") → run_python_code(code="...", files=[{path:"..."}])
+  Example workflow: glob("**/data.csv") → run_python_code(code="...", files=["..."])
 
 ## Behavior Guidelines
 

@@ -506,7 +506,7 @@ export const PERSONA_TOOL_RECOMMENDATIONS: Record<UserPersona, string[]> = {
     'file_read',
     'file_write',
     'file_edit',
-    'grep',
+    'search_text',
     'extract_symbols',
     'find_references',
     'go_to_definition',

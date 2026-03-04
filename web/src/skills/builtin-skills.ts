@@ -135,7 +135,7 @@ describe('calculateDiscount', () => {
    - When did it start (what changed)?
 
 2. **Isolate**: Narrow down the location
-   - Use grep/glob to find relevant code
+   - Use search_text/glob to find relevant code
    - Read the error message and stack trace carefully
    - Check recent git changes in the affected area
 

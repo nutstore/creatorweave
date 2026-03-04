@@ -6,8 +6,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   batchEditDefinition,
   batchEditExecutor,
-  advancedSearchDefinition,
-  advancedSearchExecutor,
   fileBatchReadDefinition,
   fileBatchReadExecutor,
 } from '../batch-operations.tool'
@@ -285,136 +283,6 @@ describe('batch_edit tool', () => {
   })
 })
 
-describe('advanced_search tool', () => {
-  let mockContext: ToolContext
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    mockContext = {
-      directoryHandle: {} as FileSystemDirectoryHandle,
-    }
-  })
-
-  describe('tool definition', () => {
-    it('should have correct tool name', () => {
-      expect(advancedSearchDefinition.function.name).toBe('advanced_search')
-    })
-
-    it('should have required parameters', () => {
-      const { required } = advancedSearchDefinition.function.parameters
-      expect(required).toContain('pattern')
-    })
-
-    it('should have optional parameters', () => {
-      const { properties } = advancedSearchDefinition.function.parameters
-      expect(properties.file_pattern).toBeDefined()
-      expect(properties.context_lines).toBeDefined()
-      expect(properties.max_results).toBeDefined()
-      expect(properties.case_insensitive).toBeDefined()
-    })
-  })
-
-  describe('search functionality', () => {
-    it('should search for pattern in files', async () => {
-      const args = {
-        pattern: 'function',
-        file_pattern: '*.ts',
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-      expect(result.pattern).toBe('function')
-    })
-
-    it('should support case-insensitive search', async () => {
-      const args = {
-        pattern: 'FUNCTION',
-        file_pattern: '*.ts',
-        case_insensitive: true,
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should include context lines', async () => {
-      const args = {
-        pattern: 'test',
-        file_pattern: '*.ts',
-        context_lines: 3,
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-    })
-
-    it('should limit results', async () => {
-      const args = {
-        pattern: '.',
-        file_pattern: '*.ts',
-        max_results: 10,
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-      expect(result.summary.totalMatches).toBeLessThanOrEqual(10)
-    })
-
-    it('should filter by file pattern', async () => {
-      const args = {
-        pattern: 'import',
-        file_pattern: '*.ts',
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-      expect(result.filePattern).toBe('*.ts')
-    })
-  })
-
-  describe('error handling', () => {
-    it('should require directory handle', async () => {
-      const args = {
-        pattern: 'test',
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, { directoryHandle: null }))
-
-      expect(result.error).toBeDefined()
-      expect(result.error).toContain('No directory selected')
-    })
-
-    it('should handle invalid regex patterns', async () => {
-      const args = {
-        pattern: '[invalid(',
-        file_pattern: '*.ts',
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.error).toBeDefined()
-      expect(result.error).toContain('Invalid regex pattern')
-    })
-
-    it('should handle no matches gracefully', async () => {
-      const args = {
-        pattern: 'NONEXISTENT_PATTERN_xyz123',
-        file_pattern: '*.ts',
-      }
-
-      const result = JSON.parse(await advancedSearchExecutor(args, mockContext))
-
-      expect(result.success).toBe(true)
-      expect(result.results.length).toBe(0)
-    })
-  })
-})
-
 describe('file_batch_read tool', () => {
   let mockContext: ToolContext
 
@@ -617,7 +485,6 @@ describe('tool integration', () => {
 
     const tools = [
       { executor: batchEditExecutor, args: { file_pattern: '*.ts', find: 'x', replace: 'y' } },
-      { executor: advancedSearchExecutor, args: { pattern: 'test' } },
       { executor: fileBatchReadExecutor, args: { paths: ['test.txt'] } },
     ]
 

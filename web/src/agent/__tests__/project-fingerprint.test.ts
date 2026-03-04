@@ -286,7 +286,7 @@ describe('format fingerprint for prompt', () => {
       directories: ['src', 'public'],
       size: 'medium',
       hasTypeScript: true,
-      recommendedTools: ['glob', 'file_read', 'grep', 'file_edit'],
+      recommendedTools: ['glob', 'file_read', 'search_text', 'file_edit'],
     }
 
     const formatted = formatFingerprintForPrompt(fingerprint)

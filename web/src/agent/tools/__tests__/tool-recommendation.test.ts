@@ -8,6 +8,7 @@ import {
   RecommendationEngine,
   getRecommendationEngine,
 } from '@/agent/tools/tool-recommendation'
+import { getBuiltinToolNames } from '@/agent/tool-registry'
 
 describe('IntentAnalyzer', () => {
   const analyzer = new IntentAnalyzer()
@@ -76,8 +77,8 @@ describe('IntentAnalyzer', () => {
       expect(result.primaryIntent).toBe('code-search')
     })
 
-    it('should detect grep pattern mentions', () => {
-      const result = analyzer.analyze('grep for useState')
+    it('should detect text-search pattern mentions', () => {
+      const result = analyzer.analyze('search text for useState')
       expect(result.primaryIntent).toBe('code-search')
     })
 
@@ -169,21 +170,23 @@ describe('RecommendationEngine', () => {
   })
 
   describe('tool recommendations for code search', () => {
-    it('should recommend grep for code search', () => {
+    it('should recommend search_text for code search', () => {
       const recommendations = engine.recommend('search for useEffect usage in components')
-      const grepTool = recommendations.find((r) => r.toolName === 'grep')
+      const searchTool = recommendations.find((r) => r.toolName === 'search_text')
 
-      expect(grepTool).toBeDefined()
-      expect(grepTool?.category).toBe('search')
+      expect(searchTool).toBeDefined()
+      expect(searchTool?.category).toBe('search')
     })
 
     it('should include file pattern in example', () => {
       const recommendations = engine.recommend('find useState in TSX files')
       // @ts-expect-error - reserved for future assertions
-      const grepTool = recommendations.find((r) => r.toolName === 'grep')
+      const searchTool = recommendations.find((r) => r.toolName === 'search_text')
 
-      // grep is recommended for code search
       expect(recommendations.length).toBeGreaterThan(0)
+      if (searchTool) {
+        expect(searchTool.example).toContain('file_pattern')
+      }
     })
   })
 
@@ -209,6 +212,15 @@ describe('RecommendationEngine', () => {
         // Example contains some pattern
         expect(globTool.example.length).toBeGreaterThan(0)
       }
+    })
+
+    it('should use string array format for run_python_code files example', () => {
+      const recommendations = engine.recommend('analyze sales.csv with python')
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
+
+      expect(pythonTool).toBeDefined()
+      expect(pythonTool?.example).toContain('files=["your/data.csv"]')
+      expect(pythonTool?.example).not.toContain('files=[{path:')
     })
   })
 
@@ -238,6 +250,36 @@ describe('RecommendationEngine', () => {
 
       expect(pythonTool).toBeDefined()
       expect(pythonTool?.category).toBe('analysis')
+    })
+
+    it('should expose registered sync tool name instead of legacy name', () => {
+      const allTools = engine.getAllTools()
+      const syncTool = allTools.writing.find((t) => t.toolName === 'sync_to_disk')
+      const legacySync = allTools.writing.find((t) => t.toolName === 'file_sync')
+
+      expect(syncTool).toBeDefined()
+      expect(legacySync).toBeUndefined()
+    })
+
+    it('should expose registered batch write tool name instead of legacy name', () => {
+      const allTools = engine.getAllTools()
+      const batchTool = allTools.batch.find((t) => t.toolName === 'file_batch_write')
+      const legacyBatch = allTools.batch.find((t) => t.toolName === 'file_batch')
+
+      expect(batchTool).toBeDefined()
+      expect(legacyBatch).toBeUndefined()
+    })
+
+    it('should only recommend tools that exist in the built-in registry', () => {
+      const builtinToolNames = new Set(getBuiltinToolNames())
+      const allTools = engine.getAllTools()
+      const recommendedNames = Object.values(allTools)
+        .flat()
+        .map((tool) => tool.toolName)
+
+      for (const toolName of recommendedNames) {
+        expect(builtinToolNames.has(toolName)).toBe(true)
+      }
     })
   })
 })

@@ -26,7 +26,7 @@ export interface TestGenerationResult {
 
 export interface GenerateTestsArgs {
   /** File path to analyze */
-  file: string
+  path: string
   /** Source code to analyze */
   code: string
   /** Programming language */
@@ -34,7 +34,7 @@ export interface GenerateTestsArgs {
   /** Framework to use for tests */
   framework?: 'vitest' | 'jest'
   /** Include snapshot tests for components */
-  includeSnapshotTests?: boolean
+  include_snapshot_tests?: boolean
 }
 
 // ============================================================================
@@ -387,7 +387,7 @@ export const test_generation: ToolDefinition = {
     parameters: {
       type: 'object',
       properties: {
-        file: {
+        path: {
           type: 'string',
           description: 'File path to generate tests for',
         },
@@ -405,12 +405,12 @@ export const test_generation: ToolDefinition = {
           enum: ['vitest', 'jest'],
           description: 'Test framework to use',
         },
-        includeSnapshotTests: {
+        include_snapshot_tests: {
           type: 'boolean',
           description: 'Include snapshot tests for components',
         },
       },
-      required: ['file', 'code'],
+      required: ['path', 'code'],
     },
   },
 }
@@ -424,11 +424,11 @@ export const test_generation_executor: ToolExecutor = async (
   _context: ToolContext
 ): Promise<string> => {
   try {
-    const file = args.file as string
+    const file = args.path as string
     const code = args.code as string
     void args.language // Reserved for future language-specific test generation
     const framework = (args.framework as 'vitest' | 'jest') || 'vitest'
-    const includeSnapshotTests = (args.includeSnapshotTests as boolean) ?? false
+    const includeSnapshotTests = (args.include_snapshot_tests as boolean) ?? false
 
     // Detect test framework (use provided framework if specified, otherwise auto-detect)
     const detectedFramework = framework === 'jest' ? 'jest' : detectFramework(code)

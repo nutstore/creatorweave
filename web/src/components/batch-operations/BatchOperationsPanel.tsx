@@ -25,7 +25,7 @@ import { Progress } from '@/components/ui/progress'
 // Types
 //=============================================================================
 
-export type BatchOperationType = 'batch_edit' | 'advanced_search' | 'file_batch_read'
+export type BatchOperationType = 'batch_edit' | 'search_text' | 'file_batch_read'
 
 export interface BatchEditPreview {
   path: string
@@ -150,18 +150,19 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
 
     setState((prev) => ({
       ...prev,
-      type: 'advanced_search',
+      type: 'search_text',
       isRunning: true,
       progress: 0,
       error: null,
     }))
 
     try {
-      const result = await onExecute('advanced_search', {
-        pattern: searchPattern,
+      const result = await onExecute('search_text', {
+        query: searchPattern,
+        mode: 'regex',
         file_pattern: searchFilePattern || undefined,
         context_lines: searchContextLines,
-        case_insensitive: searchCaseInsensitive,
+        case_sensitive: !searchCaseInsensitive,
         max_results: 100,
       })
 
@@ -473,7 +474,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
       )
     }
 
-    if (state.type === 'advanced_search') {
+    if (state.type === 'search_text') {
       const results = state.preview as AdvancedSearchResult[]
       return (
         <div className="mt-4 space-y-2">
@@ -569,8 +570,8 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
             Batch Edit
           </button>
           <button
-            onClick={() => setState((prev) => ({ ...prev, type: 'advanced_search' }))}
-            className={`px-3 py-1 text-sm ${state.type === 'advanced_search' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
+            onClick={() => setState((prev) => ({ ...prev, type: 'search_text' }))}
+            className={`px-3 py-1 text-sm ${state.type === 'search_text' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
           >
             Advanced Search
           </button>
@@ -599,7 +600,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
 
         {/* Forms */}
         {state.type === 'batch_edit' && renderBatchEditForm()}
-        {state.type === 'advanced_search' && renderAdvancedSearchForm()}
+        {state.type === 'search_text' && renderAdvancedSearchForm()}
         {state.type === 'file_batch_read' && renderBatchReadForm()}
 
         {/* Preview */}

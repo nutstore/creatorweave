@@ -43,7 +43,7 @@ const TOOL_CATEGORIES = [
     icon: FileSearch,
     description: 'Find and explore files in your project',
     descriptionKey: 'tools.categories.discovery.description',
-    toolNames: ['glob', 'list_files', 'grep'],
+    toolNames: ['glob', 'list_files', 'search_text'],
   },
   {
     id: 'operations',
@@ -52,7 +52,7 @@ const TOOL_CATEGORIES = [
     icon: FileSearch,
     description: 'Read, write, and edit files',
     descriptionKey: 'tools.categories.operations.description',
-    toolNames: ['file_read', 'file_write', 'file_edit', 'file_batch', 'file_sync'],
+    toolNames: ['file_read', 'file_write', 'file_edit', 'file_batch_write', 'sync_to_disk'],
   },
   {
     id: 'code',

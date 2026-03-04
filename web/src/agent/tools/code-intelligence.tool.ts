@@ -225,7 +225,7 @@ export const goToDefinitionDefinition: ToolDefinition = {
           description:
             'Symbol name to find definition for (e.g. "myFunction", "MyClass", "myVariable")',
         },
-        file: {
+        path: {
           type: 'string',
           description: 'File path where the symbol is referenced (e.g. "src/components/App.tsx")',
         },
@@ -234,7 +234,7 @@ export const goToDefinitionDefinition: ToolDefinition = {
           description: 'Line number in the file where the symbol is referenced',
         },
       },
-      required: ['symbol', 'file', 'line'],
+      required: ['symbol', 'path', 'line'],
     },
   },
 }
@@ -405,7 +405,7 @@ export const findReferencesExecutor: ToolExecutor = async (args, context) => {
 
 export const goToDefinitionExecutor: ToolExecutor = async (args, context) => {
   const symbol = args.symbol as string
-  const filePath = args.file as string
+  const filePath = args.path as string
   const lineNumber = args.line as number
 
   if (!context.directoryHandle) {

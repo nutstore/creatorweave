@@ -94,7 +94,7 @@ export const AGENT_TYPES: Record<string, AgentCapabilities> = {
     agentId: 'search_agent',
     name: 'Search Specialist Agent',
     description: 'Handles file searching, pattern matching, and content discovery',
-    canHandle: ['search', 'grep', 'find-references', 'locate'],
+    canHandle: ['search', 'search-text', 'find-references', 'locate'],
     maxConcurrentTasks: 5,
     currentLoad: 0,
   },

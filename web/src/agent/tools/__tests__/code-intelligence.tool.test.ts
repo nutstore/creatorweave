@@ -568,10 +568,10 @@ const x = helper  // read
       it('should have all required parameters', () => {
         const params = goToDefinitionDefinition.function.parameters
         expect(params.properties.symbol).toBeDefined()
-        expect(params.properties.file).toBeDefined()
+        expect(params.properties.path).toBeDefined()
         expect(params.properties.line).toBeDefined()
         expect(params.required).toContain('symbol')
-        expect(params.required).toContain('file')
+        expect(params.required).toContain('path')
         expect(params.required).toContain('line')
       })
     })
@@ -594,7 +594,7 @@ const result = calculateTotal(data)
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'calculateTotal', file: 'test.ts', line: 6 },
+          { symbol: 'calculateTotal', path: 'test.ts', line: 6 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -624,7 +624,7 @@ const service = new UserService()
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'UserService', file: 'test.ts', line: 6 },
+          { symbol: 'UserService', path: 'test.ts', line: 6 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -652,7 +652,7 @@ function processUser(user: User) {}
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'User', file: 'test.ts', line: 6 },
+          { symbol: 'User', path: 'test.ts', line: 6 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -680,7 +680,7 @@ async function fetchData() {
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'API_URL', file: 'test.ts', line: 4 },
+          { symbol: 'API_URL', path: 'test.ts', line: 4 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -706,7 +706,7 @@ const result = processData()
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'processData', file: 'main.ts', line: 4 },
+          { symbol: 'processData', path: 'main.ts', line: 4 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -728,7 +728,7 @@ const result = processData()
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'nonexistent', file: 'test.ts', line: 1 },
+          { symbol: 'nonexistent', path: 'test.ts', line: 1 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -745,7 +745,7 @@ const result = processData()
         vi.mocked(resolveFileHandle).mockResolvedValue(mockFileHandle)
 
         const result = await goToDefinitionExecutor(
-          { symbol: 'test', file: 'test.ts', line: 999 },
+          { symbol: 'test', path: 'test.ts', line: 999 },
           mockContext
         )
         const parsed = JSON.parse(result)
@@ -755,7 +755,7 @@ const result = processData()
 
       it('should handle missing directory handle', async () => {
         const result = await goToDefinitionExecutor(
-          { symbol: 'test', file: 'test.ts', line: 1 },
+          { symbol: 'test', path: 'test.ts', line: 1 },
           { directoryHandle: null }
         )
         const parsed = JSON.parse(result)
