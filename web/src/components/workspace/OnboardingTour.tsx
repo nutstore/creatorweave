@@ -9,11 +9,12 @@
  * - Smooth animations
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react'
 import { BrandButton } from '@browser-fs-analyzer/ui'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
-import { useT } from '@/i18n'
+import { useT, useLocale } from '@/i18n'
+import { t as staticT, DEFAULT_LOCALE, type Locale } from '@browser-fs-analyzer/i18n'
 
 export interface TourStep {
   id: string
@@ -33,17 +34,24 @@ interface OnboardingTourProps {
 }
 
 export function OnboardingTour({
-  steps,
+  steps: propSteps,
   onComplete,
   onSkip,
   autoStart = false,
   showAgain = false,
 }: OnboardingTourProps) {
   const t = useT()
+  const [locale] = useLocale()
   const { onboardingCompleted, setOnboardingCompleted } = useWorkspacePreferencesStore()
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
+
+  // 根据当前语言获取引导步骤
+  const steps = useMemo(() => {
+    if (propSteps) return propSteps
+    return getDefaultOnboardingSteps(locale)
+  }, [propSteps, locale])
 
   // Check if we should show the tour
   useEffect(() => {
@@ -97,13 +105,12 @@ export function OnboardingTour({
   const isFirstStep = currentStepIndex === 0
 
   const handleComplete = useCallback(() => {
-    if (dontShowAgain) {
-      setOnboardingCompleted(true)
-    }
+    // 修复：无论是否勾选"不再显示"，完成引导都保存状态
+    setOnboardingCompleted(true)
     setIsOpen(false)
     setCurrentStepIndex(0)
     onComplete?.()
-  }, [dontShowAgain, setOnboardingCompleted, onComplete])
+  }, [setOnboardingCompleted, onComplete])
 
   const handleNext = useCallback(() => {
     if (isLastStep) {
@@ -121,13 +128,12 @@ export function OnboardingTour({
   }, [isFirstStep])
 
   const handleSkip = useCallback(() => {
-    if (dontShowAgain) {
-      setOnboardingCompleted(true)
-    }
+    // 修复：无论是否勾选"不再显示"，跳过引导都保存状态
+    setOnboardingCompleted(true)
     setIsOpen(false)
     setCurrentStepIndex(0)
     onSkip?.()
-  }, [dontShowAgain, setOnboardingCompleted, onSkip])
+  }, [setOnboardingCompleted, onSkip])
 
   if (!isOpen || !currentStep) return null
 
@@ -221,47 +227,89 @@ export function OnboardingTour({
 }
 
 /**
- * Default tour steps for first-time users
+ * 静态翻译函数（用于模块级别）
  */
-export const DEFAULT_ONBOARDING_STEPS: TourStep[] = [
-  {
-    id: 'welcome',
-    title: 'Welcome to Browser FS Analyzer!',
-    description: 'Let us show you around the key features.',
-    position: 'center',
-  },
-  {
-    id: 'conversations',
-    title: 'Conversations',
-    description: 'Chat with AI to analyze your codebase. Each conversation has its own workspace.',
-    target: '[data-tour="conversations"]',
-    position: 'right',
-  },
-  {
-    id: 'file-tree',
-    title: 'File Browser',
-    description: 'Browse your project files and folders. Click any file to preview its contents.',
-    target: '[data-tour="file-tree"]',
-    position: 'right',
-  },
-  {
-    id: 'skills',
-    title: 'Skills',
-    description: 'Manage and execute reusable skills for common tasks.',
-    target: '[data-tour="skills"]',
-    position: 'bottom',
-  },
-  {
-    id: 'tools',
-    title: 'Tools Panel',
-    description: 'Access quick actions, reasoning visualization, and smart suggestions.',
-    target: '[data-tour="tools"]',
-    position: 'bottom',
-  },
-  {
-    id: 'complete',
-    title: 'All Set!',
-    description: 'You can always access these features from the toolbar or keyboard shortcuts.',
-    position: 'center',
-  },
-]
+function getStepTitle(locale: Locale, step: string, fallback: string): string {
+  const key = `onboarding.steps.${step}.title` as const
+  const result = staticT(locale, key)
+  return result === key ? fallback : result
+}
+
+function getStepDescription(locale: Locale, step: string, fallback: string): string {
+  const key = `onboarding.steps.${step}.description` as const
+  const result = staticT(locale, key)
+  return result === key ? fallback : result
+}
+
+/**
+ * Get default tour steps for a given locale
+ */
+export function getDefaultOnboardingSteps(locale: Locale = DEFAULT_LOCALE): TourStep[] {
+  return [
+    {
+      id: 'welcome',
+      title: getStepTitle(locale, 'welcome', 'Welcome to Browser FS Analyzer!'),
+      description: getStepDescription(locale, 'welcome', 'Let us show you around the key features.'),
+      position: 'center',
+    },
+    {
+      id: 'conversations',
+      title: getStepTitle(locale, 'conversations', 'Conversations'),
+      description: getStepDescription(
+        locale,
+        'conversations',
+        'Chat with AI to analyze your codebase. Each conversation has its own workspace.'
+      ),
+      target: '[data-tour="conversations"]',
+      position: 'right',
+    },
+    {
+      id: 'file-tree',
+      title: getStepTitle(locale, 'fileTree', 'File Browser'),
+      description: getStepDescription(
+        locale,
+        'fileTree',
+        'Browse your project files and folders. Click any file to preview its contents.'
+      ),
+      target: '[data-tour="file-tree"]',
+      position: 'right',
+    },
+    {
+      id: 'skills',
+      title: getStepTitle(locale, 'skills', 'Skills'),
+      description: getStepDescription(
+        locale,
+        'skills',
+        'Manage and execute reusable skills for common tasks.'
+      ),
+      target: '[data-tour="skills"]',
+      position: 'bottom',
+    },
+    {
+      id: 'tools',
+      title: getStepTitle(locale, 'tools', 'Tools Panel'),
+      description: getStepDescription(
+        locale,
+        'tools',
+        'Access quick actions, reasoning visualization, and smart suggestions.'
+      ),
+      target: '[data-tour="tools"]',
+      position: 'bottom',
+    },
+    {
+      id: 'complete',
+      title: getStepTitle(locale, 'complete', 'All Set!'),
+      description: getStepDescription(
+        locale,
+        'complete',
+        'You can always access these features from the toolbar or keyboard shortcuts.'
+      ),
+      position: 'center',
+    },
+  ]
+}
+
+/**
+ * Default tour steps for first-time users (English fallback)
+ */
+export const DEFAULT_ONBOARDING_STEPS: TourStep[] = getDefaultOnboardingSteps('en-US')

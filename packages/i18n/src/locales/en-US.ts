@@ -284,6 +284,32 @@ export const enUS = {
     previous: 'Previous',
     next: 'Next',
     complete: 'Complete',
+    steps: {
+      welcome: {
+        title: 'Welcome to Browser FS Analyzer!',
+        description: 'Let us show you around the key features.',
+      },
+      conversations: {
+        title: 'Conversations',
+        description: 'Chat with AI to analyze your codebase. Each conversation has its own workspace.',
+      },
+      fileTree: {
+        title: 'File Browser',
+        description: 'Browse your project files and folders. Click any file to preview its contents.',
+      },
+      skills: {
+        title: 'Skills',
+        description: 'Manage and execute reusable skills for common tasks.',
+      },
+      tools: {
+        title: 'Tools Panel',
+        description: 'Access quick actions, reasoning visualization, and smart suggestions.',
+      },
+      complete: {
+        title: 'All Set!',
+        description: 'You can always access these features from the toolbar or keyboard shortcuts.',
+      },
+    },
   },
 
   workspace: {
