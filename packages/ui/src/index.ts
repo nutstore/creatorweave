@@ -43,3 +43,11 @@ export {
   DropdownMenuSubContent,
   DropdownMenuRadioGroup,
 } from './components/ui/dropdown-menu'
+
+// Tooltip - exported for app toolbar actions
+export {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from './components/ui/tooltip'

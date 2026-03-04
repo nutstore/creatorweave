@@ -27,6 +27,10 @@ import {
   BrandDialogBody,
   BrandDialogFooter,
   BrandDialogTitle,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@browser-fs-analyzer/ui'
 import { cn } from '@/lib/utils'
 
@@ -198,11 +202,27 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   // Get current workspace info
   const currentWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
 
+  const ActionTooltip = ({
+    label,
+    children,
+  }: {
+    label: string
+    children: React.ReactNode
+  }) => (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+
   return (
-    <div className="relative" ref={containerRef}>
-      <BrandButton iconButton variant="ghost" onClick={() => setOpen(!open)} title="存储空间">
-        <HardDrive className="h-5 w-5" />
-      </BrandButton>
+    <TooltipProvider delayDuration={200}>
+      <div className="relative" ref={containerRef}>
+        <ActionTooltip label="存储空间">
+          <BrandButton iconButton variant="ghost" onClick={() => setOpen(!open)}>
+            <HardDrive className="h-5 w-5" />
+          </BrandButton>
+        </ActionTooltip>
       {/* Status dot: sibling element to avoid overflow clipping */}
       {showStatusDot && (
         <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusDotColor)} />
@@ -397,7 +417,8 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           </BrandDialogFooter>
         </BrandDialogContent>
       </BrandDialog>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 
   function SessionDropdown() {
@@ -458,14 +479,15 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                     >
                       {STORAGE_STATUS_LABELS[storage.status]}
                     </BrandBadge>
-                    <button
-                      type="button"
-                      onClick={() => refresh(true)}
-                      className="text-[10px] text-primary-600 hover:underline"
-                      title="计算每个会话的缓存大小（可能较慢）"
-                    >
-                      刷新
-                    </button>
+                    <ActionTooltip label="计算每个会话的缓存大小（可能较慢）">
+                      <button
+                        type="button"
+                        onClick={() => refresh(true)}
+                        className="text-[10px] text-primary-600 hover:underline"
+                      >
+                        刷新
+                      </button>
+                    </ActionTooltip>
                   </div>
                   {/* Explanatory note */}
                   <div className="flex items-start gap-1.5 text-[9px] leading-tight text-muted">
@@ -556,14 +578,15 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
                       {/* Delete button */}
                       {!isActive && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteClick(session.id)}
-                          className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
-                          title="删除工作区"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <ActionTooltip label="删除工作区">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClick(session.id)}
+                            className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </ActionTooltip>
                       )}
                     </li>
                   )
@@ -576,16 +599,17 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
           {/* Footer - Cleanup Action */}
           <div className="px-4 py-2">
-            <button
-              type="button"
-              onClick={() => handleOpenCleanupDialog('old')}
-              disabled={cleanupLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-gray-50 disabled:opacity-50"
-              title="清理旧会话的文件缓存，释放存储空间"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {cleanupLoading ? '加载中...' : '清理文件缓存'}
-            </button>
+            <ActionTooltip label="清理旧会话的文件缓存，释放存储空间">
+              <button
+                type="button"
+                onClick={() => handleOpenCleanupDialog('old')}
+                disabled={cleanupLoading}
+                className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-gray-50 disabled:opacity-50"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                {cleanupLoading ? '加载中...' : '清理文件缓存'}
+              </button>
+            </ActionTooltip>
             <p className="px-1 pt-1.5 text-[9px] leading-tight text-muted">
               仅清理文件缓存，不影响对话记录
             </p>

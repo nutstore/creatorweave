@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton, Tooltip, TooltipContent, TooltipTrigger } from '@browser-fs-analyzer/ui'
 
 const THEME_ICONS = {
   light: Sun,
@@ -39,18 +39,25 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
   return (
     <div className={`relative ${className}`}>
       {/* Main toggle button */}
-      <BrandButton
-        variant="ghost"
-        onClick={toggleTheme}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          setShowMenu(!showMenu)
-        }}
-        className="relative"
-        title={`Current theme: ${THEME_LABELS[mode]} (right-click for options)`}
-      >
-        <CurrentIcon className="h-4 w-4" />
-      </BrandButton>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <BrandButton
+            iconButton
+            variant="ghost"
+            onClick={toggleTheme}
+            onContextMenu={(e) => {
+              e.preventDefault()
+              setShowMenu(!showMenu)
+            }}
+            className="relative"
+          >
+            <CurrentIcon className="h-4 w-4" />
+          </BrandButton>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">
+          当前主题：{THEME_LABELS[mode]}（右键打开主题菜单）
+        </TooltipContent>
+      </Tooltip>
 
       {/* Theme selection menu */}
       {showMenu && (

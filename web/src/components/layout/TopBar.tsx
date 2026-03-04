@@ -12,9 +12,10 @@
  * - Replaced inline folder button with FolderSelector component
  */
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   Settings,
+  SlidersHorizontal,
   Sparkles,
   Wrench,
   KeyRound,
@@ -33,7 +34,13 @@ import { ConversationStorageBadge } from '@/components/session'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { FolderSelector } from './FolderSelector'
 import { useT } from '@/i18n'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import {
+  BrandButton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@browser-fs-analyzer/ui'
 import { ThemeToggle } from '@/components/workspace'
 
 interface TopBarProps {
@@ -66,34 +73,60 @@ export function TopBar({
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
 
+  const ActionTooltip = ({
+    label,
+    children,
+  }: {
+    label: string
+    children: ReactNode
+  }) => (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  )
+
   return (
     <>
-      <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-gray-200 bg-background px-4">
+      <TooltipProvider delayDuration={200}>
+        <header className="flex h-[52px] shrink-0 items-center justify-between border-b border-gray-200 bg-background px-4">
         {/* Left: Menu button (mobile) + Logo + Name */}
         <div className="flex items-center gap-2.5">
           {onBackToProjects && (
-            <BrandButton iconButton onClick={onBackToProjects} title="返回项目列表">
-              <ArrowLeft className="h-[14px] w-[14px]" />
-            </BrandButton>
+            <ActionTooltip label="返回项目列表">
+              <BrandButton iconButton onClick={onBackToProjects}>
+                <ArrowLeft className="h-[14px] w-[14px]" />
+              </BrandButton>
+            </ActionTooltip>
           )}
           {isMobile && (
-            <BrandButton iconButton onClick={onMenuOpen} title="菜单" data-tour="menu">
-              <Menu className="h-[14px] w-[14px]" />
-            </BrandButton>
+            <ActionTooltip label="菜单">
+              <BrandButton iconButton onClick={onMenuOpen} data-tour="menu">
+                <Menu className="h-[14px] w-[14px]" />
+              </BrandButton>
+            </ActionTooltip>
           )}
-          <Sparkles className="h-5 w-5 text-primary-600" />
-          <span className="text-base font-medium text-primary">{t('topbar.productName')}</span>
+          <ActionTooltip label={t('topbar.productName')}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary-600" />
+              <span className="text-base font-medium text-primary">{t('topbar.productName')}</span>
+            </div>
+          </ActionTooltip>
           {activeProjectName && (
             <div className="flex items-center gap-1">
-              <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
-                {activeProjectName}
-              </span>
+              <ActionTooltip label={`项目：${activeProjectName}`}>
+                <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                  {activeProjectName}
+                </span>
+              </ActionTooltip>
               {activeWorkspaceName && (
                 <>
                   <span className="text-xs text-neutral-400">/</span>
-                  <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
-                    {activeWorkspaceName}
-                  </span>
+                  <ActionTooltip label={`工作区：${activeWorkspaceName}`}>
+                    <span className="rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-700">
+                      {activeWorkspaceName}
+                    </span>
+                  </ActionTooltip>
                 </>
               )}
             </div>
@@ -107,14 +140,16 @@ export function TopBar({
 
           {/* API Key status - consistent button style */}
           {!hasApiKey && (
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(true)}
-              className="hover:bg-warning-100 focus:ring-warning-500 inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
-            >
-              <KeyRound className="h-4 w-4" />
-              <span>{t('topbar.noApiKey')}</span>
-            </button>
+            <ActionTooltip label="打开 API Key 设置">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(true)}
+                className="hover:bg-warning-100 focus:ring-warning-500 inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
+              >
+                <KeyRound className="h-4 w-4" />
+                <span>{t('topbar.noApiKey')}</span>
+              </button>
+            </ActionTooltip>
           )}
 
           {/* Remote */}
@@ -131,51 +166,54 @@ export function TopBar({
           {/* Theme Toggle */}
           <ThemeToggle />
 
+          <div className="h-5 w-px bg-neutral-200" />
+
           {/* Workspace Settings (Phase 4) */}
-          <BrandButton iconButton onClick={onWorkspaceSettingsOpen} title="Workspace Settings">
-            <Settings className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="工作区布局与偏好">
+            <BrandButton iconButton onClick={onWorkspaceSettingsOpen}>
+              <SlidersHorizontal className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
 
           {/* Tools Panel */}
-          <BrandButton
-            iconButton
-            onClick={onToolsPanelOpen}
-            title="Available Tools"
-            data-tour="tools"
-          >
-            <List className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="工具面板">
+            <BrandButton iconButton onClick={onToolsPanelOpen} data-tour="tools">
+              <List className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
 
           {/* Quick Actions / Command Palette (Phase 4) */}
-          <BrandButton iconButton onClick={onCommandPaletteOpen} title="Command Palette (Cmd+K)">
-            <Keyboard className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="命令面板 (Cmd/Ctrl+K)">
+            <BrandButton iconButton onClick={onCommandPaletteOpen}>
+              <Keyboard className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
 
           {/* Skills */}
-          <BrandButton
-            iconButton
-            onClick={onSkillsManagerOpen}
-            title={t('topbar.skillsManagement')}
-            data-tour="skills"
-          >
-            <Wrench className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="技能管理">
+            <BrandButton iconButton onClick={onSkillsManagerOpen} data-tour="skills">
+              <Wrench className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
 
           {/* MCP Settings */}
-          <BrandButton iconButton onClick={() => setMcpSettingsOpen(true)} title="MCP 服务配置">
-            <Server className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="MCP 服务配置">
+            <BrandButton iconButton onClick={() => setMcpSettingsOpen(true)}>
+              <Server className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
+
+          <div className="h-5 w-px bg-neutral-200" />
 
           {/* Settings */}
-          <BrandButton
-            iconButton
-            onClick={() => setSettingsOpen(true)}
-            title={t('topbar.settings')}
-          >
-            <Settings className="h-[14px] w-[14px]" />
-          </BrandButton>
+          <ActionTooltip label="应用设置">
+            <BrandButton iconButton onClick={() => setSettingsOpen(true)}>
+              <Settings className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
         </div>
       </header>
+      </TooltipProvider>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <MCPSettingsDialog open={mcpSettingsOpen} onOpenChange={setMcpSettingsOpen} />
