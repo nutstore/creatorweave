@@ -572,9 +572,18 @@ function App() {
         return
       }
 
+      const hasConversation = useConversationStore
+        .getState()
+        .conversations.some((conversation) => conversation.id === workspaceId)
+      if (hasConversation) {
+        if (useConversationStore.getState().activeConversationId !== workspaceId) {
+          await useConversationStore.getState().setActive(workspaceId)
+        }
+        return
+      }
+
       if (scopedWorkspaceIds.length > 0) {
         const fallbackWorkspaceId = scopedWorkspaceIds[0]
-        toast.error('工作区不存在或不属于当前项目，已切换到最近会话')
         navigateToRoute(
           { kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId },
           true
@@ -599,9 +608,10 @@ function App() {
   useEffect(() => {
     if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
     if (!activeProjectId || !activeConversationId) return
-
-    const scopedWorkspaceIds = new Set(useWorkspaceStore.getState().workspaces.map((workspace) => workspace.id))
-    if (!scopedWorkspaceIds.has(activeConversationId)) return
+    const hasConversation = useConversationStore
+      .getState()
+      .conversations.some((conversation) => conversation.id === activeConversationId)
+    if (!hasConversation) return
 
     const routePath = toPath({
       kind: 'projectWorkspace',

@@ -469,7 +469,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   )
 
   const hasActiveConversation =
-    !!activeConversationId && projectWorkspaceIds.includes(activeConversationId)
+    !!activeConversationId && conversations.some((c) => c.id === activeConversationId)
   const showFilePreview = !!selectedFilePath && !!selectedFileHandle
   const showRightPanel = showPreview || showFilePreview
 

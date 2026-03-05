@@ -78,7 +78,9 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
   const { directoryHandle, directoryName } = useAgentStore()
   const workspaceIds = useWorkspaceStore((state) => state.workspaces.map((w) => w.id))
   const scopedWorkspaceIdSet = new Set(workspaceIds)
-  const scopedConversations = conversations.filter((conv) => scopedWorkspaceIdSet.has(conv.id))
+  const scopedConversations = conversations.filter(
+    (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeConversationId
+  )
 
   // Load conversations on mount
   useEffect(() => {
@@ -236,7 +238,10 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
             <BrandButton
               variant="ghost"
               className="h-7 w-full justify-start gap-1.5 bg-muted px-2 text-xs"
-              onClick={() => createNew()}
+              onClick={() => {
+                const conv = createNew()
+                void setActive(conv.id)
+              }}
             >
               <Plus className="h-3 w-3" />
               新对话
