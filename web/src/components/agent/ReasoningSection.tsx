@@ -3,7 +3,7 @@
  * MessageBubble, AssistantTurnBubble, and StreamingBubble.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Brain, ChevronDown, ChevronRight } from 'lucide-react'
 
 interface ReasoningSectionProps {
@@ -13,7 +13,13 @@ interface ReasoningSectionProps {
 }
 
 export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(!!streaming)
+
+  useEffect(() => {
+    if (streaming) {
+      setOpen(true)
+    }
+  }, [streaming])
 
   return (
     <>

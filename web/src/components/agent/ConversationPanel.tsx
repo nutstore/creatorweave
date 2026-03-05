@@ -25,6 +25,7 @@ import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { groupMessagesIntoTurns } from './group-messages'
 import { toast } from 'sonner'
+import type { ConversationStatus } from '@/agent/message-types'
 
 interface ConversationPanelProps {
   /** Current conversation ID */
@@ -33,6 +34,8 @@ interface ConversationPanelProps {
   toolResults?: Map<string, string>
   /** Whether agent is processing */
   isProcessing?: boolean
+  /** Current conversation status */
+  status?: ConversationStatus
   /** Streaming state for last message */
   streamingState?: {
     reasoning?: boolean
@@ -53,6 +56,7 @@ export function ConversationPanel({
   conversationId,
   toolResults = new Map(),
   isProcessing = false,
+  status = 'idle',
   streamingState,
   streamingContent,
   currentToolCall,
@@ -164,6 +168,7 @@ export function ConversationPanel({
 
   const isCollapsed = (threadId: string) => collapsedThreads.has(threadId)
   const turns = groupMessagesIntoTurns(conversation.messages)
+  const hasAssistantTurn = turns.some((t) => t.type === 'assistant')
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
@@ -214,7 +219,7 @@ export function ConversationPanel({
 
           <div className="mx-auto max-w-3xl space-y-4">
             {/* Render thread groups */}
-            {threadGroups.map(({ threadId, messages, isMain, rootMessage }) => {
+            {threadGroups.map(({ threadId, isMain, rootMessage }) => {
               const collapsed = isCollapsed(threadId)
               const stats = getThreadStats(conversation.messages, threadId)
 
@@ -274,54 +279,91 @@ export function ConversationPanel({
                     <div
                       className={`space-y-4 ${!isMain ? 'ml-4 border-l-2 border-neutral-200 pl-4 dark:border-neutral-700' : ''}`}
                     >
-                      {messages.map((message, idx) => {
-                        const turnIdx = turns.findIndex(
-                          (t) => t.type === 'user' && t.message.id === message.id
-                        )
-                        const turn = turnIdx !== -1 ? turns[turnIdx] : null
-
-                        if (!turn) return null
-
-                        return turn.type === 'user' ? (
-                          <MessageBubble key={message.id} message={turn.message} />
-                        ) : (
-                          <AssistantTurnBubble
-                            key={turn.messages[0].id}
-                            turn={turn}
-                            toolResults={toolResults}
-                            isProcessing={isProcessing}
-                            isWaiting={false}
-                            streamingState={
-                              isProcessing && idx === messages.length - 1
-                                ? streamingState
-                                : undefined
-                            }
-                            streamingContent={
-                              isProcessing && idx === messages.length - 1
-                                ? streamingContent
-                                : undefined
-                            }
-                            currentToolCall={
-                              isProcessing && idx === messages.length - 1 && currentToolCall
-                                ? currentToolCall
-                                : undefined
-                            }
-                            streamingToolArgs={
-                              isProcessing && idx === messages.length - 1
-                                ? streamingToolArgs
-                                : undefined
-                            }
-                          />
-                        )
-                      })}
+                      {turns
+                        .filter((turn) => {
+                          if (turn.type === 'user') {
+                            return (turn.message.threadId || 'main') === threadId
+                          }
+                          const assistantThreadId = turn.messages[0]?.threadId || 'main'
+                          return assistantThreadId === threadId
+                        })
+                        .map((turn, idx, filteredTurns) =>
+                          turn.type === 'user' ? (
+                            <MessageBubble key={turn.message.id} message={turn.message} />
+                          ) : (
+                            <AssistantTurnBubble
+                              key={turn.messages[0].id}
+                              turn={turn}
+                              toolResults={toolResults}
+                              isProcessing={isProcessing}
+                              isWaiting={false}
+                              streamingState={
+                                isProcessing && idx === filteredTurns.length - 1
+                                  ? streamingState
+                                  : undefined
+                              }
+                              streamingContent={
+                                isProcessing && idx === filteredTurns.length - 1
+                                  ? streamingContent
+                                  : undefined
+                              }
+                              currentToolCall={
+                                isProcessing &&
+                                idx === filteredTurns.length - 1 &&
+                                status === 'tool_calling'
+                                  ? currentToolCall
+                                  : undefined
+                              }
+                              streamingToolArgs={
+                                isProcessing &&
+                                idx === filteredTurns.length - 1 &&
+                                status === 'tool_calling'
+                                  ? streamingToolArgs
+                                  : undefined
+                              }
+                              runtimeToolCalls={
+                                isProcessing && idx === filteredTurns.length - 1
+                                  ? conversation.draftAssistant?.toolCalls
+                                  : undefined
+                              }
+                              runtimeSteps={
+                                isProcessing && idx === filteredTurns.length - 1
+                                  ? conversation.draftAssistant?.steps
+                                  : undefined
+                              }
+                            />
+                          )
+                        )}
                     </div>
                   )}
                 </div>
               )
             })}
 
+            {/* Draft assistant turn while streaming before first assistant message commits */}
+            {isProcessing && !hasAssistantTurn && (
+              <AssistantTurnBubble
+                key="draft-assistant-threaded"
+                turn={{
+                  type: 'assistant',
+                  messages: [],
+                  timestamp: Date.now(),
+                  totalUsage: null,
+                }}
+                toolResults={toolResults}
+                isProcessing={true}
+                isWaiting={status === 'pending'}
+                streamingState={streamingState}
+                streamingContent={streamingContent}
+                currentToolCall={status === 'tool_calling' ? currentToolCall : undefined}
+                streamingToolArgs={status === 'tool_calling' ? streamingToolArgs : undefined}
+                runtimeToolCalls={conversation.draftAssistant?.toolCalls}
+                runtimeSteps={conversation.draftAssistant?.steps}
+              />
+            )}
+
             {/* Pending indicator */}
-            {isProcessing && (
+            {isProcessing && status === 'pending' && !hasAssistantTurn && (
               <div className="flex gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
                   <MessageSquare className="h-4 w-4" />

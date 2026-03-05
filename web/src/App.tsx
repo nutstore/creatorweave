@@ -572,13 +572,11 @@ function App() {
         return
       }
 
-      const hasConversation = useConversationStore
-        .getState()
-        .conversations.some((conversation) => conversation.id === workspaceId)
-      if (hasConversation) {
-        if (useConversationStore.getState().activeConversationId !== workspaceId) {
-          await useConversationStore.getState().setActive(workspaceId)
-        }
+      const convState = useConversationStore.getState()
+      const isTransientActiveConversation =
+        convState.activeConversationId === workspaceId &&
+        convState.conversations.some((conversation) => conversation.id === workspaceId)
+      if (isTransientActiveConversation) {
         return
       }
 
@@ -608,10 +606,16 @@ function App() {
   useEffect(() => {
     if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
     if (!activeProjectId || !activeConversationId) return
-    const hasConversation = useConversationStore
-      .getState()
-      .conversations.some((conversation) => conversation.id === activeConversationId)
-    if (!hasConversation) return
+    const scopedWorkspaceIds = new Set(useWorkspaceStore.getState().workspaces.map((workspace) => workspace.id))
+    const convState = useConversationStore.getState()
+    const activeConversation = convState.conversations.find(
+      (conversation) => conversation.id === activeConversationId
+    )
+    const allowTransientRoute =
+      !!activeConversation &&
+      !scopedWorkspaceIds.has(activeConversationId) &&
+      Date.now() - activeConversation.createdAt < 15000
+    if (!scopedWorkspaceIds.has(activeConversationId) && !allowTransientRoute) return
 
     const routePath = toPath({
       kind: 'projectWorkspace',

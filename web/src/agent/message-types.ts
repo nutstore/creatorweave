@@ -65,6 +65,28 @@ export interface Message {
   parentMessageId?: string
 }
 
+export type DraftAssistantStep =
+  | {
+      id: string
+      type: 'reasoning'
+      content: string
+      streaming: boolean
+    }
+  | {
+      id: string
+      type: 'content'
+      content: string
+      streaming: boolean
+    }
+  | {
+      id: string
+      type: 'tool_call'
+      toolCall: ToolCall
+      args: string
+      result?: string
+      streaming: boolean
+    }
+
 /** Runtime status for a conversation */
 export type ConversationStatus = 'idle' | 'pending' | 'streaming' | 'tool_calling' | 'error'
 
@@ -94,6 +116,25 @@ export interface Conversation {
   streamingToolArgs: string
   /** Error message (not persisted) */
   error: string | null
+  /** Active run id for guarding stale callbacks (not persisted) */
+  activeRunId?: string | null
+  /** Monotonic run counter for this conversation (not persisted) */
+  runEpoch?: number
+  /** Streaming draft projection rendered in UI (not persisted) */
+  draftAssistant?: {
+    reasoning: string
+    content: string
+    toolCalls: ToolCall[]
+    toolResults: Record<string, string>
+    toolCall: ToolCall | null
+    toolArgs: string
+    steps: DraftAssistantStep[]
+    activeReasoningStepId?: string | null
+    activeContentStepId?: string | null
+    activeToolStepId?: string | null
+  } | null
+  /** Number of mounted views consuming this conversation (not persisted) */
+  mountRefCount?: number
 }
 
 /** Generate a unique message ID */
@@ -162,5 +203,9 @@ export function createConversation(title?: string): Conversation {
     currentToolCall: null,
     streamingToolArgs: '',
     error: null,
+    activeRunId: null,
+    runEpoch: 0,
+    draftAssistant: null,
+    mountRefCount: 0,
   }
 }

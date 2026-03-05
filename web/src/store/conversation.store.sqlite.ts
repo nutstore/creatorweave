@@ -49,6 +49,8 @@ import {
   forkThread as forkThreadUtil,
 } from '@/agent/thread-utils'
 
+const ENABLE_FOLLOW_UP_LLM = import.meta.env.VITE_ENABLE_FOLLOW_UP_LLM === 'true'
+
 //=============================================================================
 // Persistence Functions (SQLite)
 //=============================================================================
@@ -84,6 +86,10 @@ async function loadConversations(): Promise<Conversation[]> {
     currentToolCall: null,
     streamingToolArgs: '',
     error: null,
+    activeRunId: null,
+    runEpoch: 0,
+    draftAssistant: null,
+    mountRefCount: 0,
   }))
 }
 
@@ -130,9 +136,9 @@ interface ConversationState {
   // Follow-up suggestions (not persisted) - per conversation
   suggestedFollowUps: Map<string, string>
 
-  // Track which conversations have active UI components (not persisted)
-  // Used to prevent state updates after component unmount
-  mountedConversations: Set<string>
+  // Track mounted view ref counts per conversation (not persisted)
+  // Used to prevent StrictMode mount/unmount churn from cancelling active runs
+  mountedConversations: Map<string, number>
 
   // Computed
   activeConversation: () => Conversation | null
@@ -207,7 +213,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     agentLoops: new Map(),
     streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
-    mountedConversations: new Set(),
+    mountedConversations: new Map(),
 
     activeConversation: () => {
       const { conversations, activeConversationId } = get()
@@ -236,18 +242,33 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     // Mount tracking actions
     mountConversation: (id: string) => {
       set((state) => {
-        state.mountedConversations.add(id)
+        const next = (state.mountedConversations.get(id) || 0) + 1
+        state.mountedConversations.set(id, next)
+        const conv = state.conversations.find((c) => c.id === id)
+        if (conv) {
+          conv.mountRefCount = next
+        }
       })
     },
 
     unmountConversation: (id: string) => {
       set((state) => {
-        state.mountedConversations.delete(id)
+        const current = state.mountedConversations.get(id) || 0
+        const next = Math.max(0, current - 1)
+        if (next === 0) {
+          state.mountedConversations.delete(id)
+        } else {
+          state.mountedConversations.set(id, next)
+        }
+        const conv = state.conversations.find((c) => c.id === id)
+        if (conv) {
+          conv.mountRefCount = next
+        }
       })
     },
 
     isConversationMounted: (id: string) => {
-      return get().mountedConversations.has(id)
+      return (get().mountedConversations.get(id) || 0) > 0
     },
 
     loadFromDB: async () => {
@@ -320,6 +341,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             currentToolCall: null,
             streamingToolArgs: '',
             error: null,
+            activeRunId: null,
+            runEpoch: 0,
+            draftAssistant: null,
+            mountRefCount: 0,
           }))
           state.activeConversationId = activeId
           state.loaded = true
@@ -446,6 +471,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
         state.suggestedFollowUps.delete(id)
         state.streamingQueues.delete(id)
+        state.mountedConversations.delete(id)
       })
       deleteConversationFromDB(id).catch((error) => {
         console.error('[conversation.store] Failed to delete conversation from DB:', error)
@@ -497,6 +523,63 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       }
 
       try {
+        const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        let runEpoch = 0
+        let latestMessages: Message[] = conv.messages
+        let committed = false
+
+        // Acquire run lock immediately to prevent concurrent duplicate starts.
+        set((state) => {
+          const c = state.conversations.find((x) => x.id === conversationId)
+          if (!c) return
+          c.runEpoch = (c.runEpoch || 0) + 1
+          runEpoch = c.runEpoch
+          c.activeRunId = runId
+          c.status = 'pending'
+          c.error = null
+          c.currentToolCall = null
+          c.streamingToolArgs = ''
+          c.streamingContent = ''
+          c.streamingReasoning = ''
+          c.completedContent = null
+          c.completedReasoning = null
+          c.isContentStreaming = false
+          c.isReasoningStreaming = false
+          c.draftAssistant = {
+            reasoning: '',
+            content: '',
+            toolCalls: [],
+            toolResults: {},
+            toolCall: null,
+            toolArgs: '',
+            steps: [],
+            activeReasoningStepId: null,
+            activeContentStepId: null,
+            activeToolStepId: null,
+          }
+        })
+
+        const isCurrentRun = () => {
+          const current = get().conversations.find((c) => c.id === conversationId)
+          return !!current && current.activeRunId === runId && (current.runEpoch || 0) === runEpoch
+        }
+
+        const failRunEarly = (message: string) => {
+          if (!isCurrentRun()) return
+          set((state) => {
+            const c = state.conversations.find((x) => x.id === conversationId)
+            if (!c || c.activeRunId !== runId) return
+            c.status = 'error'
+            c.error = message
+            c.activeRunId = null
+            c.draftAssistant = null
+            c.currentToolCall = null
+            c.streamingToolArgs = ''
+            c.streamingContent = ''
+            c.streamingReasoning = ''
+          })
+        }
+
         const apiKeyRepo = getApiKeyRepository()
         const settingsState = useSettingsStore.getState()
         const effectiveConfig = settingsState.getEffectiveProviderConfig()
@@ -510,25 +593,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               }
 
         if (!providerConfig?.baseUrl || !providerConfig.modelName) {
-          set((state) => {
-            const c = state.conversations.find((c) => c.id === conversationId)
-            if (c) {
-              c.status = 'error'
-              c.error = '请先配置自定义服务商和模型'
-            }
-          })
+          failRunEarly('请先配置自定义服务商和模型')
           return
         }
 
         const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
         if (!apiKey) {
-          set((state) => {
-            const c = state.conversations.find((c) => c.id === conversationId)
-            if (c) {
-              c.status = 'error'
-              c.error = 'API Key 未设置，请先在设置中配置'
-            }
-          })
+          failRunEarly('API Key 未设置，请先在设置中配置')
           return
         }
 
@@ -563,15 +634,75 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.agentLoops.set(conversationId, agentLoop)
         })
 
-        set((state) => {
-          const c = state.conversations.find((c) => c.id === conversationId)
-          if (c) {
-            c.status = 'pending'
-            c.error = null
-          }
-        })
-
         const currentMessages = conv.messages
+
+        const finalizeRun = async (
+          status: ConversationStatus,
+          finalMessages?: Message[],
+          error?: string
+        ) => {
+          if (committed || !isCurrentRun()) return
+          committed = true
+          const targetMessages = finalMessages || latestMessages
+
+          set((inner) => {
+            const c = inner.conversations.find((x) => x.id === conversationId)
+            if (!c) return
+            if (status === 'idle') {
+              c.messages = targetMessages
+            }
+            c.status = status
+            c.error = error || null
+            c.currentToolCall = null
+            c.streamingToolArgs = ''
+            c.streamingContent = ''
+            c.streamingReasoning = ''
+            c.completedContent = null
+            c.completedReasoning = null
+            c.isContentStreaming = false
+            c.isReasoningStreaming = false
+            c.draftAssistant = null
+            c.activeRunId = null
+            inner.agentLoops.delete(conversationId)
+            inner.streamingQueues.delete(conversationId)
+          })
+
+          if (status === 'idle') {
+            emitComplete()
+            const finalConv = get().conversations.find((c) => c.id === conversationId)
+            if (finalConv)
+              persistConversation(finalConv).catch((err) => {
+                console.error(
+                  '[conversation.store] Failed to persist conversation on complete:',
+                  err
+                )
+                toast.error('对话保存失败，部分内容可能丢失')
+              })
+
+            try {
+              const { useWorkspaceStore } = await import('@/store/workspace.store')
+              await useWorkspaceStore.getState().refreshPendingChanges(true)
+            } catch (err) {
+              console.warn('[conversation.store] Failed to refresh pending changes on complete:', err)
+            }
+
+            if (ENABLE_FOLLOW_UP_LLM) {
+              try {
+                const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
+                if (apiKey) {
+                  const suggestion = await generateFollowUp(targetMessages, providerType, apiKey)
+                  if (suggestion) {
+                    get().setSuggestedFollowUp(conversationId, suggestion)
+                  }
+                }
+              } catch (err) {
+                console.error('[conversation.store] Failed to generate follow-up:', err)
+              }
+            } else {
+              get().clearSuggestedFollowUp(conversationId)
+            }
+          }
+        }
 
         // Reasoning streaming queue
         let fullReasoningAccumulator = ''
@@ -579,7 +710,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           fullReasoningAccumulator += accumulated
           set((state) => {
             const c = state.conversations.find((c) => c.id === conversationId)
-            if (c) c.streamingReasoning = fullReasoningAccumulator
+            if (c && c.activeRunId === runId) {
+              c.streamingReasoning = fullReasoningAccumulator
+              if (c.draftAssistant) {
+                c.draftAssistant.reasoning = fullReasoningAccumulator
+                const stepId = c.draftAssistant.activeReasoningStepId
+                if (stepId) {
+                  const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                  if (step && step.type === 'reasoning') {
+                    step.content = fullReasoningAccumulator
+                  }
+                }
+              }
+            }
           })
         })
 
@@ -591,7 +734,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           fullContentAccumulator += accumulated
           set((state) => {
             const c = state.conversations.find((c) => c.id === conversationId)
-            if (c) c.streamingContent = fullContentAccumulator
+            if (c && c.activeRunId === runId) {
+              c.streamingContent = fullContentAccumulator
+              if (c.draftAssistant) {
+                c.draftAssistant.content = fullContentAccumulator
+                const stepId = c.draftAssistant.activeContentStepId
+                if (stepId) {
+                  const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                  if (step && step.type === 'content') {
+                    step.content = fullContentAccumulator
+                  }
+                }
+              }
+            }
           })
         })
 
@@ -610,93 +765,183 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           })
         }
 
-        // Helper to check if conversation is still mounted before state updates
-        const isMounted = () => get().mountedConversations.has(conversationId)
-
         const resultMessages = await agentLoop.run(currentMessages, {
           onMessageStart: () => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             // Reset accumulators for new message
             fullContentAccumulator = ''
             fullReasoningAccumulator = ''
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.streamingContent = ''
                 c.streamingReasoning = ''
                 c.isReasoningStreaming = false
                 c.completedReasoning = ''
                 c.isContentStreaming = false
                 c.completedContent = ''
+                c.draftAssistant = {
+                  reasoning: '',
+                  content: '',
+                  toolCalls: [],
+                  toolResults: {},
+                  toolCall: null,
+                  toolArgs: '',
+                  // Keep streaming timeline across assistant restarts in one run.
+                  steps: c.draftAssistant?.steps || [],
+                  activeReasoningStepId: null,
+                  activeContentStepId: null,
+                  activeToolStepId: null,
+                }
               }
             })
           },
           onReasoningStart: () => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.status = 'streaming'
                 c.isReasoningStreaming = true
+                if (c.draftAssistant) {
+                  const last = c.draftAssistant.steps[c.draftAssistant.steps.length - 1]
+                  if (last && last.type === 'reasoning') {
+                    last.streaming = true
+                    c.draftAssistant.activeReasoningStepId = last.id
+                  } else {
+                    const stepId = `reasoning-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+                    c.draftAssistant.steps.push({
+                      id: stepId,
+                      type: 'reasoning',
+                      content: '',
+                      streaming: true,
+                    })
+                    c.draftAssistant.activeReasoningStepId = stepId
+                  }
+                }
               }
             })
             emitThinkingStart()
           },
           onReasoningDelta: (delta: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             reasoningQueue.add('reasoning', delta)
             emitThinkingDelta(delta)
           },
           onReasoningComplete: (reasoning: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             reasoningQueue.flushNow()
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.isReasoningStreaming = false
                 c.completedReasoning = reasoning
                 c.streamingReasoning = ''
+                if (c.draftAssistant) {
+                  c.draftAssistant.reasoning = reasoning
+                  const stepId = c.draftAssistant.activeReasoningStepId
+                  if (stepId) {
+                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                    if (step && step.type === 'reasoning') {
+                      step.content = reasoning
+                      step.streaming = false
+                    }
+                  }
+                  c.draftAssistant.activeReasoningStepId = null
+                }
               }
             })
           },
           onContentStart: () => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.status = 'streaming'
                 c.isContentStreaming = true
+                if (c.draftAssistant) {
+                  const last = c.draftAssistant.steps[c.draftAssistant.steps.length - 1]
+                  if (last && last.type === 'content') {
+                    last.streaming = true
+                    c.draftAssistant.activeContentStepId = last.id
+                  } else {
+                    const stepId = `content-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+                    c.draftAssistant.steps.push({
+                      id: stepId,
+                      type: 'content',
+                      content: '',
+                      streaming: true,
+                    })
+                    c.draftAssistant.activeContentStepId = stepId
+                  }
+                }
               }
             })
           },
           onContentDelta: (delta: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             contentQueue.add('content', delta)
           },
           onContentComplete: (content: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             contentQueue.flushNow()
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.isContentStreaming = false
                 c.completedContent = content
                 c.streamingContent = ''
+                if (c.draftAssistant) {
+                  c.draftAssistant.content = content
+                  const stepId = c.draftAssistant.activeContentStepId
+                  if (stepId) {
+                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                    if (step && step.type === 'content') {
+                      step.content = content
+                      step.streaming = false
+                    }
+                  }
+                  c.draftAssistant.activeContentStepId = null
+                }
               }
             })
           },
           onToolCallStart: (tc: ToolCall) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+              if (c && c.activeRunId === runId) {
                 c.status = 'tool_calling'
                 const isSameTool = c.currentToolCall?.id === tc.id
                 c.currentToolCall = tc
+                if (c.draftAssistant) {
+                  c.draftAssistant.toolCall = tc
+                  if (!c.draftAssistant.toolCalls.some((x) => x.id === tc.id)) {
+                    c.draftAssistant.toolCalls.push(tc)
+                  }
+                  const stepId = `tool-${tc.id}`
+                  const existing = c.draftAssistant.steps.find((s) => s.id === stepId)
+                  if (existing && existing.type === 'tool_call') {
+                    existing.streaming = true
+                    existing.toolCall = tc
+                  } else {
+                    c.draftAssistant.steps.push({
+                      id: stepId,
+                      type: 'tool_call',
+                      toolCall: tc,
+                      args: '',
+                      streaming: true,
+                    })
+                  }
+                  c.draftAssistant.activeToolStepId = stepId
+                }
                 // Keep already streamed args when the same tool transitions
                 // from "stream preview" to actual execution.
                 if (!isSameTool) {
                   c.streamingToolArgs = ''
+                  if (c.draftAssistant) {
+                    c.draftAssistant.toolArgs = ''
+                  }
                 }
               }
             })
@@ -707,25 +952,51 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
           onToolCallDelta: (_index: number, argsDelta: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) c.streamingToolArgs += argsDelta
+              if (c && c.activeRunId === runId) {
+                c.streamingToolArgs += argsDelta
+                if (c.draftAssistant) {
+                  c.draftAssistant.toolArgs += argsDelta
+                  const stepId = c.draftAssistant.activeToolStepId
+                  if (stepId) {
+                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                    if (step && step.type === 'tool_call') {
+                      step.args += argsDelta
+                    }
+                  }
+                }
+              }
             })
           },
           onToolCallComplete: (tc: ToolCall, _result: string) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
-              if (c && c.currentToolCall?.id === tc.id) {
+              if (c && c.activeRunId === runId && c.currentToolCall?.id === tc.id) {
                 c.currentToolCall = null
                 c.streamingToolArgs = ''
+                if (c.draftAssistant) {
+                  c.draftAssistant.toolCall = null
+                  c.draftAssistant.toolResults[tc.id] = _result || ''
+                  c.draftAssistant.toolArgs = ''
+                  const stepId = c.draftAssistant.activeToolStepId
+                  if (stepId) {
+                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                    if (step && step.type === 'tool_call') {
+                      step.result = _result || ''
+                      step.streaming = false
+                    }
+                  }
+                  c.draftAssistant.activeToolStepId = null
+                }
               }
             })
           },
           // SEP-1306: Handle binary elicitation for file uploads
           onElicitation: async (elicitation: any) => {
-            if (!isMounted()) return
+            if (!isCurrentRun()) return
             console.log('[conversation.store] SEP-1306 elicitation:', elicitation)
 
             try {
@@ -804,6 +1075,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 if (c) {
                   c.status = 'idle'
                   c.error = null
+                  c.activeRunId = null
+                  c.draftAssistant = null
                 }
                 state.agentLoops.delete(conversationId)
               })
@@ -843,118 +1116,38 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           },
           onMessagesUpdated: (msgs: Message[]) => {
-            if (!isMounted()) return
-            set((state) => {
-              const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) c.messages = msgs
-            })
+            if (!isCurrentRun()) return
+            latestMessages = msgs
           },
           onComplete: async (msgs: Message[]) => {
-            if (!isMounted()) {
-              // Cleanup resources even if unmounted
-              reasoningQueue.flushNow()
-              contentQueue.flushNow()
-              cleanupQueues()
-              set((state) => {
-                state.agentLoops.delete(conversationId)
-              })
-              return
-            }
+            if (!isCurrentRun()) return
+            latestMessages = msgs
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
-
-            set((state) => {
-              const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
-                c.messages = msgs
-                c.status = 'idle'
-              }
-              state.agentLoops.delete(conversationId)
-            })
-            emitComplete()
-            const finalConv = get().conversations.find((c) => c.id === conversationId)
-            if (finalConv)
-              persistConversation(finalConv).catch((error) => {
-                console.error(
-                  '[conversation.store] Failed to persist conversation on complete:',
-                  error
-                )
-                toast.error('对话保存失败，部分内容可能丢失')
-              })
-
-            // Ensure pending sync list is refreshed after each completed agent loop.
-            try {
-              const { useWorkspaceStore } = await import('@/store/workspace.store')
-              await useWorkspaceStore.getState().refreshPendingChanges(true)
-            } catch (error) {
-              console.warn('[conversation.store] Failed to refresh pending changes on complete:', error)
-            }
-
-            try {
-              const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
-              if (apiKey) {
-                const suggestion = await generateFollowUp(msgs, providerType, apiKey)
-                if (suggestion) {
-                  get().setSuggestedFollowUp(conversationId, suggestion)
-                }
-              }
-            } catch (error) {
-              console.error('[conversation.store] Failed to generate follow-up:', error)
-            }
+            await finalizeRun('idle', msgs)
           },
           onError: (err: Error) => {
-            if (!isMounted()) {
-              // Cleanup resources even if unmounted
-              reasoningQueue.flushNow()
-              contentQueue.flushNow()
-              cleanupQueues()
-              set((state) => {
-                state.agentLoops.delete(conversationId)
-              })
-              return
-            }
+            if (!isCurrentRun()) return
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
-
-            set((state) => {
-              const c = state.conversations.find((c) => c.id === conversationId)
-              if (c) {
+            set((inner) => {
+              const c = inner.conversations.find((x) => x.id === conversationId)
+              if (c && c.activeRunId === runId) {
                 c.status = 'error'
                 c.error = err.message
+                c.activeRunId = null
+                c.draftAssistant = null
               }
-              state.agentLoops.delete(conversationId)
+              inner.agentLoops.delete(conversationId)
+              inner.streamingQueues.delete(conversationId)
             })
             emitError(err.message)
           },
         })
-
-        const queues = get().streamingQueues.get(conversationId)
-        if (queues) {
-          queues.reasoning.flushNow()
-          queues.content.flushNow()
-          queues.reasoning.destroy()
-          queues.content.destroy()
-        }
-        set((state) => {
-          const c = state.conversations.find((c) => c.id === conversationId)
-          if (c) {
-            c.messages = resultMessages
-            c.status = 'idle'
-          }
-          state.agentLoops.delete(conversationId)
-          state.streamingQueues.delete(conversationId)
-        })
-        const finalConv = get().conversations.find((c) => c.id === conversationId)
-        if (finalConv)
-          persistConversation(finalConv).catch((err) => {
-            console.error(
-              '[conversation.store] Failed to persist conversation on stream error:',
-              err
-            )
-            toast.error('对话保存失败，部分内容可能丢失')
-          })
+        latestMessages = resultMessages
+        await finalizeRun('idle', resultMessages)
       } catch (error) {
         const queues = get().streamingQueues.get(conversationId)
         if (queues) {
@@ -970,8 +1163,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
               c.status = 'idle'
+              c.activeRunId = null
+              c.draftAssistant = null
             }
             state.agentLoops.delete(conversationId)
+            state.streamingQueues.delete(conversationId)
           })
           return
         }
@@ -980,8 +1176,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           if (c) {
             c.status = 'error'
             c.error = error instanceof Error ? error.message : String(error)
+            c.activeRunId = null
+            c.draftAssistant = null
           }
           state.agentLoops.delete(conversationId)
+          state.streamingQueues.delete(conversationId)
         })
       }
     },
@@ -999,7 +1198,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.agentLoops.delete(conversationId)
           state.streamingQueues.delete(conversationId)
           const c = state.conversations.find((c) => c.id === conversationId)
-          if (c) c.status = 'idle'
+          if (c) {
+            c.status = 'idle'
+            c.activeRunId = null
+            c.draftAssistant = null
+            c.currentToolCall = null
+            c.streamingToolArgs = ''
+            c.streamingContent = ''
+            c.streamingReasoning = ''
+            c.isContentStreaming = false
+            c.isReasoningStreaming = false
+          }
         })
       }
     },
@@ -1113,6 +1322,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           c.currentToolCall = null
           c.streamingToolArgs = ''
           c.error = null
+          c.activeRunId = null
+          c.draftAssistant = null
         }
       })
     },

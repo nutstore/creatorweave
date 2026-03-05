@@ -7,7 +7,7 @@
 
 import { Bot } from 'lucide-react'
 import type { Turn } from './group-messages'
-import type { Message, ToolCall } from '@/agent/message-types'
+import type { DraftAssistantStep, Message, ToolCall } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
@@ -44,6 +44,10 @@ interface AssistantTurnBubbleProps {
   currentToolCall?: ToolCall | null
   /** Streaming tool arguments (only for last turn when tool_calling) */
   streamingToolArgs?: string | null
+  /** Runtime tool calls captured during this run (for providers that don't emit tool_calls in assistant messages) */
+  runtimeToolCalls?: ToolCall[]
+  /** Runtime ordered streaming timeline (reasoning/content/tool calls) */
+  runtimeSteps?: DraftAssistantStep[]
 }
 
 export function AssistantTurnBubble({
@@ -55,12 +59,35 @@ export function AssistantTurnBubble({
   streamingContent,
   currentToolCall,
   streamingToolArgs,
+  runtimeToolCalls,
+  runtimeSteps,
 }: AssistantTurnBubbleProps) {
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
-  const hasCurrentToolCallInTurn = !!(
-    currentToolCall &&
-    turn.messages.some((msg) => msg.toolCalls?.some((tc) => tc.id === currentToolCall.id))
+  const committedToolCallIds = new Set(
+    turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])
+  )
+  const committedReasoningSet = new Set(
+    turn.messages.map((msg) => msg.reasoning || '').filter((x): x is string => !!x)
+  )
+  const committedContentSet = new Set(
+    turn.messages.map((msg) => msg.content || '').filter((x): x is string => !!x)
+  )
+  const draftToolCalls = (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id))
+  const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
+    if (step.type === 'reasoning') {
+      return step.streaming || !committedReasoningSet.has(step.content)
+    }
+    if (step.type === 'content') {
+      return step.streaming || !committedContentSet.has(step.content)
+    }
+    if (step.type === 'tool_call') {
+      return step.streaming || !committedToolCallIds.has(step.toolCall.id)
+    }
+    return true
+  })
+  const hasCurrentToolCallInDraft = !!(
+    currentToolCall && draftToolCalls.some((tc) => tc.id === currentToolCall.id)
   )
 
   // Find the last message with content for copy button
@@ -104,8 +131,58 @@ export function AssistantTurnBubble({
           </div>
         )}
 
-        {/* Streaming content area - rendered as part of the current turn */}
+        {/* Ordered runtime timeline: strictly follows stream event order */}
         {isProcessing &&
+          orderedRuntimeSteps.length > 0 &&
+          orderedRuntimeSteps.map((step) => {
+            if (step.type === 'reasoning') {
+              if (!step.content) return null
+              return (
+                <StreamingContentSection
+                  key={step.id}
+                  reasoning={step.content}
+                  isStreamingReasoning={step.streaming}
+                  isStreamingContent={false}
+                  lightweight={true}
+                />
+              )
+            }
+            if (step.type === 'content') {
+              if (!step.content) return null
+              return (
+                <StreamingContentSection
+                  key={step.id}
+                  content={step.content}
+                  isStreamingReasoning={false}
+                  isStreamingContent={step.streaming}
+                  lightweight={true}
+                />
+              )
+            }
+            return (
+              <ToolCallDisplay
+                key={step.id}
+                toolCall={step.toolCall}
+                result={step.result ?? toolResults.get(step.toolCall.id)}
+                streamingArgs={step.streaming ? step.args || streamingToolArgs || undefined : undefined}
+              />
+            )
+          })}
+
+        {/* Fallback for older runtime path without ordered steps */}
+        {isProcessing &&
+          orderedRuntimeSteps.length === 0 &&
+          draftToolCalls.map((tc) => (
+            <ToolCallDisplay
+              key={tc.id}
+              toolCall={tc}
+              result={toolResults.get(tc.id)}
+              streamingArgs={currentToolCall?.id === tc.id ? (streamingToolArgs || undefined) : undefined}
+            />
+          ))}
+
+        {isProcessing &&
+          orderedRuntimeSteps.length === 0 &&
           streamingContent &&
           (streamingContent.reasoning || streamingContent.content) && (
             <StreamingContentSection
@@ -117,7 +194,7 @@ export function AssistantTurnBubble({
           )}
 
         {/* Active tool call streaming */}
-        {isProcessing && currentToolCall && !hasCurrentToolCallInTurn && (
+        {isProcessing && currentToolCall && !hasCurrentToolCallInDraft && !committedToolCallIds.has(currentToolCall.id) && (
           <ToolCallDisplay
             toolCall={currentToolCall}
             streamingArgs={streamingToolArgs || undefined}
@@ -157,11 +234,13 @@ function StreamingContentSection({
   content,
   isStreamingReasoning,
   isStreamingContent,
+  lightweight = false,
 }: {
   reasoning?: string
   content?: string
   isStreamingReasoning: boolean
   isStreamingContent: boolean
+  lightweight?: boolean
 }) {
   return (
     <>
@@ -174,9 +253,13 @@ function StreamingContentSection({
       {/* Content */}
       {content && (
         <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
-          <div className="prose-sm max-w-prose overflow-x-auto break-words">
-            <MarkdownContent content={content} />
-          </div>
+          {lightweight ? (
+            <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
+          ) : (
+            <div className="prose-sm max-w-prose overflow-x-auto break-words">
+              <MarkdownContent content={content} />
+            </div>
+          )}
           {/* Cursor when actively streaming content */}
           {isStreamingContent && (
             <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />

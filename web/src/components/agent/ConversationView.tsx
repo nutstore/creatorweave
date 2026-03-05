@@ -39,12 +39,11 @@ export function ConversationView({
   const { directoryHandle } = useAgentStore()
   const [enableThreading] = useState(useThreadedView)
 
-  // Subscribe directly to conversations and activeConversationId to ensure updates trigger re-renders
-  const conversations = useConversationStore((s) => s.conversations)
   const activeConversationId = useConversationStore((s) => s.activeConversationId)
-  const activeConversation = activeConversationId
-    ? conversations.find((c) => c.id === activeConversationId)
-    : null
+  const activeConversation = useConversationStore((s) => {
+    if (!s.activeConversationId) return null
+    return s.conversations.find((c) => c.id === s.activeConversationId) || null
+  })
   const createNew = useConversationStore((s) => s.createNew)
   const updateMessages = useConversationStore((s) => s.updateMessages)
   const setActive = useConversationStore((s) => s.setActive)
@@ -60,32 +59,37 @@ export function ConversationView({
 
   // Must be declared before useEffect that uses it
   const initialMessageHandled = useRef(false)
+  const initialMessageKeyRef = useRef<string | null>(null)
+  const lastRenderedMessageCountRef = useRef(0)
   const convId = activeConversationId
   const isRunning = convId ? isConversationRunning(convId) : false
 
-  // Mount/unmount tracking - prevents state updates after component unmounts
+  // Mount/unmount tracking - StrictMode-safe via ref counting in store
   useEffect(() => {
     if (convId) {
       mountConversation(convId)
     }
     return () => {
       if (convId) {
-        // Unmount first to prevent further state updates
         unmountConversation(convId)
-        // Then cancel if still running
-        if (isConversationRunning(convId)) {
-          cancelAgent(convId)
-        }
       }
     }
-    // Only depend on convId - we don't want to re-run when other functions change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId])
 
-  // Auto-scroll to bottom
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [activeConversation])
+    initialMessageHandled.current = false
+    initialMessageKeyRef.current = null
+  }, [convId])
+
+  // Auto-scroll to bottom on committed message append / finalization edges.
+  useEffect(() => {
+    const messageCount = activeConversation?.messages.length || 0
+    const behavior: ScrollBehavior =
+      messageCount > lastRenderedMessageCountRef.current ? 'smooth' : 'auto'
+    lastRenderedMessageCountRef.current = messageCount
+    messagesEndRef.current?.scrollIntoView({ behavior })
+  }, [activeConversation?.messages.length, activeConversation?.status])
 
   // Build tool results map from conversation messages
   const buildToolResultsMap = useCallback((messages: Message[]) => {
@@ -101,7 +105,14 @@ export function ConversationView({
   // Update tool results when conversation changes
   const toolResults = useMemo(() => {
     if (activeConversation) {
-      return buildToolResultsMap(activeConversation.messages)
+      const merged = buildToolResultsMap(activeConversation.messages)
+      const runtimeResults = activeConversation.draftAssistant?.toolResults || {}
+      for (const [toolCallId, result] of Object.entries(runtimeResults)) {
+        if (!merged.has(toolCallId)) {
+          merged.set(toolCallId, result)
+        }
+      }
+      return merged
     }
     return new Map<string, string>()
   }, [activeConversation, buildToolResultsMap])
@@ -110,13 +121,17 @@ export function ConversationView({
   const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
 
   useEffect(() => {
-    if (initialMessage && !initialMessageHandled.current && !isRunning && convId) {
+    if (!initialMessage || !convId || isRunning) return
+    const key = `${convId}:${initialMessage}`
+    if (initialMessageKeyRef.current === key || initialMessageHandled.current) return
+    initialMessageKeyRef.current = key
+    if (!initialMessageHandled.current) {
       initialMessageHandled.current = true
       sendMessage(initialMessage)
       onInitialMessageConsumed?.()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialMessage])
+  }, [initialMessage, convId, isRunning])
 
   const sendMessage = async (text: string) => {
     if (!text) return
@@ -142,7 +157,7 @@ export function ConversationView({
 
     // Add user message
     const userMsg = createUserMessage(text)
-    const conv = conversations.find((c) => c.id === targetConvId)
+    const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)
     const currentMessages = conv ? [...conv.messages, userMsg] : [userMsg]
     updateMessages(targetConvId, currentMessages)
     setInput('')
@@ -197,6 +212,8 @@ export function ConversationView({
 
   const status = activeConversation?.status || 'idle'
   const isProcessing = isRunning
+  const conversationError =
+    activeConversation?.status === 'error' ? activeConversation.error?.trim() || null : null
 
   // Build streaming state for the last message when processing (direct calculation for streaming performance)
   const streamingState =
@@ -212,10 +229,20 @@ export function ConversationView({
     !activeConversation || !isProcessing
       ? undefined
       : (() => {
-          const reasoning =
-            activeConversation.completedReasoning || activeConversation.streamingReasoning
-          const content = activeConversation.completedContent || activeConversation.streamingContent
+          const draft = activeConversation.draftAssistant
+          const reasoning = draft?.reasoning || activeConversation.streamingReasoning
+          const content = draft?.content || activeConversation.streamingContent
           if (!reasoning && !content) return undefined
+          const lastAssistant = [...activeConversation.messages]
+            .reverse()
+            .find((m) => m.role === 'assistant')
+          if (
+            lastAssistant &&
+            (lastAssistant.reasoning || '') === (reasoning || '') &&
+            (lastAssistant.content || '') === (content || '')
+          ) {
+            return undefined
+          }
           return { reasoning, content }
         })()
 
@@ -223,6 +250,7 @@ export function ConversationView({
     const messages = activeConversation?.messages || []
     return groupMessagesIntoTurns(messages)
   }, [activeConversation?.messages])
+  const hasAssistantTurn = turns.some((t) => t.type === 'assistant')
 
   // Check if conversation has threads
   const hasThreads = useMemo(() => {
@@ -251,6 +279,7 @@ export function ConversationView({
             conversationId={convId!}
             toolResults={toolResults}
             isProcessing={isProcessing}
+            status={status}
             streamingState={streamingState}
             streamingContent={streamingContentMessage}
             currentToolCall={
@@ -264,6 +293,15 @@ export function ConversationView({
                 : undefined
             }
           />
+
+          {conversationError && (
+            <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              <div className="mx-auto max-w-3xl">
+                <span className="font-medium">请求失败：</span>
+                <span>{conversationError}</span>
+              </div>
+            </div>
+          )}
 
           {/* Input area */}
           <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
@@ -352,12 +390,44 @@ export function ConversationView({
                           ? activeConversation?.streamingToolArgs
                           : undefined
                       }
+                      runtimeToolCalls={
+                        isProcessing && idx === turns.length - 1
+                          ? activeConversation?.draftAssistant?.toolCalls
+                          : undefined
+                      }
+                      runtimeSteps={
+                        isProcessing && idx === turns.length - 1
+                          ? activeConversation?.draftAssistant?.steps
+                          : undefined
+                      }
                     />
                   )
                 )}
 
+                {/* Draft assistant turn while streaming before first assistant message commits */}
+                {isProcessing && !hasAssistantTurn && (
+                  <AssistantTurnBubble
+                    key="draft-assistant"
+                    turn={{
+                      type: 'assistant',
+                      messages: [],
+                      timestamp: Date.now(),
+                      totalUsage: null,
+                    }}
+                    toolResults={toolResults}
+                    isProcessing={true}
+                    isWaiting={status === 'pending'}
+                    streamingState={streamingState}
+                    streamingContent={streamingContentMessage}
+                    currentToolCall={status === 'tool_calling' ? activeConversation?.currentToolCall : undefined}
+                    streamingToolArgs={status === 'tool_calling' ? activeConversation?.streamingToolArgs : undefined}
+                    runtimeToolCalls={activeConversation?.draftAssistant?.toolCalls}
+                    runtimeSteps={activeConversation?.draftAssistant?.steps}
+                  />
+                )}
+
                 {/* Pending indicator - show when waiting for response and no assistant turn yet */}
-                {isProcessing && status === 'pending' && (
+                {isProcessing && status === 'pending' && !hasAssistantTurn && (
                   <div className="flex gap-3">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
                       <Bot className="h-4 w-4" />
@@ -385,6 +455,15 @@ export function ConversationView({
               </div>
             </div>
           </div>
+
+          {conversationError && (
+            <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+              <div className="mx-auto max-w-3xl">
+                <span className="font-medium">请求失败：</span>
+                <span>{conversationError}</span>
+              </div>
+            </div>
+          )}
 
           {/* Input area */}
           <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
