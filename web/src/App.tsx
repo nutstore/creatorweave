@@ -17,11 +17,13 @@ import { useT } from '@/i18n'
 import { PWAUpdateBanner } from '@/pwa/PWAUpdateBanner'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { ProjectHome } from '@/components/project/ProjectHome'
+import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 
 type AppRoute =
   | { kind: 'projectsHome' }
   | { kind: 'projectWorkspace'; projectId: string; workspaceId?: string }
   | { kind: 'legacyWorkspace' }
+  | { kind: 'webcontainerPreview' }
   | { kind: 'unknown' }
 
 function resolveRoute(pathname: string): AppRoute {
@@ -33,6 +35,10 @@ function resolveRoute(pathname: string): AppRoute {
 
   if (normalized === '/workspace') {
     return { kind: 'legacyWorkspace' }
+  }
+
+  if (normalized === '/webcontainer-preview') {
+    return { kind: 'webcontainerPreview' }
   }
 
   const segments = normalized.split('/').filter(Boolean)
@@ -76,6 +82,10 @@ function toPath(route: AppRoute): string {
 
   if (route.kind === 'legacyWorkspace') {
     return '/workspace'
+  }
+
+  if (route.kind === 'webcontainerPreview') {
+    return '/webcontainer-preview'
   }
 
   const encodedProjectId = encodeURIComponent(route.projectId)
@@ -507,6 +517,10 @@ function App() {
         return
       }
 
+      if (currentRoute.kind === 'webcontainerPreview') {
+        return
+      }
+
       if (currentRoute.kind === 'unknown') {
         navigateToRoute({ kind: 'projectsHome' }, true)
         return
@@ -737,6 +751,8 @@ function App() {
       onArchiveProject={handleArchiveProject}
       onDeleteProject={handleDeleteProject}
     />
+  ) : currentRoute.kind === 'webcontainerPreview' ? (
+    <WebContainerStandalonePreview />
   ) : isMobile ? (
     <MobileLayout>{workspaceView}</MobileLayout>
   ) : (

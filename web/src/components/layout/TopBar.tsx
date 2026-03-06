@@ -24,6 +24,7 @@ import {
   Keyboard,
   Menu,
   ArrowLeft,
+  Terminal,
 } from 'lucide-react'
 import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
@@ -48,6 +49,7 @@ interface TopBarProps {
   onToolsPanelOpen?: () => void
   onCommandPaletteOpen?: () => void
   onWorkspaceSettingsOpen?: () => void
+  onWebContainerOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
   activeWorkspaceName?: string
@@ -62,6 +64,7 @@ export function TopBar({
   onToolsPanelOpen,
   onCommandPaletteOpen,
   onWorkspaceSettingsOpen,
+  onWebContainerOpen,
   onBackToProjects,
   activeProjectName,
   activeWorkspaceName,
@@ -179,6 +182,13 @@ export function TopBar({
           <ActionTooltip label={t('topbar.tooltips.toolsPanel')}>
             <BrandButton iconButton onClick={onToolsPanelOpen} data-tour="tools">
               <List className="h-[14px] w-[14px]" />
+            </BrandButton>
+          </ActionTooltip>
+
+          {/* WebContainer */}
+          <ActionTooltip label="WebContainer">
+            <BrandButton iconButton onClick={onWebContainerOpen}>
+              <Terminal className="h-[14px] w-[14px]" />
             </BrandButton>
           </ActionTooltip>
 

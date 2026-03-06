@@ -53,6 +53,8 @@ import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { BrandButton } from '@browser-fs-analyzer/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
+import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
+import { useWebContainerStore } from '@/store/webcontainer.store'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -105,6 +107,9 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
   const [showRecentFiles, setShowRecentFiles] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
+  const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
+  const openWebContainerPanel = useWebContainerStore((s) => s.openPanel)
+  const closeWebContainerPanel = useWebContainerStore((s) => s.closePanel)
   const [locale] = useLocale()
   const t = useT()
 
@@ -347,6 +352,8 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           setToolsPanelOpen(false)
         } else if (skillsManagerOpen) {
           setSkillsManagerOpen(false)
+        } else if (isWebContainerPanelOpen) {
+          closeWebContainerPanel()
         } else if (selectedFilePath) {
           setSelectedFilePath(null)
           setSelectedFileHandle(null)
@@ -363,10 +370,12 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
     quickActionsOpen,
     toolsPanelOpen,
     skillsManagerOpen,
+    isWebContainerPanelOpen,
     selectedFilePath,
     panelState.sidebarCollapsed,
     setSidebarCollapsed,
     setActiveResourceTab,
+    closeWebContainerPanel,
   ])
 
   // Register callbacks for remote messages (Host mode)
@@ -496,6 +505,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
         onToolsPanelOpen={() => setToolsPanelOpen(true)}
         onCommandPaletteOpen={() => setShowCommandPalette(true)}
         onWorkspaceSettingsOpen={() => setShowWorkspaceSettings(true)}
+        onWebContainerOpen={openWebContainerPanel}
         onBackToProjects={onBackToProjects}
         activeProjectName={projectName}
         activeWorkspaceName={workspaceName}
@@ -655,6 +665,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
       )}
 
       <MCPSettingsDialog open={showMcpSettings} onOpenChange={setShowMcpSettings} />
+      <WebContainerPanel isOpen={isWebContainerPanelOpen} onClose={closeWebContainerPanel} />
     </div>
   )
 }

@@ -20,7 +20,7 @@
     <!-- COOP/COEP headers for SharedArrayBuffer and OPFS VFS support -->
     <meta http-equiv="Cross-Origin-Opener-Policy" content="same-origin">
     <meta http-equiv="Cross-Origin-Embedder-Policy" content="require-corp">
-    <!-- COOP/COEP Diagnostic Tool - 仅开发环境加载 -->
+    <!-- COOP/COEP Diagnostic Tool - dev only -->
     <script type="module">
       if (import.meta.env.DEV) {
         window.addEventListener('load', () => {
@@ -31,11 +31,11 @@
               .then(code => eval(code))
               .catch(() => console.error('Failed to load diagnostic tool'))
           }
-          console.log('💡 Run diagnoseCoopCoep() in console to check COOP/COEP status')
+          console.log('Run diagnoseCoopCoep() in console to check COOP/COEP status')
         })
       }
     </script>
-    <!-- React Grab - 仅开发环境加载 -->
+    <!-- React Grab - dev only -->
     <script type="module">
       if (import.meta.env.DEV) {
         import('react-grab');
@@ -49,4 +49,3 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-

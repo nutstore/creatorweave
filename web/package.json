@@ -32,6 +32,7 @@
     "@iconify/react": "^6.0.2",
     "@mariozechner/pi-agent-core": "^0.56.1",
     "@mariozechner/pi-ai": "^0.56.0",
+    "@webcontainer/api": "^1.5.1",
     "@mozilla/readability": "^0.6.0",
     "@sqlite.org/sqlite-wasm": "3.51.2-build6",
     "@types/qrcode.react": "^1.0.5",
