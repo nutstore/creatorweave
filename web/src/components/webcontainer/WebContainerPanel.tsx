@@ -1,14 +1,43 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { X, Play, Square, RotateCcw, RefreshCcw, Trash2, ExternalLink, Copy } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  X,
+  Play,
+  Square,
+  RotateCcw,
+  RefreshCcw,
+  Trash2,
+  ExternalLink,
+  Copy,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react'
 import { useWebContainerStore } from '@/store/webcontainer.store'
 import { useProjectStore } from '@/store/project.store'
+import { useFolderAccessStore } from '@/store/folder-access.store'
+import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { buildWebContainerPreviewRoute } from '@/services/webcontainer/preview-route'
 import { toast } from 'sonner'
+import {
+  BrandBadge,
+  BrandButton,
+  BrandCard,
+  BrandCardContent,
+  BrandCardHeader,
+  BrandCardTitle,
+  BrandInput,
+  BrandSelect,
+  BrandSelectContent,
+  BrandSelectItem,
+  BrandSelectTrigger,
+  BrandSelectValue,
+} from '@browser-fs-analyzer/ui'
 
 interface WebContainerPanelProps {
   isOpen: boolean
   onClose: () => void
 }
+
+type StatusBadgeVariant = 'success' | 'warning' | 'error' | 'neutral'
 
 function statusLabel(status: string): string {
   if (status === 'idle') return '空闲'
@@ -21,15 +50,18 @@ function statusLabel(status: string): string {
   return '错误'
 }
 
-function statusStyles(status: string): string {
-  if (status === 'running') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-  if (status === 'error') return 'bg-red-50 text-red-700 border-red-200'
-  if (status === 'idle') return 'bg-neutral-100 text-neutral-700 border-neutral-200'
-  return 'bg-amber-50 text-amber-700 border-amber-200'
+function statusStyles(status: string): StatusBadgeVariant {
+  if (status === 'running') return 'success'
+  if (status === 'error') return 'error'
+  if (status === 'idle') return 'neutral'
+  return 'warning'
 }
 
 export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  const activeDirectoryHandle = useFolderAccessStore((s) =>
+    activeProjectId ? s.records[activeProjectId]?.handle ?? null : null
+  )
   const {
     status,
     packageManager,
@@ -44,9 +76,6 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     previewPort,
     logs,
     errorMessage,
-    autoOpenPreviewInNewTab,
-    startupPathOptions,
-    isScanningStartupPaths,
     start,
     stop,
     restart,
@@ -55,9 +84,10 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     clearLogs,
     setStartupPath,
     setStartScriptOverride,
-    setAutoOpenPreviewInNewTab,
-    refreshStartupPathOptions,
   } = useWebContainerStore()
+  const [isDirectoryPickerOpen, setIsDirectoryPickerOpen] = useState(false)
+  const [pendingStartupPath, setPendingStartupPath] = useState<string>(startupPath)
+  const [showAdvanced, setShowAdvanced] = useState(false)
 
   const logRef = useRef<HTMLPreElement>(null)
   const busy =
@@ -80,6 +110,14 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     return buildWebContainerPreviewRoute(previewUrl, activeProjectId)
   }, [previewUrl, activeProjectId])
 
+  const mergedScriptOptions = useMemo(() => {
+    const options = startScriptOptions.slice()
+    if (startScriptOverride && !options.includes(startScriptOverride)) {
+      options.push(startScriptOverride)
+    }
+    return options
+  }, [startScriptOptions, startScriptOverride])
+
   const handleCopyLogs = async () => {
     try {
       await navigator.clipboard.writeText(logsText || '')
@@ -89,12 +127,28 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     }
   }
 
+  useEffect(() => {
+    if (!isDirectoryPickerOpen) {
+      setPendingStartupPath(startupPath)
+    }
+  }, [startupPath, isDirectoryPickerOpen])
+
+  const openDirectoryPicker = () => {
+    setPendingStartupPath(startupPath)
+    setIsDirectoryPickerOpen(true)
+  }
+
+  const confirmDirectoryPicker = () => {
+    setStartupPath(pendingStartupPath || '.')
+    setIsDirectoryPickerOpen(false)
+  }
+
   if (!isOpen) return null
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-[720px] min-w-0 flex-col overflow-hidden border-l border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
+      <div className="fixed right-0 top-0 z-50 flex h-full w-[720px] max-w-[92vw] min-w-0 flex-col overflow-hidden border-l border-neutral-200 bg-white shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
         <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
           <div className="flex items-start justify-between">
             <div className="min-w-0">
@@ -113,150 +167,170 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
               </p>
             </div>
             <div className="ml-3 flex items-center gap-2">
-              <span
-                className={`inline-flex items-center rounded-md border px-2 py-1 text-xs ${statusStyles(status)}`}
-              >
+              <BrandBadge variant={statusStyles(status)}>
                 {statusLabel(status)}
-              </span>
-              <button
+              </BrandBadge>
+              <BrandButton
                 type="button"
+                iconButton
+                variant="ghost"
                 onClick={onClose}
-                className="rounded-md p-2 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+                className="h-8 w-8"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </BrandButton>
             </div>
           </div>
         </div>
 
-        <div className="space-y-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
-                目录选择
-              </label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={startupPath}
-                  onChange={(e) => setStartupPath(e.target.value)}
-                  className="h-8 w-full rounded-md border border-neutral-200 bg-white px-2 text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
-                >
-                  {startupPathOptions.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                  {!startupPathOptions.includes(startupPath) && (
-                    <option value={startupPath}>{startupPath}</option>
+        <div className="space-y-3 border-b border-neutral-200 p-4 dark:border-neutral-700">
+          <BrandCard variant="content" className="rounded-xl">
+            <BrandCardHeader className="space-y-1 border-b border-gray-200 px-4 py-3 dark:border-neutral-700">
+              <BrandCardTitle className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                启动配置
+              </BrandCardTitle>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                可选择子目录与脚本，适配 monorepo 或多应用目录结构。
+              </p>
+            </BrandCardHeader>
+            <BrandCardContent className="space-y-3 px-4 py-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                    目录选择
+                  </label>
+                  <div className="space-y-2">
+                    <BrandButton
+                      type="button"
+                      variant="outline"
+                      onClick={openDirectoryPicker}
+                      disabled={!activeDirectoryHandle}
+                      className="h-8 px-3 text-xs"
+                    >
+                      选择目录
+                    </BrandButton>
+                    <div className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-800/60">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                        当前启动目录
+                      </div>
+                      <div className="mt-0.5 truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                        {startupPath}
+                      </div>
+                      <div className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                        修改目录后需重新启动或重启才会生效
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between rounded-md border border-gray-200 px-2.5 py-2 text-left text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    onClick={() => setShowAdvanced((prev) => !prev)}
+                  >
+                    <span>高级选项</span>
+                    {showAdvanced ? (
+                      <ChevronDown className="h-3.5 w-3.5" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  {showAdvanced && (
+                    <div className="mt-2 space-y-1">
+                      <label className="block text-xs text-neutral-500 dark:text-neutral-400">
+                        启动目录（手动）
+                      </label>
+                      <BrandInput
+                        value={startupPath}
+                        onChange={(e) => setStartupPath(e.target.value)}
+                        placeholder="例如 apps/web（默认 .）"
+                        className="h-8 text-xs"
+                      />
+                    </div>
                   )}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => void refreshStartupPathOptions()}
-                  disabled={isScanningStartupPaths}
-                  className="inline-flex h-8 items-center gap-1 rounded-md border border-neutral-200 px-2 text-xs text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
-                  title="刷新目录列表"
-                >
-                  <RefreshCcw
-                    className={`h-3.5 w-3.5 ${isScanningStartupPaths ? 'animate-spin' : ''}`}
-                  />
-                </button>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
-                启动目录（手动）
-              </label>
-              <input
-                type="text"
-                value={startupPath}
-                onChange={(e) => setStartupPath(e.target.value)}
-                placeholder="例如 apps/web（默认 .）"
-                className="h-8 w-full rounded-md border border-neutral-200 bg-white px-2 text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
-                启动脚本
-              </label>
-              <select
-                value={startScriptOverride ?? '__auto__'}
-                onChange={(e) =>
-                  setStartScriptOverride(e.target.value === '__auto__' ? null : e.target.value)
-                }
-                className="h-8 w-full rounded-md border border-neutral-200 bg-white px-2 text-xs text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary-200 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200"
-              >
-                <option value="__auto__">自动（当前: {startScriptName ?? '未识别'}）</option>
-                {startScriptOptions.map((script) => (
-                  <option key={script} value={script}>
-                    {script}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="flex items-end">
-              <label className="inline-flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-300">
-                <input
-                  type="checkbox"
-                  checked={autoOpenPreviewInNewTab}
-                  onChange={(e) => setAutoOpenPreviewInNewTab(e.target.checked)}
-                />
-                启动后自动新标签打开
-              </label>
-            </div>
-          </div>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                    启动脚本
+                  </label>
+                  <BrandSelect
+                    value={startScriptOverride ?? '__auto__'}
+                    onValueChange={(value) => setStartScriptOverride(value === '__auto__' ? null : value)}
+                  >
+                    <BrandSelectTrigger className="h-8">
+                      <BrandSelectValue placeholder="选择启动脚本" />
+                    </BrandSelectTrigger>
+                    <BrandSelectContent>
+                      <BrandSelectItem value="__auto__">
+                        自动（当前: {startScriptName ?? '未识别'}）
+                      </BrandSelectItem>
+                      {mergedScriptOptions.map((script) => (
+                        <BrandSelectItem key={script} value={script}>
+                          {script}
+                        </BrandSelectItem>
+                      ))}
+                    </BrandSelectContent>
+                    </BrandSelect>
+                </div>
+              </div>
+            </BrandCardContent>
+          </BrandCard>
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <BrandButton
               type="button"
+              variant="primary"
               onClick={() => void start()}
               disabled={busy || status === 'running'}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+              className="h-9 px-3 text-sm"
             >
               <Play className="h-3.5 w-3.5" />
-              Start
-            </button>
-            <button
+              启动
+            </BrandButton>
+            <BrandButton
               type="button"
+              variant="outline"
               onClick={() => void stop()}
               disabled={busy || status === 'idle'}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+              className="h-9 px-3 text-sm"
             >
               <Square className="h-3.5 w-3.5" />
-              Stop
-            </button>
-            <button
+              停止
+            </BrandButton>
+            <BrandButton
               type="button"
+              variant="outline"
               onClick={() => void restart()}
               disabled={busy}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+              className="h-9 px-3 text-sm"
             >
               <RotateCcw className="h-3.5 w-3.5" />
-              Restart
-            </button>
-            <button
+              重启
+            </BrandButton>
+            <BrandButton
               type="button"
+              variant="outline"
               onClick={() => void syncNow()}
               disabled={busy}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+              className="h-9 px-3 text-sm"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
-              Sync
-            </button>
-            <button
+              同步
+            </BrandButton>
+            <BrandButton
               type="button"
+              variant="outline"
               onClick={() => void reinstall()}
               disabled={busy}
-              className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700 disabled:opacity-50 dark:border-neutral-700 dark:text-neutral-200"
+              className="h-9 px-3 text-sm"
             >
               <RefreshCcw className="h-3.5 w-3.5" />
-              Reinstall
-            </button>
+              重装依赖
+            </BrandButton>
           </div>
         </div>
 
@@ -266,72 +340,121 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
           </div>
         )}
 
-        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[45%_55%]">
-          <div className="min-h-0 min-w-0 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="min-h-0 min-w-0 flex-1">
+          <div className="flex h-full min-h-0 min-w-0 flex-col">
             <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-700">
               <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
                 日志输出 ({logCount})
               </div>
               <div className="flex items-center gap-2">
-                <button
+                <BrandButton
                   type="button"
+                  variant="outline"
                   onClick={() => clearLogs()}
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                  className="h-7 px-2 text-xs"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  Clear
-                </button>
-                <button
+                  清空日志
+                </BrandButton>
+                <BrandButton
                   type="button"
+                  variant="outline"
                   onClick={() => void handleCopyLogs()}
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
+                  className="h-7 px-2 text-xs"
                 >
                   <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </button>
+                  复制日志
+                </BrandButton>
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  className="h-7 px-2 text-xs"
+                  disabled={!standalonePreviewHref}
+                  onClick={() => {
+                    if (!standalonePreviewHref) return
+                    window.open(standalonePreviewHref, '_blank', 'noopener')
+                  }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  打开预览
+                </BrandButton>
               </div>
             </div>
             <pre
               ref={logRef}
-              className="h-[calc(100%-41px)] min-w-0 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 px-4 py-3 text-xs leading-5 text-neutral-100"
+              className="h-full min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 px-4 py-3 text-xs leading-5 text-neutral-100"
             >
-              {logsText || '暂无输出，点击 Start 启动'}
+              {logsText || '暂无输出，点击“启动”开始'}
             </pre>
-          </div>
-
-          <div className="flex min-h-0 min-w-0 flex-col">
-            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-700">
-              <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                应用预览
-              </div>
-              {standalonePreviewHref && (
-                <a
-                  href={standalonePreviewHref}
-                  target="_blank"
-                  rel="noopener"
-                  className="inline-flex items-center gap-1 rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-700 dark:border-neutral-700 dark:text-neutral-200"
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  Open Preview
-                </a>
-              )}
-            </div>
-            <div className="min-h-0 min-w-0 flex-1 overflow-hidden bg-neutral-100 dark:bg-neutral-950">
-              {previewUrl ? (
-                <iframe
-                  title="webcontainer-preview"
-                  src={previewUrl}
-                  className="h-full w-full min-w-0 border-0"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-sm text-neutral-500 dark:text-neutral-400">
-                  暂无预览地址
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
+
+      {isDirectoryPickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4">
+          <div className="flex h-[70vh] w-full max-w-[760px] min-w-0 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
+              <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                选择启动目录
+              </div>
+              <BrandButton
+                type="button"
+                iconButton
+                variant="ghost"
+                className="h-8 w-8"
+                onClick={() => setIsDirectoryPickerOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </BrandButton>
+            </div>
+
+            <div className="min-h-0 flex-1 p-3">
+              <div className="h-full overflow-hidden rounded-lg border border-gray-200 dark:border-neutral-700">
+                <FileTreePanel
+                  directoryHandle={activeDirectoryHandle}
+                  rootName={activeDirectoryHandle?.name ?? '项目目录'}
+                  mode="directories"
+                  selectedPath={pendingStartupPath === '.' ? null : pendingStartupPath}
+                  onDirectorySelect={(path) => setPendingStartupPath(path)}
+                  showHeader
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 dark:border-neutral-700">
+              <div className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+                已选择: {pendingStartupPath || '.'}
+              </div>
+              <div className="flex items-center gap-2">
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => setPendingStartupPath('.')}
+                >
+                  设为根目录
+                </BrandButton>
+                <BrandButton
+                  type="button"
+                  variant="outline"
+                  className="h-8 px-3 text-xs"
+                  onClick={() => setIsDirectoryPickerOpen(false)}
+                >
+                  取消
+                </BrandButton>
+                <BrandButton
+                  type="button"
+                  variant="primary"
+                  className="h-8 px-3 text-xs"
+                  onClick={confirmDirectoryPicker}
+                >
+                  确认
+                </BrandButton>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

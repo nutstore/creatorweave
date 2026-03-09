@@ -52,8 +52,11 @@ interface TreeNode {
 interface FileTreePanelProps {
   directoryHandle: FileSystemDirectoryHandle | null
   rootName?: string | null
-  onFileSelect: (path: string, handle: FileSystemFileHandle) => void
+  onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
+  onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
   selectedPath?: string | null
+  mode?: 'all' | 'directories'
+  showHeader?: boolean
 }
 
 /** Icon name by file extension (using vscode-icons) */
@@ -187,7 +190,6 @@ function TreeNodeRow({
   expanded,
   selected,
   pendingType,
-  onToggle,
   onClick,
 }: {
   node: TreeNode
@@ -195,7 +197,6 @@ function TreeNodeRow({
   expanded: boolean
   selected: boolean
   pendingType: PendingChange['type'] | null
-  onToggle: () => void
   onClick: () => void
 }) {
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
@@ -260,7 +261,7 @@ function TreeNodeRow({
             : 'hover:bg-hover text-secondary'
         }`}
         style={{ paddingLeft: `${indent + 4}px` }}
-        onClick={isDir ? onToggle : onClick}
+        onClick={onClick}
         onContextMenu={handleContextMenu}
         title={node.path}
       >
@@ -331,7 +332,7 @@ function TreeBranch({
   selectedPath,
   pendingMap,
   onToggle,
-  onFileSelect,
+  onNodeClick,
 }: {
   nodes: TreeNode[]
   depth: number
@@ -339,7 +340,7 @@ function TreeBranch({
   selectedPath: string | null
   pendingMap: Map<string, PendingChange['type']>
   onToggle: (node: TreeNode) => void
-  onFileSelect: (node: TreeNode) => void
+  onNodeClick: (node: TreeNode) => void
 }) {
   // Sort: directories first, then alphabetically
   const sorted = [...nodes].sort((a, b) => {
@@ -362,8 +363,7 @@ function TreeBranch({
               expanded={expanded}
               selected={selected}
               pendingType={pendingType}
-              onToggle={() => onToggle(node)}
-              onClick={() => onFileSelect(node)}
+              onClick={() => onNodeClick(node)}
             />
             {expanded && node.children && (
               <TreeBranch
@@ -373,7 +373,7 @@ function TreeBranch({
                 selectedPath={selectedPath}
                 pendingMap={pendingMap}
                 onToggle={onToggle}
-                onFileSelect={onFileSelect}
+                onNodeClick={onNodeClick}
               />
             )}
           </div>
@@ -387,7 +387,10 @@ export function FileTreePanel({
   directoryHandle,
   rootName,
   onFileSelect,
+  onDirectorySelect,
   selectedPath,
+  mode = 'all',
+  showHeader = true,
 }: FileTreePanelProps) {
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
@@ -430,6 +433,7 @@ export function FileTreePanel({
         const path = parentPath ? `${parentPath}/${name}` : name
 
         if (handle.kind === 'file') {
+          if (mode === 'directories') continue
           const fileHandle = handle as FileSystemFileHandle
           try {
             const file = await fileHandle.getFile()
@@ -459,7 +463,7 @@ export function FileTreePanel({
 
       return children
     },
-    [isHidden]
+    [isHidden, mode]
   )
 
   /** Load root directory and optionally reload expanded paths */
@@ -541,11 +545,16 @@ export function FileTreePanel({
   /** Handle file click */
   const handleFileSelect = useCallback(
     (node: TreeNode) => {
+      if (node.kind === 'directory') {
+        onDirectorySelect?.(node.path, node.handle as FileSystemDirectoryHandle)
+        void handleToggle(node)
+        return
+      }
       if (node.kind === 'file') {
-        onFileSelect(node.path, node.handle as FileSystemFileHandle)
+        onFileSelect?.(node.path, node.handle as FileSystemFileHandle)
       }
     },
-    [onFileSelect]
+    [onFileSelect, onDirectorySelect, handleToggle]
   )
 
   // Reset states when directoryHandle changes
@@ -579,21 +588,22 @@ export function FileTreePanel({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="border-subtle flex items-center justify-between border-b px-2 py-1">
-        <span className="truncate text-xs font-semibold uppercase tracking-wider text-primary">
-          {rootName || directoryHandle.name}
-        </span>
-        <BrandButton
-          iconButton
-          variant="ghost"
-          className="h-6 w-6"
-          onClick={() => loadRoot(true)}
-          title="刷新"
-        >
-          <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-        </BrandButton>
-      </div>
+      {showHeader && (
+        <div className="border-subtle flex items-center justify-between border-b px-2 py-1">
+          <span className="truncate text-xs font-semibold uppercase tracking-wider text-primary">
+            {rootName || directoryHandle.name}
+          </span>
+          <BrandButton
+            iconButton
+            variant="ghost"
+            className="h-6 w-6"
+            onClick={() => loadRoot(true)}
+            title="刷新"
+          >
+            <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
+          </BrandButton>
+        </div>
+      )}
 
       {/* Tree */}
       <div className="custom-scrollbar flex-1 overflow-y-auto">
@@ -608,7 +618,7 @@ export function FileTreePanel({
               selectedPath={selectedPath || null}
               pendingMap={pendingMap}
               onToggle={handleToggle}
-              onFileSelect={handleFileSelect}
+              onNodeClick={handleFileSelect}
             />
           )}
         </div>

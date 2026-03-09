@@ -8,7 +8,6 @@ import type {
   WebContainerRuntimeStatus,
 } from '@/services/webcontainer/types'
 import { webProjectDetector } from '@/services/webcontainer/project-detector'
-import { buildWebContainerPreviewRoute } from '@/services/webcontainer/preview-route'
 import { useFolderAccessStore } from './folder-access.store'
 import { useProjectStore } from './project.store'
 
@@ -29,7 +28,6 @@ interface WebContainerStoreState {
   errorMessage: string | null
   initialized: boolean
   isPanelOpen: boolean
-  autoOpenPreviewInNewTab: boolean
   startupPathOptions: string[]
   isScanningStartupPaths: boolean
   start: () => Promise<void>
@@ -42,7 +40,6 @@ interface WebContainerStoreState {
   closePanel: () => void
   setStartupPath: (path: string) => void
   setStartScriptOverride: (scriptName: string | null) => void
-  setAutoOpenPreviewInNewTab: (enabled: boolean) => void
   refreshStartupPathOptions: () => Promise<void>
   refreshStartScriptOptions: () => Promise<void>
 }
@@ -58,8 +55,6 @@ function pushLog(lines: string[], chunk: string): string[] {
 }
 
 let listenerBound = false
-const STARTUP_PATH_MAX_DEPTH = 5
-const STARTUP_PATH_MAX_COUNT = 500
 const STARTUP_PATH_EXCLUDED_DIRS = new Set([
   '.git',
   'node_modules',
@@ -82,36 +77,18 @@ function getStartScriptOverrideStorageKey(projectId: string): string {
   return `webcontainer:start-script:${projectId}`
 }
 
-function getAutoOpenPreviewStorageKey(projectId: string): string {
-  return `webcontainer:auto-open-preview:${projectId}`
-}
-
 async function collectDirectoryOptions(
   rootHandle: FileSystemDirectoryHandle
 ): Promise<string[]> {
-  const result = new Set<string>(['.'])
-
-  const walk = async (
-    dirHandle: FileSystemDirectoryHandle,
-    basePath: string,
-    depth: number
-  ): Promise<void> => {
-    if (depth > STARTUP_PATH_MAX_DEPTH) return
-    if (result.size >= STARTUP_PATH_MAX_COUNT) return
-
-    for await (const [name, entry] of dirHandle.entries()) {
-      if (result.size >= STARTUP_PATH_MAX_COUNT) break
-      if (entry.kind !== 'directory') continue
-      if (STARTUP_PATH_EXCLUDED_DIRS.has(name)) continue
-
-      const fullPath = basePath ? `${basePath}/${name}` : name
-      result.add(fullPath)
-      await walk(entry as FileSystemDirectoryHandle, fullPath, depth + 1)
-    }
+  const result = ['.']
+  const children: string[] = []
+  for await (const [name, entry] of rootHandle.entries()) {
+    if (entry.kind !== 'directory') continue
+    if (STARTUP_PATH_EXCLUDED_DIRS.has(name)) continue
+    children.push(name)
   }
-
-  await walk(rootHandle, '', 1)
-  return Array.from(result).sort((a, b) => {
+  children.sort((a, b) => a.localeCompare(b)).forEach((path) => result.push(path))
+  return result.sort((a, b) => {
     if (a === '.') return -1
     if (b === '.') return 1
     return a.localeCompare(b)
@@ -136,7 +113,6 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
     errorMessage: null,
     initialized: false,
     isPanelOpen: false,
-    autoOpenPreviewInNewTab: false,
     startupPathOptions: ['.'],
     isScanningStartupPaths: false,
 
@@ -198,14 +174,6 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
         draft.status = 'booting'
       })
 
-      let previewWindow: Window | null = null
-      if (get().autoOpenPreviewInNewTab && typeof window !== 'undefined') {
-        previewWindow = window.open('about:blank', '_blank')
-        if (!previewWindow) {
-          toast.warning('浏览器拦截了新标签页，请允许弹窗后重试')
-        }
-      }
-
       try {
         const contextKey = [
           activeProjectId,
@@ -254,9 +222,6 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
           draft.previewPort = server.port
           draft.previewUrl = server.url
         })
-        if (previewWindow && !previewWindow.closed) {
-          previewWindow.location.href = buildWebContainerPreviewRoute(server.url, activeProjectId)
-        }
         toast.success('项目开发服务已启动')
       } catch (error) {
         const message = error instanceof Error ? error.message : 'WebContainer 启动失败'
@@ -389,8 +354,6 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
           getStartScriptOverrideStorageKey(activeProjectId)
         )
         draft.startScriptOverride = savedScript && savedScript.length > 0 ? savedScript : null
-        draft.autoOpenPreviewInNewTab =
-          window.localStorage.getItem(getAutoOpenPreviewStorageKey(activeProjectId)) === '1'
       })
       void get().refreshStartupPathOptions()
     },
@@ -423,17 +386,6 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
       })
       void get().refreshStartScriptOptions()
     },
-    setAutoOpenPreviewInNewTab: (enabled: boolean) =>
-      set((draft) => {
-        draft.autoOpenPreviewInNewTab = enabled
-        const activeProjectId = useProjectStore.getState().activeProjectId
-        if (!activeProjectId || typeof window === 'undefined') return
-        if (enabled) {
-          window.localStorage.setItem(getAutoOpenPreviewStorageKey(activeProjectId), '1')
-        } else {
-          window.localStorage.removeItem(getAutoOpenPreviewStorageKey(activeProjectId))
-        }
-      }),
     refreshStartupPathOptions: async () => {
       const activeProjectId = useProjectStore.getState().activeProjectId
       if (!activeProjectId) {
