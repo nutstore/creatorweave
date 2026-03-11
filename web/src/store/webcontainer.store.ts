@@ -11,6 +11,8 @@ import { webProjectDetector } from '@/services/webcontainer/project-detector'
 import { useFolderAccessStore } from './folder-access.store'
 import { useProjectStore } from './project.store'
 
+import type { CompatibilityWarning } from '@/services/webcontainer/types'
+
 interface WebContainerStoreState {
   boundProjectId: string | null
   status: WebContainerRuntimeStatus
@@ -26,6 +28,7 @@ interface WebContainerStoreState {
   previewPort: number | null
   logs: string[]
   errorMessage: string | null
+  compatibilityWarnings: CompatibilityWarning[]
   initialized: boolean
   isPanelOpen: boolean
   startupPathOptions: string[]
@@ -111,6 +114,7 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
     previewPort: null,
     logs: [],
     errorMessage: null,
+    compatibilityWarnings: [],
     initialized: false,
     isPanelOpen: false,
     startupPathOptions: ['.'],
@@ -201,6 +205,7 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
           draft.startScriptOptions = projectInfo.availableScripts
           draft.effectiveDevWorkingDirectory = projectInfo.devWorkingDirectory
           draft.effectiveInstallWorkingDirectory = projectInfo.installWorkingDirectory
+          draft.compatibilityWarnings = projectInfo.compatibilityWarnings
         })
 
         await runtime.syncProject(directoryHandle)
@@ -340,6 +345,7 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
           draft.packageName = null
           draft.startScriptName = null
           draft.startScriptOptions = []
+          draft.compatibilityWarnings = []
           draft.previewUrl = null
           draft.previewPort = null
           draft.errorMessage = null
@@ -444,10 +450,12 @@ export const useWebContainerStore = create<WebContainerStoreState>()(
           draft.packageManager = info.packageManager
           draft.effectiveDevWorkingDirectory = info.devWorkingDirectory
           draft.effectiveInstallWorkingDirectory = info.installWorkingDirectory
+          draft.compatibilityWarnings = info.compatibilityWarnings
         })
       } catch {
         set((draft) => {
           draft.startScriptOptions = []
+          draft.compatibilityWarnings = []
         })
       }
     },

@@ -1,5 +1,10 @@
 export type WebContainerPackageManager = 'pnpm' | 'yarn' | 'npm'
 
+export interface CompatibilityWarning {
+  type: string
+  message: string
+}
+
 export interface WebProjectInfo {
   mode: 'package-script' | 'static'
   packageManager: WebContainerPackageManager
@@ -13,6 +18,7 @@ export interface WebProjectInfo {
   availableScripts: string[]
   devWorkingDirectory: string
   installWorkingDirectory: string
+  compatibilityWarnings: CompatibilityWarning[]
 }
 
 export type WebContainerRuntimeStatus =

@@ -76,6 +76,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
     previewPort,
     logs,
     errorMessage,
+    compatibilityWarnings,
     start,
     stop,
     restart,
@@ -340,6 +341,16 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
           </div>
         )}
 
+        {compatibilityWarnings.length > 0 && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+            {compatibilityWarnings.map((warning, index) => (
+              <div key={index} className={index > 0 ? 'mt-2' : ''}>
+                <span className="font-medium">⚠️ {warning.type}:</span> {warning.message}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="min-h-0 min-w-0 flex-1">
           <div className="flex h-full min-h-0 min-w-0 flex-col">
             <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-700">
@@ -430,9 +441,12 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                   type="button"
                   variant="outline"
                   className="h-8 px-3 text-xs"
-                  onClick={() => setPendingStartupPath('.')}
+                  onClick={() => {
+                    setStartupPath('.')
+                    setIsDirectoryPickerOpen(false)
+                  }}
                 >
-                  设为根目录
+                  重置为项目根目录
                 </BrandButton>
                 <BrandButton
                   type="button"

@@ -49,15 +49,24 @@ interface TreeNode {
   handle: FileSystemDirectoryHandle | FileSystemFileHandle
 }
 
-interface FileTreePanelProps {
+interface FileTreePanelBaseProps {
   directoryHandle: FileSystemDirectoryHandle | null
   rootName?: string | null
-  onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
-  onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
   selectedPath?: string | null
-  mode?: 'all' | 'directories'
   showHeader?: boolean
 }
+
+type FileTreePanelProps =
+  | (FileTreePanelBaseProps & {
+      mode?: 'all'
+      onFileSelect: (path: string, handle: FileSystemFileHandle) => void
+      onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
+    })
+  | (FileTreePanelBaseProps & {
+      mode: 'directories'
+      onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
+      onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
+    })
 
 /** Icon name by file extension (using vscode-icons) */
 function getFileIconName(name: string, kind: 'file' | 'directory'): string {

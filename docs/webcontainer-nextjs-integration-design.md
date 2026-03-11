@@ -257,7 +257,14 @@ interface IWebContainerRuntimeService {
 
 ## 13. 风险与注意事项
 
-1. WebContainer 对浏览器环境有要求，需保留兼容性提示
+    1. WebContainer 对浏览器环境有要求，需保留兼容性提示
+    2. 大项目全量同步耗时高，MVP 先可用，后续优化增量同步
+    3. 同步排除规则需要严格,避免写入 `node_modules/.next`
+    4. 运行时只保留单实例,避免多进程抢占端口和资源
+
+### 13.1 已知限制
+
+    **Next.js 版本限制**: WebContainer 当前仅支持 Next.js 14.x 及以下版本。 Next.js 15+ 版本由于 LightningCSS 依赖问题，无法在 WebContainer 中正常运行。 如果用户项目使用 Next.js 15+, 系统会检测并显示兼容性警告，建议降级到 `next@14` 以避免运行时错误.1. WebContainer 对浏览器环境有要求，需保留兼容性提示
 2. 大项目全量同步耗时高，MVP 先可用，后续优化增量同步
 3. 同步排除规则必须严格，避免写入 `node_modules/.next`
 4. 运行时只保留单实例，避免多进程抢占端口和资源

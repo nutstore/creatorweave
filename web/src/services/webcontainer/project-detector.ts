@@ -1,6 +1,13 @@
 import { resolveDirectoryHandle } from '@/services/fsAccess.service'
 import type { WebContainerPackageManager, WebProjectInfo } from './types'
 
+export interface ProjectCompatibilityWarning {
+  type: string
+  message: string
+}
+
+const WEBCONTAINER_MAX_NEXTJS_MAJOR = 14
+
 const STATIC_SERVER_SCRIPT_SOURCE = `
 const http=require('http');
 const fs=require('fs');
@@ -88,7 +95,7 @@ async function existsFile(
   }
 }
 
-function pickPackageManager(
+export function pickPackageManager(
   hasPnpmLock: boolean,
   hasYarnLock: boolean
 ): WebContainerPackageManager {
@@ -118,7 +125,7 @@ interface ScriptCandidate {
   score: number
 }
 
-function scoreScript(name: string, command: string): number {
+export function scoreScript(name: string, command: string): number {
   const n = name.toLowerCase()
   const c = command.toLowerCase()
 
@@ -206,6 +213,42 @@ function pickStartScript(
   }
 }
 
+/**
+ * 从 semver 版本字符串中提取主版本号
+ */
+export function parseMajorVersion(version: string): number | null {
+  const cleaned = version.replace(/^[\^~>=<\s]+/, '').trim()
+  const match = cleaned.match(/^(\d+)/)
+  return match ? parseInt(match[1], 10) : null
+}
+
+/**
+ * 检测框架版本兼容性问题
+ */
+function checkCompatibility(
+  parsedPackageJson: Record<string, unknown>,
+  startScriptCommand: string
+): Array<{ type: string; message: string }> {
+  const warnings: Array<{ type: string; message: string }> = []
+
+  // 检测 Next.js 版本
+  const deps = parsedPackageJson.dependencies as Record<string, string> | undefined
+  const devDeps = parsedPackageJson.devDependencies as Record<string, string> | undefined
+  const nextVersion = deps?.next ?? devDeps?.next
+
+  if (nextVersion && startScriptCommand.toLowerCase().includes('next')) {
+    const major = parseMajorVersion(nextVersion)
+    if (major !== null && major > WEBCONTAINER_MAX_NEXTJS_MAJOR) {
+      warnings.push({
+        type: 'nextjs-version',
+        message: `检测到 Next.js ${major}.x，WebContainer 当前仅支持 Next.js ${WEBCONTAINER_MAX_NEXTJS_MAJOR}.x 及以下版本。建议降级到 next@${WEBCONTAINER_MAX_NEXTJS_MAJOR}.x 以避免 LightningCSS 兼容性问题。`,
+      })
+    }
+  }
+
+  return warnings
+}
+
 export class WebProjectDetector {
   async detect(
     rootDirectoryHandle: FileSystemDirectoryHandle,
@@ -234,6 +277,7 @@ export class WebProjectDetector {
         availableScripts: [],
         installWorkingDirectory: staticWorkingDirectory,
         devWorkingDirectory: staticWorkingDirectory,
+        compatibilityWarnings: [],
       }
     }
 
@@ -276,6 +320,9 @@ export class WebProjectDetector {
         ? '/'
         : projectWorkingDirectory
 
+    // 检测框架版本兼容性
+    const compatibilityWarnings = checkCompatibility(parsed, startScript.command)
+
     return {
       mode: 'package-script',
       packageManager,
@@ -289,6 +336,7 @@ export class WebProjectDetector {
       availableScripts: scriptCandidates.map((s) => s.name),
       installWorkingDirectory,
       devWorkingDirectory: projectWorkingDirectory,
+      compatibilityWarnings,
     }
   }
 }
