@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "🚀 CreatorWeave - Development Setup"
+echo "🚀 AI Workspace - Development Setup"
 echo ""
 echo "This script will set up your development environment."
 echo ""

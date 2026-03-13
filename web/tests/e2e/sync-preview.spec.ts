@@ -26,7 +26,7 @@ test.describe('Sync Preview Feature', () => {
       
       // Look for any sync-related empty state or placeholder
       // This test verifies the UI renders correctly without errors
-      await expect(page).toHaveTitle(/CreatorWeave/i)
+      await expect(page).toHaveTitle(/AI Workspace/i)
     })
 
     test('should display sync preview panel when triggered', async ({ page }) => {
@@ -229,7 +229,7 @@ test.describe('Sync Flow Integration', () => {
     }
     
     // Verify page still works after interaction
-    await expect(page).toHaveTitle(/CreatorWeave/i)
+    await expect(page).toHaveTitle(/AI Workspace/i)
   })
 
   test('should handle close/cancel gracefully', async ({ page }) => {

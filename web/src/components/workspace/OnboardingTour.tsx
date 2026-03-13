@@ -254,7 +254,7 @@ export function getDefaultOnboardingSteps(locale: Locale = DEFAULT_LOCALE): Tour
   return [
     {
       id: 'welcome',
-      title: getStepTitle(locale, 'welcome', 'Welcome to CreatorWeave!'),
+      title: getStepTitle(locale, 'welcome', 'Welcome to AI Workspace!'),
       description: getStepDescription(locale, 'welcome', 'Let us show you around the key features.'),
       position: 'center',
     },

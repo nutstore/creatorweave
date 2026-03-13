@@ -21,7 +21,7 @@ export const zhCN = {
     preparing: '正在准备...',
     loadProgress: '加载进度',
     firstLoadHint: '首次加载可能需要几秒钟时间',
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     initComplete: '初始化完成',
     initFailed: '初始化失败',
     sessionStorageOnly: '数据仅在当前会话保存，刷新后将丢失',
@@ -33,7 +33,7 @@ export const zhCN = {
 
   // 顶部导航
   topbar: {
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     openFolder: '打开文件夹',
     switchFolder: '切换项目文件夹',
     noApiKey: '未配置 API Key',
@@ -159,7 +159,7 @@ export const zhCN = {
 
   // 欢迎页
   welcome: {
-    title: 'CreatorWeave',
+    title: 'AI Workspace',
     tagline: '面向创作者的 AI 原生工作台（知识库与多 Agent 编排）',
     placeholder: '输入消息开始对话...',
     placeholderNoKey: '请先在设置中配置 API Key',
@@ -599,7 +599,7 @@ export const zhCN = {
     stepProgress: '第 {current} / {total} 步',
     steps: {
       welcome: {
-        title: '欢迎使用 CreatorWeave！',
+        title: '欢迎使用 AI Workspace！',
         description: '让我们为您介绍主要功能。',
       },
       conversations: {

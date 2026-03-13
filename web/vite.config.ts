@@ -20,7 +20,7 @@ export default defineConfig({
       // Disable in dev to avoid COOP/COEP conflicts
       disable: process.env.NODE_ENV === 'development',
       manifest: {
-        name: 'CreatorWeave',
+        name: 'AI Workspace',
         short_name: 'CWeave',
         description: 'AI-native creator workspace with local-first files, knowledge workflows, and multi-agent orchestration',
         theme_color: '#3b82f6',

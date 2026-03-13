@@ -1,5 +1,5 @@
 /**
- * Mobile Web App - Remote control interface for CreatorWeave
+ * Mobile Web App - Remote control interface for AI Workspace
  *
  * - Auto-joins session when URL contains ?session=xxx parameter
  * - Shows input form for manual session ID entry when no session parameter

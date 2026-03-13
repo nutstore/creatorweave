@@ -1,7 +1,7 @@
 export const jaJP = {
   // 应用
   app: {
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     initializing: '初期化中...',
     loadProgress: '読み込み進捗',
     preparing: '準備中...',
@@ -25,7 +25,7 @@ export const jaJP = {
 
   // 顶部导航
   topbar: {
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     openFolder: 'フォルダを開く',
     switchFolder: 'プロジェクトフォルダを切り替え',
     noApiKey: 'API Key が設定されていません',
@@ -141,7 +141,7 @@ export const jaJP = {
 
   // 欢迎页
   welcome: {
-    title: 'CreatorWeave',
+    title: 'AI Workspace',
     tagline: 'ナレッジベースとマルチエージェント編成のための AI ネイティブ Creator Workspace',
     placeholder: 'メッセージを入力して会話を開始...',
     placeholderNoKey: 'まず設定で API Key を設定してください',

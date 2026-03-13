@@ -20,7 +20,7 @@ export const enUS = {
     preparing: 'Preparing...',
     loadProgress: 'Load Progress',
     firstLoadHint: 'First load may take a few seconds',
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     initComplete: 'Initialization complete',
     initFailed: 'Initialization failed',
     sessionStorageOnly: 'Data is saved for current session only, will be lost on refresh',
@@ -31,7 +31,7 @@ export const enUS = {
   },
 
   topbar: {
-    productName: 'CreatorWeave',
+    productName: 'AI Workspace',
     openFolder: 'Open Folder',
     switchFolder: 'Switch Project Folder',
     noApiKey: 'No API Key',
@@ -155,7 +155,7 @@ export const enUS = {
   },
 
   welcome: {
-    title: 'CreatorWeave',
+    title: 'AI Workspace',
     tagline: 'AI-Native Creator Workspace for Knowledge & Multi-Agent Flows',
     placeholder: 'Type a message to start...',
     placeholderNoKey: 'Please configure API Key in settings first',
@@ -590,7 +590,7 @@ export const enUS = {
     stepProgress: 'Step {current} of {total}',
     steps: {
       welcome: {
-        title: 'Welcome to CreatorWeave!',
+        title: 'Welcome to AI Workspace!',
         description: 'Let us show you around the key features.',
       },
       conversations: {
