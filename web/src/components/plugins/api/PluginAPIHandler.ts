@@ -1,10 +1,10 @@
 /**
- * CreatorWeave API Handler
+ * Plugin API Handler
  * Handles API calls from plugin iframe and delegates to appropriate handlers
  */
 
 import type {
-  CreatorWeaveAPICall,
+  PluginAPICall,
   AnalysisResult,
   NotifyToastData,
   NotifyConfirmData,
@@ -24,9 +24,9 @@ export interface APIHandlerContext {
 }
 
 /**
- * Handle CreatorWeave API call from iframe
+ * Handle Plugin API call from iframe
  */
-export function handleCreatorWeaveAPICall(msg: CreatorWeaveAPICall, context: APIHandlerContext): void {
+export function handlePluginAPICall(msg: PluginAPICall, context: APIHandlerContext): void {
   const { id, action, data } = msg
   const [category, method] = action.split('.')
 

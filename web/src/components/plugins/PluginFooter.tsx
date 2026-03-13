@@ -40,7 +40,7 @@ export function PluginFooter({ stats }: PluginFooterProps) {
       </div>
 
       <div className="plugin-footer-brand">
-        <span>CreatorWeave Plugin System v2.0</span>
+        <span>Plugin System v2.0</span>
       </div>
     </footer>
   )

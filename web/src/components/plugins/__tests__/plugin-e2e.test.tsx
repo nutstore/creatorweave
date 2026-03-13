@@ -43,7 +43,7 @@ const mockPlugin: PluginInstance = {
     version: '1.0.0',
     api_version: '2.0.0',
     description: 'A test plugin for E2E testing',
-    author: 'CreatorWeave Team',
+    author: 'Core Team',
     capabilities: {
       metadata_only: false,
       requires_content: true,

@@ -19,7 +19,7 @@ interface GlobalWebContainerState {
   contextKey: string | null
 }
 
-const GLOBAL_WEBCONTAINER_STATE_KEY = '__CREATORWEAVE_WEBCONTAINER_STATE__'
+const GLOBAL_WEBCONTAINER_STATE_KEY = '__APP_WEBCONTAINER_STATE__'
 
 function getGlobalWebContainerState(): GlobalWebContainerState {
   const root = globalThis as typeof globalThis & {

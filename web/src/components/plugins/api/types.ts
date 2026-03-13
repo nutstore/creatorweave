@@ -1,5 +1,5 @@
 /**
- * CreatorWeave Plugin API Types
+ * Plugin API Types
  */
 
 // =============================================================================
@@ -17,22 +17,22 @@ export interface PluginHTMLResult {
 // API Message Types
 // =============================================================================
 
-export interface CreatorWeaveAPICall {
-  type: 'creatorweave-api-call'
+export interface PluginAPICall {
+  type: 'plugin-api-call'
   id: string
   action: string // e.g., 'ui.toast', 'data.getResult'
   data: unknown
 }
 
-export interface CreatorWeaveAPIResponse {
-  type: 'creatorweave-api-response'
+export interface PluginAPIResponse {
+  type: 'plugin-api-response'
   id: string
   data?: unknown
   error?: string
 }
 
-export interface CreatorWeaveReadyMessage {
-  type: 'creatorweave-api-ready'
+export interface PluginReadyMessage {
+  type: 'plugin-api-ready'
   version: string
 }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CreatorWeave Plugin API Demo</title>
+  <title>Plugin API Demo</title>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -163,7 +163,7 @@
   </style>
 </head>
 <body>
-  <h1 style="color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔌 CreatorWeave Plugin API Demo</h1>
+  <h1 style="color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">🔌 Plugin API Demo</h1>
 
   <div class="container">
     <!-- Sidebar with API test buttons -->
@@ -175,71 +175,71 @@
       <h2 style="margin-top: 20px;">UI Operations</h2>
       <button id="btnToast" disabled>
         Show Toast
-        <div class="description">CreatorWeave.ui.toast('Hello!')</div>
+        <div class="description">PluginAPI.ui.toast('Hello!')</div>
       </button>
       <button id="btnModal" disabled>
         Show Modal
-        <div class="description">CreatorWeave.ui.modal(content)</div>
+        <div class="description">PluginAPI.ui.modal(content)</div>
       </button>
       <button id="btnConfirm" disabled>
         Confirm Dialog
-        <div class="description">CreatorWeave.confirm('Are you sure?')</div>
+        <div class="description">PluginAPI.confirm('Are you sure?')</div>
       </button>
       <button id="btnPrompt" disabled>
         Prompt Dialog
-        <div class="description">CreatorWeave.prompt('Enter name')</div>
+        <div class="description">PluginAPI.prompt('Enter name')</div>
       </button>
       <button id="btnFullscreen" disabled>
         Toggle Fullscreen
-        <div class="description">CreatorWeave.ui.fullscreen()</div>
+        <div class="description">PluginAPI.ui.fullscreen()</div>
       </button>
       <button id="btnResize" disabled>
         Resize Iframe
-        <div class="description">CreatorWeave.ui.resize(600)</div>
+        <div class="description">PluginAPI.ui.resize(600)</div>
       </button>
 
       <h2 style="margin-top: 20px;">Data Operations</h2>
       <button id="btnGetData" disabled>
         Get Analysis Data
-        <div class="description">CreatorWeave.data.getAnalysisResult()</div>
+        <div class="description">PluginAPI.data.getAnalysisResult()</div>
       </button>
       <button id="btnSetData" disabled>
         Store Data
-        <div class="description">CreatorWeave.data.setItem('key', value)</div>
+        <div class="description">PluginAPI.data.setItem('key', value)</div>
       </button>
       <button id="btnGetData" disabled>
         Retrieve Data
-        <div class="description">CreatorWeave.data.getItem('key')</div>
+        <div class="description">PluginAPI.data.getItem('key')</div>
       </button>
 
       <h2 style="margin-top: 20px;">Export Operations</h2>
       <button id="btnExportJSON" disabled>
         Export JSON
-        <div class="description">CreatorWeave.export.json(data, 'file.json')</div>
+        <div class="description">PluginAPI.export.json(data, 'file.json')</div>
       </button>
       <button id="btnCopy" disabled>
         Copy to Clipboard
-        <div class="description">CreatorWeave.export.copy(text)</div>
+        <div class="description">PluginAPI.export.copy(text)</div>
       </button>
 
       <h2 style="margin-top: 20px;">Theme & Info</h2>
       <button id="btnGetTheme" disabled>
         Get Theme
-        <div class="description">CreatorWeave.theme.get()</div>
+        <div class="description">PluginAPI.theme.get()</div>
       </button>
       <button id="btnGetColors" disabled>
         Get Color Palette
-        <div class="description">CreatorWeave.theme.getColors()</div>
+        <div class="description">PluginAPI.theme.getColors()</div>
       </button>
       <button id="btnGetDevice" disabled>
         Get Device Info
-        <div class="description">CreatorWeave.theme.getDeviceInfo()</div>
+        <div class="description">PluginAPI.theme.getDeviceInfo()</div>
       </button>
 
       <h2 style="margin-top: 20px;">Utilities</h2>
       <button id="btnFormatBytes" disabled>
         Format Bytes
-        <div class="description">CreatorWeave.utils.formatBytes(1234567)</div>
+        <div class="description">PluginAPI.utils.formatBytes(1234567)</div>
       </button>
     </div>
 
@@ -310,12 +310,12 @@
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
-      if (msg.type === 'creatorweave-api-ready') {
+      if (msg.type === 'plugin-api-ready') {
         log('API', `Plugin API v${msg.version} ready`);
         enableButtons();
       }
 
-      if (msg.type === 'creatorweave-api-call') {
+      if (msg.type === 'plugin-api-call') {
         const { id, action, data } = msg;
         log('API CALL', `${action}`, data);
 
@@ -325,7 +325,7 @@
         const sendResponse = (responseData, error = null) => {
           if (iframe) {
             iframe.postMessage({
-              type: 'creatorweave-api-response',
+              type: 'plugin-api-response',
               id,
               data: responseData,
               error
@@ -537,19 +537,19 @@
           <head>
             <style>
               body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 16px; margin: 0; }
-              .creatorweave-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-              .creatorweave-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-              .creatorweave-metric { background: #f9fafb; border-radius: 6px; padding: 12px; }
-              .creatorweave-metric-label { font-size: 12px; color: #6b7280; }
-              .creatorweave-metric-value { font-size: 18px; font-weight: 600; color: #111827; }
-              .creatorweave-table { width: 100%; border-collapse: collapse; }
-              .creatorweave-table th { padding: 8px 12px; text-align: left; background: #f9fafb; font-weight: 600; }
-              .creatorweave-table td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
-              .creatorweave-badge { padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
-              .creatorweave-badge-success { background: #dcfce7; color: #166534; }
-              .creatorweave-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
-              .creatorweave-btn-primary { background: #2563eb; color: white; }
-              .creatorweave-btn:hover { opacity: 0.9; }
+              .plugin-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+              .plugin-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+              .plugin-metric { background: #f9fafb; border-radius: 6px; padding: 12px; }
+              .plugin-metric-label { font-size: 12px; color: #6b7280; }
+              .plugin-metric-value { font-size: 18px; font-weight: 600; color: #111827; }
+              .plugin-table { width: 100%; border-collapse: collapse; }
+              .plugin-table th { padding: 8px 12px; text-align: left; background: #f9fafb; font-weight: 600; }
+              .plugin-table td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
+              .plugin-badge { padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+              .plugin-badge-success { background: #dcfce7; color: #166534; }
+              .plugin-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+              .plugin-btn-primary { background: #2563eb; color: white; }
+              .plugin-btn:hover { opacity: 0.9; }
             </style>
           </head>
           <body>${finalize.content}</body>
@@ -569,116 +569,116 @@
     document.getElementById('btnToast').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.toast("Hello from the plugin!", "success")'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.toast("Hello from the plugin!", "success")'
       }, '*');
     });
 
     document.getElementById('btnModal').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.modal("<h3>Plugin Modal</h3><p>This is a modal from the plugin!</p>")'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.modal("<h3>Plugin Modal</h3><p>This is a modal from the plugin!</p>")'
       }, '*');
     });
 
     document.getElementById('btnConfirm').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.confirm("Do you want to proceed?").then(result => console.log("Confirmed:", result))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.confirm("Do you want to proceed?").then(result => console.log("Confirmed:", result))'
       }, '*');
     });
 
     document.getElementById('btnPrompt').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.prompt("Enter your name:", "Guest").then(name => CreatorWeave.ui.toast("Hello, " + name + "!"))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.prompt("Enter your name:", "Guest").then(name => PluginAPI.ui.toast("Hello, " + name + "!"))'
       }, '*');
     });
 
     document.getElementById('btnFullscreen').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.fullscreen()'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.fullscreen()'
       }, '*');
     });
 
     document.getElementById('btnResize').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.ui.resize(300)'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.ui.resize(300)'
       }, '*');
     });
 
     document.getElementById('btnGetData').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.data.getAnalysisResult().then(data => console.log("Analysis Data:", data))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.data.getAnalysisResult().then(data => console.log("Analysis Data:", data))'
       }, '*');
     });
 
     document.getElementById('btnSetData').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.data.setItem("myKey", { foo: "bar", timestamp: Date.now() })'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.data.setItem("myKey", { foo: "bar", timestamp: Date.now() })'
       }, '*');
     });
 
     document.getElementById('btnExportJSON').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.export.json({ test: "data", numbers: [1,2,3] }, "test-export.json")'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.export.json({ test: "data", numbers: [1,2,3] }, "test-export.json")'
       }, '*');
     });
 
     document.getElementById('btnCopy').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.export.copy("Copied from plugin iframe!")'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.export.copy("Copied from plugin iframe!")'
       }, '*');
     });
 
     document.getElementById('btnGetTheme').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.theme.get().then(t => console.log("Theme:", t))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.theme.get().then(t => console.log("Theme:", t))'
       }, '*');
     });
 
     document.getElementById('btnGetColors').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.theme.getColors().then(c => console.log("Colors:", c))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.theme.getColors().then(c => console.log("Colors:", c))'
       }, '*');
     });
 
     document.getElementById('btnGetDevice').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'CreatorWeave.theme.getDeviceInfo().then(d => console.log("Device:", d))'
+        type: 'plugin-api-instruction',
+        instruction: 'PluginAPI.theme.getDeviceInfo().then(d => console.log("Device:", d))'
       }, '*');
     });
 
     document.getElementById('btnFormatBytes').addEventListener('click', () => {
       if (!iframeElement) return;
       iframeElement.contentWindow.postMessage({
-        type: 'creatorweave-api-instruction',
-        instruction: 'console.log("Bytes formatted:", CreatorWeave.utils.formatBytes(1234567))'
+        type: 'plugin-api-instruction',
+        instruction: 'console.log("Bytes formatted:", PluginAPI.utils.formatBytes(1234567))'
       }, '*');
     });
 
-    log('INIT', 'CreatorWeave Plugin API Demo loaded');
+    log('INIT', 'Plugin API Demo loaded');
   </script>
 </body>
 </html>

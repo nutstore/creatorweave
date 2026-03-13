@@ -1,15 +1,15 @@
 /**
- * CreatorWeave Plugin API
+ * Plugin API
  *
  * Provides a comprehensive JavaScript API that plugins can call from within
  * their iframe to interact with the host application.
  *
  * Plugins can use:
- * - CreatorWeave.modal() - Show a modal dialog
- * - CreatorWeave.toast() - Show a toast notification
- * - CreatorWeave.confirm() - Show a confirmation dialog
- * - CreatorWeave.fullscreen() - Go fullscreen
- * - CreatorWeave.getAnalysisResult() - Get analysis data
+ * - PluginAPI.modal() - Show a modal dialog
+ * - PluginAPI.toast() - Show a toast notification
+ * - PluginAPI.confirm() - Show a confirmation dialog
+ * - PluginAPI.fullscreen() - Go fullscreen
+ * - PluginAPI.getAnalysisResult() - Get analysis data
  * - etc.
  */
 
@@ -27,7 +27,7 @@ export interface PluginHTMLResult {
   title?: string
 }
 
-export interface CreatorWeavePluginAPIProps {
+export interface PluginHostAPIProps {
   result: PluginHTMLResult
   onAction?: (action: string, data: unknown) => void
   analysisData?: AnalysisData // Passed from parent
@@ -58,7 +58,7 @@ export interface PluginResultEntry {
   metrics?: unknown
 }
 
-type CreatorWeaveApiMessage = {
+type PluginApiMessage = {
   id?: string
   action?: string
   data?: unknown
@@ -66,7 +66,7 @@ type CreatorWeaveApiMessage = {
   pluginType?: string
 }
 
-type CreatorWeaveResponseSender = (data?: unknown, error?: string) => void
+type PluginResponseSender = (data?: unknown, error?: string) => void
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -86,39 +86,39 @@ function toToastType(value: unknown): ToastMessage['type'] {
 const SHARED_STYLES = `
   :root {
     /* Primary (Teal - matching design system) */
-    --creatorweave-primary: #14B8A6;
-    --creatorweave-primary-hover: #0D9488;
+    --plugin-primary: #14B8A6;
+    --plugin-primary-hover: #0D9488;
     /* Status colors */
-    --creatorweave-success: #16A34A;
-    --creatorweave-warning: #D97706;
-    --creatorweave-danger: #DC2626;
+    --plugin-success: #16A34A;
+    --plugin-warning: #D97706;
+    --plugin-danger: #DC2626;
     /* Neutral palette (mapped to design system) */
-    --creatorweave-gray-50: #FAFAFA;
-    --creatorweave-gray-100: #F5F5F5;
-    --creatorweave-gray-200: #E5E5E5;
-    --creatorweave-gray-400: #A3A3A3;
-    --creatorweave-gray-500: #737373;
-    --creatorweave-gray-600: #525252;
-    --creatorweave-gray-700: #404040;
-    --creatorweave-gray-900: #171717;
-    --creatorweave-surface: #FFFFFF;
+    --plugin-gray-50: #FAFAFA;
+    --plugin-gray-100: #F5F5F5;
+    --plugin-gray-200: #E5E5E5;
+    --plugin-gray-400: #A3A3A3;
+    --plugin-gray-500: #737373;
+    --plugin-gray-600: #525252;
+    --plugin-gray-700: #404040;
+    --plugin-gray-900: #171717;
+    --plugin-surface: #FFFFFF;
   }
 
   .dark {
-    --creatorweave-primary: #2DD4BF;
-    --creatorweave-primary-hover: #5EEAD4;
-    --creatorweave-success: #22C55E;
-    --creatorweave-warning: #FBBF24;
-    --creatorweave-danger: #F59E6B;
-    --creatorweave-gray-50: #1A1A1A;
-    --creatorweave-gray-100: #171717;
-    --creatorweave-gray-200: #262626;
-    --creatorweave-gray-400: #525252;
-    --creatorweave-gray-500: #737373;
-    --creatorweave-gray-600: #A3A3A3;
-    --creatorweave-gray-700: #E5E5E5;
-    --creatorweave-gray-900: #F5F5F5;
-    --creatorweave-surface: #0A0A0A;
+    --plugin-primary: #2DD4BF;
+    --plugin-primary-hover: #5EEAD4;
+    --plugin-success: #22C55E;
+    --plugin-warning: #FBBF24;
+    --plugin-danger: #F59E6B;
+    --plugin-gray-50: #1A1A1A;
+    --plugin-gray-100: #171717;
+    --plugin-gray-200: #262626;
+    --plugin-gray-400: #525252;
+    --plugin-gray-500: #737373;
+    --plugin-gray-600: #A3A3A3;
+    --plugin-gray-700: #E5E5E5;
+    --plugin-gray-900: #F5F5F5;
+    --plugin-surface: #0A0A0A;
   }
 
   * { box-sizing: border-box; }
@@ -127,7 +127,7 @@ const SHARED_STYLES = `
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
-    color: var(--creatorweave-gray-700);
+    color: var(--plugin-gray-700);
     margin: 0;
     padding: 16px;
     background: transparent;
@@ -136,7 +136,7 @@ const SHARED_STYLES = `
   h1, h2, h3, h4, h5, h6 {
     margin: 0 0 12px 0;
     font-weight: 600;
-    color: var(--creatorweave-gray-900);
+    color: var(--plugin-gray-900);
   }
 
   h1 { font-size: 24px; }
@@ -146,14 +146,14 @@ const SHARED_STYLES = `
   p { margin: 0 0 12px 0; }
 
   a {
-    color: var(--creatorweave-primary);
+    color: var(--plugin-primary);
     text-decoration: none;
   }
   a:hover { text-decoration: underline; }
 
   code, pre {
     font-family: ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace;
-    background: var(--creatorweave-gray-100);
+    background: var(--plugin-gray-100);
     border-radius: 4px;
   }
 
@@ -173,66 +173,66 @@ const SHARED_STYLES = `
   }
 
   /* Card Component */
-  .creatorweave-card {
-    background: var(--creatorweave-surface);
-    border: 1px solid var(--creatorweave-gray-200);
+  .plugin-card {
+    background: var(--plugin-surface);
+    border: 1px solid var(--plugin-gray-200);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
   }
 
   /* Metrics Grid */
-  .creatorweave-metrics {
+  .plugin-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 12px;
     margin: 12px 0;
   }
 
-  .creatorweave-metric {
-    background: var(--creatorweave-gray-50);
+  .plugin-metric {
+    background: var(--plugin-gray-50);
     border-radius: 6px;
     padding: 12px;
   }
 
-  .creatorweave-metric-label {
+  .plugin-metric-label {
     font-size: 12px;
-    color: var(--creatorweave-gray-600);
+    color: var(--plugin-gray-600);
     margin-bottom: 4px;
   }
 
-  .creatorweave-metric-value {
+  .plugin-metric-value {
     font-size: 20px;
     font-weight: 600;
-    color: var(--creatorweave-gray-900);
+    color: var(--plugin-gray-900);
   }
 
   /* Table */
-  .creatorweave-table {
+  .plugin-table {
     width: 100%;
     border-collapse: collapse;
     margin: 12px 0;
   }
 
-  .creatorweave-table th,
-  .creatorweave-table td {
+  .plugin-table th,
+  .plugin-table td {
     padding: 8px 12px;
     text-align: left;
-    border-bottom: 1px solid var(--creatorweave-gray-200);
+    border-bottom: 1px solid var(--plugin-gray-200);
   }
 
-  .creatorweave-table th {
+  .plugin-table th {
     font-weight: 600;
-    color: var(--creatorweave-gray-700);
-    background: var(--creatorweave-gray-50);
+    color: var(--plugin-gray-700);
+    background: var(--plugin-gray-50);
   }
 
-  .creatorweave-table tr:last-child td {
+  .plugin-table tr:last-child td {
     border-bottom: none;
   }
 
   /* Badge */
-  .creatorweave-badge {
+  .plugin-badge {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
@@ -241,13 +241,13 @@ const SHARED_STYLES = `
     font-weight: 500;
   }
 
-  .creatorweave-badge-success { background: var(--success-bg); color: var(--success-text); }
-  .creatorweave-badge-warning { background: var(--warning-bg); color: var(--warning-text, var(--creatorweave-gray-700)); }
-  .creatorweave-badge-error { background: var(--danger-bg); color: var(--danger-text, var(--creatorweave-gray-700)); }
-  .creatorweave-badge-info { background: var(--creatorweave-gray-100); color: var(--creatorweave-primary); }
+  .plugin-badge-success { background: var(--success-bg); color: var(--success-text); }
+  .plugin-badge-warning { background: var(--warning-bg); color: var(--warning-text, var(--plugin-gray-700)); }
+  .plugin-badge-error { background: var(--danger-bg); color: var(--danger-text, var(--plugin-gray-700)); }
+  .plugin-badge-info { background: var(--plugin-gray-100); color: var(--plugin-primary); }
 
   /* Button */
-  .creatorweave-btn {
+  .plugin-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -260,109 +260,109 @@ const SHARED_STYLES = `
     transition: all 0.15s;
   }
 
-  .creatorweave-btn-primary {
-    background: var(--creatorweave-primary);
+  .plugin-btn-primary {
+    background: var(--plugin-primary);
     color: white;
   }
-  .creatorweave-btn-primary:hover { background: var(--creatorweave-primary-hover); }
+  .plugin-btn-primary:hover { background: var(--plugin-primary-hover); }
 
-  .creatorweave-btn-secondary {
-    background: var(--creatorweave-surface);
-    border: 1px solid var(--creatorweave-gray-200);
-    color: var(--creatorweave-gray-700);
+  .plugin-btn-secondary {
+    background: var(--plugin-surface);
+    border: 1px solid var(--plugin-gray-200);
+    color: var(--plugin-gray-700);
   }
-  .creatorweave-btn-secondary:hover { background: var(--creatorweave-gray-50); }
+  .plugin-btn-secondary:hover { background: var(--plugin-gray-50); }
 
-  .creatorweave-btn-danger {
-    background: var(--creatorweave-danger);
+  .plugin-btn-danger {
+    background: var(--plugin-danger);
     color: white;
   }
-  .creatorweave-btn-danger:hover { opacity: 0.9; }
+  .plugin-btn-danger:hover { opacity: 0.9; }
 
   /* Progress Bar */
-  .creatorweave-progress {
+  .plugin-progress {
     width: 100%;
     height: 8px;
-    background: var(--creatorweave-gray-200);
+    background: var(--plugin-gray-200);
     border-radius: 4px;
     overflow: hidden;
   }
 
-  .creatorweave-progress-bar {
+  .plugin-progress-bar {
     height: 100%;
-    background: var(--creatorweave-primary);
+    background: var(--plugin-primary);
     transition: width 0.3s ease;
   }
 
   /* Tabs */
-  .creatorweave-tabs {
+  .plugin-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid var(--creatorweave-gray-200);
+    border-bottom: 1px solid var(--plugin-gray-200);
     margin-bottom: 16px;
   }
 
-  .creatorweave-tab {
+  .plugin-tab {
     padding: 8px 16px;
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--creatorweave-gray-600);
+    color: var(--plugin-gray-600);
     cursor: pointer;
   }
 
-  .creatorweave-tab:hover { color: var(--creatorweave-gray-900); }
+  .plugin-tab:hover { color: var(--plugin-gray-900); }
 
-  .creatorweave-tab.active {
-    color: var(--creatorweave-primary);
-    border-bottom-color: var(--creatorweave-primary);
+  .plugin-tab.active {
+    color: var(--plugin-primary);
+    border-bottom-color: var(--plugin-primary);
   }
 
   /* Accordion */
-  .creatorweave-accordion-item {
-    border: 1px solid var(--creatorweave-gray-200);
+  .plugin-accordion-item {
+    border: 1px solid var(--plugin-gray-200);
     border-radius: 6px;
     margin-bottom: 8px;
     overflow: hidden;
   }
 
-  .creatorweave-accordion-header {
+  .plugin-accordion-header {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: var(--creatorweave-gray-50);
+    background: var(--plugin-gray-50);
     border: none;
     cursor: pointer;
     font-weight: 500;
   }
 
-  .creatorweave-accordion-content {
+  .plugin-accordion-content {
     padding: 12px 16px;
-    border-top: 1px solid var(--creatorweave-gray-200);
+    border-top: 1px solid var(--plugin-gray-200);
   }
 
   /* Input */
-  .creatorweave-input {
+  .plugin-input {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid var(--creatorweave-gray-200);
+    border: 1px solid var(--plugin-gray-200);
     border-radius: 6px;
     font-size: 14px;
   }
 
-  .creatorweave-input:focus {
+  .plugin-input:focus {
     outline: none;
-    border-color: var(--creatorweave-primary);
+    border-color: var(--plugin-primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
 
   /* Select */
-  .creatorweave-select {
+  .plugin-select {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid var(--creatorweave-gray-200);
+    border: 1px solid var(--plugin-gray-200);
     border-radius: 6px;
     font-size: 14px;
     background: white;
@@ -370,7 +370,7 @@ const SHARED_STYLES = `
 `
 
 //=============================================================================
-// CreatorWeave API Script (injected into iframe)
+// Plugin API Script (injected into iframe)
 //=============================================================================
 
 const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 'dark'): string => `
@@ -398,13 +398,13 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
           setTimeout(() => {
             if (_pendingCallbacks.has(messageId)) {
               _pendingCallbacks.delete(messageId);
-              reject(new Error('CreatorWeave API request timed out'));
+              reject(new Error('Plugin API request timed out'));
             }
           }, 30000);
         }
 
         window.parent.postMessage({
-          type: 'creatorweave-api-call',
+          type: 'plugin-api-call',
           id: messageId,
           action: action,
           data: data
@@ -419,7 +419,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
     // Listen for responses from parent
     window.addEventListener('message', function(event) {
       const msg = event.data;
-      if (msg && msg.type === 'creatorweave-api-response' && msg.id) {
+      if (msg && msg.type === 'plugin-api-response' && msg.id) {
         const callback = _pendingCallbacks.get(msg.id);
         if (callback) {
           _pendingCallbacks.delete(msg.id);
@@ -432,7 +432,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
       }
 
       // Handle events from parent
-      if (msg && msg.type === 'creatorweave-api-event') {
+      if (msg && msg.type === 'plugin-api-event') {
         const eventName = msg.event;
         if (window._bfsaEventListeners && window._bfsaEventListeners[eventName]) {
           window._bfsaEventListeners[eventName].forEach(fn => {
@@ -443,10 +443,10 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
     });
 
     //===========================================================================
-    // CreatorWeave API - Main Object
+    // Plugin API - Main Object
     //===========================================================================
 
-    window.CreatorWeave = {
+    window.PluginAPI = {
       version: API_VERSION,
 
       //=========================================================================
@@ -725,10 +725,10 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
 
     // Notify parent that API is ready
     window.parent.postMessage({
-      type: 'creatorweave-api-ready',
+      type: 'plugin-api-ready',
       version: API_VERSION
     }, '*');
-    console.log('[CreatorWeave] Plugin API v' + API_VERSION + ' loaded');
+    console.log('[PluginAPI] Plugin API v' + API_VERSION + ' loaded');
   })();
 `
 
@@ -736,7 +736,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
 // Main Component
 //=============================================================================
 
-export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }: CreatorWeavePluginAPIProps) {
+export function PluginHostAPIRenderer({ result, onAction, analysisData }: PluginHostAPIProps) {
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(result.height || 400)
@@ -753,16 +753,16 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
         const msg = event.data
 
         switch (msg.type) {
-          case 'creatorweave-api-ready':
+          case 'plugin-api-ready':
             setIsReady(true)
-            console.log('[CreatorWeave] Plugin API ready')
+            console.log('[PluginAPI] Plugin API ready')
             break
 
-          case 'creatorweave-api-call':
+          case 'plugin-api-call':
             handleAPICall(msg)
             break
 
-          case 'creatorweave-plugin-message':
+          case 'plugin-message':
             // Legacy message format
             onAction?.(msg.pluginType, msg.pluginData)
             break
@@ -776,15 +776,15 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Handle API calls from iframe
-  function handleAPICall(msg: CreatorWeaveApiMessage) {
+  function handleAPICall(msg: PluginApiMessage) {
     const { id, action, data } = msg
     const iframe = iframeRef.current
 
-    const sendResponse: CreatorWeaveResponseSender = (responseData?: unknown, error?: string) => {
+    const sendResponse: PluginResponseSender = (responseData?: unknown, error?: string) => {
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(
           {
-            type: 'creatorweave-api-response',
+            type: 'plugin-api-response',
             id,
             data: responseData,
             error,
@@ -846,7 +846,7 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
   const handleUIOperation = (
     method: string,
     data: unknown,
-    sendResponse: CreatorWeaveResponseSender
+    sendResponse: PluginResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -921,7 +921,7 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
   const handleDataOperation = (
     method: string,
     data: unknown,
-    sendResponse: CreatorWeaveResponseSender
+    sendResponse: PluginResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -991,7 +991,7 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
   const handleExportOperation = (
     method: string,
     data: unknown,
-    sendResponse: CreatorWeaveResponseSender
+    sendResponse: PluginResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -1050,7 +1050,7 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
   const handlePluginOperation = (
     method: string,
     data: unknown,
-    sendResponse: CreatorWeaveResponseSender
+    sendResponse: PluginResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -1149,7 +1149,7 @@ export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">CreatorWeave API v1.0</span>
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">Plugin API v1.0</span>
         </div>
 
         <div className="flex items-center gap-2">

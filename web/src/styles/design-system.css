@@ -1,8 +1,8 @@
 /**
- * CreatorWeave Design System
+ * Application Design System
  *
  * Unified design tokens and component styles
- * Based on CreatorWeave brand color (Teal)
+ * Based on application brand color (Teal)
  */
 
 /* ==========================================================================
@@ -48,7 +48,7 @@
 }
 
 /* ==========================================================================
-   UTILITY CLASSES (Using CreatorWeave Teal Color)
+   UTILITY CLASSES (Using application teal color)
    ========================================================================== */
 
 @layer components {
@@ -219,11 +219,11 @@
 }
 
 /* ==========================================================================
-   PLUGIN HTML STYLES (CreatorWeave Teal Theme)
+   PLUGIN HTML STYLES (application teal theme)
    ========================================================================== */
 
 /* Styles injected into plugin iframes for consistency */
-.creatorweave-card {
+.plugin-card {
   font-family:
     system-ui,
     -apple-system,
@@ -235,33 +235,33 @@
   box-shadow: var(--shadow-sm);
 }
 
-.creatorweave-card h3,
-.creatorweave-card h4 {
+.plugin-card h3,
+.plugin-card h4 {
   color: hsl(var(--text-primary));
   font-weight: 600;
   margin-top: 0;
 }
 
-.creatorweave-card p {
+.plugin-card p {
   color: hsl(var(--text-secondary));
   line-height: 1.6;
 }
 
-.creatorweave-metrics {
+.plugin-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--spacing-lg);
   margin: var(--spacing-lg) 0;
 }
 
-.creatorweave-metric {
+.plugin-metric {
   text-align: center;
   padding: var(--spacing-lg);
   background: hsl(var(--gray-100));
   border-radius: var(--radius-md);
 }
 
-.creatorweave-metric-label {
+.plugin-metric-label {
   font-size: 12px;
   font-weight: 500;
   color: hsl(var(--text-muted));
@@ -269,24 +269,24 @@
   letter-spacing: 0.05em;
 }
 
-.creatorweave-metric-value {
+.plugin-metric-value {
   font-size: 24px;
   font-weight: 700;
   color: hsl(var(--primary-600));
   margin-top: var(--spacing-xs);
 }
 
-.creatorweave-table {
+.plugin-table {
   width: 100%;
   border-collapse: collapse;
   margin: var(--spacing-lg) 0;
 }
 
-.creatorweave-table thead {
+.plugin-table thead {
   background: hsl(var(--gray-100));
 }
 
-.creatorweave-table th {
+.plugin-table th {
   text-align: left;
   padding: var(--spacing-md) var(--spacing-lg);
   font-size: 12px;
@@ -297,16 +297,16 @@
   border-bottom: 1px solid hsl(var(--gray-200));
 }
 
-.creatorweave-table td {
+.plugin-table td {
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid hsl(var(--gray-100));
 }
 
-.creatorweave-table tbody tr:last-child td {
+.plugin-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.creatorweave-badge {
+.plugin-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
@@ -315,27 +315,27 @@
   border-radius: 9999px;
 }
 
-.creatorweave-badge-success {
+.plugin-badge-success {
   background: hsl(var(--success-bg));
   color: hsl(var(--success-text));
 }
 
-.creatorweave-badge-warning {
+.plugin-badge-warning {
   background: hsl(var(--warning-bg));
   color: hsl(var(--warning));
 }
 
-.creatorweave-badge-error {
+.plugin-badge-error {
   background: hsl(var(--danger-bg));
   color: hsl(var(--danger));
 }
 
-.creatorweave-badge-info {
+.plugin-badge-info {
   background: hsl(var(--primary-50));
   color: hsl(var(--primary-700));
 }
 
-.creatorweave-btn {
+.plugin-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -349,20 +349,20 @@
   transition: all 150ms ease;
 }
 
-.creatorweave-btn-primary {
+.plugin-btn-primary {
   background: hsl(var(--primary-600));
   color: white;
 }
 
-.creatorweave-btn-primary:hover {
+.plugin-btn-primary:hover {
   background: hsl(var(--primary-700));
 }
 
-.creatorweave-btn-secondary {
+.plugin-btn-secondary {
   background: hsl(var(--gray-100));
   color: hsl(var(--text-secondary));
 }
 
-.creatorweave-btn-secondary:hover {
+.plugin-btn-secondary:hover {
   background: hsl(var(--gray-200));
 }

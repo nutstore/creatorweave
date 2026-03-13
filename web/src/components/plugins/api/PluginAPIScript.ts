@@ -1,9 +1,9 @@
 /**
- * CreatorWeave API Script
- * JavaScript code injected into plugin iframe to provide CreatorWeave.* API
+ * Plugin API Script
+ * JavaScript code injected into plugin iframe to provide PluginAPI.* API
  */
 
-export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string {
+export function generatePluginAPIScript(version: string = '2.0.0'): string {
   return `
   (function() {
     'use strict';
@@ -27,13 +27,13 @@ export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string
           setTimeout(() => {
             if (_pendingCallbacks.has(messageId)) {
               _pendingCallbacks.delete(messageId);
-              reject(new Error('CreatorWeave API request timed out'));
+              reject(new Error('Plugin API request timed out'));
             }
           }, 30000);
         }
 
         window.parent.postMessage({
-          type: 'creatorweave-api-call',
+          type: 'plugin-api-call',
           id: messageId,
           action: action,
           data: data
@@ -48,7 +48,7 @@ export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string
     // Listen for responses from parent
     window.addEventListener('message', function(event) {
       const msg = event.data;
-      if (msg && msg.type === 'creatorweave-api-response' && msg.id) {
+      if (msg && msg.type === 'plugin-api-response' && msg.id) {
         const callback = _pendingCallbacks.get(msg.id);
         if (callback) {
           _pendingCallbacks.delete(msg.id);
@@ -62,10 +62,10 @@ export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string
     });
 
     // =============================================================================
-    // CreatorWeave API - Main Object
+    // Plugin API - Main Object
     // =============================================================================
 
-    window.CreatorWeave = {
+    window.PluginAPI = {
       version: API_VERSION,
 
       // -------------------------------------------------------------------------
@@ -163,11 +163,11 @@ export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string
     // =============================================================================
 
     window.parent.postMessage({
-      type: 'creatorweave-api-ready',
+      type: 'plugin-api-ready',
       version: API_VERSION
     }, '*');
 
-    console.log('[CreatorWeave] Plugin API v' + API_VERSION + ' loaded');
+    console.log('[PluginAPI] Plugin API v' + API_VERSION + ' loaded');
   })();
 `
 }
