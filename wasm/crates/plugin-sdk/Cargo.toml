@@ -1,16 +1,16 @@
 [package]
-name = "browser-fs-analyzer-plugin-sdk"
+name = "creatorweave-plugin-sdk"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
-description = "SDK template for building BFOSA plugins and Agent tools"
+description = "SDK template for building CreatorWeave plugins and Agent tools"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-browser-fs-analyzer-plugin-api = { path = "../plugin-api" }
+creatorweave-plugin-api = { path = "../plugin-api" }
 wasm-bindgen = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

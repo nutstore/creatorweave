@@ -161,10 +161,10 @@ export function calculateTax(amount: number): number {
     window.addEventListener('message', (event) => {
       const msg = event.data;
 
-      // Handle BFSA API calls
-      if (msg && msg.type === 'bfsa-api-call') {
+      // Handle CreatorWeave API calls
+      if (msg && msg.type === 'creatorweave-api-call') {
         const { id, action, data } = msg;
-        console.log('[BFSA API]', action, data);
+        console.log('[CreatorWeave API]', action, data);
 
         const [category, method] = action.split('.');
         const iframe = document.querySelector('#iframeContainer iframe');
@@ -172,7 +172,7 @@ export function calculateTax(amount: number): number {
         const sendResponse = (responseData, error = null) => {
           if (iframe && iframe.contentWindow) {
             iframe.contentWindow.postMessage({
-              type: 'bfsa-api-response',
+              type: 'creatorweave-api-response',
               id,
               data: responseData,
               error
@@ -199,7 +199,7 @@ export function calculateTax(amount: number): number {
       }
 
       // Legacy action format
-      if (event.data && event.data.type === 'bfsa-plugin-action') {
+      if (event.data && event.data.type === 'creatorweave-plugin-action') {
         const { action, data } = event.data;
         console.log('Plugin action received:', action, data);
         functionOutputDiv.innerHTML = `
@@ -441,22 +441,22 @@ export function calculateTax(amount: number): number {
           <head>
             <style>
               body { font-family: ui-sans-serif, system-ui, sans-serif; padding: 16px; margin: 0; }
-              .bfsa-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
-              .bfsa-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-              .bfsa-metric { background: #f9fafb; border-radius: 6px; padding: 12px; }
-              .bfsa-metric-label { font-size: 12px; color: #6b7280; }
-              .bfsa-metric-value { font-size: 18px; font-weight: 600; color: #111827; }
-              .bfsa-table { width: 100%; border-collapse: collapse; }
-              .bfsa-table th { padding: 8px 12px; text-align: left; background: #f9fafb; font-weight: 600; }
-              .bfsa-table td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
-              .bfsa-badge { padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
-              .bfsa-badge-success { background: #dcfce7; color: #166534; }
-              .bfsa-badge-warning { background: #fef9c3; color: #854d0e; }
-              .bfsa-badge-error { background: #fee2e2; color: #991b1b; }
-              .bfsa-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
-              .bfsa-btn-primary { background: #2563eb; color: white; }
-              .bfsa-btn-secondary { background: white; border: 1px solid #e5e7eb; color: #374151; }
-              .bfsa-btn:hover { opacity: 0.9; }
+              .creatorweave-card { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+              .creatorweave-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+              .creatorweave-metric { background: #f9fafb; border-radius: 6px; padding: 12px; }
+              .creatorweave-metric-label { font-size: 12px; color: #6b7280; }
+              .creatorweave-metric-value { font-size: 18px; font-weight: 600; color: #111827; }
+              .creatorweave-table { width: 100%; border-collapse: collapse; }
+              .creatorweave-table th { padding: 8px 12px; text-align: left; background: #f9fafb; font-weight: 600; }
+              .creatorweave-table td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; }
+              .creatorweave-badge { padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+              .creatorweave-badge-success { background: #dcfce7; color: #166534; }
+              .creatorweave-badge-warning { background: #fef9c3; color: #854d0e; }
+              .creatorweave-badge-error { background: #fee2e2; color: #991b1b; }
+              .creatorweave-btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; }
+              .creatorweave-btn-primary { background: #2563eb; color: white; }
+              .creatorweave-btn-secondary { background: white; border: 1px solid #e5e7eb; color: #374151; }
+              .creatorweave-btn:hover { opacity: 0.9; }
             </style>
             <script>
               (function() {
@@ -479,7 +479,7 @@ export function calculateTax(amount: number): number {
                     }
 
                     window.parent.postMessage({
-                      type: 'bfsa-api-call',
+                      type: 'creatorweave-api-call',
                       id: messageId,
                       action: action,
                       data: data
@@ -491,7 +491,7 @@ export function calculateTax(amount: number): number {
 
                 window.addEventListener('message', function(event) {
                   const msg = event.data;
-                  if (msg && msg.type === 'bfsa-api-response' && msg.id) {
+                  if (msg && msg.type === 'creatorweave-api-response' && msg.id) {
                     const callback = _pendingCallbacks.get(msg.id);
                     if (callback) {
                       _pendingCallbacks.delete(msg.id);
@@ -504,8 +504,8 @@ export function calculateTax(amount: number): number {
                   }
                 });
 
-                // BFSA API
-                window.BFSA = {
+                // CreatorWeave API
+                window.CreatorWeave = {
                   version: '1.0.0',
 
                   ui: {
@@ -571,13 +571,7 @@ export function calculateTax(amount: number): number {
                     }
                   }
                 };
-
-                // Legacy support
-                window.bfsaSend = function(action, data) {
-                  send('action', { action, data });
-                };
-
-                console.log('[BFSA] Plugin API v1.0.0 loaded');
+                console.log('[CreatorWeave] Plugin API v1.0.0 loaded');
               })();
             <\/script>
           </head>

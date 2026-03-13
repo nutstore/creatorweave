@@ -182,7 +182,7 @@ describe('FileAnalyzer', () => {
 Add to your README:
 
 ```markdown
-[![CI](https://github.com/yourusername/browser-fs-analyzer/workflows/CI/badge.svg)]
+[![CI](https://github.com/yourusername/creatorweave/workflows/CI/badge.svg)]
 ```
 
 ## 🔄 Branch Protection

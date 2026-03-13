@@ -12,7 +12,7 @@
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN, enUS } from 'date-fns/locale'
 import { Clock, Trash2, X } from 'lucide-react'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { useWorkspacePreferencesStore, type RecentFile } from '@/store/workspace-preferences.store'
 import { useT } from '@/i18n'
 

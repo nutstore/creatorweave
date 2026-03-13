@@ -16,7 +16,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock } from 'lucide-react'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useWorkspaceStore } from '@/store/workspace.store'

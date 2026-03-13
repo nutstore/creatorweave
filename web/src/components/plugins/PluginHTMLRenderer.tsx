@@ -11,8 +11,8 @@ import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import type { PluginHTMLRendererProps } from './api/types'
 
 // Modules
-import { generateBFSAAPIScript } from './api/BFSAAPIScript'
-import { handleBFSAAPICall, type APIHandlerContext } from './api/BFSAAPIHandler'
+import { generateCreatorWeaveAPIScript } from './api/CreatorWeaveAPIScript'
+import { handleCreatorWeaveAPICall, type APIHandlerContext } from './api/CreatorWeaveAPIHandler'
 import { IFRAME_STYLES } from './styles/iframe-styles'
 import { PluginDialog } from './ui/PluginDialog'
 import { showToast, type ToastType } from './ui/PluginToast'
@@ -85,7 +85,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
     if (iframe && iframe.contentWindow) {
       iframe.contentWindow.postMessage(
         {
-          type: 'bfsa-api-response',
+          type: 'creatorweave-api-response',
           id,
           data,
           error,
@@ -122,13 +122,13 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
         const msg = event.data
 
         switch (msg.type) {
-          case 'bfsa-api-ready':
+          case 'creatorweave-api-ready':
             setIsReady(true)
-            console.log('[BFSA] Plugin API ready')
+            console.log('[CreatorWeave] Plugin API ready')
             break
 
-          case 'bfsa-api-call':
-            handleBFSAAPICall(msg, apiContext)
+          case 'creatorweave-api-call':
+            handleCreatorWeaveAPICall(msg, apiContext)
             break
 
           default:
@@ -162,7 +162,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>${IFRAME_STYLES}</style>
           <style>${userStyles}</style>
-          <script>${generateBFSAAPIScript()}</script>
+          <script>${generateCreatorWeaveAPIScript()}</script>
         </head>
         <body>${bodyContent}</body>
       </html>
@@ -203,7 +203,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">BFSA API v2.0</span>
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">CreatorWeave API v2.0</span>
         </div>
 
         <div className="flex items-center gap-2">

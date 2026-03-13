@@ -38,7 +38,7 @@ export interface DirectoryPickerOptions {
  * Directory handle manager class
  */
 export class DirectoryHandleManager {
-  private static readonly DB_NAME = 'BrowserFSAnalyzer'
+  private static readonly DB_NAME = 'CreatorWeave'
   private static readonly STORE_NAME = 'directoryHandles'
   private _db: IDBDatabase | null = null
 
@@ -88,7 +88,7 @@ export class DirectoryHandleManager {
 
     try {
       const handle = await (window as any).showDirectoryPicker({
-        id: 'browser-fs-analyzer-directory',
+        id: 'creatorweave-directory',
         mode: options.mode || 'readwrite',
         startIn: options.startIn,
       })

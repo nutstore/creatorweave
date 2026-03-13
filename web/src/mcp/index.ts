@@ -1,7 +1,7 @@
 /**
  * MCP Module Index
  *
- * Exports MCP client functionality for browser-fs-analyzer.
+ * Exports MCP client functionality for creatorweave.
  */
 
 // Type definitions

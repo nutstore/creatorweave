@@ -1,8 +1,8 @@
 /**
- * BFOSA Design System
+ * CreatorWeave Design System
  *
  * Unified design tokens and component styles
- * Based on BFOSA brand color (Teal)
+ * Based on CreatorWeave brand color (Teal)
  */
 
 /* ==========================================================================
@@ -48,7 +48,7 @@
 }
 
 /* ==========================================================================
-   UTILITY CLASSES (Using BFOSA Teal Color)
+   UTILITY CLASSES (Using CreatorWeave Teal Color)
    ========================================================================== */
 
 @layer components {
@@ -219,11 +219,11 @@
 }
 
 /* ==========================================================================
-   PLUGIN HTML STYLES (BFOSA Teal Theme)
+   PLUGIN HTML STYLES (CreatorWeave Teal Theme)
    ========================================================================== */
 
 /* Styles injected into plugin iframes for consistency */
-.bfsa-card {
+.creatorweave-card {
   font-family:
     system-ui,
     -apple-system,
@@ -235,33 +235,33 @@
   box-shadow: var(--shadow-sm);
 }
 
-.bfsa-card h3,
-.bfsa-card h4 {
+.creatorweave-card h3,
+.creatorweave-card h4 {
   color: hsl(var(--text-primary));
   font-weight: 600;
   margin-top: 0;
 }
 
-.bfsa-card p {
+.creatorweave-card p {
   color: hsl(var(--text-secondary));
   line-height: 1.6;
 }
 
-.bfsa-metrics {
+.creatorweave-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: var(--spacing-lg);
   margin: var(--spacing-lg) 0;
 }
 
-.bfsa-metric {
+.creatorweave-metric {
   text-align: center;
   padding: var(--spacing-lg);
   background: hsl(var(--gray-100));
   border-radius: var(--radius-md);
 }
 
-.bfsa-metric-label {
+.creatorweave-metric-label {
   font-size: 12px;
   font-weight: 500;
   color: hsl(var(--text-muted));
@@ -269,24 +269,24 @@
   letter-spacing: 0.05em;
 }
 
-.bfsa-metric-value {
+.creatorweave-metric-value {
   font-size: 24px;
   font-weight: 700;
   color: hsl(var(--primary-600));
   margin-top: var(--spacing-xs);
 }
 
-.bfsa-table {
+.creatorweave-table {
   width: 100%;
   border-collapse: collapse;
   margin: var(--spacing-lg) 0;
 }
 
-.bfsa-table thead {
+.creatorweave-table thead {
   background: hsl(var(--gray-100));
 }
 
-.bfsa-table th {
+.creatorweave-table th {
   text-align: left;
   padding: var(--spacing-md) var(--spacing-lg);
   font-size: 12px;
@@ -297,16 +297,16 @@
   border-bottom: 1px solid hsl(var(--gray-200));
 }
 
-.bfsa-table td {
+.creatorweave-table td {
   padding: var(--spacing-md) var(--spacing-lg);
   border-bottom: 1px solid hsl(var(--gray-100));
 }
 
-.bfsa-table tbody tr:last-child td {
+.creatorweave-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.bfsa-badge {
+.creatorweave-badge {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
@@ -315,27 +315,27 @@
   border-radius: 9999px;
 }
 
-.bfsa-badge-success {
+.creatorweave-badge-success {
   background: hsl(var(--success-bg));
   color: hsl(var(--success-text));
 }
 
-.bfsa-badge-warning {
+.creatorweave-badge-warning {
   background: hsl(var(--warning-bg));
   color: hsl(var(--warning));
 }
 
-.bfsa-badge-error {
+.creatorweave-badge-error {
   background: hsl(var(--danger-bg));
   color: hsl(var(--danger));
 }
 
-.bfsa-badge-info {
+.creatorweave-badge-info {
   background: hsl(var(--primary-50));
   color: hsl(var(--primary-700));
 }
 
-.bfsa-btn {
+.creatorweave-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -349,20 +349,20 @@
   transition: all 150ms ease;
 }
 
-.bfsa-btn-primary {
+.creatorweave-btn-primary {
   background: hsl(var(--primary-600));
   color: white;
 }
 
-.bfsa-btn-primary:hover {
+.creatorweave-btn-primary:hover {
   background: hsl(var(--primary-700));
 }
 
-.bfsa-btn-secondary {
+.creatorweave-btn-secondary {
   background: hsl(var(--gray-100));
   color: hsl(var(--text-secondary));
 }
 
-.bfsa-btn-secondary:hover {
+.creatorweave-btn-secondary:hover {
   background: hsl(var(--gray-200));
 }

@@ -1,5 +1,5 @@
 [package]
-name = "browser-fs-analyzer-plugin-api"
+name = "creatorweave-plugin-api"
 version.workspace = true
 edition.workspace = true
 

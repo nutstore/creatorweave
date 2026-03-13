@@ -1,5 +1,5 @@
 /**
- * BFSA Plugin API Types
+ * CreatorWeave Plugin API Types
  */
 
 // =============================================================================
@@ -17,22 +17,22 @@ export interface PluginHTMLResult {
 // API Message Types
 // =============================================================================
 
-export interface BFSAAPICall {
-  type: 'bfsa-api-call'
+export interface CreatorWeaveAPICall {
+  type: 'creatorweave-api-call'
   id: string
   action: string // e.g., 'ui.toast', 'data.getResult'
   data: unknown
 }
 
-export interface BFSAAPIResponse {
-  type: 'bfsa-api-response'
+export interface CreatorWeaveAPIResponse {
+  type: 'creatorweave-api-response'
   id: string
   data?: unknown
   error?: string
 }
 
-export interface BFSAReadyMessage {
-  type: 'bfsa-api-ready'
+export interface CreatorWeaveReadyMessage {
+  type: 'creatorweave-api-ready'
   version: string
 }
 

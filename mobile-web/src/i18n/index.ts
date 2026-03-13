@@ -1,4 +1,4 @@
-import { createUseT } from '@browser-fs-analyzer/i18n'
+import { createUseT } from '@creatorweave/i18n'
 import { useI18nStore } from './store'
 
 /**
@@ -24,4 +24,4 @@ export function useLocale() {
 }
 
 // 重新导出类型
-export type { Locale } from '@browser-fs-analyzer/i18n'
+export type { Locale } from '@creatorweave/i18n'

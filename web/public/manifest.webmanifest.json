@@ -1,7 +1,7 @@
 {
-  "name": "Browser FS Analyzer",
-  "short_name": "BFSA",
-  "description": "Browser-based File System Analyzer - Analyze local folders with WebAssembly",
+  "name": "CreatorWeave",
+  "short_name": "CWeave",
+  "description": "AI-native creator workspace with local-first files, knowledge workflows, and multi-agent orchestration",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e1e2e",

@@ -1,6 +1,6 @@
 # API Documentation
 
-Complete API reference for Browser FS Analyzer.
+Complete API reference for CreatorWeave.
 
 ## Stores (Zustand)
 

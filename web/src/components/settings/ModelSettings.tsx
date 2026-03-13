@@ -45,16 +45,16 @@ import type {
   ProviderCategory,
 } from '@/agent/providers/types'
 import { useT } from '@/i18n'
-import { BrandInput } from '@browser-fs-analyzer/ui'
-import { BrandSlider } from '@browser-fs-analyzer/ui'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandInput } from '@creatorweave/ui'
+import { BrandSlider } from '@creatorweave/ui'
+import { BrandButton } from '@creatorweave/ui'
 import {
   BrandSelect,
   BrandSelectContent,
   BrandSelectItem,
   BrandSelectTrigger,
   BrandSelectValue,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 
 // =============================================================================
 // Constants

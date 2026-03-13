@@ -1,5 +1,5 @@
 {
-  "name": "@browser-fs-analyzer/i18n",
+  "name": "@creatorweave/i18n",
   "version": "1.0.0",
   "type": "module",
   "main": "./src/index.ts",

@@ -6,9 +6,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
-import { ConversationDetail } from '@browser-fs-analyzer/conversation'
+import { ConversationDetail } from '@creatorweave/conversation'
 import { useConversationStore } from '../store/conversation.store'
-import type { Conversation, ConversationStatus } from '@browser-fs-analyzer/conversation'
+import type { Conversation, ConversationStatus } from '@creatorweave/conversation'
 
 function mapAgentStatusToConversationStatus(
   status: 'idle' | 'thinking' | 'tool_calling' | 'error'

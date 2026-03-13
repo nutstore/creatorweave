@@ -12,7 +12,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { type ChangeDetectionResult, type FileChange, type ChangeType } from '@/opfs/types/opfs-types'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
-import { BrandButton, BrandCheckbox } from '@browser-fs-analyzer/ui'
+import { BrandButton, BrandCheckbox } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { Download, Trash2, X, ChevronDown, ChevronRight } from 'lucide-react'
 

@@ -14,7 +14,7 @@ import {
   BrandDialogHeader,
   BrandDialogTitle,
   BrandDialogBody,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { useT } from '@/i18n'
 
 export interface Command {

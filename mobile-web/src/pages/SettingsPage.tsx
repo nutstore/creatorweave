@@ -115,7 +115,7 @@ export function SettingsPage() {
         {/* 关于 */}
         <section className="bg-white rounded-xl p-4">
           <h2 className="text-sm font-medium text-neutral-600 mb-3">{t('mobile.settings.about')}</h2>
-          <p className="text-sm text-neutral-500">BFOSA Remote v1.0.0</p>
+          <p className="text-sm text-neutral-500">CreatorWeave Remote v1.0.0</p>
         </section>
 
         {/* 断开连接 */}

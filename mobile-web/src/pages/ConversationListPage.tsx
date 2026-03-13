@@ -6,7 +6,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { RefreshCw, MessageSquare } from 'lucide-react'
-import { ConversationList } from '@browser-fs-analyzer/conversation'
+import { ConversationList } from '@creatorweave/conversation'
 import { useConversationStore } from '../store/conversation.store'
 
 export function ConversationListPage() {

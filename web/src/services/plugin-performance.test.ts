@@ -83,7 +83,7 @@ function createMockPlugin(id: string = 'test-plugin'): PluginInstance {
       version: '1.0.0',
       api_version: '2.0.0',
       description: 'Performance test plugin',
-      author: 'BFOSA Team',
+      author: 'CreatorWeave Team',
       capabilities: {
         metadata_only: false,
         requires_content: true,

@@ -14,7 +14,7 @@ export const MOCK_PLUGINS: PluginInstance[] = [
       version: '0.1.0',
       api_version: '2.0.0',
       description: 'Count lines, characters, and blank lines in text files',
-      author: 'BFOSA Team',
+      author: 'CreatorWeave Team',
       capabilities: {
         metadata_only: false,
         requires_content: true,
@@ -53,7 +53,7 @@ export const MOCK_PLUGINS: PluginInstance[] = [
       version: '0.1.0',
       api_version: '2.0.0',
       description: 'Calculate MD5 hash of files',
-      author: 'BFOSA Team',
+      author: 'CreatorWeave Team',
       capabilities: {
         metadata_only: false,
         requires_content: true,

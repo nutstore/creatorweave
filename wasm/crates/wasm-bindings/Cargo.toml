@@ -1,5 +1,5 @@
 [package]
-name = "browser-fs-analyzer-wasm"
+name = "creatorweave-wasm"
 version.workspace = true
 edition.workspace = true
 
@@ -7,7 +7,7 @@ edition.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-browser-fs-analyzer-core = { path = "../core" }
+creatorweave-core = { path = "../core" }
 wasm-bindgen = { workspace = true }
 js-sys = { workspace = true }
 web-sys = { workspace = true }

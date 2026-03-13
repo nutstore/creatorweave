@@ -1,8 +1,8 @@
 {
-  "name": "@browser-fs-analyzer/config",
+  "name": "@creatorweave/config",
   "version": "0.1.0",
   "type": "module",
-  "description": "Shared configuration packages for browser-fs-analyzer monorepo",
+  "description": "Shared configuration packages for creatorweave monorepo",
   "exports": {
     "./tailwind": "./src/tailwind/index.js",
     "./tailwind/presets": "./src/tailwind/presets.js",

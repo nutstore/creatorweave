@@ -13,19 +13,19 @@ importers:
 
   mobile-web:
     dependencies:
-      '@browser-fs-analyzer/config':
+      '@creatorweave/config':
         specifier: workspace:*
         version: link:../packages/config
-      '@browser-fs-analyzer/conversation':
+      '@creatorweave/conversation':
         specifier: workspace:*
         version: link:../packages/conversation
-      '@browser-fs-analyzer/encryption':
+      '@creatorweave/encryption':
         specifier: workspace:*
         version: link:../packages/encryption
-      '@browser-fs-analyzer/i18n':
+      '@creatorweave/i18n':
         specifier: workspace:*
         version: link:../packages/i18n
-      '@browser-fs-analyzer/ui':
+      '@creatorweave/ui':
         specifier: workspace:*
         version: link:../packages/ui
       lucide-react:
@@ -297,16 +297,16 @@ importers:
 
   web:
     dependencies:
-      '@browser-fs-analyzer/config':
+      '@creatorweave/config':
         specifier: workspace:*
         version: link:../packages/config
-      '@browser-fs-analyzer/encryption':
+      '@creatorweave/encryption':
         specifier: workspace:*
         version: link:../packages/encryption
-      '@browser-fs-analyzer/i18n':
+      '@creatorweave/i18n':
         specifier: workspace:*
         version: link:../packages/i18n
-      '@browser-fs-analyzer/ui':
+      '@creatorweave/ui':
         specifier: workspace:*
         version: link:../packages/ui
       '@iconify/react':

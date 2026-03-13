@@ -1,4 +1,4 @@
-//! Browser File System Analyzer - WASM Bindings
+//! CreatorWeave - WASM Bindings
 //!
 //! Entry point for the WASM module, exporting Rust functionality to JavaScript.
 

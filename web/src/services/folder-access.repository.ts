@@ -55,7 +55,7 @@ class FolderAccessRepository {
    * 从旧数据库迁移数据
    */
   private async migrateFromLegacy(): Promise<void> {
-    const LEGACY_DB_NAME = 'bfsa-dir-handle'
+    const LEGACY_DB_NAME = 'creatorweave-dir-handle'
 
     return new Promise((resolve) => {
       // 尝试打开旧数据库

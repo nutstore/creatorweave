@@ -27,12 +27,12 @@
 #[wasm_bindgen]
 pub fn finalize(outputs_json: String) -> String {
     let html = r#"
-        <div class="bfsa-card">
+        <div class="creatorweave-card">
             <h3>Results</h3>
-            <div class="bfsa-metrics">
-                <div class="bfsa-metric">
-                    <div class="bfsa-metric-label">Files</div>
-                    <div class="bfsa-metric-value">42</div>
+            <div class="creatorweave-metrics">
+                <div class="creatorweave-metric">
+                    <div class="creatorweave-metric-label">Files</div>
+                    <div class="creatorweave-metric-value">42</div>
                 </div>
             </div>
         </div>
@@ -82,27 +82,27 @@ function MyComponent() {
 
 ```html
 <!-- 卡片 -->
-<div class="bfsa-card">Content</div>
+<div class="creatorweave-card">Content</div>
 
 <!-- 指标网格 -->
-<div class="bfsa-metrics">
-  <div class="bfsa-metric">...</div>
+<div class="creatorweave-metrics">
+  <div class="creatorweave-metric">...</div>
 </div>
 ```
 
 ### 指标
 
 ```html
-<div class="bfsa-metric">
-  <div class="bfsa-metric-label">Label</div>
-  <div class="bfsa-metric-value">Value</div>
+<div class="creatorweave-metric">
+  <div class="creatorweave-metric-label">Label</div>
+  <div class="creatorweave-metric-value">Value</div>
 </div>
 ```
 
 ### 表格
 
 ```html
-<table class="bfsa-table">
+<table class="creatorweave-table">
   <thead>
     <tr>
       <th>Column 1</th>
@@ -121,44 +121,44 @@ function MyComponent() {
 ### 徽章
 
 ```html
-<span class="bfsa-badge bfsa-badge-success">Success</span>
-<span class="bfsa-badge bfsa-badge-warning">Warning</span>
-<span class="bfsa-badge bfsa-badge-error">Error</span>
-<span class="bfsa-badge bfsa-badge-info">Info</span>
+<span class="creatorweave-badge creatorweave-badge-success">Success</span>
+<span class="creatorweave-badge creatorweave-badge-warning">Warning</span>
+<span class="creatorweave-badge creatorweave-badge-error">Error</span>
+<span class="creatorweave-badge creatorweave-badge-info">Info</span>
 ```
 
 ### 按钮
 
 ```html
-<button class="bfsa-btn bfsa-btn-primary">Primary</button>
-<button class="bfsa-btn bfsa-btn-secondary">Secondary</button>
+<button class="creatorweave-btn creatorweave-btn-primary">Primary</button>
+<button class="creatorweave-btn creatorweave-btn-secondary">Secondary</button>
 ```
 
 ### 进度条
 
 ```html
-<div class="bfsa-progress">
-  <div class="bfsa-progress-bar" style="width: 75%"></div>
+<div class="creatorweave-progress">
+  <div class="creatorweave-progress-bar" style="width: 75%"></div>
 </div>
 ```
 
 ### 标签页
 
 ```html
-<div class="bfsa-tabs">
-  <button class="bfsa-tab active">Tab 1</button>
-  <button class="bfsa-tab">Tab 2</button>
+<div class="creatorweave-tabs">
+  <button class="creatorweave-tab active">Tab 1</button>
+  <button class="creatorweave-tab">Tab 2</button>
 </div>
 ```
 
 ### 手风琴
 
 ```html
-<div class="bfsa-accordion-item">
-  <button class="bfsa-accordion-header">
+<div class="creatorweave-accordion-item">
+  <button class="creatorweave-accordion-header">
     Title
   </button>
-  <div class="bfsa-accordion-content">
+  <div class="creatorweave-accordion-content">
     Content
   </div>
 </div>

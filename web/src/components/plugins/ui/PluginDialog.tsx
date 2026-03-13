@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
  * PluginDialog - Reusable dialog component for plugin API
- * Used when plugins call BFSA.notify.confirm() or request modal display
+ * Used when plugins call CreatorWeave.notify.confirm() or request modal display
  */
 
 import { useEffect, useRef } from 'react'

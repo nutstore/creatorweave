@@ -6,7 +6,7 @@
  * Includes defensive validation to prevent errors from unknown states
  */
 
-import type { EncryptionState } from '@browser-fs-analyzer/encryption'
+import type { EncryptionState } from '@creatorweave/encryption'
 import { Lock, LockOpen, Key, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useRemoteStore } from '@/store/remote.store'
 

@@ -41,7 +41,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { ThemeToggle } from '@/components/workspace'
 
 interface TopBarProps {

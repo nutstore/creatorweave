@@ -25,7 +25,7 @@ import {
   BrandDialogHeader,
   BrandDialogTitle,
   BrandDialogClose,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useTheme } from '@/store/theme.store'
 import { useT } from '@/i18n'

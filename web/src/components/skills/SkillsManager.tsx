@@ -24,7 +24,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { SkillCard } from './SkillCard'
 import { SkillEditor } from './SkillEditor'
 import { useSkillsStore } from '@/store/skills.store'

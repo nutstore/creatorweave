@@ -30,7 +30,7 @@ import {
   BrandSelectItem,
   BrandSelectTrigger,
   BrandSelectValue,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 
 interface WebContainerPanelProps {
   isOpen: boolean

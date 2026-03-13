@@ -1,5 +1,5 @@
 {
-  "name": "@browser-fs-analyzer/ui",
+  "name": "@creatorweave/ui",
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",

@@ -11,10 +11,10 @@
 
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { X, ChevronRight, ChevronLeft, Check } from 'lucide-react'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useT, useLocale } from '@/i18n'
-import { t as staticT, DEFAULT_LOCALE, type Locale } from '@browser-fs-analyzer/i18n'
+import { t as staticT, DEFAULT_LOCALE, type Locale } from '@creatorweave/i18n'
 
 export interface TourStep {
   id: string
@@ -254,7 +254,7 @@ export function getDefaultOnboardingSteps(locale: Locale = DEFAULT_LOCALE): Tour
   return [
     {
       id: 'welcome',
-      title: getStepTitle(locale, 'welcome', 'Welcome to Browser FS Analyzer!'),
+      title: getStepTitle(locale, 'welcome', 'Welcome to CreatorWeave!'),
       description: getStepDescription(locale, 'welcome', 'Let us show you around the key features.'),
       position: 'center',
     },

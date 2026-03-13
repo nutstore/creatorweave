@@ -50,7 +50,7 @@ import {
 } from '@/components/workspace'
 import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'

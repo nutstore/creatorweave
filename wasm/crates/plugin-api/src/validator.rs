@@ -282,7 +282,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: BFOSA_API_VERSION.to_string(),
             description: "Test plugin".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: crate::types::PluginCapabilities {
                 metadata_only: true,
                 requires_content: false,
@@ -310,7 +310,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: "3.0.0".to_string(), // Wrong major version
             description: "Test plugin".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: crate::types::PluginCapabilities {
                 metadata_only: true,
                 requires_content: false,
@@ -338,7 +338,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: BFOSA_API_VERSION.to_string(),
             description: "Test plugin".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: crate::types::PluginCapabilities {
                 metadata_only: true,    // Conflicts with:
                 requires_content: true, // this
@@ -365,7 +365,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: BFOSA_API_VERSION.to_string(),
             description: "".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: crate::types::PluginCapabilities {
                 metadata_only: true,
                 requires_content: false,
@@ -393,7 +393,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: BFOSA_API_VERSION.to_string(),
             description: "Test plugin".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: crate::types::PluginCapabilities {
                 metadata_only: true,
                 requires_content: false,
@@ -420,7 +420,7 @@ mod tests {
             "version": "1.0.0",
             "api_version": "2.0.0",
             "description": "Test plugin",
-            "author": "BFOSA Team",
+            "author": "CreatorWeave Team",
             "capabilities": {
                 "metadata_only": true,
                 "requires_content": false,

@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import {
   BrandButton,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import {
   exportToCSV,
   exportToJSON,

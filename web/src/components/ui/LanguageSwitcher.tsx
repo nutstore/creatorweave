@@ -7,10 +7,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { Globe } from 'lucide-react'
-import { LOCALE_LABELS } from '@browser-fs-analyzer/i18n'
+import { LOCALE_LABELS } from '@creatorweave/i18n'
 import { useLocale } from '@/i18n'
 import type { Locale } from '@/i18n'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 
 export function LanguageSwitcher() {
   const [locale, setLocale] = useLocale()

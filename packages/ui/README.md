@@ -1,6 +1,6 @@
-# @browser-fs-analyzer/ui
+# @creatorweave/ui
 
-Shared UI components for browser-fs-analyzer.
+Shared UI components for creatorweave.
 
 ## Components
 
@@ -11,19 +11,19 @@ Temporary notification with auto-dismiss support.
 **Variants**: `info` | `warning` | `error` | `success`
 
 ```tsx
-import { Toast } from '@browser-fs-analyzer/ui'
+import { Toast } from '@creatorweave/ui'
 
 <Toast
   variant="warning"
   title="Host 已切换目录"
-  message="当前目录：browser-fs-analyzer"
+  message="当前目录：creatorweave"
 />
 ```
 
 ### useToast Hook
 
 ```tsx
-import { useToast } from '@browser-fs-analyzer/ui'
+import { useToast } from '@creatorweave/ui'
 
 function MyComponent() {
   const { showToast, toast, closeToast } = useToast()
@@ -56,7 +56,7 @@ pnpm run typecheck
 
 ## Integration
 
-This package is part of the browser-fs-analyzer monorepo and uses:
+This package is part of the creatorweave monorepo and uses:
 - **React** - UI framework
 - **Tailwind CSS** - Styling
 - **Vite** - Build tool

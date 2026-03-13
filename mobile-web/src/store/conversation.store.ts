@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ConversationStatus, Message, Conversation } from '@browser-fs-analyzer/conversation'
+import type { ConversationStatus, Message, Conversation } from '@creatorweave/conversation'
 import { StreamingQueue } from '../utils/streaming-queue'
 
 // Re-export types for convenience

@@ -1,8 +1,8 @@
-# Browser FS Analyzer
+# CreatorWeave
 
 <div align="center">
 
-**Browser-based AI Workspace - Natural language interaction with local files**
+**AI-native creator workspace for local-first creation, knowledge, and multi-agent orchestration**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -13,13 +13,15 @@
 
 </div>
 
-## What is Browser FS Analyzer?
+## What is CreatorWeave?
 
-Browser FS Analyzer is a **browser-based AI workspace** that enables natural language interaction with your local files. Built entirely with web technologies, it runs securely in your browser sandbox without uploading any data to external servers.
+CreatorWeave is an **AI-native creator workspace** for content creators and builder teams. It combines local-first file workflows, AI copilots, knowledge-base workflows, and multi-agent orchestration in one browser-native product.
 
 ### Key Product Description
 
 - **AI-Powered Conversations**: Chat naturally with your codebase using advanced AI agents with multi-agent collaboration
+- **Knowledge Workflows**: Build reusable context from project files and structured notes
+- **Multi-Agent Orchestration**: Design and run multi-step creative workflows with specialized agents
 - **Local File Access**: Direct interaction with files through modern browser APIs (File System Access API)
 - **Code Intelligence**: Understand, analyze, and manipulate code with 30+ intelligent tools
 - **Python Integration**: Execute Python code in the browser with Pyodide (pandas, numpy, matplotlib support)
@@ -91,8 +93,8 @@ Browser FS Analyzer is a **browser-based AI workspace** that enables natural lan
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/browser-fs-analyzer.git
-cd browser-fs-analyzer
+git clone https://github.com/yourusername/creatorweave.git
+cd creatorweave
 
 # Install dependencies
 pnpm install
@@ -120,7 +122,7 @@ pnpm -C web run build
 ### Project Structure
 
 ```
-browser-fs-analyzer/
+creatorweave/
 ├── web/                    # React frontend application (Desktop)
 │   ├── src/
 │   │   ├── agent/         # AI agent logic, tools, multi-agent collaboration

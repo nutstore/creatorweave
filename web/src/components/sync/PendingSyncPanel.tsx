@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
 import { useWorkspaceStore, getActiveWorkspace } from '@/store/workspace.store'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { RefreshCw } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 

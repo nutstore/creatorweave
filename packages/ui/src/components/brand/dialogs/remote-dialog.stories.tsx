@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react'
 import { useState } from 'react'
-import { RemoteDialog, RemoteDialogContent } from '@browser-fs-analyzer/ui'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { RemoteDialog, RemoteDialogContent } from '@creatorweave/ui'
+import { BrandButton } from '@creatorweave/ui'
 
 const meta: Meta<typeof RemoteDialogContent> = {
   title: 'Brand/Dialogs/Remote',

@@ -12,7 +12,7 @@ import {
   BrandDialogContent,
   BrandDialogTitle,
   BrandButton,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { cn } from '@/lib/utils'

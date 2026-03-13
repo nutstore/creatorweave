@@ -12,7 +12,7 @@ import type { Locale } from './types'
  *
  * 使用方式（在各项目中）：
  * ```ts
- * import { createUseT } from '@browser-fs-analyzer/i18n'
+ * import { createUseT } from '@creatorweave/i18n'
  * import { useI18nStore } from '@/store/i18n.store'
  *
  * export function useT() {
@@ -54,7 +54,7 @@ export function createUseT(locale: Locale) {
  * 静态翻译函数（用于 React 组件外部）
  *
  * @example
- * import { t } from '@browser-fs-analyzer/i18n'
+ * import { t } from '@creatorweave/i18n'
  * t('zh-CN', 'common.save') => '保存'
  */
 export function t(

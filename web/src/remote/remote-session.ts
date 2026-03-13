@@ -14,7 +14,7 @@ import {
   isEncryptedEnvelope,
   isProtocolMessage,
   mustEncrypt,
-} from '@browser-fs-analyzer/encryption'
+} from '@creatorweave/encryption'
 import type {
   RemoteMessage,
   WireMessage,

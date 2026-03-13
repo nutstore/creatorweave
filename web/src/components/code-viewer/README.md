@@ -15,7 +15,7 @@ A powerful React component for displaying file differences with syntax highlight
 
 ## Installation
 
-The component is part of the browser-fs-analyzer project. Ensure you have the required dependencies:
+The component is part of the creatorweave project. Ensure you have the required dependencies:
 
 ```bash
 pnpm install shiki
@@ -210,7 +210,7 @@ pnpm test FileComparison
 
 ## License
 
-MIT License - part of the browser-fs-analyzer project
+MIT License - part of the creatorweave project
 
 ## Contributing
 

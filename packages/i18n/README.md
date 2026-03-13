@@ -1,4 +1,4 @@
-# @browser-fs-analyzer/i18n
+# @creatorweave/i18n
 
 共享的国际化 (i18n) package，提供中英文翻译支持。
 
@@ -15,11 +15,11 @@
 
 ```bash
 # workspace protocol
-pnpm add @browser-fs-analyzer/i18n
+pnpm add @creatorweave/i18n
 
 # or in package.json
 "dependencies": {
-  "@browser-fs-analyzer/i18n": "workspace:*"
+  "@creatorweave/i18n": "workspace:*"
 }
 ```
 
@@ -31,7 +31,7 @@ pnpm add @browser-fs-analyzer/i18n
 // src/i18n/store.ts
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Locale } from '@browser-fs-analyzer/i18n'
+import type { Locale } from '@creatorweave/i18n'
 
 interface I18nState {
   locale: Locale
@@ -53,7 +53,7 @@ export const useI18nStore = create<I18nState>()(
 
 ```typescript
 // src/i18n/index.ts
-import { createUseT } from '@browser-fs-analyzer/i18n'
+import { createUseT } from '@creatorweave/i18n'
 import { useI18nStore } from './store'
 
 export function useT() {
@@ -66,7 +66,7 @@ export function useLocale() {
   return [locale, setLocale] as const
 }
 
-export type { Locale } from '@browser-fs-analyzer/i18n'
+export type { Locale } from '@creatorweave/i18n'
 ```
 
 ### 3. 在组件中使用
@@ -112,8 +112,8 @@ function Component() {
 
 | 键 | 中文 | 英文 |
 |---|------|------|
-| title | BFOSA | BFOSA |
-| tagline | 浏览器原生 AI 工作台 | Browser-Native AI Workspace |
+| title | CreatorWeave | CreatorWeave |
+| tagline | AI 原生创作者工作台 | AI-Native Creator Workspace |
 | placeholder | 输入消息开始对话... | Type a message to start... |
 
 ### 技能管理 (`skills`)
@@ -165,7 +165,7 @@ t('common.save') // '保存'
 静态翻译函数，用于非 React 环境。
 
 ```typescript
-import { t } from '@browser-fs-analyzer/i18n'
+import { t } from '@creatorweave/i18n'
 t('zh-CN', 'common.save') // '保存'
 t('en-US', 'session.pendingCount', { count: 5 }) // '5 pending'
 ```

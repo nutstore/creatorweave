@@ -1,5 +1,5 @@
 /**
- * @browser-fs-analyzer/ui - BFOSA Brand Components
+ * @creatorweave/ui - CreatorWeave Brand Components
  *
  * Public API: Only brand components are exposed.
  * Internal shadcn/ui components are not exported.

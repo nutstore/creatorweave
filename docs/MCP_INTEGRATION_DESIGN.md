@@ -2,7 +2,7 @@
 
 ## Overview
 
-将 MCP (Model Context Protocol) 服务发现和工具调用能力集成到 browser-fs-analyzer (bfosa) 中，使 Agent 能够动态调用外部 MCP 服务器提供的工具。
+将 MCP (Model Context Protocol) 服务发现和工具调用能力集成到 creatorweave (bfosa) 中，使 Agent 能够动态调用外部 MCP 服务器提供的工具。
 
 ## Design Goals
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { Locale } from '@browser-fs-analyzer/i18n'
+import type { Locale } from '@creatorweave/i18n'
 
 interface I18nState {
   locale: Locale

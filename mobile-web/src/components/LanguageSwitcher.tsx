@@ -6,7 +6,7 @@
  */
 
 import { Check, Globe } from 'lucide-react'
-import { LOCALE_LABELS } from '@browser-fs-analyzer/i18n'
+import { LOCALE_LABELS } from '@creatorweave/i18n'
 import { useLocale } from '../i18n'
 import type { Locale } from '../i18n'
 

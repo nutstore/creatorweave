@@ -1,5 +1,5 @@
 /**
- * Mobile Web App - Remote control interface for BFOSA
+ * Mobile Web App - Remote control interface for CreatorWeave
  *
  * - Auto-joins session when URL contains ?session=xxx parameter
  * - Shows input form for manual session ID entry when no session parameter
@@ -11,7 +11,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom'
 import { io, Socket } from 'socket.io-client'
-import { E2EEncryption, type EncryptionState, isEncryptedEnvelope, type RemoteMessage, type EncryptedEnvelope } from '@browser-fs-analyzer/encryption'
+import { E2EEncryption, type EncryptionState, isEncryptedEnvelope, type RemoteMessage, type EncryptedEnvelope } from '@creatorweave/encryption'
 import { FilePicker } from './components/FilePicker'
 import { useRemoteStore } from './store/remote.store'
 import { useConversationStore, type Conversation, type Message } from './store/conversation.store'
@@ -20,7 +20,7 @@ import { ConnectionContext, type ConnectionContextValue, type ConnectionState, u
 
 // Pages
 import { ConversationListPage } from './pages/ConversationListPage'
-import { ConversationDetail } from '@browser-fs-analyzer/conversation'
+import { ConversationDetail } from '@creatorweave/conversation'
 import { SessionInputPage } from './pages/SessionInputPage'
 import { SettingsPage } from './pages/SettingsPage'
 

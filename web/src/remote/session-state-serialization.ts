@@ -343,7 +343,7 @@ const DEFAULT_OPTIONS: Required<SessionStateManagerOptions> = {
  */
 export class SessionStateManager {
   private options: Required<SessionStateManagerOptions>
-  private storageKey = 'browser-fs-analyzer-session'
+  private storageKey = 'creatorweave-session'
 
   constructor(options: SessionStateManagerOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options }
@@ -581,7 +581,7 @@ export class SessionStateManager {
   private openIndexedDB(): Promise<IDBDatabase | null> {
     return new Promise((resolve) => {
       try {
-        const request = indexedDB.open('BrowserFSAnalyzerSessions', 1)
+        const request = indexedDB.open('CreatorWeaveSessions', 1)
 
         request.onerror = () => resolve(null)
         request.onsuccess = () => {

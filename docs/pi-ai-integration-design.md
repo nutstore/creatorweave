@@ -1,4 +1,4 @@
-# `pi-ai` 接入设计（Browser FS Analyzer）
+# `pi-ai` 接入设计（CreatorWeave）
 
 ## 1. 目标
 

@@ -10,7 +10,7 @@ import {
   getEncryptionConfig,
   type EncryptionConfig,
 } from '../useEncryptionConfig'
-import type { EncryptionState } from '@browser-fs-analyzer/encryption'
+import type { EncryptionState } from '@creatorweave/encryption'
 
 describe('getValidEncryptionState', () => {
   describe('有效状态', () => {

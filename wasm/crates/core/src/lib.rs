@@ -1,4 +1,4 @@
-//! Browser File System Analyzer - Core Library
+//! CreatorWeave - Core Library
 //!
 //! Core computation logic library for the file system analyzer.
 //! Provides pure Rust implementation with no WASM dependency.

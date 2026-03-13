@@ -8,7 +8,7 @@ import type { ConnectionState } from '@/remote/ws-client'
 import type { SessionRole } from '@/remote/remote-session'
 import { RemoteSession } from '@/remote/remote-session'
 import type { RemoteMessage, StateSyncMessage, FileEntry } from '@/remote/remote-protocol'
-import type { EncryptionState } from '@browser-fs-analyzer/encryption'
+import type { EncryptionState } from '@creatorweave/encryption'
 import { fileDiscoveryService } from '@/services/file-discovery.service'
 import { streamingBus } from '@/streaming-bus'
 

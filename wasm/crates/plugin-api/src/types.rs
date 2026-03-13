@@ -25,7 +25,7 @@ pub struct PluginInfo {
     /// Plugin version (semver)
     pub version: String,
 
-    /// Required BFOSA API version
+    /// Required CreatorWeave API version
     pub api_version: String,
 
     /// Short description of what the plugin does
@@ -210,7 +210,7 @@ impl ValidationResult {
 // Constants
 //=============================================================================
 
-/// Current BFOSA Plugin API version
+/// Current CreatorWeave Plugin API version
 pub const BFOSA_API_VERSION: &str = "2.0.0";
 
 /// Default maximum memory limit (16 MB)
@@ -276,7 +276,7 @@ mod tests {
             version: "1.0.0".to_string(),
             api_version: BFOSA_API_VERSION.to_string(),
             description: "A test plugin".to_string(),
-            author: "BFOSA Team".to_string(),
+            author: "CreatorWeave Team".to_string(),
             capabilities: PluginCapabilities {
                 metadata_only: false,
                 requires_content: true,

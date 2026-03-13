@@ -1,10 +1,10 @@
-# @browser-fs-analyzer/ui 使用指南
+# @creatorweave/ui 使用指南
 
-本文档说明如何在 web 应用中使用 `@browser-fs-analyzer/ui` 公共包的组件和样式。
+本文档说明如何在 web 应用中使用 `@creatorweave/ui` 公共包的组件和样式。
 
 ## 概述
 
-`@browser-fs-analyzer/ui` 是基于 shadcn/ui 和 Radix UI 构建的组件库，提供了一组设计统一的 React 组件。
+`@creatorweave/ui` 是基于 shadcn/ui 和 Radix UI 构建的组件库，提供了一组设计统一的 React 组件。
 
 ## 安装
 
@@ -23,7 +23,7 @@ pnpm install
 
 ```javascript
 // web/tailwind.config.js
-import { createBaseConfig } from '@browser-fs-analyzer/config/tailwind'
+import { createBaseConfig } from '@creatorweave/config/tailwind'
 
 export default createBaseConfig({
   content: [
@@ -54,7 +54,7 @@ import {
   BrandDialogTitle,
   BrandInput,
   BrandButton,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 ```
 
 ## 组件使用模式
@@ -71,7 +71,7 @@ import {
   BrandDialogBody,
   BrandDialogFooter,
   BrandDialogClose,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 
 interface MyDialogProps {
   open: boolean

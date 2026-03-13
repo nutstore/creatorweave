@@ -1,6 +1,6 @@
 /**
  * PluginToast - Toast notification wrapper using sonner
- * Used when plugins call BFSA.notify.toast()
+ * Used when plugins call CreatorWeave.notify.toast()
  *
  * This provides a compatibility layer that wraps sonner's toast API
  * to match the existing plugin API interface.

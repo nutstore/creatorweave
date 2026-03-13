@@ -15,7 +15,7 @@ import {
   BrandDialogTitle,
   BrandDialogBody,
   BrandDialogFooter,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import {
   useKeyboardShortcuts,
   formatShortcutKey,

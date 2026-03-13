@@ -1,7 +1,7 @@
 /**
  * Design Tokens - Colors
  *
- * Color palette for the BFOSA design system.
+ * Color palette for the CreatorWeave design system.
  * Uses HSL format for consistency with CSS variables.
  *
  * @typedef {Object} Colors

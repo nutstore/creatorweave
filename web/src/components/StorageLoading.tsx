@@ -11,7 +11,7 @@ import {
   BrandCardTitle,
   BrandCardDescription,
   BrandProgress,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { AlertTriangle, Database, RefreshCw } from 'lucide-react'
 import { useT } from '@/i18n'
 

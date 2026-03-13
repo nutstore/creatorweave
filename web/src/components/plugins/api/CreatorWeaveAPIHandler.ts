@@ -1,10 +1,10 @@
 /**
- * BFSA API Handler
+ * CreatorWeave API Handler
  * Handles API calls from plugin iframe and delegates to appropriate handlers
  */
 
 import type {
-  BFSAAPICall,
+  CreatorWeaveAPICall,
   AnalysisResult,
   NotifyToastData,
   NotifyConfirmData,
@@ -24,9 +24,9 @@ export interface APIHandlerContext {
 }
 
 /**
- * Handle BFSA API call from iframe
+ * Handle CreatorWeave API call from iframe
  */
-export function handleBFSAAPICall(msg: BFSAAPICall, context: APIHandlerContext): void {
+export function handleCreatorWeaveAPICall(msg: CreatorWeaveAPICall, context: APIHandlerContext): void {
   const { id, action, data } = msg
   const [category, method] = action.split('.')
 

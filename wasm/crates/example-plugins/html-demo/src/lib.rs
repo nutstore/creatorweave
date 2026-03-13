@@ -44,7 +44,7 @@ pub fn get_plugin_info() -> String {
         "version": env!("CARGO_PKG_VERSION"),
         "api_version": "2.0.0",
         "description": "Demonstrates custom HTML rendering in plugin output",
-        "author": "BFOSA Team",
+        "author": "CreatorWeave Team",
         "capabilities": {
             "metadata_only": false,
             "requires_content": true,
@@ -101,9 +101,9 @@ pub fn process_file(input_json: String) -> String {
     };
 
     let complexity_badge = match complexity_label {
-        "Low" => "bfsa-badge-success",
-        "Medium" => "bfsa-badge-warning",
-        _ => "bfsa-badge-error",
+        "Low" => "creatorweave-badge-success",
+        "Medium" => "creatorweave-badge-warning",
+        _ => "creatorweave-badge-error",
     };
 
     let output = json!({
@@ -165,7 +165,7 @@ pub fn finalize(outputs_json: String) -> String {
     // Build custom HTML - construct piece by piece to avoid format! conflicts
     let mut html = String::from(
         r#"
-<div class="bfsa-card">
+<div class="creatorweave-card">
   <h3>📊 Code Analysis Results</h3>
   <p>Analyzed <strong>"#,
     );
@@ -176,34 +176,34 @@ pub fn finalize(outputs_json: String) -> String {
     html.push_str(
         r#"</strong> lines of code.</p>
 
-  <div class="bfsa-metrics">
-    <div class="bfsa-metric">
-      <div class="bfsa-metric-label">Total Files</div>
-      <div class="bfsa-metric-value">"#,
+  <div class="creatorweave-metrics">
+    <div class="creatorweave-metric">
+      <div class="creatorweave-metric-label">Total Files</div>
+      <div class="creatorweave-metric-value">"#,
     );
     html.push_str(&outputs.len().to_string());
     html.push_str(
         r#"</div>
     </div>
-    <div class="bfsa-metric">
-      <div class="bfsa-metric-label">Total Lines</div>
-      <div class="bfsa-metric-value">"#,
+    <div class="creatorweave-metric">
+      <div class="creatorweave-metric-label">Total Lines</div>
+      <div class="creatorweave-metric-value">"#,
     );
     html.push_str(&format_number(total_lines));
     html.push_str(
         r#"</div>
     </div>
-    <div class="bfsa-metric">
-      <div class="bfsa-metric-label">Total Chars</div>
-      <div class="bfsa-metric-value">"#,
+    <div class="creatorweave-metric">
+      <div class="creatorweave-metric-label">Total Chars</div>
+      <div class="creatorweave-metric-value">"#,
     );
     html.push_str(&format_number(total_chars));
     html.push_str(
         r#"</div>
     </div>
-    <div class="bfsa-metric">
-      <div class="bfsa-metric-label">Avg Complexity</div>
-      <div class="bfsa-metric-value">"#,
+    <div class="creatorweave-metric">
+      <div class="creatorweave-metric-label">Avg Complexity</div>
+      <div class="creatorweave-metric-value">"#,
     );
     html.push_str(&avg_complexity.to_string());
     html.push_str(
@@ -212,7 +212,7 @@ pub fn finalize(outputs_json: String) -> String {
   </div>
 
   <h4 style="margin-top: 20px;">File Details</h4>
-  <table class="bfsa-table">
+  <table class="creatorweave-table">
     <thead>
       <tr>
         <th>File</th>
@@ -231,43 +231,43 @@ pub fn finalize(outputs_json: String) -> String {
     </tbody>
   </table>
 
-  <h4 style="margin-top: 24px;">🔌 BFSA API Demo</h4>
-  <p style="font-size: 13px; color: #6b7280;">Click these buttons to test the BFSA Plugin API:</p>
+  <h4 style="margin-top: 24px;">🔌 CreatorWeave API Demo</h4>
+  <p style="font-size: 13px; color: #6b7280;">Click these buttons to test the CreatorWeave Plugin API:</p>
 
   <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 12px;">
     <!-- UI Operations -->
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.notify.toast(&quot;Hello from plugin!&quot;, &quot;success&quot;)">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.notify.toast(&quot;Hello from plugin!&quot;, &quot;success&quot;)">
       🔔 Show Toast
     </button>
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.notify.confirm(&quot;Do you want to proceed?&quot;).then(r => BFSA.notify.toast(r ? &quot;Confirmed!&quot; : &quot;Cancelled&quot;, r ? &quot;success&quot; : &quot;info&quot;))">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.notify.confirm(&quot;Do you want to proceed?&quot;).then(r => CreatorWeave.notify.toast(r ? &quot;Confirmed!&quot; : &quot;Cancelled&quot;, r ? &quot;success&quot; : &quot;info&quot;))">
       ❓ Confirm Dialog
     </button>
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.ui.resize(400)">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.ui.resize(400)">
       📏 Resize Iframe
     </button>
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.ui.fullscreen()">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.ui.fullscreen()">
       🔲 Toggle Fullscreen
     </button>
 
     <!-- Data Operations -->
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.data.getResult().then(data => console.log(&quot;Analysis:&quot;, data))">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.data.getResult().then(data => console.log(&quot;Analysis:&quot;, data))">
       📊 Get Analysis Data
     </button>
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.data.set(&quot;demoKey&quot;, {timestamp: Date.now()})">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.data.set(&quot;demoKey&quot;, {timestamp: Date.now()})">
       💾 Store Data
     </button>
 
     <!-- Export Operations -->
-    <button class="bfsa-btn bfsa-btn-primary" onclick="BFSA.export.json({demo: true, data: [1,2,3]}, &quot;plugin-export.json&quot;)">
+    <button class="creatorweave-btn creatorweave-btn-primary" onclick="CreatorWeave.export.json({demo: true, data: [1,2,3]}, &quot;plugin-export.json&quot;)">
       📥 Export JSON
     </button>
-    <button class="bfsa-btn bfsa-btn-secondary" onclick="BFSA.export.copy(&quot;Copied from plugin!&quot;).then(() => BFSA.notify.toast(&quot;Copied!&quot;, &quot;success&quot;))">
+    <button class="creatorweave-btn creatorweave-btn-secondary" onclick="CreatorWeave.export.copy(&quot;Copied from plugin!&quot;).then(() => CreatorWeave.notify.toast(&quot;Copied!&quot;, &quot;success&quot;))">
       📋 Copy to Clipboard
     </button>
   </div>
 
   <p style="margin-top: 16px; font-size: 12px; color: #9ca3af;">
-    Open browser console to see API responses. All BFSA.* functions are available.
+    Open browser console to see API responses. All CreatorWeave.* functions are available.
   </p>
 </div>
 "#);
@@ -305,7 +305,7 @@ pub fn cleanup() {
 fn error_result(message: &str) -> String {
     json!({
         "render_type": "html",
-        "content": format!(r#"<div class="bfsa-card" style="border-color: #fecaca; background: #fef2f2;">
+        "content": format!(r#"<div class="creatorweave-card" style="border-color: #fecaca; background: #fef2f2;">
   <h4 style="color: #991b1b;">⚠️ Error</h4>
   <p style="color: #b91c1c;">{}</p>
 </div>"#, message),
@@ -366,7 +366,7 @@ fn build_table_rows(outputs: &[FileOutput]) -> String {
             let complexity_label = o.data["complexity_label"].as_str().unwrap_or("Unknown");
             let complexity_badge = o.data["complexity_badge"]
                 .as_str()
-                .unwrap_or("bfsa-badge-info");
+                .unwrap_or("creatorweave-badge-info");
             let language = o.data["language"].as_str().unwrap_or("Unknown");
 
             format!(
@@ -375,7 +375,7 @@ fn build_table_rows(outputs: &[FileOutput]) -> String {
         <td>{}</td>
         <td>{}</td>
         <td>{}</td>
-        <td><span class="bfsa-badge {}">{}</span></td>
+        <td><span class="creatorweave-badge {}">{}</span></td>
         <td>{}</td>
       </tr>"#,
                 name,

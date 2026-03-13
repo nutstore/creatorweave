@@ -15,7 +15,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <email@example.com>"]
 license = "MIT"
-repository = "https://github.com/yourusername/browser-fs-analyzer"
+repository = "https://github.com/yourusername/creatorweave"
 
 [workspace.dependencies]
 # Shared dependency versions

@@ -1,9 +1,9 @@
 /**
- * BFSA API Script
- * JavaScript code injected into plugin iframe to provide BFSA.* API
+ * CreatorWeave API Script
+ * JavaScript code injected into plugin iframe to provide CreatorWeave.* API
  */
 
-export function generateBFSAAPIScript(version: string = '2.0.0'): string {
+export function generateCreatorWeaveAPIScript(version: string = '2.0.0'): string {
   return `
   (function() {
     'use strict';
@@ -27,13 +27,13 @@ export function generateBFSAAPIScript(version: string = '2.0.0'): string {
           setTimeout(() => {
             if (_pendingCallbacks.has(messageId)) {
               _pendingCallbacks.delete(messageId);
-              reject(new Error('BFSA API request timed out'));
+              reject(new Error('CreatorWeave API request timed out'));
             }
           }, 30000);
         }
 
         window.parent.postMessage({
-          type: 'bfsa-api-call',
+          type: 'creatorweave-api-call',
           id: messageId,
           action: action,
           data: data
@@ -48,7 +48,7 @@ export function generateBFSAAPIScript(version: string = '2.0.0'): string {
     // Listen for responses from parent
     window.addEventListener('message', function(event) {
       const msg = event.data;
-      if (msg && msg.type === 'bfsa-api-response' && msg.id) {
+      if (msg && msg.type === 'creatorweave-api-response' && msg.id) {
         const callback = _pendingCallbacks.get(msg.id);
         if (callback) {
           _pendingCallbacks.delete(msg.id);
@@ -62,10 +62,10 @@ export function generateBFSAAPIScript(version: string = '2.0.0'): string {
     });
 
     // =============================================================================
-    // BFSA API - Main Object
+    // CreatorWeave API - Main Object
     // =============================================================================
 
-    window.BFSA = {
+    window.CreatorWeave = {
       version: API_VERSION,
 
       // -------------------------------------------------------------------------
@@ -163,11 +163,11 @@ export function generateBFSAAPIScript(version: string = '2.0.0'): string {
     // =============================================================================
 
     window.parent.postMessage({
-      type: 'bfsa-api-ready',
+      type: 'creatorweave-api-ready',
       version: API_VERSION
     }, '*');
 
-    console.log('[BFSA] Plugin API v' + API_VERSION + ' loaded');
+    console.log('[CreatorWeave] Plugin API v' + API_VERSION + ' loaded');
   })();
 `
 }

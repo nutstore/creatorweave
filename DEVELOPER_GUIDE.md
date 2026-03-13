@@ -1,4 +1,4 @@
-# Browser FS Analyzer - Developer Guide
+# CreatorWeave - Developer Guide
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@
 
 ## Project Overview
 
-Browser FS Analyzer is a browser-based AI workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
+CreatorWeave is an AI-native creator workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
 
 ### Technology Stack
 
@@ -106,8 +106,8 @@ Browser FS Analyzer is a browser-based AI workspace built with React, TypeScript
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/browser-fs-analyzer.git
-cd browser-fs-analyzer
+git clone https://github.com/yourusername/creatorweave.git
+cd creatorweave
 
 # Install dependencies
 pnpm install
@@ -141,7 +141,7 @@ pnpm run build:wasm
 ## Project Structure
 
 ```
-browser-fs-analyzer/
+creatorweave/
 ├── web/                          # Main web application
 │   ├── src/
 │   │   ├── agent/               # AI agent system
@@ -456,7 +456,7 @@ pnpm run build:gh-pages
 ```bash
 # .env.production
 VITE_API_ENDPOINT=https://api.example.com
-VITE_APP_NAME=Browser FS Analyzer
+VITE_APP_NAME=CreatorWeave
 VITE_ENABLE_ANALYTICS=false
 ```
 

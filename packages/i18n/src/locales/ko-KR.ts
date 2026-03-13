@@ -1,7 +1,7 @@
 export const koKR = {
   // 应用
   app: {
-    productName: 'BFOSA',
+    productName: 'CreatorWeave',
     initializing: '초기화 중...',
     loadProgress: '로딩 진행률',
     preparing: '준비 중...',
@@ -25,7 +25,7 @@ export const koKR = {
 
   // 顶部导航
   topbar: {
-    productName: 'BFOSA',
+    productName: 'CreatorWeave',
     openFolder: '폴더 열기',
     switchFolder: '프로젝트 폴더 전환',
     noApiKey: 'API Key가 설정되지 않음',
@@ -141,8 +141,8 @@ export const koKR = {
 
   // 欢迎页
   welcome: {
-    title: 'BFOSA',
-    tagline: '브라우저 네이티브 AI 워크스페이스',
+    title: 'CreatorWeave',
+    tagline: '지식베이스와 멀티 에이전트 오케스트레이션을 위한 AI 네이티브 Creator Workspace',
     placeholder: '메시지를 입력하여 대화를 시작하세요...',
     placeholderNoKey: '먼저 설정에서 API Key를 구성해주세요',
     send: '전송',

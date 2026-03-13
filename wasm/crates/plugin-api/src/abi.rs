@@ -159,7 +159,7 @@ pub const BFOSA_FINALIZE_FILE: &str = "bfosa_finalize_file";
 /// * `len` - Length of the message
 pub const BFOSA_LOG: &str = "bfosa_log";
 
-/// Import: Get the host BFOSA API version
+/// Import: Get the host CreatorWeave API version
 ///
 /// ```rust
 /// extern "C" {

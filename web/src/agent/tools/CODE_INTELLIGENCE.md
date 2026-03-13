@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module provides code intelligence capabilities for the browser-based AI workspace, including symbol extraction, reference finding, and go-to-definition functionality.
+This module provides code intelligence capabilities for the AI-native creator workspace, including symbol extraction, reference finding, and go-to-definition functionality.
 
 ## Implemented Tools
 
@@ -315,4 +315,4 @@ openFile(definition.file, definition.line)
 
 ## License
 
-Part of the browser-fs-analyzer project.
+Part of the creatorweave project.

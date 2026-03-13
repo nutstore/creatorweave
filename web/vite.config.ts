@@ -20,9 +20,9 @@ export default defineConfig({
       // Disable in dev to avoid COOP/COEP conflicts
       disable: process.env.NODE_ENV === 'development',
       manifest: {
-        name: 'Browser FS Analyzer',
-        short_name: 'BFSA',
-        description: 'Browser-based file system analyzer with SQLite storage and plugin support',
+        name: 'CreatorWeave',
+        short_name: 'CWeave',
+        description: 'AI-native creator workspace with local-first files, knowledge workflows, and multi-agent orchestration',
         theme_color: '#3b82f6',
         background_color: '#0f172a',
         display: 'standalone',
@@ -46,7 +46,7 @@ export default defineConfig({
           {
             name: 'New Session',
             short_name: 'New',
-            description: 'Start a new analysis session',
+            description: 'Start a new creator workspace session',
             url: './?new=true',
             icons: [{ src: '/icon-192x192.png', sizes: '192x192' }],
           },

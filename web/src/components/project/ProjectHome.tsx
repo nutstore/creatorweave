@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { MoreVertical, Archive, ArchiveRestore, Pencil, Trash2, SearchX, Plus, ShieldCheck, Brain } from 'lucide-react'
 
 // 动画关键帧样式

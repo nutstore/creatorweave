@@ -1,6 +1,6 @@
 /**
  * SettingsDialog - LLM settings and cross-device session sync.
- * Using @browser-fs-analyzer/ui brand components.
+ * Using @creatorweave/ui brand components.
  *
  * Features:
  * - LLM Provider & API Key settings
@@ -35,8 +35,8 @@ import {
   BrandDialogHeader,
   BrandDialogTitle,
   BrandDialogBody,
-} from '@browser-fs-analyzer/ui'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { getSessionStateManager } from '@/remote/session-state-serialization'
 
 // =============================================================================

@@ -1,5 +1,5 @@
 [package]
-name = "browser-fs-analyzer-core"
+name = "creatorweave-core"
 version.workspace = true
 edition.workspace = true
 

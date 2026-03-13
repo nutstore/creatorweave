@@ -13,13 +13,13 @@ export { PluginExecutor } from './PluginExecutor'
 export { PluginResults } from './PluginResults'
 export { PluginFooter } from './PluginFooter'
 
-// Plugin HTML Renderer (modular BFSA API)
+// Plugin HTML Renderer (modular CreatorWeave API)
 export { PluginHTMLRenderer } from './PluginHTMLRenderer'
 export type { PluginHTMLResult } from './api/types'
 
-// BFSA API modules
-export { handleBFSAAPICall } from './api/BFSAAPIHandler'
-export { generateBFSAAPIScript } from './api/BFSAAPIScript'
+// CreatorWeave API modules
+export { handleCreatorWeaveAPICall } from './api/CreatorWeaveAPIHandler'
+export { generateCreatorWeaveAPIScript } from './api/CreatorWeaveAPIScript'
 export type { AnalysisResult, FileInfo } from './api/types'
 
 // Plugin UI components

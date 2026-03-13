@@ -56,8 +56,8 @@ npm --version
 ### 4. 克隆项目
 
 ```bash
-git clone https://github.com/yourusername/browser-fs-analyzer.git
-cd browser-fs-analyzer
+git clone https://github.com/yourusername/creatorweave.git
+cd creatorweave
 ```
 
 ### 5. 安装依赖
@@ -161,7 +161,7 @@ pnpm test
 ## 项目结构
 
 ```
-browser-fs-analyzer/
+creatorweave/
 ├── wasm/                    # Rust + WASM 模块
 │   ├── Cargo.toml           # Workspace 配置
 │   ├── crates/

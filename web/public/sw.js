@@ -4,7 +4,7 @@
  * Handles offline caching, push notifications, and background sync.
  */
 
-const CACHE_NAME = 'browser-fs-analyzer-v1'
+const CACHE_NAME = 'creatorweave-v1'
 const STATIC_CACHE = 'static-v1'
 const DYNAMIC_CACHE = 'dynamic-v1'
 
@@ -228,7 +228,7 @@ self.addEventListener('push', (event) => {
   console.log('[ServiceWorker] Push received:', event)
 
   let data = {
-    title: 'Browser FS Analyzer',
+    title: 'CreatorWeave',
     body: 'You have a new notification',
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',
@@ -253,7 +253,7 @@ self.addEventListener('push', (event) => {
       { action: 'open', title: 'Open' },
       { action: 'dismiss', title: 'Dismiss' },
     ],
-    tag: 'browser-fs-analyzer-notification',
+    tag: 'creatorweave-notification',
     renotify: true,
   }
 

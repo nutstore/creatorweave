@@ -2,7 +2,7 @@
 
 ## Overview
 
-Three new batch operation tools have been successfully implemented for the browser-based AI workspace:
+Three new batch operation tools have been successfully implemented for the AI-native creator workspace:
 
 1. **batch_edit** - Apply the same edit to multiple files
 2. **advanced_search** - Enhanced search with regex and context

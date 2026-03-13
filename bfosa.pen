@@ -28,7 +28,7 @@
           "id": "lWQvE",
           "name": "subtitle",
           "fill": "#9CA3AF",
-          "content": "BFOSA Application Design System — Vibrant Editorial Fusion / Teal Cyan",
+          "content": "CreatorWeave Application Design System — Vibrant Editorial Fusion / Teal Cyan",
           "fontFamily": "JetBrains Mono",
           "fontSize": 12,
           "fontWeight": "500",
@@ -1479,7 +1479,7 @@
           "id": "0srxt",
           "name": "dsubtitle",
           "fill": "#525252",
-          "content": "BFOSA Application Design System — Vibrant Editorial Fusion / Teal Cyan",
+          "content": "CreatorWeave Application Design System — Vibrant Editorial Fusion / Teal Cyan",
           "fontFamily": "JetBrains Mono",
           "fontSize": 12,
           "fontWeight": "500",
@@ -3009,7 +3009,7 @@
                       "id": "n3Lqm",
                       "name": "brandText1",
                       "fill": "$text-primary",
-                      "content": "BFOSA",
+                      "content": "CreatorWeave",
                       "fontFamily": "Inter",
                       "fontSize": 15,
                       "fontWeight": "600"
@@ -3285,7 +3285,7 @@
                           "id": "XwEMr",
                           "name": "brandText2",
                           "fill": "$text-primary",
-                          "content": "BFOSA",
+                          "content": "CreatorWeave",
                           "fontFamily": "Inter",
                           "fontSize": 15,
                           "fontWeight": "600"
@@ -12926,7 +12926,7 @@
                   "id": "SLRkB",
                   "name": "brand",
                   "fill": "$text-primary",
-                  "content": "Browser FS Analyzer",
+                  "content": "CreatorWeave",
                   "fontFamily": "Newsreader",
                   "fontSize": 16,
                   "fontWeight": "500"
@@ -13532,7 +13532,7 @@
                           "id": "s6NfY",
                           "name": "ftName",
                           "fill": "$text-primary",
-                          "content": "browser-fs-analyzer",
+                          "content": "creatorweave",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
@@ -13839,7 +13839,7 @@
                       "id": "4cNtf",
                       "name": "titleTxt",
                       "fill": "$text-primary",
-                      "content": "Browser FS Analyzer",
+                      "content": "CreatorWeave",
                       "fontFamily": "Newsreader",
                       "fontSize": 28,
                       "fontWeight": "500"
@@ -14045,7 +14045,7 @@
                   "id": "GkyCa",
                   "name": "brand",
                   "fill": "$text-primary",
-                  "content": "Browser FS Analyzer",
+                  "content": "CreatorWeave",
                   "fontFamily": "Newsreader",
                   "fontSize": 16,
                   "fontWeight": "500"
@@ -14651,7 +14651,7 @@
                           "id": "Q2Cv1",
                           "name": "ftName",
                           "fill": "$text-primary",
-                          "content": "browser-fs-analyzer",
+                          "content": "creatorweave",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
@@ -15416,7 +15416,7 @@
                   "id": "KFkLr",
                   "name": "brand",
                   "fill": "$text-primary",
-                  "content": "Browser FS Analyzer",
+                  "content": "CreatorWeave",
                   "fontFamily": "Newsreader",
                   "fontSize": 16,
                   "fontWeight": "500"
@@ -16022,7 +16022,7 @@
                           "id": "ShISf",
                           "name": "ftName",
                           "fill": "$text-primary",
-                          "content": "browser-fs-analyzer",
+                          "content": "creatorweave",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "600"
@@ -20612,7 +20612,7 @@
                       "id": "IkJKX",
                       "name": "folderName",
                       "fill": "$text-secondary",
-                      "content": "browser-fs-analyzer",
+                      "content": "creatorweave",
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
@@ -20689,7 +20689,7 @@
                       "id": "LHuGU",
                       "name": "openName",
                       "fill": "$text-secondary",
-                      "content": "browser-fs-analyzer",
+                      "content": "creatorweave",
                       "fontFamily": "Inter",
                       "fontSize": 12,
                       "fontWeight": "normal"
@@ -20851,7 +20851,7 @@
                           "id": "uP9So",
                           "name": "normalName",
                           "fill": "$text-secondary",
-                          "content": "browser-fs-analyzer",
+                          "content": "creatorweave",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "normal"
@@ -21055,7 +21055,7 @@
                           "id": "hcIZD",
                           "name": "errorBtnName",
                           "fill": "$text-secondary",
-                          "content": "browser-fs-analyzer",
+                          "content": "creatorweave",
                           "fontFamily": "Inter",
                           "fontSize": 12,
                           "fontWeight": "normal"

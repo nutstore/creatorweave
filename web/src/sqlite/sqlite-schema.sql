@@ -1,5 +1,5 @@
 -- ============================================================================
--- Browser FOS Analyzer - Unified SQLite Schema
+-- CreatorWeave - Unified SQLite Schema
 -- ============================================================================
 -- This schema unifies storage for:
 -- - Conversations (chat history)

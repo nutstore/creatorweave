@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
-import { BrandButton, Tooltip, TooltipContent, TooltipTrigger } from '@browser-fs-analyzer/ui'
+import { BrandButton, Tooltip, TooltipContent, TooltipTrigger } from '@creatorweave/ui'
 
 const THEME_ICONS = {
   light: Sun,

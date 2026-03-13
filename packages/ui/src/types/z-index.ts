@@ -1,7 +1,7 @@
 /**
  * Z-Index Layering System Types
  *
- * Defines the semantic z-index layers for the @browser-fs-analyzer/ui component library.
+ * Defines the semantic z-index layers for the @creatorweave/ui component library.
  *
  * @see /docs/z-index-layering-spec.md for complete specification
  */

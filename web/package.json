@@ -1,5 +1,5 @@
 {
-  "name": "browser-fs-analyzer-web",
+  "name": "creatorweave-web",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -25,10 +25,10 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@browser-fs-analyzer/config": "workspace:*",
-    "@browser-fs-analyzer/encryption": "workspace:*",
-    "@browser-fs-analyzer/i18n": "workspace:*",
-    "@browser-fs-analyzer/ui": "workspace:*",
+    "@creatorweave/config": "workspace:*",
+    "@creatorweave/encryption": "workspace:*",
+    "@creatorweave/i18n": "workspace:*",
+    "@creatorweave/ui": "workspace:*",
     "@iconify/react": "^6.0.2",
     "@mariozechner/pi-agent-core": "^0.56.1",
     "@mariozechner/pi-ai": "^0.56.0",

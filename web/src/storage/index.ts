@@ -1,7 +1,7 @@
 /**
  * Storage Module
  *
- * Unified SQLite-based storage for Browser FOS Analyzer.
+ * Unified SQLite-based storage for CreatorWeave.
  *
  * @module storage
  */

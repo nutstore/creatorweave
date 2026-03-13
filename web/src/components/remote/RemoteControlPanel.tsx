@@ -19,7 +19,7 @@ import {
   BrandDialogClose,
   BrandInput,
   BrandButton,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { useT } from '@/i18n'
 
 interface RemoteControlPanelProps {

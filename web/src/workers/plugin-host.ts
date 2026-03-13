@@ -48,7 +48,7 @@ export function bfosa_log(ptr: number, len: number): void {
 //=============================================================================
 
 /**
- * Get the BFOSA Plugin API version
+ * Get the CreatorWeave Plugin API version
  * Returns version as number (e.g., 20000 for "2.0.0")
  */
 export function bfosa_get_version(): number {

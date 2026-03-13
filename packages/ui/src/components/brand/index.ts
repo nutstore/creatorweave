@@ -1,6 +1,6 @@
 /**
- * @browser-fs-analyzer/ui - Brand Components
- * Design system components based on BFOSA design specifications
+ * @creatorweave/ui - Brand Components
+ * Design system components based on CreatorWeave design specifications
  */
 
 // ========== Buttons ==========

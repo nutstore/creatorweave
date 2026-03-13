@@ -1,11 +1,11 @@
 /**
  * Tailwind CSS Configuration
  *
- * Extends the base configuration from @browser-fs-analyzer/config
+ * Extends the base configuration from @creatorweave/config
  * with mobile-specific customizations.
  */
 
-import { createBaseConfig } from '@browser-fs-analyzer/config/tailwind'
+import { createBaseConfig } from '@creatorweave/config/tailwind'
 
 /** @type {import('tailwindcss').Config} */
 export default createBaseConfig({

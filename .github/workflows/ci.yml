@@ -64,7 +64,7 @@ jobs:
       - name: Enforce import path convention
         run: |
           if git grep -nE "@(ui|i18n|encryption|conversation)(/|['\"])" -- '**/*.ts' '**/*.tsx' '**/*.js' '**/*.jsx' '**/*.mjs' '**/*.cjs'; then
-            echo "Short aliases (@ui/@i18n/@encryption/@conversation) are forbidden. Use @browser-fs-analyzer/*."
+            echo "Short aliases (@ui/@i18n/@encryption/@conversation) are forbidden. Use @creatorweave/*."
             exit 1
           fi
 

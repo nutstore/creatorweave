@@ -1,5 +1,5 @@
 {
-  "name": "@browser-fs-analyzer/mobile-web",
+  "name": "@creatorweave/mobile-web",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -9,11 +9,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@browser-fs-analyzer/config": "workspace:*",
-    "@browser-fs-analyzer/conversation": "workspace:*",
-    "@browser-fs-analyzer/encryption": "workspace:*",
-    "@browser-fs-analyzer/i18n": "workspace:*",
-    "@browser-fs-analyzer/ui": "workspace:*",
+    "@creatorweave/config": "workspace:*",
+    "@creatorweave/conversation": "workspace:*",
+    "@creatorweave/encryption": "workspace:*",
+    "@creatorweave/i18n": "workspace:*",
+    "@creatorweave/ui": "workspace:*",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

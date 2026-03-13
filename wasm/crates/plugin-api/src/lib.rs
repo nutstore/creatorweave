@@ -1,4 +1,4 @@
-//! Browser File System Analyzer - Plugin API (Phase 2)
+//! CreatorWeave - Plugin API (Phase 2)
 //!
 //! This crate defines the plugin ABI and types for the dynamic plugin system.
 //! Plugins are WASM modules that implement the required exports and can be

@@ -102,7 +102,7 @@ pub fn get_plugin_info() -> String {
         version: env!("CARGO_PKG_VERSION").to_string(),
         api_version: "2.0.0".to_string(),
         description: "Calculate MD5 hash of files".to_string(),
-        author: "BFOSA Team".to_string(),
+        author: "CreatorWeave Team".to_string(),
         capabilities: PluginCapabilities {
             metadata_only: false,
             requires_content: true,

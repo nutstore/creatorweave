@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-echo "🚀 Browser File System Analyzer - Development Setup"
+echo "🚀 CreatorWeave - Development Setup"
 echo ""
 echo "This script will set up your development environment."
 echo ""

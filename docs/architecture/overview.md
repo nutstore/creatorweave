@@ -1,4 +1,4 @@
-# Browser FS Analyzer 架构总览
+# CreatorWeave 架构总览
 
 > 本文档基于当前仓库代码（`master`）整理，目标是给开发者一个可执行的系统地图：模块边界、关键数据流、启动路径、以及排障入口。
 
@@ -81,7 +81,7 @@
 3. `PluginResultAggregator` 聚合多插件结果。
 4. `PluginMonitorService` 做资源监控和违规记录。
 5. `PluginStreamService` 面向大文件分块处理。
-6. UI 渲染由 `PluginResultRenderer` 与 `BFSAPluginAPI` 承接。
+6. UI 渲染由 `PluginResultRenderer` 与 CreatorWeave Plugin API（`CreatorWeavePluginAPI`）承接。
 
 ### 5.3 Python（Pyodide）
 
@@ -92,7 +92,7 @@
 ## 6. 远程会话（Desktop <-> Relay <-> Mobile）
 
 1. 桌面端通过 `RemoteSession` 创建/恢复会话。
-2. 双端使用 `@browser-fs-analyzer/encryption` 做密钥交换与消息加密封装。
+2. 双端使用 `@creatorweave/encryption` 做密钥交换与消息加密封装。
 3. `relay-server` 仅转发和会话管理，不承载业务解密。
 4. `relay-server` 暴露：
    `GET /health` 健康检查。

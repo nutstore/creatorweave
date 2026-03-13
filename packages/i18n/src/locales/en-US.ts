@@ -20,7 +20,7 @@ export const enUS = {
     preparing: 'Preparing...',
     loadProgress: 'Load Progress',
     firstLoadHint: 'First load may take a few seconds',
-    productName: 'Browser FS Analyzer',
+    productName: 'CreatorWeave',
     initComplete: 'Initialization complete',
     initFailed: 'Initialization failed',
     sessionStorageOnly: 'Data is saved for current session only, will be lost on refresh',
@@ -31,7 +31,7 @@ export const enUS = {
   },
 
   topbar: {
-    productName: 'BFOSA',
+    productName: 'CreatorWeave',
     openFolder: 'Open Folder',
     switchFolder: 'Switch Project Folder',
     noApiKey: 'No API Key',
@@ -155,8 +155,8 @@ export const enUS = {
   },
 
   welcome: {
-    title: 'Browser FS Analyzer',
-    tagline: 'Browser-Native AI Workspace',
+    title: 'CreatorWeave',
+    tagline: 'AI-Native Creator Workspace for Knowledge & Multi-Agent Flows',
     placeholder: 'Type a message to start...',
     placeholderNoKey: 'Please configure API Key in settings first',
     send: 'Send',
@@ -590,7 +590,7 @@ export const enUS = {
     stepProgress: 'Step {current} of {total}',
     steps: {
       welcome: {
-        title: 'Welcome to Browser FS Analyzer!',
+        title: 'Welcome to CreatorWeave!',
         description: 'Let us show you around the key features.',
       },
       conversations: {

@@ -1,8 +1,8 @@
-# Browser File System Analyzer
+# CreatorWeave
 
 <div align="center">
 
-**A Browser-Based Local File System Analyzer**
+**AI-native creator workspace for local-first creation, knowledge, and multi-agent orchestration**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -15,13 +15,15 @@ English | [简体中文](./README.md)
 
 ## ✨ Features
 
-- 🌐 **Browser-Native** - Leverages the File System Access API of modern browsers
+- 🧠 **AI-Native Creator Workflow** - Built for content creation and assisted production
+- 🕸️ **Knowledge + Multi-Agent Flows** - Connect context, memory, and agent orchestration
+- 🌐 **Browser-Native** - Leverages modern browser APIs including File System Access API
 - ⚡ **High Performance** - Rust + WebAssembly for compute-intensive tasks
 - 🎨 **Modern UI** - Built with React + Tailwind CSS + shadcn/ui
 - 💾 **SQLite + OPFS Storage** - SQLite WASM with OPFS VFS for high-performance local database
 - 🔄 **Seamless Migration** - Automatic migration from IndexedDB to SQLite
 - 🔐 **Secure Sandbox** - Runs entirely in browser sandbox, no data uploaded
-- 📱 **Remote Control** - E2E encrypted remote session with mobile device support [See docs](./docs/remote-session-architecture.md)
+- 📱 **Remote Control** - E2E encrypted remote session with mobile device support [See docs](./docs/relay-server/remote-session-architecture.md)
 
 ## 🚀 Quick Start
 
@@ -35,8 +37,8 @@ English | [简体中文](./README.md)
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/browser-fs-analyzer.git
-cd browser-fs-analyzer
+git clone https://github.com/yourusername/creatorweave.git
+cd creatorweave
 
 # Install dependencies
 make install
@@ -66,21 +68,17 @@ make build
 
 ## 📖 Usage
 
-### 1. Select Folder
+### 1. Open a Project Folder
 
-Click "Select Folder" button to choose a local folder to analyze.
+Click "Select Folder" to connect a local project or content workspace.
 
-### 2. Automatic Analysis
+### 2. Chat and Execute
 
-The app will automatically recursively traverse the folder and collect file size information.
+Use natural language to inspect files, transform content, and run coding/data tasks.
 
-### 3. View Results
+### 3. Build Reusable Context
 
-Real-time analysis results:
-- 📊 Total file count
-- 📦 Total size (auto-convert to KB/MB/GB)
-- 📈 Average file size
-- 🗂️ File type distribution
+Persist useful context in conversations, knowledge notes, and agent workflows.
 
 ## 🏗️ Architecture
 
@@ -203,7 +201,7 @@ server: {
 ## 📦 Project Structure
 
 ```
-browser-fs-analyzer/
+creatorweave/
 ├── wasm/                      # Rust + WASM
 │   ├── crates/
 │   │   ├── core/              # Core library

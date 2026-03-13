@@ -11,7 +11,7 @@
 import React, { useState, useCallback } from 'react'
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { useWorkspaceStore, getActiveWorkspace } from '@/store/workspace.store'
-import { BrandButton } from '@browser-fs-analyzer/ui'
+import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'

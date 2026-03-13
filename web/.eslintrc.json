@@ -29,19 +29,19 @@
         "paths": [
           {
             "name": "@ui",
-            "message": "Use @browser-fs-analyzer/ui"
+            "message": "Use @creatorweave/ui"
           },
           {
             "name": "@i18n",
-            "message": "Use @browser-fs-analyzer/i18n"
+            "message": "Use @creatorweave/i18n"
           },
           {
             "name": "@encryption",
-            "message": "Use @browser-fs-analyzer/encryption"
+            "message": "Use @creatorweave/encryption"
           },
           {
             "name": "@conversation",
-            "message": "Use @browser-fs-analyzer/conversation"
+            "message": "Use @creatorweave/conversation"
           }
         ],
         "patterns": ["@ui/*", "@i18n/*", "@encryption/*", "@conversation/*"]

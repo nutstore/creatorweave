@@ -31,7 +31,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@browser-fs-analyzer/ui'
+} from '@creatorweave/ui'
 import { cn } from '@/lib/utils'
 
 export interface ConversationStorageBadgeProps {

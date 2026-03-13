@@ -15,8 +15,8 @@ Ensure you have the following installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/browser-fs-analyzer.git
-cd browser-fs-analyzer
+git clone https://github.com/yourusername/creatorweave.git
+cd creatorweave
 
 # Install dependencies
 pnpm install
@@ -124,7 +124,7 @@ pnpm run start            # Start production server
 ## 🏗️ Project Structure
 
 ```
-browser-fs-analyzer/
+creatorweave/
 ├── web/                   # React frontend (Desktop)
 │   ├── src/
 │   │   ├── agent/         # AI agent system
@@ -245,6 +245,6 @@ curl -I https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js
 
 ## 🤝 Need Help?
 
-- Check existing [Issues](https://github.com/yourusername/browser-fs-analyzer/issues)
+- Check existing [Issues](https://github.com/yourusername/creatorweave/issues)
 - Read [Documentation](../../README.md)
-- Start a [Discussion](https://github.com/yourusername/browser-fs-analyzer/discussions)
+- Start a [Discussion](https://github.com/yourusername/creatorweave/discussions)

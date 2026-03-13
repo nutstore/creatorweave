@@ -1,6 +1,6 @@
 # SQLite Storage Architecture
 
-Unified SQLite WASM-based storage system for Browser FOS Analyzer.
+Unified SQLite WASM-based storage system for CreatorWeave.
 
 > **💡 新开发者**: 建议先阅读 [存储架构设计文档](../storage/ARCHITECTURE.md) 了解整体存储设计。
 

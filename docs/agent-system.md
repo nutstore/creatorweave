@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AI Agent System is the core intelligence engine of Browser FS Analyzer, enabling natural language interaction with local files through advanced AI agents.
+The AI Agent System is the core intelligence engine of CreatorWeave, enabling natural language interaction with local files through advanced AI agents.
 
 ## Architecture
 

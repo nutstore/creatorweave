@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
   "display": "Mobile Web Application",
-  "extends": "@browser-fs-analyzer/config/tsconfig/react",
+  "extends": "@creatorweave/config/tsconfig/react",
   "compilerOptions": {
     /* Path aliases */
     "baseUrl": ".",

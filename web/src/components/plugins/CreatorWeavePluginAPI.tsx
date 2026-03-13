@@ -1,15 +1,15 @@
 /**
- * BFSA Plugin API
+ * CreatorWeave Plugin API
  *
  * Provides a comprehensive JavaScript API that plugins can call from within
  * their iframe to interact with the host application.
  *
  * Plugins can use:
- * - BFSA.modal() - Show a modal dialog
- * - BFSA.toast() - Show a toast notification
- * - BFSA.confirm() - Show a confirmation dialog
- * - BFSA.fullscreen() - Go fullscreen
- * - BFSA.getAnalysisResult() - Get analysis data
+ * - CreatorWeave.modal() - Show a modal dialog
+ * - CreatorWeave.toast() - Show a toast notification
+ * - CreatorWeave.confirm() - Show a confirmation dialog
+ * - CreatorWeave.fullscreen() - Go fullscreen
+ * - CreatorWeave.getAnalysisResult() - Get analysis data
  * - etc.
  */
 
@@ -27,7 +27,7 @@ export interface PluginHTMLResult {
   title?: string
 }
 
-export interface BFSAPluginAPIProps {
+export interface CreatorWeavePluginAPIProps {
   result: PluginHTMLResult
   onAction?: (action: string, data: unknown) => void
   analysisData?: AnalysisData // Passed from parent
@@ -58,7 +58,7 @@ export interface PluginResultEntry {
   metrics?: unknown
 }
 
-type BFSAApiMessage = {
+type CreatorWeaveApiMessage = {
   id?: string
   action?: string
   data?: unknown
@@ -66,7 +66,7 @@ type BFSAApiMessage = {
   pluginType?: string
 }
 
-type BFSAResponseSender = (data?: unknown, error?: string) => void
+type CreatorWeaveResponseSender = (data?: unknown, error?: string) => void
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
@@ -86,39 +86,39 @@ function toToastType(value: unknown): ToastMessage['type'] {
 const SHARED_STYLES = `
   :root {
     /* Primary (Teal - matching design system) */
-    --bfsa-primary: #14B8A6;
-    --bfsa-primary-hover: #0D9488;
+    --creatorweave-primary: #14B8A6;
+    --creatorweave-primary-hover: #0D9488;
     /* Status colors */
-    --bfsa-success: #16A34A;
-    --bfsa-warning: #D97706;
-    --bfsa-danger: #DC2626;
+    --creatorweave-success: #16A34A;
+    --creatorweave-warning: #D97706;
+    --creatorweave-danger: #DC2626;
     /* Neutral palette (mapped to design system) */
-    --bfsa-gray-50: #FAFAFA;
-    --bfsa-gray-100: #F5F5F5;
-    --bfsa-gray-200: #E5E5E5;
-    --bfsa-gray-400: #A3A3A3;
-    --bfsa-gray-500: #737373;
-    --bfsa-gray-600: #525252;
-    --bfsa-gray-700: #404040;
-    --bfsa-gray-900: #171717;
-    --bfsa-surface: #FFFFFF;
+    --creatorweave-gray-50: #FAFAFA;
+    --creatorweave-gray-100: #F5F5F5;
+    --creatorweave-gray-200: #E5E5E5;
+    --creatorweave-gray-400: #A3A3A3;
+    --creatorweave-gray-500: #737373;
+    --creatorweave-gray-600: #525252;
+    --creatorweave-gray-700: #404040;
+    --creatorweave-gray-900: #171717;
+    --creatorweave-surface: #FFFFFF;
   }
 
   .dark {
-    --bfsa-primary: #2DD4BF;
-    --bfsa-primary-hover: #5EEAD4;
-    --bfsa-success: #22C55E;
-    --bfsa-warning: #FBBF24;
-    --bfsa-danger: #F59E6B;
-    --bfsa-gray-50: #1A1A1A;
-    --bfsa-gray-100: #171717;
-    --bfsa-gray-200: #262626;
-    --bfsa-gray-400: #525252;
-    --bfsa-gray-500: #737373;
-    --bfsa-gray-600: #A3A3A3;
-    --bfsa-gray-700: #E5E5E5;
-    --bfsa-gray-900: #F5F5F5;
-    --bfsa-surface: #0A0A0A;
+    --creatorweave-primary: #2DD4BF;
+    --creatorweave-primary-hover: #5EEAD4;
+    --creatorweave-success: #22C55E;
+    --creatorweave-warning: #FBBF24;
+    --creatorweave-danger: #F59E6B;
+    --creatorweave-gray-50: #1A1A1A;
+    --creatorweave-gray-100: #171717;
+    --creatorweave-gray-200: #262626;
+    --creatorweave-gray-400: #525252;
+    --creatorweave-gray-500: #737373;
+    --creatorweave-gray-600: #A3A3A3;
+    --creatorweave-gray-700: #E5E5E5;
+    --creatorweave-gray-900: #F5F5F5;
+    --creatorweave-surface: #0A0A0A;
   }
 
   * { box-sizing: border-box; }
@@ -127,7 +127,7 @@ const SHARED_STYLES = `
     font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
-    color: var(--bfsa-gray-700);
+    color: var(--creatorweave-gray-700);
     margin: 0;
     padding: 16px;
     background: transparent;
@@ -136,7 +136,7 @@ const SHARED_STYLES = `
   h1, h2, h3, h4, h5, h6 {
     margin: 0 0 12px 0;
     font-weight: 600;
-    color: var(--bfsa-gray-900);
+    color: var(--creatorweave-gray-900);
   }
 
   h1 { font-size: 24px; }
@@ -146,14 +146,14 @@ const SHARED_STYLES = `
   p { margin: 0 0 12px 0; }
 
   a {
-    color: var(--bfsa-primary);
+    color: var(--creatorweave-primary);
     text-decoration: none;
   }
   a:hover { text-decoration: underline; }
 
   code, pre {
     font-family: ui-monospace, "SF Mono", Monaco, "Cascadia Code", monospace;
-    background: var(--bfsa-gray-100);
+    background: var(--creatorweave-gray-100);
     border-radius: 4px;
   }
 
@@ -173,66 +173,66 @@ const SHARED_STYLES = `
   }
 
   /* Card Component */
-  .bfsa-card {
-    background: var(--bfsa-surface);
-    border: 1px solid var(--bfsa-gray-200);
+  .creatorweave-card {
+    background: var(--creatorweave-surface);
+    border: 1px solid var(--creatorweave-gray-200);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
   }
 
   /* Metrics Grid */
-  .bfsa-metrics {
+  .creatorweave-metrics {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 12px;
     margin: 12px 0;
   }
 
-  .bfsa-metric {
-    background: var(--bfsa-gray-50);
+  .creatorweave-metric {
+    background: var(--creatorweave-gray-50);
     border-radius: 6px;
     padding: 12px;
   }
 
-  .bfsa-metric-label {
+  .creatorweave-metric-label {
     font-size: 12px;
-    color: var(--bfsa-gray-600);
+    color: var(--creatorweave-gray-600);
     margin-bottom: 4px;
   }
 
-  .bfsa-metric-value {
+  .creatorweave-metric-value {
     font-size: 20px;
     font-weight: 600;
-    color: var(--bfsa-gray-900);
+    color: var(--creatorweave-gray-900);
   }
 
   /* Table */
-  .bfsa-table {
+  .creatorweave-table {
     width: 100%;
     border-collapse: collapse;
     margin: 12px 0;
   }
 
-  .bfsa-table th,
-  .bfsa-table td {
+  .creatorweave-table th,
+  .creatorweave-table td {
     padding: 8px 12px;
     text-align: left;
-    border-bottom: 1px solid var(--bfsa-gray-200);
+    border-bottom: 1px solid var(--creatorweave-gray-200);
   }
 
-  .bfsa-table th {
+  .creatorweave-table th {
     font-weight: 600;
-    color: var(--bfsa-gray-700);
-    background: var(--bfsa-gray-50);
+    color: var(--creatorweave-gray-700);
+    background: var(--creatorweave-gray-50);
   }
 
-  .bfsa-table tr:last-child td {
+  .creatorweave-table tr:last-child td {
     border-bottom: none;
   }
 
   /* Badge */
-  .bfsa-badge {
+  .creatorweave-badge {
     display: inline-flex;
     align-items: center;
     padding: 2px 8px;
@@ -241,13 +241,13 @@ const SHARED_STYLES = `
     font-weight: 500;
   }
 
-  .bfsa-badge-success { background: var(--success-bg); color: var(--success-text); }
-  .bfsa-badge-warning { background: var(--warning-bg); color: var(--warning-text, var(--bfsa-gray-700)); }
-  .bfsa-badge-error { background: var(--danger-bg); color: var(--danger-text, var(--bfsa-gray-700)); }
-  .bfsa-badge-info { background: var(--bfsa-gray-100); color: var(--bfsa-primary); }
+  .creatorweave-badge-success { background: var(--success-bg); color: var(--success-text); }
+  .creatorweave-badge-warning { background: var(--warning-bg); color: var(--warning-text, var(--creatorweave-gray-700)); }
+  .creatorweave-badge-error { background: var(--danger-bg); color: var(--danger-text, var(--creatorweave-gray-700)); }
+  .creatorweave-badge-info { background: var(--creatorweave-gray-100); color: var(--creatorweave-primary); }
 
   /* Button */
-  .bfsa-btn {
+  .creatorweave-btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -260,109 +260,109 @@ const SHARED_STYLES = `
     transition: all 0.15s;
   }
 
-  .bfsa-btn-primary {
-    background: var(--bfsa-primary);
+  .creatorweave-btn-primary {
+    background: var(--creatorweave-primary);
     color: white;
   }
-  .bfsa-btn-primary:hover { background: var(--bfsa-primary-hover); }
+  .creatorweave-btn-primary:hover { background: var(--creatorweave-primary-hover); }
 
-  .bfsa-btn-secondary {
-    background: var(--bfsa-surface);
-    border: 1px solid var(--bfsa-gray-200);
-    color: var(--bfsa-gray-700);
+  .creatorweave-btn-secondary {
+    background: var(--creatorweave-surface);
+    border: 1px solid var(--creatorweave-gray-200);
+    color: var(--creatorweave-gray-700);
   }
-  .bfsa-btn-secondary:hover { background: var(--bfsa-gray-50); }
+  .creatorweave-btn-secondary:hover { background: var(--creatorweave-gray-50); }
 
-  .bfsa-btn-danger {
-    background: var(--bfsa-danger);
+  .creatorweave-btn-danger {
+    background: var(--creatorweave-danger);
     color: white;
   }
-  .bfsa-btn-danger:hover { opacity: 0.9; }
+  .creatorweave-btn-danger:hover { opacity: 0.9; }
 
   /* Progress Bar */
-  .bfsa-progress {
+  .creatorweave-progress {
     width: 100%;
     height: 8px;
-    background: var(--bfsa-gray-200);
+    background: var(--creatorweave-gray-200);
     border-radius: 4px;
     overflow: hidden;
   }
 
-  .bfsa-progress-bar {
+  .creatorweave-progress-bar {
     height: 100%;
-    background: var(--bfsa-primary);
+    background: var(--creatorweave-primary);
     transition: width 0.3s ease;
   }
 
   /* Tabs */
-  .bfsa-tabs {
+  .creatorweave-tabs {
     display: flex;
     gap: 4px;
-    border-bottom: 1px solid var(--bfsa-gray-200);
+    border-bottom: 1px solid var(--creatorweave-gray-200);
     margin-bottom: 16px;
   }
 
-  .bfsa-tab {
+  .creatorweave-tab {
     padding: 8px 16px;
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--bfsa-gray-600);
+    color: var(--creatorweave-gray-600);
     cursor: pointer;
   }
 
-  .bfsa-tab:hover { color: var(--bfsa-gray-900); }
+  .creatorweave-tab:hover { color: var(--creatorweave-gray-900); }
 
-  .bfsa-tab.active {
-    color: var(--bfsa-primary);
-    border-bottom-color: var(--bfsa-primary);
+  .creatorweave-tab.active {
+    color: var(--creatorweave-primary);
+    border-bottom-color: var(--creatorweave-primary);
   }
 
   /* Accordion */
-  .bfsa-accordion-item {
-    border: 1px solid var(--bfsa-gray-200);
+  .creatorweave-accordion-item {
+    border: 1px solid var(--creatorweave-gray-200);
     border-radius: 6px;
     margin-bottom: 8px;
     overflow: hidden;
   }
 
-  .bfsa-accordion-header {
+  .creatorweave-accordion-header {
     width: 100%;
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: var(--bfsa-gray-50);
+    background: var(--creatorweave-gray-50);
     border: none;
     cursor: pointer;
     font-weight: 500;
   }
 
-  .bfsa-accordion-content {
+  .creatorweave-accordion-content {
     padding: 12px 16px;
-    border-top: 1px solid var(--bfsa-gray-200);
+    border-top: 1px solid var(--creatorweave-gray-200);
   }
 
   /* Input */
-  .bfsa-input {
+  .creatorweave-input {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid var(--bfsa-gray-200);
+    border: 1px solid var(--creatorweave-gray-200);
     border-radius: 6px;
     font-size: 14px;
   }
 
-  .bfsa-input:focus {
+  .creatorweave-input:focus {
     outline: none;
-    border-color: var(--bfsa-primary);
+    border-color: var(--creatorweave-primary);
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
   }
 
   /* Select */
-  .bfsa-select {
+  .creatorweave-select {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid var(--bfsa-gray-200);
+    border: 1px solid var(--creatorweave-gray-200);
     border-radius: 6px;
     font-size: 14px;
     background: white;
@@ -370,7 +370,7 @@ const SHARED_STYLES = `
 `
 
 //=============================================================================
-// BFSA API Script (injected into iframe)
+// CreatorWeave API Script (injected into iframe)
 //=============================================================================
 
 const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 'dark'): string => `
@@ -398,13 +398,13 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
           setTimeout(() => {
             if (_pendingCallbacks.has(messageId)) {
               _pendingCallbacks.delete(messageId);
-              reject(new Error('BFSA API request timed out'));
+              reject(new Error('CreatorWeave API request timed out'));
             }
           }, 30000);
         }
 
         window.parent.postMessage({
-          type: 'bfsa-api-call',
+          type: 'creatorweave-api-call',
           id: messageId,
           action: action,
           data: data
@@ -419,7 +419,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
     // Listen for responses from parent
     window.addEventListener('message', function(event) {
       const msg = event.data;
-      if (msg && msg.type === 'bfsa-api-response' && msg.id) {
+      if (msg && msg.type === 'creatorweave-api-response' && msg.id) {
         const callback = _pendingCallbacks.get(msg.id);
         if (callback) {
           _pendingCallbacks.delete(msg.id);
@@ -432,7 +432,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
       }
 
       // Handle events from parent
-      if (msg && msg.type === 'bfsa-api-event') {
+      if (msg && msg.type === 'creatorweave-api-event') {
         const eventName = msg.event;
         if (window._bfsaEventListeners && window._bfsaEventListeners[eventName]) {
           window._bfsaEventListeners[eventName].forEach(fn => {
@@ -443,10 +443,10 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
     });
 
     //===========================================================================
-    // BFSA API - Main Object
+    // CreatorWeave API - Main Object
     //===========================================================================
 
-    window.BFSA = {
+    window.CreatorWeave = {
       version: API_VERSION,
 
       //=========================================================================
@@ -717,12 +717,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
           return idx > 0 ? filename.slice(idx + 1).toLowerCase() : '';
         }
       },
-
-      //=========================================================================
-      // Legacy Support
-      //=========================================================================
-
-      // Old bfsaSend function for backward compatibility
+      // Generic action bridge
       send: function(action, data) {
         send('action', { action, data });
       }
@@ -730,16 +725,10 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
 
     // Notify parent that API is ready
     window.parent.postMessage({
-      type: 'bfsa-api-ready',
+      type: 'creatorweave-api-ready',
       version: API_VERSION
     }, '*');
-
-    // Legacy ready notification
-    if (window.bfsaSend) {
-      window.bfsaSend('ready', { timestamp: Date.now() });
-    }
-
-    console.log('[BFSA] Plugin API v' + API_VERSION + ' loaded');
+    console.log('[CreatorWeave] Plugin API v' + API_VERSION + ' loaded');
   })();
 `
 
@@ -747,7 +736,7 @@ const BFSA_API_SCRIPT = (apiVersion: string, deviceId: string, theme: 'light' | 
 // Main Component
 //=============================================================================
 
-export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPluginAPIProps) {
+export function CreatorWeavePluginAPIRenderer({ result, onAction, analysisData }: CreatorWeavePluginAPIProps) {
   const resolvedTheme = useThemeStore((state) => state.resolvedTheme)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(result.height || 400)
@@ -764,16 +753,16 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
         const msg = event.data
 
         switch (msg.type) {
-          case 'bfsa-api-ready':
+          case 'creatorweave-api-ready':
             setIsReady(true)
-            console.log('[BFSA] Plugin API ready')
+            console.log('[CreatorWeave] Plugin API ready')
             break
 
-          case 'bfsa-api-call':
+          case 'creatorweave-api-call':
             handleAPICall(msg)
             break
 
-          case 'bfsa-plugin-message':
+          case 'creatorweave-plugin-message':
             // Legacy message format
             onAction?.(msg.pluginType, msg.pluginData)
             break
@@ -787,15 +776,15 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   /* eslint-enable react-hooks/exhaustive-deps */
 
   // Handle API calls from iframe
-  function handleAPICall(msg: BFSAApiMessage) {
+  function handleAPICall(msg: CreatorWeaveApiMessage) {
     const { id, action, data } = msg
     const iframe = iframeRef.current
 
-    const sendResponse: BFSAResponseSender = (responseData?: unknown, error?: string) => {
+    const sendResponse: CreatorWeaveResponseSender = (responseData?: unknown, error?: string) => {
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(
           {
-            type: 'bfsa-api-response',
+            type: 'creatorweave-api-response',
             id,
             data: responseData,
             error,
@@ -857,7 +846,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   const handleUIOperation = (
     method: string,
     data: unknown,
-    sendResponse: BFSAResponseSender
+    sendResponse: CreatorWeaveResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -932,7 +921,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   const handleDataOperation = (
     method: string,
     data: unknown,
-    sendResponse: BFSAResponseSender
+    sendResponse: CreatorWeaveResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -1002,7 +991,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   const handleExportOperation = (
     method: string,
     data: unknown,
-    sendResponse: BFSAResponseSender
+    sendResponse: CreatorWeaveResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -1061,7 +1050,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
   const handlePluginOperation = (
     method: string,
     data: unknown,
-    sendResponse: BFSAResponseSender
+    sendResponse: CreatorWeaveResponseSender
   ) => {
     const payload = asRecord(data)
     switch (method) {
@@ -1160,7 +1149,7 @@ export function BFSAPluginAPIRenderer({ result, onAction, analysisData }: BFSAPl
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">BFSA API v1.0</span>
+          <span className="text-xs text-neutral-400 dark:text-neutral-500">CreatorWeave API v1.0</span>
         </div>
 
         <div className="flex items-center gap-2">

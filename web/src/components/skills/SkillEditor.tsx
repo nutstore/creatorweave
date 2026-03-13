@@ -7,7 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { X, Eye, EyeOff, Save, FileCode, ChevronDown } from 'lucide-react'
-import { BrandDialog, BrandDialogContent, BrandDialogTitle } from '@browser-fs-analyzer/ui'
+import { BrandDialog, BrandDialogContent, BrandDialogTitle } from '@creatorweave/ui'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
