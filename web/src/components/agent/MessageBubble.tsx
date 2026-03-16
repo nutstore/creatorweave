@@ -5,7 +5,7 @@
  * Streaming is just a transient state prop, not a different component.
  */
 
-import { User, Bot } from 'lucide-react'
+import { User, Bot, Trash2 } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
@@ -40,6 +40,10 @@ interface MessageBubbleProps {
 
   /** For assistant messages: tool results map */
   toolResults?: Map<string, string>
+  /** For user messages: delete this user message and its whole agent loop */
+  onDeleteAgentLoop?: (userMessageId: string) => void
+  /** Disable delete action */
+  disableDeleteActions?: boolean
 }
 
 export function MessageBubble({
@@ -48,6 +52,8 @@ export function MessageBubble({
   showAvatar = true,
   reasoningCollapsed = true,
   toolResults,
+  onDeleteAgentLoop,
+  disableDeleteActions = false,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isStreamingReasoning = streaming?.reasoning ?? false
@@ -68,7 +74,7 @@ export function MessageBubble({
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
           </div>
 
-          {/* Timestamp + Copy button */}
+          {/* Timestamp + Copy + Delete buttons */}
           <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-400">
             <span>
               {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
@@ -76,7 +82,19 @@ export function MessageBubble({
                 minute: '2-digit',
               })}
             </span>
-            <CopyButton content={message.content || ''} />
+            <CopyButton content={message.content || ''} title="复制" />
+            {onDeleteAgentLoop && (
+              <button
+                type="button"
+                className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                disabled={disableDeleteActions}
+                onClick={() => onDeleteAgentLoop(message.id)}
+                title="删除此轮对话"
+                aria-label="删除此轮对话"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </div>
       </div>

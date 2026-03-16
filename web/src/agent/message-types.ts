@@ -89,10 +89,13 @@ export type DraftAssistantStep =
 
 /** Runtime status for a conversation */
 export type ConversationStatus = 'idle' | 'pending' | 'streaming' | 'tool_calling' | 'error'
+export type ConversationTitleMode = 'auto' | 'manual'
 
 export interface Conversation {
   id: string
   title: string
+  /** Whether title is auto-generated or manually edited by user */
+  titleMode?: ConversationTitleMode
   messages: Message[]
   createdAt: number
   updatedAt: number
@@ -193,6 +196,7 @@ export function createConversation(title?: string): Conversation {
   return {
     id,
     title: title || `Chat ${new Date(now).toLocaleString()}`,
+    titleMode: title ? 'manual' : 'auto',
     messages: [],
     createdAt: now,
     updatedAt: now,

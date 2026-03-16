@@ -26,6 +26,7 @@ import type { WorkerRequest, WorkerResponse } from './sqlite-worker'
 export interface ConversationRow {
   id: string
   title: string
+  title_mode?: string
   messages_json: string
   created_at: number
   updated_at: number

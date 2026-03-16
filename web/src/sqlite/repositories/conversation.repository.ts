@@ -9,6 +9,7 @@ import { getSQLiteDB, type ConversationRow, parseJSON, toJSON } from '../sqlite-
 export interface StoredConversation {
   id: string
   title: string
+  titleMode?: 'auto' | 'manual'
   messages: unknown[] // Message[]
   createdAt: number
   updatedAt: number
@@ -25,7 +26,7 @@ export class ConversationRepository {
   async findAll(): Promise<StoredConversation[]> {
     const db = getSQLiteDB()
     const rows = await db.queryAll<ConversationRow>(
-      'SELECT id, title, messages_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC'
+      'SELECT id, title, title_mode, messages_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC'
     )
     return rows.map((row) => this.rowToConversation(row))
   }
@@ -36,7 +37,7 @@ export class ConversationRepository {
   async findById(id: string): Promise<StoredConversation | null> {
     const db = getSQLiteDB()
     const row = await db.queryFirst<ConversationRow>(
-      'SELECT id, title, messages_json, created_at, updated_at FROM conversations WHERE id = ?',
+      'SELECT id, title, title_mode, messages_json, created_at, updated_at FROM conversations WHERE id = ?',
       [id]
     )
     return row ? this.rowToConversation(row) : null
@@ -48,15 +49,17 @@ export class ConversationRepository {
   async save(conversation: StoredConversation): Promise<void> {
     const db = getSQLiteDB()
     await db.execute(
-      `INSERT INTO conversations (id, title, messages_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO conversations (id, title, title_mode, messages_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          title = excluded.title,
+         title_mode = excluded.title_mode,
          messages_json = excluded.messages_json,
          updated_at = excluded.updated_at`,
       [
         conversation.id,
         conversation.title,
+        conversation.titleMode || 'manual',
         toJSON(conversation.messages),
         conversation.createdAt,
         conversation.updatedAt,
@@ -97,7 +100,7 @@ export class ConversationRepository {
   async findMostRecent(): Promise<StoredConversation | null> {
     const db = getSQLiteDB()
     const row = await db.queryFirst<ConversationRow>(
-      'SELECT id, title, messages_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 1'
+      'SELECT id, title, title_mode, messages_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 1'
     )
     return row ? this.rowToConversation(row) : null
   }
@@ -129,6 +132,7 @@ export class ConversationRepository {
     return {
       id: row.id,
       title: row.title,
+      titleMode: row.title_mode === 'auto' ? 'auto' : 'manual',
       messages: parseJSON(row.messages_json, []),
       createdAt: row.created_at,
       updatedAt: row.updated_at,

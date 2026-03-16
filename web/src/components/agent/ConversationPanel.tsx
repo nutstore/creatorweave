@@ -74,6 +74,7 @@ export function ConversationPanel({
   // Thread management actions
   const createThread = useConversationStore((s) => s.createThread)
   const forkThread = useConversationStore((s) => s.forkThread)
+  const deleteAgentLoop = useConversationStore((s) => s.deleteAgentLoop)
   const navigateToNextThread = useConversationStore((s) => s.navigateToNextThread)
   const navigateToPreviousThread = useConversationStore((s) => s.navigateToPreviousThread)
   const setActiveThread = useConversationStore((s) => s.setActiveThread)
@@ -139,6 +140,13 @@ export function ConversationPanel({
   // Fork thread at message
   const handleForkThread = (messageId: string) => {
     forkThread(conversationId, messageId)
+  }
+
+  const handleDeleteAgentLoop = (messageId: string) => {
+    const ok = deleteAgentLoop(conversationId, messageId)
+    if (ok) {
+      toast.success('已删除完整对话轮次')
+    }
   }
 
   // Navigate threads
@@ -292,7 +300,12 @@ export function ConversationPanel({
                         })
                         .map((turn, idx, filteredTurns) =>
                           turn.type === 'user' ? (
-                            <MessageBubble key={turn.message.id} message={turn.message} />
+                            <MessageBubble
+                              key={turn.message.id}
+                              message={turn.message}
+                              onDeleteAgentLoop={handleDeleteAgentLoop}
+                              disableDeleteActions={isProcessing}
+                            />
                           ) : (
                             <AssistantTurnBubble
                               key={turn.messages[0].id}

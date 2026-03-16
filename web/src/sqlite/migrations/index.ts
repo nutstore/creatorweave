@@ -14,6 +14,7 @@
  */
 
 import schemaSQL from '../sqlite-schema.sql?raw'
+import migration003AddConversationTitleModeSQL from './003_add_conversation_title_mode.sql?raw'
 
 // Progress callback type
 export type MigrationProgressCallback = (progress: {
@@ -43,8 +44,11 @@ export const BASE_SCHEMA_VERSION = 2
 // ============================================================================
 
 export const migrations: Migration[] = [
-  // No incremental migrations in current dev phase.
-  // Schema changes are applied directly via sqlite-schema.sql.
+  {
+    version: 3,
+    name: 'add_conversation_title_mode',
+    up: migration003AddConversationTitleModeSQL,
+  },
 ]
 
 // ============================================================================

@@ -62,6 +62,7 @@ async function persistConversation(conversation: Conversation): Promise<void> {
   await repo.save({
     id: conversation.id,
     title: conversation.title,
+    titleMode: conversation.titleMode || 'manual',
     messages: conversation.messages,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
@@ -75,6 +76,7 @@ async function loadConversations(): Promise<Conversation[]> {
   // Add runtime state to each stored conversation
   return stored.map((conv) => ({
     ...conv,
+    titleMode: conv.titleMode || 'manual',
     messages: conv.messages as Message[],
     status: 'idle' as const,
     streamingContent: '',
@@ -116,8 +118,15 @@ function truncateTitle(content: string): string {
   return trimmed.slice(0, MAX_TITLE_LENGTH - 1) + '…'
 }
 
-function isDefaultTitle(title: string): boolean {
-  return title.startsWith('Chat ')
+function updateAutoTitleAfterMessageDelete(conv: Conversation): void {
+  if (conv.titleMode === 'manual') return
+
+  const firstUserMessage = conv.messages.find((m) => m.role === 'user' && m.content)
+  if (firstUserMessage?.content) {
+    conv.title = truncateTitle(firstUserMessage.content)
+    return
+  }
+  conv.title = DEFAULT_CONVERSATION_NAME
 }
 
 //=============================================================================
@@ -156,6 +165,8 @@ interface ConversationState {
   setActive: (id: string | null) => Promise<void>
   addMessage: (conversationId: string, message: Message) => void
   updateMessages: (conversationId: string, messages: Message[]) => void
+  deleteUserMessage: (conversationId: string, userMessageId: string) => boolean
+  deleteAgentLoop: (conversationId: string, userMessageId: string) => boolean
   deleteConversation: (id: string) => void
   updateTitle: (id: string, title: string) => void
 
@@ -405,11 +416,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           conv.messages.push(message)
           conv.updatedAt = Date.now()
 
-          if (message.role === 'user' && isDefaultTitle(conv.title) && message.content) {
+          if (message.role === 'user' && conv.titleMode !== 'manual' && message.content) {
             const userMessages = conv.messages.filter((m) => m.role === 'user')
             if (userMessages.length === 1) {
               const newTitle = truncateTitle(message.content)
               conv.title = newTitle
+              conv.titleMode = 'auto'
             }
           }
         }
@@ -435,12 +447,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           if (
             currentUserMessageCount === 1 &&
             prevUserMessageCount === 0 &&
-            isDefaultTitle(conv.title)
+            conv.titleMode !== 'manual'
           ) {
             const firstUserMessage = messages.find((m) => m.role === 'user')
             if (firstUserMessage?.content) {
               const newTitle = truncateTitle(firstUserMessage.content)
               conv.title = newTitle
+              conv.titleMode = 'auto'
             }
           }
         }
@@ -454,6 +467,82 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           )
           toast.error('消息更新保存失败')
         })
+    },
+
+    deleteUserMessage: (conversationId, userMessageId) => {
+      const state = get()
+      if (state.isConversationRunning(conversationId)) {
+        toast.error('请先停止当前运行，再删除消息')
+        return false
+      }
+
+      let deleted = false
+      set((draft) => {
+        const conv = draft.conversations.find((c) => c.id === conversationId)
+        if (!conv) return
+        const idx = conv.messages.findIndex((m) => m.id === userMessageId)
+        if (idx < 0 || conv.messages[idx].role !== 'user') return
+        conv.messages.splice(idx, 1)
+        conv.updatedAt = Date.now()
+        updateAutoTitleAfterMessageDelete(conv)
+        deleted = true
+      })
+
+      if (!deleted) return false
+      const conv = get().conversations.find((c) => c.id === conversationId)
+      if (conv)
+        persistConversation(conv).catch((error) => {
+          console.error(
+            '[conversation.store] Failed to persist conversation on deleteUserMessage:',
+            error
+          )
+          toast.error('删除消息失败')
+        })
+      return true
+    },
+
+    deleteAgentLoop: (conversationId, userMessageId) => {
+      const state = get()
+      if (state.isConversationRunning(conversationId)) {
+        toast.error('请先停止当前运行，再删除对话轮次')
+        return false
+      }
+
+      let deleted = false
+      set((draft) => {
+        const conv = draft.conversations.find((c) => c.id === conversationId)
+        if (!conv) return
+        const startIdx = conv.messages.findIndex((m) => m.id === userMessageId)
+        if (startIdx < 0 || conv.messages[startIdx].role !== 'user') return
+        const targetThreadId = conv.messages[startIdx].threadId || 'main'
+
+        const idsToDelete = new Set<string>()
+        idsToDelete.add(conv.messages[startIdx].id)
+        for (let i = startIdx + 1; i < conv.messages.length; i++) {
+          const msg = conv.messages[i]
+          const msgThreadId = msg.threadId || 'main'
+          if (msgThreadId !== targetThreadId) continue
+          if (msg.role === 'user') break
+          idsToDelete.add(msg.id)
+        }
+
+        conv.messages = conv.messages.filter((msg) => !idsToDelete.has(msg.id))
+        conv.updatedAt = Date.now()
+        updateAutoTitleAfterMessageDelete(conv)
+        deleted = true
+      })
+
+      if (!deleted) return false
+      const conv = get().conversations.find((c) => c.id === conversationId)
+      if (conv)
+        persistConversation(conv).catch((error) => {
+          console.error(
+            '[conversation.store] Failed to persist conversation on deleteAgentLoop:',
+            error
+          )
+          toast.error('删除对话轮次失败')
+        })
+      return true
     },
 
     deleteConversation: (id) => {
@@ -495,6 +584,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const conv = state.conversations.find((c) => c.id === id)
         if (conv) {
           conv.title = title
+          conv.titleMode = 'manual'
           conv.updatedAt = Date.now()
         }
       })

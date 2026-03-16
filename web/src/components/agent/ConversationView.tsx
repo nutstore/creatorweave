@@ -46,6 +46,7 @@ export function ConversationView({
   })
   const createNew = useConversationStore((s) => s.createNew)
   const updateMessages = useConversationStore((s) => s.updateMessages)
+  const deleteAgentLoop = useConversationStore((s) => s.deleteAgentLoop)
   const setActive = useConversationStore((s) => s.setActive)
   const runAgent = useConversationStore((s) => s.runAgent)
   const cancelAgent = useConversationStore((s) => s.cancelAgent)
@@ -181,6 +182,14 @@ export function ConversationView({
   const handleCancel = () => {
     if (convId) {
       cancelAgent(convId)
+    }
+  }
+
+  const handleDeleteAgentLoop = (messageId: string) => {
+    if (!convId) return
+    const ok = deleteAgentLoop(convId, messageId)
+    if (ok) {
+      toast.success('已删除完整对话轮次')
     }
   }
 
@@ -364,7 +373,12 @@ export function ConversationView({
               <div className="mx-auto max-w-3xl space-y-4">
                 {turns.map((turn, idx) =>
                   turn.type === 'user' ? (
-                    <MessageBubble key={turn.message.id} message={turn.message} />
+                    <MessageBubble
+                      key={turn.message.id}
+                      message={turn.message}
+                      onDeleteAgentLoop={handleDeleteAgentLoop}
+                      disableDeleteActions={isProcessing}
+                    />
                   ) : (
                     <AssistantTurnBubble
                       key={turn.messages[0].id}

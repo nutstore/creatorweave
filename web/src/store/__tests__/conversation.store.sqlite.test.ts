@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createAssistantMessage, createToolMessage, createUserMessage } from '@/agent/message-types'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -194,5 +195,130 @@ describe('conversation.store.sqlite tool-call routing', () => {
     const bComplete = snapshots.find((s) => s.label === 'after_b_complete')
     expect(bComplete?.stepB?.streaming).toBe(false)
     expect(bComplete?.stepB?.result).toBe('result B')
+  })
+
+  it('should delete only the specified user message', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('delete-user')
+
+    const u1 = createUserMessage('u1')
+    const a1 = createAssistantMessage('a1')
+    const t1 = createToolMessage({ toolCallId: 'tc-1', name: 'file_read', content: 'r1' })
+    const u2 = createUserMessage('u2')
+
+    useConversationStore.getState().updateMessages(conv.id, [u1, a1, t1, u2])
+
+    const ok = useConversationStore.getState().deleteUserMessage(conv.id, u1.id)
+    expect(ok).toBe(true)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([a1.id, t1.id, u2.id])
+  })
+
+  it('should delete a whole agent loop from user message to before next user message', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('delete-loop')
+
+    const u1 = createUserMessage('u1')
+    const a1 = createAssistantMessage('a1')
+    const t1 = createToolMessage({ toolCallId: 'tc-1', name: 'file_read', content: 'r1' })
+    const u2 = createUserMessage('u2')
+    const a2 = createAssistantMessage('a2')
+
+    useConversationStore.getState().updateMessages(conv.id, [u1, a1, t1, u2, a2])
+
+    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
+    expect(ok).toBe(true)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([u2.id, a2.id])
+  })
+
+  it('should delete agent loop only within the same thread', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('threaded-loop')
+
+    const u1 = { ...createUserMessage('main-u1'), threadId: 'main' as const }
+    const a1 = { ...createAssistantMessage('main-a1'), threadId: 'main' as const }
+    const branchU1 = { ...createUserMessage('branch-u1'), threadId: 'branch' as const }
+    const branchA1 = { ...createAssistantMessage('branch-a1'), threadId: 'branch' as const }
+    const u2 = { ...createUserMessage('main-u2'), threadId: 'main' as const }
+    const a2 = { ...createAssistantMessage('main-a2'), threadId: 'main' as const }
+
+    useConversationStore.getState().updateMessages(conv.id, [u1, a1, branchU1, branchA1, u2, a2])
+
+    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
+    expect(ok).toBe(true)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([branchU1.id, branchA1.id, u2.id, a2.id])
+  })
+
+  it('should block loop deletion while conversation is running', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('running-delete')
+    const u1 = createUserMessage('u1')
+    const a1 = createAssistantMessage('a1')
+    useConversationStore.getState().updateMessages(conv.id, [u1, a1])
+
+    useConversationStore.setState((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conv.id ? { ...c, status: 'streaming' as const } : c
+      ),
+    }))
+
+    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
+    expect(ok).toBe(false)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([u1.id, a1.id])
+  })
+
+  it('should retitle to next user message when deleting the first auto-titled loop', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew()
+
+    const u1 = createUserMessage('first title source')
+    const a1 = createAssistantMessage('a1')
+    const u2 = createUserMessage('second title source')
+    const a2 = createAssistantMessage('a2')
+
+    useConversationStore.getState().addMessage(conv.id, u1)
+    useConversationStore.getState().addMessage(conv.id, a1)
+    useConversationStore.getState().addMessage(conv.id, u2)
+    useConversationStore.getState().addMessage(conv.id, a2)
+
+    const before = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(before?.title).toBe('first title source')
+
+    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
+    expect(ok).toBe(true)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([u2.id, a2.id])
+    expect(updated?.title).toBe('second title source')
+  })
+
+  it('should keep manual title unchanged when deleting the first loop', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew()
+
+    const u1 = createUserMessage('first title source')
+    const a1 = createAssistantMessage('a1')
+    const u2 = createUserMessage('second title source')
+    const a2 = createAssistantMessage('a2')
+
+    useConversationStore.getState().addMessage(conv.id, u1)
+    useConversationStore.getState().addMessage(conv.id, a1)
+    useConversationStore.getState().addMessage(conv.id, u2)
+    useConversationStore.getState().addMessage(conv.id, a2)
+    useConversationStore.getState().updateTitle(conv.id, 'first title source')
+
+    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
+    expect(ok).toBe(true)
+
+    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+    expect(updated?.messages.map((m) => m.id)).toEqual([u2.id, a2.id])
+    expect(updated?.title).toBe('first title source')
   })
 })

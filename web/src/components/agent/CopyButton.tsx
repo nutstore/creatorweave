@@ -33,19 +33,14 @@ export function CopyButton({ content, className, title = '复制' }: CopyButtonP
     <button
       type="button"
       onClick={handleCopy}
-      className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 ${className || ''}`}
+      className={`inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 ${className || ''}`}
       title={copied ? '已复制' : title}
+      aria-label={copied ? '已复制' : title}
     >
       {copied ? (
-        <>
-          <Check className="h-3 w-3" />
-          <span>已复制</span>
-        </>
+        <Check className="h-3.5 w-3.5" />
       ) : (
-        <>
-          <Copy className="h-3 w-3" />
-          <span>复制</span>
-        </>
+        <Copy className="h-3.5 w-3.5" />
       )}
     </button>
   )
