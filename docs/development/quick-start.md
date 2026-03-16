@@ -15,7 +15,7 @@ Ensure you have the following installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/creatorweave.git
+git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 
 # Install dependencies
@@ -245,6 +245,6 @@ curl -I https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js
 
 ## 🤝 Need Help?
 
-- Check existing [Issues](https://github.com/yourusername/creatorweave/issues)
+- Check existing [Issues](https://github.com/nutstore/creatorweave/issues)
 - Read [Documentation](../../README.md)
-- Start a [Discussion](https://github.com/yourusername/creatorweave/discussions)
+- Start a [Discussion](https://github.com/nutstore/creatorweave/discussions)

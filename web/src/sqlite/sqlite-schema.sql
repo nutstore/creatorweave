@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -51,6 +51,7 @@ CREATE TRIGGER IF NOT EXISTS active_project_singleton
 CREATE TABLE IF NOT EXISTS conversations (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL DEFAULT 'New Chat',
+    title_mode TEXT NOT NULL DEFAULT 'manual', -- 'auto' | 'manual'
     messages_json TEXT NOT NULL DEFAULT '[]',
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)

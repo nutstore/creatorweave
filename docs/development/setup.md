@@ -56,7 +56,7 @@ npm --version
 ### 4. 克隆项目
 
 ```bash
-git clone https://github.com/yourusername/creatorweave.git
+git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 ```
 

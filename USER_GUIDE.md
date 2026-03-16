@@ -371,7 +371,7 @@ The command palette is the fastest way to access any feature:
 
 - [Developer Guide](./DEVELOPER_GUIDE.md) - For contributors and developers
 - [Changelog](./CHANGELOG.md) - Version history and new features
-- [GitHub Issues](https://github.com/yourusername/creatorweave/issues) - Report bugs
+- [GitHub Issues](https://github.com/nutstore/creatorweave/issues) - Report bugs
 
 ---
 

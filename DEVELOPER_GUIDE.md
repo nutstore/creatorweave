@@ -106,7 +106,7 @@ AI Workspace is an AI-native creator workspace built with React, TypeScript, and
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/creatorweave.git
+git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 
 # Install dependencies

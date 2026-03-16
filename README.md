@@ -93,7 +93,7 @@ AI Workspace is an **AI-native creator workspace** for content creators and buil
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/creatorweave.git
+git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 
 # Install dependencies
@@ -212,12 +212,12 @@ pnpm -C web run test:e2e
 
 ## Contributing
 
-We welcome contributions! Please see our [Developer Guide](./DEVELOPER_GUIDE.md) for details on:
+We welcome contributions. Please read:
 
-- Setting up your development environment
-- Running tests
-- Code style guidelines
-- Submitting pull requests
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
+- [Developer Guide](./DEVELOPER_GUIDE.md)
 
 ## License
 

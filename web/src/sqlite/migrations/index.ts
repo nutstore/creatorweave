@@ -9,12 +9,11 @@
  * - Each migration must be idempotent (safe to run multiple times)
  * - After execution, PRAGMA user_version is updated
  *
- * Version 1 is the base schema defined in sqlite-schema.sql
- * Migrations start from version 2
+ * Version is defined in sqlite-schema.sql via PRAGMA user_version.
+ * Incremental migrations start from the next schema version.
  */
 
 import schemaSQL from '../sqlite-schema.sql?raw'
-import migration003AddConversationTitleModeSQL from './003_add_conversation_title_mode.sql?raw'
 
 // Progress callback type
 export type MigrationProgressCallback = (progress: {
@@ -32,7 +31,7 @@ export interface Migration {
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 2
+export const BASE_SCHEMA_VERSION = 3
 
 // ============================================================================
 // Migration Registry
@@ -44,11 +43,8 @@ export const BASE_SCHEMA_VERSION = 2
 // ============================================================================
 
 export const migrations: Migration[] = [
-  {
-    version: 3,
-    name: 'add_conversation_title_mode',
-    up: migration003AddConversationTitleModeSQL,
-  },
+  // No incremental migrations in current dev phase.
+  // Schema changes are applied directly via sqlite-schema.sql.
 ]
 
 // ============================================================================

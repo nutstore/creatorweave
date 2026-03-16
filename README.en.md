@@ -37,7 +37,7 @@ English | [简体中文](./README.md)
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/creatorweave.git
+git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 
 # Install dependencies
@@ -54,7 +54,7 @@ make dev
 # or
 cd web && pnpm run dev
 
-# Visit http://localhost:3000
+# Visit http://localhost:5173
 ```
 
 ### Build
@@ -291,13 +291,12 @@ make clean       # Clean build artifacts
 
 ## 🤝 Contributing
 
-Contributions are welcome! Feel free to submit issues or pull requests.
+Contributions are welcome. Please read:
 
-1. Fork the project
-2. Create feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Open Pull Request
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Security Policy](./SECURITY.md)
+- [Developer Guide](./DEVELOPER_GUIDE.md)
 
 ## 📄 License
 
