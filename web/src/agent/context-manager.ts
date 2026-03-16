@@ -13,6 +13,8 @@
 import type { ChatMessage } from './llm/llm-provider'
 import { estimateMessageTokens, estimateStringTokens } from './llm/token-counter'
 
+const COMPRESSED_MEMORY_PREFIX = 'Compressed memory of earlier conversation:'
+
 export interface ContextManagerConfig {
   maxContextTokens: number
   /** Reserve tokens for the response */
@@ -29,6 +31,7 @@ export interface TrimResult {
   messages: ChatMessage[]
   wasTruncated: boolean
   droppedGroups: number
+  droppedContent?: string
 }
 
 /**
@@ -41,9 +44,13 @@ export interface SummarizationOptions {
   summaryPrompt?: string
   /** Maximum tokens for summary */
   maxSummaryTokens?: number
+  /** Summary generation strategy */
+  summaryStrategy?: 'heuristic' | 'external'
 }
 
 export class ContextManager {
+  private static readonly PROACTIVE_COMPRESSION_TRIGGER = 0.85
+  private static readonly PROACTIVE_COMPRESSION_TARGET = 0.7
   private maxTokens: number
   private reserveTokens: number
   private systemPrompt: string
@@ -95,14 +102,17 @@ export class ContextManager {
 
     // Group messages: keep tool_calls and their results together
     const groups = this.groupMessages(messages)
+    const candidateGroups =
+      groups.length > this.maxMessageGroups ? groups.slice(-this.maxMessageGroups) : groups
+    const droppedByGroupLimit = groups.length - candidateGroups.length
 
     // Fill from newest to oldest
     const selectedGroups: ChatMessage[][] = []
     let usedTokens = 0
-    let droppedGroups = 0
+    let droppedGroups = droppedByGroupLimit
 
-    for (let i = groups.length - 1; i >= 0; i--) {
-      const group = groups[i]
+    for (let i = candidateGroups.length - 1; i >= 0; i--) {
+      const group = candidateGroups[i]
       const groupTokens = group.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
 
       if (usedTokens + groupTokens <= availableTokens) {
@@ -114,20 +124,46 @@ export class ContextManager {
       }
     }
 
+    // Proactive compression: when we're close to the context ceiling, summarize
+    // oldest groups early to preserve headroom for follow-up turns and tool output.
+    if (
+      this.enableSummarization &&
+      options?.createSummary &&
+      droppedGroups === 0 &&
+      selectedGroups.length > 12
+    ) {
+      const proactiveTrigger = Math.floor(availableTokens * ContextManager.PROACTIVE_COMPRESSION_TRIGGER)
+      const proactiveTarget = Math.floor(availableTokens * ContextManager.PROACTIVE_COMPRESSION_TARGET)
+      if (usedTokens >= proactiveTrigger) {
+        while (selectedGroups.length > 8 && usedTokens > proactiveTarget) {
+          const droppedGroup = selectedGroups.shift()
+          if (!droppedGroup) break
+          usedTokens -= droppedGroup.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
+          droppedGroups++
+        }
+      }
+    }
+
     // If summarization is enabled and we dropped groups, create a summary
     let summaryMessage: ChatMessage | null = null
-    if (this.enableSummarization && droppedGroups > 0 && options?.createSummary) {
+    let droppedContentForExternalSummary: string | undefined
+    const shouldSummarize = this.enableSummarization && droppedGroups > 0 && options?.createSummary
+    if (shouldSummarize) {
       const droppedContent = this.extractDroppedContent(groups, selectedGroups)
       if (droppedContent.length > 0) {
-        const summary = this.createSummary(
-          droppedContent,
-          options.summaryPrompt,
-          options.maxSummaryTokens ?? 500
-        )
-        if (summary) {
-          summaryMessage = {
-            role: 'system',
-            content: summary,
+        if (options.summaryStrategy === 'external') {
+          droppedContentForExternalSummary = droppedContent
+        } else {
+          const summary = this.createSummary(
+            droppedContent,
+            options.summaryPrompt,
+            options.maxSummaryTokens ?? 500
+          )
+          if (summary) {
+            summaryMessage = {
+              role: 'system',
+              content: summary,
+            }
           }
         }
       }
@@ -149,6 +185,7 @@ export class ContextManager {
       messages: result,
       wasTruncated: droppedGroups > 0,
       droppedGroups,
+      droppedContent: droppedContentForExternalSummary,
     }
   }
 
@@ -177,6 +214,9 @@ export class ContextManager {
       if (msg.role === 'user' && typeof msg.content === 'string') {
         parts.push(`User: ${msg.content.slice(0, 200)}`)
       } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
+        if (msg.content.startsWith(COMPRESSED_MEMORY_PREFIX)) {
+          continue
+        }
         parts.push(`Assistant: ${msg.content.slice(0, 300)}`)
       } else if (msg.role === 'tool' && typeof msg.content === 'string') {
         parts.push(`Tool result: ${msg.content.slice(0, 200)}`)
@@ -190,26 +230,46 @@ export class ContextManager {
    * Create a summary of dropped messages
    */
   private createSummary(droppedContent: string, customPrompt?: string, maxTokens?: number): string {
-    const defaultPrompt = `Summarize the following conversation history concisely. Focus on:
-1. Main topics discussed
-2. Key decisions made
-3. Important context for future conversation
-
-Conversation:
-${droppedContent}
-
-Summary:`
-
-    const prompt = customPrompt ?? defaultPrompt
-    const estimatedTokens = estimateStringTokens(prompt)
     const targetTokens = maxTokens ?? 500
+    const lines = droppedContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
 
-    if (estimatedTokens > targetTokens) {
-      // Truncate the content more aggressively
-      return this.truncateToTokens(droppedContent, targetTokens - 50)
+    const userHighlights: string[] = []
+    const assistantHighlights: string[] = []
+    const toolHighlights: string[] = []
+
+    for (const line of lines) {
+      if (line.startsWith('User:') && userHighlights.length < 6) {
+        userHighlights.push(line.slice(5).trim())
+        continue
+      }
+      if (line.startsWith('Assistant:') && assistantHighlights.length < 6) {
+        assistantHighlights.push(line.slice(10).trim())
+        continue
+      }
+      if (line.startsWith('Tool result:') && toolHighlights.length < 4) {
+        toolHighlights.push(line.slice(12).trim())
+      }
     }
 
-    return this.truncateToTokens(prompt, targetTokens)
+    const summaryParts: string[] = []
+    summaryParts.push(customPrompt?.trim() || 'Compressed memory of earlier conversation:')
+    if (userHighlights.length > 0) {
+      summaryParts.push('User intents:')
+      summaryParts.push(...userHighlights.map((item) => `- ${item}`))
+    }
+    if (assistantHighlights.length > 0) {
+      summaryParts.push('Assistant outputs:')
+      summaryParts.push(...assistantHighlights.map((item) => `- ${item}`))
+    }
+    if (toolHighlights.length > 0) {
+      summaryParts.push('Key tool findings:')
+      summaryParts.push(...toolHighlights.map((item) => `- ${item}`))
+    }
+
+    return this.truncateToTokens(summaryParts.join('\n'), targetTokens)
   }
 
   /**

@@ -11,7 +11,7 @@
  */
 
 import { produce } from 'immer'
-import { messagesToChatMessages } from './llm/llm-provider'
+import { messagesToChatMessages, type ChatMessage } from './llm/llm-provider'
 import type { ToolContext } from './tools/tool-types'
 import type { Message, ToolCall } from './message-types'
 import { createAssistantMessage, createToolMessage } from './message-types'
@@ -45,6 +45,12 @@ import { PiAIProvider } from './llm/pi-ai-provider'
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = UNIVERSAL_SYSTEM_PROMPT
 const DEFAULT_TOOL_TIMEOUT = 30000
+const SUMMARY_MIN_DROPPED_GROUPS = 2
+const SUMMARY_MIN_DROPPED_CONTENT_CHARS = 800
+const SUMMARY_MIN_INTERVAL_CONVERT_CALLS = 3
+const CONTEXT_SUMMARY_SYSTEM_PROMPT =
+  'You are compressing earlier conversation context for another model call. Keep only durable facts, decisions, constraints, file paths, tool findings, and unresolved tasks. Output plain text only.'
+const COMPRESSED_MEMORY_PREFIX = 'Compressed memory of earlier conversation:'
 
 export interface AgentCallbacks {
   /** Called when a new assistant message starts */
@@ -90,6 +96,10 @@ export interface AgentCallbacks {
   onToolTimeout?: (toolCall: ToolCall) => void
   /** Called when agent stops due to maxIterations limit */
   onIterationLimitReached?: (limit: number) => void
+  /** Called when context compression starts */
+  onContextCompressionStart?: () => void
+  /** Called when context compression completes (summary text may be null on fallback) */
+  onContextCompressionComplete?: (summary: string | null) => void
 }
 
 export interface AgentLoopConfig {
@@ -118,6 +128,8 @@ export class AgentLoop {
   private sessionId?: string
   private onLoopComplete?: () => Promise<void>
   private toolExecutionTimeout: number
+  private convertCallCount = 0
+  private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
 
   constructor(config: AgentLoopConfig) {
     this.provider = config.provider
@@ -278,6 +290,98 @@ export class AgentLoop {
     })
   }
 
+  private async generateContextSummaryWithLLM(
+    droppedContent: string,
+    maxSummaryTokens: number
+  ): Promise<string | null> {
+    try {
+      const response = await this.provider.chat({
+        messages: [
+          { role: 'system', content: CONTEXT_SUMMARY_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content:
+              'Summarize the following dropped conversation context. Keep it concise and actionable.\n\n' +
+              droppedContent,
+          },
+        ],
+        maxTokens: maxSummaryTokens,
+        temperature: 0.1,
+      })
+
+      const summary = response.choices[0]?.message?.content?.trim()
+      return summary || null
+    } catch (error) {
+      console.warn('[AgentLoop] LLM context summary failed, falling back to heuristic summary:', error)
+      return this.createHeuristicSummary(droppedContent, maxSummaryTokens)
+    }
+  }
+
+  private createHeuristicSummary(droppedContent: string, maxSummaryTokens: number): string {
+    const lines = droppedContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    const userHighlights: string[] = []
+    const assistantHighlights: string[] = []
+    const toolHighlights: string[] = []
+
+    for (const line of lines) {
+      if (line.startsWith('User:') && userHighlights.length < 6) {
+        userHighlights.push(line.slice(5).trim())
+        continue
+      }
+      if (line.startsWith('Assistant:') && assistantHighlights.length < 6) {
+        assistantHighlights.push(line.slice(10).trim())
+        continue
+      }
+      if (line.startsWith('Tool result:') && toolHighlights.length < 4) {
+        toolHighlights.push(line.slice(12).trim())
+      }
+    }
+
+    const parts: string[] = [COMPRESSED_MEMORY_PREFIX]
+    if (userHighlights.length > 0) {
+      parts.push('User intents:')
+      parts.push(...userHighlights.map((item) => `- ${item}`))
+    }
+    if (assistantHighlights.length > 0) {
+      parts.push('Assistant outputs:')
+      parts.push(...assistantHighlights.map((item) => `- ${item}`))
+    }
+    if (toolHighlights.length > 0) {
+      parts.push('Key tool findings:')
+      parts.push(...toolHighlights.map((item) => `- ${item}`))
+    }
+
+    const roughMaxChars = Math.max(120, maxSummaryTokens * 3)
+    const combined = parts.join('\n')
+    if (combined.length <= roughMaxChars) return combined
+    return combined.slice(0, roughMaxChars) + '\n...[truncated]'
+  }
+
+  private injectSummaryMessage(messages: ChatMessage[], summary: string): ChatMessage[] {
+    const summaryMessage: ChatMessage = {
+      role: 'assistant',
+      content: `${COMPRESSED_MEMORY_PREFIX}\n${summary}`,
+    }
+
+    if (messages[0]?.role === 'system' && messages[1]) {
+      return [messages[0], summaryMessage, ...messages.slice(1)]
+    }
+    return [summaryMessage, ...messages]
+  }
+
+  private shouldCallLLMSummary(droppedGroups: number, droppedContent: string): boolean {
+    if (droppedGroups < SUMMARY_MIN_DROPPED_GROUPS) return false
+    if (droppedContent.trim().length < SUMMARY_MIN_DROPPED_CONTENT_CHARS) return false
+    if (this.convertCallCount - this.lastSummaryConvertCall < SUMMARY_MIN_INTERVAL_CONVERT_CALLS) {
+      return false
+    }
+    return true
+  }
+
   /** Execute tool with timeout protection to prevent hanging loops */
   private async executeToolWithTimeout(
     toolName: string,
@@ -370,6 +474,9 @@ export class AgentLoop {
   private internalToPiMessages(messages: Message[]): PiMessage[] {
     const model = this.provider.getModel()
     return messages.flatMap((msg): PiMessage[] => {
+      if (msg.kind === 'context_summary') {
+        return []
+      }
       if (msg.role === 'user') {
         return [
           {
@@ -636,10 +743,40 @@ export class AgentLoop {
         getApiKey: () => apiKey,
         maxTokens: model.maxTokens,
         convertToLlm: async (agentMessages) => {
+          this.convertCallCount++
           const internalMessages = agentMessages
             .map((m) => this.piToInternalMessage(m))
             .filter((m): m is Message => m !== null)
-          const trimmed = this.contextManager.trimMessages(messagesToChatMessages(internalMessages)).messages
+          const summaryTokenBudget = Math.min(
+            1200,
+            Math.max(256, Math.floor(this.contextManager.getConfig().maxContextTokens * 0.01))
+          )
+          const trimmedResult = this.contextManager.trimMessages(
+            messagesToChatMessages(internalMessages),
+            {
+              createSummary: true,
+              maxSummaryTokens: summaryTokenBudget,
+              summaryStrategy: 'external',
+            }
+          )
+          let trimmed = trimmedResult.messages
+          if (
+            trimmedResult.droppedContent &&
+            this.shouldCallLLMSummary(trimmedResult.droppedGroups, trimmedResult.droppedContent)
+          ) {
+            callbacks?.onContextCompressionStart?.()
+            const llmSummary = await this.generateContextSummaryWithLLM(
+              trimmedResult.droppedContent,
+              summaryTokenBudget
+            )
+            if (llmSummary) {
+              this.lastSummaryConvertCall = this.convertCallCount
+              trimmed = this.injectSummaryMessage(trimmed, llmSummary)
+              // Final safety pass: summary injection must still fit the context budget.
+              trimmed = this.contextManager.trimMessages(trimmed, { createSummary: false }).messages
+            }
+            callbacks?.onContextCompressionComplete?.(llmSummary)
+          }
           return this.internalToPiMessages(
             trimmed.map((msg) => ({
               id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,

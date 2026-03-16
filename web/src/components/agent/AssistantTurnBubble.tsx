@@ -162,6 +162,15 @@ export function AssistantTurnBubble({
                 />
               )
             }
+            if (step.type === 'compression') {
+              return (
+                <CompressionStatusCard
+                  key={step.id}
+                  text={step.content}
+                  streaming={step.streaming}
+                />
+              )
+            }
             return (
               <ToolCallDisplay
                 key={step.id}
@@ -293,6 +302,7 @@ function AssistantStep({
   const hasReasoning = !!message.reasoning
   const hasContent = !!message.content
   const hasToolCalls = !!(message.toolCalls && message.toolCalls.length > 0)
+  const isContextSummary = message.kind === 'context_summary'
 
   return (
     <>
@@ -306,7 +316,18 @@ function AssistantStep({
 
           {/* Content section */}
           {hasContent && (
-            <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+            <div
+              className={
+                isContextSummary
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'
+                  : 'rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
+              }
+            >
+              {isContextSummary && (
+                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+                  上下文压缩摘要
+                </div>
+              )}
               <div className="prose-sm max-w-prose overflow-x-auto break-words">
                 <MarkdownContent content={message.content!} />
               </div>
@@ -324,5 +345,16 @@ function AssistantStep({
         </div>
       )}
     </>
+  )
+}
+
+function CompressionStatusCard({ text, streaming }: { text: string; streaming: boolean }) {
+  return (
+    <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/60 dark:text-neutral-300">
+      <span>{text}</span>
+      {streaming && (
+        <span className="ml-2 inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-middle" />
+      )}
+    </div>
   )
 }

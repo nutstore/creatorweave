@@ -240,6 +240,64 @@ describe('ContextManager', () => {
       expect(result.wasTruncated).toBe(true)
       expect(result.droppedGroups).toBeGreaterThan(0)
     })
+
+    it('should proactively compress when near context ceiling', () => {
+      const manager = new ContextManager({
+        maxContextTokens: 1000,
+        reserveTokens: 100,
+        enableSummarization: true,
+      })
+
+      const messages: ChatMessage[] = []
+      for (let i = 0; i < 70; i++) {
+        messages.push(
+          createMessage(
+            'user',
+            `Message ${i} with enough content to consume tokens quickly and push context close to model limits`
+          )
+        )
+      }
+
+      const result = manager.trimMessages(messages, {
+        createSummary: true,
+      })
+
+      expect(result.wasTruncated).toBe(true)
+      expect(result.droppedGroups).toBeGreaterThan(0)
+      const compressedSummary = result.messages.find(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('Compressed memory')
+      )
+      expect(compressedSummary).toBeDefined()
+    })
+
+    it('should exclude prior compressed memory messages from external dropped content', () => {
+      const manager = new ContextManager({
+        maxContextTokens: 260,
+        reserveTokens: 100,
+        enableSummarization: true,
+      })
+
+      const messages: ChatMessage[] = [
+        createMessage(
+          'assistant',
+          'Compressed memory of earlier conversation:\nOld summary that should not be summarized again'
+        ),
+      ]
+      for (let i = 0; i < 20; i++) {
+        messages.push(createMessage('user', `User question ${i} with enough text to force truncation`))
+        messages.push(
+          createMessage('assistant', `Assistant answer ${i} with enough text to force truncation`)
+        )
+      }
+
+      const result = manager.trimMessages(messages, {
+        createSummary: true,
+        summaryStrategy: 'external',
+      })
+
+      expect(result.droppedContent).toBeTruthy()
+      expect(result.droppedContent).not.toContain('Compressed memory of earlier conversation:')
+    })
   })
 
   describe('estimateContextTokens', () => {

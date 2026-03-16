@@ -51,6 +51,8 @@ export interface Message {
   id: string
   role: MessageRole
   content: string | null
+  /** UI-only classification for special assistant records */
+  kind?: 'normal' | 'context_summary'
   /** Chain-of-thought reasoning content (GLM-4.7+), not sent back to API */
   reasoning?: string | null
   toolCalls?: ToolCall[]
@@ -84,6 +86,12 @@ export type DraftAssistantStep =
       toolCall: ToolCall
       args: string
       result?: string
+      streaming: boolean
+    }
+  | {
+      id: string
+      type: 'compression'
+      content: string
       streaming: boolean
     }
 
@@ -139,6 +147,7 @@ export interface Conversation {
     activeReasoningStepId?: string | null
     activeContentStepId?: string | null
     activeToolStepId?: string | null
+    activeCompressionStepId?: string | null
   } | null
   /** Number of mounted views consuming this conversation (not persisted) */
   mountRefCount?: number
@@ -164,12 +173,14 @@ export function createAssistantMessage(
   content: string | null,
   toolCalls?: ToolCall[],
   usage?: MessageUsage,
-  reasoning?: string | null
+  reasoning?: string | null,
+  kind: Message['kind'] = 'normal'
 ): Message {
   return {
     id: generateId(),
     role: 'assistant',
     content,
+    kind,
     reasoning: reasoning || null,
     toolCalls,
     usage,

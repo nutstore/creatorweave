@@ -14,7 +14,7 @@ import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import { toast } from 'sonner'
 import type { Conversation, Message, ToolCall, ConversationStatus } from '@/agent/message-types'
-import { createConversation } from '@/agent/message-types'
+import { createAssistantMessage, createConversation } from '@/agent/message-types'
 import {
   emitThinkingStart,
   emitThinkingDelta,
@@ -620,6 +620,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
+        const compressionSummaryMessages: Message[] = []
         let committed = false
 
         // Acquire run lock immediately to prevent concurrent duplicate starts.
@@ -652,6 +653,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             activeReasoningStepId: null,
             activeContentStepId: null,
             activeToolStepId: null,
+            activeCompressionStepId: null,
           }
         })
 
@@ -711,6 +713,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const contextManager = new ContextManager({
           maxContextTokens: provider.maxContextTokens,
           reserveTokens: maxTokens,
+          enableSummarization: true,
+          maxMessageGroups: provider.maxContextTokens >= 200000 ? 80 : 50,
         })
 
         const toolRegistry = getToolRegistry()
@@ -892,6 +896,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   activeReasoningStepId: null,
                   activeContentStepId: null,
                   activeToolStepId: null,
+                  activeCompressionStepId: c.draftAssistant?.activeCompressionStepId || null,
                 }
               }
             })
@@ -1133,6 +1138,48 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               }
             })
           },
+          onContextCompressionStart: () => {
+            if (!isCurrentRun()) return
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (!c || c.activeRunId !== runId || !c.draftAssistant) return
+              const stepId = `compression-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+              c.draftAssistant.steps.push({
+                id: stepId,
+                type: 'compression',
+                content: '正在压缩历史上下文...',
+                streaming: true,
+              })
+              c.draftAssistant.activeCompressionStepId = stepId
+            })
+          },
+          onContextCompressionComplete: (summary: string | null) => {
+            if (!isCurrentRun()) return
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (!c || c.activeRunId !== runId || !c.draftAssistant) return
+              const stepId = c.draftAssistant.activeCompressionStepId
+              if (stepId) {
+                const step = c.draftAssistant.steps.find((s) => s.id === stepId)
+                if (step && step.type === 'compression') {
+                  step.content = summary ? '上下文已压缩并生成摘要' : '上下文压缩完成'
+                  step.streaming = false
+                }
+              }
+              c.draftAssistant.activeCompressionStepId = null
+            })
+            if (summary) {
+              compressionSummaryMessages.push(
+                createAssistantMessage(
+                  summary,
+                  undefined,
+                  undefined,
+                  null,
+                  'context_summary'
+                )
+              )
+            }
+          },
           // SEP-1306: Handle binary elicitation for file uploads
           onElicitation: async (elicitation: any) => {
             if (!isCurrentRun()) return
@@ -1260,11 +1307,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onComplete: async (msgs: Message[]) => {
             if (!isCurrentRun()) return
-            latestMessages = msgs
+            latestMessages = [...msgs, ...compressionSummaryMessages]
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
-            await finalizeRun('idle', msgs)
+            await finalizeRun('idle', latestMessages)
           },
           onError: (err: Error) => {
             if (!isCurrentRun()) return
@@ -1285,8 +1332,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             emitError(err.message)
           },
         })
-        latestMessages = resultMessages
-        await finalizeRun('idle', resultMessages)
+        latestMessages = [...resultMessages, ...compressionSummaryMessages]
+        await finalizeRun('idle', latestMessages)
       } catch (error) {
         const queues = get().streamingQueues.get(conversationId)
         if (queues) {

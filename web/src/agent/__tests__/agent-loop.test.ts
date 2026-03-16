@@ -255,6 +255,136 @@ describe('AgentLoop', () => {
       expect(mockContextManager.trimMessages).toHaveBeenCalled()
     })
 
+    it('should call LLM to summarize dropped context when compression occurs', async () => {
+      let convertedMessages: any[] | null = null
+      const longDroppedContent =
+        'User: ' + 'earlier requirement '.repeat(80) + '\nAssistant: ' + 'earlier implementation '.repeat(80)
+      let trimCallCount = 0
+      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => {
+        trimCallCount++
+        if (trimCallCount === 1) {
+          return {
+            messages: [{ role: 'user', content: 'latest user message' }],
+            wasTruncated: true,
+            droppedGroups: 3,
+            droppedContent: longDroppedContent,
+          }
+        }
+        return {
+          messages: msgs,
+          wasTruncated: false,
+          droppedGroups: 0,
+        }
+      })
+      ;(mockProvider.chat as any).mockResolvedValue({
+        choices: [{ message: { content: 'Earlier requirement implemented with fallback.' } }],
+      })
+
+      mockAgentLoopContinue.mockImplementation((context: any, config: any) => {
+        return (async function* () {
+          convertedMessages = await config.convertToLlm(context.messages)
+          yield { type: 'message_start', message: assistantMessage('') }
+          yield { type: 'message_end', message: assistantMessage('Hello!') }
+        })()
+      })
+
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([createUserMessage('test')])
+
+      expect(mockProvider.chat).toHaveBeenCalledTimes(1)
+      expect(mockContextManager.trimMessages).toHaveBeenCalledTimes(2)
+      expect(convertedMessages).toBeTruthy()
+      const hasSummary = (convertedMessages || []).some(
+        (m: any) =>
+          m.role === 'assistant' &&
+          Array.isArray(m.content) &&
+          m.content.some(
+            (item: any) =>
+              item.type === 'text' &&
+              String(item.text).includes('Compressed memory of earlier conversation')
+          )
+      )
+      expect(hasSummary).toBe(true)
+    })
+
+    it('should skip LLM summary when dropped content is too small', async () => {
+      mockContextManager.trimMessages.mockReturnValue({
+        messages: [{ role: 'user', content: 'latest user message' }],
+        wasTruncated: true,
+        droppedGroups: 3,
+        droppedContent: 'User: short',
+      })
+
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([createUserMessage('test')])
+      expect(mockProvider.chat).not.toHaveBeenCalled()
+    })
+
+    it('should fallback to heuristic summary when LLM summary call fails', async () => {
+      let convertedMessages: any[] | null = null
+      const longDroppedContent =
+        'User: ' + 'critical requirement '.repeat(80) + '\nAssistant: ' + 'implementation detail '.repeat(80)
+      let trimCallCount = 0
+      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => {
+        trimCallCount++
+        if (trimCallCount === 1) {
+          return {
+            messages: [{ role: 'user', content: 'latest user message' }],
+            wasTruncated: true,
+            droppedGroups: 4,
+            droppedContent: longDroppedContent,
+          }
+        }
+        return {
+          messages: msgs,
+          wasTruncated: false,
+          droppedGroups: 0,
+        }
+      })
+      ;(mockProvider.chat as any).mockRejectedValue(new Error('network failed'))
+
+      mockAgentLoopContinue.mockImplementation((context: any, config: any) => {
+        return (async function* () {
+          convertedMessages = await config.convertToLlm(context.messages)
+          yield { type: 'message_start', message: assistantMessage('') }
+          yield { type: 'message_end', message: assistantMessage('Hello!') }
+        })()
+      })
+
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([createUserMessage('test')])
+      expect(mockProvider.chat).toHaveBeenCalledTimes(1)
+      const hasSummary = (convertedMessages || []).some(
+        (m: any) =>
+          m.role === 'assistant' &&
+          Array.isArray(m.content) &&
+          m.content.some(
+            (item: any) =>
+              item.type === 'text' &&
+              String(item.text).includes('Compressed memory of earlier conversation')
+          )
+      )
+      expect(hasSummary).toBe(true)
+    })
+
     it('should update messages through callbacks', async () => {
       const updates: Message[][] = []
       const loop = new AgentLoop({
