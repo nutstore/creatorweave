@@ -7,8 +7,7 @@
  * 3. format-imports - Format and organize imports
  * 4. review-code - Code review checklist
  * 5. analyze-performance - Performance analysis
- * 6. batch-rename - Batch rename files
- * 7. doc-generate - Generate documentation
+ * 6. doc-generate - Generate documentation
  */
 
 import type { Macro, MacroCategory } from './macro-types'
@@ -32,12 +31,12 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{sourcePath}' },
         description: 'Read the source file',
       },
       {
-        name: 'file_write',
+        name: 'write',
         arguments: {
           path: '{componentPath}',
           content:
@@ -82,12 +81,12 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{sourcePath}' },
         description: 'Read the source code',
       },
       {
-        name: 'file_write',
+        name: 'write',
         arguments: {
           path: '{testPath}',
           content:
@@ -121,7 +120,7 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{path}' },
         description: 'Read file to format',
       },
@@ -160,24 +159,9 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{path}' },
         description: 'Read code to review',
-      },
-      {
-        name: 'search_text',
-        arguments: { query: 'TODO|FIXME|HACK|XXX', mode: 'regex', file_pattern: '{path}' },
-        description: 'Check for TODO/FIXME comments',
-      },
-      {
-        name: 'search_text',
-        arguments: { query: 'console\\.(log|warn|error)', mode: 'regex', file_pattern: '{path}' },
-        description: 'Check for console logs',
-      },
-      {
-        name: 'search_text',
-        arguments: { query: 'any|unknown', mode: 'regex', file_pattern: '{path}' },
-        description: 'Check for any/unknown types',
       },
     ],
     parameters: [{ name: 'path', label: 'File Path', type: 'string', required: true }],
@@ -187,7 +171,7 @@ export const BUILTIN_MACROS: Macro[] = [
     builtin: true,
   },
 
-  // 5. Analysis: Performance Check
+  // 5. Analysis: Performance Check - simplified
   {
     id: 'builtin-analyze-performance',
     name: 'Performance Analysis',
@@ -201,28 +185,9 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{path}' },
         description: 'Read code to analyze',
-      },
-      {
-        name: 'search_text',
-        arguments: { query: 'useEffect.*\\[\\]', mode: 'regex', file_pattern: '{path}' },
-        description: 'Check for useEffect with empty deps',
-      },
-      {
-        name: 'search_text',
-        arguments: {
-          query: 'useState|useMemo|useCallback',
-          mode: 'regex',
-          file_pattern: '{path}',
-        },
-        description: 'Check hook usage patterns',
-      },
-      {
-        name: 'search_text',
-        arguments: { query: 'map.*key=', mode: 'regex', file_pattern: '{path}' },
-        description: 'Check for missing keys in lists',
       },
     ],
     parameters: [{ name: 'path', label: 'File Path', type: 'string', required: true }],
@@ -232,47 +197,7 @@ export const BUILTIN_MACROS: Macro[] = [
     builtin: true,
   },
 
-  // 6. Batch: Batch Rename
-  {
-    id: 'builtin-batch-rename',
-    name: 'Batch Rename Files',
-    description: 'Rename multiple files matching a pattern',
-    triggers: [
-      'batch rename',
-      'rename multiple files',
-      'mass rename',
-      'rename files matching pattern',
-    ],
-    calls: [
-      {
-        name: 'glob',
-        arguments: { pattern: '{pattern}' },
-        description: 'Find files matching pattern',
-      },
-      {
-        name: 'file_batch',
-        arguments: {
-          operations: '{renameOperations}',
-        },
-        description: 'Execute rename operations',
-      },
-    ],
-    parameters: [
-      { name: 'pattern', label: 'File Pattern', type: 'string', required: true },
-      {
-        name: 'renameOperations',
-        label: 'Rename Operations',
-        type: 'array',
-        required: true,
-      },
-    ],
-    createdAt: Date.now(),
-    usageCount: 0,
-    category: 'batch',
-    builtin: true,
-  },
-
-  // 7. Documentation: Generate Docs
+  // 6. Documentation: Generate Docs
   {
     id: 'builtin-doc-generate',
     name: 'Generate Documentation',
@@ -286,7 +211,7 @@ export const BUILTIN_MACROS: Macro[] = [
     ],
     calls: [
       {
-        name: 'file_read',
+        name: 'read',
         arguments: { path: '{path}' },
         description: 'Read code to document',
       },
@@ -300,7 +225,7 @@ export const BUILTIN_MACROS: Macro[] = [
         description: 'Add documentation to code',
       },
       {
-        name: 'file_write',
+        name: 'write',
         arguments: { path: '{docPath}', content: '{docContent}' },
         description: 'Generate separate documentation file',
       },

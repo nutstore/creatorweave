@@ -53,6 +53,32 @@ const CONTEXT_SUMMARY_SYSTEM_PROMPT =
 const COMPRESSED_MEMORY_PREFIX = 'Compressed memory of earlier conversation:'
 type CompressionSummaryMode = 'llm' | 'fallback' | 'skip'
 
+export interface BeforeToolCallHookContext {
+  toolName: string
+  toolCallId: string
+  args: Record<string, unknown>
+}
+
+export interface BeforeToolCallHookResult {
+  block?: boolean
+  reason?: string
+}
+
+export interface AfterToolCallHookContext {
+  toolName: string
+  toolCallId: string
+  args: Record<string, unknown>
+  content: string
+  details: Record<string, unknown>
+  isError: boolean
+}
+
+export interface AfterToolCallHookResult {
+  content?: string
+  details?: Record<string, unknown>
+  isError?: boolean
+}
+
 export interface AgentCallbacks {
   /** Called when a new assistant message starts */
   onMessageStart?: () => void
@@ -123,6 +149,14 @@ export interface AgentLoopConfig {
   onLoopComplete?: () => Promise<void>
   /** Tool execution timeout in milliseconds (default: 30000ms) */
   toolExecutionTimeout?: number
+  /** Optional hook called before tool execution */
+  beforeToolCall?: (
+    context: BeforeToolCallHookContext
+  ) => Promise<BeforeToolCallHookResult | undefined> | BeforeToolCallHookResult | undefined
+  /** Optional hook called after tool execution */
+  afterToolCall?: (
+    context: AfterToolCallHookContext
+  ) => Promise<AfterToolCallHookResult | undefined> | AfterToolCallHookResult | undefined
 }
 
 export class AgentLoop {
@@ -136,6 +170,8 @@ export class AgentLoop {
   private sessionId?: string
   private onLoopComplete?: () => Promise<void>
   private toolExecutionTimeout: number
+  private beforeToolCall?: AgentLoopConfig['beforeToolCall']
+  private afterToolCall?: AgentLoopConfig['afterToolCall']
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
 
@@ -149,6 +185,8 @@ export class AgentLoop {
     this.sessionId = config.sessionId
     this.onLoopComplete = config.onLoopComplete
     this.toolExecutionTimeout = config.toolExecutionTimeout || DEFAULT_TOOL_TIMEOUT
+    this.beforeToolCall = config.beforeToolCall
+    this.afterToolCall = config.afterToolCall
     this.contextManager.setSystemPrompt(this.baseSystemPrompt)
   }
 
@@ -257,11 +295,16 @@ export class AgentLoop {
       // Extract file paths from tool calls
       if (msg.role === 'assistant' && msg.toolCalls) {
         for (const tc of msg.toolCalls) {
-          if (tc.function.name === 'file_read') {
+          if (tc.function.name === 'read') {
             try {
               const args = JSON.parse(tc.function.arguments)
-              if (args.path) {
-                recentFiles.push(args.path as string)
+              if (typeof args.path === 'string') {
+                recentFiles.push(args.path)
+              }
+              if (Array.isArray(args.paths)) {
+                for (const p of args.paths) {
+                  if (typeof p === 'string') recentFiles.push(p)
+                }
               }
             } catch {
               // Skip invalid JSON
@@ -461,6 +504,40 @@ export class AgentLoop {
       return JSON.parse(args)
     } catch {
       return {}
+    }
+  }
+
+  private normalizeToolResult(
+    rawResult: string
+  ): { content: string; details: Record<string, unknown>; isError: boolean } {
+    const details: Record<string, unknown> = { raw: rawResult }
+    const trimmed = rawResult.trim()
+    if (!trimmed) {
+      return { content: '', details, isError: false }
+    }
+
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      details.parsed = parsed
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'error' in parsed &&
+        typeof (parsed as { error?: unknown }).error === 'string'
+      ) {
+        const errorMessage = (parsed as { error: string }).error
+        details.error = errorMessage
+        return { content: `Error: ${errorMessage}`, details, isError: true }
+      }
+    } catch {
+      // Non-JSON output is a valid tool result.
+    }
+
+    const isError = /^error:/i.test(trimmed)
+    return {
+      content: rawResult,
+      details,
+      isError,
     }
   }
 
@@ -682,11 +759,45 @@ export class AgentLoop {
         }
 
         try {
-          const result = await this.executeToolWithTimeout(
+          if (this.beforeToolCall) {
+            const before = await this.beforeToolCall({
+              toolName: toolDef.function.name,
+              toolCallId,
+              args,
+            })
+            if (before?.block) {
+              throw new Error(before.reason || 'Tool execution was blocked by policy.')
+            }
+          }
+
+          const rawResult = await this.executeToolWithTimeout(
             toolDef.function.name,
             args,
             this.toolExecutionTimeout
           )
+          const normalized = this.normalizeToolResult(rawResult)
+
+          let finalContent = normalized.content
+          let finalDetails = normalized.details
+          let finalIsError = normalized.isError
+
+          if (this.afterToolCall) {
+            const patched = await this.afterToolCall({
+              toolName: toolDef.function.name,
+              toolCallId,
+              args,
+              content: finalContent,
+              details: finalDetails,
+              isError: finalIsError,
+            })
+            if (patched?.content !== undefined) finalContent = patched.content
+            if (patched?.details !== undefined) finalDetails = patched.details
+            if (patched?.isError !== undefined) finalIsError = patched.isError
+          }
+
+          if (finalIsError) {
+            throw new Error(finalContent.replace(/^Error:\s*/i, '') || 'Tool execution failed')
+          }
 
           let elicitationData: {
             mode: 'binary'
@@ -696,7 +807,7 @@ export class AgentLoop {
             serverId: string
           } | null = null
           try {
-            const parsedResult = JSON.parse(result)
+            const parsedResult = JSON.parse(rawResult)
             if (parsedResult._elicitation?.mode === 'binary') {
               elicitationData = parsedResult._elicitation
             }
@@ -713,9 +824,9 @@ export class AgentLoop {
             this.abortController?.abort()
           }
 
-          if (toolDef.function.name === 'run_python_code' && result) {
+          if (toolDef.function.name === 'execute' && args.language === 'python' && rawResult) {
             try {
-              const parsedResult = JSON.parse(result)
+              const parsedResult = JSON.parse(rawResult)
               if (parsedResult.fileChanges) {
                 const { useWorkspaceStore } = await import('@/store/workspace.store')
                 useWorkspaceStore.getState().addChanges(parsedResult.fileChanges)
@@ -726,8 +837,8 @@ export class AgentLoop {
           }
 
           return {
-            content: [{ type: 'text', text: result }],
-            details: { raw: result },
+            content: [{ type: 'text', text: finalContent }],
+            details: finalDetails,
           }
         } catch (toolError) {
           if (toolError instanceof Error && toolError.message.includes('timed out')) {

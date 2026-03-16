@@ -25,7 +25,7 @@ import { Progress } from '@/components/ui/progress'
 // Types
 //=============================================================================
 
-export type BatchOperationType = 'batch_edit' | 'search_text' | 'file_batch_read'
+export type BatchOperationType = 'batch_edit' | 'read' | 'file_edit'
 
 export interface BatchEditPreview {
   path: string
@@ -37,14 +37,6 @@ export interface BatchEditPreview {
     line: number
   }
   error?: string
-}
-
-export interface AdvancedSearchResult {
-  path: string
-  line: number
-  match: string
-  contextBefore?: string[]
-  contextAfter?: string[]
 }
 
 export interface BatchReadResult {
@@ -59,7 +51,7 @@ export interface BatchOperationState {
   type: BatchOperationType | null
   isRunning: boolean
   progress: number
-  preview: BatchEditPreview[] | AdvancedSearchResult[] | BatchReadResult[] | null
+  preview: BatchEditPreview[] | BatchReadResult[] | null
   error: string | null
 }
 
@@ -90,10 +82,6 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
   const [editUseRegex, setEditUseRegex] = useState(false)
 
   // Advanced Search Form State
-  const [searchPattern, setSearchPattern] = useState('')
-  const [searchFilePattern, setSearchFilePattern] = useState('')
-  const [searchContextLines, setSearchContextLines] = useState(2)
-  const [searchCaseInsensitive, setSearchCaseInsensitive] = useState(false)
 
   // Batch Read Form State
   const [readPaths, setReadPaths] = useState('')
@@ -112,8 +100,8 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
     setState((prev) => ({ ...prev, type: 'batch_edit', isRunning: true, progress: 0, error: null }))
 
     try {
-      const result = await onExecute('batch_edit', {
-        file_pattern: editFilePattern,
+      const result = await onExecute('file_edit', {
+        path: editFilePattern,
         find: editFind,
         replace: editReplace,
         dry_run: editDryRun,
@@ -142,51 +130,6 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
     }
   }, [editFilePattern, editFind, editReplace, editDryRun, editUseRegex, onExecute])
 
-  const handleAdvancedSearch = useCallback(async () => {
-    if (!searchPattern) {
-      setState((prev) => ({ ...prev, error: 'Search pattern is required' }))
-      return
-    }
-
-    setState((prev) => ({
-      ...prev,
-      type: 'search_text',
-      isRunning: true,
-      progress: 0,
-      error: null,
-    }))
-
-    try {
-      const result = await onExecute('search_text', {
-        query: searchPattern,
-        mode: 'regex',
-        file_pattern: searchFilePattern || undefined,
-        context_lines: searchContextLines,
-        case_sensitive: !searchCaseInsensitive,
-        max_results: 100,
-      })
-
-      const parsed = JSON.parse(result)
-
-      if (parsed.error) {
-        setState((prev) => ({ ...prev, error: parsed.error, isRunning: false }))
-      } else {
-        setState((prev) => ({
-          ...prev,
-          isRunning: false,
-          progress: 100,
-          preview: parsed.results || [],
-        }))
-      }
-    } catch (error) {
-      setState((prev) => ({
-        ...prev,
-        error: error instanceof Error ? error.message : String(error),
-        isRunning: false,
-      }))
-    }
-  }, [searchPattern, searchFilePattern, searchContextLines, searchCaseInsensitive, onExecute])
-
   const handleBatchRead = useCallback(async () => {
     const paths = readPaths
       .split('\n')
@@ -200,14 +143,14 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
 
     setState((prev) => ({
       ...prev,
-      type: 'file_batch_read',
+      type: 'read',
       isRunning: true,
       progress: 0,
       error: null,
     }))
 
     try {
-      const result = await onExecute('file_batch_read', {
+      const result = await onExecute('read', {
         paths,
         max_files: readMaxFiles,
         max_size: 262144, // 256KB
@@ -329,67 +272,6 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
     </div>
   )
 
-  const renderAdvancedSearchForm = () => (
-    <div className="space-y-4">
-      <div>
-        <label className="mb-2 block text-sm font-medium">Search Pattern (Regex)</label>
-        <Input
-          value={searchPattern}
-          onChange={(e) => setSearchPattern(e.target.value)}
-          placeholder="function\s+\w+, TODO:, import.*React"
-          disabled={state.isRunning}
-        />
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium">File Pattern (Optional)</label>
-        <Input
-          value={searchFilePattern}
-          onChange={(e) => setSearchFilePattern(e.target.value)}
-          placeholder="*.ts, src/**/*.tsx"
-          disabled={state.isRunning}
-        />
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium">Context Lines</label>
-        <Input
-          type="number"
-          min="0"
-          max="10"
-          value={searchContextLines}
-          onChange={(e) => setSearchContextLines(parseInt(e.target.value) || 0)}
-          disabled={state.isRunning}
-        />
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="case-insensitive"
-          checked={searchCaseInsensitive}
-          onCheckedChange={setSearchCaseInsensitive}
-          disabled={state.isRunning}
-        />
-        <label htmlFor="case-insensitive" className="text-sm">
-          Case Insensitive
-        </label>
-      </div>
-
-      <div className="flex gap-2">
-        <Button
-          onClick={handleAdvancedSearch}
-          disabled={state.isRunning || !searchPattern}
-          className="flex-1"
-        >
-          {state.isRunning ? 'Searching...' : 'Search'}
-        </Button>
-        <Button variant="outline" onClick={handleClear} disabled={state.isRunning}>
-          Clear
-        </Button>
-      </div>
-    </div>
-  )
-
   const renderBatchReadForm = () => (
     <div className="space-y-4">
       <div>
@@ -474,43 +356,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
       )
     }
 
-    if (state.type === 'search_text') {
-      const results = state.preview as AdvancedSearchResult[]
-      return (
-        <div className="mt-4 space-y-2">
-          <h4 className="text-sm font-medium">Search Results ({results.length} matches)</h4>
-          <div className="max-h-[400px] space-y-2 overflow-auto">
-            {results.map((result, idx) => (
-              <Card key={idx} className="p-3">
-                <div className="mb-1 flex items-center gap-2">
-                  <code className="text-sm">{result.path}</code>
-                  <Badge variant="outline">Line {result.line}</Badge>
-                </div>
-                {result.contextBefore && (
-                  <div className="mb-1 text-xs text-neutral-500">
-                    {result.contextBefore.map((line, i) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                  </div>
-                )}
-                <div className="rounded bg-blue-50 p-2 text-sm text-blue-900">
-                  <span className="font-medium">Line {result.line}:</span> {result.match}
-                </div>
-                {result.contextAfter && (
-                  <div className="mt-1 text-xs text-neutral-500">
-                    {result.contextAfter.map((line, i) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-        </div>
-      )
-    }
-
-    if (state.type === 'file_batch_read') {
+    if (state.type === 'read') {
       const results = state.preview as BatchReadResult[]
       const successCount = results.filter((r) => r.success).length
       return (
@@ -570,14 +416,8 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
             Batch Edit
           </button>
           <button
-            onClick={() => setState((prev) => ({ ...prev, type: 'search_text' }))}
-            className={`px-3 py-1 text-sm ${state.type === 'search_text' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
-          >
-            Advanced Search
-          </button>
-          <button
-            onClick={() => setState((prev) => ({ ...prev, type: 'file_batch_read' }))}
-            className={`px-3 py-1 text-sm ${state.type === 'file_batch_read' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
+            onClick={() => setState((prev) => ({ ...prev, type: 'read' }))}
+            className={`px-3 py-1 text-sm ${state.type === 'read' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
           >
             Batch Read
           </button>
@@ -600,8 +440,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
 
         {/* Forms */}
         {state.type === 'batch_edit' && renderBatchEditForm()}
-        {state.type === 'search_text' && renderAdvancedSearchForm()}
-        {state.type === 'file_batch_read' && renderBatchReadForm()}
+        {state.type === 'read' && renderBatchReadForm()}
 
         {/* Preview */}
         {renderPreview()}

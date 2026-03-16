@@ -181,69 +181,45 @@ const TOOL_METADATA: Record<
     baseExample: string
   }
 > = {
-  glob: {
-    name: 'glob',
-    displayName: 'File Search (glob)',
+  read_directory: {
+    name: 'read_directory',
+    displayName: 'Directory & Search',
     category: 'discovery',
     intents: ['file-discovery', 'batch-operations'],
-    description: 'Find files by pattern',
-    baseExample: 'glob(pattern="**/*.csv")',
+    description: 'List directory or search files by pattern',
+    baseExample: 'read_directory(pattern="**/*.csv") or read_directory(path="src")',
   },
-  list_files: {
-    name: 'list_files',
-    displayName: 'List Directory',
-    category: 'discovery',
-    intents: ['file-discovery'],
-    description: 'Show directory structure',
-    baseExample: 'list_files(path="src")',
-  },
-  file_read: {
-    name: 'file_read',
+  read: {
+    name: 'read',
     displayName: 'Read File',
     category: 'reading',
     intents: ['file-read', 'code-search', 'documentation'],
     description: 'Read file contents',
-    baseExample: 'file_read(path="src/index.ts")',
+    baseExample: 'read(path="src/index.ts") or read(paths=["a.ts", "b.ts"])',
   },
-  file_write: {
-    name: 'file_write',
+  write: {
+    name: 'write',
     displayName: 'Write File',
     category: 'writing',
     intents: ['file-write', 'code-generation'],
-    description: 'Create a new file',
-    baseExample: 'file_write(path="new.md", content="# Title")',
+    description: 'Create or update files',
+    baseExample: 'write(path="new.md", content="# Title") or write(files=[{path:"a.ts", content:"..."}])',
   },
   file_edit: {
     name: 'file_edit',
     displayName: 'Edit File',
     category: 'writing',
     intents: ['file-edit', 'refactoring'],
-    description: 'Replace text in a file',
+    description: 'Replace text in files',
     baseExample: 'file_edit(path="config.ts", old_text="old", new_text="new")',
   },
-  file_batch_write: {
-    name: 'file_batch_write',
-    displayName: 'Batch Operations',
-    category: 'batch',
-    intents: ['batch-operations'],
-    description: 'Multiple file operations at once',
-    baseExample: 'file_batch_write(files=[{path:"src/a.ts", content:"export {}"}])',
-  },
-  search_text: {
-    name: 'search_text',
-    displayName: 'Search Text',
-    category: 'search',
-    intents: ['code-search', 'debugging'],
-    description: 'Search text inside files',
-    baseExample: 'search_text(query="function handleClick", file_pattern="*.tsx")',
-  },
-  run_python_code: {
-    name: 'run_python_code',
-    displayName: 'Python Execution',
+  execute: {
+    name: 'execute',
+    displayName: 'Code Execution',
     category: 'analysis',
     intents: ['data-analysis', 'data-visualization', 'testing'],
-    description: 'Execute Python code for analysis',
-    baseExample: 'run_python_code(code="import pandas as pd; ...", files=[{path:"data.csv"}])',
+    description: 'Execute Python or JavaScript code',
+    baseExample: 'execute(language="python", code="print(1+1)") or execute(language="javascript", code="console.log(1+1)")',
   },
 }
 
@@ -476,19 +452,15 @@ export class RecommendationEngine {
     analysis: IntentAnalysis
   ): string {
     // Customize example based on detected file types
-    if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'run_python_code') {
-      return `First find the file: glob(pattern="**/*.csv")\nThen analyze: run_python_code(code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())", files=["your/data.csv"])`
+    if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'execute') {
+      return `First find the file: read_directory(pattern="**/*.csv")\nThen analyze: execute(language="python", code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())")`
     }
 
-    if (analysis.fileTypeHints.includes('.tsx') && metadata.name === 'search_text') {
-      return 'search_text(query="useEffect|useState", mode="regex", file_pattern="*.tsx")'
-    }
-
-    if (analysis.primaryIntent === 'file-discovery' && metadata.name === 'glob') {
+    if (analysis.primaryIntent === 'file-discovery' && metadata.name === 'read_directory') {
       if (analysis.fileTypeHints.length > 0) {
-        return `glob(pattern="**/*${analysis.fileTypeHints[0]}")`
+        return `read_directory(pattern="**/*${analysis.fileTypeHints[0]}")`
       }
-      return 'glob(pattern="**/*keyword*")'
+      return 'read_directory(pattern="**/*keyword*")'
     }
 
     return metadata.baseExample

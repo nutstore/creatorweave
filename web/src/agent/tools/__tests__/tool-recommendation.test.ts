@@ -120,44 +120,44 @@ describe('RecommendationEngine', () => {
   const engine = new RecommendationEngine()
 
   describe('tool recommendations for data analysis', () => {
-    it('should recommend run_python_code for CSV analysis', () => {
+    it('should recommend execute for CSV analysis', () => {
       const recommendations = engine.recommend('analyze data.csv with pandas')
-      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
+      const executeTool = recommendations.find((r) => r.toolName === 'execute')
 
-      expect(pythonTool).toBeDefined()
-      expect(pythonTool?.score).toBeGreaterThan(0)
-      expect(pythonTool?.category).toBe('analysis')
+      expect(executeTool).toBeDefined()
+      expect(executeTool?.score).toBeGreaterThan(0)
+      expect(executeTool?.category).toBe('analysis')
     })
 
-    it('should recommend glob for finding data files', () => {
+    it('should recommend read_directory for finding data files', () => {
       const recommendations = engine.recommend('analyze the sales data in my project')
       // Should have some recommendations
       expect(recommendations.length).toBeGreaterThan(0)
     })
 
-    it('should recommend both glob and python for data workflow', () => {
+    it('should recommend both read_directory and execute for data workflow', () => {
       const recommendations = engine.recommend('analyze CSV files with pandas')
-      // Should have recommendations including python
-      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
-      expect(pythonTool).toBeDefined()
+      // Should have recommendations including execute
+      const executeTool = recommendations.find((r) => r.toolName === 'execute')
+      expect(executeTool).toBeDefined()
     })
   })
 
   describe('tool recommendations for file operations', () => {
-    it('should recommend glob for file discovery', () => {
+    it('should recommend read_directory for file discovery', () => {
       const recommendations = engine.recommend('find all test files')
-      const globTool = recommendations.find((r) => r.toolName === 'glob')
+      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
 
-      expect(globTool).toBeDefined()
-      expect(globTool?.score).toBeGreaterThan(0)
+      expect(readDirTool).toBeDefined()
+      expect(readDirTool?.score).toBeGreaterThan(0)
     })
 
-    it('should recommend file_read after file discovery', () => {
+    it('should recommend read after file discovery', () => {
       const recommendations = engine.recommend('find and read config files')
-      const globTool = recommendations.find((r) => r.toolName === 'glob')
-      const readTool = recommendations.find((r) => r.toolName === 'file_read')
+      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
+      const readTool = recommendations.find((r) => r.toolName === 'read')
 
-      expect(globTool).toBeDefined()
+      expect(readDirTool).toBeDefined()
       expect(readTool).toBeDefined()
     })
 
@@ -170,56 +170,43 @@ describe('RecommendationEngine', () => {
   })
 
   describe('tool recommendations for code search', () => {
-    it('should recommend search_text for code search', () => {
+    it('should recommend tools for code search', () => {
       const recommendations = engine.recommend('search for useEffect usage in components')
-      const searchTool = recommendations.find((r) => r.toolName === 'search_text')
-
-      expect(searchTool).toBeDefined()
-      expect(searchTool?.category).toBe('search')
-    })
-
-    it('should include file pattern in example', () => {
-      const recommendations = engine.recommend('find useState in TSX files')
-      const searchTool = recommendations.find((r) => r.toolName === 'search_text')
-
+      // Text search removed, should still have recommendations
       expect(recommendations.length).toBeGreaterThan(0)
-      if (searchTool) {
-        expect(searchTool.example).toContain('file_pattern')
-      }
     })
   })
 
   describe('recommendation examples', () => {
-    it('should provide contextual examples for Python', () => {
+    it('should provide contextual examples for execute', () => {
       const recommendations = engine.recommend('analyze sales.csv')
-      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
+      const executeTool = recommendations.find((r) => r.toolName === 'execute')
 
-      expect(pythonTool).toBeDefined()
-      if (pythonTool) {
-        expect(pythonTool.example).toBeDefined()
-        expect(typeof pythonTool.example).toBe('string')
+      expect(executeTool).toBeDefined()
+      if (executeTool) {
+        expect(executeTool.example).toBeDefined()
+        expect(typeof executeTool.example).toBe('string')
       }
     })
 
-    it('should provide file pattern examples for glob', () => {
+    it('should provide file pattern examples for read_directory', () => {
       const recommendations = engine.recommend('find all CSV files')
-      const globTool = recommendations.find((r) => r.toolName === 'glob')
+      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
 
-      expect(globTool).toBeDefined()
-      if (globTool) {
-        expect(globTool.example).toBeDefined()
+      expect(readDirTool).toBeDefined()
+      if (readDirTool) {
+        expect(readDirTool.example).toBeDefined()
         // Example contains some pattern
-        expect(globTool.example.length).toBeGreaterThan(0)
+        expect(readDirTool.example.length).toBeGreaterThan(0)
       }
     })
 
-    it('should use string array format for run_python_code files example', () => {
+    it('should use language parameter for execute', () => {
       const recommendations = engine.recommend('analyze sales.csv with python')
-      const pythonTool = recommendations.find((r) => r.toolName === 'run_python_code')
+      const executeTool = recommendations.find((r) => r.toolName === 'execute')
 
-      expect(pythonTool).toBeDefined()
-      expect(pythonTool?.example).toContain('files=["your/data.csv"]')
-      expect(pythonTool?.example).not.toContain('files=[{path:')
+      expect(executeTool).toBeDefined()
+      expect(executeTool?.example).toContain('language="python"')
     })
   })
 
@@ -235,38 +222,35 @@ describe('RecommendationEngine', () => {
       expect(allTools.batch).toBeDefined()
     })
 
-    it('should include glob in discovery category', () => {
+    it('should include read_directory in discovery category', () => {
       const allTools = engine.getAllTools()
-      const globTool = allTools.discovery.find((t) => t.toolName === 'glob')
+      const readDirTool = allTools.discovery.find((t) => t.toolName === 'read_directory')
 
-      expect(globTool).toBeDefined()
-      expect(globTool?.category).toBe('discovery')
+      expect(readDirTool).toBeDefined()
+      expect(readDirTool?.category).toBe('discovery')
     })
 
-    it('should include run_python_code in analysis category', () => {
+    it('should include execute in analysis category', () => {
       const allTools = engine.getAllTools()
-      const pythonTool = allTools.analysis.find((t) => t.toolName === 'run_python_code')
+      const executeTool = allTools.analysis.find((t) => t.toolName === 'execute')
 
-      expect(pythonTool).toBeDefined()
-      expect(pythonTool?.category).toBe('analysis')
+      expect(executeTool).toBeDefined()
+      expect(executeTool?.category).toBe('analysis')
     })
 
     it('should not expose sync tool while it is disabled', () => {
       const allTools = engine.getAllTools()
       const syncTool = allTools.writing.find((t) => t.toolName === 'sync_to_disk')
-      const legacySync = allTools.writing.find((t) => t.toolName === 'file_sync')
 
       expect(syncTool).toBeUndefined()
-      expect(legacySync).toBeUndefined()
     })
 
-    it('should expose registered batch write tool name instead of legacy name', () => {
+    it('should include write in writing category (unified batch)', () => {
       const allTools = engine.getAllTools()
-      const batchTool = allTools.batch.find((t) => t.toolName === 'file_batch_write')
-      const legacyBatch = allTools.batch.find((t) => t.toolName === 'file_batch')
+      const writeTool = allTools.writing.find((t) => t.toolName === 'write')
 
-      expect(batchTool).toBeDefined()
-      expect(legacyBatch).toBeUndefined()
+      expect(writeTool).toBeDefined()
+      expect(writeTool?.category).toBe('writing')
     })
 
     it('should only recommend tools that exist in the built-in registry', () => {

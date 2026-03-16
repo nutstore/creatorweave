@@ -721,7 +721,7 @@ export class FingerprintScanner {
       directories: scanResult.directories,
       size,
       hasTypeScript,
-      recommendedTools: ['glob', 'file_read'],
+      recommendedTools: ['read_directory', 'read'],
     }
   }
 
@@ -861,26 +861,20 @@ export class FingerprintScanner {
   /**
    * Get recommended tools for this project type
    */
-  private getRecommendedTools(projectType: ProjectType, hasTypeScript: boolean): string[] {
-    const base = ['glob', 'file_read', 'search_text']
+  private getRecommendedTools(projectType: ProjectType, _hasTypeScript: boolean): string[] {
+    const base = ['read_directory', 'read']
 
     const typeTools: Record<string, string[]> = {
-      react: ['file_edit', 'file_batch'],
+      react: ['file_edit'],
       vue: ['file_edit'],
-      python: ['run_python_code'],
-      'data-science': ['run_python_code', 'glob'],
+      python: ['execute'],
+      'data-science': ['execute', 'analyze_data'],
       rust: ['file_edit'],
       go: ['file_edit'],
-      node: ['file_edit', 'file_batch'],
+      node: ['file_edit'],
     }
 
-    const tools = [...base, ...(typeTools[projectType] || [])]
-
-    if (hasTypeScript) {
-      tools.push('search_text') // Useful for TypeScript code
-    }
-
-    return [...new Set(tools)]
+    return [...new Set([...base, ...(typeTools[projectType] || [])])]
   }
 }
 

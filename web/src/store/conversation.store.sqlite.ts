@@ -33,6 +33,7 @@ import { StreamingQueue } from '../utils/streaming-queue'
 // Enable Immer Map/Set support
 enableMapSet()
 import { AgentLoop } from '@/agent/agent-loop'
+import { createToolPolicyHooks } from '@/agent/tool-policy'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { ContextManager } from '@/agent/context-manager'
 import { getToolRegistry } from '@/agent/tool-registry'
@@ -719,6 +720,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         })
 
         const toolRegistry = getToolRegistry()
+        const toolPolicyHooks = createToolPolicyHooks()
 
         const agentLoop = new AgentLoop({
           provider,
@@ -726,6 +728,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           contextManager,
           toolContext: { directoryHandle },
           maxIterations: 20,
+          beforeToolCall: toolPolicyHooks.beforeToolCall,
           onLoopComplete: async () => {
             // Refresh pending changes after each agent loop completes
             const { useWorkspaceStore } = await import('@/store/workspace.store')

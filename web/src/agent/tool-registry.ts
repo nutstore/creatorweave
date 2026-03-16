@@ -8,49 +8,13 @@ import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext } from './too
 import type { PluginMetadata } from '@/types/plugin'
 import { formatErrorForUser, withAutoRetry } from './error-handling'
 
-// Import built-in tools
-import { fileReadDefinition, fileReadExecutor } from './tools/file-read.tool'
-import { fileWriteDefinition, fileWriteExecutor } from './tools/file-write.tool'
+// Import unified IO tools
+import { readDefinition, readExecutor, writeDefinition, writeExecutor } from './tools/io.tool'
 import { fileEditDefinition, fileEditExecutor } from './tools/file-edit.tool'
-import { fileBatchWriteDefinition, fileBatchWriteExecutor } from './tools/file-batch.tool'
-import { globDefinition, globExecutor } from './tools/glob.tool'
-import { searchTextDefinition, searchTextExecutor } from './tools/search-text.tool'
-import { listFilesDefinition, listFilesExecutor } from './tools/list-files.tool'
-import { pythonCodeDefinition, pythonCodeExecutor } from './tools/python.tool'
-import { javascriptCodeDefinition, javascriptCodeExecutor } from './tools/javascript-execution.tool'
-import {
-  extractSymbolsDefinition,
-  extractSymbolsExecutor,
-  findReferencesDefinition,
-  findReferencesExecutor,
-  goToDefinitionDefinition,
-  goToDefinitionExecutor,
-} from './tools/code-intelligence.tool'
+import { readDirectoryDefinition, readDirectoryExecutor } from './tools/read-directory.tool'
+import { executeDefinition, executeExecutor } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
-import {
-  batchEditDefinition,
-  batchEditExecutor,
-  fileBatchReadDefinition,
-  fileBatchReadExecutor,
-} from './tools/batch-operations.tool'
-import {
-  analyzeDataDefinition,
-  analyzeDataExecutor,
-  generateChartDefinition,
-  generateChartExecutor,
-  filterDataDefinition,
-  filterDataExecutor,
-  aggregateDataDefinition,
-  aggregateDataExecutor,
-} from './tools/data-analysis.tool'
-
-// Import code review tools
-import {
-  code_review,
-  code_review_executor,
-  batch_code_review,
-  batch_code_review_executor,
-} from './tools/code-review.tool'
+import { analyzeDataDefinition, analyzeDataExecutor } from './tools/data-analysis.tool'
 
 // Import skill tools
 import {
@@ -61,31 +25,17 @@ import {
 } from '@/skills/skill-tools'
 import { getAllEnabledSkillNames } from '@/skills/skill-storage'
 
-// Import test generation tool
-import { test_generation, test_generation_executor } from './tools/test-generation.tool'
-
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
-  { definition: fileReadDefinition, executor: fileReadExecutor },
-  { definition: fileWriteDefinition, executor: fileWriteExecutor },
+  // Unified IO tools (read, write, edit)
+  { definition: readDefinition, executor: readExecutor },
+  { definition: writeDefinition, executor: writeExecutor },
   { definition: fileEditDefinition, executor: fileEditExecutor },
-  { definition: fileBatchWriteDefinition, executor: fileBatchWriteExecutor },
-  { definition: globDefinition, executor: globExecutor },
-  { definition: searchTextDefinition, executor: searchTextExecutor },
-  { definition: listFilesDefinition, executor: listFilesExecutor },
-  { definition: pythonCodeDefinition, executor: pythonCodeExecutor },
-  { definition: javascriptCodeDefinition, executor: javascriptCodeExecutor },
-  { definition: extractSymbolsDefinition, executor: extractSymbolsExecutor },
-  { definition: findReferencesDefinition, executor: findReferencesExecutor },
-  { definition: goToDefinitionDefinition, executor: goToDefinitionExecutor },
-  { definition: batchEditDefinition, executor: batchEditExecutor },
-  { definition: fileBatchReadDefinition, executor: fileBatchReadExecutor },
+  // Directory & search
+  { definition: readDirectoryDefinition, executor: readDirectoryExecutor },
+  // Execution (unified)
+  { definition: executeDefinition, executor: executeExecutor },
+  // Data
   { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
-  { definition: generateChartDefinition, executor: generateChartExecutor },
-  { definition: filterDataDefinition, executor: filterDataExecutor },
-  { definition: aggregateDataDefinition, executor: aggregateDataExecutor },
-  { definition: code_review, executor: code_review_executor },
-  { definition: batch_code_review, executor: batch_code_review_executor },
-  { definition: test_generation, executor: test_generation_executor },
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -120,11 +70,6 @@ export class ToolRegistry {
     args: Record<string, unknown>,
     context: ToolContext
   ): Promise<string> {
-    if (name === 'sync_to_disk') {
-      return JSON.stringify({
-        error: 'Tool "sync_to_disk" is temporarily disabled.',
-      })
-    }
     const entry = this.tools.get(name)
     if (!entry) {
       return JSON.stringify({ error: `Unknown tool: ${name}` })

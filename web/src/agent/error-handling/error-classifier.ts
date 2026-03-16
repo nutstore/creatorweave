@@ -148,15 +148,15 @@ const ERROR_PATTERNS: ErrorPattern[] = [
     retryStrategy: RetryStrategy.BACKOFF,
   },
   {
-    patterns: [/no files parameter/i, /files parameter provided/i],
+    patterns: [/no files parameter/i, /files parameter provided/i, /file.*not found/i, /no such file/i],
     category: ErrorCategory.FORMAT,
     userMessage:
-      'When working with files in Python, you must first find them using the file search, then specify them in the files parameter.',
+      'When working with files in Python, first locate the file, then read it from your code using the resolved path.',
     canRetry: true,
     retryStrategy: RetryStrategy.DIFFERENT_PARAMS,
     suggestedActions: [
-      'First search for the file using glob()',
-      'Then pass the found file path in the files parameter',
+      'First search for the file using read_directory()',
+      'Then use the resolved path directly in execute(language="python", code="...")',
     ],
   },
 ]

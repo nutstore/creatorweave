@@ -196,7 +196,7 @@ export class ElicitationHandler {
         } else {
           // File not found - throw error so LLM can correct the filename
           throw new Error(
-            `文件不存在: ${pathValue}\n\n请确认文件名是否正确，当前工作目录中可用的文件可以通过 list_files 工具查看。`
+            `文件不存在: ${pathValue}\n\n请确认文件名是否正确，当前工作目录中可用的文件可以通过 read_directory 工具查看。`
           )
         }
       } else {
