@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "pnpm run build:wasm && vite build && pnpm run copy:pyodide",
     "build:wasm": "cd ../wasm && bash scripts/build-wasm.sh",
+    "build:vercel": "pnpm run build:wasm && vite build && pnpm run copy:pyodide",
     "copy:pyodide": "mkdir -p dist/assets/pyodide && cp -r node_modules/pyodide/* dist/assets/pyodide/",
     "preview": "vite preview",
     "test": "vitest",

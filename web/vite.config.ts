@@ -130,7 +130,10 @@ export default defineConfig({
   ],
   define: {
     'process.env': {},
-    __DEV__: process.env.NODE_ENV !== 'production' ? 'true' : 'false',
+    'process.platform': JSON.stringify('browser'),
+    'process.version': JSON.stringify(''),
+    'process.browser': JSON.stringify(true),
+    __DEV__: process.env.NODE_ENV !== 'production' ? JSON.stringify(true) : JSON.stringify(false),
   },
   worker: {
     format: 'es',

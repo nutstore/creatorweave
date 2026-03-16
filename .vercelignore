@@ -1,0 +1,44 @@
+# .vercelignore - Files to ignore during Vercel deployment
+
+# Dependencies
+**/node_modules
+**/.pnpm-store
+
+# Build artifacts (will be rebuilt)
+**/dist
+**/.next
+**/.nuxt
+**/.output
+
+# Development files
+**/.env
+**/.env.local
+**/.env.*.local
+**/*.log
+
+# IDE
+**/.idea
+**/.vscode
+**/*.swp
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Tests
+**/coverage
+**/.nyc_output
+**/test-results
+**/playwright-report
+
+# Rust build cache (needs rebuild)
+**/target
+**/wasm/target
+
+# Others
+**/.turbo
+**/.cache
