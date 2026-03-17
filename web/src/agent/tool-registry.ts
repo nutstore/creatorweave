@@ -10,6 +10,7 @@ import { formatErrorForUser, withAutoRetry } from './error-handling'
 
 // Import unified IO tools
 import { readDefinition, readExecutor, writeDefinition, writeExecutor } from './tools/io.tool'
+import { deleteDefinition, deleteExecutor } from './tools/delete.tool'
 import { fileEditDefinition, fileEditExecutor } from './tools/file-edit.tool'
 import { readDirectoryDefinition, readDirectoryExecutor } from './tools/read-directory.tool'
 import { executeDefinition, executeExecutor } from './tools/execute.tool'
@@ -29,6 +30,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
   { definition: writeDefinition, executor: writeExecutor },
+  { definition: deleteDefinition, executor: deleteExecutor },
   { definition: fileEditDefinition, executor: fileEditExecutor },
   // Directory & search
   { definition: readDirectoryDefinition, executor: readDirectoryExecutor },
