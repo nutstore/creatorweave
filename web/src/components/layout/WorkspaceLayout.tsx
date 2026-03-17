@@ -32,6 +32,7 @@ import { ConversationView } from '@/components/agent/ConversationView'
 import { FilePreview } from '@/components/file-viewer/FilePreview'
 import { WelcomeScreenV2 } from '@/components/WelcomeScreenV2'
 import { SyncPreviewPanel } from '@/components/sync'
+import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ProjectSkillsDialog } from '@/components/skills/ProjectSkillsDialog'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
@@ -480,7 +481,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const hasActiveConversation =
     !!activeConversationId && conversations.some((c) => c.id === activeConversationId)
   const showFilePreview = !!selectedFilePath && !!selectedFileHandle
-  const showRightPanel = showPreview || showFilePreview
+  // showRightPanel is now only for FilePreview (not SyncPreview which uses Drawer)
 
   // Close preview panel (hide without clearing changes)
   const handleClosePreview = useCallback(() => {
@@ -528,7 +529,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           {/* Conversation / Welcome */}
           <main
             className="overflow-hidden"
-            style={{ width: showRightPanel ? `${100 - previewRatio}%` : '100%' }}
+            style={{ width: showFilePreview ? `${100 - previewRatio}%` : '100%' }}
           >
             {hasActiveConversation ? (
               <ConversationView
@@ -552,8 +553,13 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
             )}
           </main>
 
-          {/* Drag divider + Sync preview panel */}
-          {showRightPanel && (
+          {/* Sync preview as Drawer (overlay, no squeeze) - full width */}
+          <Drawer open={showPreview} onClose={handleClosePreview} title="同步预览" width="85vw">
+            <SyncPreviewPanel onCancel={handleClosePreview} />
+          </Drawer>
+
+          {/* File preview panel (keep squeeze pattern) */}
+          {showFilePreview && (
             <>
               <div
                 className="hover:bg-primary-300 active:bg-primary-400 w-1 shrink-0 cursor-col-resize bg-neutral-200"
@@ -563,15 +569,11 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
                 className="overflow-hidden border-l border-neutral-200 dark:border-neutral-700"
                 style={{ width: `${previewRatio}%` }}
               >
-                {showPreview ? (
-                  <SyncPreviewPanel onCancel={handleClosePreview} />
-                ) : (
-                  <FilePreview
-                    filePath={selectedFilePath}
-                    fileHandle={selectedFileHandle}
-                    onClose={handleCloseFilePreview}
-                  />
-                )}
+                <FilePreview
+                  filePath={selectedFilePath}
+                  fileHandle={selectedFileHandle}
+                  onClose={handleCloseFilePreview}
+                />
               </div>
             </>
           )}

@@ -28,25 +28,6 @@ export interface MessageUsage {
   totalTokens: number
 }
 
-/** Thread metadata for conversation threading */
-export interface Thread {
-  id: string
-  /** Root message ID that starts this thread */
-  rootMessageId: string
-  /** Thread title (auto-generated from first message) */
-  title: string
-  /** Number of messages in this thread */
-  messageCount: number
-  /** Thread creation timestamp */
-  createdAt: number
-  /** Thread last update timestamp */
-  updatedAt: number
-  /** Whether thread is collapsed in UI */
-  isCollapsed?: boolean
-  /** Optional thread summary for long conversations */
-  summary?: string
-}
-
 export interface Message {
   id: string
   role: MessageRole
@@ -61,10 +42,6 @@ export interface Message {
   timestamp: number
   /** Token usage for this assistant message (from API response) */
   usage?: MessageUsage
-  /** Thread ID if message belongs to a thread (optional for backward compatibility) */
-  threadId?: string
-  /** Parent message ID for threaded conversations (optional for backward compatibility) */
-  parentMessageId?: string
 }
 
 export type DraftAssistantStep =

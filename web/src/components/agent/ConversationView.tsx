@@ -14,7 +14,6 @@ import { useSettingsStore } from '@/store/settings.store'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
-import { ConversationPanel } from './ConversationPanel'
 import { groupMessagesIntoTurns } from './group-messages'
 import { createUserMessage } from '@/agent/message-types'
 import type { Message } from '@/agent/message-types'
@@ -23,21 +22,17 @@ interface ConversationViewProps {
   /** Optional initial message to send immediately (from WelcomeScreen) */
   initialMessage?: string | null
   onInitialMessageConsumed?: () => void
-  /** Use ConversationPanel with thread support (default: true) */
-  useThreadedView?: boolean
 }
 
 export function ConversationView({
   initialMessage,
   onInitialMessageConsumed,
-  useThreadedView = true,
 }: ConversationViewProps) {
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const { directoryHandle } = useAgentStore()
-  const [enableThreading] = useState(useThreadedView)
 
   const activeConversationId = useConversationStore((s) => s.activeConversationId)
   const activeConversation = useConversationStore((s) => {
@@ -260,16 +255,15 @@ export function ConversationView({
     return groupMessagesIntoTurns(messages)
   }, [activeConversation?.messages])
   const lastTurn = turns[turns.length - 1]
-  const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
-
-  // Check if conversation has threads
-  const hasThreads = useMemo(() => {
-    if (!activeConversation) return false
-    return activeConversation.messages.some((m) => m.threadId)
-  }, [activeConversation])
-
-  // Use threaded view if enabled and conversation has threads
-  const shouldUseThreadedView = enableThreading && hasThreads
+  // Render draft assistant loading when:
+  // 1. Processing AND (no last turn OR last turn is not assistant)
+  // 2. OR processing AND last turn is assistant but we're in pending/tool_calling state (meaning new loop iteration)
+  const shouldRenderDraftAssistant = isProcessing && (
+    !lastTurn ||
+    lastTurn.type !== 'assistant' ||
+    status === 'pending' ||
+    status === 'tool_calling'
+  )
 
   // Context window usage
   const contextWindowUsage =
@@ -296,7 +290,6 @@ export function ConversationView({
 
   const renderContextUsage = () => {
     if (!contextWindowUsage || !usageTone) return null
-    const remaining = Math.max(0, contextWindowUsage.maxTokens - contextWindowUsage.usedTokens)
 
     return (
       <div className="mt-2 flex items-center justify-end gap-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -306,7 +299,7 @@ export function ConversationView({
         <span className="opacity-40">·</span>
         <span className="tabular-nums">{formatTokenCompact(contextWindowUsage.usedTokens)}</span>
         <span className="opacity-40">/</span>
-        <span className="tabular-nums opacity-60">{formatTokenCompact(remaining)}</span>
+        <span className="tabular-nums opacity-60">{formatTokenCompact(contextWindowUsage.maxTokens)}</span>
         {isProcessing && (
           <span className="ml-1 h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500" />
         )}
@@ -325,236 +318,156 @@ export function ConversationView({
         }
       }}
     >
-      {shouldUseThreadedView ? (
-        // Use ConversationPanel with thread support
-        <div className="flex h-full flex-col" data-tour="conversations">
-          <ConversationPanel
-            conversationId={convId!}
-            toolResults={toolResults}
-            isProcessing={isProcessing}
-            status={status}
-            streamingState={streamingState}
-            streamingContent={streamingContentMessage}
-            currentToolCall={
-              isProcessing && status === 'tool_calling'
-                ? activeConversation?.currentToolCall
-                : undefined
-            }
-            streamingToolArgs={
-              isProcessing && status === 'tool_calling'
-                ? activeConversation?.streamingToolArgs
-                : undefined
-            }
-            streamingToolArgsByCallId={
-              isProcessing ? activeConversation?.streamingToolArgsByCallId : undefined
-            }
-          />
-
-          {conversationError && (
-            <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              <div className="mx-auto max-w-3xl">
-                <span className="font-medium">请求失败：</span>
-                <span>{conversationError}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Input area */}
-          <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="mx-auto flex max-w-3xl flex-col">
-              <div className="flex items-end gap-2">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    suggestedFollowUp ||
-                    (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
-                  }
-                  aria-label="输入消息"
-                  style={{ height: '38px', maxHeight: '96px' }}
-                  className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
-                  disabled={isProcessing || !hasApiKey}
-                />
-                {isProcessing ? (
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
-                    title="停止"
-                  >
-                    <StopCircle className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
-                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
-                    title="发送"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            {renderContextUsage()}
-          </div>
-        </div>
-      ) : (
-        // Original view without threads
-        <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
-          {/* Messages area */}
-          <div className="custom-scrollbar flex-1 overflow-y-auto">
-            <div className="px-4 py-4">
-              {activeConversation?.messages.length === 0 && !isProcessing && (
-                <div className="flex h-full items-center justify-center">
-                  <div className="text-center text-neutral-400">
-                    <MessageSquare className="mx-auto mb-2 h-8 w-8" />
-                    <p className="text-sm">输入消息开始对话</p>
-                  </div>
+      <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
+        {/* Messages area */}
+        <div className="custom-scrollbar flex-1 overflow-y-auto">
+          <div className="px-4 py-4">
+            {activeConversation?.messages.length === 0 && !isProcessing && (
+              <div className="flex h-full items-center justify-center">
+                <div className="text-center text-neutral-400">
+                  <MessageSquare className="mx-auto mb-2 h-8 w-8" />
+                  <p className="text-sm">输入消息开始对话</p>
                 </div>
+              </div>
+            )}
+
+            <div className="mx-auto max-w-3xl space-y-4">
+              {turns.map((turn, idx) =>
+                turn.type === 'user' ? (
+                  <MessageBubble
+                    key={turn.message.id}
+                    message={turn.message}
+                    onDeleteAgentLoop={handleDeleteAgentLoop}
+                    disableDeleteActions={isProcessing}
+                  />
+                ) : (
+                  <AssistantTurnBubble
+                    key={turn.messages[0].id}
+                    turn={turn}
+                    toolResults={toolResults}
+                    isProcessing={isProcessing}
+                    isWaiting={false}
+                    streamingState={
+                      // Only pass streaming state to the last assistant turn when processing
+                      isProcessing && idx === turns.length - 1 ? streamingState : undefined
+                    }
+                    streamingContent={
+                      // Pass streaming content to the last assistant turn when processing
+                      isProcessing && idx === turns.length - 1
+                        ? streamingContentMessage
+                        : undefined
+                    }
+                    currentToolCall={
+                      // Pass current tool call to the last assistant turn when in tool_calling phase
+                      isProcessing && idx === turns.length - 1 && status === 'tool_calling'
+                        ? activeConversation?.currentToolCall
+                        : undefined
+                    }
+                    streamingToolArgs={
+                      // Pass streaming tool args to the last assistant turn when in tool_calling phase
+                      isProcessing && idx === turns.length - 1 && status === 'tool_calling'
+                        ? activeConversation?.streamingToolArgs
+                        : undefined
+                    }
+                    streamingToolArgsByCallId={
+                      isProcessing && idx === turns.length - 1
+                        ? activeConversation?.streamingToolArgsByCallId
+                        : undefined
+                    }
+                    runtimeToolCalls={
+                      isProcessing && idx === turns.length - 1
+                        ? activeConversation?.draftAssistant?.toolCalls
+                        : undefined
+                    }
+                    runtimeSteps={
+                      isProcessing && idx === turns.length - 1
+                        ? activeConversation?.draftAssistant?.steps
+                        : undefined
+                    }
+                  />
+                )
               )}
 
-              <div className="mx-auto max-w-3xl space-y-4">
-                {turns.map((turn, idx) =>
-                  turn.type === 'user' ? (
-                    <MessageBubble
-                      key={turn.message.id}
-                      message={turn.message}
-                      onDeleteAgentLoop={handleDeleteAgentLoop}
-                      disableDeleteActions={isProcessing}
-                    />
-                  ) : (
-                    <AssistantTurnBubble
-                      key={turn.messages[0].id}
-                      turn={turn}
-                      toolResults={toolResults}
-                      isProcessing={isProcessing}
-                      isWaiting={false}
-                      streamingState={
-                        // Only pass streaming state to the last assistant turn when processing
-                        isProcessing && idx === turns.length - 1 ? streamingState : undefined
-                      }
-                      streamingContent={
-                        // Pass streaming content to the last assistant turn when processing
-                        isProcessing && idx === turns.length - 1
-                          ? streamingContentMessage
-                          : undefined
-                      }
-                      currentToolCall={
-                        // Pass current tool call to the last assistant turn when in tool_calling phase
-                        isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                          ? activeConversation?.currentToolCall
-                          : undefined
-                      }
-                      streamingToolArgs={
-                        // Pass streaming tool args to the last assistant turn when in tool_calling phase
-                        isProcessing && idx === turns.length - 1 && status === 'tool_calling'
-                          ? activeConversation?.streamingToolArgs
-                          : undefined
-                      }
-                      streamingToolArgsByCallId={
-                        isProcessing && idx === turns.length - 1
-                          ? activeConversation?.streamingToolArgsByCallId
-                          : undefined
-                      }
-                      runtimeToolCalls={
-                        isProcessing && idx === turns.length - 1
-                          ? activeConversation?.draftAssistant?.toolCalls
-                          : undefined
-                      }
-                      runtimeSteps={
-                        isProcessing && idx === turns.length - 1
-                          ? activeConversation?.draftAssistant?.steps
-                          : undefined
-                      }
-                    />
-                  )
-                )}
-
-                {/* Draft assistant turn while waiting for current run's first committed assistant message */}
-                {shouldRenderDraftAssistant && (
-                  <AssistantTurnBubble
-                    key="draft-assistant"
-                    turn={{
-                      type: 'assistant',
-                      messages: [],
-                      timestamp: Date.now(),
-                      totalUsage: null,
-                    }}
-                    toolResults={toolResults}
-                    isProcessing={true}
-                    isWaiting={status === 'pending'}
-                    streamingState={streamingState}
-                    streamingContent={streamingContentMessage}
-                    currentToolCall={status === 'tool_calling' ? activeConversation?.currentToolCall : undefined}
-                    streamingToolArgs={status === 'tool_calling' ? activeConversation?.streamingToolArgs : undefined}
-                    streamingToolArgsByCallId={activeConversation?.streamingToolArgsByCallId}
-                    runtimeToolCalls={activeConversation?.draftAssistant?.toolCalls}
-                    runtimeSteps={activeConversation?.draftAssistant?.steps}
-                  />
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-            </div>
-          </div>
-
-          {conversationError && (
-            <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-              <div className="mx-auto max-w-3xl">
-                <span className="font-medium">请求失败：</span>
-                <span>{conversationError}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Input area */}
-          <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
-            <div className="mx-auto flex max-w-3xl flex-col">
-              <div className="flex items-end gap-2">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    suggestedFollowUp ||
-                    (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
-                  }
-                  aria-label="输入消息"
-                  style={{ height: '38px', maxHeight: '96px' }}
-                  className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
-                  disabled={isProcessing || !hasApiKey}
+              {/* Draft assistant turn while waiting for current run's first committed assistant message */}
+              {shouldRenderDraftAssistant && (
+                <AssistantTurnBubble
+                  key="draft-assistant"
+                  turn={{
+                    type: 'assistant',
+                    messages: [],
+                    timestamp: Date.now(),
+                    totalUsage: null,
+                  }}
+                  toolResults={toolResults}
+                  isProcessing={true}
+                  isWaiting={status === 'pending'}
+                  streamingState={streamingState}
+                  streamingContent={streamingContentMessage}
+                  currentToolCall={status === 'tool_calling' ? activeConversation?.currentToolCall : undefined}
+                  streamingToolArgs={status === 'tool_calling' ? activeConversation?.streamingToolArgs : undefined}
+                  streamingToolArgsByCallId={activeConversation?.streamingToolArgsByCallId}
+                  runtimeToolCalls={activeConversation?.draftAssistant?.toolCalls}
+                  runtimeSteps={activeConversation?.draftAssistant?.steps}
                 />
-                {isProcessing ? (
-                  <button
-                    type="button"
-                    onClick={handleCancel}
-                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
-                    title="停止"
-                  >
-                    <StopCircle className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleSend}
-                    disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
-                    className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
-                    title="发送"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-            {renderContextUsage()}
           </div>
         </div>
-      )}
+
+        {conversationError && (
+          <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+            <div className="mx-auto max-w-3xl">
+              <span className="font-medium">请求失败：</span>
+              <span>{conversationError}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Input area */}
+        <div className="border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <div className="mx-auto flex max-w-3xl flex-col">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  suggestedFollowUp ||
+                  (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
+                }
+                aria-label="输入消息"
+                style={{ height: '38px', maxHeight: '96px' }}
+                className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
+                disabled={isProcessing || !hasApiKey}
+              />
+              {isProcessing ? (
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
+                  title="停止"
+                >
+                  <StopCircle className="h-4 w-4" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
+                  className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
+                  title="发送"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+          {renderContextUsage()}
+        </div>
+      </div>
     </ErrorBoundary>
   )
 }

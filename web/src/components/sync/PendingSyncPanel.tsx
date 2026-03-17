@@ -16,6 +16,7 @@ import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-help
 export function PendingSyncPanel() {
   const pendingChanges = useWorkspaceStore((state) => state.pendingChanges)
   const clearChanges = useWorkspaceStore((state) => state.clearChanges)
+  const discardPendingPath = useWorkspaceStore((state) => state.discardPendingPath)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSyncing, setIsSyncing] = useState(false)
@@ -105,25 +106,13 @@ export function PendingSyncPanel() {
   }, [selectAll, pendingChanges])
 
   // 处理删除单个文件 (必须在条件返回之前定义)
-  const handleRemoveFile = useCallback(
-    (path: string) => {
-      if (!pendingChanges) return
-
-      // Remove file from changes
-      const updatedChanges = {
-        ...pendingChanges,
-        changes: pendingChanges.changes.filter((c) => c.path !== path),
-      }
-
-      // Update store with filtered changes
-      useWorkspaceStore.getState().addChanges(updatedChanges)
-    },
-    [pendingChanges]
-  )
+  const handleRemoveFile = useCallback(async (path: string) => {
+    await discardPendingPath(path)
+  }, [discardPendingPath])
 
   // 处理清空列表 (必须在条件返回之前定义)
-  const handleClear = useCallback(() => {
-    clearChanges()
+  const handleClear = useCallback(async () => {
+    await clearChanges()
     setSelectedItems(new Set())
     setSelectAll(false)
     setShowClearConfirm(false)

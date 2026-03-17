@@ -81,15 +81,6 @@ vi.mock('@/mcp/elicitation-handler.tsx', () => ({
   })),
 }))
 
-vi.mock('@/agent/thread-utils', () => ({
-  createThread: vi.fn(),
-  mergeThreads: vi.fn(),
-  deleteThread: vi.fn(),
-  getNextThread: vi.fn(),
-  getPreviousThread: vi.fn(),
-  forkThread: vi.fn(),
-}))
-
 vi.mock('@/agent/agent-loop', () => {
   class MockAgentLoop {
     cancel() {}
@@ -232,26 +223,6 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
     expect(updated?.messages.map((m) => m.id)).toEqual([u2.id, a2.id])
-  })
-
-  it('should delete agent loop only within the same thread', () => {
-    const store = useConversationStore.getState()
-    const conv = store.createNew('threaded-loop')
-
-    const u1 = { ...createUserMessage('main-u1'), threadId: 'main' as const }
-    const a1 = { ...createAssistantMessage('main-a1'), threadId: 'main' as const }
-    const branchU1 = { ...createUserMessage('branch-u1'), threadId: 'branch' as const }
-    const branchA1 = { ...createAssistantMessage('branch-a1'), threadId: 'branch' as const }
-    const u2 = { ...createUserMessage('main-u2'), threadId: 'main' as const }
-    const a2 = { ...createAssistantMessage('main-a2'), threadId: 'main' as const }
-
-    useConversationStore.getState().updateMessages(conv.id, [u1, a1, branchU1, branchA1, u2, a2])
-
-    const ok = useConversationStore.getState().deleteAgentLoop(conv.id, u1.id)
-    expect(ok).toBe(true)
-
-    const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
-    expect(updated?.messages.map((m) => m.id)).toEqual([branchU1.id, branchA1.id, u2.id, a2.id])
   })
 
   it('should block loop deletion while conversation is running', () => {

@@ -50,7 +50,7 @@ export const readDirectoryDefinition: ToolDefinition = {
         },
         max_entries: {
           type: 'number',
-          description: 'Maximum entries to return (default: 200)',
+          description: 'Maximum entries to return. If omitted, no entry-count limit is applied.',
         },
         maxEntries: {
           type: 'number',
@@ -58,7 +58,7 @@ export const readDirectoryDefinition: ToolDefinition = {
         },
         max_results: {
           type: 'number',
-          description: 'Maximum results for glob search (default: 200)',
+          description: 'Maximum results for glob search. If omitted, no result-count limit is applied.',
         },
         maxResults: {
           type: 'number',
@@ -136,7 +136,11 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
 
   const rawMaxDepth = args.max_depth ?? args.maxDepth
   const maxDepth = parseBoundedInt(rawMaxDepth, 2, 1, 10)
-  const maxEntries = parseBoundedInt(args.max_entries ?? args.maxEntries, 200, 20, 2000)
+  const maxEntriesRaw = args.max_entries ?? args.maxEntries
+  const maxEntries =
+    typeof maxEntriesRaw === 'number' && Number.isFinite(maxEntriesRaw)
+      ? parseBoundedInt(maxEntriesRaw, 200, 1, 50000)
+      : undefined
   const deadlineMs = parseBoundedInt(args.deadline_ms ?? args.deadlineMs, 25000, 1000, 28000)
   const includeSizes = args.include_sizes === true || args.includeSizes === true
   const includeIgnored = args.include_ignored === true || args.includeIgnored === true
@@ -206,12 +210,20 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
           entries.push({ path: relPath, type: 'file', size, depth: childDepth })
         }
 
-        if (entries.length >= maxEntries) {
+        if (maxEntries !== undefined && entries.length >= maxEntries) {
           isTruncated = true
           break
         }
       }
       if (isTruncated || timedOut) break
+    }
+
+    if (timedOut) {
+      return JSON.stringify({
+        error: 'deadline_exceeded',
+        message: `List scan exceeded deadline ${deadlineMs}ms. Narrow path or increase deadline_ms.`,
+        scannedEntries: entries.length,
+      })
     }
 
     if (entries.length === 0) {
@@ -233,11 +245,8 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     }
 
     const suffixes: string[] = []
-    if (isTruncated) {
+    if (isTruncated && maxEntries !== undefined) {
       suffixes.push(`... (limited to ${maxEntries} entries)`)
-    }
-    if (timedOut) {
-      suffixes.push(`... (scan budget reached at ${Date.now() - startedAt}ms)`)
     }
     return lines.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
   } catch (error) {
@@ -265,7 +274,11 @@ async function executeGlobMode(
     return JSON.stringify({ error: 'Glob search failed: path cannot include ".."' })
   }
 
-  const maxResults = parseBoundedInt(args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries, 200, 1, 5000)
+  const maxResultsRaw = args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries
+  const maxResults =
+    typeof maxResultsRaw === 'number' && Number.isFinite(maxResultsRaw)
+      ? parseBoundedInt(maxResultsRaw, 1, 1, 100000)
+      : undefined
   const maxDepth = parseBoundedInt(args.max_depth ?? args.maxDepth, 20, 1, 64)
   const deadlineMs = parseBoundedInt(args.deadline_ms ?? args.deadlineMs, 25000, 1000, 28000)
   const includeIgnored = args.include_ignored === true || args.includeIgnored === true
@@ -334,7 +347,7 @@ async function executeGlobMode(
 
         if (micromatch.isMatch(fullPath, pattern) || micromatch.isMatch(localPath, pattern)) {
           matches.push(fullPath)
-          if (matches.length >= maxResults) {
+          if (maxResults !== undefined && matches.length >= maxResults) {
             isTruncated = true
             break
           }
@@ -343,16 +356,21 @@ async function executeGlobMode(
       if (isTruncated || timedOut) break
     }
 
+    if (timedOut) {
+      return JSON.stringify({
+        error: 'deadline_exceeded',
+        message: `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`,
+        matchedSoFar: matches.length,
+      })
+    }
+
     if (matches.length === 0) {
       return `No files matching pattern "${pattern}"${subPath ? ` in ${subPath}` : ''}`
     }
 
     const suffixes: string[] = []
-    if (isTruncated) {
+    if (isTruncated && maxResults !== undefined) {
       suffixes.push(`... (limited to ${maxResults} results)`)
-    }
-    if (timedOut) {
-      suffixes.push(`... (scan budget reached at ${Date.now() - startedAt}ms)`)
     }
     return matches.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
   } catch (error) {

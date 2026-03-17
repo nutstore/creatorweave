@@ -164,6 +164,20 @@ export class SessionPendingManager {
   }
 
   /**
+   * Check whether a path currently has pending overlay operations.
+   */
+  hasPendingPath(path: string): boolean {
+    if (this.pendingChanges.has(path)) return true
+    const normalized = this.normalizeComparePath(path)
+    for (const pendingPath of this.pendingChanges.keys()) {
+      if (this.normalizeComparePath(pendingPath) === normalized) {
+        return true
+      }
+    }
+    return false
+  }
+
+  /**
    * Clear pending queue
    */
   async clear(): Promise<void> {
@@ -403,6 +417,16 @@ export class SessionPendingManager {
     } catch {
       return null
     }
+  }
+
+  private normalizeComparePath(p: string): string {
+    let normalized = p.replace(/\\/g, '/')
+    if (normalized.startsWith('/mnt/')) {
+      normalized = normalized.slice(5)
+    } else if (normalized.startsWith('/')) {
+      normalized = normalized.slice(1)
+    }
+    return normalized
   }
 
 }

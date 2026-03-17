@@ -36,51 +36,141 @@ export const readDefinition: ToolDefinition = {
           description: 'Multiple file paths to read (batch mode)',
           items: { type: 'string' },
         },
+        reads: {
+          type: 'array',
+          description:
+            'Advanced batch mode: [{ path, offset?, limit?, start_line?, line_count? }]. ' +
+            'Use this when each file needs different read ranges.',
+          items: {
+            type: 'object',
+            properties: {
+              path: { type: 'string' },
+              offset: { type: 'number' },
+              limit: { type: 'number' },
+              start_line: { type: 'number' },
+              line_count: { type: 'number' },
+            },
+            required: ['path'],
+          },
+        },
+        offset: {
+          type: 'number',
+          description: 'Optional 1-based line offset for partial text read (single path mode only)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Optional line count for partial text read (single path mode only)',
+        },
+        start_line: {
+          type: 'number',
+          description: 'Optional 1-based start line for partial text read (single path mode only)',
+        },
+        line_count: {
+          type: 'number',
+          description: 'Optional line count for partial text read (single path mode only)',
+        },
         max_size: {
           type: 'number',
-          description: 'Maximum file size in bytes for batch read. Default: 256KB.',
+          description:
+            'Optional hard limit in bytes. If exceeded, returns too_large error (never truncates content).',
         },
       },
     },
   },
 }
 
+interface ReadRequest {
+  path: string
+  offset?: number
+  limit?: number
+  start_line?: number
+  line_count?: number
+}
+
+interface ReadRangeOptions {
+  offset?: number
+  limit?: number
+  startLine?: number
+  lineCount?: number
+}
+
 export const readExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const paths = args.paths as string[] | undefined
+  const reads = args.reads as ReadRequest[] | undefined
   const maxSize = args.max_size as number | undefined
+  const rangeOptions: ReadRangeOptions = {
+    offset: args.offset as number | undefined,
+    limit: args.limit as number | undefined,
+    startLine: args.start_line as number | undefined,
+    lineCount: args.line_count as number | undefined,
+  }
+
+  const modeCount = Number(Boolean(path)) + Number(Boolean(paths?.length)) + Number(Boolean(reads?.length))
+  if (modeCount !== 1) {
+    return JSON.stringify({ error: 'Provide exactly one of: path, paths, reads' })
+  }
+
+  const validationError = validateReadRange(rangeOptions)
+  if (validationError) {
+    return JSON.stringify({ error: validationError })
+  }
 
   // Batch mode: multiple files
   if (paths && Array.isArray(paths) && paths.length > 0) {
-    return executeBatchRead(paths, maxSize, context.directoryHandle)
+    return executeBatchRead(paths.map((p) => ({ path: p })), maxSize, context.directoryHandle)
+  }
+
+  if (reads && Array.isArray(reads) && reads.length > 0) {
+    for (const read of reads) {
+      if (!read.path) {
+        return JSON.stringify({ error: 'reads[].path is required' })
+      }
+      const err = validateReadRange({
+        offset: read.offset,
+        limit: read.limit,
+        startLine: read.start_line,
+        lineCount: read.line_count,
+      })
+      if (err) return JSON.stringify({ error: `Invalid reads for "${read.path}": ${err}` })
+    }
+    return executeBatchRead(reads, maxSize, context.directoryHandle)
   }
 
   // Single file mode
-  if (!path) {
-    return JSON.stringify({ error: 'Either path or paths must be provided' })
-  }
-  return executeSingleRead(path, context.directoryHandle)
+  return executeSingleRead(path!, context.directoryHandle, rangeOptions, maxSize)
 }
 
 async function executeSingleRead(
   path: string,
-  directoryHandle?: FileSystemDirectoryHandle | null
+  directoryHandle?: FileSystemDirectoryHandle | null,
+  options: ReadRangeOptions = {},
+  maxSize?: number
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
 
   try {
     const { content, metadata } = await readFile(path, directoryHandle)
-
-    // Check file size - limit to 1MB for text reading
-    if (metadata.size > 1024 * 1024) {
+    if (maxSize && metadata.size > maxSize) {
       return JSON.stringify({
-        error: `File is too large (${(metadata.size / 1024 / 1024).toFixed(1)}MB). Maximum readable size is 1MB.`,
+        error: 'too_large',
+        path,
+        fileSize: metadata.size,
+        maxSize,
+        message: `File size ${metadata.size} exceeds requested max_size ${maxSize}.`,
       })
     }
 
     if (typeof content === 'string') {
-      return content
+      return applyTextRange(content, options)
     } else {
+      if (hasRangeOptions(options)) {
+        return JSON.stringify({
+          error: 'range_not_supported_for_binary',
+          path,
+          message: 'offset/limit/start_line/line_count can only be used for text files.',
+        })
+      }
       // Binary content - return as base64
       const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
       const uint8Array = new Uint8Array(buffer)
@@ -103,33 +193,77 @@ async function executeSingleRead(
 }
 
 async function executeBatchRead(
-  paths: string[],
+  reads: ReadRequest[],
   maxSize: number | undefined,
   directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
-  const sizeLimit = maxSize || 262144 // 256KB default
-  const results: Array<{ path: string; success: boolean; content?: string; error?: string }> = []
+  const results: Array<{ path: string; success: boolean; content?: string; error?: string; metadata?: unknown }> =
+    []
   let successCount = 0
   let errorCount = 0
 
-  for (const filePath of paths) {
+  for (const read of reads) {
+    const filePath = read.path
     try {
       const { content, metadata } = await readFile(filePath, directoryHandle)
 
-      if (metadata.size > sizeLimit) {
-        results.push({ path: filePath, success: false, error: `File size exceeds ${sizeLimit} bytes` })
+      if (maxSize && metadata.size > maxSize) {
+        results.push({
+          path: filePath,
+          success: false,
+          error: `too_large: file size ${metadata.size} exceeds requested max_size ${maxSize}`,
+          metadata: { size: metadata.size, contentType: metadata.contentType },
+        })
         errorCount++
         continue
       }
 
       if (typeof content !== 'string') {
-        results.push({ path: filePath, success: false, error: 'Binary file not supported' })
-        errorCount++
+        if (hasRangeOptions({
+          offset: read.offset,
+          limit: read.limit,
+          startLine: read.start_line,
+          lineCount: read.line_count,
+        })) {
+          results.push({
+            path: filePath,
+            success: false,
+            error: 'range_not_supported_for_binary',
+            metadata: { size: metadata.size, contentType: metadata.contentType },
+          })
+          errorCount++
+          continue
+        }
+        const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
+        const uint8Array = new Uint8Array(buffer)
+        const base64 = btoa(String.fromCharCode(...uint8Array))
+        results.push({
+          path: filePath,
+          success: true,
+          content: JSON.stringify({
+            binary: true,
+            content: base64,
+            size: metadata.size,
+            contentType: metadata.contentType,
+          }),
+          metadata: { size: metadata.size, contentType: metadata.contentType },
+        })
+        successCount++
         continue
       }
 
-      results.push({ path: filePath, success: true, content })
+      results.push({
+        path: filePath,
+        success: true,
+        content: applyTextRange(content, {
+          offset: read.offset,
+          limit: read.limit,
+          startLine: read.start_line,
+          lineCount: read.line_count,
+        }),
+        metadata: { size: metadata.size, contentType: metadata.contentType },
+      })
       successCount++
     } catch (error) {
       results.push({
@@ -143,11 +277,59 @@ async function executeBatchRead(
 
   return JSON.stringify({
     success: true,
-    total: paths.length,
+    total: reads.length,
     successCount,
     errorCount,
     results,
   })
+}
+
+function hasRangeOptions(options: ReadRangeOptions): boolean {
+  return (
+    options.offset !== undefined ||
+    options.limit !== undefined ||
+    options.startLine !== undefined ||
+    options.lineCount !== undefined
+  )
+}
+
+function validateReadRange(options: ReadRangeOptions): string | null {
+  const hasOffsetRange = options.offset !== undefined || options.limit !== undefined
+  const hasLineRange = options.startLine !== undefined || options.lineCount !== undefined
+
+  if (hasOffsetRange && hasLineRange) {
+    return 'Cannot mix offset/limit with start_line/line_count in one read request'
+  }
+  if (options.offset !== undefined && options.offset < 1) {
+    return 'offset must be >= 1 (line index)'
+  }
+  if (options.limit !== undefined && options.limit <= 0) {
+    return 'limit must be > 0'
+  }
+  if (options.startLine !== undefined && options.startLine < 1) {
+    return 'start_line must be >= 1'
+  }
+  if (options.lineCount !== undefined && options.lineCount <= 0) {
+    return 'line_count must be > 0'
+  }
+  return null
+}
+
+function applyTextRange(content: string, options: ReadRangeOptions): string {
+  const hasOffsetRange = options.offset !== undefined || options.limit !== undefined
+  const hasLineRange = options.startLine !== undefined || options.lineCount !== undefined
+
+  if (!hasOffsetRange && !hasLineRange) {
+    return content
+  }
+
+  // Range reads are line-based.
+  // - offset/limit: preferred short form
+  // - start_line/line_count: explicit aliases
+  const start = (options.startLine ?? options.offset ?? 1) - 1
+  const count = options.lineCount ?? options.limit ?? Number.MAX_SAFE_INTEGER
+  const lines = content.split('\n')
+  return lines.slice(start, start + count).join('\n')
 }
 
 //=============================================================================

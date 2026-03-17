@@ -73,7 +73,7 @@ function createMockContextManager() {
       droppedGroups: 0,
     })),
     setSystemPrompt: vi.fn(),
-    getConfig: vi.fn(() => ({ systemPrompt: 'sys' })),
+    getConfig: vi.fn(() => ({ systemPrompt: 'sys', maxContextTokens: 128000, reserveTokens: 4096 })),
   } as any
 }
 
@@ -162,6 +162,66 @@ describe('AgentLoop', () => {
   })
 
   describe('run()', () => {
+    it('should only send messages from latest context summary to model context', async () => {
+      let capturedContextMessages: any[] = []
+      mockAgentLoopContinue.mockImplementation((context: any, config: any) => {
+        capturedContextMessages = context.messages
+        return (async function* () {
+          if (config.convertToLlm) {
+            await config.convertToLlm(context.messages)
+          }
+          yield { type: 'message_start', message: assistantMessage('') }
+          yield { type: 'message_end', message: assistantMessage('OK') }
+        })()
+      })
+
+      const now = Date.now()
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await loop.run([
+        {
+          id: 'old-user',
+          timestamp: now - 3000,
+          role: 'user',
+          content: 'old user message',
+        },
+        {
+          id: 'old-assistant',
+          timestamp: now - 2000,
+          role: 'assistant',
+          content: 'old assistant message',
+        },
+        {
+          id: 'summary',
+          timestamp: now - 1000,
+          role: 'assistant',
+          kind: 'context_summary',
+          content: 'compressed summary',
+        },
+        {
+          id: 'latest-user',
+          timestamp: now,
+          role: 'user',
+          content: 'latest user message',
+        },
+      ])
+
+      expect(capturedContextMessages).toHaveLength(2)
+      expect(capturedContextMessages[0]?.role).toBe('assistant')
+      expect(capturedContextMessages[0]?.content?.[0]?.type).toBe('text')
+      expect(capturedContextMessages[0]?.content?.[0]?.text).toContain(
+        'Compressed memory of earlier conversation:'
+      )
+      expect(capturedContextMessages[0]?.content?.[0]?.text).toContain('compressed summary')
+      expect(capturedContextMessages[1]?.role).toBe('user')
+      expect(capturedContextMessages[1]?.content).toBe('latest user message')
+    })
+
     it('should execute single turn conversation', async () => {
       const loop = new AgentLoop({
         provider: mockProvider,
@@ -690,6 +750,47 @@ describe('AgentLoop', () => {
 
       await expect(loop.run([createUserMessage('test')], callbacks)).rejects.toThrow('Provider error')
       expect(callbacks.onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider error' }))
+    })
+
+    it('should throw context_overflow when latest tool result is dropped by compression', async () => {
+      mockProvider.estimateTokens = vi.fn((messages: ChatMessage[]) => {
+        return messages.reduce((sum, msg) => {
+          const content = typeof msg.content === 'string' ? msg.content.length : 0
+          return sum + content
+        }, 0)
+      }) as any
+      mockContextManager.getConfig.mockReturnValue({
+        systemPrompt: 'sys',
+        maxContextTokens: 200,
+        reserveTokens: 20,
+      })
+      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => ({
+        messages: msgs.filter((m) => m.role !== 'tool'),
+        wasTruncated: true,
+        droppedGroups: 1,
+      }))
+
+      mockAgentLoopContinue.mockImplementation((_context: any, config: any) => {
+        return (async function* () {
+          await config.convertToLlm([
+            createUserMessage('Please read big file'),
+            toolResultMessage('call_read_1', 'read', 'x'.repeat(500)),
+          ])
+        })()
+      })
+
+      const callbacks = { onError: vi.fn() }
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      await expect(loop.run([createUserMessage('test')], callbacks)).rejects.toThrow('context_overflow')
+      expect(callbacks.onError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringContaining('context_overflow') })
+      )
     })
 
     it('should stop gracefully at maxIterations in Pi loop', async () => {

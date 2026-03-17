@@ -156,8 +156,11 @@ interface WorkspaceState {
   /** Add file changes from Python execution */
   addChanges: (changes: ChangeDetectionResult) => void
 
-  /** Clear pending changes (after sync) */
-  clearChanges: () => void
+  /** Clear pending changes without syncing (discard pending ledger entries) */
+  clearChanges: () => Promise<void>
+
+  /** Discard one pending path without syncing */
+  discardPendingPath: (path: string) => Promise<void>
 
   /** Show the sync preview panel */
   showPreviewPanel: () => void
@@ -619,8 +622,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set({ pendingChanges: changes, showPreview: true })
         },
 
-        clearChanges: () => {
+        clearChanges: async () => {
+          const activeWorkspace = await getActiveWorkspace()
+          if (activeWorkspace) {
+            await activeWorkspace.workspace.discardAllPendingChanges()
+            await get().updateCurrentCounts()
+          }
           set({ pendingChanges: null, showPreview: false })
+        },
+
+        discardPendingPath: async (path: string) => {
+          const activeWorkspace = await getActiveWorkspace()
+          if (!activeWorkspace) return
+
+          await activeWorkspace.workspace.discardPendingPath(path)
+          await get().updateCurrentCounts()
+
+          // Refresh pending list from source-of-truth ledger.
+          await get().refreshPendingChanges(true)
         },
 
         showPreviewPanel: () => {

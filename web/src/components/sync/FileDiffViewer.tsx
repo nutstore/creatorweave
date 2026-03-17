@@ -258,7 +258,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
   // Compute diff for inline view
   const diffResult = useMemo(() => {
     if (!content.opfs || !content.native) return []
-    return diffLines(content.opfs, content.native)
+    // Left column = native (current), right column = OPFS (target)
+    return diffLines(content.native, content.opfs)
   }, [content.opfs, content.native])
   const sideBySideRows = useMemo<SideBySideRow[]>(() => {
     if (!content.opfs || !content.native) return []
@@ -481,7 +482,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
     if (sideBySideRows.length === 0) {
       return (
         <div className="font-mono text-sm">
-          {highlightCode(side === 'left' ? content.opfs || '' : content.native || '')}
+          {highlightCode(side === 'left' ? content.native || '' : content.opfs || '')}
         </div>
       )
     }
@@ -495,16 +496,16 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
 
           const bgClass =
             type === 'removed'
-              ? 'bg-danger-bg/80 dark:bg-danger-950/20'
+              ? 'bg-red-50 dark:bg-red-950/40 border-l-2 border-red-400'
               : type === 'added'
-                ? 'bg-success-bg/80 dark:bg-success-950/20'
+                ? 'bg-green-50 dark:bg-green-950/40 border-l-2 border-green-400'
                 : ''
 
           const textClass =
             type === 'removed'
-              ? 'text-red-700 dark:text-red-300'
+              ? 'text-red-800 dark:text-red-200 font-medium'
               : type === 'added'
-                ? 'text-green-700 dark:text-green-300'
+                ? 'text-green-800 dark:text-green-200 font-medium'
                 : 'text-secondary dark:text-muted'
 
           return (
@@ -588,7 +589,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
       <div className="flex-1 flex overflow-hidden">
         {isImage || !content.showNativePanel || viewMode === 'sideBySide' ? (
           <>
-            {/* OPFS Version */}
+            {/* Left column: Native (when available), otherwise OPFS-only fallback */}
             <div
               className={`flex-1 flex flex-col ${
                 content.showNativePanel ? 'border-r border dark:border-border' : ''
@@ -596,42 +597,52 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
             >
               <div className="px-4 py-2 bg-muted dark:bg-muted border-b border dark:border-border">
                 <h4 className="text-sm font-medium text-secondary dark:text-muted">
-                  OPFS 版本
-                  {fileChange.type === 'delete' && (
+                  {content.showNativePanel ? '本机文件系统（当前）' : 'OPFS 版本（待同步）'}
+                  {!content.showNativePanel && fileChange.type === 'delete' && (
                     <span className="ml-2 text-xs text-red-600">(将被删除)</span>
                   )}
                 </h4>
               </div>
               <div className="flex-1 overflow-auto bg-card dark:bg-card p-4">
                 {isImage ? (
-                  content.opfsImageUrl ? (
+                  (content.showNativePanel ? content.nativeImageUrl : content.opfsImageUrl) ? (
                     <button
                       type="button"
                       onClick={() =>
                         setLightbox({
-                          src: content.opfsImageUrl!,
-                          title: `OPFS 版本 - ${fileChange.path}`,
+                          src: (content.showNativePanel ? content.nativeImageUrl : content.opfsImageUrl)!,
+                          title: content.showNativePanel
+                            ? `本机文件系统 - ${fileChange.path}`
+                            : `OPFS 版本 - ${fileChange.path}`,
                         })
                       }
                       className="h-full w-full flex items-center justify-center"
                     >
                       <img
-                        src={content.opfsImageUrl}
-                        alt={`OPFS: ${fileChange.path}`}
+                        src={(content.showNativePanel ? content.nativeImageUrl : content.opfsImageUrl)!}
+                        alt={content.showNativePanel ? `Native: ${fileChange.path}` : `OPFS: ${fileChange.path}`}
                         className="max-w-full max-h-full object-contain rounded border border dark:border-border"
                         loading="lazy"
                       />
                     </button>
                   ) : (
                     <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                      {fileChange.type === 'delete' ? '图片将被删除（OPFS 中无内容）' : '无法读取 OPFS 图片'}
+                      {content.showNativePanel
+                        ? '无法读取本机图片'
+                        : fileChange.type === 'delete'
+                          ? '图片将被删除（OPFS 中无内容）'
+                          : '无法读取 OPFS 图片'}
                     </div>
                   )
-                ) : content.opfs !== null ? (
-                  content.showNativePanel ? renderSideBySideColumn('left') : highlightCode(content.opfs)
+                ) : (content.showNativePanel ? content.native : content.opfs) !== null ? (
+                  content.showNativePanel ? renderSideBySideColumn('left') : highlightCode(content.opfs || '')
                 ) : (
                   <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                    {fileChange.type === 'delete' ? '文件已删除（OPFS 中无内容）' : '无法读取 OPFS 内容'}
+                    {content.showNativePanel
+                      ? '无法读取本机文件'
+                      : fileChange.type === 'delete'
+                        ? '文件已删除（OPFS 中无内容）'
+                        : '无法读取 OPFS 内容'}
                   </div>
                 )}
               </div>
@@ -640,38 +651,43 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange }) =>
             {content.showNativePanel && (
               <div className="flex-1 flex flex-col">
                 <div className="px-4 py-2 bg-muted dark:bg-muted border-b border dark:border-border">
-                  <h4 className="text-sm font-medium text-secondary dark:text-muted">本机文件系统</h4>
+                  <h4 className="text-sm font-medium text-secondary dark:text-muted">
+                    OPFS 版本（待同步）
+                    {fileChange.type === 'delete' && (
+                      <span className="ml-2 text-xs text-red-600">(将被删除)</span>
+                    )}
+                  </h4>
                 </div>
                 <div className="flex-1 overflow-auto bg-card dark:bg-card p-4">
                   {isImage ? (
-                    content.nativeImageUrl ? (
+                    content.opfsImageUrl ? (
                       <button
                         type="button"
                         onClick={() =>
                           setLightbox({
-                            src: content.nativeImageUrl!,
-                            title: `本机文件系统 - ${fileChange.path}`,
+                            src: content.opfsImageUrl!,
+                            title: `OPFS 版本 - ${fileChange.path}`,
                           })
                         }
                         className="h-full w-full flex items-center justify-center"
                       >
                         <img
-                          src={content.nativeImageUrl}
-                          alt={`Native: ${fileChange.path}`}
+                          src={content.opfsImageUrl}
+                          alt={`OPFS: ${fileChange.path}`}
                           className="max-w-full max-h-full object-contain rounded border border dark:border-border"
                           loading="lazy"
                         />
                       </button>
                     ) : (
                       <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                        无法读取本机图片
+                        {fileChange.type === 'delete' ? '图片将被删除（OPFS 中无内容）' : '无法读取 OPFS 图片'}
                       </div>
                     )
-                  ) : content.native !== null ? (
+                  ) : content.opfs !== null ? (
                     renderSideBySideColumn('right')
                   ) : (
                     <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                      无法读取本机文件
+                      {fileChange.type === 'delete' ? '文件已删除（OPFS 中无内容）' : '无法读取 OPFS 内容'}
                     </div>
                   )}
                 </div>

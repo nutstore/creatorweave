@@ -42,14 +42,6 @@ import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/ty
 import { generateFollowUp } from '@/agent/follow-up-generator'
 import { getConversationRepository, initSQLiteDB } from '@/sqlite'
 import { useSettingsStore } from './settings.store'
-import {
-  createThread as createThreadUtil,
-  mergeThreads as mergeThreadsUtil,
-  deleteThread as deleteThreadUtil,
-  getNextThread,
-  getPreviousThread,
-  forkThread as forkThreadUtil,
-} from '@/agent/thread-utils'
 
 const ENABLE_FOLLOW_UP_LLM = import.meta.env.VITE_ENABLE_FOLLOW_UP_LLM === 'true'
 
@@ -209,17 +201,6 @@ interface ConversationState {
   setSuggestedFollowUp: (conversationId: string, suggestion: string) => void
   clearSuggestedFollowUp: (conversationId: string) => void
   getSuggestedFollowUp: (conversationId: string) => string
-
-  // Thread management actions
-  createThread: (conversationId: string, messageId: string, title?: string) => void
-  mergeThreads: (conversationId: string, sourceThreadId: string, targetThreadId: string) => void
-  deleteThread: (conversationId: string, threadId: string) => void
-  toggleThreadCollapsed: (conversationId: string, threadId: string) => void
-  navigateToNextThread: (conversationId: string) => string | null
-  navigateToPreviousThread: (conversationId: string) => string | null
-  getActiveThreadId: (conversationId: string) => string | null
-  setActiveThread: (conversationId: string, threadId: string) => void
-  forkThread: (conversationId: string, messageId: string, title?: string) => void
 }
 
 export const useConversationStoreSQLite = create<ConversationState>()(
@@ -520,14 +501,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (!conv) return
         const startIdx = conv.messages.findIndex((m) => m.id === userMessageId)
         if (startIdx < 0 || conv.messages[startIdx].role !== 'user') return
-        const targetThreadId = conv.messages[startIdx].threadId || 'main'
 
         const idsToDelete = new Set<string>()
         idsToDelete.add(conv.messages[startIdx].id)
         for (let i = startIdx + 1; i < conv.messages.length; i++) {
           const msg = conv.messages[i]
-          const msgThreadId = msg.threadId || 'main'
-          if (msgThreadId !== targetThreadId) continue
           if (msg.role === 'user') break
           idsToDelete.add(msg.id)
         }
@@ -1114,10 +1092,21 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   c.streamingToolArgs = ''
                 }
                 c.activeToolCalls = (c.activeToolCalls || []).filter((x) => x.id !== tc.id)
-                if ((c.activeToolCalls || []).length > 0) {
+                
+                // Check if there are more tools to execute
+                const hasMoreTools = (c.activeToolCalls || []).length > 0
+                if (hasMoreTools) {
+                  // Continue with next tool
                   c.currentToolCall = c.activeToolCalls[c.activeToolCalls.length - 1]
                   c.streamingToolArgs = (c.streamingToolArgsByCallId || {})[c.currentToolCall.id] || ''
+                  // Keep status as 'tool_calling' since we're still executing tools
+                  c.status = 'tool_calling'
+                } else {
+                  // All tools completed, waiting for next model response
+                  // Set status to 'pending' to show loading effect
+                  c.status = 'pending'
                 }
+                
                 c.streamingToolArgsByCallId = c.streamingToolArgsByCallId || {}
 
                 if (c.draftAssistant) {
@@ -1582,169 +1571,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
     getSuggestedFollowUp: (conversationId: string) => {
       return get().suggestedFollowUps.get(conversationId) || ''
-    },
-
-    // Thread management actions
-    createThread: (conversationId: string, messageId: string, title?: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return
-
-      const message = conv.messages.find((m) => m.id === messageId)
-      if (!message) return
-
-      const thread = createThreadUtil(message, title)
-      const threadId = thread.id
-
-      set((state) => {
-        const c = state.conversations.find((c) => c.id === conversationId)
-        if (!c) return
-
-        // Update message with thread ID
-        const msgIndex = c.messages.findIndex((m) => m.id === messageId)
-        if (msgIndex !== -1) {
-          c.messages[msgIndex] = { ...c.messages[msgIndex], threadId }
-        }
-
-        c.updatedAt = Date.now()
-      })
-
-      const updatedConv = get().conversations.find((c) => c.id === conversationId)
-      if (updatedConv) {
-        persistConversation(updatedConv).catch((error) => {
-          console.error('[conversation.store] Failed to persist thread creation:', error)
-          toast.error('线程创建失败')
-        })
-      }
-    },
-
-    mergeThreads: (conversationId: string, sourceThreadId: string, targetThreadId: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return
-
-      const updatedMessages = mergeThreadsUtil(conv.messages, sourceThreadId, targetThreadId)
-
-      set((state) => {
-        const c = state.conversations.find((c) => c.id === conversationId)
-        if (!c) return
-
-        c.messages = updatedMessages
-        c.updatedAt = Date.now()
-      })
-
-      const updatedConv = get().conversations.find((c) => c.id === conversationId)
-      if (updatedConv) {
-        persistConversation(updatedConv).catch((error) => {
-          console.error('[conversation.store] Failed to persist thread merge:', error)
-          toast.error('线程合并失败')
-        })
-      }
-    },
-
-    deleteThread: (conversationId: string, threadId: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return
-
-      const updatedMessages = deleteThreadUtil(conv.messages, threadId)
-
-      set((state) => {
-        const c = state.conversations.find((c) => c.id === conversationId)
-        if (!c) return
-
-        c.messages = updatedMessages
-        c.updatedAt = Date.now()
-      })
-
-      const updatedConv = get().conversations.find((c) => c.id === conversationId)
-      if (updatedConv) {
-        persistConversation(updatedConv).catch((error) => {
-          console.error('[conversation.store] Failed to persist thread deletion:', error)
-          toast.error('线程删除失败')
-        })
-      }
-    },
-
-    toggleThreadCollapsed: (conversationId: string, threadId: string) => {
-      set((state) => {
-        const c = state.conversations.find((c) => c.id === conversationId)
-        if (!c) return
-
-        // Find first message in thread and toggle a metadata flag
-        const msgIndex = c.messages.findIndex((m) => m.threadId === threadId)
-        if (msgIndex !== -1) {
-          // Use message metadata to store collapsed state
-          const isCollapsed = !!(c.messages[msgIndex] as any)._collapsed
-          ;(c.messages[msgIndex] as any)._collapsed = !isCollapsed
-        }
-      })
-    },
-
-    navigateToNextThread: (conversationId: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return null
-
-      const activeThreadId = get().getActiveThreadId(conversationId)
-      const nextThreadId = getNextThread(conv.messages, activeThreadId || undefined)
-      return nextThreadId
-    },
-
-    navigateToPreviousThread: (conversationId: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return null
-
-      const activeThreadId = get().getActiveThreadId(conversationId)
-      const prevThreadId = getPreviousThread(conv.messages, activeThreadId || undefined)
-      return prevThreadId
-    },
-
-    getActiveThreadId: (conversationId: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return null
-
-      // Get active thread from conversation metadata
-      return (conv as any)._activeThreadId || null
-    },
-
-    setActiveThread: (conversationId: string, threadId: string) => {
-      set((state) => {
-        const c = state.conversations.find((c) => c.id === conversationId)
-        if (!c) return
-        ;(c as any)._activeThreadId = threadId
-      })
-    },
-
-    forkThread: (conversationId: string, messageId: string, title?: string) => {
-      const conv = get().conversations.find((c) => c.id === conversationId)
-      if (!conv) return
-
-      try {
-        const { messages: updatedMessages, newThreadId } = forkThreadUtil(
-          conv.messages,
-          messageId,
-          title
-        )
-
-        set((state) => {
-          const c = state.conversations.find((c) => c.id === conversationId)
-          if (!c) return
-
-          c.messages = updatedMessages
-          c.updatedAt = Date.now()
-          ;(c as any)._activeThreadId = newThreadId
-        })
-
-        const updatedConv = get().conversations.find((c) => c.id === conversationId)
-        if (updatedConv) {
-          persistConversation(updatedConv).catch((error) => {
-            console.error('[conversation.store] Failed to persist thread fork:', error)
-            toast.error('线程分支创建失败')
-          })
-        }
-
-        toast.success('线程分支创建成功')
-      } catch (error) {
-        console.error('[conversation.store] Failed to fork thread:', error)
-        toast.error('线程分支创建失败')
-      }
     },
   }))
 )

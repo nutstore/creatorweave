@@ -12,6 +12,7 @@ import { formatErrorForUser, withAutoRetry } from './error-handling'
 import { readDefinition, readExecutor, writeDefinition, writeExecutor } from './tools/io.tool'
 import { deleteDefinition, deleteExecutor } from './tools/delete.tool'
 import { editDefinition, editExecutor } from './tools/file-edit.tool'
+import { searchDefinition, searchExecutor } from './tools/search.tool'
 import {
   commitChangesDefinition,
   commitChangesExecutor,
@@ -38,6 +39,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: writeDefinition, executor: writeExecutor },
   { definition: deleteDefinition, executor: deleteExecutor },
   { definition: editDefinition, executor: editExecutor },
+  { definition: searchDefinition, executor: searchExecutor },
   { definition: commitChangesDefinition, executor: commitChangesExecutor },
   { definition: rollbackChangesetDefinition, executor: rollbackChangesetExecutor },
   // Directory & search

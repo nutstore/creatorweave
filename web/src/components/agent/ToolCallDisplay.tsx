@@ -102,12 +102,10 @@ export function ToolCallDisplay({
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">结果</span>
-                <CopyIconButton
-                  content={result.length > 2000 ? result + '\n...(truncated)' : result}
-                />
+                <CopyIconButton content={result} />
               </div>
               <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-                {result.length > 2000 ? result.slice(0, 2000) + '\n...(truncated)' : result}
+                {result}
               </pre>
             </div>
           )}

@@ -15,7 +15,7 @@ import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
-import { ArrowLeft, AlertCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, AlertCircle } from 'lucide-react'
 
 /**
  * Empty state when no changes detected
@@ -91,16 +91,19 @@ function EmptyState(): React.ReactNode {
 export interface SyncPreviewPanelProps {
   /** Callback when sync is confirmed */
   onSync?: () => void
-  /** Callback when sync is cancelled */
+  /** Callback when sync is cancelled (kept for compatibility, but drawer handles close) */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onCancel?: () => void
 }
 
 export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   onSync,
-  onCancel,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onCancel: _onCancel,
 }) => {
   const pendingChanges = useWorkspaceStore((state) => state.pendingChanges)
   const clearChanges = useWorkspaceStore((state) => state.clearChanges)
+  const discardPendingPath = useWorkspaceStore((state) => state.discardPendingPath)
   const [selectedFile, setSelectedFile] = useState<FileChange | null>(null)
   const selectedPath = selectedFile?.path
   const [isSyncing, setIsSyncing] = useState(false)
@@ -173,19 +176,10 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   }, [pendingChanges, isSyncing, onSync, selectedPath])
 
   /**
-   * Handle close (just close the panel, don't clear pending changes)
-   */
-  const handleClose = useCallback(() => {
-    setSelectedFile(null)
-    setSyncError(null)
-    onCancel?.()
-  }, [onCancel])
-
-  /**
    * Handle clear all pending changes (user decides not to sync)
    */
-  const handleClear = useCallback(() => {
-    clearChanges()
+  const handleClear = useCallback(async () => {
+    await clearChanges()
     setSelectedFile(null)
     setSyncError(null)
     setSelectedItems(new Set())
@@ -194,25 +188,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   /**
    * Handle removing a single file from pending list
    */
-  const handleRemoveFile = useCallback(
-    (path: string) => {
-      if (!pendingChanges) return
-
-      // Remove the file from changes
-      const updatedChanges = {
-        ...pendingChanges,
-        changes: pendingChanges.changes.filter((c) => c.path !== path),
-      }
-
-      // Update counts based on removed file type
-      const removedFile = pendingChanges.changes.find((c) => c.path === path)
-      if (!removedFile) return
-
-      // Update store with filtered changes
-      useWorkspaceStore.getState().addChanges(updatedChanges)
-    },
-    [pendingChanges]
-  )
+  const handleRemoveFile = useCallback(async (path: string) => {
+    await discardPendingPath(path)
+  }, [discardPendingPath])
 
   // Show empty state when no changes
   if (!pendingChanges || pendingChanges.changes.length === 0) {
@@ -223,31 +201,16 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="border-b px-6 py-4 bg-card">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">同步预览</h2>
-          <div className="flex items-center gap-2">
-            {syncError && (
-              <span className="text-xs text-destructive flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
-                {syncError}
-              </span>
-            )}
-            <BrandButton variant="ghost" onClick={handleClose} disabled={isSyncing}>
-              关闭
-            </BrandButton>
-          </div>
-        </div>
-
+      {/* Header - simplified for Drawer (title and close handled by Drawer) */}
+      <div className="border-b px-4 py-3 bg-card">
         {/* Summary */}
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-4 text-sm">
           <span className="text-muted-foreground">
             检测到{' '}
             <span className="font-semibold text-foreground">{totalFiles}</span>{' '}
             个文件变更
           </span>
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-2 text-xs">
             {pendingChanges.added > 0 && (
               <Badge variant="success" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
@@ -267,6 +230,12 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               </Badge>
             )}
           </div>
+          {syncError && (
+            <span className="text-xs text-destructive flex items-center gap-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {syncError}
+            </span>
+          )}
         </div>
       </div>
 
@@ -299,16 +268,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           {/* Diff Viewer */}
           <div className="flex-1">
             <FileDiffViewer fileChange={selectedFile} />
-          </div>
-        </div>
-      )}
-
-      {/* Footer Actions - Only show when in list view */}
-      {!selectedFile && (
-        <div className="px-6 py-4 border-t bg-muted/50">
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
-            点击文件查看变更详情，或使用上方按钮进行批量操作
           </div>
         </div>
       )}

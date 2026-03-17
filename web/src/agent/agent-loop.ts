@@ -514,6 +514,67 @@ export class AgentLoop {
     }
   }
 
+  private buildContextOverflowError(payload: {
+    maxContextLimit: number
+    reserveTokens: number
+    inputBudget: number
+    historyTokens: number
+    toolResultTokens: number
+    totalInputTokens: number
+  }): Error {
+    return new Error(
+      JSON.stringify({
+        error: 'context_overflow',
+        message:
+          'Tool result is too large for current model context after history compression. Retry with smaller read ranges.',
+        modelContextLimit: payload.maxContextLimit,
+        reserveTokens: payload.reserveTokens,
+        inputBudget: payload.inputBudget,
+        historyTokens: payload.historyTokens,
+        toolResultTokens: payload.toolResultTokens,
+        totalInputTokens: payload.totalInputTokens,
+        suggestion: 'Retry read with offset/limit or start_line/line_count.',
+      })
+    )
+  }
+
+  private assertLatestToolResultFitsContext(
+    internalMessages: Message[],
+    trimmedMessages: ChatMessage[],
+    maxContextTokens: number,
+    reserveTokens: number
+  ): void {
+    const latestTool = [...internalMessages].reverse().find((msg) => msg.role === 'tool')
+    if (!latestTool || !latestTool.toolCallId) return
+
+    const toolStillIncluded = trimmedMessages.some(
+      (msg) =>
+        msg.role === 'tool' &&
+        msg.tool_call_id === latestTool.toolCallId &&
+        typeof msg.content === 'string' &&
+        msg.content === latestTool.content
+    )
+    if (toolStillIncluded) return
+
+    const allMessages = messagesToChatMessages(internalMessages)
+    const historyOnlyMessages = messagesToChatMessages(
+      internalMessages.filter((msg) => msg.id !== latestTool.id)
+    )
+    const totalInputTokens = this.provider.estimateTokens(allMessages)
+    const historyTokens = this.provider.estimateTokens(historyOnlyMessages)
+    const toolResultTokens = Math.max(0, totalInputTokens - historyTokens)
+    const inputBudget = Math.max(1, maxContextTokens - reserveTokens)
+
+    throw this.buildContextOverflowError({
+      maxContextLimit: maxContextTokens,
+      reserveTokens,
+      inputBudget,
+      historyTokens,
+      toolResultTokens,
+      totalInputTokens,
+    })
+  }
+
   private normalizeToolResult(
     rawResult: string
   ): { content: string; details: Record<string, unknown>; isError: boolean } {
@@ -564,10 +625,35 @@ export class AgentLoop {
   }
 
   private internalToPiMessages(messages: Message[]): PiMessage[] {
+    const lastSummaryIndex = messages.map((m) => m.kind).lastIndexOf('context_summary')
+    const modelMessages = lastSummaryIndex >= 0 ? messages.slice(lastSummaryIndex) : messages
     const model = this.provider.getModel()
-    return messages.flatMap((msg): PiMessage[] => {
+    return modelMessages.flatMap((msg): PiMessage[] => {
       if (msg.kind === 'context_summary') {
-        return []
+        return [
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'text',
+                text: `${COMPRESSED_MEMORY_PREFIX}\n${msg.content || ''}`,
+              },
+            ],
+            api: model.api,
+            provider: model.provider,
+            model: model.id,
+            usage: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              totalTokens: 0,
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+            },
+            stopReason: 'stop',
+            timestamp: msg.timestamp || Date.now(),
+          },
+        ]
       }
       if (msg.role === 'user') {
         return [
@@ -924,9 +1010,31 @@ export class AgentLoop {
             }
           }
           const contextConfig = this.contextManager.getConfig()
-          const maxContextTokens = contextConfig.maxContextTokens
+          const maxContextTokens =
+            contextConfig.maxContextTokens || this.provider.maxContextTokens || 128000
           const reserveTokens = contextConfig.reserveTokens ?? 0
+          const inputBudget = Math.max(1, maxContextTokens - reserveTokens)
+
+          // If the latest tool result can't survive compression, fail explicitly
+          // instead of silently hiding it from the model.
+          this.assertLatestToolResultFitsContext(
+            internalMessages,
+            trimmed,
+            maxContextTokens,
+            reserveTokens
+          )
+
           const usedTokens = this.provider.estimateTokens(trimmed)
+          if (usedTokens > inputBudget) {
+            throw this.buildContextOverflowError({
+              maxContextLimit: maxContextTokens,
+              reserveTokens,
+              inputBudget,
+              historyTokens: usedTokens,
+              toolResultTokens: 0,
+              totalInputTokens: usedTokens,
+            })
+          }
           const usagePercent = Math.max(0, Math.min(100, (usedTokens / Math.max(1, maxContextTokens)) * 100))
           callbacks?.onContextUsageUpdate?.({
             usedTokens,

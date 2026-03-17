@@ -147,7 +147,11 @@ export class SessionWorkspace {
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<{ content: FileContent; metadata: FileMetadata }> {
     if (!this.initialized) await this.initialize()
-    if (directoryHandle) {
+
+    // If path has pending changes, always read workspace state (OPFS cache/files),
+    // never fallback to native disk to avoid showing stale on-disk content.
+    const isPendingPath = this.pendingManager.hasPendingPath(path)
+    if (directoryHandle && !isPendingPath) {
       return await this.cacheManager.read(path, directoryHandle)
     }
 
@@ -350,6 +354,27 @@ export class SessionWorkspace {
     await this.saveMetadata()
 
     return result
+  }
+
+  /**
+   * Discard all pending changes without syncing to native filesystem.
+   * Keeps OPFS cache/files as-is, but clears overlay pending ledger.
+   */
+  async discardAllPendingChanges(): Promise<void> {
+    if (!this.initialized) await this.initialize()
+    await this.pendingManager.clear()
+    this.metadata.lastAccessedAt = Date.now()
+    await this.saveMetadata()
+  }
+
+  /**
+   * Discard one pending path without syncing to native filesystem.
+   */
+  async discardPendingPath(path: string): Promise<void> {
+    if (!this.initialized) await this.initialize()
+    await this.pendingManager.removeByPath(path)
+    this.metadata.lastAccessedAt = Date.now()
+    await this.saveMetadata()
   }
 
   /**
