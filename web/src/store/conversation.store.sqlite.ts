@@ -1159,7 +1159,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
-              if (!c || c.activeRunId !== runId || !c.draftAssistant) return
+              if (!c || c.activeRunId !== runId) return
+              if (c.status !== 'streaming' && c.status !== 'tool_calling') {
+                c.status = 'pending'
+              }
+              if (!c.draftAssistant) return
               const stepId = `compression-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
               c.draftAssistant.steps.push({
                 id: stepId,

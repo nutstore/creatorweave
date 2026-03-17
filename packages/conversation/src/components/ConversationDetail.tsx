@@ -32,7 +32,7 @@ export function ConversationDetail({
   // Auto-scroll to bottom when new messages arrive or thinking updates
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conversation, thinkingContent])
+  }, [conversation, thinkingContent, status, toolCalls.length])
 
   if (!conversation) {
     return (
@@ -86,11 +86,6 @@ export function ConversationDetail({
               />
             )}
 
-            {/* Loading indicator */}
-            {isLoading && !hasThinking && (
-              <ThinkingIndicator status={thinkingStatus} />
-            )}
-
             {/* Load more button */}
             {conversation.hasMore && onLoadMore && (
               <div className="flex justify-center py-4">
@@ -102,6 +97,11 @@ export function ConversationDetail({
                   加载更多消息
                 </button>
               </div>
+            )}
+
+            {/* Loading indicator - shown at the bottom */}
+            {isLoading && !hasThinking && (
+              <ThinkingIndicator status={thinkingStatus} />
             )}
 
             <div ref={messagesEndRef} />

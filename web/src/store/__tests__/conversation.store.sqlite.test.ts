@@ -10,6 +10,7 @@ vi.mock('sonner', () => ({
 vi.mock('@/streaming-bus', () => ({
   emitThinkingStart: vi.fn(),
   emitThinkingDelta: vi.fn(),
+  emitCompressionEvent: vi.fn(),
   emitToolStart: vi.fn(),
   emitComplete: vi.fn(),
   emitError: vi.fn(),
@@ -86,6 +87,13 @@ vi.mock('@/agent/agent-loop', () => {
     cancel() {}
 
     async run(messages: any[], callbacks: any) {
+      ;(globalThis as any).__conversationStoreBeforeCompressionStart?.()
+      callbacks.onContextCompressionStart?.({
+        droppedGroups: 1,
+        droppedContentChars: 128,
+      })
+      ;(globalThis as any).__conversationStoreTestHook?.('after_compression_start')
+
       const toolA = {
         id: 'call_A',
         type: 'function',
@@ -142,6 +150,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
       mountedConversations: new Map(),
     } as any)
     delete (globalThis as any).__conversationStoreTestHook
+    delete (globalThis as any).__conversationStoreBeforeCompressionStart
   })
 
   it('should finalize non-current tool steps by toolCallId in interleaved calls', async () => {
@@ -291,5 +300,29 @@ describe('conversation.store.sqlite tool-call routing', () => {
     const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
     expect(updated?.messages.map((m) => m.id)).toEqual([u2.id, a2.id])
     expect(updated?.title).toBe('first title source')
+  })
+
+  it('should set status to pending when compression starts and status is not streaming/tool_calling', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('compression-pending')
+
+    ;(globalThis as any).__conversationStoreBeforeCompressionStart = () => {
+      useConversationStore.setState((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conv.id ? { ...c, status: 'idle' } : c
+        ),
+      }))
+    }
+
+    const snapshots: Array<{ label: string; status: string | undefined }> = []
+    ;(globalThis as any).__conversationStoreTestHook = (label: string) => {
+      const c = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
+      snapshots.push({ label, status: c?.status })
+    }
+
+    await useConversationStore.getState().runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const compressionStart = snapshots.find((s) => s.label === 'after_compression_start')
+    expect(compressionStart?.status).toBe('pending')
   })
 })

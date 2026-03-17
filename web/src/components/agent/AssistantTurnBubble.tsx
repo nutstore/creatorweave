@@ -114,26 +114,6 @@ export function AssistantTurnBubble({
           />
         ))}
 
-        {/* Waiting indicator - three pulsing dots */}
-        {isWaiting && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
-            <span className="flex items-center gap-1.5">
-              <span
-                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
-                style={{ animationDelay: '0ms' }}
-              />
-              <span
-                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
-                style={{ animationDelay: '200ms' }}
-              />
-              <span
-                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
-                style={{ animationDelay: '400ms' }}
-              />
-            </span>
-          </div>
-        )}
-
         {/* Ordered runtime timeline: strictly follows stream event order */}
         {isProcessing &&
           orderedRuntimeSteps.length > 0 &&
@@ -218,6 +198,26 @@ export function AssistantTurnBubble({
             isExecuting={true}
             streamingArgs={streamingToolArgsByCallId?.[currentToolCall.id] || streamingToolArgs || undefined}
           />
+        )}
+
+        {/* Waiting indicator - three pulsing dots while waiting for next model response */}
+        {isWaiting && !currentToolCall && !streamingContent && (
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+            <span className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
+                style={{ animationDelay: '0ms' }}
+              />
+              <span
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
+                style={{ animationDelay: '200ms' }}
+              />
+              <span
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
+                style={{ animationDelay: '400ms' }}
+              />
+            </span>
+          </div>
         )}
 
         {/* Summary footer: timestamp + aggregated token usage + copy button (only show when not processing) */}

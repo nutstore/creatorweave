@@ -264,6 +264,11 @@ export function ConversationView({
     status === 'pending' ||
     status === 'tool_calling'
   )
+  const isWaitingForModel =
+    status === 'pending' ||
+    (status === 'tool_calling' &&
+      !activeConversation?.currentToolCall &&
+      (activeConversation?.activeToolCalls?.length || 0) === 0)
 
   // Context window usage
   const contextWindowUsage =
@@ -400,7 +405,7 @@ export function ConversationView({
                   }}
                   toolResults={toolResults}
                   isProcessing={true}
-                  isWaiting={status === 'pending'}
+                  isWaiting={isWaitingForModel}
                   streamingState={streamingState}
                   streamingContent={streamingContentMessage}
                   currentToolCall={status === 'tool_calling' ? activeConversation?.currentToolCall : undefined}

@@ -18,10 +18,10 @@ export function ThinkingIndicator({ status, toolName }: ThinkingIndicatorProps) 
           <span>思考中...</span>
         </>
       )}
-      {status === 'tool_calling' && toolName && (
+      {status === 'tool_calling' && (
         <>
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          <span>调用工具 {toolName}...</span>
+          <span>{toolName ? `调用工具 ${toolName}...` : '调用工具中...'}</span>
         </>
       )}
     </div>
