@@ -77,6 +77,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
 
   const { directoryHandle, directoryName } = useAgentStore()
   const workspaceIds = useWorkspaceStore((state) => state.workspaces.map((w) => w.id))
+  const currentPendingCount = useWorkspaceStore((state) => state.currentPendingCount)
   const scopedWorkspaceIdSet = new Set(workspaceIds)
   const scopedConversations = conversations.filter(
     (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeConversationId
@@ -331,6 +332,11 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
               >
                 <Clock className="h-3 w-3" />
                 待同步
+                {currentPendingCount > 0 && (
+                  <span className="min-w-[1.1rem] rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning">
+                    {currentPendingCount}
+                  </span>
+                )}
               </BrandButton>
             </div>
 

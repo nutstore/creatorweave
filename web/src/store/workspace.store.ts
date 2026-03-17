@@ -406,6 +406,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 await convStore.setActive(id)
               }
 
+              await get().refreshPendingChanges(true)
+
               return
             }
 
@@ -472,6 +474,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 await convStore.setActive(id)
               }
 
+              await get().refreshPendingChanges(true)
+
               return
             }
 
@@ -496,6 +500,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (convStore.activeConversationId !== targetConversationId) {
               await convStore.setActive(targetConversationId)
             }
+
+            await get().refreshPendingChanges(true)
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to switch workspace'
             set({
@@ -619,7 +625,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         addChanges: (changes: ChangeDetectionResult) => {
-          set({ pendingChanges: changes, showPreview: true })
+          set({ pendingChanges: changes })
         },
 
         clearChanges: async () => {
@@ -660,9 +666,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (!activeWorkspace) return
 
             const changes = await activeWorkspace.workspace.refreshPendingChanges()
-            // Show preview panel when changes are detected
             const hasChanges = changes && changes.changes.length > 0
-            set({ pendingChanges: changes, showPreview: hasChanges })
+            set((state) => ({
+              pendingChanges: changes,
+              // Keep current panel state when there are changes; only auto-close when empty.
+              showPreview: hasChanges ? state.showPreview : false,
+            }))
 
             // Show toast notification when changes are detected
             if (!silent && hasChanges && changes) {
