@@ -259,7 +259,8 @@ export function ConversationView({
     const messages = activeConversation?.messages || []
     return groupMessagesIntoTurns(messages)
   }, [activeConversation?.messages])
-  const hasAssistantTurn = turns.some((t) => t.type === 'assistant')
+  const lastTurn = turns[turns.length - 1]
+  const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
 
   // Check if conversation has threads
   const hasThreads = useMemo(() => {
@@ -427,8 +428,8 @@ export function ConversationView({
                   )
                 )}
 
-                {/* Draft assistant turn while streaming before first assistant message commits */}
-                {isProcessing && !hasAssistantTurn && (
+                {/* Draft assistant turn while waiting for current run's first committed assistant message */}
+                {shouldRenderDraftAssistant && (
                   <AssistantTurnBubble
                     key="draft-assistant"
                     turn={{

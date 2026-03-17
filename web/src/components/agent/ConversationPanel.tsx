@@ -179,7 +179,8 @@ export function ConversationPanel({
 
   const isCollapsed = (threadId: string) => collapsedThreads.has(threadId)
   const turns = groupMessagesIntoTurns(conversation.messages)
-  const hasAssistantTurn = turns.some((t) => t.type === 'assistant')
+  const lastTurn = turns[turns.length - 1]
+  const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
 
   return (
     <div className="flex h-full flex-col bg-white dark:bg-background">
@@ -361,8 +362,8 @@ export function ConversationPanel({
               )
             })}
 
-            {/* Draft assistant turn while streaming before first assistant message commits */}
-            {isProcessing && !hasAssistantTurn && (
+            {/* Draft assistant turn while waiting for current run's first committed assistant message */}
+            {shouldRenderDraftAssistant && (
               <AssistantTurnBubble
                 key="draft-assistant-threaded"
                 turn={{
