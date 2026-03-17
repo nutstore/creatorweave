@@ -70,8 +70,8 @@ export function MessageBubble({
 
         {/* Content */}
         <div className="min-w-0 max-w-[80%]">
-          <div className="inline-block rounded-lg bg-primary-600 px-4 py-2 text-sm text-white">
-            <div className="whitespace-pre-wrap break-words">{message.content}</div>
+          <div className="inline-block max-w-full rounded-lg bg-primary-600 px-4 py-2 text-sm text-white">
+            <div className="whitespace-pre-wrap break-words overflow-x-auto">{message.content}</div>
           </div>
 
           {/* Timestamp + Copy + Delete buttons */}
@@ -125,8 +125,8 @@ export function MessageBubble({
 
         {/* Content */}
         {hasContent && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
-            <div className="prose-sm max-w-none break-words">
+          <div className="inline-block max-w-full rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+            <div className="prose-sm max-w-none break-words overflow-x-auto">
               <MarkdownContent content={message.content!} />
             </div>
             {/* Cursor when streaming */}
