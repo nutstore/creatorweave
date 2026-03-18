@@ -163,6 +163,7 @@ interface ConversationState {
   updateMessages: (conversationId: string, messages: Message[]) => void
   deleteUserMessage: (conversationId: string, userMessageId: string) => boolean
   deleteAgentLoop: (conversationId: string, userMessageId: string) => boolean
+  regenerateUserMessage: (conversationId: string, userMessageId: string) => void
   deleteConversation: (id: string) => void
   updateTitle: (id: string, title: string) => void
 
@@ -527,6 +528,68 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           toast.error('删除对话轮次失败')
         })
       return true
+    },
+
+    regenerateUserMessage: (conversationId, userMessageId) => {
+      const state = get()
+      if (state.isConversationRunning(conversationId)) {
+        toast.error('请先停止当前运行，再重新生成')
+        return
+      }
+
+      const conv = state.conversations.find((c) => c.id === conversationId)
+      if (!conv) return
+
+      const userMsgIndex = conv.messages.findIndex((m) => m.id === userMessageId)
+      if (userMsgIndex < 0 || conv.messages[userMsgIndex].role !== 'user') return
+
+      // 找到该用户消息之后的第一个 AI 回复
+      let assistantMsgIdToDelete: string | null = null
+      for (let i = userMsgIndex + 1; i < conv.messages.length; i++) {
+        const msg = conv.messages[i]
+        if (msg.role === 'assistant') {
+          assistantMsgIdToDelete = msg.id
+          break
+        }
+        if (msg.role === 'user') break // 遇到下一个用户消息，停止
+      }
+
+      set((draft) => {
+        const conv = draft.conversations.find((c) => c.id === conversationId)
+        if (!conv) return
+
+        // 删除对应的 AI 回复
+        if (assistantMsgIdToDelete) {
+          conv.messages = conv.messages.filter((m) => m.id !== assistantMsgIdToDelete)
+        }
+        // 重置流式状态
+        conv.status = 'idle'
+        conv.streamingContent = ''
+        conv.streamingReasoning = ''
+        conv.completedContent = null
+        conv.completedReasoning = null
+        conv.currentToolCall = null
+        conv.activeToolCalls = []
+        conv.error = null
+        conv.updatedAt = Date.now()
+      })
+
+      // 持久化
+      const updatedConv = get().conversations.find((c) => c.id === conversationId)
+      if (updatedConv) {
+        persistConversation(updatedConv).catch((error) => {
+          console.error('[conversation.store] Failed to persist on regenerate:', error)
+        })
+      }
+
+      // 获取设置并执行
+      const settingsState = useSettingsStore.getState()
+      const provider = settingsState.providerType
+      const model = settingsState.modelName
+
+      if (provider && model) {
+        get().runAgent(conversationId, provider, model, 8192, null)
+      }
     },
 
     deleteConversation: (id) => {

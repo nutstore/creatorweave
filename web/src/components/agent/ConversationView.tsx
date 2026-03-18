@@ -50,6 +50,7 @@ export function ConversationView({
   const clearSuggestedFollowUp = useConversationStore((s) => s.clearSuggestedFollowUp)
   const mountConversation = useConversationStore((s) => s.mountConversation)
   const unmountConversation = useConversationStore((s) => s.unmountConversation)
+  const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
 
@@ -343,6 +344,9 @@ export function ConversationView({
                     key={turn.message.id}
                     message={turn.message}
                     onDeleteAgentLoop={handleDeleteAgentLoop}
+                    onRegenerate={
+                      convId ? (userMessageId: string) => regenerateUserMessage(convId, userMessageId) : undefined
+                    }
                     disableDeleteActions={isProcessing}
                   />
                 ) : (

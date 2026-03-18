@@ -11,6 +11,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { CopyButton } from './CopyButton'
+import { RegenerateButton } from './RegenerateButton'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -44,6 +45,8 @@ interface MessageBubbleProps {
   onDeleteAgentLoop?: (userMessageId: string) => void
   /** Disable delete action */
   disableDeleteActions?: boolean
+  /** 重新生成回调 */
+  onRegenerate?: (userMessageId: string) => void
 }
 
 export function MessageBubble({
@@ -54,6 +57,7 @@ export function MessageBubble({
   toolResults,
   onDeleteAgentLoop,
   disableDeleteActions = false,
+  onRegenerate,
 }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isStreamingReasoning = streaming?.reasoning ?? false
@@ -82,6 +86,16 @@ export function MessageBubble({
                 minute: '2-digit',
               })}
             </span>
+            {/* 顺序: Regenerate → Copy → Delete */}
+            {onRegenerate && (
+              <RegenerateButton
+                userMessageId={message.id}
+                messageContent={message.content || ''}
+                conversationId={''}
+                onRegenerate={onRegenerate}
+                disabled={disableDeleteActions}
+              />
+            )}
             <CopyButton content={message.content || ''} title="复制" />
             {onDeleteAgentLoop && (
               <button
