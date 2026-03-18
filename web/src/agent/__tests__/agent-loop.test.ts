@@ -161,6 +161,84 @@ describe('AgentLoop', () => {
     })
   })
 
+  describe('truncateLargeToolResult()', () => {
+    it('returns summary when even one search hit cannot fit token budget', () => {
+      mockProvider.estimateTokens = vi.fn((messages: ChatMessage[]) => {
+        return messages.reduce((sum, msg) => {
+          const content = typeof msg.content === 'string' ? msg.content.length : 0
+          return sum + content
+        }, 0)
+      }) as any
+
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+      })
+
+      const rawResult = JSON.stringify({
+        results: [
+          {
+            path: 'src/huge.ts',
+            line: 10,
+            column: 1,
+            match: 'x'.repeat(3000),
+            preview: 'x'.repeat(3000),
+          },
+        ],
+        totalMatches: 1,
+        scannedFiles: 1,
+      })
+
+      const truncated = (loop as any).truncateLargeToolResult(
+        rawResult,
+        'search',
+        [],
+        1800,
+        2200,
+        200
+      )
+      const parsed = JSON.parse(truncated)
+
+      expect(parsed.truncated).toBe(true)
+      expect(parsed.results).toEqual([])
+      expect(parsed.originalTotalMatches).toBe(1)
+    })
+
+    it('restores toolContext after tool execution failure', async () => {
+      mockTools.getToolDefinitions.mockReturnValue([
+        {
+          type: 'function',
+          function: {
+            name: 'read',
+            description: 'Read file',
+            parameters: { type: 'object', properties: {}, required: [] },
+          },
+        },
+      ])
+      mockTools.execute.mockRejectedValueOnce(new Error('tool failed'))
+
+      mockAgentLoopContinue.mockImplementation((context: any) => {
+        return (async function* () {
+          await context.tools[0].execute('call_1', {})
+        })()
+      })
+
+      const originalToolContext = createMockToolContext()
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: originalToolContext,
+      })
+
+      await expect(loop.run([createUserMessage('test')])).rejects.toThrow('tool failed')
+      expect((loop as any).toolContext).toBe(originalToolContext)
+      expect((loop as any).toolContext.contextUsage).toBeUndefined()
+    })
+  })
+
   describe('run()', () => {
     it('should only send messages from latest context summary to model context', async () => {
       let capturedContextMessages: any[] = []
@@ -752,7 +830,8 @@ describe('AgentLoop', () => {
       expect(callbacks.onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider error' }))
     })
 
-    it('should throw context_overflow when latest tool result is dropped by compression', async () => {
+    it('should degrade latest tool result to summary when dropped by compression', async () => {
+      let convertedMessages: any[] = []
       mockProvider.estimateTokens = vi.fn((messages: ChatMessage[]) => {
         return messages.reduce((sum, msg) => {
           const content = typeof msg.content === 'string' ? msg.content.length : 0
@@ -764,22 +843,28 @@ describe('AgentLoop', () => {
         maxContextTokens: 200,
         reserveTokens: 20,
       })
-      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => ({
-        messages: msgs.filter((m) => m.role !== 'tool'),
-        wasTruncated: true,
-        droppedGroups: 1,
-      }))
+      mockContextManager.trimMessages
+        .mockImplementationOnce((msgs: ChatMessage[]) => ({
+          messages: msgs.filter((m) => m.role !== 'tool'),
+          wasTruncated: true,
+          droppedGroups: 1,
+        }))
+        .mockImplementationOnce((msgs: ChatMessage[]) => ({
+          messages: msgs,
+          wasTruncated: false,
+          droppedGroups: 0,
+        }))
 
       mockAgentLoopContinue.mockImplementation((_context: any, config: any) => {
         return (async function* () {
-          await config.convertToLlm([
+          convertedMessages = await config.convertToLlm([
             createUserMessage('Please read big file'),
             toolResultMessage('call_read_1', 'read', 'x'.repeat(500)),
           ])
+          yield { type: 'message_end', message: assistantMessage('ok') }
         })()
       })
 
-      const callbacks = { onError: vi.fn() }
       const loop = new AgentLoop({
         provider: mockProvider,
         toolRegistry: mockTools,
@@ -787,10 +872,16 @@ describe('AgentLoop', () => {
         toolContext: createMockToolContext(),
       })
 
-      await expect(loop.run([createUserMessage('test')], callbacks)).rejects.toThrow('context_overflow')
-      expect(callbacks.onError).toHaveBeenCalledWith(
-        expect.objectContaining({ message: expect.stringContaining('context_overflow') })
+      const result = await loop.run([createUserMessage('test')])
+
+      expect(result.some((m) => m.role === 'assistant')).toBe(true)
+      const degradedToolMessage = convertedMessages.find(
+        (m: any) => m.role === 'toolResult' && m.toolCallId === 'call_read_1'
       )
+      expect(degradedToolMessage).toBeDefined()
+      expect(Array.isArray(degradedToolMessage.content)).toBe(true)
+      expect(degradedToolMessage.content[0]?.type).toBe('text')
+      expect(degradedToolMessage.content[0]?.text).toContain('tool_result_truncated')
     })
 
     it('should stop gracefully at maxIterations in Pi loop', async () => {

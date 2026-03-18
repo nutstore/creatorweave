@@ -526,26 +526,26 @@ export class AgentLoop {
       JSON.stringify({
         error: 'context_overflow',
         message:
-          'Tool result is too large for current model context after history compression. Retry with smaller read ranges.',
+          'Tool result is too large for current model context. Use filters like max_results, glob, or start_line to limit the output size.',
         modelContextLimit: payload.maxContextLimit,
         reserveTokens: payload.reserveTokens,
         inputBudget: payload.inputBudget,
         historyTokens: payload.historyTokens,
         toolResultTokens: payload.toolResultTokens,
         totalInputTokens: payload.totalInputTokens,
-        suggestion: 'Retry read with offset/limit or start_line/line_count.',
+        suggestion: 'For search: use max_results parameter. For read: use start_line and line_count parameters.',
       })
     )
   }
 
-  private assertLatestToolResultFitsContext(
+  private ensureLatestToolResultFitsContext(
     internalMessages: Message[],
     trimmedMessages: ChatMessage[],
     maxContextTokens: number,
     reserveTokens: number
-  ): void {
+  ): ChatMessage[] {
     const latestTool = [...internalMessages].reverse().find((msg) => msg.role === 'tool')
-    if (!latestTool || !latestTool.toolCallId) return
+    if (!latestTool || !latestTool.toolCallId) return trimmedMessages
 
     const toolStillIncluded = trimmedMessages.some(
       (msg) =>
@@ -554,7 +554,7 @@ export class AgentLoop {
         typeof msg.content === 'string' &&
         msg.content === latestTool.content
     )
-    if (toolStillIncluded) return
+    if (toolStillIncluded) return trimmedMessages
 
     const allMessages = messagesToChatMessages(internalMessages)
     const historyOnlyMessages = messagesToChatMessages(
@@ -565,6 +565,36 @@ export class AgentLoop {
     const toolResultTokens = Math.max(0, totalInputTokens - historyTokens)
     const inputBudget = Math.max(1, maxContextTokens - reserveTokens)
 
+    // First fallback: degrade the latest tool result to a compact summary message,
+    // then retry trimming without summary generation.
+    const degradedToolContent = JSON.stringify({
+      tool_result_truncated: true,
+      toolCallId: latestTool.toolCallId,
+      toolName: latestTool.name,
+      originalToolTokens: toolResultTokens,
+      note: 'too_large',
+    })
+
+    const degradedInternalMessages = internalMessages.map((msg) =>
+      msg.id === latestTool.id ? { ...msg, content: degradedToolContent } : msg
+    )
+    const retrimmedMessages = this.contextManager.trimMessages(
+      messagesToChatMessages(degradedInternalMessages),
+      { createSummary: false }
+    ).messages
+
+    const degradedToolIncluded = retrimmedMessages.some(
+      (msg) =>
+        msg.role === 'tool' &&
+        msg.tool_call_id === latestTool.toolCallId &&
+        typeof msg.content === 'string' &&
+        msg.content === degradedToolContent
+    )
+    if (degradedToolIncluded) {
+      return retrimmedMessages
+    }
+
+    // If even degraded content cannot fit, fail explicitly.
     throw this.buildContextOverflowError({
       maxContextLimit: maxContextTokens,
       reserveTokens,
@@ -573,6 +603,141 @@ export class AgentLoop {
       toolResultTokens,
       totalInputTokens,
     })
+  }
+
+  /**
+   * 在 normalizeToolResult 之前截断过大的工具结果
+   * 防止原始结果在消息中就占满上下文
+   *
+   * @param rawResult 工具返回的原始结果
+   * @param toolName 工具名称
+   * @param existingTokens 现有消息的 token 数量
+   * @param maxContextTokens 最大上下文 token 数
+   * @param reserveTokens 预留 token 数
+   * @returns 截断后的结果
+   */
+  private truncateLargeToolResult(
+    rawResult: string,
+    toolName: string,
+    existingTokens: number,
+    maxContextTokens: number,
+    reserveTokens: number
+  ): string {
+    // 计算工具结果的最大可用预算（总预算 - 现有消息 - 预留）
+    // 额外留 10% 余量防止估算误差
+    const availableForTool = Math.max(
+      1000, // 最少给 1000 tokens
+      (maxContextTokens - reserveTokens - existingTokens) * 0.9
+    )
+
+    // 如果工具结果本身就在预算内，不需要截断
+    const estimatedResultTokens = this.estimateTextTokens(rawResult)
+    if (estimatedResultTokens <= availableForTool) {
+      return rawResult
+    }
+
+    console.warn(
+      `[AgentLoop] Tool result too large for context: result=${estimatedResultTokens}, available=${Math.floor(availableForTool)}, tool=${toolName}`
+    )
+
+    // 尝试解析 JSON 以进行智能截断
+    const trimmed = rawResult.trim()
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+
+      // 特殊处理 search 工具的结果
+      if (
+        toolName === 'search' &&
+        parsed &&
+        typeof parsed === 'object' &&
+        'results' in parsed &&
+        'totalMatches' in parsed &&
+        Array.isArray((parsed as { results?: unknown[] }).results)
+      ) {
+        const searchResult = parsed as {
+          results: Array<{
+            path: string
+            line: number
+            match: string
+            column?: number
+            preview?: string
+          }>
+          totalMatches: number
+          scannedFiles?: number
+          truncated?: boolean
+          message?: string
+        }
+
+        // 二分查找最大可容纳的结果数量（包含 0 条结果）
+        let left = 0
+        let right = Math.min(searchResult.results.length, 200) // 最多 200 条
+        let bestCount = 0
+        let bestResult: Record<string, unknown> = {
+          ...searchResult,
+          results: [],
+          truncated: true,
+          originalTotalMatches: searchResult.totalMatches,
+          message: `Found ${searchResult.totalMatches} matches in ${searchResult.scannedFiles || 0} files. Results too large to display. Use filters like glob, path, or reduce search scope.`,
+        }
+
+        while (left <= right) {
+          const mid = Math.floor((left + right) / 2)
+          const testResults = searchResult.results.slice(0, mid).map((hit) => ({
+            path: hit.path,
+            line: hit.line,
+            match: hit.match,
+          }))
+
+          const testResult = {
+            ...searchResult,
+            results: testResults,
+            truncated: true,
+            originalTotalMatches: searchResult.totalMatches,
+            message: `Found ${searchResult.totalMatches} matches in ${searchResult.scannedFiles || 0} files. Showing first ${testResults.length} results.`,
+          }
+
+          const testTokens = this.estimateTextTokens(JSON.stringify(testResult))
+
+          if (testTokens <= availableForTool) {
+            bestCount = testResults.length
+            bestResult = testResult
+            left = mid + 1
+          } else {
+            right = mid - 1
+          }
+        }
+
+        // 如果一条都放不下，只返回摘要
+        if (bestCount === 0) {
+          return JSON.stringify(bestResult)
+        }
+
+        return JSON.stringify(bestResult)
+      }
+
+      // 其他 JSON 结果，简单截断
+      const truncateRatio = availableForTool / estimatedResultTokens
+      const truncateAt = Math.floor(rawResult.length * truncateRatio * 0.8)
+      return rawResult.slice(0, truncateAt) +
+        `\n\n... [Result truncated due to size: ${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)} tokens. Use filters to reduce output.]`
+
+    } catch {
+      // 非 JSON 结果，直接截断
+      const truncateRatio = availableForTool / estimatedResultTokens
+      const truncateAt = Math.floor(rawResult.length * truncateRatio * 0.8)
+      return rawResult.slice(0, truncateAt) +
+        `\n\n... [Result truncated due to size: ${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)} tokens. Use filters to reduce output.]`
+    }
+  }
+
+  private estimateTextTokens(text: string): number {
+    const pseudoMessages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        content: text,
+      },
+    ]
+    return this.provider.estimateTokens(pseudoMessages)
   }
 
   private normalizeToolResult(
@@ -863,11 +1028,48 @@ export class AgentLoop {
             }
           }
 
-          const rawResult = await this.executeToolWithTimeout(
+          // 计算当前上下文使用情况，传递给工具用于自我调节
+          const existingMessages = messagesToChatMessages(allMessages)
+          const contextConfig = this.contextManager.getConfig()
+          const maxContextTokens =
+            contextConfig.maxContextTokens || this.provider.maxContextTokens || 200000
+          const reserveTokens = contextConfig.reserveTokens ?? 8192
+          const usedTokens = this.provider.estimateTokens(existingMessages)
+
+          // 在调用工具前更新 toolContext 的 contextUsage
+          const toolContextWithUsage: ToolContext = {
+            ...this.toolContext,
+            contextUsage: {
+              usedTokens,
+              maxTokens: maxContextTokens - reserveTokens,
+            },
+          }
+
+          // 临时替换 toolContext 以传递 contextUsage
+          const originalToolContext = this.toolContext
+          this.toolContext = toolContextWithUsage
+
+          let rawResult = ''
+          try {
+            rawResult = await this.executeToolWithTimeout(
+              toolDef.function.name,
+              args,
+              this.toolExecutionTimeout
+            )
+          } finally {
+            // 无论工具执行成功或失败，都恢复原始上下文
+            this.toolContext = originalToolContext
+          }
+
+          // 在 normalizeToolResult 之前就截断过大的结果
+          rawResult = this.truncateLargeToolResult(
+            rawResult,
             toolDef.function.name,
-            args,
-            this.toolExecutionTimeout
+            usedTokens,
+            maxContextTokens,
+            reserveTokens
           )
+
           const normalized = this.normalizeToolResult(rawResult)
 
           let finalContent = normalized.content
@@ -1017,7 +1219,7 @@ export class AgentLoop {
 
           // If the latest tool result can't survive compression, fail explicitly
           // instead of silently hiding it from the model.
-          this.assertLatestToolResultFitsContext(
+          trimmed = this.ensureLatestToolResultFitsContext(
             internalMessages,
             trimmed,
             maxContextTokens,
