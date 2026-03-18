@@ -304,6 +304,39 @@ export const enUS = {
     reasoning: 'Reasoning',
     toolCall: 'Tool Call',
     regenerate: 'Regenerate',
+    // Empty state
+    empty: {
+      title: 'Start New Conversation',
+      description: 'I can help you with code, data analysis, documentation, and more. Ask me anything!',
+      onlineStatus: 'Always Online',
+      smartConversation: 'Smart Conversation',
+    },
+    // Input
+    input: {
+      placeholder: 'Type a message... (Shift+Enter for new line)',
+      placeholderNoKey: 'Please configure API Key in settings first',
+      ariaLabel: 'Type a message',
+    },
+    // Buttons
+    buttons: {
+      stop: 'Stop',
+      send: 'Send',
+    },
+    // Toast
+    toast: {
+      noApiKey: 'Please configure API Key in settings first',
+      deletedTurn: 'Deleted complete conversation turn',
+    },
+    // Error
+    error: {
+      requestFailed: 'Request failed:',
+    },
+    // Token usage
+    usage: {
+      highRisk: 'High Risk',
+      nearLimit: 'Near Limit',
+      comfortable: 'Comfortable',
+    },
   },
 
   // 移动端专属

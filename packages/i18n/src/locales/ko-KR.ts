@@ -242,6 +242,39 @@ export const koKR = {
     reasoning: '추론 과정',
     toolCall: '도구 호출',
     regenerate: '재생성',
+    // 빈 상태
+    empty: {
+      title: '새 대화 시작',
+      description: '코드, 데이터 분석, 문서 작성 등 다양한 작업을 도와드립니다. 질문을 입력하세요!',
+      onlineStatus: '항상 온라인',
+      smartConversation: '스마트 대화',
+    },
+    // 입력
+    input: {
+      placeholder: '메시지 입력... (Shift+Enter 줄바꿈)',
+      placeholderNoKey: '먼저 설정에서 API Key를 구성하세요',
+      ariaLabel: '메시지 입력',
+    },
+    // 버튼
+    buttons: {
+      stop: '중지',
+      send: '전송',
+    },
+    // 알림
+    toast: {
+      noApiKey: '먼저 설정에서 API Key를 구성하세요',
+      deletedTurn: '완전한 대화 턴 삭제됨',
+    },
+    // 오류
+    error: {
+      requestFailed: '요청 실패:',
+    },
+    // 토큰 사용
+    usage: {
+      highRisk: '고위험',
+      nearLimit: '한계 근접',
+      comfortable: '여유 있음',
+    },
   },
 
   // 移动端专属

@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
@@ -53,6 +54,7 @@ export function ConversationView({
   const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
 
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
+  const t = useT()
 
   // Must be declared before useEffect that uses it
   const initialMessageHandled = useRef(false)
@@ -134,7 +136,7 @@ export function ConversationView({
     if (!text) return
 
     if (!hasApiKey) {
-      toast.error('请先在设置中配置 API Key')
+      toast.error(t('conversation.toast.noApiKey'))
       return
     }
 
@@ -185,13 +187,13 @@ export function ConversationView({
     if (!convId) return
     const ok = deleteAgentLoop(convId, messageId)
     if (ok) {
-      toast.success('已删除完整对话轮次')
+      toast.success(t('conversation.toast.deletedTurn'))
     }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      // 检测是否处于输入法状态，如果是则不发送消息
+      // Check if IME composition is in progress, don't send if composing
       if (e.nativeEvent.isComposing) {
         return
       }
@@ -200,7 +202,7 @@ export function ConversationView({
     }
   }
 
-  // 自动调整 textarea 高度
+  // Auto-adjust textarea height
   const adjustTextareaHeight = useCallback(() => {
     const textarea = inputRef.current
     if (textarea) {
@@ -210,7 +212,7 @@ export function ConversationView({
     }
   }, [])
 
-  // 输入时自动调整高度
+  // Auto-adjust height when typing
   useEffect(() => {
     adjustTextareaHeight()
   }, [input, adjustTextareaHeight])
@@ -277,12 +279,12 @@ export function ConversationView({
 
   const getUsageToneClass = (usagePercent: number): { text: string; label: string } => {
     if (usagePercent >= 90) {
-      return { text: 'text-red-600 dark:text-red-400', label: '高风险' }
+      return { text: 'text-red-600 dark:text-red-400', label: t('conversation.usage.highRisk') }
     }
     if (usagePercent >= 75) {
-      return { text: 'text-amber-600 dark:text-amber-400', label: '接近上限' }
+      return { text: 'text-amber-600 dark:text-amber-400', label: t('conversation.usage.nearLimit') }
     }
-    return { text: 'text-emerald-600 dark:text-emerald-400', label: '宽裕' }
+    return { text: 'text-emerald-600 dark:text-emerald-400', label: t('conversation.usage.comfortable') }
   }
 
   const usageTone = contextWindowUsage ? getUsageToneClass(contextWindowUsage.usagePercent) : null
@@ -327,17 +329,23 @@ export function ConversationView({
       <div className="flex h-full flex-col bg-white dark:bg-neutral-950">
         {/* Messages area */}
         <div className="custom-scrollbar flex-1 overflow-y-auto">
-          <div className="px-4 py-4">
-            {activeConversation?.messages.length === 0 && !isProcessing && (
-              <div className="flex h-full items-center justify-center">
-                <div className="text-center text-neutral-400">
-                  <MessageSquare className="mx-auto mb-2 h-8 w-8" />
-                  <p className="text-sm">输入消息开始对话</p>
+          {activeConversation?.messages.length === 0 && !isProcessing ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center text-center">
+                <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-2xl shadow-primary-500/30 ring-4 ring-primary-500/10 dark:ring-primary-500/20">
+                  <MessageSquare className="h-10 w-10 text-white" />
                 </div>
+                <h3 className="mb-3 text-xl font-semibold text-neutral-900 dark:text-neutral-100">
+                  {t('conversation.empty.title')}
+                </h3>
+                <p className="max-w-md text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                  {t('conversation.empty.description')}
+                </p>
               </div>
-            )}
-
-            <div className="mx-auto max-w-3xl space-y-4">
+            </div>
+          ) : (
+            <div className="px-4 py-4">
+              <div className="mx-auto max-w-3xl space-y-4">
               {turns.map((turn, idx) =>
                 turn.type === 'user' ? (
                   <MessageBubble
@@ -420,15 +428,16 @@ export function ConversationView({
                 />
               )}
 
-              <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {conversationError && (
           <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
             <div className="mx-auto max-w-3xl">
-              <span className="font-medium">请求失败：</span>
+              <span className="font-medium">{t('conversation.error.requestFailed')}</span>
               <span>{conversationError}</span>
             </div>
           </div>
@@ -445,9 +454,9 @@ export function ConversationView({
                 onKeyDown={handleKeyDown}
                 placeholder={
                   suggestedFollowUp ||
-                  (hasApiKey ? '输入消息... (Shift+Enter 换行)' : '请先在设置中配置 API Key')
+                  (hasApiKey ? t('conversation.input.placeholder') : t('conversation.input.placeholderNoKey'))
                 }
-                aria-label="输入消息"
+                aria-label={t('conversation.input.ariaLabel')}
                 style={{ height: '38px', maxHeight: '96px' }}
                 className="scrollbar-hide focus:border-primary-300 focus:ring-primary-300 flex-1 resize-none overflow-y-auto rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-900"
                 disabled={isProcessing || !hasApiKey}
@@ -457,7 +466,7 @@ export function ConversationView({
                   type="button"
                   onClick={handleCancel}
                   className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-red-500 text-white hover:bg-red-600"
-                  title="停止"
+                  title={t('conversation.buttons.stop')}
                 >
                   <StopCircle className="h-4 w-4" />
                 </button>
@@ -467,7 +476,7 @@ export function ConversationView({
                   onClick={handleSend}
                   disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
                   className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-30"
-                  title="发送"
+                  title={t('conversation.buttons.send')}
                 >
                   <Send className="h-4 w-4" />
                 </button>

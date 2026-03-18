@@ -313,6 +313,39 @@ export const zhCN = {
     reasoning: '推理过程',
     toolCall: '工具调用',
     regenerate: '重新生成',
+    // 空状态
+    empty: {
+      title: '开始新的对话',
+      description: '我可以帮助你处理代码、分析数据、编写文档等各种任务。输入你的问题，让我们开始吧！',
+      onlineStatus: '随时在线',
+      smartConversation: '智能对话',
+    },
+    // 输入框
+    input: {
+      placeholder: '输入消息... (Shift+Enter 换行)',
+      placeholderNoKey: '请先在设置中配置 API Key',
+      ariaLabel: '输入消息',
+    },
+    // 按钮
+    buttons: {
+      stop: '停止',
+      send: '发送',
+    },
+    // 提示
+    toast: {
+      noApiKey: '请先在设置中配置 API Key',
+      deletedTurn: '已删除完整对话轮次',
+    },
+    // 错误
+    error: {
+      requestFailed: '请求失败：',
+    },
+    // Token 使用
+    usage: {
+      highRisk: '高风险',
+      nearLimit: '接近上限',
+      comfortable: '宽裕',
+    },
   },
 
   // 移动端专属

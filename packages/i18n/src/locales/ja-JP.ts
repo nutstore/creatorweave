@@ -242,6 +242,39 @@ export const jaJP = {
     reasoning: '推論プロセス',
     toolCall: 'ツール呼び出し',
     regenerate: '再生成',
+    // 空状态
+    empty: {
+      title: '新しい会話を開始',
+      description: 'コード、データ分析、ドキュメント作成など、様々なタスクをお手伝いします。質問を入力してください！',
+      onlineStatus: '常時オンライン',
+      smartConversation: 'スマート会話',
+    },
+    // 入力框
+    input: {
+      placeholder: 'メッセージを入力... (Shift+Enter で改行)',
+      placeholderNoKey: 'まず設定で API Key を設定してください',
+      ariaLabel: 'メッセージを入力',
+    },
+    // 按钮
+    buttons: {
+      stop: '停止',
+      send: '送信',
+    },
+    // 提示
+    toast: {
+      noApiKey: 'まず設定で API Key を設定してください',
+      deletedTurn: '完全な会話ターンを削除しました',
+    },
+    // 错误
+    error: {
+      requestFailed: 'リクエスト失敗：',
+    },
+    // Token 使用
+    usage: {
+      highRisk: '高リスク',
+      nearLimit: '上限に近い',
+      comfortable: '余裕あり',
+    },
   },
 
   // 移动端专属
