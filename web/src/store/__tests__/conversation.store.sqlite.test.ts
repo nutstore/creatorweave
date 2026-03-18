@@ -325,4 +325,130 @@ describe('conversation.store.sqlite tool-call routing', () => {
     const compressionStart = snapshots.find((s) => s.label === 'after_compression_start')
     expect(compressionStart?.status).toBe('pending')
   })
+
+  it('should keep streamed assistant text on cancel and discard pending tool call', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('cancel-keep-partial')
+    const user = createUserMessage('hello')
+    useConversationStore.getState().updateMessages(conv.id, [user])
+
+    const cancelSpy = vi.fn()
+    const pendingToolCall = {
+      id: 'tool-pending-1',
+      type: 'function' as const,
+      function: {
+        name: 'read',
+        arguments: '{"path":"README.md"}',
+      },
+    }
+
+    useConversationStore.setState((state) => {
+      const target = state.conversations.find((c) => c.id === conv.id)
+      if (!target) return state
+      target.status = 'tool_calling'
+      target.activeRunId = 'run-1'
+      target.currentToolCall = pendingToolCall
+      target.activeToolCalls = [pendingToolCall]
+      target.streamingContent = 'partial answer'
+      target.streamingReasoning = 'thinking...'
+      target.draftAssistant = {
+        reasoning: 'thinking...',
+        content: 'partial answer',
+        toolCalls: [pendingToolCall],
+        toolResults: {},
+        toolCall: pendingToolCall,
+        toolArgs: '{"path":"README.md"}',
+        steps: [],
+        activeReasoningStepId: null,
+        activeContentStepId: null,
+        activeToolStepId: `tool-${pendingToolCall.id}`,
+        activeCompressionStepId: null,
+      }
+      state.agentLoops.set(conv.id, { cancel: cancelSpy } as any)
+      return state
+    })
+
+    useConversationStore.getState().cancelAgent(conv.id)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+    expect(updated?.status).toBe('idle')
+    expect(updated?.activeRunId).toBeNull()
+    expect(updated?.draftAssistant).toBeNull()
+    expect(updated?.currentToolCall).toBeNull()
+    expect(updated?.activeToolCalls).toEqual([])
+
+    const assistantMessages = (updated?.messages || []).filter((m) => m.role === 'assistant')
+    expect(assistantMessages).toHaveLength(1)
+    expect(assistantMessages[0].content).toBe('partial answer')
+    expect(assistantMessages[0].reasoning).toBe('thinking...')
+    expect(assistantMessages[0].toolCalls).toBeUndefined()
+  })
+
+  it('should keep completed draft tool call/result pairs on cancel and discard pending ones', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('cancel-keep-completed-tools')
+    const user = createUserMessage('hello')
+    useConversationStore.getState().updateMessages(conv.id, [user])
+
+    const cancelSpy = vi.fn()
+    const completedToolCall = {
+      id: 'tool-done-1',
+      type: 'function' as const,
+      function: {
+        name: 'read',
+        arguments: '{"path":"README.md"}',
+      },
+    }
+    const pendingToolCall = {
+      id: 'tool-pending-1',
+      type: 'function' as const,
+      function: {
+        name: 'search',
+        arguments: '{"query":"cancel"}',
+      },
+    }
+
+    useConversationStore.setState((state) => {
+      const target = state.conversations.find((c) => c.id === conv.id)
+      if (!target) return state
+      target.status = 'tool_calling'
+      target.activeRunId = 'run-2'
+      target.currentToolCall = pendingToolCall
+      target.activeToolCalls = [pendingToolCall]
+      target.streamingContent = 'partial answer'
+      target.streamingReasoning = 'thinking...'
+      target.draftAssistant = {
+        reasoning: 'thinking...',
+        content: 'partial answer',
+        toolCalls: [completedToolCall, pendingToolCall],
+        toolResults: {
+          [completedToolCall.id]: 'README content',
+        },
+        toolCall: pendingToolCall,
+        toolArgs: '{"query":"cancel"}',
+        steps: [],
+        activeReasoningStepId: null,
+        activeContentStepId: null,
+        activeToolStepId: `tool-${pendingToolCall.id}`,
+        activeCompressionStepId: null,
+      }
+      state.agentLoops.set(conv.id, { cancel: cancelSpy } as any)
+      return state
+    })
+
+    useConversationStore.getState().cancelAgent(conv.id)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+
+    const assistantMessages = (updated?.messages || []).filter((m) => m.role === 'assistant')
+    expect(assistantMessages).toHaveLength(1)
+    expect(assistantMessages[0].toolCalls?.map((tc) => tc.id)).toEqual([completedToolCall.id])
+
+    const toolMessages = (updated?.messages || []).filter((m) => m.role === 'tool')
+    expect(toolMessages).toHaveLength(1)
+    expect(toolMessages[0].toolCallId).toBe(completedToolCall.id)
+    expect(toolMessages[0].content).toBe('README content')
+  })
 })

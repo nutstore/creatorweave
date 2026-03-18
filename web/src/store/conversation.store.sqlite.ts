@@ -14,7 +14,7 @@ import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import { toast } from 'sonner'
 import type { Conversation, Message, ToolCall, ConversationStatus } from '@/agent/message-types'
-import { createAssistantMessage, createConversation } from '@/agent/message-types'
+import { createAssistantMessage, createConversation, createToolMessage } from '@/agent/message-types'
 import {
   emitThinkingStart,
   emitThinkingDelta,
@@ -1409,14 +1409,45 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         agentLoop.cancel()
         const queues = get().streamingQueues.get(conversationId)
         if (queues) {
+          queues.reasoning.flushNow()
+          queues.content.flushNow()
           queues.reasoning.destroy()
           queues.content.destroy()
         }
+        let committedPartial = false
         set((state) => {
           state.agentLoops.delete(conversationId)
           state.streamingQueues.delete(conversationId)
           const c = state.conversations.find((c) => c.id === conversationId)
           if (c) {
+            const draftReasoning = c.draftAssistant?.reasoning || c.streamingReasoning
+            const draftContent = c.draftAssistant?.content || c.streamingContent
+            const draftToolCalls = c.draftAssistant?.toolCalls || []
+            const draftToolResults = c.draftAssistant?.toolResults || {}
+            const completedDraftToolCalls = draftToolCalls.filter((tc) =>
+              Object.prototype.hasOwnProperty.call(draftToolResults, tc.id)
+            )
+            if (draftReasoning.trim() || draftContent.trim() || completedDraftToolCalls.length > 0) {
+              c.messages.push(
+                createAssistantMessage(
+                  draftContent || null,
+                  completedDraftToolCalls.length > 0 ? completedDraftToolCalls : undefined,
+                  undefined,
+                  draftReasoning || null
+                )
+              )
+              for (const completedToolCall of completedDraftToolCalls) {
+                c.messages.push(
+                  createToolMessage({
+                    toolCallId: completedToolCall.id,
+                    name: completedToolCall.function.name,
+                    content: draftToolResults[completedToolCall.id] || '',
+                  })
+                )
+              }
+              c.updatedAt = Date.now()
+              committedPartial = true
+            }
             c.status = 'idle'
             c.activeRunId = null
             c.draftAssistant = null
@@ -1430,6 +1461,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.isReasoningStreaming = false
           }
         })
+        if (committedPartial) {
+          const conv = get().conversations.find((c) => c.id === conversationId)
+          if (conv)
+            persistConversation(conv).catch((error) => {
+              console.error(
+                '[conversation.store] Failed to persist conversation on cancelAgent partial commit:',
+                error
+              )
+              toast.error('停止后保存草稿失败，部分内容可能丢失')
+            })
+        }
       }
     },
 
