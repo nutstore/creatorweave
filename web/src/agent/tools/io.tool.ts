@@ -209,8 +209,6 @@ async function executeBatchRead(
 
       if (typeof content !== 'string') {
         if (hasRangeOptions({
-          offset: read.offset,
-          limit: read.limit,
           startLine: read.start_line,
           lineCount: read.line_count,
         })) {
@@ -245,8 +243,6 @@ async function executeBatchRead(
         path: filePath,
         success: true,
         content: applyTextRange(content, {
-          offset: read.offset,
-          limit: read.limit,
           startLine: read.start_line,
           lineCount: read.line_count,
         }),

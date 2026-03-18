@@ -129,6 +129,9 @@ interface WorkspaceState {
   /** Whether sync preview is enabled/disabled */
   isSyncPreviewEnabled: boolean
 
+  /** ID of workspace currently being switched to (prevents concurrent switches) */
+  switchingWorkspaceId: string | null
+
   // Actions
 
   /** Initialize store (load workspaces from SQLite, fallback to OPFS) */
@@ -205,6 +208,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         showPreview: false,
         hasDirectoryHandle: false,
         isSyncPreviewEnabled: true,
+        switchingWorkspaceId: null,
 
         //=============================================================================
         // Actions
@@ -336,10 +340,30 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             return
           }
 
+          // Prevent concurrent switch operations
+          const switchingId = get().switchingWorkspaceId
+          if (switchingId && switchingId !== id) {
+            console.warn(`[WorkspaceStore] Switching to ${id} while already switching to ${switchingId}, waiting...`)
+            // Wait for the current switch to complete, then check if we need to switch again
+            await new Promise<void>((resolve) => {
+              const checkInterval = setInterval(() => {
+                if (get().switchingWorkspaceId !== switchingId) {
+                  clearInterval(checkInterval)
+                  resolve()
+                }
+              }, 100)
+            })
+            // After waiting, check if we're now on the desired workspace
+            if (get().activeWorkspaceId === id) {
+              return
+            }
+          }
+
+          // Set switching lock
+          set({ switchingWorkspaceId: id, isLoading: true, error: null })
+
           // Capture target conversation ID before async operations to avoid race condition
           const targetConversationId = id
-
-          set({ isLoading: true, error: null })
 
           try {
             const repo = getWorkspaceRepository()
@@ -492,6 +516,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               currentPendingCount: workspace.pendingCount,
               currentUndoCount: workspace.undoCount,
               isLoading: false,
+              switchingWorkspaceId: null,
             })
 
             // Also switch active conversation to match workspace
@@ -509,6 +534,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             set({
               error: message,
               isLoading: false,
+              switchingWorkspaceId: null,
             })
             throw new Error(message)
           }
