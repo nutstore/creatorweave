@@ -12,6 +12,7 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
+import { getActiveWorkspace } from '@/store/workspace.store'
 import { getUndoManager } from '@/undo/undo-manager'
 
 //=============================================================================
@@ -129,6 +130,63 @@ export const readExecutor: ToolExecutor = async (args, context) => {
   return executeSingleRead(path!, context.directoryHandle, rangeOptions, maxSize)
 }
 
+function isOPFSWorkspaceMiss(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return (
+    message.includes('File not found in OPFS workspace:') ||
+    message.includes('File not found in OPFS cache:')
+  )
+}
+
+async function resolveNativeDirectoryHandle(
+  directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<FileSystemDirectoryHandle | null> {
+  if (directoryHandle) return directoryHandle
+  const active = await getActiveWorkspace()
+  if (!active) return null
+  return await active.workspace.getNativeDirectoryHandle()
+}
+
+async function formatSingleReadResult(
+  path: string,
+  readResult: Awaited<ReturnType<ReturnType<typeof useOPFSStore.getState>['readFile']>>,
+  options: ReadRangeOptions,
+  maxSize?: number
+): Promise<string> {
+  const { content, metadata } = readResult
+  if (maxSize && metadata.size > maxSize) {
+    return JSON.stringify({
+      error: 'too_large',
+      path,
+      fileSize: metadata.size,
+      maxSize,
+      message: `File size ${metadata.size} exceeds requested max_size ${maxSize}.`,
+    })
+  }
+
+  if (typeof content === 'string') {
+    return applyTextRange(content, options)
+  }
+
+  if (hasRangeOptions(options)) {
+    return JSON.stringify({
+      error: 'range_not_supported_for_binary',
+      path,
+      message: 'offset/limit/start_line/line_count can only be used for text files.',
+    })
+  }
+  // Binary content - return as base64
+  const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
+  const uint8Array = new Uint8Array(buffer)
+  const base64 = btoa(String.fromCharCode(...uint8Array))
+  return JSON.stringify({
+    binary: true,
+    content: base64,
+    size: metadata.size,
+    contentType: metadata.contentType,
+  })
+}
+
 async function executeSingleRead(
   path: string,
   directoryHandle?: FileSystemDirectoryHandle | null,
@@ -138,39 +196,20 @@ async function executeSingleRead(
   const { readFile } = useOPFSStore.getState()
 
   try {
-    const { content, metadata } = await readFile(path, directoryHandle)
-    if (maxSize && metadata.size > maxSize) {
-      return JSON.stringify({
-        error: 'too_large',
-        path,
-        fileSize: metadata.size,
-        maxSize,
-        message: `File size ${metadata.size} exceeds requested max_size ${maxSize}.`,
-      })
-    }
-
-    if (typeof content === 'string') {
-      return applyTextRange(content, options)
-    } else {
-      if (hasRangeOptions(options)) {
-        return JSON.stringify({
-          error: 'range_not_supported_for_binary',
-          path,
-          message: 'offset/limit/start_line/line_count can only be used for text files.',
-        })
-      }
-      // Binary content - return as base64
-      const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
-      const uint8Array = new Uint8Array(buffer)
-      const base64 = btoa(String.fromCharCode(...uint8Array))
-      return JSON.stringify({
-        binary: true,
-        content: base64,
-        size: metadata.size,
-        contentType: metadata.contentType,
-      })
-    }
+    const result = await readFile(path, directoryHandle)
+    return formatSingleReadResult(path, result, options, maxSize)
   } catch (error) {
+    if (isOPFSWorkspaceMiss(error)) {
+      try {
+        const nativeHandle = await resolveNativeDirectoryHandle(directoryHandle)
+        if (nativeHandle) {
+          const result = await readFile(path, nativeHandle)
+          return formatSingleReadResult(path, result, options, maxSize)
+        }
+      } catch (fallbackError) {
+        error = fallbackError
+      }
+    }
     if (error instanceof DOMException && error.name === 'NotFoundError') {
       return JSON.stringify({ error: `File not found: ${path}` })
     }
@@ -186,6 +225,16 @@ async function executeBatchRead(
   directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
+  let nativeFallbackHandle: FileSystemDirectoryHandle | null | undefined
+  const getNativeFallbackHandle = async (): Promise<FileSystemDirectoryHandle | null> => {
+    if (nativeFallbackHandle !== undefined) return nativeFallbackHandle
+    try {
+      nativeFallbackHandle = await resolveNativeDirectoryHandle(directoryHandle)
+    } catch {
+      nativeFallbackHandle = null
+    }
+    return nativeFallbackHandle
+  }
   const results: Array<{ path: string; success: boolean; content?: string; error?: string; metadata?: unknown }> =
     []
   let successCount = 0
@@ -194,7 +243,20 @@ async function executeBatchRead(
   for (const read of reads) {
     const filePath = read.path
     try {
-      const { content, metadata } = await readFile(filePath, directoryHandle)
+      let readResult: Awaited<ReturnType<ReturnType<typeof useOPFSStore.getState>['readFile']>>
+      try {
+        readResult = await readFile(filePath, directoryHandle)
+      } catch (error) {
+        if (!isOPFSWorkspaceMiss(error)) {
+          throw error
+        }
+        const fallbackHandle = await getNativeFallbackHandle()
+        if (!fallbackHandle) {
+          throw error
+        }
+        readResult = await readFile(filePath, fallbackHandle)
+      }
+      const { content, metadata } = readResult
 
       if (maxSize && metadata.size > maxSize) {
         results.push({

@@ -8,6 +8,8 @@ const readFileMock = vi.fn<
     directoryHandle?: FileSystemDirectoryHandle | null
   ) => Promise<{ content: string | ArrayBuffer; metadata: { size: number; contentType: string } }>
 >()
+const getNativeDirectoryHandleMock = vi.fn<() => Promise<FileSystemDirectoryHandle | null>>()
+const getActiveWorkspaceMock = vi.fn()
 
 vi.mock('@/store/opfs.store', () => ({
   useOPFSStore: {
@@ -15,6 +17,10 @@ vi.mock('@/store/opfs.store', () => ({
       readFile: readFileMock,
     }),
   },
+}))
+
+vi.mock('@/store/workspace.store', () => ({
+  getActiveWorkspace: () => getActiveWorkspaceMock(),
 }))
 
 const context: ToolContext = {
@@ -94,5 +100,48 @@ describe('io read tool', () => {
     const parsed = JSON.parse(result)
     expect(parsed.error).toBe('too_large')
     expect(parsed.maxSize).toBe(5)
+  })
+
+  it('falls back to native directory when file is missing in OPFS workspace and syncs via read cache', async () => {
+    const nativeHandle = {} as FileSystemDirectoryHandle
+    readFileMock
+      .mockRejectedValueOnce(new Error('File not found in OPFS workspace: src/components/agent/ConversationView.tsx'))
+      .mockResolvedValueOnce({
+        content: 'export const ConversationView = () => null',
+        metadata: { size: 40, contentType: 'text' },
+      })
+    getNativeDirectoryHandleMock.mockResolvedValue(nativeHandle)
+    getActiveWorkspaceMock.mockResolvedValue({
+      workspace: {
+        getNativeDirectoryHandle: getNativeDirectoryHandleMock,
+      },
+      workspaceId: 'ws_1',
+    })
+
+    const result = await readExecutor({ path: 'src/components/agent/ConversationView.tsx' }, { directoryHandle: null })
+    expect(result).toBe('export const ConversationView = () => null')
+    expect(getNativeDirectoryHandleMock).toHaveBeenCalledOnce()
+    expect(readFileMock).toHaveBeenNthCalledWith(1, 'src/components/agent/ConversationView.tsx', null)
+    expect(readFileMock).toHaveBeenNthCalledWith(2, 'src/components/agent/ConversationView.tsx', nativeHandle)
+  })
+
+  it('does not fail entire batch when resolving native workspace handle throws', async () => {
+    readFileMock.mockResolvedValueOnce({
+      content: 'line1\nline2',
+      metadata: { size: 11, contentType: 'text' },
+    })
+    getActiveWorkspaceMock.mockRejectedValueOnce(new Error('workspace unavailable'))
+
+    const result = await readExecutor({ paths: ['a.txt'] }, { directoryHandle: null })
+    const parsed = JSON.parse(result)
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.total).toBe(1)
+    expect(parsed.successCount).toBe(1)
+    expect(parsed.errorCount).toBe(0)
+    expect(parsed.results[0]?.path).toBe('a.txt')
+    expect(parsed.results[0]?.content).toBe('line1\nline2')
+    expect(readFileMock).toHaveBeenCalledOnce()
+    expect(readFileMock).toHaveBeenCalledWith('a.txt', null)
   })
 })
