@@ -554,7 +554,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           </main>
 
           {/* Sync preview as Drawer (overlay, no squeeze) - full width */}
-          <Drawer open={showPreview} onClose={handleClosePreview} title="同步预览" width="85vw">
+          <Drawer open={showPreview} onClose={handleClosePreview} title="变更待审阅" width="85vw">
             <SyncPreviewPanel onCancel={handleClosePreview} />
           </Drawer>
 

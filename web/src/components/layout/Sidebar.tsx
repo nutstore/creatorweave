@@ -110,7 +110,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
 
   // Sidebar state
   const [collapsed, setCollapsed] = useState(false)
-  const [width, setWidth] = useState(260)
+  const [width, setWidth] = useState(320)
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [conversationRatio, _setConversationRatio] = useState(loadConversationRatio)
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)

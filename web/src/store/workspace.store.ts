@@ -122,6 +122,8 @@ interface WorkspaceState {
 
   /** Whether sync preview panel is currently shown */
   showPreview: boolean
+  /** Optional preselected file path for change review panel */
+  previewSelectedPath: string | null
 
   /** Whether workspace has valid native FS directory handle */
   hasDirectoryHandle: boolean
@@ -169,9 +171,13 @@ interface WorkspaceState {
 
   /** Show the sync preview panel */
   showPreviewPanel: () => void
+  /** Show preview panel and preselect a file path */
+  showPreviewPanelForPath: (path: string) => void
 
   /** Hide the sync preview panel (without clearing changes) */
   hidePreviewPanel: () => void
+  /** Clear preselected file path for review panel */
+  clearPreviewSelectedPath: () => void
 
   /**
    * Refresh pending changes - independent of Python tool execution
@@ -206,6 +212,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         initialized: false,
         pendingChanges: null,
         showPreview: false,
+        previewSelectedPath: null,
         hasDirectoryHandle: false,
         isSyncPreviewEnabled: true,
         switchingWorkspaceId: null,
@@ -680,8 +687,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set({ showPreview: true })
         },
 
+        showPreviewPanelForPath: (path: string) => {
+          set({ showPreview: true, previewSelectedPath: path })
+        },
+
         hidePreviewPanel: () => {
-          set({ showPreview: false })
+          set({ showPreview: false, previewSelectedPath: null })
+        },
+
+        clearPreviewSelectedPath: () => {
+          set({ previewSelectedPath: null })
         },
 
         refreshPendingChanges: async (silent = false) => {
@@ -717,8 +732,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (!silent && hasChanges && changes) {
               const changeCount = changes.changes.length
               const message = changeCount === 1
-                ? '检测到 1 个文件变更，请查看同步预览'
-                : `检测到 ${changeCount} 个文件变更，请查看同步预览`
+                ? '检测到 1 个文件变更，请查看变更待审阅'
+                : `检测到 ${changeCount} 个文件变更，请查看变更待审阅`
 
               toast(message, {
                 action: {
