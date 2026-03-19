@@ -91,12 +91,14 @@ export interface PendingChange {
   timestamp: number
   /** Associated Agent message ID */
   agentMessageId?: string
-  /** Optional checkpoint id that this change belongs to */
-  checkpointId?: string
-  /** Optional checkpoint status */
-  checkpointStatus?: 'draft' | 'committed'
-  /** Optional checkpoint summary */
-  checkpointSummary?: string
+  /** Optional snapshot id that this change belongs to */
+  snapshotId?: string
+  /** Optional snapshot status */
+  snapshotStatus?: 'draft' | 'committed' | 'approved' | 'rolled_back'
+  /** Optional snapshot summary */
+  snapshotSummary?: string
+  /** Optional review status for change-review workflow */
+  reviewStatus?: 'pending' | 'approved' | 'rejected'
 }
 
 /**
@@ -261,12 +263,14 @@ export interface FileChange {
   size?: number
   /** Modification time */
   mtime?: number
-  /** Optional checkpoint id that this file change belongs to */
-  checkpointId?: string
-  /** Optional checkpoint status */
-  checkpointStatus?: 'draft' | 'committed'
-  /** Optional checkpoint summary */
-  checkpointSummary?: string
+  /** Optional snapshot id that this file change belongs to */
+  snapshotId?: string
+  /** Optional snapshot status */
+  snapshotStatus?: 'draft' | 'committed' | 'approved' | 'rolled_back'
+  /** Optional snapshot summary */
+  snapshotSummary?: string
+  /** Optional review status for change-review workflow */
+  reviewStatus?: 'pending' | 'approved' | 'rejected'
 }
 
 /**

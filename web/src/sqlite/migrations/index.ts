@@ -140,6 +140,81 @@ export const migrations: Migration[] = [
       PRAGMA user_version = 5;
     `,
   },
+  {
+    version: 6,
+    name: 'add_review_status_to_fs_ops',
+    up: `
+      ALTER TABLE fs_ops ADD COLUMN review_status TEXT NOT NULL DEFAULT 'pending';
+      ALTER TABLE fs_ops ADD COLUMN approved_at INTEGER;
+
+      CREATE INDEX IF NOT EXISTS idx_fs_ops_workspace_review_status
+        ON fs_ops(workspace_id, review_status, updated_at DESC);
+
+      PRAGMA user_version = 6;
+    `,
+  },
+  {
+    version: 7,
+    name: 'add_snapshot_files_for_rollback',
+    up: `
+      CREATE TABLE IF NOT EXISTS fs_snapshot_files (
+        id TEXT PRIMARY KEY,
+        snapshot_id TEXT NOT NULL,
+        workspace_id TEXT NOT NULL,
+        path TEXT NOT NULL,
+        op_type TEXT NOT NULL,
+        content_kind TEXT NOT NULL,
+        content_text TEXT,
+        content_blob BLOB,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (snapshot_id) REFERENCES fs_changesets(id) ON DELETE CASCADE,
+        FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+        UNIQUE(snapshot_id, path)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_fs_snapshot_files_snapshot
+        ON fs_snapshot_files(snapshot_id, created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_fs_snapshot_files_workspace_path
+        ON fs_snapshot_files(workspace_id, path, created_at DESC);
+
+      PRAGMA user_version = 7;
+    `,
+  },
+  {
+    version: 8,
+    name: 'add_before_after_content_to_snapshot_files',
+    up: `
+      ALTER TABLE fs_snapshot_files ADD COLUMN before_content_kind TEXT NOT NULL DEFAULT 'none';
+      ALTER TABLE fs_snapshot_files ADD COLUMN before_content_text TEXT;
+      ALTER TABLE fs_snapshot_files ADD COLUMN before_content_blob BLOB;
+      ALTER TABLE fs_snapshot_files ADD COLUMN after_content_kind TEXT NOT NULL DEFAULT 'none';
+      ALTER TABLE fs_snapshot_files ADD COLUMN after_content_text TEXT;
+      ALTER TABLE fs_snapshot_files ADD COLUMN after_content_blob BLOB;
+
+      UPDATE fs_snapshot_files
+      SET
+        before_content_kind = CASE WHEN op_type = 'delete' THEN content_kind ELSE 'none' END,
+        before_content_text = CASE WHEN op_type = 'delete' THEN content_text ELSE NULL END,
+        before_content_blob = CASE WHEN op_type = 'delete' THEN content_blob ELSE NULL END,
+        after_content_kind = CASE WHEN op_type IN ('create', 'modify') THEN content_kind ELSE 'none' END,
+        after_content_text = CASE WHEN op_type IN ('create', 'modify') THEN content_text ELSE NULL END,
+        after_content_blob = CASE WHEN op_type IN ('create', 'modify') THEN content_blob ELSE NULL END;
+
+      PRAGMA user_version = 8;
+    `,
+  },
+  {
+    version: 9,
+    name: 'add_current_snapshot_pointer_to_workspaces',
+    up: `
+      ALTER TABLE workspaces ADD COLUMN current_snapshot_id TEXT;
+
+      CREATE INDEX IF NOT EXISTS idx_workspaces_current_snapshot
+        ON workspaces(current_snapshot_id);
+
+      PRAGMA user_version = 9;
+    `,
+  },
 ]
 
 // ============================================================================
