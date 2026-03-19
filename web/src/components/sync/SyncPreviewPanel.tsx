@@ -20,7 +20,7 @@ import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
-import { ArrowLeft, AlertCircle } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Sparkles } from 'lucide-react'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
@@ -270,7 +270,12 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
       // Show sync result
       if (pendingResult.failed > 0) {
-        setSyncError(`${pendingResult.failed} 个文件审批应用失败`)
+        const conflictHint =
+          pendingResult.conflicts.length > 0
+            ? `，其中 ${pendingResult.conflicts.length} 个存在冲突`
+            : ''
+        setSyncError(`${pendingResult.failed} 个文件审批应用失败${conflictHint}`)
+        return false
       }
 
       // Refresh pending snapshot after sync (supports partial sync)
@@ -410,7 +415,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               disabled={isSyncing || isReviewing || totalFiles === 0}
               aria-label="一键审阅变更"
             >
-              {isReviewing ? '审阅中...' : '一键 Review'}
+              {isReviewing ? (
+                '审阅中...'
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  审阅
+                </>
+              )}
             </BrandButton>
           </div>
         </div>

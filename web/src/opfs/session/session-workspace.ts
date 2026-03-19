@@ -195,10 +195,12 @@ export class SessionWorkspace {
 
     // Get old content for undo
     let oldContent: FileContent | undefined
+    let baselineFsMtime = 0
     try {
       if (directoryHandle) {
         const oldData = await this.cacheManager.read(path, directoryHandle)
         oldContent = oldData.content
+        baselineFsMtime = oldData.metadata.mtime || 0
       } else {
         const cached = await this.cacheManager.readCached(path)
         if (cached !== null) oldContent = cached
@@ -214,7 +216,7 @@ export class SessionWorkspace {
     await this.cacheManager.write(path, content)
 
     // Mark as pending
-    await this.pendingManager.add(path)
+    await this.pendingManager.add(path, baselineFsMtime)
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -231,10 +233,12 @@ export class SessionWorkspace {
 
     // Get old content for undo
     let oldContent: FileContent | undefined
+    let baselineFsMtime = 0
     try {
       if (directoryHandle) {
         const oldData = await this.cacheManager.read(path, directoryHandle)
         oldContent = oldData.content
+        baselineFsMtime = oldData.metadata.mtime || 0
       } else {
         const cached = await this.cacheManager.readCached(path)
         if (cached !== null) oldContent = cached
@@ -250,7 +254,7 @@ export class SessionWorkspace {
     await this.cacheManager.delete(path)
 
     // Mark as pending for deletion
-    await this.pendingManager.markForDeletion(path)
+    await this.pendingManager.markForDeletion(path, baselineFsMtime)
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -356,6 +360,14 @@ export class SessionWorkspace {
     return result
   }
 
+  async detectSyncConflicts(
+    directoryHandle: FileSystemDirectoryHandle,
+    onlyPaths?: string[]
+  ): Promise<SyncResult['conflicts']> {
+    if (!this.initialized) await this.initialize()
+    return await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
+  }
+
   /**
    * Discard all pending changes without syncing to native filesystem.
    * Keeps OPFS cache/files as-is, but clears overlay pending ledger.
@@ -427,39 +439,126 @@ export class SessionWorkspace {
     return await this.cacheManager.readCached(path)
   }
 
-  async commitDraftChangeset(summary?: string): Promise<{ changesetId: string; opCount: number } | null> {
+  async createDraftSnapshot(summary?: string): Promise<{ snapshotId: string; opCount: number } | null> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    return await repo.commitLatestDraftChangeset(this.sessionId, summary)
+    return await repo.commitLatestDraftSnapshot(this.sessionId, summary)
   }
 
-  async rollbackChangeset(
-    changesetId: string,
+  async createApprovedSnapshotForPaths(
+    paths: string[],
+    summary?: string,
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{ snapshotId: string; opCount: number } | null> {
+    if (!this.initialized) await this.initialize()
+    if (paths.length === 0) return null
+    if (directoryHandle) {
+      const conflicts = await this.pendingManager.detectConflicts(directoryHandle, paths)
+      if (conflicts.length > 0) {
+        const sample = conflicts.slice(0, 2).map((item) => item.path).join(', ')
+        throw new Error(
+          `检测到 ${conflicts.length} 个文件冲突，无法审批通过：${sample}${conflicts.length > 2 ? ' ...' : ''}`
+        )
+      }
+    }
+
+    const repo = getFSOverlayRepository()
+    const snapshot = await repo.createApprovedSnapshotForPaths(this.sessionId, paths, summary)
+    if (!snapshot) return null
+    await repo.setCurrentSnapshotId(this.sessionId, snapshot.snapshotId)
+
+    const snapshotOps = await repo.listSnapshotOps(this.sessionId, snapshot.snapshotId)
+    for (const op of snapshotOps) {
+      let beforeContent: string | ArrayBuffer | null = null
+      let afterContent: string | ArrayBuffer | null = null
+
+      try {
+        if (op.type === 'create') {
+          const result = await this.readFile(op.path)
+          afterContent = await this.normalizeContentForSnapshot(result.content)
+        } else if (op.type === 'modify') {
+          if (directoryHandle) {
+            beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+          }
+          const result = await this.readFile(op.path)
+          afterContent = await this.normalizeContentForSnapshot(result.content)
+        } else if (op.type === 'delete') {
+          if (directoryHandle) {
+            beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+          }
+        }
+      } catch {
+        // Keep missing side as null for unresolved historical states.
+      }
+
+      await repo.upsertSnapshotFileContent({
+        snapshotId: snapshot.snapshotId,
+        workspaceId: this.sessionId,
+        path: op.path,
+        opType: op.type,
+        beforeContent,
+        afterContent,
+      })
+    }
+
+    return snapshot
+  }
+
+  async rollbackSnapshot(
+    snapshotId: string,
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<{ reverted: number; unresolved: string[] }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const ops = await repo.listChangesetPendingOps(this.sessionId, changesetId)
+    const ops = await repo.listSnapshotOps(this.sessionId, snapshotId)
     let reverted = 0
     const unresolved: string[] = []
 
     for (const op of ops) {
-      if (op.type === 'create') {
-        await this.cacheManager.delete(op.path)
-        await this.deleteFromFilesDirIfExists(op.path)
-        await this.pendingManager.removeByPath(op.path)
-        reverted++
-        continue
-      }
-
-      if (!directoryHandle) {
-        unresolved.push(op.path)
-        continue
-      }
-
       try {
-        // Hydrate the latest on-disk version back into cache as rollback target.
-        await this.cacheManager.read(op.path, directoryHandle)
+        const snapshotFile = await repo.getSnapshotFileContent(snapshotId, op.path)
+        const requiresNativeRollback = op.status === 'synced'
+        if (op.type === 'create') {
+          if (requiresNativeRollback && !directoryHandle) {
+            unresolved.push(op.path)
+            continue
+          }
+          await this.cacheManager.delete(op.path)
+          await this.deleteFromFilesDirIfExists(op.path)
+          if (directoryHandle) {
+            await this.deleteFromNativeIfExists(directoryHandle, op.path)
+          }
+          await this.pendingManager.removeByPath(op.path)
+          reverted++
+          continue
+        }
+
+        const restored = await this.restoreFromSnapshotContent(
+          op.path,
+          snapshotFile?.beforeContentKind,
+          snapshotFile?.beforeContentText,
+          snapshotFile?.beforeContentBlob || null
+        )
+        if (!restored) {
+          unresolved.push(op.path)
+          continue
+        }
+
+        if (requiresNativeRollback && !directoryHandle) {
+          unresolved.push(op.path)
+          continue
+        }
+
+        if (directoryHandle) {
+          const data = await this.readCacheContentForPath(op.path)
+          if (data !== null) {
+            await this.writeNativeFile(directoryHandle, op.path, data)
+          } else {
+            unresolved.push(op.path)
+            continue
+          }
+        }
+
         await this.pendingManager.removeByPath(op.path)
         reverted++
       } catch {
@@ -467,7 +566,309 @@ export class SessionWorkspace {
       }
     }
 
+    if (unresolved.length === 0 && reverted > 0) {
+      await repo.markSnapshotRolledBack(this.sessionId, snapshotId)
+      await this.syncCurrentSnapshotPointer()
+    }
+
     return { reverted, unresolved }
+  }
+
+  private async applySnapshot(
+    snapshotId: string,
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{ applied: number; unresolved: string[] }> {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    const ops = await repo.listSnapshotOps(this.sessionId, snapshotId)
+    let applied = 0
+    const unresolved: string[] = []
+
+    for (const op of ops) {
+      try {
+        const snapshotFile = await repo.getSnapshotFileContent(snapshotId, op.path)
+        const requiresNativeApply = op.status === 'synced'
+
+        if (op.type === 'delete') {
+          if (requiresNativeApply && !directoryHandle) {
+            unresolved.push(op.path)
+            continue
+          }
+          await this.cacheManager.delete(op.path)
+          await this.deleteFromFilesDirIfExists(op.path)
+          if (directoryHandle) {
+            await this.deleteFromNativeIfExists(directoryHandle, op.path)
+          }
+          await this.pendingManager.removeByPath(op.path)
+          applied++
+          continue
+        }
+
+        const restored = await this.restoreFromSnapshotContent(
+          op.path,
+          snapshotFile?.afterContentKind,
+          snapshotFile?.afterContentText,
+          snapshotFile?.afterContentBlob || null
+        )
+        if (!restored) {
+          unresolved.push(op.path)
+          continue
+        }
+
+        if (requiresNativeApply && !directoryHandle) {
+          unresolved.push(op.path)
+          continue
+        }
+
+        if (directoryHandle) {
+          const data = await this.readCacheContentForPath(op.path)
+          if (data !== null) {
+            await this.writeNativeFile(directoryHandle, op.path, data)
+          } else {
+            unresolved.push(op.path)
+            continue
+          }
+        }
+
+        await this.pendingManager.removeByPath(op.path)
+        applied++
+      } catch {
+        unresolved.push(op.path)
+      }
+    }
+
+    if (unresolved.length === 0 && applied > 0) {
+      await repo.markSnapshotActive(this.sessionId, snapshotId)
+      await repo.setCurrentSnapshotId(this.sessionId, snapshotId)
+    }
+
+    return { applied, unresolved }
+  }
+
+  async rollbackLatestSnapshot(
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{ snapshotId: string | null; reverted: number; unresolved: string[] }> {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    const snapshots = await repo.listSnapshots(this.sessionId, 200)
+    const latest = snapshots.find((item) => item.status === 'approved' || item.status === 'committed')
+    if (!latest) {
+      return { snapshotId: null, reverted: 0, unresolved: [] }
+    }
+
+    const result = await this.rollbackSnapshot(latest.id, directoryHandle)
+    return {
+      snapshotId: latest.id,
+      reverted: result.reverted,
+      unresolved: result.unresolved,
+    }
+  }
+
+  async rollbackToSnapshot(
+    snapshotId: string,
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{
+    targetSnapshotId: string
+    rolledBackSnapshotIds: string[]
+    reverted: number
+    unresolved: string[]
+    failedSnapshotId?: string
+  }> {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const targetIndex = snapshots.findIndex((item) => item.id === snapshotId)
+    if (targetIndex < 0) {
+      throw new Error(`快照不存在: ${snapshotId}`)
+    }
+
+    const newerSnapshotIds = snapshots
+      .slice(0, targetIndex)
+      .filter((item) => item.status === 'approved' || item.status === 'committed')
+      .map((item) => item.id)
+
+    const rolledBackSnapshotIds: string[] = []
+    let reverted = 0
+    let unresolved: string[] = []
+    let failedSnapshotId: string | undefined
+
+    for (const id of newerSnapshotIds) {
+      const result = await this.rollbackSnapshot(id, directoryHandle)
+      reverted += result.reverted
+      if (result.unresolved.length > 0) {
+        unresolved = result.unresolved
+        failedSnapshotId = id
+        break
+      }
+      rolledBackSnapshotIds.push(id)
+    }
+
+    return {
+      targetSnapshotId: snapshotId,
+      rolledBackSnapshotIds,
+      reverted,
+      unresolved,
+      failedSnapshotId,
+    }
+  }
+
+  async switchToSnapshot(
+    snapshotId: string,
+    directoryHandle?: FileSystemDirectoryHandle | null,
+    onProgress?: (progress: {
+      phase: 'rollback' | 'apply'
+      processed: number
+      total: number
+      snapshotId: string
+    }) => void
+  ): Promise<{
+    targetSnapshotId: string
+    direction: 'backward' | 'forward' | 'noop'
+    rolledBackSnapshotIds: string[]
+    appliedSnapshotIds: string[]
+    reverted: number
+    applied: number
+    unresolved: string[]
+    failedSnapshotId?: string
+    compensationAttempted?: boolean
+    compensationSucceeded?: boolean
+  }> {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const targetIndex = snapshots.findIndex((item) => item.id === snapshotId)
+    if (targetIndex < 0) {
+      throw new Error(`快照不存在: ${snapshotId}`)
+    }
+
+    const isActive = (status: string): boolean => status === 'approved' || status === 'committed'
+    const currentIndex = snapshots.findIndex((item) => isActive(item.status))
+    const normalizedCurrentIndex = currentIndex >= 0 ? currentIndex : snapshots.length
+
+    if (targetIndex === normalizedCurrentIndex) {
+      await repo.setCurrentSnapshotId(this.sessionId, snapshotId)
+      return {
+        targetSnapshotId: snapshotId,
+        direction: 'noop',
+        rolledBackSnapshotIds: [],
+        appliedSnapshotIds: [],
+        reverted: 0,
+        applied: 0,
+        unresolved: [],
+        compensationAttempted: false,
+        compensationSucceeded: true,
+      }
+    }
+
+    const rolledBackSnapshotIds: string[] = []
+    const appliedSnapshotIds: string[] = []
+    let reverted = 0
+    let applied = 0
+    let unresolved: string[] = []
+    let failedSnapshotId: string | undefined
+    let compensationAttempted = false
+    let compensationSucceeded = true
+
+    // target older than current: rollback newer snapshots down to target(exclusive).
+    if (targetIndex > normalizedCurrentIndex) {
+      const total = Math.max(targetIndex - normalizedCurrentIndex, 0)
+      for (let i = normalizedCurrentIndex; i < targetIndex; i++) {
+        const id = snapshots[i]?.id
+        if (!id) continue
+        onProgress?.({
+          phase: 'rollback',
+          processed: i - normalizedCurrentIndex + 1,
+          total,
+          snapshotId: id,
+        })
+        const result = await this.rollbackSnapshot(id, directoryHandle)
+        reverted += result.reverted
+        if (result.unresolved.length > 0) {
+          unresolved = result.unresolved
+          failedSnapshotId = id
+          if (rolledBackSnapshotIds.length > 0) {
+            compensationAttempted = true
+            for (const rollbacked of [...rolledBackSnapshotIds].reverse()) {
+              const compensation = await this.applySnapshot(rollbacked, directoryHandle)
+              if (compensation.unresolved.length > 0) {
+                compensationSucceeded = false
+                break
+              }
+            }
+          }
+          break
+        }
+        rolledBackSnapshotIds.push(id)
+      }
+
+      await this.syncCurrentSnapshotPointer()
+
+      return {
+        targetSnapshotId: snapshotId,
+        direction: 'backward',
+        rolledBackSnapshotIds,
+        appliedSnapshotIds,
+        reverted,
+        applied,
+        unresolved,
+        failedSnapshotId,
+        compensationAttempted,
+        compensationSucceeded,
+      }
+    }
+
+    // target newer than current: re-apply snapshots from current(exclusive) to target(inclusive).
+    const total = Math.max(normalizedCurrentIndex - targetIndex, 0)
+    for (let i = normalizedCurrentIndex - 1; i >= targetIndex; i--) {
+      const id = snapshots[i]?.id
+      if (!id) continue
+      onProgress?.({
+        phase: 'apply',
+        processed: normalizedCurrentIndex - i,
+        total,
+        snapshotId: id,
+      })
+      const result = await this.applySnapshot(id, directoryHandle)
+      applied += result.applied
+      if (result.unresolved.length > 0) {
+        unresolved = result.unresolved
+        failedSnapshotId = id
+        if (appliedSnapshotIds.length > 0) {
+          compensationAttempted = true
+          for (const appliedId of [...appliedSnapshotIds].reverse()) {
+            const compensation = await this.rollbackSnapshot(appliedId, directoryHandle)
+            if (compensation.unresolved.length > 0) {
+              compensationSucceeded = false
+              break
+            }
+          }
+        }
+        break
+      }
+      appliedSnapshotIds.push(id)
+    }
+
+    await this.syncCurrentSnapshotPointer()
+
+    return {
+      targetSnapshotId: snapshotId,
+      direction: 'forward',
+      rolledBackSnapshotIds,
+      appliedSnapshotIds,
+      reverted,
+      applied,
+      unresolved,
+      failedSnapshotId,
+      compensationAttempted,
+      compensationSucceeded,
+    }
+  }
+
+  private async syncCurrentSnapshotPointer(): Promise<void> {
+    const repo = getFSOverlayRepository()
+    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const current = snapshots.find((item) => item.status === 'approved' || item.status === 'committed')
+    await repo.setCurrentSnapshotId(this.sessionId, current?.id || null)
   }
 
   private buildVirtualMetadata(path: string, content: FileContent): FileMetadata {
@@ -540,6 +941,100 @@ export class SessionWorkspace {
     } catch {
       // Ignore if file doesn't exist in files/ snapshot.
     }
+  }
+
+  private async deleteFromNativeIfExists(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<void> {
+    try {
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return
+      let current = directoryHandle
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      await current.removeEntry(parts[parts.length - 1])
+    } catch {
+      // Ignore if file doesn't exist.
+    }
+  }
+
+  private async readNativeFileContent(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<string | ArrayBuffer> {
+    const handle = await this.getFileHandle(directoryHandle, path)
+    const file = await handle.getFile()
+    try {
+      return await file.text()
+    } catch {
+      return await file.arrayBuffer()
+    }
+  }
+
+  private async writeNativeFile(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string,
+    content: string | ArrayBuffer
+  ): Promise<void> {
+    const parts = path.split('/').filter(Boolean)
+    if (parts.length === 0) return
+
+    const fileName = parts[parts.length - 1]
+    let current = directoryHandle
+    for (let i = 0; i < parts.length - 1; i++) {
+      current = await current.getDirectoryHandle(parts[i], { create: true })
+    }
+
+    const targetFile = await current.getFileHandle(fileName, { create: true })
+    const writable = await targetFile.createWritable()
+    await writable.write(content)
+    await writable.close()
+  }
+
+  private async readCacheContentForPath(path: string): Promise<string | ArrayBuffer | null> {
+    const cached = await this.cacheManager.readCached(path)
+    if (cached === null) return null
+    if (typeof cached === 'string') return cached
+    if (cached instanceof Blob) return await cached.arrayBuffer()
+    return cached
+  }
+
+  private async normalizeContentForSnapshot(content: FileContent): Promise<string | ArrayBuffer> {
+    if (typeof content === 'string') return content
+    if (content instanceof Blob) return await content.arrayBuffer()
+    return content
+  }
+
+  private async restoreFromSnapshotContent(
+    path: string,
+    contentKind?: 'text' | 'binary' | 'none',
+    contentText?: string | null,
+    contentBlob?: Uint8Array | ArrayBuffer | null
+  ): Promise<boolean> {
+    if (!contentKind || contentKind === 'none') return false
+
+    if (contentKind === 'text') {
+      await this.cacheManager.write(path, contentText || '')
+      const filesDir = await this.getFilesDir()
+      await this.writeFileToOPFS(filesDir, path, new TextEncoder().encode(contentText || '').buffer)
+      return true
+    }
+
+    const binary =
+      contentBlob instanceof Uint8Array
+        ? contentBlob.buffer.slice(
+            contentBlob.byteOffset,
+            contentBlob.byteOffset + contentBlob.byteLength
+          )
+        : contentBlob
+    if (!(binary instanceof ArrayBuffer)) return false
+
+    await this.cacheManager.write(path, binary)
+    const filesDir = await this.getFilesDir()
+    await this.writeFileToOPFS(filesDir, path, binary)
+    return true
   }
 
   /**
@@ -931,7 +1426,7 @@ export class SessionWorkspace {
       } else if (pendingItem.type !== 'delete' && pendingItem.fsMtime !== item.mtime) {
         // File was modified after being added to pending - update mtime
         // Note: fsMtime will be set during sync, just update timestamp here
-        await this.pendingManager.add(pendingPath) // Keep original path shape to avoid duplicate records
+        await this.pendingManager.add(pendingPath, pendingItem.fsMtime)
         detectedChanges.push({ type: 'modify', path: pendingPath, size: item.size, mtime: item.mtime })
         detectedModified++
       }
@@ -945,7 +1440,7 @@ export class SessionWorkspace {
           await this.pendingManager.remove(deleteRecordId)
         }
         // Now add as created/modified
-        await this.pendingManager.markAsCreated(pendingPath)
+        await this.pendingManager.markAsCreated(pendingPath, item.mtime)
         detectedChanges.push({ type: 'add', path: pendingPath, size: item.size, mtime: item.mtime })
         detectedAdded++
       }
@@ -974,14 +1469,18 @@ export class SessionWorkspace {
 
     // IMPORTANT: UI pending panels expect the full pending snapshot, not just newly detected deltas.
     const latestPending = await this.pendingManager.getAll()
-    const changes: FileChange[] = latestPending.map((pending) => {
+    const reviewPending = latestPending.filter(
+      (pending) => !pending.reviewStatus || pending.reviewStatus === 'pending'
+    )
+    const changes: FileChange[] = reviewPending.map((pending) => {
       if (pending.type === 'delete') {
         return {
           type: 'delete',
           path: pending.path,
-          checkpointId: pending.checkpointId,
-          checkpointStatus: pending.checkpointStatus,
-          checkpointSummary: pending.checkpointSummary,
+          snapshotId: pending.snapshotId,
+          snapshotStatus: pending.snapshotStatus,
+          snapshotSummary: pending.snapshotSummary,
+          reviewStatus: pending.reviewStatus,
         }
       }
       const file = currentFiles.get(normalizeComparePath(pending.path))
@@ -990,9 +1489,10 @@ export class SessionWorkspace {
         path: pending.path,
         size: file?.size,
         mtime: file?.mtime,
-        checkpointId: pending.checkpointId,
-        checkpointStatus: pending.checkpointStatus,
-        checkpointSummary: pending.checkpointSummary,
+        snapshotId: pending.snapshotId,
+        snapshotStatus: pending.snapshotStatus,
+        snapshotSummary: pending.snapshotSummary,
+        reviewStatus: pending.reviewStatus,
       }
     })
 
@@ -1019,11 +1519,11 @@ export class SessionWorkspace {
 
     for (const change of changes) {
       if (change.type === 'add') {
-        await this.pendingManager.markAsCreated(change.path)
+        await this.pendingManager.markAsCreated(change.path, change.mtime)
       } else if (change.type === 'modify') {
-        await this.pendingManager.add(change.path)
+        await this.pendingManager.add(change.path, change.mtime)
       } else if (change.type === 'delete') {
-        await this.pendingManager.markForDeletion(change.path)
+        await this.pendingManager.markForDeletion(change.path, change.mtime)
       }
     }
   }

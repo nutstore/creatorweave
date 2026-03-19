@@ -397,12 +397,18 @@ export class FSOverlayRepository {
     }))
   }
 
-  async upsertPendingOp(workspaceId: string, path: string, type: OpType): Promise<PendingOverlayOp> {
+  async upsertPendingOp(
+    workspaceId: string,
+    path: string,
+    type: OpType,
+    fsMtime?: number
+  ): Promise<PendingOverlayOp> {
     const db = getSQLiteDB()
     const now = Date.now()
+    const requestedFsMtime = typeof fsMtime === 'number' && Number.isFinite(fsMtime) ? fsMtime : 0
     const changesetId = await this.getOrCreateDraftChangeset(workspaceId)
-    const existing = await db.queryFirst<{ id: string }>(
-      `SELECT id
+    const existing = await db.queryFirst<{ id: string; fs_mtime: number }>(
+      `SELECT id, fs_mtime
        FROM fs_ops
        WHERE workspace_id = ? AND path = ? AND status = 'pending'
        ORDER BY updated_at DESC
@@ -411,18 +417,19 @@ export class FSOverlayRepository {
     )
 
     if (existing?.id) {
+      const baselineFsMtime = existing.fs_mtime > 0 ? existing.fs_mtime : requestedFsMtime
       await db.execute(
         `UPDATE fs_ops
          SET changeset_id = ?, op_type = ?, fs_mtime = ?, updated_at = ?, error_message = NULL, review_status = 'pending'
          WHERE id = ?`,
-        [changesetId, type, 0, now, existing.id]
+        [changesetId, type, baselineFsMtime, now, existing.id]
       )
       return {
         id: existing.id,
         workspaceId,
         path,
         type,
-        fsMtime: 0,
+        fsMtime: baselineFsMtime,
         timestamp: now,
         snapshotId: changesetId,
         snapshotStatus: 'draft',
@@ -434,14 +441,14 @@ export class FSOverlayRepository {
       `INSERT INTO fs_ops
        (id, workspace_id, changeset_id, path, op_type, status, review_status, fs_mtime, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, 'pending', 'pending', ?, ?, ?)`,
-      [id, workspaceId, changesetId, path, type, 0, now, now]
+      [id, workspaceId, changesetId, path, type, requestedFsMtime, now, now]
     )
     return {
       id,
       workspaceId,
       path,
       type,
-      fsMtime: 0,
+      fsMtime: requestedFsMtime,
       timestamp: now,
       snapshotId: changesetId,
       snapshotStatus: 'draft',

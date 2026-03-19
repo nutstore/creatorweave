@@ -15,7 +15,7 @@ import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import { BrandButton } from '@creatorweave/ui'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Sparkles } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
@@ -268,6 +268,13 @@ export function PendingSyncPanel() {
 
       if (result.failed > 0) {
         console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
+        const conflictHint =
+          result.conflicts.length > 0
+            ? `，其中 ${result.conflicts.length} 个存在冲突`
+            : ''
+        setSyncError(`${result.failed} 个文件审批应用失败${conflictHint}`)
+        setTimeout(() => setSyncError(null), 6000)
+        return false
       }
 
       // 同步后刷新列表（支持部分同步）
@@ -505,7 +512,14 @@ export function PendingSyncPanel() {
             disabled={isSyncing || isReviewing}
             aria-label="一键审阅变更"
           >
-            {isReviewing ? '审阅中...' : '一键 Review'}
+            {isReviewing ? (
+              '审阅中...'
+            ) : (
+              <>
+                <Sparkles className="h-3.5 w-3.5" />
+                审阅
+              </>
+            )}
           </BrandButton>
           <BrandButton
             variant="outline"

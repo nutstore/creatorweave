@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Session Pending Manager
  *
@@ -6,11 +5,30 @@
  * Merges multiple modifications to the same file and handles sync to filesystem.
  */
 
-import type { PendingChange, SyncResult } from '../types/opfs-types'
-import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
+import type { FileContent, PendingChange, SyncResult } from '../types/opfs-types'
+import {
+  getFSOverlayRepository,
+  type PendingOverlayOp,
+} from '@/sqlite/repositories/fs-overlay.repository'
 
 const PENDING_FILE = 'pending.json'
 const FILES_DIR = 'files'
+
+type CachedContent = FileContent
+
+interface CacheManager {
+  readCached?: (path: string) => Promise<CachedContent | null>
+  read: (
+    path: string,
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ) => Promise<{ content?: CachedContent | null } | null | undefined>
+}
+
+interface SyncConflictCheck {
+  isConflict: boolean
+  reason?: string
+  currentFsMtime: number
+}
 
 /**
  * Session Pending Manager
@@ -25,6 +43,7 @@ export class SessionPendingManager {
   private readonly workspaceId: string
   private readonly sessionDir: FileSystemDirectoryHandle
   private pendingChanges: Map<string, PendingChange> = new Map()
+  private pendingIdToPath: Map<string, string> = new Map()
   private initialized = false
 
   constructor(workspaceId: string, sessionDir: FileSystemDirectoryHandle) {
@@ -49,7 +68,7 @@ export class SessionPendingManager {
     const repo = getFSOverlayRepository()
     const sqlitePending = await repo.listPendingOps(this.workspaceId)
     if (sqlitePending.length > 0) {
-      this.pendingChanges = new Map(sqlitePending.map((c) => [c.path, c]))
+      this.setPendingFromRepo(sqlitePending)
       return
     }
 
@@ -68,37 +87,28 @@ export class SessionPendingManager {
     }
 
     const imported = await repo.listPendingOps(this.workspaceId)
-    this.pendingChanges = new Map(imported.map((c) => [c.path, c]))
+    this.setPendingFromRepo(imported)
   }
 
   /**
    * Add pending record for file modification
    * @param path File path
    */
-  async add(path: string): Promise<void> {
+  async add(path: string, fsMtime?: number): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     const repo = getFSOverlayRepository()
     const existing = this.pendingChanges.get(path)
     const nextType = existing?.type === 'create' ? 'create' : 'modify'
-    const op = await repo.upsertPendingOp(this.workspaceId, path, nextType)
-    this.pendingChanges.set(path, {
-      id: op.id,
-      path: op.path,
-      type: op.type,
-      fsMtime: op.fsMtime,
-      timestamp: op.timestamp,
-      checkpointId: op.checkpointId,
-      checkpointStatus: op.checkpointStatus,
-      checkpointSummary: op.checkpointSummary,
-    })
+    const op = await repo.upsertPendingOp(this.workspaceId, path, nextType, fsMtime)
+    this.setPendingChange(op)
   }
 
   /**
    * Mark file for deletion
    * @param path File path
    */
-  async markForDeletion(path: string): Promise<void> {
+  async markForDeletion(path: string, fsMtime?: number): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     const repo = getFSOverlayRepository()
@@ -107,42 +117,58 @@ export class SessionPendingManager {
     // create -> delete cancels out in pending view.
     if (existing?.type === 'create') {
       await repo.discardPendingPath(this.workspaceId, path)
-      this.pendingChanges.delete(path)
+      this.removePendingPath(path)
       return
     }
 
-    const op = await repo.upsertPendingOp(this.workspaceId, path, 'delete')
-    this.pendingChanges.set(path, {
-      id: op.id,
-      path: op.path,
-      type: op.type,
-      fsMtime: op.fsMtime,
-      timestamp: op.timestamp,
-      checkpointId: op.checkpointId,
-      checkpointStatus: op.checkpointStatus,
-      checkpointSummary: op.checkpointSummary,
-    })
+    const op = await repo.upsertPendingOp(this.workspaceId, path, 'delete', fsMtime)
+    this.setPendingChange(op)
   }
 
   /**
    * Mark file as newly created
    * @param path File path
    */
-  async markAsCreated(path: string): Promise<void> {
+  async markAsCreated(path: string, fsMtime?: number): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     const repo = getFSOverlayRepository()
-    const op = await repo.upsertPendingOp(this.workspaceId, path, 'create')
-    this.pendingChanges.set(path, {
-      id: op.id,
-      path: op.path,
-      type: op.type,
-      fsMtime: op.fsMtime,
-      timestamp: op.timestamp,
-      checkpointId: op.checkpointId,
-      checkpointStatus: op.checkpointStatus,
-      checkpointSummary: op.checkpointSummary,
-    })
+    const op = await repo.upsertPendingOp(this.workspaceId, path, 'create', fsMtime)
+    this.setPendingChange(op)
+  }
+
+  async detectConflicts(
+    directoryHandle: FileSystemDirectoryHandle,
+    onlyPaths?: string[]
+  ): Promise<SyncResult['conflicts']> {
+    const conflicts: SyncResult['conflicts'] = []
+    const normalizeComparePath = (p: string): string => {
+      let normalized = p.replace(/\\/g, '/')
+      if (normalized.startsWith('/mnt/')) {
+        normalized = normalized.slice(5)
+      } else if (normalized.startsWith('/')) {
+        normalized = normalized.slice(1)
+      }
+      return normalized
+    }
+    const allowedPaths = onlyPaths ? new Set(onlyPaths.map((p) => normalizeComparePath(p))) : null
+
+    for (const change of this.getAll()) {
+      if (allowedPaths && !allowedPaths.has(normalizeComparePath(change.path))) {
+        continue
+      }
+      const check = await this.checkNativeConflict(directoryHandle, change)
+      if (!check.isConflict) continue
+      conflicts.push({
+        path: change.path,
+        session: this.workspaceId,
+        otherSessions: [],
+        opfsMtime: change.fsMtime || change.timestamp,
+        currentFsMtime: check.currentFsMtime,
+      })
+    }
+
+    return conflicts
   }
 
   /**
@@ -160,7 +186,13 @@ export class SessionPendingManager {
    * Get pending count
    */
   get count(): number {
-    return this.pendingChanges.size
+    let total = 0
+    for (const change of this.pendingChanges.values()) {
+      if (!change.reviewStatus || change.reviewStatus === 'pending') {
+        total++
+      }
+    }
+    return total
   }
 
   /**
@@ -186,6 +218,7 @@ export class SessionPendingManager {
       await repo.discardPendingPath(this.workspaceId, pending.path)
     }
     this.pendingChanges.clear()
+    this.pendingIdToPath.clear()
   }
 
   /**
@@ -193,11 +226,11 @@ export class SessionPendingManager {
    * @param id Record ID
    */
   async remove(id: string): Promise<void> {
-    const target = Array.from(this.pendingChanges.values()).find((c) => c.id === id)
-    if (!target) return
+    const targetPath = this.pendingIdToPath.get(id)
+    if (!targetPath) return
     const repo = getFSOverlayRepository()
-    await repo.discardPendingPath(this.workspaceId, target.path)
-    this.pendingChanges.delete(target.path)
+    await repo.discardPendingPath(this.workspaceId, targetPath)
+    this.removePendingPath(targetPath)
   }
 
   /**
@@ -209,7 +242,7 @@ export class SessionPendingManager {
     if (!existing) return
     const repo = getFSOverlayRepository()
     await repo.discardPendingPath(this.workspaceId, path)
-    this.pendingChanges.delete(path)
+    this.removePendingPath(path)
   }
 
   /**
@@ -219,7 +252,7 @@ export class SessionPendingManager {
    */
   async sync(
     directoryHandle: FileSystemDirectoryHandle,
-    cacheManager: any,
+    cacheManager: CacheManager,
     onlyPaths?: string[]
   ): Promise<SyncResult> {
     const result: SyncResult = {
@@ -250,12 +283,30 @@ export class SessionPendingManager {
       }
 
       try {
+        const conflictCheck = await this.checkNativeConflict(directoryHandle, change)
+        if (conflictCheck.isConflict) {
+          result.failed++
+          const message =
+            conflictCheck.reason ||
+            `检测到冲突：${change.path} 在草稿创建后已被磁盘更新，请先处理冲突后再审批。`
+          await repo.keepOpPending(change.id, message)
+          await repo.recordSyncItem(batchId, change.id, change.path, 'failed', message)
+          result.conflicts.push({
+            path: change.path,
+            session: this.workspaceId,
+            otherSessions: [],
+            opfsMtime: change.fsMtime || change.timestamp,
+            currentFsMtime: conflictCheck.currentFsMtime,
+          })
+          continue
+        }
+
         if (change.type === 'delete') {
           await this.deleteFile(directoryHandle, change.path)
           result.success++
           await repo.markOpSynced(change.id)
           await repo.recordSyncItem(batchId, change.id, change.path, 'success')
-          this.pendingChanges.delete(change.path)
+          this.removePendingPath(change.path)
         } else {
           // Read from OPFS cache and write to filesystem
           const content = await this.readCacheContent(change.path, cacheManager)
@@ -264,21 +315,21 @@ export class SessionPendingManager {
             result.success++
             await repo.markOpSynced(change.id)
             await repo.recordSyncItem(batchId, change.id, change.path, 'success')
-            this.pendingChanges.delete(change.path)
+            this.removePendingPath(change.path)
           } else {
             result.failed++
             await repo.keepOpPending(change.id, 'No cached content found')
             await repo.recordSyncItem(batchId, change.id, change.path, 'failed', 'No cached content')
           }
         }
-      } catch (err: any) {
-        if (err.name === 'NotFoundError') {
+      } catch (err: unknown) {
+        if (this.getErrorName(err) === 'NotFoundError') {
           if (change.type === 'delete') {
             // Idempotent delete: target already gone, treat as success.
             result.success++
             await repo.markOpSynced(change.id)
             await repo.recordSyncItem(batchId, change.id, change.path, 'success')
-            this.pendingChanges.delete(change.path)
+            this.removePendingPath(change.path)
             continue
           }
           if (change.type === 'create') {
@@ -286,21 +337,22 @@ export class SessionPendingManager {
             result.success++
             await repo.markOpSynced(change.id)
             await repo.recordSyncItem(batchId, change.id, change.path, 'success')
-            this.pendingChanges.delete(change.path)
+            this.removePendingPath(change.path)
           } else {
             result.failed++
-            await repo.keepOpPending(change.id, err.message || 'NotFoundError')
+            const notFoundMessage = this.getErrorMessage(err, 'NotFoundError')
+            await repo.keepOpPending(change.id, notFoundMessage)
             await repo.recordSyncItem(
               batchId,
               change.id,
               change.path,
               'failed',
-              err.message || 'NotFoundError'
+              notFoundMessage
             )
           }
         } else {
           result.failed++
-          const msg = err?.message || String(err)
+          const msg = `Sync failed for ${change.path}: ${this.getErrorMessage(err)}`
           await repo.keepOpPending(change.id, msg)
           await repo.recordSyncItem(batchId, change.id, change.path, 'failed', msg)
         }
@@ -344,7 +396,7 @@ export class SessionPendingManager {
   private async writeFile(
     directoryHandle: FileSystemDirectoryHandle,
     path: string,
-    content: string | ArrayBuffer
+    content: CachedContent
   ): Promise<void> {
     const parts = path.split('/')
     let current = directoryHandle
@@ -373,8 +425,8 @@ export class SessionPendingManager {
    */
   private async readCacheContent(
     path: string,
-    cacheManager: any
-  ): Promise<string | ArrayBuffer | null> {
+    cacheManager: CacheManager
+  ): Promise<CachedContent | null> {
     try {
       // Prefer cache-only read. This avoids fake native directory handles and
       // keeps sync deterministic with OPFS pending content.
@@ -390,7 +442,7 @@ export class SessionPendingManager {
       }
 
       // Backward compatibility fallback.
-      const result = await cacheManager.read(path, { getFileHandle: () => null })
+      const result = await cacheManager.read(path, null)
       return result?.content ?? null
     } catch {
       console.warn(`Failed to read cache for ${path}`)
@@ -427,6 +479,125 @@ export class SessionPendingManager {
       normalized = normalized.slice(1)
     }
     return normalized
+  }
+
+  private setPendingFromRepo(changes: PendingOverlayOp[]): void {
+    this.pendingChanges.clear()
+    this.pendingIdToPath.clear()
+    for (const change of changes) {
+      this.setPendingChange(change)
+    }
+  }
+
+  private setPendingChange(op: PendingOverlayOp): void {
+    const previous = this.pendingChanges.get(op.path)
+    if (previous && previous.id !== op.id) {
+      this.pendingIdToPath.delete(previous.id)
+    }
+    this.pendingChanges.set(op.path, {
+      id: op.id,
+      path: op.path,
+      type: op.type,
+      fsMtime: op.fsMtime,
+      timestamp: op.timestamp,
+      snapshotId: op.snapshotId,
+      snapshotStatus: op.snapshotStatus,
+      snapshotSummary: op.snapshotSummary,
+      reviewStatus: op.reviewStatus,
+    })
+    this.pendingIdToPath.set(op.id, op.path)
+  }
+
+  private removePendingPath(path: string): void {
+    const existing = this.pendingChanges.get(path)
+    if (!existing) return
+    this.pendingChanges.delete(path)
+    this.pendingIdToPath.delete(existing.id)
+  }
+
+  private getErrorName(err: unknown): string | undefined {
+    if (err && typeof err === 'object' && 'name' in err && typeof err.name === 'string') {
+      return err.name
+    }
+    return undefined
+  }
+
+  private getErrorMessage(err: unknown, fallback: string = 'Unknown error'): string {
+    if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+      return err.message
+    }
+    return fallback
+  }
+
+  private async checkNativeConflict(
+    directoryHandle: FileSystemDirectoryHandle,
+    change: PendingChange
+  ): Promise<SyncConflictCheck> {
+    const currentFsMtime = await this.readNativeMtime(directoryHandle, change.path)
+    const baselineFsMtime = change.fsMtime || 0
+
+    if (change.type === 'create') {
+      if (currentFsMtime !== null) {
+        if (baselineFsMtime === 0 || currentFsMtime !== baselineFsMtime) {
+          return {
+            isConflict: true,
+            reason: `检测到冲突：${change.path} 在草稿创建后已存在更新的磁盘版本。`,
+            currentFsMtime,
+          }
+        }
+      }
+      return { isConflict: false, currentFsMtime: 0 }
+    }
+
+    if (change.type === 'modify') {
+      if (baselineFsMtime > 0 && currentFsMtime !== baselineFsMtime) {
+        return {
+          isConflict: true,
+          reason: `检测到冲突：${change.path} 在草稿创建后被磁盘修改。`,
+          currentFsMtime: currentFsMtime ?? 0,
+        }
+      }
+      return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+    }
+
+    if (change.type === 'delete') {
+      if (
+        baselineFsMtime > 0 &&
+        currentFsMtime !== null &&
+        currentFsMtime !== baselineFsMtime
+      ) {
+        return {
+          isConflict: true,
+          reason: `检测到冲突：${change.path} 在草稿删除前已被磁盘修改。`,
+          currentFsMtime,
+        }
+      }
+      return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+    }
+
+    return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+  }
+
+  private async readNativeMtime(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<number | null> {
+    try {
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+      let current = directoryHandle
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return file.lastModified
+    } catch (err: unknown) {
+      if (this.getErrorName(err) === 'NotFoundError') {
+        return null
+      }
+      throw err
+    }
   }
 
 }
