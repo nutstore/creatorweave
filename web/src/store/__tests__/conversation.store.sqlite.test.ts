@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAssistantMessage, createToolMessage, createUserMessage } from '@/agent/message-types'
 
+const deleteWorkspaceMock = vi.fn(() => Promise.resolve())
+const conversationRepoDeleteMock = vi.fn(() => Promise.resolve())
+
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
@@ -19,8 +22,11 @@ vi.mock('@/streaming-bus', () => ({
 vi.mock('../workspace.store', () => ({
   useWorkspaceStore: {
     getState: vi.fn(() => ({
+      activeWorkspaceId: null,
       createWorkspace: vi.fn(() => Promise.resolve()),
+      switchWorkspace: vi.fn(() => Promise.resolve()),
       refreshPendingChanges: vi.fn(() => Promise.resolve()),
+      deleteWorkspace: deleteWorkspaceMock,
     })),
   },
 }))
@@ -45,7 +51,7 @@ vi.mock('@/sqlite', () => ({
   getConversationRepository: vi.fn(() => ({
     findAll: vi.fn(() => Promise.resolve([])),
     save: vi.fn(() => Promise.resolve()),
-    delete: vi.fn(() => Promise.resolve()),
+    delete: conversationRepoDeleteMock,
   })),
 }))
 
@@ -140,6 +146,8 @@ import { useConversationStore } from '../conversation.store'
 
 describe('conversation.store.sqlite tool-call routing', () => {
   beforeEach(() => {
+    deleteWorkspaceMock.mockClear()
+    conversationRepoDeleteMock.mockClear()
     useConversationStore.setState({
       conversations: [],
       activeConversationId: null,
@@ -252,6 +260,45 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     const updated = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
     expect(updated?.messages.map((m) => m.id)).toEqual([u1.id, a1.id])
+  })
+
+  it('should delete multiple conversations in one action', async () => {
+    const store = useConversationStore.getState()
+    const conv1 = store.createNew('batch-1')
+    const conv2 = store.createNew('batch-2')
+    const conv3 = store.createNew('batch-3')
+    await store.setActive(conv2.id)
+
+    // include duplicate ids and a non-existing id
+    const result = await useConversationStore
+      .getState()
+      .deleteConversations([conv1.id, conv2.id, conv2.id, 'missing-id'])
+
+    const state = useConversationStore.getState()
+    expect(state.activeConversationId).toBeNull()
+    expect(state.conversations.map((c) => c.id)).toEqual([conv3.id])
+    expect(result).toEqual({
+      successIds: [conv1.id, conv2.id, 'missing-id'],
+      failed: [],
+    })
+    expect(conversationRepoDeleteMock).toHaveBeenCalledTimes(3)
+    expect(deleteWorkspaceMock).toHaveBeenCalledTimes(3)
+    expect(conversationRepoDeleteMock).toHaveBeenCalledWith(conv1.id)
+    expect(conversationRepoDeleteMock).toHaveBeenCalledWith(conv2.id)
+    expect(conversationRepoDeleteMock).toHaveBeenCalledWith('missing-id')
+  })
+
+  it('should keep conversation when persisted deletion fails', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('delete-fail')
+    deleteWorkspaceMock.mockRejectedValueOnce(new Error('opfs delete failed'))
+
+    await expect(useConversationStore.getState().deleteConversation(conv.id)).rejects.toThrow(
+      /delete conversation failed/i
+    )
+
+    const state = useConversationStore.getState()
+    expect(state.conversations.some((c) => c.id === conv.id)).toBe(true)
   })
 
   it('should retitle to next user message when deleting the first auto-titled loop', () => {

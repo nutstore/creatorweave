@@ -14,6 +14,7 @@ import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Clock, RotateCcw, HardDrive, Trash2, Check, Info, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationStore } from '@/store/conversation.store'
 import { useStorageInfo, type CleanupPreview } from '@/hooks/useStorageInfo'
 import { useSQLiteMode } from '@/hooks/useSQLiteMode'
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
@@ -99,8 +100,8 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     initialized,
     error: sessionError,
     switchWorkspace,
-    deleteWorkspace,
   } = useWorkspaceStore()
+  const deleteConversation = useConversationStore((state) => state.deleteConversation)
   const {
     storage,
     sessions: storageSessions,
@@ -142,18 +143,18 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     setDeleteLoading(true)
 
     try {
-      await deleteWorkspace(workspaceToDelete)
+      await deleteConversation(workspaceToDelete)
       toast.success('会话已删除')
       setDeleteDialogOpen(false)
       setWorkspaceToDelete(null)
       await refresh()
     } catch (error) {
-      console.error('[ConversationStorageBadge] Failed to delete workspace:', error)
+      console.error('[ConversationStorageBadge] Failed to delete conversation:', error)
       toast.error('删除会话失败')
     } finally {
       setDeleteLoading(false)
     }
-  }, [workspaceToDelete, deleteWorkspace, refresh])
+  }, [workspaceToDelete, deleteConversation, refresh])
 
   // Handle open cleanup dialog
   const handleOpenCleanupDialog = useCallback(
@@ -346,7 +347,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
       <BrandDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <BrandDialogContent>
           <BrandDialogHeader>
-            <BrandDialogTitle>删除对话缓存</BrandDialogTitle>
+            <BrandDialogTitle>删除对话</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
             {(() => {
@@ -358,8 +359,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
               return (
                 <>
                   <p className="text-sm text-secondary">
-                    确定要删除 <span className="font-medium text-primary">"{workspace?.name}"</span>{' '}
-                    的对话缓存吗？
+                    确定要删除 <span className="font-medium text-primary">"{workspace?.name}"</span> 吗？
                   </p>
 
                   {hasData && (
@@ -380,22 +380,16 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                     <div>
                       <span className="font-medium text-danger">❌ 将删除</span>
                       <ul className="ml-6 mt-1 list-disc space-y-1 text-secondary">
-                        <li>对话缓存和所有文件</li>
-                        <li>未保存的修改（无法恢复）</li>
-                      </ul>
-                    </div>
-
-                    <div>
-                      <span className="font-medium text-emerald-600">✅ 将保留</span>
-                      <ul className="ml-6 mt-1 list-disc space-y-1 text-secondary">
                         <li>对话记录</li>
+                        <li>文件缓存与工作区</li>
+                        <li>未保存的修改（无法恢复）</li>
                       </ul>
                     </div>
 
                     <div className="rounded-md bg-muted dark:bg-muted px-3 py-2 dark:bg-muted">
                       <p className="flex items-center gap-2 text-[10px] text-muted">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        <span>删除后对话记录还在，但无法再访问这个对话的文件缓存</span>
+                        <span>删除后不可恢复</span>
                       </p>
                     </div>
                   </div>
@@ -578,7 +572,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
                       {/* Delete button */}
                       {!isActive && (
-                        <ActionTooltip label="删除工作区">
+                        <ActionTooltip label="删除会话">
                           <button
                             type="button"
                             onClick={() => handleDeleteClick(session.id)}

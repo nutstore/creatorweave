@@ -14,16 +14,26 @@
  * File preview is handled by WorkspaceLayout (push-squeeze panel in main area).
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock } from 'lucide-react'
-import { BrandButton } from '@creatorweave/ui'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  BrandButton,
+  BrandDialog,
+  BrandDialogBody,
+  BrandDialogContent,
+  BrandDialogFooter,
+  BrandDialogHeader,
+  BrandDialogTitle,
+} from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
+import { SnapshotList } from '@/components/sync/SnapshotList'
 
-type ResourceTab = 'files' | 'plugins' | 'pending'
+type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
 const STORAGE_KEY_RATIO = 'sidebar-conversation-ratio'
 
@@ -72,16 +82,26 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
     createNew,
     setActive,
     deleteConversation,
+    deleteConversations,
     isConversationRunning,
   } = useConversationStore()
 
   const { directoryHandle, directoryName } = useAgentStore()
-  const workspaceIds = useWorkspaceStore((state) => state.workspaces.map((w) => w.id))
+  const workspaceStats = useWorkspaceStore((state) => state.workspaces)
+  const workspaceIds = workspaceStats.map((w) => w.id)
   const currentPendingCount = useWorkspaceStore((state) => state.currentPendingCount)
   const scopedWorkspaceIdSet = new Set(workspaceIds)
   const scopedConversations = conversations.filter(
     (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeConversationId
   )
+  const pendingCountByConversationId = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const ws of workspaceStats) {
+      map.set(ws.id, ws.pendingCount || 0)
+    }
+    return map
+  }, [workspaceStats])
+  const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
 
   // Load conversations on mount
   useEffect(() => {
@@ -93,6 +113,8 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
   const [width, setWidth] = useState(260)
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [conversationRatio, _setConversationRatio] = useState(loadConversationRatio)
+  const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
+  const [clearingConversations, setClearingConversations] = useState(false)
 
   // Drag sidebar width (horizontal)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
@@ -219,15 +241,26 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
         {/* Collapse button */}
         <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1 dark:bg-card">
           <span className="text-xs font-semibold uppercase tracking-wider text-primary">对话</span>
-          <BrandButton
-            iconButton
-            variant="ghost"
-            className="h-6 w-6"
-            onClick={() => setCollapsed(true)}
-            title="折叠侧栏"
-          >
-            <PanelLeftClose className="h-3 w-3" />
-          </BrandButton>
+          <div className="flex items-center gap-1">
+            <BrandButton
+              variant="ghost"
+              className="h-6 px-2 text-[11px]"
+              disabled={scopedConversationIds.length === 0 || clearingConversations}
+              onClick={() => setClearConversationsDialogOpen(true)}
+              title="清空当前项目会话"
+            >
+              清空
+            </BrandButton>
+            <BrandButton
+              iconButton
+              variant="ghost"
+              className="h-6 w-6"
+              onClick={() => setCollapsed(true)}
+              title="折叠侧栏"
+            >
+              <PanelLeftClose className="h-3 w-3" />
+            </BrandButton>
+          </div>
         </div>
 
         {/* Conversation list */}
@@ -253,6 +286,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
             {scopedConversations.map((conv) => {
               const isRunning = isConversationRunning(conv.id)
               const isActive = conv.id === activeConversationId
+              const pendingReviewCount = pendingCountByConversationId.get(conv.id) || 0
               return (
                 <div
                   key={conv.id}
@@ -268,13 +302,27 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
                     <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{conv.title}</span>
+                  {pendingReviewCount > 0 && (
+                    <span
+                      className="rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning"
+                      title={`${pendingReviewCount} 个变更待审阅`}
+                    >
+                      {pendingReviewCount}
+                    </span>
+                  )}
                   <BrandButton
                     iconButton
                     variant="ghost"
                     className="ml-auto h-6 w-6 opacity-0 group-hover:opacity-100"
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
-                      deleteConversation(conv.id)
+                      try {
+                        await deleteConversation(conv.id)
+                        toast.success('会话已删除')
+                      } catch (error) {
+                        console.error('[Sidebar] Failed to delete conversation:', error)
+                        toast.error('删除会话失败')
+                      }
                     }}
                     title="删除对话"
                   >
@@ -307,36 +355,60 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
             {/* Tab buttons */}
             <div className="border-subtle flex items-center gap-0.5 border-b px-1.5 py-1">
               <BrandButton
-                variant={resourceTab === 'files' ? 'secondary' : 'ghost'}
-                className="h-7 gap-1 px-2 py-1 text-xs"
+                variant="ghost"
+                className={`h-7 gap-1 px-2 py-1 text-xs ${
+                  resourceTab === 'files'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : ''
+                }`}
                 onClick={() => setResourceTab('files')}
               >
                 <FolderTree className="h-3 w-3" />
                 文件
               </BrandButton>
               <BrandButton
-                variant={resourceTab === 'plugins' ? 'secondary' : 'ghost'}
-                className="h-7 gap-1 px-2 py-1 text-xs"
-                onClick={() => setResourceTab('plugins')}
+                variant="ghost"
+                className={`h-7 gap-1 px-2 py-1 text-xs ${
+                  resourceTab === 'snapshots'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : ''
+                }`}
+                onClick={() => setResourceTab('snapshots')}
               >
-                <Puzzle className="h-3 w-3" />
-                插件
+                <History className="h-3 w-3" />
+                快照
               </BrandButton>
               <BrandButton
-                variant={resourceTab === 'pending' ? 'secondary' : 'ghost'}
-                className="h-7 gap-1 px-2 py-1 text-xs"
+                variant="ghost"
+                className={`h-7 gap-1 px-2 py-1 text-xs ${
+                  resourceTab === 'pending'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : ''
+                }`}
                 onClick={async () => {
                   setResourceTab('pending')
                   await refreshPending()
                 }}
               >
                 <Clock className="h-3 w-3" />
-                待同步
+                变更
                 {currentPendingCount > 0 && (
                   <span className="min-w-[1.1rem] rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning">
                     {currentPendingCount}
                   </span>
                 )}
+              </BrandButton>
+              <BrandButton
+                variant="ghost"
+                className={`h-7 gap-1 px-2 py-1 text-xs ${
+                  resourceTab === 'plugins'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : ''
+                }`}
+                onClick={() => setResourceTab('plugins')}
+              >
+                <Puzzle className="h-3 w-3" />
+                插件
               </BrandButton>
             </div>
 
@@ -364,10 +436,61 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
                   <PendingSyncPanel />
                 </div>
               )}
+
+              {resourceTab === 'snapshots' && (
+                <div className="h-full overflow-hidden">
+                  <SnapshotList limit={300} fullHeight />
+                </div>
+              )}
             </div>
           </div>
         )}
       </div>
+
+      <BrandDialog
+        open={clearConversationsDialogOpen}
+        onOpenChange={setClearConversationsDialogOpen}
+      >
+        <BrandDialogContent className="max-w-md">
+          <BrandDialogHeader>
+            <BrandDialogTitle>清空会话</BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            <p className="text-secondary text-sm">确认清空当前项目的所有会话？此操作不可撤销。</p>
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton
+              variant="ghost"
+              disabled={clearingConversations}
+              onClick={() => setClearConversationsDialogOpen(false)}
+            >
+              取消
+            </BrandButton>
+            <BrandButton
+              variant="danger"
+              onClick={async () => {
+                try {
+                  setClearingConversations(true)
+                  const result = await deleteConversations(scopedConversationIds)
+                  if (result.failed.length === 0) {
+                    toast.success(`已清空 ${result.successIds.length} 个会话`)
+                    setClearConversationsDialogOpen(false)
+                  } else if (result.successIds.length === 0) {
+                    toast.error(`清空失败（${result.failed.length} 个失败）`)
+                  } else {
+                    toast.error(`已删除 ${result.successIds.length} 个，失败 ${result.failed.length} 个`)
+                  }
+                } finally {
+                  setClearingConversations(false)
+                }
+              }}
+              disabled={scopedConversationIds.length === 0 || clearingConversations}
+            >
+              {clearingConversations ? '清空中...' : '清空'}
+            </BrandButton>
+          </BrandDialogFooter>
+        </BrandDialogContent>
+      </BrandDialog>
 
       {/* Horizontal drag divider (sidebar width) */}
       <div

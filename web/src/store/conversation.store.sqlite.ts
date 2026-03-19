@@ -164,7 +164,11 @@ interface ConversationState {
   deleteUserMessage: (conversationId: string, userMessageId: string) => boolean
   deleteAgentLoop: (conversationId: string, userMessageId: string) => boolean
   regenerateUserMessage: (conversationId: string, userMessageId: string) => void
-  deleteConversation: (id: string) => void
+  deleteConversation: (id: string) => Promise<void>
+  deleteConversations: (ids: string[]) => Promise<{
+    successIds: string[]
+    failed: Array<{ id: string; error: string }>
+  }>
   updateTitle: (id: string, title: string) => void
 
   // Mount tracking actions
@@ -592,38 +596,75 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       }
     },
 
-    deleteConversation: (id) => {
+    deleteConversation: async (id) => {
       const queues = get().streamingQueues.get(id)
       if (queues) {
         queues.reasoning.destroy()
         queues.content.destroy()
       }
 
+      // Stop runtime work first to avoid continued writes while deleting persisted data.
       set((state) => {
         const agentLoop = state.agentLoops.get(id)
         if (agentLoop) {
           agentLoop.cancel()
           state.agentLoops.delete(id)
         }
-        state.conversations = state.conversations.filter((c) => c.id !== id)
-        if (state.activeConversationId === id) {
-          state.activeConversationId = null
-        }
         state.suggestedFollowUps.delete(id)
         state.streamingQueues.delete(id)
         state.mountedConversations.delete(id)
       })
-      deleteConversationFromDB(id).catch((error) => {
-        console.error('[conversation.store] Failed to delete conversation from DB:', error)
-        toast.error('对话删除失败，请刷新页面后重试')
-      })
 
-      useWorkspaceStore
-        .getState()
-        .deleteWorkspace(id)
-        .catch((e) => {
-          console.error('[conversation.store] Failed to delete workspace:', e)
-        })
+      const [convDeleteResult, workspaceDeleteResult] = await Promise.allSettled([
+        deleteConversationFromDB(id),
+        useWorkspaceStore.getState().deleteWorkspace(id),
+      ])
+      const errors: string[] = []
+      if (convDeleteResult.status === 'rejected') {
+        console.error('[conversation.store] Failed to delete conversation from DB:', convDeleteResult.reason)
+        errors.push(
+          convDeleteResult.reason instanceof Error
+            ? convDeleteResult.reason.message
+            : String(convDeleteResult.reason)
+        )
+      }
+      if (workspaceDeleteResult.status === 'rejected') {
+        console.error('[conversation.store] Failed to delete workspace:', workspaceDeleteResult.reason)
+        errors.push(
+          workspaceDeleteResult.reason instanceof Error
+            ? workspaceDeleteResult.reason.message
+            : String(workspaceDeleteResult.reason)
+        )
+      }
+      if (errors.length > 0) {
+        throw new Error(`delete conversation failed: ${errors.join('; ')}`)
+      }
+
+      // Only remove in-memory conversation after persisted deletion succeeds.
+      set((state) => {
+        state.conversations = state.conversations.filter((c) => c.id !== id)
+        if (state.activeConversationId === id) {
+          state.activeConversationId = null
+        }
+      })
+    },
+
+    deleteConversations: async (ids) => {
+      const uniqueIds = Array.from(new Set(ids.filter((id): id is string => !!id)))
+      const successIds: string[] = []
+      const failed: Array<{ id: string; error: string }> = []
+      for (const id of uniqueIds) {
+        try {
+          await get().deleteConversation(id)
+          successIds.push(id)
+        } catch (error) {
+          failed.push({
+            id,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      return { successIds, failed }
     },
 
     updateTitle: (id, title) => {
@@ -775,6 +816,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           toolContext: { directoryHandle },
           maxIterations: 20,
           beforeToolCall: toolPolicyHooks.beforeToolCall,
+          afterToolCall: async (context) => {
+            if (context.isError) return undefined
+            const changeTools = new Set(['write', 'edit', 'delete'])
+            if (!changeTools.has(context.toolName)) return undefined
+            const { useWorkspaceStore } = await import('@/store/workspace.store')
+            await useWorkspaceStore.getState().refreshPendingChanges(true)
+            return undefined
+          },
           onLoopComplete: async () => {
             // Refresh pending changes after each agent loop completes
             const { useWorkspaceStore } = await import('@/store/workspace.store')
