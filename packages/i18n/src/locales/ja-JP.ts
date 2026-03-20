@@ -384,6 +384,19 @@ export const jaJP = {
       },
     },
   },
+
+  workspace: {
+    title: 'ワークスペース',
+  },
+
+  // ファイルツリー
+  fileTree: {
+    pending: {
+      create: '追加',
+      modify: '変更',
+      delete: '削除',
+    },
+  },
 } as const
 
 export default jaJP

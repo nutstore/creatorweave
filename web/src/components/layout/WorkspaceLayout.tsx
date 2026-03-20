@@ -83,6 +83,10 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
+  const [previewWidth, setPreviewWidth] = useState(35) // percentage
+
+  // Drag ref for preview panel resize
+  const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
   // Skills management state
   const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
@@ -95,9 +99,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
 
   // Phase 4: Workspace preferences state
   const {
-    panelSizes,
     panelState,
-    setPreviewRatio,
     setSidebarCollapsed,
     setActiveResourceTab,
   } = useWorkspacePreferencesStore()
@@ -125,12 +127,6 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   // Mobile sidebar state
   const isMobile = useMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-
-  // Use panel sizes from preferences store
-  const previewRatio = panelSizes.previewRatio
-
-  // Drag divider for preview panel
-  const dividerRef = useRef<{ startX: number; startRatio: number } | null>(null)
   const mainRef = useRef<HTMLDivElement>(null)
 
   const handleStartConversation = useCallback(
@@ -355,9 +351,6 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           setSkillsManagerOpen(false)
         } else if (isWebContainerPanelOpen) {
           closeWebContainerPanel()
-        } else if (selectedFilePath) {
-          setSelectedFilePath(null)
-          setSelectedFileHandle(null)
         }
       }
     }
@@ -453,50 +446,82 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   ])
 
   // Drag divider between conversation and preview
-  const handleDividerDragStart = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      if (!mainRef.current) return
-      dividerRef.current = { startX: e.clientX, startRatio: panelSizes.previewRatio }
-      const mainWidth = mainRef.current.clientWidth
-      const handleMove = (me: MouseEvent) => {
-        if (!dividerRef.current) return
-        const delta = me.clientX - dividerRef.current.startX
-        // Moving right → preview smaller, moving left → preview larger
-        const deltaPercent = (delta / mainWidth) * 100
-        const newRatio = Math.max(30, Math.min(80, dividerRef.current.startRatio - deltaPercent))
-        setPreviewRatio(newRatio)
-      }
-      const handleUp = () => {
-        dividerRef.current = null
-        document.removeEventListener('mousemove', handleMove)
-        document.removeEventListener('mouseup', handleUp)
-      }
-      document.addEventListener('mousemove', handleMove)
-      document.addEventListener('mouseup', handleUp)
-    },
-    [panelSizes.previewRatio, setPreviewRatio]
-  )
-
   const hasActiveConversation =
     !!activeConversationId && conversations.some((c) => c.id === activeConversationId)
-  const showFilePreview = !!selectedFilePath && !!selectedFileHandle
-  // showRightPanel is now only for FilePreview (not SyncPreview which uses Drawer)
 
   // Close preview panel (hide without clearing changes)
   const handleClosePreview = useCallback(() => {
     hidePreviewPanel()
   }, [hidePreviewPanel])
 
+  // Handle file click - set selected file for embedded preview
+  const handleSidebarFileSelect = useCallback((path: string, handle: FileSystemFileHandle | null) => {
+    setSelectedFilePath(path)
+    setSelectedFileHandle(handle)
+  }, [])
+
+  // Handle element inspector from sidebar - open in new tab
+  const handleElementInspect = useCallback(async (path: string, handle: FileSystemFileHandle | null) => {
+    try {
+      let content: string
+      if (handle) {
+        // Read from disk file handle
+        const file = await handle.getFile()
+        content = await file.text()
+      } else {
+        // Read from OPFS for pending create files
+        const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+        const result = await opfs.readFile(path)
+        if (typeof result.content === 'string') {
+          content = result.content
+        } else if (result.content instanceof Blob) {
+          content = await result.content.text()
+        } else {
+          const decoder = new TextDecoder()
+          content = decoder.decode(result.content as ArrayBuffer)
+        }
+      }
+      // Save to localStorage
+      localStorage.setItem('preview-content-' + path, content)
+      // Open in new tab
+      window.open(`/preview?path=${encodeURIComponent(path)}`, '_blank')
+    } catch (err) {
+      console.error('[WorkspaceLayout] Failed to open inspector:', err)
+    }
+  }, [])
+
+  // Close embedded file preview
   const handleCloseFilePreview = useCallback(() => {
     setSelectedFilePath(null)
     setSelectedFileHandle(null)
   }, [])
 
-  const handleSidebarFileSelect = useCallback((path: string, handle: FileSystemFileHandle) => {
-    setSelectedFilePath(path)
-    setSelectedFileHandle(handle)
-  }, [])
+  // Drag handler for preview panel resize
+  const handlePreviewDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      dragRef.current = { startX: e.clientX, startWidth: previewWidth }
+
+      const handleMove = (me: MouseEvent) => {
+        if (!dragRef.current) return
+        const containerWidth = mainRef.current?.offsetWidth || window.innerWidth
+        const delta = dragRef.current.startX - me.clientX
+        const deltaPercent = (delta / containerWidth) * 100
+        const newWidth = Math.max(20, Math.min(60, dragRef.current.startWidth + deltaPercent))
+        setPreviewWidth(newWidth)
+      }
+
+      const handleUp = () => {
+        dragRef.current = null
+        document.removeEventListener('mousemove', handleMove)
+        document.removeEventListener('mouseup', handleUp)
+      }
+
+      document.addEventListener('mousemove', handleMove)
+      document.addEventListener('mouseup', handleUp)
+    },
+    [previewWidth]
+  )
 
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-950">
@@ -521,7 +546,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
 
         {/* Sidebar - hidden on mobile when closed */}
         {(!isMobile || isSidebarOpen) && (
-          <Sidebar onFileSelect={handleSidebarFileSelect} selectedFilePath={selectedFilePath} />
+          <Sidebar onFileSelect={handleSidebarFileSelect} onInspect={handleElementInspect} selectedFilePath={selectedFilePath} />
         )}
 
         {/* Main area: conversation + optional sync preview panel */}
@@ -529,7 +554,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           {/* Conversation / Welcome */}
           <main
             className="overflow-hidden"
-            style={{ width: showFilePreview ? `${100 - previewRatio}%` : '100%' }}
+            style={{ width: selectedFilePath ? `${100 - previewWidth}%` : '100%' }}
           >
             {hasActiveConversation ? (
               <ConversationView
@@ -553,21 +578,20 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
             )}
           </main>
 
-          {/* Sync preview as Drawer (overlay, no squeeze) - full width */}
-          <Drawer open={showPreview} onClose={handleClosePreview} title="变更待审阅" width="85vw">
-            <SyncPreviewPanel onCancel={handleClosePreview} />
-          </Drawer>
-
-          {/* File preview panel (keep squeeze pattern) */}
-          {showFilePreview && (
+          {/* File preview panel */}
+          {selectedFilePath && (
             <>
+              {/* Drag handle */}
               <div
-                className="hover:bg-primary-300 active:bg-primary-400 w-1 shrink-0 cursor-col-resize bg-neutral-200"
-                onMouseDown={handleDividerDragStart}
-              />
+                className="group relative flex w-1 shrink-0 cursor-col-resize flex-col items-center justify-center bg-neutral-200/50 transition-colors hover:bg-primary-200/50 dark:bg-neutral-700/50 dark:hover:bg-primary-700/50"
+                onMouseDown={handlePreviewDragStart}
+                title="拖动调整宽度"
+              >
+                <div className="h-8 w-0.5 rounded-full bg-neutral-300 transition-colors group-hover:bg-primary-400" />
+              </div>
               <div
                 className="overflow-hidden border-l border-neutral-200 dark:border-neutral-700"
-                style={{ width: `${previewRatio}%` }}
+                style={{ width: `${previewWidth}%` }}
               >
                 <FilePreview
                   filePath={selectedFilePath}
@@ -577,6 +601,11 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
               </div>
             </>
           )}
+
+          {/* Sync preview as Drawer (overlay, no squeeze) - full width */}
+          <Drawer open={showPreview} onClose={handleClosePreview} title="变更待审阅" width="85vw">
+            <SyncPreviewPanel onCancel={handleClosePreview} />
+          </Drawer>
         </div>
       </div>
 

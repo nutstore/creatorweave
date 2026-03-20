@@ -215,6 +215,15 @@ export class SessionWorkspace {
     // Write to cache
     await this.cacheManager.write(path, content)
 
+    // Notify other tabs about the file change
+    try {
+      const channel = new BroadcastChannel('opfs-file-changes')
+      channel.postMessage({ type: 'opfs-file-changed', path })
+      channel.close()
+    } catch (e) {
+      console.warn('[SessionWorkspace] Failed to broadcast file change:', e)
+    }
+
     // Mark as pending
     await this.pendingManager.add(path, baselineFsMtime)
 

@@ -68,12 +68,14 @@ function saveConversationRatio(ratio: number): void {
 
 interface SidebarProps {
   /** Called when user clicks a file in the tree */
-  onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
+  onFileSelect?: (path: string, handle: FileSystemFileHandle | null) => void
+  /** Called when user clicks element inspector on a file */
+  onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
   /** Currently selected file path (for highlight in tree) */
   selectedFilePath?: string | null
 }
 
-export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
+export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarProps) {
   const {
     conversations,
     activeConversationId,
@@ -139,15 +141,8 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
   }, [])
 
   const handleFileSelect = useCallback(
-    (path: string, handle: FileSystemFileHandle) => {
+    (path: string, handle: FileSystemFileHandle | null) => {
       onFileSelect?.(path, handle)
-      // 如果有待同步文件，自动切换到 pending 标签
-      const state = useWorkspaceStore.getState()
-      if (state.pendingChanges && state.pendingChanges.changes.length > 0) {
-        setResourceTab('pending')
-      } else {
-        setResourceTab('files')
-      }
     },
     [onFileSelect]
   )
@@ -369,18 +364,6 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
               <BrandButton
                 variant="ghost"
                 className={`h-7 gap-1 px-2 py-1 text-xs ${
-                  resourceTab === 'snapshots'
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                    : ''
-                }`}
-                onClick={() => setResourceTab('snapshots')}
-              >
-                <History className="h-3 w-3" />
-                快照
-              </BrandButton>
-              <BrandButton
-                variant="ghost"
-                className={`h-7 gap-1 px-2 py-1 text-xs ${
                   resourceTab === 'pending'
                     ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
                     : ''
@@ -397,6 +380,18 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
                     {currentPendingCount}
                   </span>
                 )}
+              </BrandButton>
+              <BrandButton
+                variant="ghost"
+                className={`h-7 gap-1 px-2 py-1 text-xs ${
+                  resourceTab === 'snapshots'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : ''
+                }`}
+                onClick={() => setResourceTab('snapshots')}
+              >
+                <History className="h-3 w-3" />
+                快照
               </BrandButton>
               <BrandButton
                 variant="ghost"
@@ -420,6 +415,7 @@ export function Sidebar({ onFileSelect, selectedFilePath }: SidebarProps) {
                   rootName={directoryName}
                   onFileSelect={handleFileSelect}
                   selectedPath={selectedFilePath}
+                  onInspect={onInspect}
                 />
               )}
 

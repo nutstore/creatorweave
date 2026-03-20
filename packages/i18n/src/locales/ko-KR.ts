@@ -384,6 +384,19 @@ export const koKR = {
       },
     },
   },
+
+  workspace: {
+    title: '워크스페이스',
+  },
+
+  // 파일 트리
+  fileTree: {
+    pending: {
+      create: '추가',
+      modify: '수정',
+      delete: '삭제',
+    },
+  },
 } as const
 
 export default koKR

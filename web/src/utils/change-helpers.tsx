@@ -21,15 +21,16 @@ export interface ChangeTypeInfo {
 
 /**
  * 获取变更类型的颜色和标签
+ * 统一使用 A/M/D 标签，与 FileTreePanel 保持一致
  */
 export function getChangeTypeInfo(type: ChangeType): ChangeTypeInfo {
   switch (type) {
     case 'add':
-      return { color: 'text-green-700', bg: 'bg-green-50', label: '增' }
+      return { color: 'text-success', bg: 'bg-success/10', label: 'A' }
     case 'modify':
-      return { color: 'text-blue-700', bg: 'bg-blue-50', label: '改' }
+      return { color: 'text-warning', bg: 'bg-warning/10', label: 'M' }
     case 'delete':
-      return { color: 'text-red-700', bg: 'bg-red-50', label: '删' }
+      return { color: 'text-danger', bg: 'bg-danger/10', label: 'D' }
   }
 }
 

@@ -667,6 +667,15 @@ export const zhCN = {
   workspace: {
     title: '工作区',
   },
+
+  // 文件树
+  fileTree: {
+    pending: {
+      create: '新增',
+      modify: '修改',
+      delete: '删除',
+    },
+  },
 } as const
 
 export default zhCN

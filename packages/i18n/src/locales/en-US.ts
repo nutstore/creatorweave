@@ -658,6 +658,15 @@ export const enUS = {
   workspace: {
     title: 'Workspace',
   },
+
+  // File Tree
+  fileTree: {
+    pending: {
+      create: 'Added',
+      modify: 'Modified',
+      delete: 'Deleted',
+    },
+  },
 } as const
 
 export default enUS

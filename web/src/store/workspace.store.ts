@@ -728,6 +728,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               showPreview: hasChanges ? state.showPreview : false,
             }))
 
+            // Also refresh OPFS store so FileTreePanel updates (it subscribes to opfs.store.pendingChanges)
+            try {
+              const { useOPFSStore } = await import('./opfs.store')
+              await useOPFSStore.getState().refresh()
+            } catch (e) {
+              console.warn('[WorkspaceStore] Failed to refresh OPFS store:', e)
+            }
+
             // Show toast notification when changes are detected
             if (!silent && hasChanges && changes) {
               const changeCount = changes.changes.length

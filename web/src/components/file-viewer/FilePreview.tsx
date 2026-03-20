@@ -174,14 +174,16 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [diskNewer, setDiskNewer] = useState(false) // Conflict: disk file is newer than OPFS
   const contentRef = useRef<HTMLDivElement>(null)
 
   // Load file content when filePath or fileHandle changes
   useEffect(() => {
-    if (!filePath || !fileHandle) {
+    if (!filePath) {
       setContent(null)
       setHighlightedHtml(null)
       setError(null)
+      setDiskNewer(false)
       return
     }
 
@@ -192,10 +194,67 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       setError(null)
       setContent(null)
       setHighlightedHtml(null)
+      setDiskNewer(false)
 
       try {
-        const file = await fileHandle!.getFile()
-        setFileSize(file.size)
+        let text: string | undefined
+        let fileSize = 0
+        let opfsMtime: number | null = null
+        let diskMtime: number | null = null
+
+        // Try to read from OPFS first (pending changes version)
+        try {
+          const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+          const result = await opfs.readFile(filePath!)
+
+          if (typeof result.content === 'string') {
+            text = result.content
+            fileSize = new Blob([result.content]).size
+          } else if (result.content instanceof Blob) {
+            text = await result.content.text()
+            fileSize = result.content.size
+          } else {
+            const decoder = new TextDecoder()
+            text = decoder.decode(result.content as ArrayBuffer)
+            fileSize = (result.content as ArrayBuffer).byteLength
+          }
+          opfsMtime = result.metadata.mtime || null
+        } catch {
+          // OPFS read failed, will try disk
+        }
+
+        // If we have a file handle, compare mtimes and use newer content
+        if (fileHandle) {
+          try {
+            const diskFile = await fileHandle.getFile()
+            diskMtime = diskFile.lastModified
+
+            // If disk file is newer than OPFS, use disk content and mark conflict
+            if (opfsMtime !== null && diskMtime > opfsMtime) {
+              console.log('[FilePreview] Disk file is newer, using disk content:', {
+                path: filePath,
+                opfsMtime,
+                diskMtime,
+              })
+              fileSize = diskFile.size
+              text = await diskFile.text()
+              setDiskNewer(true) // Mark as conflict - disk is newer
+            } else if (opfsMtime === null) {
+              // No OPFS content, use disk
+              text = await diskFile.text()
+            }
+            // If opfsMtime >= diskMtime, we already have OPFS content
+          } catch {
+            // Disk read failed, rely on OPFS if available
+          }
+        } else if (!text) {
+          // No file handle and OPFS failed, error
+          setError('无法读取文件')
+          setLoading(false)
+          return
+        }
+
+        setFileSize(fileSize)
 
         // Extension-only file type detection
         const textFile = isTextFile(filePath!)
@@ -207,18 +266,22 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         }
 
         // Too large
-        if (file.size > MAX_PLAIN_SIZE) {
-          setError(`文件过大 (${formatBytes(file.size)})，最大支持 ${formatBytes(MAX_PLAIN_SIZE)}`)
+        if (fileSize > MAX_PLAIN_SIZE) {
+          setError(`文件过大 (${formatBytes(fileSize)})，最大支持 ${formatBytes(MAX_PLAIN_SIZE)}`)
           setLoading(false)
           return
         }
 
-        const text = await file.text()
         if (cancelled) return
+        if (text === undefined) {
+          setError('无法读取文件内容')
+          setLoading(false)
+          return
+        }
         setContent(text)
 
         // Apply syntax highlighting for smaller files
-        if (file.size <= MAX_FILE_SIZE) {
+        if (fileSize <= MAX_FILE_SIZE) {
           try {
             const { codeToHtml } = await import('shiki')
             const lang = getLangFromPath(filePath!)
@@ -276,6 +339,14 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-700">
         <div className="flex min-w-0 items-center gap-2">
+          {diskNewer && (
+            <span
+              className="shrink-0 rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold text-warning"
+              title="磁盘文件比 OPFS 变更更新，可能存在冲突"
+            >
+              冲突
+            </span>
+          )}
           <span className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200" title={filePath}>
             {fileName}
           </span>
@@ -287,7 +358,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               type="button"
               onClick={handleCopy}
               className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="复制内容"
+              title="Copy content"
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
             </button>
@@ -296,7 +367,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
             type="button"
             onClick={onClose}
             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-            title="关闭"
+            title="Close"
           >
             <X className="h-3 w-3" />
           </button>
@@ -305,7 +376,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
 
       {/* Content */}
       <div className="flex-1 overflow-auto" ref={contentRef}>
-        {loading && <div className="p-4 text-center text-xs text-neutral-400">加载中...</div>}
+        {loading && <div className="p-4 text-center text-xs text-neutral-400">Loading...</div>}
 
         {error && <div className="p-4 text-center text-xs text-red-500">{error}</div>}
 

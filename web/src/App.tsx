@@ -11,18 +11,21 @@ import { attemptReconnect } from '@/store/remote.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
 import { useConversationStore } from '@/store/conversation.store'
+import { useOPFSStore } from '@/store/opfs.store'
 import { initStorage, setupAutoSave } from '@/storage'
 import { useT } from '@/i18n'
 import { PWAUpdateBanner } from '@/pwa/PWAUpdateBanner'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
+import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
 
 type AppRoute =
   | { kind: 'projectsHome' }
   | { kind: 'projectWorkspace'; projectId: string; workspaceId?: string }
   | { kind: 'legacyWorkspace' }
   | { kind: 'webcontainerPreview' }
+  | { kind: 'filePreview'; path: string }
   | { kind: 'unknown' }
 
 function resolveRoute(pathname: string): AppRoute {
@@ -38,6 +41,15 @@ function resolveRoute(pathname: string): AppRoute {
 
   if (normalized === '/webcontainer-preview') {
     return { kind: 'webcontainerPreview' }
+  }
+
+  // Preview route: /preview?path=xxx
+  if (normalized === '/preview') {
+    const params = new URLSearchParams(window.location.search)
+    const path = params.get('path')
+    if (path) {
+      return { kind: 'filePreview', path: decodeURIComponent(path) }
+    }
   }
 
   const segments = normalized.split('/').filter(Boolean)
@@ -85,6 +97,10 @@ function toPath(route: AppRoute): string {
 
   if (route.kind === 'webcontainerPreview') {
     return '/webcontainer-preview'
+  }
+
+  if (route.kind === 'filePreview') {
+    return `/preview?path=${encodeURIComponent(route.path)}`
   }
 
   const encodedProjectId = encodeURIComponent(route.projectId)
@@ -320,6 +336,7 @@ function App() {
       try {
         await runInitStep('initializeProjects', () => useProjectStore.getState().initialize())
         await runInitStep('initializeWorkspaces', () => useWorkspaceStore.getState().initialize())
+        await runInitStep('initializeOPFS', () => useOPFSStore.getState().initialize())
       } catch (err) {
         console.error('[App] Failed to initialize projects/workspaces:', err)
       }
@@ -504,6 +521,10 @@ function App() {
       }
 
       if (currentRoute.kind === 'webcontainerPreview') {
+        return
+      }
+
+      if (currentRoute.kind === 'filePreview') {
         return
       }
 
@@ -739,6 +760,8 @@ function App() {
     />
   ) : currentRoute.kind === 'webcontainerPreview' ? (
     <WebContainerStandalonePreview />
+  ) : currentRoute.kind === 'filePreview' ? (
+    <StandalonePreview filePath={currentRoute.path} />
   ) : isMobile ? (
     <MobileLayout>{workspaceView}</MobileLayout>
   ) : (

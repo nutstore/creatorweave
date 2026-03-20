@@ -20,11 +20,12 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2 } from 'lucide-react'
 import { Icon } from '@iconify/react'
 import { BrandButton, BrandBadge } from '@creatorweave/ui'
 import { formatBytes } from '@/lib/utils'
 import { useOPFSStore } from '@/store/opfs.store'
+import { useT } from '@/i18n'
 import type { PendingChange } from '@/opfs/types/opfs-types'
 
 const HIDDEN_PATTERNS = [
@@ -59,13 +60,15 @@ interface FileTreePanelBaseProps {
 type FileTreePanelProps =
   | (FileTreePanelBaseProps & {
       mode?: 'all'
-      onFileSelect: (path: string, handle: FileSystemFileHandle) => void
+      onFileSelect: (path: string, handle: FileSystemFileHandle | null) => void
       onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
+      onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
     })
   | (FileTreePanelBaseProps & {
       mode: 'directories'
-      onFileSelect?: (path: string, handle: FileSystemFileHandle) => void
+      onFileSelect?: (path: string, handle: FileSystemFileHandle | null) => void
       onDirectorySelect?: (path: string, handle: FileSystemDirectoryHandle) => void
+      onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
     })
 
 /** Icon name by file extension (using vscode-icons) */
@@ -157,6 +160,7 @@ function getFileIconName(name: string, kind: 'file' | 'directory'): string {
 
 /** Pending status badge using brand badge component */
 function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
+  const t = useT()
   if (!type) return null
 
   const variantMap = {
@@ -166,9 +170,15 @@ function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
   }
 
   const labelMap = {
-    create: '新建',
-    modify: '修改',
-    delete: '删除',
+    create: 'A',
+    modify: 'M',
+    delete: 'D',
+  }
+
+  const titleKeyMap = {
+    create: 'fileTree.pending.create',
+    modify: 'fileTree.pending.modify',
+    delete: 'fileTree.pending.delete',
   }
 
   return (
@@ -176,10 +186,10 @@ function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
       type="badge"
       variant={variantMap[type]}
       shape="pill"
-      className="h-4 min-w-4 px-1 text-[10px]"
-      title={`待${labelMap[type]}`}
+      className="h-4 min-w-4 px-1 text-[10px] font-mono"
+      title={t(titleKeyMap[type])}
     >
-      {labelMap[type][0]}
+      {labelMap[type]}
     </BrandBadge>
   )
 }
@@ -200,6 +210,7 @@ function TreeNodeRow({
   selected,
   pendingType,
   onClick,
+  onInspect,
 }: {
   node: TreeNode
   depth: number
@@ -207,6 +218,7 @@ function TreeNodeRow({
   selected: boolean
   pendingType: PendingChange['type'] | null
   onClick: () => void
+  onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
@@ -319,13 +331,27 @@ function TreeNodeRow({
             className="z-dropdown fixed min-w-[6rem] overflow-hidden rounded border bg-popover py-0.5 shadow-md"
             style={{ left: contextMenuPos.x + 20, top: contextMenuPos.y }}
           >
-            <button
-              className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
-              onClick={handleCopyPath}
-            >
-              <Copy className="h-3 w-3" />
-              <span>复制路径</span>
-            </button>
+            {!isDir && (
+              <button
+                className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
+                onClick={handleCopyPath}
+              >
+                <Copy className="h-3 w-3" />
+                <span>复制路径</span>
+              </button>
+            )}
+            {!isDir && onInspect && node.path.endsWith('.html') && (
+              <button
+                className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
+                onClick={() => {
+                  onInspect(node.path, node.handle as FileSystemFileHandle)
+                  handleCloseMenu()
+                }}
+              >
+                <MousePointer2 className="h-3 w-3" />
+                <span>元素审查</span>
+              </button>
+            )}
           </div>,
           document.body
         )}
@@ -342,6 +368,7 @@ function TreeBranch({
   pendingMap,
   onToggle,
   onNodeClick,
+  onInspect,
 }: {
   nodes: TreeNode[]
   depth: number
@@ -350,6 +377,7 @@ function TreeBranch({
   pendingMap: Map<string, PendingChange['type']>
   onToggle: (node: TreeNode) => void
   onNodeClick: (node: TreeNode) => void
+  onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
   // Sort: directories first, then alphabetically
   const sorted = [...nodes].sort((a, b) => {
@@ -373,6 +401,7 @@ function TreeBranch({
               selected={selected}
               pendingType={pendingType}
               onClick={() => onNodeClick(node)}
+              onInspect={onInspect ? (path, handle) => onInspect(path, handle) : undefined}
             />
             {expanded && node.children && (
               <TreeBranch
@@ -383,6 +412,7 @@ function TreeBranch({
                 pendingMap={pendingMap}
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
+                onInspect={onInspect}
               />
             )}
           </div>
@@ -397,6 +427,7 @@ export function FileTreePanel({
   rootName,
   onFileSelect,
   onDirectorySelect,
+  onInspect,
   selectedPath,
   mode = 'all',
   showHeader = true,
@@ -418,48 +449,90 @@ export function FileTreePanel({
     return map
   }, [pendingChanges])
 
+  /** Get pending create changes that belong to a specific parent directory */
+  const getPendingCreatesForPath = useCallback(
+    (parentPath: string): PendingChange[] => {
+      return pendingChanges.filter((change) => {
+        if (change.type !== 'create') return false
+        // Check if the file's parent matches the parentPath
+        const parentOfFile = change.path.split('/').slice(0, -1).join('/')
+        return parentOfFile === parentPath
+      })
+    },
+    [pendingChanges]
+  )
+
+  /** Get pending create subdirectory names that don't exist on disk */
+  const getPendingCreateSubdirs = useCallback(
+    (parentPath: string, diskSubdirs: Set<string>): string[] => {
+      const subdirs = new Set<string>()
+      for (const change of pendingChanges) {
+        if (change.type !== 'create') continue
+        // Check if the path is under parentPath
+        const expectedPrefix = parentPath ? `${parentPath}/` : ''
+        if (!change.path.startsWith(expectedPrefix)) continue
+        // Get the first subdirectory component
+        const relative = change.path.slice(expectedPrefix.length)
+        const parts = relative.split('/')
+        if (parts.length >= 2) {
+          // There's a subdirectory
+          const subdir = parts[0]
+          // Only add if it doesn't exist on disk
+          if (!diskSubdirs.has(subdir)) {
+            subdirs.add(subdir)
+          }
+        }
+      }
+      return Array.from(subdirs)
+    },
+    [pendingChanges]
+  )
+
   /** Check if a file/directory name should be hidden */
   const isHidden = useCallback(
     (name: string): boolean => HIDDEN_PATTERNS.some((pattern) => pattern.test(name)),
     []
   )
 
-  /** Load children of a directory handle */
+  /** Load children of a directory handle (can be null for OPFS-only directories) */
   const loadChildren = useCallback(
-    async (dirHandle: FileSystemDirectoryHandle, parentPath: string): Promise<TreeNode[]> => {
+    async (dirHandle: FileSystemDirectoryHandle | null, parentPath: string): Promise<TreeNode[]> => {
       const children: TreeNode[] = []
       const allEntries: string[] = []
 
-      for await (const entry of dirHandle.entries()) {
-        const [name, handle] = entry
-        allEntries.push(name)
+      // If dirHandle is null (OPFS-only directory), skip disk entries
+      if (dirHandle !== null) {
+        for await (const entry of dirHandle.entries()) {
+          const [name, handle] = entry
+          allEntries.push(name)
 
-        // Skip hidden files like .DS_Store
-        if (isHidden(name)) {
-          console.log('[FileTree] Skipping hidden file:', name)
-          continue
-        }
-        const path = parentPath ? `${parentPath}/${name}` : name
-
-        if (handle.kind === 'file') {
-          if (mode === 'directories') continue
-          const fileHandle = handle as FileSystemFileHandle
-          try {
-            const file = await fileHandle.getFile()
-            children.push({ name, path, kind: 'file', size: file.size, handle: fileHandle })
-          } catch (err) {
-            console.warn('[FileTree] Failed to get file details for:', name, err)
-            children.push({ name, path, kind: 'file', handle: fileHandle })
+          // Skip hidden files like .DS_Store
+          if (isHidden(name)) {
+            console.log('[FileTree] Skipping hidden file:', name)
+            continue
           }
-        } else {
-          children.push({
-            name,
-            path,
-            kind: 'directory',
-            handle: handle as FileSystemDirectoryHandle,
-            children: [],
-            loaded: false,
-          })
+          const path = parentPath ? `${parentPath}/${name}` : name
+
+          if (handle.kind === 'file') {
+            if (mode === 'directories') continue
+            const fileHandle = handle as FileSystemFileHandle
+            try {
+              const file = await fileHandle.getFile()
+              children.push({ name, path, kind: 'file', size: file.size, handle: fileHandle })
+            } catch (err) {
+              console.warn('[FileTree] Failed to get file details for:', name, err)
+              children.push({ name, path, kind: 'file', handle: fileHandle })
+            }
+          } else {
+            children.push({
+              name,
+              path,
+              kind: 'directory',
+              handle: handle as FileSystemDirectoryHandle,
+              children: [],
+              loaded: false,
+            })
+          }
         }
       }
 
@@ -470,9 +543,45 @@ export function FileTreePanel({
         resultNames: children.map((c) => c.name).sort(),
       })
 
+      // Merge pending create files into children
+      const pendingCreates = getPendingCreatesForPath(parentPath)
+      for (const pending of pendingCreates) {
+        const fileName = pending.path.split('/').pop()!
+        // Skip if already exists on disk
+        if (children.some((c) => c.name === fileName)) {
+          continue
+        }
+        // Add pending create file (handle is null since it's OPFS-only)
+        children.push({
+          name: fileName,
+          path: pending.path,
+          kind: 'file',
+          handle: null as unknown as FileSystemFileHandle, // null for OPFS-only files
+        })
+        console.log('[FileTree] Added pending create:', pending.path)
+      }
+
+      // Add pending create subdirectories that don't exist on disk
+      const diskSubdirs = new Set(
+        children.filter((c) => c.kind === 'directory').map((c) => c.name)
+      )
+      const pendingSubdirs = getPendingCreateSubdirs(parentPath, diskSubdirs)
+      for (const subdir of pendingSubdirs) {
+        const subdirPath = parentPath ? `${parentPath}/${subdir}` : subdir
+        children.push({
+          name: subdir,
+          path: subdirPath,
+          kind: 'directory',
+          handle: null as unknown as FileSystemDirectoryHandle, // null for OPFS-only dirs
+          children: [],
+          loaded: false,
+        })
+        console.log('[FileTree] Added pending create subdir:', subdirPath)
+      }
+
       return children
     },
-    [isHidden, mode]
+    [isHidden, mode, getPendingCreatesForPath, getPendingCreateSubdirs]
   )
 
   /** Load root directory and optionally reload expanded paths */
@@ -534,7 +643,12 @@ export function FileTreePanel({
       // Load children if not yet loaded
       if (!node.loaded) {
         try {
-          const children = await loadChildren(node.handle as FileSystemDirectoryHandle, node.path)
+          // If node.handle is null (OPFS-only directory), pass null to loadChildren
+          // which will only load pending creates
+          const children = await loadChildren(
+            node.handle as FileSystemDirectoryHandle | null,
+            node.path
+          )
           node.children = children
           node.loaded = true
           // Force re-render by creating new array
@@ -628,6 +742,7 @@ export function FileTreePanel({
               pendingMap={pendingMap}
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
+              onInspect={onInspect}
             />
           )}
         </div>
