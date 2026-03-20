@@ -670,6 +670,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             await get().updateCurrentCounts()
           }
           set({ pendingChanges: null, showPreview: false })
+          // Also refresh OPFS store so FileTreePanel updates
+          try {
+            const { useOPFSStore } = await import('./opfs.store')
+            await useOPFSStore.getState().refresh()
+          } catch (e) {
+            console.warn('[WorkspaceStore] Failed to refresh OPFS store:', e)
+          }
         },
 
         discardPendingPath: async (path: string) => {
