@@ -112,17 +112,6 @@ export interface PendingChangeRow {
   timestamp: number
 }
 
-export interface UndoRecordRow {
-  id: string
-  workspace_id: string
-  path: string
-  type: 'create' | 'modify' | 'delete'
-  old_content_path: string | null
-  new_content_path: string | null
-  timestamp: number
-  undone: number // BOOLEAN
-}
-
 //=============================================================================
 // SQLite Worker Client
 //=============================================================================

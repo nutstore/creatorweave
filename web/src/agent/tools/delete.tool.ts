@@ -9,7 +9,6 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import { getUndoManager } from '@/undo/undo-manager'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -92,22 +91,13 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
     })
   }
 
-  const { deleteFile, readFile, getPendingChanges } = useOPFSStore.getState()
+  const { deleteFile, getPendingChanges } = useOPFSStore.getState()
   const deleted: string[] = []
   const failed: Array<{ path: string; error: string }> = []
 
   for (const target of targets) {
     try {
-      let oldContent: string | null = null
-      try {
-        const current = await readFile(target, context.directoryHandle)
-        oldContent = typeof current.content === 'string' ? current.content : null
-      } catch {
-        // Ignore old content read errors; deleteFile will produce canonical error if needed.
-      }
-
       await deleteFile(target, context.directoryHandle)
-      getUndoManager().recordModification(target, 'delete', oldContent, null)
 
       const session = useRemoteStore.getState().session
       if (session) {

@@ -15,7 +15,6 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import { getUndoManager } from '@/undo/undo-manager'
 import micromatch from 'micromatch'
 import { traverseDirectory } from '@/services/traversal.service'
 
@@ -145,8 +144,6 @@ async function executeSingleEdit(
     await writeFile(path, newContent, toolContext.directoryHandle)
 
     const pendingChanges = getPendingChanges()
-
-    getUndoManager().recordModification(path, 'modify', fileContent, newContent)
 
     const session = useRemoteStore.getState().session
     if (session) {
@@ -285,7 +282,6 @@ async function executeBatchEdit(
 
             if (!dryRun) {
               await writeFile(filePath, newContent, toolContext.directoryHandle)
-              getUndoManager().recordModification(filePath, 'modify', fileContent, newContent)
               totalReplacements++
             }
           }
@@ -313,7 +309,6 @@ async function executeBatchEdit(
 
             if (!dryRun) {
               await writeFile(filePath, newContent, toolContext.directoryHandle)
-              getUndoManager().recordModification(filePath, 'modify', fileContent, newContent)
               totalReplacements++
             }
           }

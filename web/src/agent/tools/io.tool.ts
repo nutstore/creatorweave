@@ -13,7 +13,6 @@ import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { getActiveWorkspace } from '@/store/workspace.store'
-import { getUndoManager } from '@/undo/undo-manager'
 
 //=============================================================================
 // Read Tool
@@ -431,7 +430,6 @@ async function executeSingleWrite(
     await writeFile(path, content, directoryHandle)
 
     const pendingChanges = getPendingChanges()
-    getUndoManager().recordModification(path, isNew ? 'create' : 'modify', isNew ? null : '', content)
 
     const session = useRemoteStore.getState().session
     if (session) {
@@ -470,7 +468,6 @@ async function executeBatchWrite(
     try {
       const isNew = !hasCachedFile(file.path)
       await writeFile(file.path, file.content, directoryHandle)
-      getUndoManager().recordModification(file.path, isNew ? 'create' : 'modify', isNew ? null : '', file.content)
 
       results.push({ path: file.path, success: true })
       if (isNew) created++

@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-import { Clock, RotateCcw, HardDrive, Trash2, Check, Info, AlertTriangle } from 'lucide-react'
+import { Clock, HardDrive, Trash2, Check, Info, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useConversationStore } from '@/store/conversation.store'
@@ -245,8 +245,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                     <div className="text-[10px] text-amber-800">
                       <span className="font-semibold">注意：</span>
-                      将丢弃 {cleanupPreview.pendingCount} 个未保存的修改和{' '}
-                      {cleanupPreview.undoCount} 条撤销记录
+                      将丢弃 {cleanupPreview.pendingCount} 个未保存的修改
                     </div>
                   </div>
                 )}
@@ -353,8 +352,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
             {(() => {
               const workspace = workspaces.find((w) => w.id === workspaceToDelete)
               const hasPending = workspace?.pendingCount ? workspace.pendingCount > 0 : false
-              const hasUndo = workspace?.undoCount ? workspace.undoCount > 0 : false
-              const hasData = hasPending || hasUndo
+              const hasData = hasPending
 
               return (
                 <>
@@ -370,8 +368,6 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       </p>
                       <p className="ml-5 text-[10px] text-amber-700">
                         {hasPending && `${workspace?.pendingCount ?? 0} 个待同步的修改`}
-                        {hasPending && hasUndo && '，'}
-                        {hasUndo && `${workspace?.undoCount ?? 0} 条撤销记录`}
                       </p>
                     </div>
                   )}
@@ -514,7 +510,6 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                 {storageSessions.map((session) => {
                   const isActive = session.id === activeWorkspaceId
                   const hasPending = session.pendingCount > 0
-                  const hasUndo = session.undoCount > 0
 
                   return (
                     <li
@@ -556,17 +551,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                               {session.pendingCount}
                             </BrandBadge>
                           )}
-                          {hasUndo && (
-                            <BrandBadge
-                              type="tag"
-                              color="blue"
-                              className="!gap-0.5 !px-1.5 !py-0 !text-[10px]"
-                            >
-                              <RotateCcw className="h-2.5 w-2.5" />
-                              {session.undoCount}
-                            </BrandBadge>
-                          )}
-                          {!hasPending && !hasUndo && <span className="text-muted">无变更</span>}
+                          {!hasPending && <span className="text-muted">无变更</span>}
                         </div>
                       </button>
 

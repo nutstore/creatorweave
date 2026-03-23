@@ -14,9 +14,8 @@
  * - AgentManager: Manages agents within a project
  * - SessionManager: Top-level manager for multiple session workspaces
  * - SessionWorkspace: Encapsulates single session's OPFS operations
- * - SessionCacheManager: Per-session file caching with mtime-based change detection
  * - SessionPendingManager: Per-session pending sync queue management
- * - SessionUndoStorage: Per-session undo history stored in OPFS
+ * - (Undo history is stored in SQLite, not OPFS)
  */
 
 // Types
@@ -80,9 +79,7 @@ export {
 export {
   SessionManager,
   SessionWorkspace,
-  SessionCacheManager,
   SessionPendingManager,
-  SessionUndoStorage,
   getSessionManager,
   resetSessionManager,
 } from './session'

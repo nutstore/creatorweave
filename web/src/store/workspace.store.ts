@@ -65,8 +65,6 @@ export function getWorkspaceDisplayName(
 export interface WorkspaceWithStats extends SessionMetadata {
   /** Number of pending changes */
   pendingCount: number
-  /** Number of undo records */
-  undoCount: number
 }
 
 /**
@@ -80,7 +78,6 @@ function sqliteSessionToWorkspaceStats(session: Workspace): WorkspaceWithStats {
     lastActiveAt: session.lastAccessedAt,
     cacheSize: session.cacheSize,
     pendingCount: session.pendingCount,
-    undoCount: session.undoCount,
     modifiedFiles: session.modifiedFiles,
     status: session.status,
   }
@@ -104,9 +101,6 @@ interface WorkspaceState {
 
   /** Current workspace's pending count (for quick access) */
   currentPendingCount: number
-
-  /** Current workspace's undo count (for quick access) */
-  currentUndoCount: number
 
   /** Whether workspaces are being loaded/modified */
   isLoading: boolean
@@ -206,7 +200,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         activeWorkspaceId: null,
         workspaces: [],
         currentPendingCount: 0,
-        currentUndoCount: 0,
         isLoading: false,
         error: null,
         initialized: false,
@@ -235,7 +228,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 workspaces: [],
                 activeWorkspaceId: null,
                 currentPendingCount: 0,
-                currentUndoCount: 0,
                 isLoading: false,
                 initialized: true,
               })
@@ -260,7 +252,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               workspaces,
               activeWorkspaceId: activeId,
               currentPendingCount: activeId ? workspaces[0]?.pendingCount || 0 : 0,
-              currentUndoCount: activeId ? workspaces[0]?.undoCount || 0 : 0,
               isLoading: false,
               initialized: true,
             })
@@ -305,7 +296,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               status: 'active',
               cacheSize: 0,
               pendingCount: workspace.pendingCount,
-              undoCount: workspace.undoCount,
               modifiedFiles: 0,
             })
 
@@ -316,7 +306,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               lastActiveAt: Date.now(),
               cacheSize: 0,
               pendingCount: workspace.pendingCount,
-              undoCount: workspace.undoCount,
               modifiedFiles: 0,
               status: 'active',
             }
@@ -325,7 +314,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               workspaces: [newWorkspace, ...get().workspaces],
               activeWorkspaceId: id,
               currentPendingCount: workspace.pendingCount,
-              currentUndoCount: workspace.undoCount,
               isLoading: false,
             })
 
@@ -409,7 +397,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 status: 'active',
                 cacheSize: 0,
                 pendingCount: workspace.pendingCount,
-                undoCount: workspace.undoCount,
                 modifiedFiles: 0,
               })
 
@@ -420,7 +407,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 lastActiveAt: Date.now(),
                 cacheSize: 0,
                 pendingCount: workspace.pendingCount,
-                undoCount: workspace.undoCount,
                 modifiedFiles: 0,
                 status: 'active',
               }
@@ -429,7 +415,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 workspaces: [newWorkspace, ...get().workspaces],
                 activeWorkspaceId: id,
                 currentPendingCount: workspace.pendingCount,
-                currentUndoCount: workspace.undoCount,
                 isLoading: false,
               })
 
@@ -474,7 +459,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Update the workspace in SQLite with fresh stats
               await repo.updateWorkspaceStats(id, {
                 pendingCount: newWorkspace.pendingCount,
-                undoCount: newWorkspace.undoCount,
                 modifiedFiles: 0,
               })
 
@@ -488,7 +472,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         lastActiveAt: Date.now(),
                         cacheSize: 0,
                         pendingCount: newWorkspace.pendingCount,
-                        undoCount: newWorkspace.undoCount,
                         modifiedFiles: 0,
                         status: 'active',
                       }
@@ -496,7 +479,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 ),
                 activeWorkspaceId: id,
                 currentPendingCount: newWorkspace.pendingCount,
-                currentUndoCount: newWorkspace.undoCount,
                 isLoading: false,
               })
 
@@ -521,7 +503,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ),
               activeWorkspaceId: id,
               currentPendingCount: workspace.pendingCount,
-              currentUndoCount: workspace.undoCount,
               isLoading: false,
               switchingWorkspaceId: null,
             })
@@ -574,8 +555,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               activeWorkspaceId: newActiveId,
               currentPendingCount:
                 newActiveId && remaining.length > 0 ? remaining[0]?.pendingCount || 0 : 0,
-              currentUndoCount:
-                newActiveId && remaining.length > 0 ? remaining[0]?.undoCount || 0 : 0,
               isLoading: false,
             })
 
@@ -637,15 +616,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Update counts in SQLite
               await repo.updateWorkspaceStats(activeWorkspaceId, {
                 pendingCount: workspace.pendingCount,
-                undoCount: workspace.undoCount,
               })
 
               set({
                 currentPendingCount: workspace.pendingCount,
-                currentUndoCount: workspace.undoCount,
                 workspaces: get().workspaces.map((w) =>
                   w.id === activeWorkspaceId
-                    ? { ...w, pendingCount: workspace.pendingCount, undoCount: workspace.undoCount }
+                    ? { ...w, pendingCount: workspace.pendingCount }
                     : w
                 ),
               })

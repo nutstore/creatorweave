@@ -154,31 +154,29 @@ writeFile(path, content)
 
 ---
 
-### SessionCacheManager
+### files/ Directory (Unified File Storage)
 
-**职责**: 文件缓存管理，支持 mtime 变更检测
+**职责**: 直接的文件存储，无单独缓存层
 
-**位置**: `src/opfs/session/session-cache.ts`
+**位置**: `src/opfs/session/session-workspace.ts` 中的 `files/` 目录操作
 
 **特性**:
 
-- 基于文件修改时间（mtime）的缓存失效
+- 所有文件直接存储在 `files/` 目录
+- 内存索引 (`filesIndex: Set<string>`) 快速查找
+- 支持 mtime 元数据用于变更检测
 - 支持文本和二进制文件
-- 自动计算文件大小和哈希
 
-**缓存流程**:
+**文件读取流程**:
 
 ```
 readFile(path, dirHandle)
     │
-    ├─→ 检查缓存是否存在
+    ├─→ 检查 files/ 目录
     │   ↓
-    ├─→ 存在 → 比较 mtime
-    │   │   ↓
-    │   ├─→ mtime 相同 → 返回缓存
-    │   └─→ mtime 不同 → 从文件系统读取，更新缓存
+    ├─→ 存在 → 返回 files/ 内容
     │
-    └─→ 不存在 → 从文件系统读取，写入缓存
+    └─→ 不存在 → 从 native FS 读取 (如果 dirHandle 存在)
 ```
 
 ---

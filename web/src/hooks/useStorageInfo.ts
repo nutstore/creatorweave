@@ -32,8 +32,6 @@ export interface WorkspaceStorageInfo {
   cacheSizeFormatted: string
   /** Pending changes count */
   pendingCount: number
-  /** Undo records count */
-  undoCount: number
   /** Last active timestamp */
   lastActiveAt: number
 }
@@ -64,8 +62,6 @@ export interface CleanupPreview {
   totalSizeFormatted: string
   /** Number of pending changes that will be lost */
   pendingCount: number
-  /** Number of undo records that will be lost */
-  undoCount: number
   /** Whether there are any unsaved changes */
   hasUnsavedChanges: boolean
   /** List of session names that will be cleaned */
@@ -108,7 +104,6 @@ function sqliteSessionToWithStats(session: Workspace): WorkspaceWithStats {
     lastActiveAt: session.lastAccessedAt,
     cacheSize: session.cacheSize,
     pendingCount: session.pendingCount,
-    undoCount: session.undoCount,
     modifiedFiles: session.modifiedFiles,
     status: session.status,
   }
@@ -181,7 +176,6 @@ export function useStorageInfo(): UseStorageInfoResult {
         cacheSize: workspace.cacheSize || 0,
         cacheSizeFormatted: workspace.cacheSize ? formatBytes(workspace.cacheSize) : '计算中...',
         pendingCount: workspace.pendingCount,
-        undoCount: workspace.undoCount,
         lastActiveAt: workspace.lastActiveAt || 0,
       })
     }
@@ -223,7 +217,6 @@ export function useStorageInfo(): UseStorageInfoResult {
             cacheSize,
             cacheSizeFormatted: formatBytes(cacheSize),
             pendingCount: session.pendingCount,
-            undoCount: session.undoCount,
             lastActiveAt: session.lastActiveAt || 0,
           }
 
@@ -237,7 +230,6 @@ export function useStorageInfo(): UseStorageInfoResult {
             cacheSize: 0,
             cacheSizeFormatted: '0 B',
             pendingCount: session.pendingCount,
-            undoCount: session.undoCount,
             lastActiveAt: session.lastActiveAt || 0,
           })
         }
@@ -289,7 +281,6 @@ export function useStorageInfo(): UseStorageInfoResult {
           cacheSize: session.cacheSize || 0,
           cacheSizeFormatted: session.cacheSize ? formatBytes(session.cacheSize) : '-',
           pendingCount: session.pendingCount,
-          undoCount: session.undoCount,
           lastActiveAt: session.lastActiveAt || 0,
         }))
       }
@@ -411,13 +402,11 @@ export function useStorageInfo(): UseStorageInfoResult {
       // Calculate totals
       let totalSize = 0
       let totalPending = 0
-      let totalUndo = 0
       const sessionNames: string[] = []
 
       for (const session of sessionsToClean) {
         totalSize += session.cacheSize || 0
         totalPending += session.pendingCount || 0
-        totalUndo += session.undoCount || 0
         sessionNames.push(session.name)
       }
 
@@ -426,9 +415,8 @@ export function useStorageInfo(): UseStorageInfoResult {
         totalSize,
         totalSizeFormatted: formatBytes(totalSize),
         pendingCount: totalPending,
-        undoCount: totalUndo,
         hasUnsavedChanges: totalPending > 0,
-        sessionNames,
+        sessionNames
       }
     },
     []

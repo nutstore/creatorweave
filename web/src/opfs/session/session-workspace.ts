@@ -3,14 +3,14 @@
  * Session Workspace
  *
  * Encapsulates a single session's OPFS operations.
- * Coordinates cache, pending queue, and undo storage for file operations.
+ * Coordinates pending queue for file operations.
+ * Undo/redo is handled by SQLite fs_snapshot_files table.
  */
 
 import type {
   FileContent,
   FileMetadata,
   PendingChange,
-  UndoRecord,
   SyncResult,
   FileScanItem,
   FileChange,
@@ -19,9 +19,8 @@ import type {
   SystemLog,
 } from '../types/opfs-types'
 import { ErrorCode } from '../types/opfs-types'
-import { SessionCacheManager } from './session-cache'
+import { getFileContentType } from '../utils/opfs-utils'
 import { SessionPendingManager } from './session-pending'
-import { SessionUndoStorage } from './session-undo'
 import { scanFilesInWorker } from '@/workers/diff-worker-manager'
 import { getRuntimeDirectoryHandle } from '@/native-fs'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
@@ -44,17 +43,19 @@ interface SessionMetadataPersist {
  *
  * Responsibilities:
  * - Encapsulate single session's OPFS operations
- * - Coordinate cache, pending queue, and undo storage
- * - Provide interfaces: readFile, writeFile, deleteFile, getPendingChanges, syncToDisk, clear
+ * - Coordinate pending queue for file operations
+ * - All file content is stored directly in files/ directory
+ * - Undo/redo handled by SQLite fs_snapshot_files
  */
 export class SessionWorkspace {
   readonly sessionId: string
   readonly sessionDir: FileSystemDirectoryHandle
   readonly rootDirectory: string
 
-  private readonly cacheManager: SessionCacheManager
   private readonly pendingManager: SessionPendingManager
-  private readonly undoStorage: SessionUndoStorage
+
+  /** In-memory index of files stored in files/ directory */
+  private filesIndex: Set<string> = new Set()
 
   private initialized = false
   private metadata: SessionMetadataPersist
@@ -64,10 +65,8 @@ export class SessionWorkspace {
     this.sessionDir = sessionDir
     this.rootDirectory = rootDirectory
 
-    // Initialize managers
-    this.cacheManager = new SessionCacheManager(sessionDir)
+    // Initialize pending manager (files/ is the source of truth)
     this.pendingManager = new SessionPendingManager(sessionId, sessionDir)
-    this.undoStorage = new SessionUndoStorage(sessionDir)
 
     // Initial metadata
     this.metadata = {
@@ -87,12 +86,11 @@ export class SessionWorkspace {
     // Load or create metadata
     await this.loadMetadata()
 
-    // Initialize all managers
-    await Promise.all([
-      this.cacheManager.initialize(),
-      this.pendingManager.initialize(),
-      this.undoStorage.initialize(),
-    ])
+    // Initialize pending manager
+    await this.pendingManager.initialize()
+
+    // Build files index from existing files/ directory
+    await this.buildFilesIndex()
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -136,8 +134,209 @@ export class SessionWorkspace {
     await writable.close()
   }
 
+  // ============ Files Directory Operations (replaces cache) ============
+
   /**
-   * Read file from session (cache first)
+   * Build in-memory index of files in files/ directory
+   */
+  private async buildFilesIndex(): Promise<void> {
+    this.filesIndex.clear()
+    try {
+      const filesDir = await this.getFilesDir()
+      await this.scanDirRecursive(filesDir, '', this.filesIndex)
+    } catch {
+      // files/ directory doesn't exist yet
+    }
+  }
+
+  /**
+   * Recursively scan directory and add paths to index
+   */
+  private async scanDirRecursive(
+    dir: FileSystemDirectoryHandle,
+    prefix: string,
+    index: Set<string>
+  ): Promise<void> {
+    for await (const [name, handle] of dir.entries()) {
+      const path = prefix ? `${prefix}/${name}` : name
+      if (handle.kind === 'file') {
+        index.add(path)
+      } else {
+        await this.scanDirRecursive(handle as FileSystemDirectoryHandle, path, index)
+      }
+    }
+  }
+
+  /**
+   * Read file content from files/ directory
+   * @returns Content, mtime, size, contentType or null if not found
+   */
+  private async readFromFilesDir(
+    path: string
+  ): Promise<{ content: FileContent; mtime: number; size: number; contentType: 'text' | 'binary' } | null> {
+    try {
+      const filesDir = await this.getFilesDir()
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = filesDir
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      let content: FileContent
+      let contentType: 'text' | 'binary' = 'binary'
+      try {
+        content = await file.text()
+        contentType = 'text'
+      } catch {
+        content = await file.arrayBuffer()
+      }
+      return {
+        content,
+        mtime: file.lastModified,
+        size: file.size,
+        contentType,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Write file content to files/ directory
+   */
+  private async writeToFilesDir(path: string, content: FileContent): Promise<void> {
+    const filesDir = await this.getFilesDir()
+    const parts = path.split('/').filter(Boolean)
+    if (parts.length === 0) return
+
+    const fileName = parts[parts.length - 1]
+    let currentDir = filesDir
+
+    // Create directories if needed
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentDir = await currentDir.getDirectoryHandle(parts[i], { create: true })
+    }
+
+    // Write file
+    const targetFile = await currentDir.getFileHandle(fileName, { create: true })
+    const writable = await targetFile.createWritable()
+    await writable.write(content)
+    await writable.close()
+
+    // Update index
+    this.filesIndex.add(path)
+  }
+
+  /**
+   * Delete file from files/ directory
+   */
+  private async deleteFromFilesDir(path: string): Promise<void> {
+    try {
+      const filesDir = await this.getFilesDir()
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return
+
+      let current = filesDir
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      await current.removeEntry(parts[parts.length - 1])
+
+      // Update index
+      this.filesIndex.delete(path)
+    } catch {
+      // File doesn't exist, ignore
+    }
+  }
+
+  /**
+   * Delete file from files/ directory if it exists (alias for deleteFromFilesDir)
+   */
+  private async deleteFromFilesDirIfExists(path: string): Promise<void> {
+    await this.deleteFromFilesDir(path)
+  }
+
+  /**
+   * Check if file exists in files/ directory (uses in-memory index)
+   */
+  private hasFileInIndex(path: string): boolean {
+    return this.filesIndex.has(path)
+  }
+
+  /**
+   * Get all file paths from files/ directory (uses in-memory index)
+   */
+  private getIndexedPaths(): string[] {
+    return Array.from(this.filesIndex)
+  }
+
+  /**
+   * Clear all files from files/ directory
+   */
+  private async clearFilesDir(): Promise<void> {
+    try {
+      // Remove entire files/ directory and recreate
+      await this.sessionDir.removeEntry(FILES_DIR, { recursive: true })
+      // Recreate empty
+      await this.sessionDir.getDirectoryHandle(FILES_DIR, { create: true })
+      this.filesIndex.clear()
+    } catch {
+      // Directory doesn't exist, just clear index
+      this.filesIndex.clear()
+    }
+  }
+
+  /**
+   * Get statistics for files/ directory
+   */
+  private async getFilesStats(): Promise<{ size: number; fileCount: number }> {
+    let size = 0
+    let fileCount = 0
+
+    try {
+      const filesDir = await this.getFilesDir()
+      const stats = await this.calculateDirStats(filesDir)
+      size = stats.size
+      fileCount = stats.fileCount
+    } catch {
+      // Directory doesn't exist
+    }
+
+    return { size, fileCount }
+  }
+
+  /**
+   * Calculate directory statistics recursively
+   */
+  private async calculateDirStats(
+    dir: FileSystemDirectoryHandle
+  ): Promise<{ size: number; fileCount: number }> {
+    let size = 0
+    let fileCount = 0
+
+    for await (const [, handle] of dir.entries()) {
+      if (handle.kind === 'file') {
+        const file = await (handle as FileSystemFileHandle).getFile()
+        size += file.size
+        fileCount++
+      } else {
+        const subStats = await this.calculateDirStats(handle as FileSystemDirectoryHandle)
+        size += subStats.size
+        fileCount += subStats.fileCount
+      }
+    }
+
+    return { size, fileCount }
+  }
+
+  // ============ File Operations ============
+
+  /**
+   * Read file from session (files/ first, then native FS)
    * @param path File path
    * @param directoryHandle Real filesystem directory handle
    * @returns File content and metadata
@@ -148,32 +347,42 @@ export class SessionWorkspace {
   ): Promise<{ content: FileContent; metadata: FileMetadata }> {
     if (!this.initialized) await this.initialize()
 
-    // If path has pending changes, always read workspace state (OPFS cache/files),
+    // If path has pending changes, always read workspace state (OPFS files/),
     // never fallback to native disk to avoid showing stale on-disk content.
     const isPendingPath = this.pendingManager.hasPendingPath(path)
     if (directoryHandle && !isPendingPath) {
-      return await this.cacheManager.read(path, directoryHandle)
-    }
-
-    const cached = await this.cacheManager.readCached(path)
-    if (cached !== null) {
-      return {
-        content: cached,
-        metadata: this.buildVirtualMetadata(path, cached),
+      // Try to read from files/ first
+      if (this.hasFileInIndex(path)) {
+        const fromFilesDir = await this.readFromFilesDir(path)
+        if (fromFilesDir) {
+          return {
+            content: fromFilesDir.content,
+            metadata: {
+              path,
+              mtime: fromFilesDir.mtime,
+              size: fromFilesDir.size,
+              contentType: fromFilesDir.contentType,
+            },
+          }
+        }
       }
+      // Fallback to native filesystem
+      return await this.readFromNativeFS(path, directoryHandle)
     }
 
-    const fromFilesDir = await this.readFromFilesDir(path)
-    if (fromFilesDir) {
-      await this.cacheManager.write(path, fromFilesDir.content)
-      return {
-        content: fromFilesDir.content,
-        metadata: {
-          path,
-          mtime: fromFilesDir.mtime,
-          size: fromFilesDir.size,
-          contentType: fromFilesDir.contentType,
-        },
+    // Read from files/ only (no native FS available or has pending changes)
+    if (this.hasFileInIndex(path)) {
+      const fromFilesDir = await this.readFromFilesDir(path)
+      if (fromFilesDir) {
+        return {
+          content: fromFilesDir.content,
+          metadata: {
+            path,
+            mtime: fromFilesDir.mtime,
+            size: fromFilesDir.size,
+            contentType: fromFilesDir.contentType,
+          },
+        }
       }
     }
 
@@ -181,10 +390,53 @@ export class SessionWorkspace {
   }
 
   /**
-   * Write file to session (cache + pending + undo)
+   * Read file from native filesystem
+   */
+  private async readFromNativeFS(
+    path: string,
+    directoryHandle: FileSystemDirectoryHandle
+  ): Promise<{ content: FileContent; metadata: FileMetadata }> {
+    const fileHandle = await this.getFileHandle(directoryHandle, path)
+    const file = await fileHandle.getFile()
+    const mtime = file.lastModified
+    const size = file.size
+    const contentType = getFileContentType(path)
+    let content: FileContent
+    if (contentType === 'text') {
+      content = await file.text()
+    } else {
+      content = await file.arrayBuffer()
+    }
+
+    return {
+      content,
+      metadata: {
+        path,
+        mtime,
+        size,
+        contentType,
+      },
+    }
+  }
+
+  /**
+   * Read file content from files/ directory only (no native FS fallback).
+   * Returns null if the file is not in files/.
+   */
+  async readCachedFile(path: string): Promise<FileContent | null> {
+    if (!this.initialized) await this.initialize()
+    if (!this.hasFileInIndex(path)) {
+      return null
+    }
+    const fromFilesDir = await this.readFromFilesDir(path)
+    return fromFilesDir?.content ?? null
+  }
+
+  /**
+   * Write file to session (files/ + pending)
    * @param path File path
    * @param content File content
-   * @param directoryHandle Real filesystem directory handle (for old content)
+   * @param directoryHandle Real filesystem directory handle (for mtime baseline)
    */
   async writeFile(
     path: string,
@@ -193,27 +445,29 @@ export class SessionWorkspace {
   ): Promise<void> {
     if (!this.initialized) await this.initialize()
 
-    // Get old content for undo
-    let oldContent: FileContent | undefined
+    // Get baseline mtime for conflict detection
     let baselineFsMtime = 0
     try {
       if (directoryHandle) {
-        const oldData = await this.cacheManager.read(path, directoryHandle)
-        oldContent = oldData.content
-        baselineFsMtime = oldData.metadata.mtime || 0
-      } else {
-        const cached = await this.cacheManager.readCached(path)
-        if (cached !== null) oldContent = cached
+        // Try to read existing content from files/ first, then native FS
+        if (this.hasFileInIndex(path)) {
+          const fromFiles = await this.readFromFilesDir(path)
+          if (fromFiles) {
+            baselineFsMtime = fromFiles.mtime
+          }
+        } else {
+          // Read from native filesystem
+          const fromNative = await this.readFromNativeFS(path, directoryHandle)
+          baselineFsMtime = fromNative.metadata.mtime
+        }
       }
     } catch {
-      // File doesn't exist, oldContent stays undefined
+      // File doesn't exist, baselineFsMtime stays 0
     }
 
-    // Record to undo history
-    await this.undoStorage.recordModification(path, content, oldContent)
-
-    // Write to cache
-    await this.cacheManager.write(path, content)
+    // Write to files/ directory
+    await this.writeToFilesDir(path, content)
+    this.filesIndex.add(path)
 
     // Notify other tabs about the file change
     try {
@@ -235,32 +489,25 @@ export class SessionWorkspace {
   /**
    * Delete file from session
    * @param path File path
-   * @param directoryHandle Real filesystem directory handle (for old content)
+   * @param directoryHandle Real filesystem directory handle (for mtime baseline)
    */
   async deleteFile(path: string, directoryHandle?: FileSystemDirectoryHandle | null): Promise<void> {
     if (!this.initialized) await this.initialize()
 
-    // Get old content for undo
-    let oldContent: FileContent | undefined
+    // Get baseline mtime for conflict detection
     let baselineFsMtime = 0
     try {
       if (directoryHandle) {
-        const oldData = await this.cacheManager.read(path, directoryHandle)
-        oldContent = oldData.content
+        const oldData = await this.readFromNativeFS(path, directoryHandle)
         baselineFsMtime = oldData.metadata.mtime || 0
-      } else {
-        const cached = await this.cacheManager.readCached(path)
-        if (cached !== null) oldContent = cached
       }
     } catch {
-      // File doesn't exist in cache
+      // File doesn't exist
     }
 
-    // Record to undo history
-    await this.undoStorage.recordDeletion(path, oldContent)
-
-    // Delete from cache
-    await this.cacheManager.delete(path)
+    // Delete from files/ directory
+    await this.deleteFromFilesDir(path)
+    this.filesIndex.delete(path)
 
     // Mark as pending for deletion
     await this.pendingManager.markForDeletion(path, baselineFsMtime)
@@ -285,74 +532,6 @@ export class SessionWorkspace {
   }
 
   /**
-   * Get undo records
-   */
-  getUndoRecords(): UndoRecord[] {
-    return this.undoStorage.getAll()
-  }
-
-  /**
-   * Get undo count
-   */
-  get undoCount(): number {
-    return this.undoStorage.count
-  }
-
-  /**
-   * Undo a specific operation
-   * @param recordId Undo record ID
-   */
-  async undo(recordId: string): Promise<void> {
-    if (!this.initialized) await this.initialize()
-
-    const record = this.undoStorage.getRecord(recordId)
-    if (!record) {
-      throw new Error(`Undo record not found: ${recordId}`)
-    }
-
-    await this.undoStorage.undo(recordId, this.cacheManager)
-
-    // Keep pending queue aligned with working cache state.
-    if (record.type === 'create') {
-      await this.pendingManager.removeByPath(record.path)
-    } else if (record.type === 'modify' || record.type === 'delete') {
-      await this.pendingManager.add(record.path)
-    }
-
-    // Update last accessed time
-    this.metadata.lastAccessedAt = Date.now()
-    await this.saveMetadata()
-  }
-
-  /**
-   * Redo a specific operation
-   * @param recordId Undo record ID
-   */
-  async redo(recordId: string): Promise<void> {
-    if (!this.initialized) await this.initialize()
-
-    const record = this.undoStorage.getRecord(recordId)
-    if (!record) {
-      throw new Error(`Undo record not found: ${recordId}`)
-    }
-
-    await this.undoStorage.redo(recordId, this.cacheManager)
-
-    // Keep pending queue aligned with redone operation semantics.
-    if (record.type === 'create') {
-      await this.pendingManager.markAsCreated(record.path)
-    } else if (record.type === 'modify') {
-      await this.pendingManager.add(record.path)
-    } else if (record.type === 'delete') {
-      await this.pendingManager.markForDeletion(record.path)
-    }
-
-    // Update last accessed time
-    this.metadata.lastAccessedAt = Date.now()
-    await this.saveMetadata()
-  }
-
-  /**
    * Sync pending changes to real filesystem
    * @param directoryHandle Real filesystem directory handle
    * @returns Sync result
@@ -360,7 +539,29 @@ export class SessionWorkspace {
   async syncToDisk(directoryHandle: FileSystemDirectoryHandle, onlyPaths?: string[]): Promise<SyncResult> {
     if (!this.initialized) await this.initialize()
 
-    const result = await this.pendingManager.sync(directoryHandle, this.cacheManager, onlyPaths)
+    // Create cache interface for sync operation
+    const cacheInterface = {
+      readCached: async (path: string) => {
+        const result = await this.readFromFilesDir(path)
+        return result?.content ?? null
+      },
+      read: async (path: string, dirHandle?: FileSystemDirectoryHandle | null) => {
+        // Try files/ first, then native FS if available
+        const fromFiles = await this.readFromFilesDir(path)
+        if (fromFiles) return { content: fromFiles.content }
+        if (dirHandle) {
+          try {
+            const result = await this.readFromNativeFS(path, dirHandle)
+            return { content: result.content }
+          } catch {
+            return null
+          }
+        }
+        return null
+      },
+    }
+
+    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths)
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -399,14 +600,16 @@ export class SessionWorkspace {
   }
 
   /**
-   * Clear all session data (cache, pending, undo)
+   * Clear all session data (files, pending)
    */
   async clear(): Promise<void> {
     await Promise.all([
-      this.cacheManager.clear(),
+      this.clearFilesDir(),
       this.pendingManager.clear(),
-      this.undoStorage.clear(),
     ])
+
+    // Clear in-memory index
+    this.filesIndex.clear()
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -417,17 +620,15 @@ export class SessionWorkspace {
    * Get session statistics
    */
   async getStats(): Promise<{
-    cache: { size: number; fileCount: number }
+    files: { size: number; fileCount: number }
     pending: number
-    undo: number
     metadata: SessionMetadataPersist
   }> {
-    const cacheStats = await this.cacheManager.getStats()
+    const filesStats = await this.getFilesStats()
 
     return {
-      cache: cacheStats,
+      files: filesStats,
       pending: this.pendingCount,
-      undo: this.undoCount,
       metadata: { ...this.metadata },
     }
   }
@@ -436,16 +637,7 @@ export class SessionWorkspace {
    * Get cached file paths
    */
   getCachedPaths(): string[] {
-    return this.cacheManager.getCachedPaths()
-  }
-
-  /**
-   * Read file content from working cache only (no native FS fallback).
-   * Useful for previewing pending edits that are not materialized into files/ yet.
-   */
-  async readCachedFile(path: string): Promise<FileContent | null> {
-    if (!this.initialized) await this.initialize()
-    return await this.cacheManager.readCached(path)
+    return this.getIndexedPaths()
   }
 
   async createDraftSnapshot(summary?: string): Promise<{ snapshotId: string; opCount: number } | null> {
@@ -532,8 +724,8 @@ export class SessionWorkspace {
             unresolved.push(op.path)
             continue
           }
-          await this.cacheManager.delete(op.path)
           await this.deleteFromFilesDirIfExists(op.path)
+          this.filesIndex.delete(op.path)
           if (directoryHandle) {
             await this.deleteFromNativeIfExists(directoryHandle, op.path)
           }
@@ -603,8 +795,8 @@ export class SessionWorkspace {
             unresolved.push(op.path)
             continue
           }
-          await this.cacheManager.delete(op.path)
           await this.deleteFromFilesDirIfExists(op.path)
+          this.filesIndex.delete(op.path)
           if (directoryHandle) {
             await this.deleteFromNativeIfExists(directoryHandle, op.path)
           }
@@ -880,78 +1072,6 @@ export class SessionWorkspace {
     await repo.setCurrentSnapshotId(this.sessionId, current?.id || null)
   }
 
-  private buildVirtualMetadata(path: string, content: FileContent): FileMetadata {
-    let size = 0
-    let contentType: 'text' | 'binary' = 'binary'
-    if (typeof content === 'string') {
-      size = new Blob([content]).size
-      contentType = 'text'
-    } else if (content instanceof Blob) {
-      size = content.size
-      contentType = 'binary'
-    } else {
-      size = content.byteLength
-      contentType = 'binary'
-    }
-
-    return {
-      path,
-      mtime: Date.now(),
-      size,
-      contentType,
-    }
-  }
-
-  private async readFromFilesDir(
-    path: string
-  ): Promise<{ content: FileContent; mtime: number; size: number; contentType: 'text' | 'binary' } | null> {
-    try {
-      const filesDir = await this.getFilesDir()
-      const parts = path.split('/').filter(Boolean)
-      if (parts.length === 0) return null
-
-      let current = filesDir
-      for (let i = 0; i < parts.length - 1; i++) {
-        current = await current.getDirectoryHandle(parts[i])
-      }
-
-      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
-      const file = await fileHandle.getFile()
-      let content: FileContent
-      let contentType: 'text' | 'binary' = 'binary'
-      try {
-        content = await file.text()
-        contentType = 'text'
-      } catch {
-        content = await file.arrayBuffer()
-      }
-      return {
-        content,
-        mtime: file.lastModified,
-        size: file.size,
-        contentType,
-      }
-    } catch {
-      return null
-    }
-  }
-
-  private async deleteFromFilesDirIfExists(path: string): Promise<void> {
-    try {
-      const filesDir = await this.getFilesDir()
-      const parts = path.split('/').filter(Boolean)
-      if (parts.length === 0) return
-
-      let current = filesDir
-      for (let i = 0; i < parts.length - 1; i++) {
-        current = await current.getDirectoryHandle(parts[i])
-      }
-      await current.removeEntry(parts[parts.length - 1])
-    } catch {
-      // Ignore if file doesn't exist in files/ snapshot.
-    }
-  }
-
   private async deleteFromNativeIfExists(
     directoryHandle: FileSystemDirectoryHandle,
     path: string
@@ -1003,11 +1123,11 @@ export class SessionWorkspace {
   }
 
   private async readCacheContentForPath(path: string): Promise<string | ArrayBuffer | null> {
-    const cached = await this.cacheManager.readCached(path)
+    const cached = await this.readFromFilesDir(path)
     if (cached === null) return null
-    if (typeof cached === 'string') return cached
-    if (cached instanceof Blob) return await cached.arrayBuffer()
-    return cached
+    if (typeof cached.content === 'string') return cached.content
+    if (cached.content instanceof Blob) return await cached.content.arrayBuffer()
+    return cached.content
   }
 
   private async normalizeContentForSnapshot(content: FileContent): Promise<string | ArrayBuffer> {
@@ -1025,9 +1145,9 @@ export class SessionWorkspace {
     if (!contentKind || contentKind === 'none') return false
 
     if (contentKind === 'text') {
-      await this.cacheManager.write(path, contentText || '')
       const filesDir = await this.getFilesDir()
       await this.writeFileToOPFS(filesDir, path, new TextEncoder().encode(contentText || '').buffer)
+      this.filesIndex.add(path)
       return true
     }
 
@@ -1040,9 +1160,9 @@ export class SessionWorkspace {
         : contentBlob
     if (!(binary instanceof ArrayBuffer)) return false
 
-    await this.cacheManager.write(path, binary)
     const filesDir = await this.getFilesDir()
     await this.writeFileToOPFS(filesDir, path, binary)
+    this.filesIndex.add(path)
     return true
   }
 
@@ -1051,23 +1171,7 @@ export class SessionWorkspace {
    * @param path File path
    */
   hasCachedFile(path: string): boolean {
-    return this.cacheManager.has(path)
-  }
-
-  /**
-   * Prune undo records older than specified days
-   * @param days Age in days
-   */
-  async pruneUndoOlderThan(days: number): Promise<number> {
-    if (!this.initialized) await this.initialize()
-
-    const pruned = await this.undoStorage.pruneOlderThan(days)
-
-    // Update last accessed time
-    this.metadata.lastAccessedAt = Date.now()
-    await this.saveMetadata()
-
-    return pruned
+    return this.hasFileInIndex(path)
   }
 
   /**

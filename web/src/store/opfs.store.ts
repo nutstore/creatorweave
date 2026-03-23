@@ -5,7 +5,6 @@
  * - All file operations go through the current active session's workspace
  * - Files are cached in OPFS with mtime-based change detection
  * - Pending changes are tracked for sync to real filesystem
- * - Undo history is maintained per session
  *
  * Architecture:
  * - Application → OPFSStore → SessionWorkspace → OPFS
@@ -13,18 +12,36 @@
 
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import { enableMapSet } from 'immer'
 import type {
   FileContent,
   FileMetadata,
   PendingChange,
-  UndoRecord,
   SyncResult,
 } from '@/opfs/types/opfs-types'
 import { getSessionManager } from '@/opfs/session'
 
-// Enable Immer Map/Set support
-enableMapSet()
+/**
+ * Check if error is a quota exceeded error
+ */
+function isQuotaError(error: unknown): boolean {
+  if (error instanceof Error) {
+    return (
+      error.name === 'QuotaExceededError' ||
+      error.message.includes('QuotaExceededError') ||
+      error.message.includes('storage quota') ||
+      error.message.includes('存储空间不足')
+    )
+  }
+  return false
+}
+
+/**
+ * Show quota exceeded alert to user
+ */
+function showQuotaAlert(): void {
+  console.warn('[opfs.store] Storage quota exceeded')
+  // Could integrate with toast/notification system here
+}
 
 /**
  * File read result with metadata
@@ -47,9 +64,6 @@ interface OPFSState {
   /** Pending changes for current session */
   pendingChanges: PendingChange[]
 
-  /** Undo records for current session */
-  undoRecords: UndoRecord[]
-
   /** Cached file paths for current session */
   cachedPaths: string[]
 
@@ -67,7 +81,7 @@ interface OPFSState {
   /** Read file from current session (cache first, then filesystem) */
   readFile: (path: string, directoryHandle?: FileSystemDirectoryHandle | null) => Promise<FileReadResult>
 
-  /** Write file to current session (cache + pending + undo) */
+  /** Write file to current session (cache + pending) */
   writeFile: (
     path: string,
     content: FileContent,
@@ -80,19 +94,10 @@ interface OPFSState {
   /** Get pending changes for current session */
   getPendingChanges: () => PendingChange[]
 
-  /** Get undo records for current session */
-  getUndoRecords: () => UndoRecord[]
-
   /** Sync pending changes to real filesystem */
   syncPendingChanges: (directoryHandle: FileSystemDirectoryHandle) => Promise<SyncResult>
 
-  /** Undo a specific operation */
-  undo: (recordId: string) => Promise<void>
-
-  /** Redo a specific operation */
-  redo: (recordId: string) => Promise<void>
-
-  /** Clear current session's cache, pending, and undo */
+  /** Clear current session's cache and pending */
   clearSession: () => Promise<void>
 
   /** Check if file is cached in current session */
@@ -129,45 +134,11 @@ async function getActiveWorkspace() {
   return { workspace, workspaceId: activeWorkspaceId }
 }
 
-/**
- * Check if error is a quota exceeded error
- */
-function isQuotaError(error: unknown): boolean {
-  if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-    return true
-  }
-  if (error instanceof Error && error.name === 'QuotaExceededError') {
-    return true
-  }
-  const message = error instanceof Error ? error.message : String(error)
-  return (
-    message.includes('QuotaExceededError') ||
-    message.includes('quota') ||
-    message.includes('配额') ||
-    message.includes('空间不足')
-  )
-}
-
-/**
- * Show quota exceeded alert to user
- */
-function showQuotaAlert() {
-  alert(
-    '存储空间不足\n\n' +
-      '浏览器配额已满或磁盘剩余空间不足。\n\n' +
-      '建议：\n' +
-      '1. 清空所有缓存（点击会话菜单 → 清空所有缓存）\n' +
-      '2. 清理旧会话（点击会话菜单 → 清理旧会话）\n' +
-      '3. 检查磁盘剩余空间'
-  )
-}
-
 export const useOPFSStore = create<OPFSState>()(
   immer((set, get) => ({
     sessionId: null,
     initialized: false,
     pendingChanges: [],
-    undoRecords: [],
     cachedPaths: [],
     isLoading: false,
     error: null,
@@ -184,7 +155,6 @@ export const useOPFSStore = create<OPFSState>()(
           set({
             sessionId: workspaceId,
             pendingChanges: workspace.getPendingChanges(),
-            undoRecords: workspace.getUndoRecords(),
             cachedPaths: workspace.getCachedPaths(),
             initialized: true,
             error: null,
@@ -226,7 +196,6 @@ export const useOPFSStore = create<OPFSState>()(
         // Update state
         set((state) => {
           state.pendingChanges = workspace.getPendingChanges()
-          state.undoRecords = workspace.getUndoRecords()
           state.cachedPaths = workspace.getCachedPaths()
           state.isLoading = false
         })
@@ -261,7 +230,6 @@ export const useOPFSStore = create<OPFSState>()(
         // Update state
         set((state) => {
           state.pendingChanges = workspace.getPendingChanges()
-          state.undoRecords = workspace.getUndoRecords()
           state.cachedPaths = workspace.getCachedPaths()
           state.isLoading = false
         })
@@ -280,10 +248,6 @@ export const useOPFSStore = create<OPFSState>()(
 
     getPendingChanges: () => {
       return get().pendingChanges
-    },
-
-    getUndoRecords: () => {
-      return get().undoRecords
     },
 
     syncPendingChanges: async (directoryHandle) => {
@@ -321,54 +285,6 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    undo: async (recordId) => {
-      set({ isLoading: true, error: null })
-
-      try {
-        const { workspace } = await getActiveWorkspace()
-        await workspace.undo(recordId)
-
-        // Update state
-        set((state) => {
-          state.undoRecords = workspace.getUndoRecords()
-          state.cachedPaths = workspace.getCachedPaths()
-          state.isLoading = false
-        })
-
-        // Update workspace store counts
-        const { useWorkspaceStore } = await import('./workspace.store')
-        useWorkspaceStore.getState().updateCurrentCounts()
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Failed to undo'
-        set({ error: message, isLoading: false })
-        throw new Error(message)
-      }
-    },
-
-    redo: async (recordId) => {
-      set({ isLoading: true, error: null })
-
-      try {
-        const { workspace } = await getActiveWorkspace()
-        await workspace.redo(recordId)
-
-        // Update state
-        set((state) => {
-          state.undoRecords = workspace.getUndoRecords()
-          state.cachedPaths = workspace.getCachedPaths()
-          state.isLoading = false
-        })
-
-        // Update workspace store counts
-        const { useWorkspaceStore } = await import('./workspace.store')
-        useWorkspaceStore.getState().updateCurrentCounts()
-      } catch (e) {
-        const message = e instanceof Error ? e.message : 'Failed to redo'
-        set({ error: message, isLoading: false })
-        throw new Error(message)
-      }
-    },
-
     clearSession: async () => {
       set({ isLoading: true, error: null })
 
@@ -379,7 +295,6 @@ export const useOPFSStore = create<OPFSState>()(
         // Update state
         set((state) => {
           state.pendingChanges = []
-          state.undoRecords = []
           state.cachedPaths = []
           state.isLoading = false
         })
@@ -409,7 +324,6 @@ export const useOPFSStore = create<OPFSState>()(
         set((state) => {
           state.sessionId = newWorkspaceId
           state.pendingChanges = workspace.getPendingChanges()
-          state.undoRecords = workspace.getUndoRecords()
           state.cachedPaths = workspace.getCachedPaths()
           state.error = null
         })
@@ -421,9 +335,10 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    clearError: () =>
+    clearError: () => {
       set((state) => {
         state.error = null
-      }),
+      })
+    },
   }))
 )

@@ -53,8 +53,6 @@ export interface SessionMetadata {
   cacheSize: number
   /** Pending sync count */
   pendingCount: number
-  /** Undo record count */
-  undoCount: number
   /** Number of files modified by this session */
   modifiedFiles: number
   /** Session status */

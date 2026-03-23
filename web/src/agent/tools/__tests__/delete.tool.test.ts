@@ -13,7 +13,6 @@ const readFileMock = vi.fn<
 >()
 const getPendingChangesMock = vi.fn<() => Array<{ id: string }>>()
 
-const recordModificationMock = vi.fn()
 const broadcastFileChangeMock = vi.fn()
 
 vi.mock('@/store/opfs.store', () => ({
@@ -24,12 +23,6 @@ vi.mock('@/store/opfs.store', () => ({
       getPendingChanges: getPendingChangesMock,
     }),
   },
-}))
-
-vi.mock('@/undo/undo-manager', () => ({
-  getUndoManager: () => ({
-    recordModification: recordModificationMock,
-  }),
 }))
 
 vi.mock('@/store/remote.store', () => ({
@@ -85,7 +78,6 @@ describe('delete tool', () => {
     expect(parsed.dryRun).toBe(true)
     expect(parsed.targets).toEqual(['src/a.ts', 'src/b.ts'])
     expect(deleteFileMock).not.toHaveBeenCalled()
-    expect(recordModificationMock).not.toHaveBeenCalled()
   })
 
   it('marks a single file as pending deletion', async () => {
@@ -100,7 +92,6 @@ describe('delete tool', () => {
 
     expect(deleteFileMock).toHaveBeenCalledTimes(1)
     expect(deleteFileMock).toHaveBeenCalledWith('src/a.ts', mockDirectoryHandle)
-    expect(recordModificationMock).toHaveBeenCalledWith('src/a.ts', 'delete', 'old content', null)
     expect(broadcastFileChangeMock).toHaveBeenCalledWith('src/a.ts', 'delete', 'Deleted: src/a.ts')
   })
 
@@ -119,7 +110,6 @@ describe('delete tool', () => {
     expect(parsed.status).toBe('pending')
 
     expect(deleteFileMock).toHaveBeenCalledTimes(2)
-    expect(recordModificationMock).toHaveBeenCalledTimes(1)
     expect(broadcastFileChangeMock).toHaveBeenCalledTimes(1)
   })
 })

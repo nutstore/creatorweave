@@ -23,7 +23,6 @@ export type {
   WorkspaceRow,
   FileMetadataRow,
   PendingChangeRow,
-  UndoRecordRow,
 } from './sqlite-database'
 
 // Utility functions
@@ -44,7 +43,6 @@ export type {
   Workspace,
   FileMetadata,
   PendingChange,
-  UndoRecord,
   WorkspaceStats,
 } from './repositories/workspace.repository'
 

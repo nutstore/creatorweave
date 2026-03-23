@@ -4,13 +4,12 @@
  * Shows:
  * - Current session name (active conversation)
  * - Pending changes count
- * - Undo records count
  * Phase 4: Added i18n support
  */
 
 import React, { useCallback, useMemo } from 'react'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { Clock, RotateCcw, AlertCircle } from 'lucide-react'
+import { Clock, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 
 export interface SessionBadgeProps {
@@ -21,7 +20,7 @@ export interface SessionBadgeProps {
 }
 
 export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = false }) => {
-  const { activeWorkspaceId, workspaces, currentPendingCount, currentUndoCount, initialized } =
+  const { activeWorkspaceId, workspaces, currentPendingCount, initialized } =
     useWorkspaceStore()
   const t = useT()
 
@@ -37,7 +36,6 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
   }, [currentWorkspace, activeWorkspaceId, t])
 
   const hasPending = currentPendingCount > 0
-  const hasUndo = currentUndoCount > 0
 
   const handleClick = useCallback(() => {
     onClick?.()
@@ -82,15 +80,6 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
             <span className="text-[10px] font-medium">{currentPendingCount}</span>
           </span>
         )}
-        {hasUndo && (
-          <span
-            className="flex h-5 items-center gap-1 rounded-full bg-primary-50 px-1.5 text-primary-700"
-            title={t('session.undoCount', { count: currentUndoCount })}
-          >
-            <RotateCcw className="h-3 w-3" />
-            <span className="text-[10px] font-medium">{currentUndoCount}</span>
-          </span>
-        )}
       </button>
     )
   }
@@ -117,19 +106,8 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
         </span>
       )}
 
-      {/* Undo count */}
-      {hasUndo && (
-        <span
-          className="flex h-5 items-center gap-1 rounded-full bg-primary-50 px-1.5 text-primary-700"
-          title={t('session.undoOperations', { count: currentUndoCount })}
-        >
-          <RotateCcw className="h-3 w-3" />
-          <span className="text-[10px] font-medium">{currentUndoCount}</span>
-        </span>
-      )}
-
       {/* No changes indicator */}
-      {!hasPending && !hasUndo && (
+      {!hasPending && (
         <span className="text-xs text-tertiary dark:text-muted">{t('session.noChanges')}</span>
       )}
     </button>

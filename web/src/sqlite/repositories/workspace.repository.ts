@@ -10,7 +10,6 @@ import {
   type WorkspaceRow,
   type FileMetadataRow,
   type PendingChangeRow,
-  type UndoRecordRow,
 } from '../sqlite-database'
 
 export interface Workspace {
@@ -21,7 +20,6 @@ export interface Workspace {
   status: 'active' | 'archived'
   cacheSize: number
   pendingCount: number
-  undoCount: number
   modifiedFiles: number
   createdAt: number
   lastAccessedAt: number
@@ -49,23 +47,11 @@ export interface PendingChange {
   timestamp: number
 }
 
-export interface UndoRecord {
-  id: string
-  workspaceId: string
-  path: string
-  type: 'create' | 'modify' | 'delete'
-  oldContentPath?: string
-  newContentPath?: string
-  timestamp: number
-  undone: boolean
-}
-
 export interface WorkspaceStats {
   workspaceId: string
   fileCount: number
   totalFileSize: number
   pendingCount: number
-  undoCount: number
 }
 
 //=============================================================================
@@ -158,8 +144,8 @@ export class WorkspaceRepository {
     }
 
     await db.execute(
-      `INSERT INTO workspaces (id, project_id, root_directory, name, status, cache_size, pending_count, undo_count, modified_files, created_at, last_accessed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO workspaces (id, project_id, root_directory, name, status, cache_size, pending_count, modified_files, created_at, last_accessed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newWorkspace.id,
         newWorkspace.projectId,
@@ -168,7 +154,6 @@ export class WorkspaceRepository {
         newWorkspace.status,
         newWorkspace.cacheSize,
         newWorkspace.pendingCount,
-        newWorkspace.undoCount,
         newWorkspace.modifiedFiles,
         newWorkspace.createdAt,
         newWorkspace.lastAccessedAt,
@@ -184,7 +169,7 @@ export class WorkspaceRepository {
     await db.execute(
       `UPDATE workspaces
        SET project_id = ?, root_directory = ?, name = ?, status = ?, cache_size = ?, pending_count = ?,
-           undo_count = ?, modified_files = ?, last_accessed_at = ?
+           modified_files = ?, last_accessed_at = ?
        WHERE id = ?`,
       [
         workspace.projectId,
@@ -193,7 +178,6 @@ export class WorkspaceRepository {
         workspace.status,
         workspace.cacheSize,
         workspace.pendingCount,
-        workspace.undoCount,
         workspace.modifiedFiles,
         workspace.lastAccessedAt,
         workspace.id,
@@ -292,10 +276,6 @@ export class WorkspaceRepository {
       'SELECT COUNT(*) as count FROM pending_changes WHERE workspace_id = ?',
       [workspaceId]
     )
-    const undoRow = await db.queryFirst<{ count: number }>(
-      'SELECT COUNT(*) as count FROM undo_records WHERE workspace_id = ? AND undone = 0',
-      [workspaceId]
-    )
 
     if (!fileCountRow) return null
 
@@ -304,7 +284,6 @@ export class WorkspaceRepository {
       fileCount: fileCountRow.count,
       totalFileSize: fileSizeRow?.total || 0,
       pendingCount: pendingRow?.count || 0,
-      undoCount: undoRow?.count || 0,
     }
   }
 
@@ -442,76 +421,6 @@ export class WorkspaceRepository {
   }
 
   //===========================================================================
-  // Undo Records Operations
-  //===========================================================================
-
-  /**
-   * Get all undo records for a workspace
-   */
-  async findUndoRecordsByWorkspace(
-    workspaceId: string,
-    includeUndone: boolean = false
-  ): Promise<UndoRecord[]> {
-    const db = getSQLiteDB()
-    const sql = includeUndone
-      ? 'SELECT * FROM undo_records WHERE workspace_id = ? ORDER BY timestamp DESC'
-      : 'SELECT * FROM undo_records WHERE workspace_id = ? AND undone = 0 ORDER BY timestamp DESC'
-    const rows = await db.queryAll<UndoRecordRow>(sql, [workspaceId])
-    return rows.map((row) => this.rowToUndoRecord(row))
-  }
-
-  /**
-   * Save undo record
-   */
-  async saveUndoRecord(record: UndoRecord): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute(
-      `INSERT INTO undo_records (id, workspace_id, path, type, old_content_path, new_content_path, timestamp, undone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         path = excluded.path,
-         type = excluded.type,
-         old_content_path = excluded.old_content_path,
-         new_content_path = excluded.new_content_path,
-         undone = excluded.undone`,
-      [
-        record.id,
-        record.workspaceId,
-        record.path,
-        record.type,
-        record.oldContentPath || null,
-        record.newContentPath || null,
-        record.timestamp,
-        record.undone ? 1 : 0,
-      ]
-    )
-  }
-
-  /**
-   * Mark undo record as undone
-   */
-  async markUndoRecordUndone(id: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('UPDATE undo_records SET undone = 1 WHERE id = ?', [id])
-  }
-
-  /**
-   * Delete undo record
-   */
-  async deleteUndoRecord(id: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('DELETE FROM undo_records WHERE id = ?', [id])
-  }
-
-  /**
-   * Delete all undo records for a workspace
-   */
-  async deleteAllUndoRecords(workspaceId: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('DELETE FROM undo_records WHERE workspace_id = ?', [workspaceId])
-  }
-
-  //===========================================================================
   // Batch Operations for Migration
   //===========================================================================
 
@@ -525,14 +434,12 @@ export class WorkspaceRepository {
       file_count: number
       total_file_size: number
       pending_count: number
-      undo_count: number
     }>(
       `SELECT
         w.id as workspace_id,
         COUNT(DISTINCT f.id) as file_count,
         COALESCE(SUM(f.size), 0) as total_file_size,
-        w.pending_count as pending_count,
-        w.undo_count as undo_count
+        w.pending_count as pending_count
        FROM workspaces w
        LEFT JOIN file_metadata f ON f.workspace_id = w.id
        GROUP BY w.id
@@ -543,7 +450,6 @@ export class WorkspaceRepository {
       fileCount: row.file_count,
       totalFileSize: row.total_file_size,
       pendingCount: row.pending_count,
-      undoCount: row.undo_count,
     }))
   }
 
@@ -579,7 +485,6 @@ export class WorkspaceRepository {
     stats: {
       cacheSize?: number
       pendingCount?: number
-      undoCount?: number
       modifiedFiles?: number
     }
   ): Promise<void> {
@@ -594,10 +499,6 @@ export class WorkspaceRepository {
     if (stats.pendingCount !== undefined) {
       updates.push('pending_count = ?')
       values.push(stats.pendingCount)
-    }
-    if (stats.undoCount !== undefined) {
-      updates.push('undo_count = ?')
-      values.push(stats.undoCount)
     }
     if (stats.modifiedFiles !== undefined) {
       updates.push('modified_files = ?')
@@ -638,7 +539,6 @@ export class WorkspaceRepository {
       status: row.status,
       cacheSize: row.cache_size,
       pendingCount: row.pending_count,
-      undoCount: row.undo_count,
       modifiedFiles: row.modified_files,
       createdAt: row.created_at,
       lastAccessedAt: row.last_accessed_at,
@@ -668,19 +568,6 @@ export class WorkspaceRepository {
       fsMtime: row.fs_mtime,
       agentMessageId: row.agent_message_id || undefined,
       timestamp: row.timestamp,
-    }
-  }
-
-  private rowToUndoRecord(row: UndoRecordRow): UndoRecord {
-    return {
-      id: row.id,
-      workspaceId: row.workspace_id,
-      path: row.path,
-      type: row.type,
-      oldContentPath: row.old_content_path || undefined,
-      newContentPath: row.new_content_path || undefined,
-      timestamp: row.timestamp,
-      undone: row.undone !== 0,
     }
   }
 }

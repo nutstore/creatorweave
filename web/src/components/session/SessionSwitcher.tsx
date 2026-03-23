@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react'
 import { useWorkspaceStore } from '@/store/workspace.store'
-import { ChevronDown, Check, Clock, RotateCcw, Trash2, Plus } from 'lucide-react'
+import { ChevronDown, Check, Clock, Trash2, Plus } from 'lucide-react'
 
 export interface SessionSwitcherProps {
   /** Callback when session is switched */
@@ -120,7 +120,6 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                   {sortedWorkspaces.map((workspace) => {
                     const isActive = workspace.id === activeWorkspaceId
                     const hasPending = workspace.pendingCount > 0
-                    const hasUndo = workspace.undoCount > 0
 
                     return (
                       <li
@@ -160,19 +159,8 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                                 </span>
                               )}
 
-                              {/* Undo count */}
-                              {hasUndo && (
-                                <span
-                                  className="flex items-center gap-0.5 rounded-full bg-primary-50 px-1.5 text-[10px] text-primary-700"
-                                  title={`${workspace.undoCount} 个可撤销`}
-                                >
-                                  <RotateCcw className="h-2.5 w-2.5" />
-                                  {workspace.undoCount}
-                                </span>
-                              )}
-
                               {/* No changes */}
-                              {!hasPending && !hasUndo && (
+                              {!hasPending && (
                                 <span className="text-[10px] text-tertiary">无变更</span>
                               )}
                             </div>

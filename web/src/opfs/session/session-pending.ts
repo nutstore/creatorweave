@@ -2,7 +2,7 @@
  * Session Pending Manager
  *
  * Per-session pending sync queue management.
- * Merges multiple modifications to the same file and handles sync to filesystem.
+ * Pure SQLite-backed pending operations (no OPFS file storage).
  */
 
 import type { FileContent, PendingChange, SyncResult } from '../types/opfs-types'
@@ -11,7 +11,6 @@ import {
   type PendingOverlayOp,
 } from '@/sqlite/repositories/fs-overlay.repository'
 
-const PENDING_FILE = 'pending.json'
 const FILES_DIR = 'files'
 
 type CachedContent = FileContent
@@ -62,32 +61,12 @@ export class SessionPendingManager {
   }
 
   /**
-   * Load pending queue from OPFS
+   * Load pending queue from SQLite (pure SQLite, no OPFS file fallback)
    */
   private async loadPending(): Promise<void> {
     const repo = getFSOverlayRepository()
     const sqlitePending = await repo.listPendingOps(this.workspaceId)
-    if (sqlitePending.length > 0) {
-      this.setPendingFromRepo(sqlitePending)
-      return
-    }
-
-    // One-time compatibility import from legacy OPFS pending.json.
-    try {
-      const pendingFile = await this.sessionDir.getFileHandle(PENDING_FILE)
-      const file = await pendingFile.getFile()
-      const text = await file.text()
-      const legacyPending = JSON.parse(text) as PendingChange[]
-
-      for (const pending of legacyPending) {
-        await repo.upsertPendingOp(this.workspaceId, pending.path, pending.type)
-      }
-    } catch {
-      // No legacy pending file, ignore.
-    }
-
-    const imported = await repo.listPendingOps(this.workspaceId)
-    this.setPendingFromRepo(imported)
+    this.setPendingFromRepo(sqlitePending)
   }
 
   /**
