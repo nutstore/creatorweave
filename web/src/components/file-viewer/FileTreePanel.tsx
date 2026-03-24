@@ -20,7 +20,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2 } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2, Cloud } from 'lucide-react'
 import { Icon } from '@iconify/react'
 import { BrandButton, BrandBadge } from '@creatorweave/ui'
 import { formatBytes } from '@/lib/utils'
@@ -47,7 +47,8 @@ interface TreeNode {
   size?: number
   children?: TreeNode[]
   loaded?: boolean
-  handle: FileSystemDirectoryHandle | FileSystemFileHandle
+  /** File handle - null indicates OPFS-only file (not on disk) */
+  handle: FileSystemDirectoryHandle | FileSystemFileHandle | null
 }
 
 interface FileTreePanelBaseProps {
@@ -194,6 +195,22 @@ function PendingIndicator({ type }: { type: PendingChange['type'] | null }) {
   )
 }
 
+/** Approved but not synced to disk indicator */
+function ApprovedNotSyncedIndicator() {
+  const t = useT()
+  return (
+    <BrandBadge
+      type="badge"
+      variant="neutral"
+      shape="pill"
+      className="h-4 min-w-4 px-1 text-[10px] font-mono"
+      title={t('fileTree.approvedNotSynced') || 'Approved, pending disk sync'}
+    >
+      <Cloud className="h-2.5 w-2.5" />
+    </BrandBadge>
+  )
+}
+
 /** Global context menu close event name */
 const CONTEXT_MENU_CLOSE_EVENT = 'file-tree-close-context-menu'
 
@@ -209,6 +226,7 @@ function TreeNodeRow({
   expanded,
   selected,
   pendingType,
+  approvedNotSynced,
   onClick,
   onInspect,
 }: {
@@ -217,6 +235,7 @@ function TreeNodeRow({
   expanded: boolean
   selected: boolean
   pendingType: PendingChange['type'] | null
+  approvedNotSynced: boolean
   onClick: () => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
@@ -322,6 +341,8 @@ function TreeNodeRow({
 
         {/* Pending status indicator */}
         {!isDir && <PendingIndicator type={pendingType} />}
+        {/* Only show cloud icon for approved-but-not-synced files */}
+        {!isDir && approvedNotSynced && !pendingType && <ApprovedNotSyncedIndicator />}
       </div>
 
       {/* Context Menu Portal */}
@@ -369,12 +390,14 @@ function TreeBranch({
   onToggle,
   onNodeClick,
   onInspect,
+  approvedNotSyncedPaths,
 }: {
   nodes: TreeNode[]
   depth: number
   expandedPaths: Set<string>
   selectedPath: string | null
   pendingMap: Map<string, PendingChange['type']>
+  approvedNotSyncedPaths: Set<string>
   onToggle: (node: TreeNode) => void
   onNodeClick: (node: TreeNode) => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
@@ -391,6 +414,7 @@ function TreeBranch({
         const expanded = expandedPaths.has(node.path)
         const selected = selectedPath === node.path
         const pendingType = pendingMap.get(node.path) || null
+        const approvedNotSynced = approvedNotSyncedPaths.has(node.path)
 
         return (
           <div key={node.path}>
@@ -400,6 +424,7 @@ function TreeBranch({
               expanded={expanded}
               selected={selected}
               pendingType={pendingType}
+              approvedNotSynced={approvedNotSynced}
               onClick={() => onNodeClick(node)}
               onInspect={onInspect ? (path, handle) => onInspect(path, handle) : undefined}
             />
@@ -410,6 +435,7 @@ function TreeBranch({
                 expandedPaths={expandedPaths}
                 selectedPath={selectedPath}
                 pendingMap={pendingMap}
+                approvedNotSyncedPaths={approvedNotSyncedPaths}
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
                 onInspect={onInspect}
@@ -437,8 +463,10 @@ export function FileTreePanel({
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
 
-  // Get pending changes from OPFS store
+  // Get pending changes and cached files from OPFS store
   const pendingChanges = useOPFSStore((state) => state.pendingChanges)
+  const approvedNotSyncedPaths = useOPFSStore((state) => state.approvedNotSyncedPaths)
+  const cachedPaths = useOPFSStore((state) => state.cachedPaths)
 
   // Build a map of file paths to pending change types for O(1) lookup
   const pendingMap = useMemo(() => {
@@ -491,6 +519,50 @@ export function FileTreePanel({
   /** Check if a file/directory name should be hidden */
   const isHidden = useCallback(
     (name: string): boolean => HIDDEN_PATTERNS.some((pattern) => pattern.test(name)),
+    []
+  )
+
+  /**
+   * Add cached files at a specific level to children array
+   * Only adds files that are directly in the parent directory (not in subdirectories)
+   */
+  const addCachedFilesAtLevel = useCallback(
+    (
+      children: TreeNode[],
+      cachedPaths: string[],
+      parentPath: string,
+      existingNames: Set<string>,
+      pendingCreates: PendingChange[]
+    ): void => {
+      const parentPrefix = parentPath ? `${parentPath}/` : ''
+
+      for (const cachedPath of cachedPaths) {
+        // Check if this cached file is directly in the parent directory
+        if (parentPrefix && !cachedPath.startsWith(parentPrefix)) continue
+        if (parentPrefix) {
+          const relative = cachedPath.slice(parentPrefix.length)
+          const parts = relative.split('/')
+          if (parts.length !== 1) continue // Not directly in this directory
+        } else {
+          // Root level: no subdirectory allowed
+          const parts = cachedPath.split('/')
+          if (parts.length !== 1) continue
+        }
+
+        const fileName = parentPrefix ? cachedPath.slice(parentPrefix.length).split('/')[0] : cachedPath.split('/')[0]
+        if (existingNames.has(fileName)) continue
+        // Skip if this file has a pending create (handled above)
+        if (pendingCreates.some((p) => p.path === cachedPath)) continue
+
+        children.push({
+          name: fileName,
+          path: cachedPath,
+          kind: 'file' as const,
+          handle: null, // OPFS-only file
+        })
+        console.log('[FileTree] Added cached file:', cachedPath)
+      }
+    },
     []
   )
 
@@ -556,7 +628,7 @@ export function FileTreePanel({
           name: fileName,
           path: pending.path,
           kind: 'file',
-          handle: null as unknown as FileSystemFileHandle, // null for OPFS-only files
+          handle: null, // OPFS-only file
         })
         console.log('[FileTree] Added pending create:', pending.path)
       }
@@ -572,16 +644,22 @@ export function FileTreePanel({
           name: subdir,
           path: subdirPath,
           kind: 'directory',
-          handle: null as unknown as FileSystemDirectoryHandle, // null for OPFS-only dirs
+          handle: null, // OPFS-only directory
           children: [],
           loaded: false,
         })
         console.log('[FileTree] Added pending create subdir:', subdirPath)
       }
 
+      // Add cached files from OPFS that are not already in children
+      // and not pending creates (already handled above)
+      // This works for both OPFS-only mode (dirHandle=null) and disk+OPFS mode
+      const existingNames = new Set(children.map((c) => c.name))
+      addCachedFilesAtLevel(children, cachedPaths, parentPath, existingNames, pendingCreates)
+
       return children
     },
-    [isHidden, mode, getPendingCreatesForPath, getPendingCreateSubdirs]
+    [isHidden, mode, getPendingCreatesForPath, getPendingCreateSubdirs, cachedPaths, addCachedFilesAtLevel]
   )
 
   /** Load root directory and optionally reload expanded paths */
@@ -699,9 +777,10 @@ export function FileTreePanel({
     }
   }, [directoryHandle, loaded, loading, loadRoot])
 
-  // Show empty state only if no directoryHandle AND no pending changes
+  // Show empty state only if no directoryHandle AND no pending changes AND no cached files
   const hasPendingChanges = pendingChanges.length > 0
-  if (!directoryHandle && !hasPendingChanges) {
+  const hasCachedFiles = cachedPaths.length > 0
+  if (!directoryHandle && !hasPendingChanges && !hasCachedFiles) {
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-tertiary text-center text-xs">
@@ -744,6 +823,7 @@ export function FileTreePanel({
               expandedPaths={expandedPaths}
               selectedPath={selectedPath || null}
               pendingMap={pendingMap}
+              approvedNotSyncedPaths={approvedNotSyncedPaths}
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
               onInspect={onInspect}

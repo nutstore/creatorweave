@@ -262,6 +262,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const sqliteSessions = await repo.findWorkspacesByProject(activeProjectId)
             if (sqliteSessions.length > 0) {
               workspaces = sqliteSessions.map(sqliteSessionToWorkspaceStats)
+              // Get real pending counts from fs_ops (not cached values)
+              const realPendingCounts = await repo.getRealPendingCounts()
+              workspaces = workspaces.map((ws) => ({
+                ...ws,
+                pendingCount: realPendingCounts.get(ws.id) ?? 0,
+              }))
             }
 
             // Set first workspace as active if none active
@@ -477,7 +483,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
               // Update the workspace in SQLite with fresh stats
               await repo.updateWorkspaceStats(id, {
-                pendingCount: newWorkspace.pendingCount,
                 modifiedFiles: 0,
               })
 
@@ -628,15 +633,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           try {
             const manager = await getSessionManager()
-            const repo = getWorkspaceRepository()
             const workspace = await manager.getSession(activeWorkspaceId)
 
             if (workspace) {
-              // Update counts in SQLite
-              await repo.updateWorkspaceStats(activeWorkspaceId, {
-                pendingCount: workspace.pendingCount,
-              })
-
               set({
                 currentPendingCount: workspace.pendingCount,
                 workspaces: get().workspaces.map((w) =>

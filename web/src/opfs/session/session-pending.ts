@@ -70,6 +70,13 @@ export class SessionPendingManager {
   }
 
   /**
+   * Force reload pending data from database
+   */
+  async reload(): Promise<void> {
+    await this.loadPending()
+  }
+
+  /**
    * Add pending record for file modification
    * @param path File path
    */
@@ -132,7 +139,7 @@ export class SessionPendingManager {
     }
     const allowedPaths = onlyPaths ? new Set(onlyPaths.map((p) => normalizeComparePath(p))) : null
 
-    for (const change of this.getAll()) {
+    for (const change of this.getSyncCandidates()) {
       if (allowedPaths && !allowedPaths.has(normalizeComparePath(change.path))) {
         continue
       }
@@ -151,12 +158,26 @@ export class SessionPendingManager {
   }
 
   /**
-   * Get all pending records
+   * Get all pending records awaiting review
+   * @returns Changes with review_status = 'pending' or NULL (not yet reviewed)
+   *         Excludes changes with review_status = 'approved'
    */
   getAll(): PendingChange[] {
     // Return cloned objects so external state layers (e.g. Zustand + Immer)
     // cannot freeze/mutate our internal map records by shared reference.
     return Array.from(this.pendingChanges.values())
+      .filter((change) => !change.reviewStatus || change.reviewStatus === 'pending')
+      .map((change) => ({ ...change }))
+      .sort((a, b) => a.timestamp - b.timestamp)
+  }
+
+  /**
+   * Get changes that are eligible for sync execution.
+   * Includes both pending and approved records; rejected records are excluded.
+   */
+  private getSyncCandidates(): PendingChange[] {
+    return Array.from(this.pendingChanges.values())
+      .filter((change) => change.reviewStatus !== 'rejected')
       .map((change) => ({ ...change }))
       .sort((a, b) => a.timestamp - b.timestamp)
   }
@@ -254,7 +275,7 @@ export class SessionPendingManager {
     }
     const allowedPaths = onlyPaths ? new Set(onlyPaths.map((p) => normalizeComparePath(p))) : null
 
-    for (const change of this.getAll()) {
+    for (const change of this.getSyncCandidates()) {
       if (allowedPaths && !allowedPaths.has(normalizeComparePath(change.path))) {
         result.skipped++
         await repo.recordSyncItem(batchId, change.id, change.path, 'skipped')

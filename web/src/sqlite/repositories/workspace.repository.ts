@@ -19,6 +19,7 @@ export interface Workspace {
   name: string
   status: 'active' | 'archived'
   cacheSize: number
+  /** Computed from fs_ops table, not stored in workspaces table */
   pendingCount: number
   modifiedFiles: number
   createdAt: number
@@ -144,8 +145,8 @@ export class WorkspaceRepository {
     }
 
     await db.execute(
-      `INSERT INTO workspaces (id, project_id, root_directory, name, status, cache_size, pending_count, modified_files, created_at, last_accessed_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO workspaces (id, project_id, root_directory, name, status, cache_size, modified_files, created_at, last_accessed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         newWorkspace.id,
         newWorkspace.projectId,
@@ -153,7 +154,6 @@ export class WorkspaceRepository {
         newWorkspace.name,
         newWorkspace.status,
         newWorkspace.cacheSize,
-        newWorkspace.pendingCount,
         newWorkspace.modifiedFiles,
         newWorkspace.createdAt,
         newWorkspace.lastAccessedAt,
@@ -168,7 +168,7 @@ export class WorkspaceRepository {
     const db = getSQLiteDB()
     await db.execute(
       `UPDATE workspaces
-       SET project_id = ?, root_directory = ?, name = ?, status = ?, cache_size = ?, pending_count = ?,
+       SET project_id = ?, root_directory = ?, name = ?, status = ?, cache_size = ?,
            modified_files = ?, last_accessed_at = ?
        WHERE id = ?`,
       [
@@ -177,7 +177,6 @@ export class WorkspaceRepository {
         workspace.name,
         workspace.status,
         workspace.cacheSize,
-        workspace.pendingCount,
         workspace.modifiedFiles,
         workspace.lastAccessedAt,
         workspace.id,
@@ -433,23 +432,25 @@ export class WorkspaceRepository {
       workspace_id: string
       file_count: number
       total_file_size: number
-      pending_count: number
     }>(
       `SELECT
         w.id as workspace_id,
         COUNT(DISTINCT f.id) as file_count,
-        COALESCE(SUM(f.size), 0) as total_file_size,
-        w.pending_count as pending_count
+        COALESCE(SUM(f.size), 0) as total_file_size
        FROM workspaces w
        LEFT JOIN file_metadata f ON f.workspace_id = w.id
        GROUP BY w.id
        ORDER BY w.last_accessed_at DESC`
     )
+
+    // Get real pending counts from fs_ops (not cached values)
+    const pendingCounts = await this.getRealPendingCounts()
+
     return rows.map((row) => ({
       workspaceId: row.workspace_id,
       fileCount: row.file_count,
       totalFileSize: row.total_file_size,
-      pendingCount: row.pending_count,
+      pendingCount: pendingCounts.get(row.workspace_id) ?? 0,
     }))
   }
 
@@ -461,7 +462,46 @@ export class WorkspaceRepository {
     const rows = await db.queryAll<WorkspaceRow>(
       "SELECT * FROM workspaces WHERE status = 'active' ORDER BY last_accessed_at DESC"
     )
-    return rows.map((row) => this.rowToWorkspace(row))
+    const workspaces = rows.map((row) => this.rowToWorkspace(row))
+
+    // Get real pending counts from fs_ops (filtered by review_status)
+    const pendingCounts = await this.getRealPendingCounts()
+    return workspaces.map((ws) => ({
+      ...ws,
+      pendingCount: pendingCounts.get(ws.id) ?? 0,
+    }))
+  }
+
+  /**
+   * Get real pending counts from fs_ops table (not cached)
+   * Only counts ops with review_status = 'pending' or NULL
+   */
+  async getRealPendingCounts(): Promise<Map<string, number>> {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<{ workspace_id: string; count: number }>(
+      `SELECT workspace_id, COUNT(*) as count
+       FROM fs_ops
+       WHERE status = 'pending'
+         AND (review_status IS NULL OR review_status = 'pending')
+       GROUP BY workspace_id`
+    )
+    return new Map(rows.map((r) => [r.workspace_id, r.count]))
+  }
+
+  /**
+   * Get real pending count for a specific workspace
+   */
+  async getRealPendingCount(workspaceId: string): Promise<number> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<{ count: number }>(
+      `SELECT COUNT(*) as count
+       FROM fs_ops
+       WHERE workspace_id = ?
+         AND status = 'pending'
+         AND (review_status IS NULL OR review_status = 'pending')`,
+      [workspaceId]
+    )
+    return row?.count ?? 0
   }
 
   /**
@@ -484,7 +524,6 @@ export class WorkspaceRepository {
     workspaceId: string,
     stats: {
       cacheSize?: number
-      pendingCount?: number
       modifiedFiles?: number
     }
   ): Promise<void> {
@@ -495,10 +534,6 @@ export class WorkspaceRepository {
     if (stats.cacheSize !== undefined) {
       updates.push('cache_size = ?')
       values.push(stats.cacheSize)
-    }
-    if (stats.pendingCount !== undefined) {
-      updates.push('pending_count = ?')
-      values.push(stats.pendingCount)
     }
     if (stats.modifiedFiles !== undefined) {
       updates.push('modified_files = ?')
@@ -538,7 +573,8 @@ export class WorkspaceRepository {
       name: row.name,
       status: row.status,
       cacheSize: row.cache_size,
-      pendingCount: row.pending_count,
+      // pendingCount is computed from fs_ops table, not stored
+      pendingCount: 0,
       modifiedFiles: row.modified_files,
       createdAt: row.created_at,
       lastAccessedAt: row.last_accessed_at,
