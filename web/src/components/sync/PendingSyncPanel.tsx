@@ -254,7 +254,7 @@ export function PendingSyncPanel() {
       if (filesToSync.length === 0) return false
 
       // 创建审批快照（无论是否有本地目录都可以）
-      await workspace.createApprovedSnapshotForPaths(
+      const snapshotResult = await workspace.createApprovedSnapshotForPaths(
         filesToSync.map((c) => c.path),
         summary.trim(),
         nativeDir
@@ -267,6 +267,11 @@ export function PendingSyncPanel() {
           nativeDir,
           filesToSync.map((c) => c.path)
         )
+
+        // 同步成功后标记快照为已同步
+        if (snapshotResult?.snapshotId) {
+          await workspace.markSnapshotAsSynced(snapshotResult.snapshotId)
+        }
 
         if (result.failed > 0) {
           console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)

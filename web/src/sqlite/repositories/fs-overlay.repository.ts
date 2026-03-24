@@ -485,9 +485,9 @@ export class FSOverlayRepository {
     const snapshotId = generateId('changeset')
     const now = Date.now()
     await db.execute(
-      `INSERT INTO fs_changesets (id, workspace_id, source, status, summary, created_at, committed_at)
-       VALUES (?, ?, 'review', 'approved', ?, ?, ?)`,
-      [snapshotId, workspaceId, summary || null, now, now]
+      `INSERT INTO fs_changesets (id, workspace_id, source, status, summary, created_at, committed_at, synced_at)
+       VALUES (?, ?, 'review', 'approved', ?, ?, ?, ?)`,
+      [snapshotId, workspaceId, summary || null, now, now, null] // synced_at 默认为 null，表示未同步到磁盘
     )
 
     await db.execute(
@@ -498,6 +498,57 @@ export class FSOverlayRepository {
     )
 
     return { snapshotId, opCount }
+  }
+
+  /**
+   * Mark a snapshot as synced to disk
+   */
+  async markSnapshotAsSynced(snapshotId: string): Promise<void> {
+    const db = getSQLiteDB()
+    const now = Date.now()
+    await db.execute(
+      `UPDATE fs_changesets SET synced_at = ? WHERE id = ?`,
+      [now, snapshotId]
+    )
+  }
+
+  /**
+   * Get unsynced snapshots for a workspace
+   * Returns snapshots that are approved but not yet synced to disk
+   */
+  async getUnsyncedSnapshots(workspaceId: string): Promise<
+    Array<{
+      snapshotId: string
+      summary: string | null
+      createdAt: number
+      opCount: number
+    }>
+  > {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<
+      {
+        snapshot_id: string
+        summary: string | null
+        created_at: number
+        op_count: number
+      }
+    >(
+      `SELECT c.id AS snapshot_id, c.summary, c.created_at, COUNT(o.id) AS op_count
+       FROM fs_changesets c
+       LEFT JOIN fs_ops o ON o.changeset_id = c.id
+       WHERE c.workspace_id = ?
+         AND c.status = 'approved'
+         AND c.synced_at IS NULL
+       GROUP BY c.id
+       ORDER BY c.created_at DESC`,
+      [workspaceId]
+    )
+    return rows.map((row) => ({
+      snapshotId: row.snapshot_id,
+      summary: row.summary,
+      createdAt: row.created_at,
+      opCount: row.op_count,
+    }))
   }
 
   async upsertSnapshotFileContent(input: SnapshotFileUpsertInput): Promise<void> {

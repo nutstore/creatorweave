@@ -2026,4 +2026,30 @@ export class SessionWorkspace {
   clearSystemLogs(): void {
     this.systemLogs = []
   }
+
+  /**
+   * Mark a snapshot as synced to disk
+   */
+  async markSnapshotAsSynced(snapshotId: string): Promise<void> {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    await repo.markSnapshotAsSynced(snapshotId)
+  }
+
+  /**
+   * Get unsynced snapshots for this workspace
+   * Returns snapshots that are approved but not yet synced to disk
+   */
+  async getUnsyncedSnapshots(): Promise<
+    Array<{
+      snapshotId: string
+      summary: string | null
+      createdAt: number
+      opCount: number
+    }>
+  > {
+    if (!this.initialized) await this.initialize()
+    const repo = getFSOverlayRepository()
+    return await repo.getUnsyncedSnapshots(this.sessionId)
+  }
 }

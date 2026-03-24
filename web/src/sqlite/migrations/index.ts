@@ -215,6 +215,18 @@ export const migrations: Migration[] = [
       PRAGMA user_version = 9;
     `,
   },
+  {
+    version: 10,
+    name: 'add_synced_at_to_fs_changesets',
+    up: `
+      ALTER TABLE fs_changesets ADD COLUMN synced_at INTEGER;
+
+      CREATE INDEX IF NOT EXISTS idx_fs_changesets_synced
+        ON fs_changesets(workspace_id, status, synced_at);
+
+      PRAGMA user_version = 10;
+    `,
+  },
 ]
 
 // ============================================================================
