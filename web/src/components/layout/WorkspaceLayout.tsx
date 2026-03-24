@@ -4,10 +4,9 @@
  *
  * Composes: TopBar + Sidebar + Main content (ConversationView | WelcomeScreen) + SyncPreviewPanel
  *
- * SyncPreviewPanel uses a "push-squeeze" pattern:
- * - When file changes are detected, preview panel opens in main area
- * - Conversation is squeezed to ~40%, preview takes ~60%
- * - A draggable divider allows resizing
+ * Preview panels use Drawer overlays:
+ * - File preview opens as an overlay drawer (does not squeeze conversation)
+ * - Sync preview opens as an overlay drawer
  * - ESC or close button dismisses the preview
  *
  * When user sends a message from WelcomeScreen:
@@ -36,7 +35,6 @@ import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ProjectSkillsDialog } from '@/components/skills/ProjectSkillsDialog'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
-import { ResizablePanels } from '@/components/layout/ResizablePanels'
 import { scanProjectSkills } from '@/skills/skill-scanner'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
@@ -84,8 +82,6 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
-  // Trigger to force expand resizable panels (incremented each time a file is selected)
-  const [expandTrigger, setExpandTrigger] = useState(0)
 
   // Skills management state
   const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
@@ -443,7 +439,6 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
     isConversationRunning,
   ])
 
-  // Drag divider between conversation and preview
   const hasActiveConversation =
     !!activeConversationId && conversations.some((c) => c.id === activeConversationId)
 
@@ -452,12 +447,10 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
     hidePreviewPanel()
   }, [hidePreviewPanel])
 
-  // Handle file click - set selected file for embedded preview
+  // Handle file click - set selected file for drawer preview
   const handleSidebarFileSelect = useCallback((path: string, handle: FileSystemFileHandle | null) => {
     setSelectedFilePath(path)
     setSelectedFileHandle(handle)
-    // Increment trigger to force resizable panels to expand
-    setExpandTrigger((t) => t + 1)
   }, [])
 
   // Handle element inspector from sidebar - open in new tab
@@ -490,39 +483,11 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
     }
   }, [])
 
-  // Close embedded file preview
+  // Close file preview drawer
   const handleCloseFilePreview = useCallback(() => {
     setSelectedFilePath(null)
     setSelectedFileHandle(null)
   }, [])
-
-  // Render conversation area or welcome screen (shared between file-selected and no-file states)
-  const renderConversationArea = () => {
-    if (hasActiveConversation) {
-      return (
-        <ConversationView
-          initialMessage={pendingMessage}
-          onInitialMessageConsumed={handleInitialMessageConsumed}
-        />
-      )
-    }
-
-    return (
-      <div className="relative h-full min-h-0 w-full overflow-hidden">
-        {workspaceCount === 0 && (
-          <div className="absolute left-4 top-4 z-10 max-w-md rounded-lg border border-primary-200/70 bg-primary-50/85 p-3 text-sm text-primary-800 shadow-sm backdrop-blur-sm dark:border-primary-900/40 dark:bg-primary-950/25 dark:text-primary-200">
-            <p className="mb-2 text-primary-800 dark:text-primary-200">
-              当前项目还没有工作区，创建首个会话后会自动生成工作区。
-            </p>
-            <BrandButton variant="outline" onClick={handleCreateFirstWorkspace}>
-              创建第一个工作区
-            </BrandButton>
-          </div>
-        )}
-        <WelcomeScreenV2 onStartConversation={handleStartConversation} />
-      </div>
-    )
-  }
 
   return (
     <div className="flex h-screen flex-col bg-white dark:bg-neutral-950">
@@ -550,32 +515,44 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
           <Sidebar onFileSelect={handleSidebarFileSelect} onInspect={handleElementInspect} selectedFilePath={selectedFilePath} />
         )}
 
-        {/* Main area: conversation + optional file preview */}
+        {/* Main area: conversation + optional sync preview panel */}
         <div className="flex flex-1 overflow-hidden">
-          {/* When file is selected: vertical split with resizable panels */}
-          {selectedFilePath ? (
-            <ResizablePanels
-              direction="vertical"
-              className="min-h-0 min-w-0 flex-1"
-              storageKey="file-preview-layout"
-              resetKey={expandTrigger}
-              firstPanel={{ id: 'file-preview', minSize: 15, maxSize: 85, initialSize: 50, collapsible: true }}
-              secondPanel={{ id: 'conversation', minSize: 25, maxSize: 85, initialSize: 50 }}
-            >
-              {/* File preview (top) */}
-              <FilePreview
-                filePath={selectedFilePath}
-                fileHandle={selectedFileHandle}
-                onClose={handleCloseFilePreview}
+          {/* Conversation / Welcome */}
+          <main className="flex-1 overflow-hidden">
+            {hasActiveConversation ? (
+              <ConversationView
+                initialMessage={pendingMessage}
+                onInitialMessageConsumed={handleInitialMessageConsumed}
               />
+            ) : (
+              <div className="relative h-full min-h-0 w-full overflow-hidden">
+                {workspaceCount === 0 && (
+                  <div className="absolute left-4 top-4 z-10 max-w-md rounded-lg border border-primary-200/70 bg-primary-50/85 p-3 text-sm text-primary-800 shadow-sm backdrop-blur-sm dark:border-primary-900/40 dark:bg-primary-950/25 dark:text-primary-200">
+                    <p className="mb-2 text-primary-800 dark:text-primary-200">
+                      当前项目还没有工作区，创建首个会话后会自动生成工作区。
+                    </p>
+                    <BrandButton variant="outline" onClick={handleCreateFirstWorkspace}>
+                      创建第一个工作区
+                    </BrandButton>
+                  </div>
+                )}
+                <WelcomeScreenV2 onStartConversation={handleStartConversation} />
+              </div>
+            )}
+          </main>
 
-              {/* Conversation / Welcome (bottom) */}
-              {renderConversationArea()}
-            </ResizablePanels>
-          ) : (
-            /* No file selected: conversation only */
-            renderConversationArea()
-          )}
+          {/* File preview as Drawer (overlay, no squeeze) */}
+          <Drawer
+            open={!!selectedFilePath}
+            onClose={handleCloseFilePreview}
+            width="50vw"
+          >
+            <FilePreview
+              filePath={selectedFilePath}
+              fileHandle={selectedFileHandle}
+              onClose={handleCloseFilePreview}
+            />
+          </Drawer>
 
           {/* Sync preview as Drawer (overlay, no squeeze) */}
           <Drawer open={showPreview} onClose={handleClosePreview} title="变更待审阅" width="85vw">
