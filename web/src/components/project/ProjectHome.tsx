@@ -642,6 +642,7 @@ export function ProjectHome({
       </BrandDialog>
 
       <BrandDialog
+        modal
         open={!!deletingProject}
         onOpenChange={(open) => {
           if (!open && !isActionSubmitting) {

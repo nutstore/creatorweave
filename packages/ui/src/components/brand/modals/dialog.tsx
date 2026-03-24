@@ -13,14 +13,14 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { cn } from "@/lib/utils"
 
 export interface BrandDialogProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root> {
-  /** Modal mode - when false, allows interaction with elements outside the dialog. Default: false */
+  /** Modal mode - when true, traps focus and prevents interaction with elements outside the dialog. Default: true */
   modal?: boolean
 }
 
 const BrandDialog = React.forwardRef<
   unknown,
   BrandDialogProps
->(({ modal = false, ...props }, _ref) => (
+>(({ modal = true, ...props }, _ref) => (
   <DialogPrimitive.Root modal={modal} {...props} />
 ))
 BrandDialog.displayName = "BrandDialog"
@@ -56,22 +56,13 @@ const BrandDialogContent = React.forwardRef<
   BrandDialogContentProps
 >(({ className, children, showOverlay = true, ...props }, ref) => (
   <BrandDialogPortal>
-    {showOverlay && (
-      <div
-        className="fixed inset-0 z-overlay bg-black/50 pointer-events-none"
-        aria-hidden="true"
-      />
-    )}
+    {showOverlay && <BrandDialogOverlay />}
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-modal w-full max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border border-gray-200 bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 dark:border-neutral-700 dark:bg-neutral-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "fixed left-[50%] top-[50%] z-modal w-[90vw] max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 dark:bg-neutral-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
-      onPointerDownOutside={(e) => {
-        // Allow clicks to pass through to underlying elements
-        e.preventDefault()
-      }}
       {...props}
     >
       {children}
@@ -87,7 +78,7 @@ const BrandDialogHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-14 items-center justify-between border-b border-gray-200 px-5 dark:border-neutral-700",
+      "flex h-14 items-center justify-between border-b border px-5",
       className
     )}
     {...props}
@@ -114,7 +105,7 @@ const BrandDialogFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-16 items-center justify-end gap-3 border-t border-gray-200 px-5 dark:border-neutral-700",
+      "flex min-h-16 items-center justify-end gap-3 border-t border px-5 py-3",
       className
     )}
     {...props}
