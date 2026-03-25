@@ -1,121 +1,21 @@
 /**
- * WelcomeScreenV2 - Scene-based guided onboarding
- *
- * Shows different user personas and capabilities to help users understand what they can do.
- * Supports:
- * - Developer persona
- * - Data Analyst persona
- * - Student/Researcher persona
- * - Office Worker persona
+ * WelcomeScreenV2 - Clean onboarding screen with drag-and-drop support
  */
 
 import { useState, useCallback } from 'react'
-import {
-  Send,
-  FolderOpen,
-  Sparkles,
-  ChevronRight,
-  Code,
-  BarChart3,
-  BookOpen,
-  FileText,
-  Upload,
-} from 'lucide-react'
+import { Send, FolderOpen, Sparkles, Upload } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { useT } from '@/i18n'
 
-//=============================================================================
-// Types and Data
-//=============================================================================
-
-interface Persona {
-  id: string
-  icon: React.ElementType
-  title: string
-  titleKey: string
-  description: string
-  descriptionKey: string
-  examples: { text: string; textKey: string }[]
-  color: string
-}
-
-const PERSONAS: Persona[] = [
-  {
-    id: 'developer',
-    icon: Code,
-    title: 'Developer',
-    titleKey: 'welcome.personas.developer.title',
-    description: 'Code understanding, debugging, refactoring',
-    descriptionKey: 'welcome.personas.developer.description',
-    examples: [
-      { text: 'Explain how this function works', textKey: 'welcome.personas.developer.examples.0' },
-      { text: 'Find bugs in this code', textKey: 'welcome.personas.developer.examples.1' },
-      { text: 'Refactor for better performance', textKey: 'welcome.personas.developer.examples.2' },
-    ],
-    color: 'bg-blue-50/50 text-blue-600 border-blue-200/50 hover:bg-blue-50',
-  },
-  {
-    id: 'analyst',
-    icon: BarChart3,
-    title: 'Data Analyst',
-    titleKey: 'welcome.personas.analyst.title',
-    description: 'Data processing, visualization, insights',
-    descriptionKey: 'welcome.personas.analyst.description',
-    examples: [
-      { text: 'Analyze sales data in CSV', textKey: 'welcome.personas.analyst.examples.0' },
-      { text: 'Create charts from Excel', textKey: 'welcome.personas.analyst.examples.1' },
-      { text: 'Summarize key metrics', textKey: 'welcome.personas.analyst.examples.2' },
-    ],
-    color: 'bg-green-50/50 text-green-600 border-green-200/50 hover:bg-green-50',
-  },
-  {
-    id: 'researcher',
-    icon: BookOpen,
-    title: 'Student / Researcher',
-    titleKey: 'welcome.personas.researcher.title',
-    description: 'Document reading, learning, knowledge organization',
-    descriptionKey: 'welcome.personas.researcher.description',
-    examples: [
-      { text: 'Summarize this documentation', textKey: 'welcome.personas.researcher.examples.0' },
-      { text: 'Explain technical concepts', textKey: 'welcome.personas.researcher.examples.1' },
-      { text: 'Find information across files', textKey: 'welcome.personas.researcher.examples.2' },
-    ],
-    color: 'bg-purple-50/50 text-purple-600 border-purple-200/50 hover:bg-purple-50',
-  },
-  {
-    id: 'office',
-    icon: FileText,
-    title: 'Office Worker',
-    titleKey: 'welcome.personas.office.title',
-    description: 'Document processing, reporting, content creation',
-    descriptionKey: 'welcome.personas.office.description',
-    examples: [
-      { text: 'Draft a report from data', textKey: 'welcome.personas.office.examples.0' },
-      { text: 'Format and organize documents', textKey: 'welcome.personas.office.examples.1' },
-      { text: 'Process multiple files', textKey: 'welcome.personas.office.examples.2' },
-    ],
-    color: 'bg-orange-50/50 text-orange-600 border-orange-200/50 hover:bg-orange-50',
-  },
-]
-
-//=============================================================================
-// Component Props
-//=============================================================================
-
 interface WelcomeScreenProps {
   onStartConversation: (text: string) => void
 }
 
-//=============================================================================
-// Main Component
-//=============================================================================
-
 export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
   const [input, setInput] = useState('')
-  const [selectedPersona, setSelectedPersona] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [draggedFiles, setDraggedFiles] = useState<FileList | null>(null)
   const { hasApiKey } = useSettingsStore()
@@ -147,16 +47,6 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
     }
   }
 
-  const handlePersonaClick = (persona: Persona) => {
-    setSelectedPersona(persona.id)
-    // Use first example as placeholder
-    setInput(persona.examples[0].text)
-  }
-
-  const handleExampleClick = (exampleText: string) => {
-    setInput(exampleText)
-  }
-
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -178,7 +68,6 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
     const files = e.dataTransfer.files
     if (files && files.length > 0) {
       setDraggedFiles(files)
-      // Generate a prompt based on the dropped files
       const fileNames = Array.from(files)
         .map((f) => f.name)
         .slice(0, 3)
@@ -222,7 +111,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="w-full max-w-4xl">
+      <div className="w-full max-w-2xl">
         {/* Logo & Tagline */}
         <div className="mb-8 text-center">
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50/80 shadow-sm">
@@ -231,54 +120,6 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
           <h1 className="mb-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-100">{t('welcome.title')}</h1>
           <p className="text-base text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
         </div>
-
-        {/* Personas Grid */}
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PERSONAS.map((persona) => {
-            const Icon = persona.icon
-            const isSelected = selectedPersona === persona.id
-            return (
-              <button
-                key={persona.id}
-                type="button"
-                onClick={() => handlePersonaClick(persona)}
-                className={`flex flex-col items-start rounded-xl border-2 p-4 text-left transition-all ${
-                  isSelected
-                    ? persona.color + ' ring-2 ring-offset-2'
-                    : 'border-neutral-200 bg-neutral-50 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800'
-                }`}
-              >
-                <div
-                  className={`mb-2 rounded-lg p-2 ${isSelected ? 'bg-white/50' : 'bg-neutral-200'}`}
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h3 className="mb-1 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{persona.title}</h3>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400">{persona.description}</p>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Example questions (based on selected persona) */}
-        {selectedPersona && (
-          <div className="mb-6 rounded-lg bg-neutral-50/80 p-4 dark:bg-neutral-900/60">
-            <p className="mb-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">Try asking:</p>
-            <div className="flex flex-wrap gap-2">
-              {PERSONAS.find((p) => p.id === selectedPersona)?.examples.map((example, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => handleExampleClick(example.text)}
-                  className="hover:border-primary-300 flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-primary-50 hover:text-primary-700 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                >
-                  <span>{example.text}</span>
-                  <ChevronRight className="h-3 w-3" />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Input area with drag overlay */}
         <div className="relative mb-6">
