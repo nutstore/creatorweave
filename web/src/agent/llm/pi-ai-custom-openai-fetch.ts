@@ -285,7 +285,7 @@ function streamCwOpenAIFetch(
   return stream
 }
 
-function buildChatCompletionsPayload(
+export function buildChatCompletionsPayload(
   model: Model<typeof CW_OPENAI_FETCH_API>,
   context: Context,
   options?: StreamOptions
@@ -294,6 +294,7 @@ function buildChatCompletionsPayload(
     model: model.id,
     messages: convertContextMessages(context, model),
     stream: true,
+    stream_options: { include_usage: true },
   }
 
   if (options?.temperature !== undefined) {
