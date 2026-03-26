@@ -23,7 +23,7 @@ import {
   emitComplete,
   emitError,
 } from '@/streaming-bus'
-import { useWorkspaceStore } from './workspace.store'
+import { useConversationContextStore } from './conversation-context.store'
 import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
 
 // Default conversation name when title is not available
@@ -281,28 +281,21 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         const conversations = await loadConversations()
 
-        // Ensure OPFS sessions exist for all loaded conversations
-        const { getSessionManager } = await import('@/opfs/session')
-        const manager = await getSessionManager()
+        // Ensure OPFS conversations exist for all loaded conversations
+        const { getWorkspaceManager } = await import('@/opfs')
+        const manager = await getWorkspaceManager()
 
-        const failedSessions: Array<{ id: string; title: string; error: string }> = []
+        const failedWorkspaces: Array<{ id: string; title: string; error: string }> = []
 
         for (const conv of conversations) {
-          const rootDir = `/conversations/${conv.id}`
+          const rootDir = `workspaces/${conv.id}`
           try {
-            const existing = manager.getSessionByRoot(rootDir)
-            if (!existing) {
-              await manager.createSession(rootDir, conv.id, conv.title || DEFAULT_CONVERSATION_NAME)
-            } else {
-              const targetName = conv.title || DEFAULT_CONVERSATION_NAME
-              if (existing.name !== targetName) {
-                await manager.updateSessionName(existing.sessionId, targetName)
-              }
-            }
+            // Create conversation if it doesn't exist (idempotent)
+            await manager.createWorkspace(rootDir, conv.id, conv.title || DEFAULT_CONVERSATION_NAME)
           } catch (e) {
             const errorMsg = e instanceof Error ? e.message : String(e)
-            console.error(`[conversation.store] Failed to ensure session for ${conv.id}:`, e)
-            failedSessions.push({
+            console.error(`[conversation.store] Failed to ensure conversation for ${conv.id}:`, e)
+            failedWorkspaces.push({
               id: conv.id,
               title: conv.title || DEFAULT_CONVERSATION_NAME,
               error: errorMsg,
@@ -310,24 +303,24 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           }
         }
 
-        if (failedSessions.length > 0) {
+        if (failedWorkspaces.length > 0) {
           console.warn(
-            `[conversation.store] Failed to create/update ${failedSessions.length} session(s):`,
-            failedSessions.map((f) => `"${f.title}" (${f.id}): ${f.error}`).join('; ')
+            `[conversation.store] Failed to create/update  workspace(s):`,
+            failedWorkspaces.map((f) => `"${f.title}" (${f.id}): ${f.error}`).join('; ')
           )
         }
 
         // Refresh the workspace store for active project scope
-        const workspaceStore = useWorkspaceStore.getState()
+        const workspaceStore = useConversationContextStore.getState()
         await workspaceStore.refreshWorkspaces()
 
         const workspaceIds = new Set(workspaceStore.workspaces.map((w) => w.id))
         const activeId = conversations.find((conv) => workspaceIds.has(conv.id))?.id || null
 
-        // Switch to active session if exists
+        // Switch to active workspace if exists
         if (activeId) {
           await workspaceStore.switchWorkspace(activeId).catch((e) => {
-            console.error('[conversation.store] Failed to switch to active session:', e)
+            console.error('[conversation.store] Failed to switch to active workspace:', e)
           })
         }
 
@@ -376,9 +369,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         toast.error('对话保存失败，刷新页面后可能丢失')
       })
 
-      useWorkspaceStore
+      useConversationContextStore
         .getState()
-        .createWorkspace(conversation.id, `/conversations/${conversation.id}`, title || '新对话')
+        .createWorkspace(conversation.id, `workspaces/${conversation.id}`, title || '新对话')
         .catch((e) => {
           console.error('[conversation.store] Failed to create workspace:', e)
         })
@@ -392,10 +385,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
 
       if (id) {
-        const workspaceStore = useWorkspaceStore.getState()
+        const workspaceStore = useConversationContextStore.getState()
         if (workspaceStore.activeWorkspaceId !== id) {
           workspaceStore.switchWorkspace(id).catch((e) => {
-            console.error('[conversation.store] Failed to switch session workspace:', e)
+            console.error('[conversation.store] Failed to switch active workspace:', e)
           })
         }
       }
@@ -617,7 +610,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
       const [convDeleteResult, workspaceDeleteResult] = await Promise.allSettled([
         deleteConversationFromDB(id),
-        useWorkspaceStore.getState().deleteWorkspace(id),
+        useConversationContextStore.getState().deleteWorkspace(id),
       ])
       const errors: string[] = []
       if (convDeleteResult.status === 'rejected') {
@@ -629,7 +622,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         )
       }
       if (workspaceDeleteResult.status === 'rejected') {
-        console.error('[conversation.store] Failed to delete workspace:', workspaceDeleteResult.reason)
+        console.error(
+          '[conversation.store] Failed to delete workspace:',
+          workspaceDeleteResult.reason
+        )
         errors.push(
           workspaceDeleteResult.reason instanceof Error
             ? workspaceDeleteResult.reason.message
@@ -820,14 +816,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (context.isError) return undefined
             const changeTools = new Set(['write', 'edit', 'delete'])
             if (!changeTools.has(context.toolName)) return undefined
-            const { useWorkspaceStore } = await import('@/store/workspace.store')
-            await useWorkspaceStore.getState().refreshPendingChanges(true)
+            const { useConversationContextStore } = await import('@/store/conversation-context.store')
+            await useConversationContextStore.getState().refreshPendingChanges(true)
             return undefined
           },
           onLoopComplete: async () => {
             // Refresh pending changes after each agent loop completes
-            const { useWorkspaceStore } = await import('@/store/workspace.store')
-            await useWorkspaceStore.getState().refreshPendingChanges()
+            const { useConversationContextStore } = await import('@/store/conversation-context.store')
+            await useConversationContextStore.getState().refreshPendingChanges()
           },
         })
 
@@ -883,8 +879,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               })
 
             try {
-              const { useWorkspaceStore } = await import('@/store/workspace.store')
-              await useWorkspaceStore.getState().refreshPendingChanges(true)
+              const { useConversationContextStore } = await import('@/store/conversation-context.store')
+              await useConversationContextStore.getState().refreshPendingChanges(true)
             } catch (err) {
               console.warn('[conversation.store] Failed to refresh pending changes on complete:', err)
             }

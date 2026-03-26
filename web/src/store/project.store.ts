@@ -120,15 +120,17 @@ export const useProjectStore = create<ProjectState>()(
         await useAgentStore.getState().setActiveProject(projectId)
 
         // Keep workspace list in sync with active project selection.
-        const { useWorkspaceStore } = await import('./workspace.store')
-        await useWorkspaceStore.getState().refreshWorkspaces()
+        const { useConversationContextStore } = await import('./conversation-context.store')
+        await useConversationContextStore.getState().refreshWorkspaces()
 
         // Keep active conversation within current project scope.
         const { useConversationStore } = await import('./conversation.store')
-        const workspaceIds = new Set(useWorkspaceStore.getState().workspaces.map((w) => w.id))
+        const conversationContextIds = new Set(
+          useConversationContextStore.getState().workspaces.map((w) => w.id)
+        )
         const conversationStore = useConversationStore.getState()
         const nextActiveConversationId = conversationStore.conversations.find((c) =>
-          workspaceIds.has(c.id)
+          conversationContextIds.has(c.id)
         )?.id
         await conversationStore.setActive(nextActiveConversationId || null)
         return true
@@ -250,7 +252,7 @@ export const useProjectStore = create<ProjectState>()(
           const remainingProjects = get().projects
           const nextProjectId = remainingProjects[0]?.id || ''
           const { useAgentStore } = await import('./agent.store')
-          const { useWorkspaceStore } = await import('./workspace.store')
+          const { useConversationContextStore } = await import('./conversation-context.store')
 
           if (nextProjectId) {
             await repo.setActiveProject(nextProjectId)
@@ -262,7 +264,7 @@ export const useProjectStore = create<ProjectState>()(
             await useAgentStore.getState().setActiveProject('')
           }
 
-          await useWorkspaceStore.getState().refreshWorkspaces()
+          await useConversationContextStore.getState().refreshWorkspaces()
         }
 
         set({ isLoading: false })

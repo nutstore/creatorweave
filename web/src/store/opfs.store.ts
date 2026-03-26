@@ -1,13 +1,13 @@
 /**
- * OPFS Store - provides file operations through SessionWorkspace
+ * OPFS Store - provides file operations through workspace runtime
  *
- * This store acts as a bridge between the application and the OPFS session system:
- * - All file operations go through the current active session's workspace
+ * This store acts as a bridge between the application and the OPFS workspace system:
+ * - All file operations go through the current active workspace
  * - Files are cached in OPFS with mtime-based change detection
  * - Pending changes are tracked for sync to real filesystem
  *
  * Architecture:
- * - Application → OPFSStore → SessionWorkspace → OPFS
+ * - Application → OPFSStore → WorkspaceFiles → OPFS
  */
 
 import { create } from 'zustand'
@@ -18,7 +18,7 @@ import type {
   PendingChange,
   SyncResult,
 } from '@/opfs/types/opfs-types'
-import { getSessionManager } from '@/opfs/session'
+import { getWorkspaceManager } from '@/opfs'
 
 /**
  * Check if error is a quota exceeded error
@@ -55,19 +55,19 @@ export interface FileReadResult {
  * OPFS store state
  */
 interface OPFSState {
-  /** Current active session ID */
-  sessionId: string | null
+  /** Current active workspace ID */
+  workspaceId: string | null
 
   /** Whether the store has been initialized */
   initialized: boolean
 
-  /** Pending changes for current session */
+  /** Pending changes for current workspace */
   pendingChanges: PendingChange[]
 
   /** File paths that are approved but not yet synced to disk */
   approvedNotSyncedPaths: Set<string>
 
-  /** Cached file paths for current session */
+  /** Cached file paths for current workspace */
   cachedPaths: string[]
 
   /** Whether an operation is in progress */
@@ -78,38 +78,40 @@ interface OPFSState {
 
   // Actions
 
-  /** Initialize the store (wait for active session) */
+  /** Initialize the store (wait for active workspace) */
   initialize: () => Promise<void>
 
-  /** Read file from current session (cache first, then filesystem) */
+  /** Read file from current workspace (cache first, then filesystem) */
   readFile: (path: string, directoryHandle?: FileSystemDirectoryHandle | null) => Promise<FileReadResult>
 
-  /** Write file to current session (cache + pending) */
+  /** Write file to current workspace (cache + pending) */
   writeFile: (
     path: string,
     content: FileContent,
     directoryHandle?: FileSystemDirectoryHandle | null
   ) => Promise<void>
 
-  /** Delete file from current session */
+  /** Delete file from current workspace */
   deleteFile: (path: string, directoryHandle?: FileSystemDirectoryHandle | null) => Promise<void>
 
-  /** Get pending changes for current session */
+  /** Get pending changes for current workspace */
   getPendingChanges: () => PendingChange[]
 
   /** Sync pending changes to real filesystem */
   syncPendingChanges: (directoryHandle: FileSystemDirectoryHandle) => Promise<SyncResult>
 
-  /** Clear current session's cache and pending */
+  /** Clear current workspace's cache and pending */
+  clearWorkspace: () => Promise<void>
+  /** @deprecated Use clearWorkspace */
   clearSession: () => Promise<void>
 
-  /** Check if file is cached in current session */
+  /** Check if file is cached in current workspace */
   hasCachedFile: (path: string) => boolean
 
   /** Get all cached file paths */
   getCachedPaths: () => string[]
 
-  /** Refresh state from current session */
+  /** Refresh state from current workspace */
   refresh: () => Promise<void>
 
   /** Clear error state */
@@ -117,7 +119,7 @@ interface OPFSState {
 }
 
 /**
- * Helper to get active session workspace
+ * Helper to get active workspace runtime
  */
 async function getActiveWorkspace() {
   const { useWorkspaceStore } = await import('./workspace.store')
@@ -127,8 +129,8 @@ async function getActiveWorkspace() {
     throw new Error('No active workspace')
   }
 
-  const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeWorkspaceId)
+  const manager = await getWorkspaceManager()
+  const workspace = await manager.getWorkspace(activeWorkspaceId)
 
   if (!workspace) {
     throw new Error(`Workspace ${activeWorkspaceId} not found`)
@@ -139,7 +141,7 @@ async function getActiveWorkspace() {
 
 export const useOPFSStore = create<OPFSState>()(
   immer((set, get) => ({
-    sessionId: null,
+    workspaceId: null,
     initialized: false,
     pendingChanges: [],
     approvedNotSyncedPaths: new Set(),
@@ -152,8 +154,8 @@ export const useOPFSStore = create<OPFSState>()(
         const { workspaceId } = await getActiveWorkspace()
 
         // Load initial state from workspace
-        const manager = await getSessionManager()
-        const workspace = await manager.getSession(workspaceId)
+        const manager = await getWorkspaceManager()
+        const workspace = await manager.getWorkspace(workspaceId)
 
         if (workspace) {
           // Get approved-not-synced paths (may fail if DB not ready)
@@ -165,7 +167,7 @@ export const useOPFSStore = create<OPFSState>()(
           }
 
           set({
-            sessionId: workspaceId,
+            workspaceId: workspaceId,
             pendingChanges: workspace.getPendingChanges(),
             approvedNotSyncedPaths,
             cachedPaths: workspace.getCachedPaths(),
@@ -298,7 +300,7 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    clearSession: async () => {
+    clearWorkspace: async () => {
       set({ isLoading: true, error: null })
 
       try {
@@ -317,10 +319,14 @@ export const useOPFSStore = create<OPFSState>()(
         const { useWorkspaceStore } = await import('./workspace.store')
         useWorkspaceStore.getState().updateCurrentCounts()
       } catch (e) {
-        const message = e instanceof Error ? e.message : 'Failed to clear session'
+        const message = e instanceof Error ? e.message : 'Failed to clear workspace'
         set({ error: message, isLoading: false })
         throw new Error(message)
       }
+    },
+
+    clearSession: async () => {
+      await get().clearWorkspace()
     },
 
     hasCachedFile: (path) => {
@@ -345,7 +351,7 @@ export const useOPFSStore = create<OPFSState>()(
         }
 
         set((state) => {
-          state.sessionId = newWorkspaceId
+          state.workspaceId = newWorkspaceId
           state.pendingChanges = workspace.getPendingChanges()
           state.approvedNotSyncedPaths = approvedNotSyncedPaths
           state.cachedPaths = workspace.getCachedPaths()

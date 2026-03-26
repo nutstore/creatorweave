@@ -19,12 +19,14 @@ vi.mock('@/streaming-bus', () => ({
   emitError: vi.fn(),
 }))
 
-vi.mock('../workspace.store', () => ({
-  useWorkspaceStore: {
+vi.mock('../conversation-context.store', () => ({
+  useConversationContextStore: {
     getState: vi.fn(() => ({
       activeWorkspaceId: null,
+      workspaces: [],
       createWorkspace: vi.fn(() => Promise.resolve()),
       switchWorkspace: vi.fn(() => Promise.resolve()),
+      refreshWorkspaces: vi.fn(() => Promise.resolve()),
       refreshPendingChanges: vi.fn(() => Promise.resolve()),
       deleteWorkspace: deleteWorkspaceMock,
     })),

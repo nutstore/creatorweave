@@ -1,21 +1,21 @@
 /**
- * Workspace Store - manages conversation workspaces
+ * Workspace Store - manages local workspaces
  *
- * This replaces the old Session Store.
- * Each conversation has an associated workspace for file operations.
+ * This replaces the old local Session store semantics.
+ * Each workspace has an associated OPFS runtime for file operations.
  *
  * Architecture:
  * - Workspace metadata stored in SQLite (fast, queryable)
  * - File content remains in OPFS (browser-native storage)
- * - Workspace ID matches Conversation ID (1:1 relationship)
+ * - Workspace ID is the canonical local runtime context ID
  *
  * @module workspace.store
  */
 
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
-import type { SessionMetadata, ChangeDetectionResult } from '@/opfs/types/opfs-types'
-import { getSessionManager, SessionWorkspace } from '@/opfs/session'
+import type { WorkspaceMetadata, ChangeDetectionResult } from '@/opfs/types/opfs-types'
+import { getWorkspaceManager, WorkspaceFiles } from '@/opfs'
 import { getWorkspaceRepository, type Workspace } from '@/sqlite/repositories/workspace.repository'
 import { getProjectRepository } from '@/sqlite/repositories/project.repository'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
@@ -32,7 +32,7 @@ let refreshPendingChangesNeedsRerun = false
 let refreshPendingChangesRerunSilent = true
 
 /**
- * Workspace metadata shape from SessionManager (matches InternalSessionMetadata)
+ * Workspace metadata shape from OPFS workspace manager.
  */
 interface WorkspaceManagerMetadata {
   workspaceId: string
@@ -44,7 +44,7 @@ interface WorkspaceManagerMetadata {
 
 /**
  * Get display name for a workspace with fallback strategy
- * Priority: stored name > conversation title > directory name > workspace ID
+ * Priority: stored name > workspace title > directory name > workspace ID
  */
 export function getWorkspaceDisplayName(
   meta: WorkspaceManagerMetadata,
@@ -63,7 +63,7 @@ export function getWorkspaceDisplayName(
 /**
  * Extended workspace metadata with runtime statistics
  */
-export interface WorkspaceWithStats extends SessionMetadata {
+export interface WorkspaceWithStats extends WorkspaceMetadata {
   /** Number of pending changes */
   pendingCount: number
 }
@@ -71,16 +71,16 @@ export interface WorkspaceWithStats extends SessionMetadata {
 /**
  * Convert SQLite Workspace to WorkspaceWithStats
  */
-function sqliteSessionToWorkspaceStats(session: Workspace): WorkspaceWithStats {
+function sqliteWorkspaceToWorkspaceStats(workspace: Workspace): WorkspaceWithStats {
   return {
-    id: session.id,
-    name: session.name,
-    createdAt: session.createdAt,
-    lastActiveAt: session.lastAccessedAt,
-    cacheSize: session.cacheSize,
-    pendingCount: session.pendingCount,
-    modifiedFiles: session.modifiedFiles,
-    status: session.status,
+    id: workspace.id,
+    name: workspace.name,
+    createdAt: workspace.createdAt,
+    lastActiveAt: workspace.lastAccessedAt,
+    cacheSize: workspace.cacheSize,
+    pendingCount: workspace.pendingCount,
+    modifiedFiles: workspace.modifiedFiles,
+    status: workspace.status,
   }
 }
 
@@ -143,7 +143,7 @@ interface WorkspaceState {
   initialize: () => Promise<void>
 
   /** Create a new workspace (writes to both SQLite and OPFS) */
-  createWorkspace: (id: string, rootDirectory: string, name?: string) => Promise<SessionMetadata>
+  createWorkspace: (id: string, rootDirectory: string, name?: string) => Promise<WorkspaceMetadata>
 
   /** Switch to a different workspace */
   switchWorkspace: (id: string) => Promise<void>
@@ -259,9 +259,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             // Load from SQLite only (no OPFS auto-migration in current dev phase)
             let workspaces: WorkspaceWithStats[] = []
-            const sqliteSessions = await repo.findWorkspacesByProject(activeProjectId)
-            if (sqliteSessions.length > 0) {
-              workspaces = sqliteSessions.map(sqliteSessionToWorkspaceStats)
+            const sqliteWorkspaces = await repo.findWorkspacesByProject(activeProjectId)
+            if (sqliteWorkspaces.length > 0) {
+              workspaces = sqliteWorkspaces.map(sqliteWorkspaceToWorkspaceStats)
               // Get real pending counts from fs_ops (not cached values)
               const realPendingCounts = await repo.getRealPendingCounts()
               workspaces = workspaces.map((ws) => ({
@@ -307,10 +307,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (!activeProjectId) {
               throw new Error('No active project selected')
             }
-            const manager = await getSessionManager()
+            const manager = await getWorkspaceManager()
 
             // Create OPFS workspace
-            const workspace = await manager.createSession(rootDirectory, id)
+            const workspace = await manager.createWorkspace(rootDirectory, id)
 
             // Create SQLite record
             await repo.createWorkspace({
@@ -391,14 +391,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (!activeProjectId) {
               throw new Error('No active project selected')
             }
-            const manager = await getSessionManager()
+            const manager = await getWorkspaceManager()
 
             // Check if workspace exists in SQLite first
-            const sessionRecord = await repo.findWorkspaceById(id)
+            const workspaceRecord = await repo.findWorkspaceById(id)
 
             // If workspace doesn't exist in SQLite, it's a new conversation
             // We need to create the workspace OPFS structure immediately
-            if (!sessionRecord) {
+            if (!workspaceRecord) {
               console.log(`[WorkspaceStore] Creating new workspace for conversation: ${id}`)
 
               // Create OPFS workspace using conversation ID as root directory
@@ -406,7 +406,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const rootDirectory = `workspaces/${id}`
 
               // Create the workspace (this creates OPFS structure and adds to SQLite)
-              const workspace = await manager.createSession(rootDirectory, id)
+              const workspace = await manager.createWorkspace(rootDirectory, id)
 
               // Get conversation title for workspace name
               const { useConversationStore } = await import('./conversation.store')
@@ -455,7 +455,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
 
             // Try to load from OPFS workspace
-            const workspace = await manager.getSession(id)
+            const workspace = await manager.getWorkspace(id)
 
             if (!workspace) {
               // Workspace exists in SQLite but not in OPFS - data inconsistency
@@ -465,9 +465,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 `[WorkspaceStore] Workspace ${id} exists in database but OPFS workspace missing. Recreating...`
               )
 
-              // Get the session record to retrieve root directory
-              const sessionRecord = await repo.findWorkspaceById(id)
-              if (!sessionRecord) {
+              // Get the workspace record to retrieve root directory
+              const workspaceRecord = await repo.findWorkspaceById(id)
+              if (!workspaceRecord) {
                 console.error(`[WorkspaceStore] Cannot recreate workspace ${id}: no record in database`)
                 await repo.deleteWorkspace(id)
                 set({
@@ -479,7 +479,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               }
 
               // Recreate the workspace
-              const newWorkspace = await manager.createSession(sessionRecord.rootDirectory, id)
+              const newWorkspace = await manager.createWorkspace(workspaceRecord.rootDirectory, id)
 
               // Update the workspace in SQLite with fresh stats
               await repo.updateWorkspaceStats(id, {
@@ -491,8 +491,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   w.id === id
                     ? {
                         id,
-                        name: sessionRecord.name,
-                        createdAt: sessionRecord.createdAt,
+                        name: workspaceRecord.name,
+                        createdAt: workspaceRecord.createdAt,
                         lastActiveAt: Date.now(),
                         cacheSize: 0,
                         pendingCount: newWorkspace.pendingCount,
@@ -557,10 +557,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           try {
             const repo = getWorkspaceRepository()
-            const manager = await getSessionManager()
+            const manager = await getWorkspaceManager()
 
             // Delete from OPFS
-            await manager.deleteSession(id)
+            await manager.deleteWorkspace(id)
 
             // Delete from SQLite (cascade deletes related records)
             await repo.deleteWorkspace(id)
@@ -632,8 +632,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           if (!activeWorkspaceId) return
 
           try {
-            const manager = await getSessionManager()
-            const workspace = await manager.getSession(activeWorkspaceId)
+            const manager = await getWorkspaceManager()
+            const workspace = await manager.getWorkspace(activeWorkspaceId)
 
             if (workspace) {
               set({
@@ -807,7 +807,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             if (handle) {
               // Bind handle for both project scope and active workspace scope.
-              // SessionWorkspace reads by workspace/session id.
+              // WorkspaceFiles reads by workspace id.
               bindRuntimeDirectoryHandle(activeProjectId, handle)
               if (activeWorkspaceId) {
                 bindRuntimeDirectoryHandle(activeWorkspaceId, handle)
@@ -851,8 +851,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           if (!activeWorkspaceId) return
 
           try {
-            const manager = await getSessionManager()
-            const workspace = await manager.getSession(activeWorkspaceId)
+            const manager = await getWorkspaceManager()
+            const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
             const unsynced = await workspace.getUnsyncedSnapshots()
@@ -882,8 +882,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           set({ isLoading: true })
 
           try {
-            const manager = await getSessionManager()
-            const workspace = await manager.getSession(activeWorkspaceId)
+            const manager = await getWorkspaceManager()
+            const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
             const nativeDir = await workspace.getNativeDirectoryHandle()
@@ -937,13 +937,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
  * Get current active workspace
  */
 export async function getActiveWorkspace(): Promise<
-  { workspace: SessionWorkspace; workspaceId: string } | undefined
+  { workspace: WorkspaceFiles; workspaceId: string } | undefined
 > {
   const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
   if (!activeWorkspaceId) return undefined
 
-  const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeWorkspaceId)
+  const manager = await getWorkspaceManager()
+  const workspace = await manager.getWorkspace(activeWorkspaceId)
 
   return workspace ? { workspace, workspaceId: activeWorkspaceId } : undefined
 }

@@ -98,11 +98,11 @@ describe('OPFS Store State', () => {
 })
 
 describe('OPFS Store Operations', () => {
-  describe('Session initialization', () => {
-    it('should require active session ID', () => {
-      const sessionId: string | null = null
+  describe('Workspace initialization', () => {
+    it('should require active workspace ID', () => {
+      const workspaceId: string | null = null
 
-      expect(sessionId).toBeNull()
+      expect(workspaceId).toBeNull()
     })
 
     it('should track initialization state', () => {

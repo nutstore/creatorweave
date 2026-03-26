@@ -1,26 +1,23 @@
 /**
  * useStorageInfo Hook
  *
- * Hook for accessing storage information and session storage breakdown.
- * Now uses SQLite for session metadata and stats, while OPFS utilities
- * provide browser storage quota information.
+ * Hook for accessing storage information and workspace storage breakdown.
+ * Uses SQLite for workspace metadata/stats and OPFS utilities for browser quota data.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useWorkspaceStore } from '@/store/workspace.store'
-import type { WorkspaceWithStats } from '@/store/workspace.store'
+import { useWorkspaceStore, type WorkspaceWithStats } from '@/store/workspace.store'
 import { getWorkspaceRepository } from '@/sqlite'
 import type { Workspace } from '@/sqlite/repositories/workspace.repository'
-import { getSessionManager } from '@/opfs/session'
+import { getWorkspaceManager } from '@/opfs'
 import {
   getStorageEstimate,
   getStorageStatus,
   formatBytes,
-  getSessionSize,
 } from '@/opfs/utils/storage-utils'
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
 
-/** Session storage information */
+/** Per-workspace storage information */
 export interface WorkspaceStorageInfo {
   /** Workspace ID */
   id: string
@@ -36,26 +33,25 @@ export interface WorkspaceStorageInfo {
   lastActiveAt: number
 }
 
+/** @deprecated Use WorkspaceStorageInfo */
+export type ConversationStorageInfo = WorkspaceStorageInfo
+
 /** Storage info result */
 export interface StorageInfo {
-  /** Total usage in bytes */
   usage: number
-  /** Total quota in bytes */
   quota: number
-  /** Usage percentage */
   usagePercent: number
-  /** Formatted usage string */
   usageFormatted: string
-  /** Formatted quota string */
   quotaFormatted: string
-  /** Storage status */
   status: StorageStatus
 }
 
 /** Cleanup preview information */
 export interface CleanupPreview {
-  /** Number of sessions that will be cleaned */
-  sessionCount: number
+  /** Number of workspaces that will be cleaned */
+  workspaceCount: number
+  /** @deprecated Use workspaceCount */
+  conversationCount: number
   /** Total cache size that will be freed */
   totalSize: number
   /** Total size formatted */
@@ -64,8 +60,10 @@ export interface CleanupPreview {
   pendingCount: number
   /** Whether there are any unsaved changes */
   hasUnsavedChanges: boolean
-  /** List of session names that will be cleaned */
-  sessionNames: string[]
+  /** List of workspace names that will be cleaned */
+  workspaceNames: string[]
+  /** @deprecated Use workspaceNames */
+  conversationNames: string[]
 }
 
 /** Cleanup scope */
@@ -76,100 +74,78 @@ export interface UseStorageInfoResult {
   /** Storage information */
   storage: StorageInfo | null
   /** Per-workspace storage breakdown */
-  sessions: WorkspaceStorageInfo[]
+  workspaces: WorkspaceStorageInfo[]
+  /** @deprecated Use workspaces */
+  conversations: WorkspaceStorageInfo[]
   /** Loading state */
   loading: boolean
   /** Error message */
   error: string | null
-  /** Refresh storage info (optionally calculate session sizes) */
-  refresh: (includeSessionSizes?: boolean) => Promise<void>
+  /** Refresh storage info (optionally calculate workspace sizes) */
+  refresh: (includeWorkspaceSizes?: boolean) => Promise<void>
   /** Get cleanup preview before executing */
   getCleanupPreview: (scope: CleanupScope, days?: number) => Promise<CleanupPreview | null>
   /** Execute cleanup with scope */
   executeCleanup: (scope: CleanupScope, days?: number) => Promise<number>
   /** @deprecated Use executeCleanup instead */
-  cleanupOldSessions: (days: number) => Promise<number>
-  /** @deprecated Use executeCleanup instead */
   clearAllCache: () => Promise<void>
 }
 
-/**
- * Convert Session from SQLite to WorkspaceWithStats format
- */
-function sqliteSessionToWithStats(session: Workspace): WorkspaceWithStats {
+/** Convert SQLite Workspace to WorkspaceWithStats shape. */
+function sqliteWorkspaceToWithStats(workspace: Workspace): WorkspaceWithStats {
   return {
-    id: session.id,
-    name: session.name,
-    createdAt: session.createdAt,
-    lastActiveAt: session.lastAccessedAt,
-    cacheSize: session.cacheSize,
-    pendingCount: session.pendingCount,
-    modifiedFiles: session.modifiedFiles,
-    status: session.status,
+    id: workspace.id,
+    name: workspace.name,
+    createdAt: workspace.createdAt,
+    lastActiveAt: workspace.lastAccessedAt,
+    cacheSize: workspace.cacheSize,
+    pendingCount: workspace.pendingCount,
+    modifiedFiles: workspace.modifiedFiles,
+    status: workspace.status,
   }
 }
 
-/**
- * Hook for accessing storage information
- * Uses SQLite for session metadata, OPFS utilities for storage quota
- */
+/** Hook for accessing storage information */
 export function useStorageInfo(): UseStorageInfoResult {
-  // Use selector to only subscribe to workspaces, not entire store
   const workspaces = useWorkspaceStore((state) => state.workspaces)
   const [storage, setStorage] = useState<StorageInfo | null>(null)
-  const [sessionStorageList, setSessionStorageList] = useState<WorkspaceStorageInfo[]>([])
+  const [workspaceStorageList, setWorkspaceStorageList] = useState<WorkspaceStorageInfo[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Use refs to store latest values without causing re-renders
-  const sessionsRef = useRef<WorkspaceWithStats[]>(workspaces)
-  const sessionIdsRef = useRef<string>('')
+  const workspacesRef = useRef<WorkspaceWithStats[]>(workspaces)
+  const workspaceIdsRef = useRef<string>('')
   const hasLoadedRef = useRef(false)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const prevSessionCountRef = useRef(0)
-  const sessionCount = workspaces.length
+  const prevWorkspaceCountRef = useRef(0)
+  const workspaceCount = workspaces.length
 
-  // Keep sessionsRef updated
   useEffect(() => {
-    sessionsRef.current = workspaces
+    workspacesRef.current = workspaces
   }, [workspaces])
 
-  /**
-   * Load workspaces from SQLite (fallback to OPFS if needed)
-   */
-  const loadSessionsFromSQLite = async (): Promise<WorkspaceWithStats[]> => {
+  const loadWorkspacesFromSQLite = async (): Promise<WorkspaceWithStats[]> => {
     try {
       const repo = getWorkspaceRepository()
-      const sqliteSessions = await repo.findAllWorkspaces()
-
-      if (sqliteSessions.length > 0) {
-        // Use SQLite data
-        return sqliteSessions.map(sqliteSessionToWithStats)
+      const sqliteWorkspaces = await repo.findAllWorkspaces()
+      if (sqliteWorkspaces.length > 0) {
+        return sqliteWorkspaces.map(sqliteWorkspaceToWithStats)
       }
     } catch (e) {
-      console.warn(
-        '[useStorageInfo] Failed to load sessions from SQLite, falling back to store:',
-        e
-      )
+      console.warn('[useStorageInfo] Failed to load workspaces from SQLite, falling back to store:', e)
     }
 
-    // Fallback to store data
-    return sessionsRef.current
+    return workspacesRef.current
   }
 
-  /**
-   * Calculate workspace sizes using OPFS directory traversal
-   * This is still needed because file content is stored in OPFS
-   */
-  const calculateSessionSizes = async (
-    sessionsList: WorkspaceWithStats[],
+  const calculateWorkspaceSizes = async (
+    workspacesList: WorkspaceWithStats[],
     signal: AbortSignal
   ): Promise<WorkspaceStorageInfo[]> => {
-    const manager = await getSessionManager()
+    const manager = await getWorkspaceManager()
     const results: Map<string, WorkspaceStorageInfo> = new Map()
 
-    // Initialize results with SQLite data (fast)
-    for (const workspace of sessionsList) {
+    for (const workspace of workspacesList) {
       results.set(workspace.id, {
         id: workspace.id,
         name: workspace.name,
@@ -180,61 +156,51 @@ export function useStorageInfo(): UseStorageInfoResult {
       })
     }
 
-    // Update UI with initial data
-    setSessionStorageList(Array.from(results.values()))
+    setWorkspaceStorageList(Array.from(results.values()))
 
-    // Process sessions in batches to calculate actual OPFS size
     const BATCH_SIZE = 1
-    for (let i = 0; i < sessionsList.length; i += BATCH_SIZE) {
+    for (let i = 0; i < workspacesList.length; i += BATCH_SIZE) {
       if (signal.aborted) break
 
-      const batch = sessionsList.slice(i, i + BATCH_SIZE)
-
-      for (const session of batch) {
+      const batch = workspacesList.slice(i, i + BATCH_SIZE)
+      for (const workspace of batch) {
         if (signal.aborted) break
 
         try {
-          const sessionDir = await manager.sessionsRoot?.getDirectoryHandle(session.id, {
-            create: false,
-          })
-
           let cacheSize = 0
-          if (sessionDir) {
-            cacheSize = await getSessionSize(sessionDir)
-
-            // Update SQLite with new cache size
+          const workspaceRuntime = await manager.getWorkspace(workspace.id)
+          if (workspaceRuntime) {
+            const stats = await workspaceRuntime.getStats()
+            cacheSize = stats.files.size
             try {
               const repo = getWorkspaceRepository()
-              await repo.updateWorkspaceStats(session.id, { cacheSize })
+              await repo.updateWorkspaceStats(workspace.id, { cacheSize })
             } catch (e) {
               console.warn('[useStorageInfo] Failed to update cache size in SQLite:', e)
             }
           }
 
-          const info: WorkspaceStorageInfo = {
-            id: session.id,
-            name: session.name,
+          results.set(workspace.id, {
+            id: workspace.id,
+            name: workspace.name,
             cacheSize,
             cacheSizeFormatted: formatBytes(cacheSize),
-            pendingCount: session.pendingCount,
-            lastActiveAt: session.lastActiveAt || 0,
-          }
-
-          results.set(session.id, info)
-          setSessionStorageList(Array.from(results.values()))
+            pendingCount: workspace.pendingCount,
+            lastActiveAt: workspace.lastActiveAt || 0,
+          })
+          setWorkspaceStorageList(Array.from(results.values()))
         } catch (e) {
-          console.error(`Failed to get size for session ${session.id}:`, e)
-          results.set(session.id, {
-            id: session.id,
-            name: session.name,
+          console.error(`Failed to get size for workspace ${workspace.id}:`, e)
+          results.set(workspace.id, {
+            id: workspace.id,
+            name: workspace.name,
             cacheSize: 0,
             cacheSizeFormatted: '0 B',
-            pendingCount: session.pendingCount,
-            lastActiveAt: session.lastActiveAt || 0,
+            pendingCount: workspace.pendingCount,
+            lastActiveAt: workspace.lastActiveAt || 0,
           })
         }
 
-        // Yield to the main thread after each session
         await new Promise((resolve) => setTimeout(resolve, 0))
       }
     }
@@ -242,8 +208,7 @@ export function useStorageInfo(): UseStorageInfoResult {
     return Array.from(results.values())
   }
 
-  const refresh = useCallback(async (includeSessionSizes = false) => {
-    // Cancel any ongoing refresh
+  const refresh = useCallback(async (includeWorkspaceSizes = false) => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -253,7 +218,6 @@ export function useStorageInfo(): UseStorageInfoResult {
     setError(null)
 
     try {
-      // Get overall storage estimate (browser API, includes OPFS + IndexedDB)
       const estimate = await getStorageEstimate()
       if (estimate) {
         setStorage({
@@ -266,196 +230,129 @@ export function useStorageInfo(): UseStorageInfoResult {
         })
       }
 
-      // Load workspaces from SQLite (or fallback to store)
-      const sessionsList = await loadSessionsFromSQLite()
-      let sessionInfo: WorkspaceStorageInfo[]
+      const workspacesList = await loadWorkspacesFromSQLite()
+      let workspaceInfo: WorkspaceStorageInfo[]
 
-      if (includeSessionSizes) {
-        // Calculate actual OPFS sizes in batches
-        sessionInfo = await calculateSessionSizes(sessionsList, abortControllerRef.current.signal)
+      if (includeWorkspaceSizes) {
+        workspaceInfo = await calculateWorkspaceSizes(workspacesList, abortControllerRef.current.signal)
       } else {
-        // Quick mode: use SQLite data without OPFS size calculation
-        sessionInfo = sessionsList.map((session) => ({
-          id: session.id,
-          name: session.name,
-          cacheSize: session.cacheSize || 0,
-          cacheSizeFormatted: session.cacheSize ? formatBytes(session.cacheSize) : '-',
-          pendingCount: session.pendingCount,
-          lastActiveAt: session.lastActiveAt || 0,
+        workspaceInfo = workspacesList.map((workspace) => ({
+          id: workspace.id,
+          name: workspace.name,
+          cacheSize: workspace.cacheSize || 0,
+          cacheSizeFormatted: workspace.cacheSize ? formatBytes(workspace.cacheSize) : '-',
+          pendingCount: workspace.pendingCount,
+          lastActiveAt: workspace.lastActiveAt || 0,
         }))
       }
 
-      setSessionStorageList(sessionInfo)
+      setWorkspaceStorageList(workspaceInfo)
     } catch (e) {
-      if ((e as Error).name === 'AbortError') {
-        // silently ignore abort
-        return
-      }
+      if ((e as Error).name === 'AbortError') return
       const message = e instanceof Error ? e.message : 'Failed to load storage info'
       setError(message)
       console.error('[useStorageInfo] Failed to load storage info:', e)
     } finally {
-      // Always reset loading, even if aborted
       setLoading(false)
     }
   }, [])
 
-  // Single useEffect for mount and workspace count changes
   useEffect(() => {
-    const currentSessionIds = workspaces
+    const currentWorkspaceIds = workspaces
       .map((w) => w.id)
       .sort()
       .join(',')
 
-    // Initial load on mount
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true
-      sessionIdsRef.current = currentSessionIds
-      prevSessionCountRef.current = sessionCount
+      workspaceIdsRef.current = currentWorkspaceIds
+      prevWorkspaceCountRef.current = workspaceCount
       refresh(true)
     } else if (
-      sessionIdsRef.current !== currentSessionIds ||
-      prevSessionCountRef.current !== sessionCount
+      workspaceIdsRef.current !== currentWorkspaceIds ||
+      prevWorkspaceCountRef.current !== workspaceCount
     ) {
-      // Session IDs or count changed, update refs and refresh
-      sessionIdsRef.current = currentSessionIds
-      prevSessionCountRef.current = sessionCount
+      workspaceIdsRef.current = currentWorkspaceIds
+      prevWorkspaceCountRef.current = workspaceCount
       refresh(true)
     }
-    // If only session properties changed (like activeSessionId, pendingCount), don't recalculate sizes
-  }, [sessionCount, refresh, workspaces])
-
-  const cleanupOldSessions = useCallback(
-    async (days: number): Promise<number> => {
-      const repo = getWorkspaceRepository()
-      const manager = await getSessionManager()
-
-      // Find inactive sessions from SQLite
-      const inactiveSessions = await repo.findInactiveWorkspaces(days)
-      let cleanedCount = 0
-
-      for (const session of inactiveSessions) {
-        try {
-          // Clear OPFS workspace cache (keeps session record)
-          const workspace = await manager.getSession(session.id)
-          if (workspace) {
-            await workspace.clear()
-            cleanedCount++
-          }
-        } catch (e) {
-          console.error(`Failed to clear session ${session.id}:`, e)
-        }
-      }
-
-      // Refresh after cleanup
-      await refresh()
-
-      return cleanedCount
-    },
-    [refresh]
-  )
+  }, [workspaceCount, refresh, workspaces])
 
   const clearAllCache = useCallback(async (): Promise<void> => {
     const repo = getWorkspaceRepository()
-    const manager = await getSessionManager()
+    const manager = await getWorkspaceManager()
+    const allWorkspaces = await repo.findAllWorkspaces()
 
-    // Get all sessions from SQLite
-    const allSessions = await repo.findAllWorkspaces()
-
-    for (const session of allSessions) {
+    for (const workspace of allWorkspaces) {
       try {
-        // Clear OPFS workspace
-        const workspace = await manager.getSession(session.id)
-        if (workspace) {
-          await workspace.clear()
+        const runtime = await manager.getWorkspace(workspace.id)
+        if (runtime) {
+          await runtime.clear()
         }
       } catch (e) {
-        console.error(`Failed to clear session ${session.id}:`, e)
+        console.error(`Failed to clear workspace ${workspace.id}:`, e)
       }
     }
 
-    // Refresh after clearing
     await refresh()
   }, [refresh])
 
-  /**
-   * Get cleanup preview - shows what will be cleaned before executing
-   */
   const getCleanupPreview = useCallback(
     async (scope: CleanupScope, days: number = 30): Promise<CleanupPreview | null> => {
       const repo = getWorkspaceRepository()
+      const workspacesToClean =
+        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await repo.findAllWorkspaces()
 
-      let sessionsToClean: Workspace[]
-
-      if (scope === 'old') {
-        // Get inactive sessions
-        sessionsToClean = await repo.findInactiveWorkspaces(days)
-      } else {
-        // Get all sessions
-        sessionsToClean = await repo.findAllWorkspaces()
-      }
-
-      if (sessionsToClean.length === 0) {
+      if (workspacesToClean.length === 0) {
         return null
       }
 
-      // Calculate totals
       let totalSize = 0
       let totalPending = 0
-      const sessionNames: string[] = []
+      const workspaceNames: string[] = []
 
-      for (const session of sessionsToClean) {
-        totalSize += session.cacheSize || 0
-        totalPending += session.pendingCount || 0
-        sessionNames.push(session.name)
+      for (const workspace of workspacesToClean) {
+        totalSize += workspace.cacheSize || 0
+        totalPending += workspace.pendingCount || 0
+        workspaceNames.push(workspace.name)
       }
 
       return {
-        sessionCount: sessionsToClean.length,
+        workspaceCount: workspacesToClean.length,
+        conversationCount: workspacesToClean.length,
         totalSize,
         totalSizeFormatted: formatBytes(totalSize),
         pendingCount: totalPending,
         hasUnsavedChanges: totalPending > 0,
-        sessionNames
+        workspaceNames,
+        conversationNames: workspaceNames,
       }
     },
     []
   )
 
-  /**
-   * Execute cleanup with specified scope
-   */
   const executeCleanup = useCallback(
     async (scope: CleanupScope, days: number = 30): Promise<number> => {
       const repo = getWorkspaceRepository()
-      const manager = await getSessionManager()
-
-      let sessionsToClean: Workspace[]
-
-      if (scope === 'old') {
-        sessionsToClean = await repo.findInactiveWorkspaces(days)
-      } else {
-        sessionsToClean = await repo.findAllWorkspaces()
-      }
+      const manager = await getWorkspaceManager()
+      const workspacesToClean =
+        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await repo.findAllWorkspaces()
 
       let cleanedCount = 0
 
-      for (const session of sessionsToClean) {
+      for (const workspace of workspacesToClean) {
         try {
-          // Clear OPFS workspace cache (keeps session record)
-          const workspace = await manager.getSession(session.id)
-          if (workspace) {
-            await workspace.clear()
+          const runtime = await manager.getWorkspace(workspace.id)
+          if (runtime) {
+            await runtime.clear()
             cleanedCount++
           }
         } catch (e) {
-          console.error(`Failed to clear session ${session.id}:`, e)
+          console.error(`Failed to clear workspace ${workspace.id}:`, e)
         }
       }
 
-      // Refresh after cleanup
       await refresh()
-
       return cleanedCount
     },
     [refresh]
@@ -463,14 +360,13 @@ export function useStorageInfo(): UseStorageInfoResult {
 
   return {
     storage,
-    sessions: sessionStorageList,
+    workspaces: workspaceStorageList,
+    conversations: workspaceStorageList,
     loading,
     error,
     refresh,
     getCleanupPreview,
     executeCleanup,
-    // Deprecated: use executeCleanup instead
-    cleanupOldSessions,
     clearAllCache,
   }
 }

@@ -2,10 +2,33 @@
  * useAgentStore Unit Tests
  *
  * Tests for the agent store state management
+ * Note: agent.store is now a compatibility layer that delegates to folder-access.store
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useAgentStore } from '../agent.store'
+
+// Mock folder-access.store
+const mockSetHandle = vi.fn(() => Promise.resolve())
+const mockRelease = vi.fn(() => Promise.resolve())
+const mockGetRecord = vi.fn(() => null)
+const mockHydrateProject = vi.fn(() => Promise.resolve())
+const mockSetActiveProject = vi.fn(() => Promise.resolve())
+const mockRequestPermission = vi.fn(() => Promise.resolve(true))
+
+vi.mock('../folder-access.store', () => ({
+  useFolderAccessStore: {
+    getState: vi.fn(() => ({
+      setHandle: mockSetHandle,
+      release: mockRelease,
+      getRecord: mockGetRecord,
+      hydrateProject: mockHydrateProject,
+      setActiveProject: mockSetActiveProject,
+      requestPermission: mockRequestPermission,
+    })),
+    subscribe: vi.fn(),
+  },
+}))
 
 // Mock remote.store
 vi.mock('../remote.store', () => ({
@@ -18,14 +41,26 @@ vi.mock('../remote.store', () => ({
   },
 }))
 
+// Mock sonner toast
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    success: vi.fn(),
+  },
+}))
+
 describe('useAgentStore', () => {
   beforeEach(() => {
     // Reset store state before each test
     useAgentStore.setState({
+      activeProjectId: '',
       directoryHandle: null,
       directoryName: null,
+      pendingHandle: null,
+      isRestoringHandle: false,
     })
     vi.clearAllMocks()
+    mockGetRecord.mockReturnValue(null)
   })
 
   describe('initial state', () => {
@@ -34,106 +69,55 @@ describe('useAgentStore', () => {
 
       expect(state.directoryHandle).toBe(null)
       expect(state.directoryName).toBe(null)
+      expect(state.activeProjectId).toBe('')
+    })
+  })
+
+  describe('setActiveProject', () => {
+    it('should update activeProjectId', async () => {
+      const { setActiveProject } = useAgentStore.getState()
+      await setActiveProject('project-1')
+
+      expect(useAgentStore.getState().activeProjectId).toBe('project-1')
     })
   })
 
   describe('setDirectoryHandle', () => {
-    it('should update directory handle and name', () => {
+    it('should not update handle without activeProjectId', async () => {
       const mockHandle = {
         name: 'test-directory',
       } as unknown as FileSystemDirectoryHandle
 
       const { setDirectoryHandle } = useAgentStore.getState()
-      setDirectoryHandle(mockHandle)
+      await setDirectoryHandle(mockHandle)
 
-      const state = useAgentStore.getState()
-      expect(state.directoryHandle).toBe(mockHandle)
-      expect(state.directoryName).toBe('test-directory')
+      // Should not have called setHandle since there's no activeProjectId
+      expect(mockSetHandle).not.toHaveBeenCalled()
     })
 
-    it('should set null handle and clear name', () => {
-      const mockHandle = {
-        name: 'test-directory',
-      } as unknown as FileSystemDirectoryHandle
-
-      const { setDirectoryHandle } = useAgentStore.getState()
-
-      // First set a handle
-      setDirectoryHandle(mockHandle)
-      expect(useAgentStore.getState().directoryName).toBe('test-directory')
-
-      // Then clear it
-      setDirectoryHandle(null)
-      expect(useAgentStore.getState().directoryHandle).toBe(null)
-      expect(useAgentStore.getState().directoryName).toBe(null)
-    })
-
-    it('should handle handle without name', () => {
-      const mockHandle = {} as FileSystemDirectoryHandle
-
-      const { setDirectoryHandle } = useAgentStore.getState()
-      setDirectoryHandle(mockHandle)
-
-      expect(useAgentStore.getState().directoryName).toBe(null)
-    })
-
-    it('should call remote refresh when session exists and user is host', async () => {
-      const mockHandle = {
-        name: 'test-directory',
-      } as unknown as FileSystemDirectoryHandle
-
-      // Mock remote.store with active session and host role
-      // Note: This test verifies the behavior but the actual remote call happens asynchronously
-      const refreshFileTreeSpy = vi.fn(() => Promise.resolve())
-      vi.doMock('../remote.store', () => ({
-        useRemoteStore: {
-          getState: vi.fn(() => ({
-            session: { id: 'session-1' },
-            getRole: vi.fn(() => 'host'),
-            refreshFileTree: refreshFileTreeSpy,
-          })),
-        },
-      }))
-
-      const { setDirectoryHandle } = useAgentStore.getState()
-      setDirectoryHandle(mockHandle)
-
-      // The remote refresh is triggered asynchronously, so we just verify the set worked
-      const state = useAgentStore.getState()
-      expect(state.directoryName).toBe('test-directory')
-    })
-  })
-
-  describe('IndexedDB operations (integration)', () => {
-    let originalIndexedDB: IDBFactory
-
-    beforeEach(() => {
-      originalIndexedDB = global.indexedDB
-    })
-
-    afterEach(() => {
-      global.indexedDB = originalIndexedDB
-    })
-
-    it('should persist handle to IndexedDB (spy test)', async () => {
-      // Spy on indexedDB.open without replacing implementation
-      const openSpy = vi.spyOn(indexedDB, 'open')
+    it('should call folder-access.setHandle when activeProjectId is set', async () => {
+      // Set active project first
+      useAgentStore.setState({ activeProjectId: 'project-1' })
 
       const mockHandle = {
         name: 'test-directory',
       } as unknown as FileSystemDirectoryHandle
 
       const { setDirectoryHandle } = useAgentStore.getState()
-      setDirectoryHandle(mockHandle)
+      await setDirectoryHandle(mockHandle)
 
-      // indexedDB.open should be called for persistence
-      expect(openSpy).toHaveBeenCalled()
-
-      openSpy.mockRestore()
+      expect(mockSetHandle).toHaveBeenCalledWith('project-1', mockHandle)
     })
 
-    // Note: Full IndexedDB integration testing requires a more complex mock setup
-    // The restoreDirectoryHandle functionality is tested in integration tests
+    it('should call release when setting null handle', async () => {
+      // Set active project first
+      useAgentStore.setState({ activeProjectId: 'project-1' })
+
+      const { setDirectoryHandle } = useAgentStore.getState()
+      await setDirectoryHandle(null)
+
+      expect(mockRelease).toHaveBeenCalledWith('project-1')
+    })
   })
 
   describe('restoreDirectoryHandle', () => {
@@ -142,25 +126,53 @@ describe('useAgentStore', () => {
       expect(typeof restoreDirectoryHandle).toBe('function')
     })
 
-    // Note: restoreDirectoryHandle requires proper IndexedDB mocking
-    // Integration tests cover full functionality
+    it('should call hydrateProject when activeProjectId is set', async () => {
+      useAgentStore.setState({ activeProjectId: 'project-1' })
+
+      const { restoreDirectoryHandle } = useAgentStore.getState()
+      await restoreDirectoryHandle()
+
+      expect(mockHydrateProject).toHaveBeenCalledWith('project-1')
+    })
+
+    it('should not call hydrateProject without activeProjectId', async () => {
+      const { restoreDirectoryHandle } = useAgentStore.getState()
+      await restoreDirectoryHandle()
+
+      expect(mockHydrateProject).not.toHaveBeenCalled()
+    })
   })
 
-  describe('state updates', () => {
-    it('should handle multiple state updates', () => {
-      const { setDirectoryHandle } = useAgentStore.getState()
+  describe('requestPendingHandlePermission', () => {
+    it('should return false without pendingHandle', async () => {
+      const { requestPendingHandlePermission } = useAgentStore.getState()
+      const result = await requestPendingHandlePermission()
 
-      const handle1 = { name: 'dir1' } as unknown as FileSystemDirectoryHandle
-      const handle2 = { name: 'dir2' } as unknown as FileSystemDirectoryHandle
+      expect(result).toBe(false)
+    })
 
-      setDirectoryHandle(handle1)
-      expect(useAgentStore.getState().directoryName).toBe('dir1')
+    it('should return false without activeProjectId', async () => {
+      const mockHandle = {} as FileSystemDirectoryHandle
+      useAgentStore.setState({ pendingHandle: mockHandle })
 
-      setDirectoryHandle(handle2)
-      expect(useAgentStore.getState().directoryName).toBe('dir2')
+      const { requestPendingHandlePermission } = useAgentStore.getState()
+      const result = await requestPendingHandlePermission()
 
-      setDirectoryHandle(null)
-      expect(useAgentStore.getState().directoryName).toBe(null)
+      expect(result).toBe(false)
+    })
+
+    it('should call requestPermission with both pendingHandle and activeProjectId', async () => {
+      const mockHandle = {} as FileSystemDirectoryHandle
+      useAgentStore.setState({
+        pendingHandle: mockHandle,
+        activeProjectId: 'project-1',
+      })
+
+      const { requestPendingHandlePermission } = useAgentStore.getState()
+      const result = await requestPendingHandlePermission()
+
+      expect(mockRequestPermission).toHaveBeenCalledWith('project-1')
+      expect(result).toBe(true)
     })
   })
 })
