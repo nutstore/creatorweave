@@ -123,7 +123,7 @@ console.log(content)
 
 文件桥接层完全集成了现有的 OPFS 会话系统:
 
-- 使用 `SessionWorkspace` 读取缓存文件
+- 使用 `WorkspaceFiles` 读取缓存文件
 - 使用 `useAgentStore` 获取目录句柄
 - 使用 `useWorkspaceStore` 获取当前工作空间
 

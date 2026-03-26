@@ -150,20 +150,13 @@ export async function bridgeOutputFiles(pyodide: PyodideInstance, files?: string
 
   console.log(`[Python Bridge] Bridging ${filesToBridge.length} output files from Pyodide...`)
 
-  // Get OPFS workspace
-  const { getSessionManager } = await import('@/opfs/session')
-  const { useWorkspaceStore } = await import('@/store/workspace.store')
-
-  const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-  if (!activeWorkspaceId) {
+  // Get active OPFS workspace
+  const { getActiveWorkspace } = await import('@/store/workspace.store')
+  const activeWorkspace = await getActiveWorkspace()
+  if (!activeWorkspace) {
     throw new Error('No active workspace')
   }
-
-  const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeWorkspaceId)
-  if (!workspace) {
-    throw new Error(`Workspace ${activeWorkspaceId} not found`)
-  }
+  const { workspace } = activeWorkspace
 
   // Get directory handle
   const { useAgentStore } = await import('@/store/agent.store')

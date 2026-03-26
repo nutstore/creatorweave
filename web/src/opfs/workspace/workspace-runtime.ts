@@ -1,7 +1,7 @@
 /**
- * Session Workspace
+ * Workspace Runtime
  *
- * Encapsulates a single session's OPFS operations.
+ * Encapsulates a single workspace's OPFS operations.
  * Coordinates pending queue for file operations.
  * Undo/redo is handled by SQLite fs_snapshot_files table.
  */
@@ -19,57 +19,57 @@ import type {
 } from '../types/opfs-types'
 import { ErrorCode } from '../types/opfs-types'
 import { getFileContentType } from '../utils/opfs-utils'
-import { SessionPendingManager } from './session-pending'
+import { WorkspacePendingManager } from './workspace-pending'
 import { scanFilesInWorker } from '@/workers/diff-worker-manager'
 import { getRuntimeDirectoryHandle } from '@/native-fs'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
 
-const SESSION_METADATA_FILE = 'session.json'
+const WORKSPACE_METADATA_FILE = 'workspace.json'
 const FILES_DIR = 'files'
 
 /**
- * Session metadata for persistence
+ * Workspace metadata for persistence.
  */
-interface SessionMetadataPersist {
-  sessionId: string
+interface WorkspaceMetadataPersist {
+  workspaceId: string
   createdAt: number
   lastAccessedAt: number
   rootDirectory: string
 }
 
 /**
- * Session Workspace
+ * Workspace Runtime
  *
  * Responsibilities:
- * - Encapsulate single session's OPFS operations
+ * - Encapsulate single workspace's OPFS operations
  * - Coordinate pending queue for file operations
  * - All file content is stored directly in files/ directory
  * - Undo/redo handled by SQLite fs_snapshot_files
  */
-export class SessionWorkspace {
-  readonly sessionId: string
-  readonly sessionDir: FileSystemDirectoryHandle
+export class WorkspaceRuntime {
+  readonly workspaceId: string
+  readonly workspaceDir: FileSystemDirectoryHandle
   readonly rootDirectory: string
 
-  private readonly pendingManager: SessionPendingManager
+  private readonly pendingManager: WorkspacePendingManager
 
   /** In-memory index of files stored in files/ directory */
   private filesIndex: Set<string> = new Set()
 
   private initialized = false
-  private metadata: SessionMetadataPersist
+  private metadata: WorkspaceMetadataPersist
 
-  constructor(sessionId: string, sessionDir: FileSystemDirectoryHandle, rootDirectory: string) {
-    this.sessionId = sessionId
-    this.sessionDir = sessionDir
+  constructor(workspaceId: string, workspaceDir: FileSystemDirectoryHandle, rootDirectory: string) {
+    this.workspaceId = workspaceId
+    this.workspaceDir = workspaceDir
     this.rootDirectory = rootDirectory
 
     // Initialize pending manager (files/ is the source of truth)
-    this.pendingManager = new SessionPendingManager(sessionId, sessionDir)
+    this.pendingManager = new WorkspacePendingManager(workspaceId, workspaceDir)
 
     // Initial metadata
     this.metadata = {
-      sessionId,
+      workspaceId,
       createdAt: Date.now(),
       lastAccessedAt: Date.now(),
       rootDirectory,
@@ -77,7 +77,7 @@ export class SessionWorkspace {
   }
 
   /**
-   * Initialize session workspace
+   * Initialize workspace runtime
    */
   async initialize(): Promise<void> {
     if (this.initialized) return
@@ -99,20 +99,39 @@ export class SessionWorkspace {
   }
 
   /**
-   * Load session metadata from OPFS
+   * Load workspace metadata from OPFS
    */
   private async loadMetadata(): Promise<void> {
+    const toMetadata = (data: unknown): WorkspaceMetadataPersist => {
+      const obj = typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : {}
+      const persistedWorkspaceId =
+        typeof obj.workspaceId === 'string'
+          ? obj.workspaceId
+          : this.workspaceId
+      const createdAt = typeof obj.createdAt === 'number' ? obj.createdAt : Date.now()
+      const lastAccessedAt = typeof obj.lastAccessedAt === 'number' ? obj.lastAccessedAt : createdAt
+      const rootDirectory =
+        typeof obj.rootDirectory === 'string' && obj.rootDirectory.length > 0
+          ? obj.rootDirectory
+          : this.rootDirectory
+
+      return {
+        workspaceId: persistedWorkspaceId,
+        createdAt,
+        lastAccessedAt,
+        rootDirectory,
+      }
+    }
+
     try {
-      const metadataFile = await this.sessionDir.getFileHandle(SESSION_METADATA_FILE)
+      const metadataFile = await this.workspaceDir.getFileHandle(WORKSPACE_METADATA_FILE)
       const file = await metadataFile.getFile()
       const text = await file.text()
-      const data = JSON.parse(text) as SessionMetadataPersist
-
-      this.metadata = data
+      this.metadata = toMetadata(JSON.parse(text))
     } catch {
-      // Metadata doesn't exist yet, will be created on first save
+      // Metadata doesn't exist yet, will be created on first save.
       this.metadata = {
-        sessionId: this.sessionId,
+        workspaceId: this.workspaceId,
         createdAt: Date.now(),
         lastAccessedAt: Date.now(),
         rootDirectory: this.rootDirectory,
@@ -121,15 +140,20 @@ export class SessionWorkspace {
   }
 
   /**
-   * Save session metadata to OPFS
+   * Save workspace metadata to OPFS
    */
   private async saveMetadata(): Promise<void> {
-    const metadataFile = await this.sessionDir.getFileHandle(SESSION_METADATA_FILE, {
+    const metadataFile = await this.workspaceDir.getFileHandle(WORKSPACE_METADATA_FILE, {
       create: true,
     })
     const writable = await metadataFile.createWritable()
-
-    await writable.write(JSON.stringify(this.metadata, null, 2))
+    const dataToPersist: WorkspaceMetadataPersist = {
+      workspaceId: this.workspaceId,
+      createdAt: this.metadata.createdAt,
+      lastAccessedAt: this.metadata.lastAccessedAt,
+      rootDirectory: this.metadata.rootDirectory,
+    }
+    await writable.write(JSON.stringify(dataToPersist, null, 2))
     await writable.close()
   }
 
@@ -279,9 +303,9 @@ export class SessionWorkspace {
   private async clearFilesDir(): Promise<void> {
     try {
       // Remove entire files/ directory and recreate
-      await this.sessionDir.removeEntry(FILES_DIR, { recursive: true })
+      await this.workspaceDir.removeEntry(FILES_DIR, { recursive: true })
       // Recreate empty
-      await this.sessionDir.getDirectoryHandle(FILES_DIR, { create: true })
+      await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
       this.filesIndex.clear()
     } catch {
       // Directory doesn't exist, just clear index
@@ -335,7 +359,7 @@ export class SessionWorkspace {
   // ============ File Operations ============
 
   /**
-   * Read file from session (files/ first, then native FS)
+   * Read file from workspace (files/ first, then native FS)
    * @param path File path
    * @param directoryHandle Real filesystem directory handle
    * @returns File content and metadata
@@ -432,7 +456,7 @@ export class SessionWorkspace {
   }
 
   /**
-   * Write file to session (files/ + pending)
+   * Write file to workspace (files/ + pending)
    * @param path File path
    * @param content File content
    * @param directoryHandle Real filesystem directory handle (for mtime baseline)
@@ -496,7 +520,7 @@ export class SessionWorkspace {
       channel.postMessage({ type: 'opfs-file-changed', path })
       channel.close()
     } catch (e) {
-      console.warn('[SessionWorkspace] Failed to broadcast file change:', e)
+      console.warn('[WorkspaceRuntime] Failed to broadcast file change:', e)
     }
 
     // Mark as pending - use markAsCreated for new files, add for modifications
@@ -512,7 +536,7 @@ export class SessionWorkspace {
   }
 
   /**
-   * Delete file from session
+   * Delete file from workspace
    * @param path File path
    * @param directoryHandle Real filesystem directory handle (for mtime baseline)
    */
@@ -562,7 +586,7 @@ export class SessionWorkspace {
   async getApprovedNotSyncedPaths(): Promise<Set<string>> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    return await repo.getApprovedNotSyncedPaths(this.sessionId)
+    return await repo.getApprovedNotSyncedPaths(this.workspaceId)
   }
 
   /**
@@ -634,7 +658,7 @@ export class SessionWorkspace {
   }
 
   /**
-   * Clear all session data (files, pending)
+   * Clear all workspace data (files, pending)
    */
   async clear(): Promise<void> {
     await Promise.all([
@@ -651,12 +675,12 @@ export class SessionWorkspace {
   }
 
   /**
-   * Get session statistics
+   * Get workspace statistics
    */
   async getStats(): Promise<{
     files: { size: number; fileCount: number }
     pending: number
-    metadata: SessionMetadataPersist
+    metadata: WorkspaceMetadataPersist
   }> {
     const filesStats = await this.getFilesStats()
 
@@ -677,7 +701,7 @@ export class SessionWorkspace {
   async createDraftSnapshot(summary?: string): Promise<{ snapshotId: string; opCount: number } | null> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    return await repo.commitLatestDraftSnapshot(this.sessionId, summary)
+    return await repo.commitLatestDraftSnapshot(this.workspaceId, summary)
   }
 
   async createApprovedSnapshotForPaths(
@@ -698,11 +722,11 @@ export class SessionWorkspace {
     }
 
     const repo = getFSOverlayRepository()
-    const snapshot = await repo.createApprovedSnapshotForPaths(this.sessionId, paths, summary)
+    const snapshot = await repo.createApprovedSnapshotForPaths(this.workspaceId, paths, summary)
     if (!snapshot) return null
-    await repo.setCurrentSnapshotId(this.sessionId, snapshot.snapshotId)
+    await repo.setCurrentSnapshotId(this.workspaceId, snapshot.snapshotId)
 
-    const snapshotOps = await repo.listSnapshotOps(this.sessionId, snapshot.snapshotId)
+    const snapshotOps = await repo.listSnapshotOps(this.workspaceId, snapshot.snapshotId)
     for (const op of snapshotOps) {
       let beforeContent: string | ArrayBuffer | null = null
       let afterContent: string | ArrayBuffer | null = null
@@ -728,7 +752,7 @@ export class SessionWorkspace {
 
       await repo.upsertSnapshotFileContent({
         snapshotId: snapshot.snapshotId,
-        workspaceId: this.sessionId,
+        workspaceId: this.workspaceId,
         path: op.path,
         opType: op.type,
         beforeContent,
@@ -745,7 +769,7 @@ export class SessionWorkspace {
   ): Promise<{ reverted: number; unresolved: string[] }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const ops = await repo.listSnapshotOps(this.sessionId, snapshotId)
+    const ops = await repo.listSnapshotOps(this.workspaceId, snapshotId)
     let reverted = 0
     const unresolved: string[] = []
 
@@ -802,7 +826,7 @@ export class SessionWorkspace {
     }
 
     if (unresolved.length === 0 && reverted > 0) {
-      await repo.markSnapshotRolledBack(this.sessionId, snapshotId)
+      await repo.markSnapshotRolledBack(this.workspaceId, snapshotId)
       await this.syncCurrentSnapshotPointer()
     }
 
@@ -815,7 +839,7 @@ export class SessionWorkspace {
   ): Promise<{ applied: number; unresolved: string[] }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const ops = await repo.listSnapshotOps(this.sessionId, snapshotId)
+    const ops = await repo.listSnapshotOps(this.workspaceId, snapshotId)
     let applied = 0
     const unresolved: string[] = []
 
@@ -873,8 +897,8 @@ export class SessionWorkspace {
     }
 
     if (unresolved.length === 0 && applied > 0) {
-      await repo.markSnapshotActive(this.sessionId, snapshotId)
-      await repo.setCurrentSnapshotId(this.sessionId, snapshotId)
+      await repo.markSnapshotActive(this.workspaceId, snapshotId)
+      await repo.setCurrentSnapshotId(this.workspaceId, snapshotId)
     }
 
     return { applied, unresolved }
@@ -885,7 +909,7 @@ export class SessionWorkspace {
   ): Promise<{ snapshotId: string | null; reverted: number; unresolved: string[] }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const snapshots = await repo.listSnapshots(this.sessionId, 200)
+    const snapshots = await repo.listSnapshots(this.workspaceId, 200)
     const latest = snapshots.find((item) => item.status === 'approved' || item.status === 'committed')
     if (!latest) {
       return { snapshotId: null, reverted: 0, unresolved: [] }
@@ -911,7 +935,7 @@ export class SessionWorkspace {
   }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const snapshots = await repo.listSnapshots(this.workspaceId, 500)
     const targetIndex = snapshots.findIndex((item) => item.id === snapshotId)
     if (targetIndex < 0) {
       throw new Error(`快照不存在: ${snapshotId}`)
@@ -970,7 +994,7 @@ export class SessionWorkspace {
   }> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const snapshots = await repo.listSnapshots(this.workspaceId, 500)
     const targetIndex = snapshots.findIndex((item) => item.id === snapshotId)
     if (targetIndex < 0) {
       throw new Error(`快照不存在: ${snapshotId}`)
@@ -981,7 +1005,7 @@ export class SessionWorkspace {
     const normalizedCurrentIndex = currentIndex >= 0 ? currentIndex : snapshots.length
 
     if (targetIndex === normalizedCurrentIndex) {
-      await repo.setCurrentSnapshotId(this.sessionId, snapshotId)
+      await repo.setCurrentSnapshotId(this.workspaceId, snapshotId)
       return {
         targetSnapshotId: snapshotId,
         direction: 'noop',
@@ -1101,9 +1125,9 @@ export class SessionWorkspace {
 
   private async syncCurrentSnapshotPointer(): Promise<void> {
     const repo = getFSOverlayRepository()
-    const snapshots = await repo.listSnapshots(this.sessionId, 500)
+    const snapshots = await repo.listSnapshots(this.workspaceId, 500)
     const current = snapshots.find((item) => item.status === 'approved' || item.status === 'committed')
-    await repo.setCurrentSnapshotId(this.sessionId, current?.id || null)
+    await repo.setCurrentSnapshotId(this.workspaceId, current?.id || null)
   }
 
   private async deleteFromNativeIfExists(
@@ -1209,9 +1233,9 @@ export class SessionWorkspace {
   }
 
   /**
-   * Get session metadata
+   * Get workspace metadata
    */
-  getMetadata(): SessionMetadataPersist {
+  getMetadata(): WorkspaceMetadataPersist {
     return { ...this.metadata }
   }
 
@@ -1231,7 +1255,7 @@ export class SessionWorkspace {
    * This is the mount point for Pyodide Python execution
    */
   async getFilesDir(): Promise<FileSystemDirectoryHandle> {
-    return await this.sessionDir.getDirectoryHandle(FILES_DIR, { create: true })
+    return await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
   }
 
   /**
@@ -1243,7 +1267,7 @@ export class SessionWorkspace {
 
     try {
       // Handle is managed in native-fs runtime registry.
-      const handle = getRuntimeDirectoryHandle(this.sessionId)
+      const handle = getRuntimeDirectoryHandle(this.workspaceId)
       if (handle) return handle
 
       // Fallback: directory access is granted at project scope in workspace.store.
@@ -1650,7 +1674,7 @@ export class SessionWorkspace {
     const modified = changes.filter((c) => c.type === 'modify').length
     const deleted = changes.filter((c) => c.type === 'delete').length
 
-    console.log('[SessionWorkspace] Pending changes refreshed (via worker):', {
+    console.log('[WorkspaceRuntime] Pending changes refreshed (via worker):', {
       changes: changes.length,
       added,
       modified,
@@ -2062,6 +2086,6 @@ export class SessionWorkspace {
   > {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    return await repo.getUnsyncedSnapshots(this.sessionId)
+    return await repo.getUnsyncedSnapshots(this.workspaceId)
   }
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { SessionWorkspace } from '../session-workspace'
+import { WorkspaceRuntime } from '../workspace-runtime'
 
 const listSnapshotsMock = vi.fn()
 const setCurrentSnapshotIdMock = vi.fn()
@@ -12,16 +12,16 @@ vi.mock('@/sqlite/repositories/fs-overlay.repository', () => ({
 }))
 
 function createWorkspaceForSwitch() {
-  const workspace: any = Object.create(SessionWorkspace.prototype)
+  const workspace: any = Object.create(WorkspaceRuntime.prototype)
   workspace.initialized = true
-  workspace.sessionId = 'ws_1'
+  workspace.workspaceId = 'ws_1'
   workspace.initialize = vi.fn(async () => undefined)
   workspace.rollbackSnapshot = vi.fn()
   workspace.applySnapshot = vi.fn()
   return workspace
 }
 
-describe('SessionWorkspace switchToSnapshot', () => {
+describe('WorkspaceRuntime switchToSnapshot', () => {
   beforeEach(() => {
     listSnapshotsMock.mockReset()
     setCurrentSnapshotIdMock.mockReset()

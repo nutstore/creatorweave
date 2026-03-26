@@ -8,13 +8,13 @@
  * Used primarily for diff/compare operations between OPFS and native FS.
  */
 
-import { getSessionManager } from '../session'
+import { getWorkspaceManager } from '../workspace'
 
 /**
  * Read file content from OPFS cache
  * This reads directly from the cached files without checking native FS
  *
- * @param workspaceId - Session/workspace ID
+ * @param workspaceId - workspace ID
  * @param path - File path relative to workspace root
  * @returns File content as string or null if not found
  */
@@ -23,8 +23,8 @@ export async function readFileFromOPFS(
   path: string
 ): Promise<string | null> {
   try {
-    const manager = await getSessionManager()
-    const workspace = await manager.getSession(workspaceId)
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(workspaceId)
 
     if (!workspace) {
       console.warn(`[FileReader] Workspace ${workspaceId} not found`)
@@ -126,8 +126,8 @@ export async function readFileFromOPFSWithMeta(
   path: string
 ): Promise<{ content: string | null; size: number; mtime: number } | null> {
   try {
-    const manager = await getSessionManager()
-    const workspace = await manager.getSession(workspaceId)
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(workspaceId)
 
     if (!workspace) {
       return null
@@ -169,8 +169,8 @@ export async function fileExistsInOPFS(
   path: string
 ): Promise<boolean> {
   try {
-    const manager = await getSessionManager()
-    const workspace = await manager.getSession(workspaceId)
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(workspaceId)
 
     if (!workspace) {
       return false
@@ -267,8 +267,8 @@ export async function readBinaryFileFromOPFS(
   path: string
 ): Promise<string | null> {
   try {
-    const manager = await getSessionManager()
-    const workspace = await manager.getSession(workspaceId)
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(workspaceId)
 
     if (!workspace) {
       return null

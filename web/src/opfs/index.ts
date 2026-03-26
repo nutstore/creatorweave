@@ -1,20 +1,19 @@
 /**
  * OPFS (Origin Private File System) Module
  *
- * Multi-session workspace architecture for browser file system operations.
+ * Multi-workspace architecture for browser file system operations.
  *
  * This module provides:
  * - Type definitions for OPFS operations
  * - Utility functions for path handling, hashing, and storage management
- * - Session management for isolated file operations per conversation
+ * - Workspace management for isolated file operations per workspace
  * - Project management with multi-agent support
  *
  * Architecture:
  * - ProjectManager: Top-level manager for projects, each with its own agents
  * - AgentManager: Manages agents within a project
- * - SessionManager: Top-level manager for multiple session workspaces
- * - SessionWorkspace: Encapsulates single session's OPFS operations
- * - SessionPendingManager: Per-session pending sync queue management
+ * - WorkspaceManager: Top-level manager for multiple workspaces
+ * - WorkspaceRuntime: Encapsulates single workspace OPFS operations
  * - (Undo history is stored in SQLite, not OPFS)
  */
 
@@ -29,8 +28,8 @@ export type {
   ConflictInfo,
   StorageEstimate,
   StorageStatus,
-  SessionIndex,
-  SessionMetadata,
+  WorkspaceIndex,
+  WorkspaceMetadata,
 } from './types/opfs-types'
 export { STORAGE_THRESHOLDS } from './types/opfs-types'
 
@@ -75,14 +74,15 @@ export {
   readBinaryFileFromNativeFS,
 } from './utils/file-reader'
 
-// Session
+// Workspace runtime (workspace-first API)
 export {
-  SessionManager,
-  SessionWorkspace,
-  SessionPendingManager,
-  getSessionManager,
-  resetSessionManager,
-} from './session'
+  WorkspaceManager,
+  WorkspaceRuntime,
+  WorkspacePendingManager,
+  getWorkspaceManager,
+  resetWorkspaceManager,
+} from './workspace'
+export type { WorkspaceFiles } from './workspace'
 
 // Project
 export { ProjectManager, type ProjectInfo } from './project'

@@ -1,14 +1,16 @@
 /**
  * Project Manager
  *
- * 管理项目系统。每个项目包含 agents、conversations、attachments。
+ * 管理项目系统。每个项目包含 agents、workspaces。
  * 创建项目时会自动初始化默认 agent。
  *
  * 目录结构:
  * projects/{projectId}/
  * ├── agents/{agentId}/
- * ├── conversations/{conversationId}/
- * └── attachments/
+ * └── workspaces/{workspaceId}/
+ *     ├── files/
+ *     ├── attachments/
+ *     └── workspace.json
  */
 
 import { AgentManager } from '../agent'
@@ -16,7 +18,7 @@ import { getDefaultAgentTemplate } from '../agent/agent-templates'
 
 const PROJECTS_DIR = 'projects'
 const AGENTS_DIR = 'agents'
-const CONVERSATIONS_DIR = 'conversations'
+const WORKSPACES_DIR = 'workspaces'
 const ATTACHMENTS_DIR = 'attachments'
 
 /**
@@ -74,8 +76,7 @@ export class ProjectManager {
     // 创建项目目录结构
     const projectDir = await this.projectsDir.getDirectoryHandle(projectId, { create: true })
     const agentsDir = await projectDir.getDirectoryHandle(AGENTS_DIR, { create: true })
-    await projectDir.getDirectoryHandle(CONVERSATIONS_DIR, { create: true })
-    await projectDir.getDirectoryHandle(ATTACHMENTS_DIR, { create: true })
+    await projectDir.getDirectoryHandle(WORKSPACES_DIR, { create: true })
 
     // 创建 AgentManager 并初始化默认 agent
     const agentManager = new AgentManager(agentsDir)
@@ -135,24 +136,29 @@ export class ProjectManager {
   }
 
   /**
-   * 获取项目的 conversations 目录
+   * 获取项目的 workspaces 目录
    */
-  async getConversationsDir(id: string): Promise<FileSystemDirectoryHandle | null> {
+  async getWorkspacesDir(id: string): Promise<FileSystemDirectoryHandle | null> {
     try {
       const projectDir = await this.projectsDir.getDirectoryHandle(id)
-      return projectDir.getDirectoryHandle(CONVERSATIONS_DIR)
+      return projectDir.getDirectoryHandle(WORKSPACES_DIR)
     } catch {
       return null
     }
   }
 
   /**
-   * 获取项目的 attachments 目录
+   * 获取工作区级别的 attachments 目录
    */
-  async getAttachmentsDir(id: string): Promise<FileSystemDirectoryHandle | null> {
+  async getWorkspaceAttachmentsDir(
+    projectId: string,
+    workspaceId: string
+  ): Promise<FileSystemDirectoryHandle | null> {
     try {
-      const projectDir = await this.projectsDir.getDirectoryHandle(id)
-      return projectDir.getDirectoryHandle(ATTACHMENTS_DIR)
+      const projectDir = await this.projectsDir.getDirectoryHandle(projectId)
+      const workspacesDir = await projectDir.getDirectoryHandle(WORKSPACES_DIR)
+      const workspaceDir = await workspacesDir.getDirectoryHandle(workspaceId)
+      return workspaceDir.getDirectoryHandle(ATTACHMENTS_DIR, { create: true })
     } catch {
       return null
     }

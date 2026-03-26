@@ -1,7 +1,7 @@
 /**
- * Session Pending Manager
+ * Workspace Pending Manager
  *
- * Per-session pending sync queue management.
+ * Per-workspace pending sync queue management.
  * Pure SQLite-backed pending operations (no OPFS file storage).
  */
 
@@ -30,24 +30,24 @@ interface SyncConflictCheck {
 }
 
 /**
- * Session Pending Manager
+ * Workspace Pending Manager
  *
  * Responsibilities:
- * - Manage pending sync queue for a session
+ * - Manage pending sync queue for a workspace
  * - Merge multiple modifications to same file
  * - Sync to real filesystem
- * - Persist queue to OPFS
+ * - Persist queue to SQLite
  */
-export class SessionPendingManager {
+export class WorkspacePendingManager {
   private readonly workspaceId: string
-  private readonly sessionDir: FileSystemDirectoryHandle
+  private readonly workspaceDir: FileSystemDirectoryHandle
   private pendingChanges: Map<string, PendingChange> = new Map()
   private pendingIdToPath: Map<string, string> = new Map()
   private initialized = false
 
-  constructor(workspaceId: string, sessionDir: FileSystemDirectoryHandle) {
+  constructor(workspaceId: string, workspaceDir: FileSystemDirectoryHandle) {
     this.workspaceId = workspaceId
-    this.sessionDir = sessionDir
+    this.workspaceDir = workspaceDir
   }
 
   /**
@@ -147,8 +147,8 @@ export class SessionPendingManager {
       if (!check.isConflict) continue
       conflicts.push({
         path: change.path,
-        session: this.workspaceId,
-        otherSessions: [],
+        workspaceId: this.workspaceId,
+        otherWorkspaces: [],
         opfsMtime: change.fsMtime || change.timestamp,
         currentFsMtime: check.currentFsMtime,
       })
@@ -293,8 +293,8 @@ export class SessionPendingManager {
           await repo.recordSyncItem(batchId, change.id, change.path, 'failed', message)
           result.conflicts.push({
             path: change.path,
-            session: this.workspaceId,
-            otherSessions: [],
+            workspaceId: this.workspaceId,
+            otherWorkspaces: [],
             opfsMtime: change.fsMtime || change.timestamp,
             currentFsMtime: conflictCheck.currentFsMtime,
           })
@@ -458,7 +458,7 @@ export class SessionPendingManager {
       const parts = path.split('/').filter(Boolean)
       if (parts.length === 0) return null
 
-      let current = await this.sessionDir.getDirectoryHandle(FILES_DIR, { create: true })
+      let current = await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
       for (let i = 0; i < parts.length - 1; i++) {
         current = await current.getDirectoryHandle(parts[i])
       }

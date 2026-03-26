@@ -31,27 +31,20 @@ export async function readFileFromHandle(handle: FileSystemFileHandle): Promise<
 }
 
 /**
- * Read file from OPFS using SessionWorkspace
+ * Read file from OPFS using workspace runtime
  *
  * @param path - File path relative to project root
  * @returns File content as string or ArrayBuffer
  * @throws Error if file cannot be read
  */
 export async function readFileFromOPFS(path: string): Promise<string | ArrayBuffer> {
-  // Import OPFS utilities dynamically to avoid circular dependencies
-  const { getSessionManager } = await import('@/opfs/session')
-  const { useWorkspaceStore } = await import('@/store/workspace.store')
+  const { getActiveWorkspace } = await import('@/store/workspace.store')
 
-  const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-  if (!activeWorkspaceId) {
+  const activeWorkspace = await getActiveWorkspace()
+  if (!activeWorkspace) {
     throw new Error('No active workspace')
   }
-
-  const manager = await getSessionManager()
-  const workspace = await manager.getSession(activeWorkspaceId)
-  if (!workspace) {
-    throw new Error(`Workspace ${activeWorkspaceId} not found`)
-  }
+  const { workspace } = activeWorkspace
 
   // Get directory handle from agent store
   const { useAgentStore } = await import('@/store/agent.store')

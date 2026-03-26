@@ -1,14 +1,14 @@
 /**
- * SessionWorkspace Unit Tests
+ * WorkspaceRuntime Unit Tests
  *
- * Tests for core OPFS session workspace functionality
- * Including sync to native filesystem tests
+ * Tests for core OPFS workspace runtime functionality,
+ * including sync-to-native-filesystem behavior.
  */
 
 import { describe, it, expect } from 'vitest'
 import type { PendingChange, UndoRecord, FileChange } from '@/opfs/types/opfs-types'
 
-describe('SessionWorkspace Types', () => {
+describe('WorkspaceRuntime Types', () => {
   describe('PendingChange structure', () => {
     it('should validate pending change types', () => {
       const validTypes: PendingChange['type'][] = ['create', 'modify', 'delete']
@@ -107,13 +107,13 @@ describe('SessionWorkspace Types', () => {
   })
 })
 
-describe('Session Operations', () => {
-  describe('Session ID mapping', () => {
-    it('should use conversation ID as session ID', () => {
+describe('Workspace Operations', () => {
+  describe('Workspace ID mapping', () => {
+    it('should use conversation ID as workspace ID', () => {
       const conversationId = 'conv-abc123'
-      const sessionId = conversationId // 1:1 mapping
+      const workspaceId = conversationId // 1:1 mapping
 
-      expect(sessionId).toBe(conversationId)
+      expect(workspaceId).toBe(conversationId)
     })
   })
 
@@ -303,8 +303,8 @@ describe('Sync Operations', () => {
       const conflicts = [
         {
           path: '/conflict.txt',
-          session: 'session-1',
-          otherSessions: ['session-2'],
+          workspaceId: 'workspace-1',
+          otherWorkspaces: ['workspace-2'],
           opfsMtime: 1000,
           currentFsMtime: 2000,
         },

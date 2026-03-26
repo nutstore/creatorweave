@@ -99,8 +99,8 @@ export async function getDirectorySize(dirHandle: FileSystemDirectoryHandle): Pr
 }
 
 /**
- * Get size of a specific session directory in OPFS
+ * Get size of a specific workspace directory in OPFS.
  */
-export async function getSessionSize(sessionDir: FileSystemDirectoryHandle): Promise<number> {
-  return getDirectorySize(sessionDir)
+export async function getWorkspaceSize(workspaceDir: FileSystemDirectoryHandle): Promise<number> {
+  return getDirectorySize(workspaceDir)
 }

@@ -1,7 +1,7 @@
 /**
  * OPFS (Origin Private File System) Type Definitions
  *
- * Core types for multi-session OPFS workspace architecture
+ * Core types for multi-workspace OPFS architecture.
  */
 
 /**
@@ -26,24 +26,12 @@ export interface FileMetadata {
 }
 
 /**
- * Session index - OPFS/index.json
+ * Workspace metadata
  */
-export interface SessionIndex {
-  /** Metadata for all sessions */
-  sessions: SessionMetadata[]
-  /** Currently active session ID */
-  activeSessionId: string
-  /** Last modified time */
-  lastModified: number
-}
-
-/**
- * Session metadata
- */
-export interface SessionMetadata {
-  /** Session ID (corresponds to conversation.id) */
+export interface WorkspaceMetadata {
+  /** Workspace ID */
   id: string
-  /** Session name */
+  /** Workspace name */
   name: string
   /** Creation time */
   createdAt: number
@@ -53,10 +41,22 @@ export interface SessionMetadata {
   cacheSize: number
   /** Pending sync count */
   pendingCount: number
-  /** Number of files modified by this session */
+  /** Number of files modified by this workspace */
   modifiedFiles: number
-  /** Session status */
+  /** Workspace status */
   status: 'active' | 'archived'
+}
+
+/**
+ * Workspace index structure.
+ */
+export interface WorkspaceIndex {
+  /** Metadata for all workspaces */
+  workspaces: WorkspaceMetadata[]
+  /** Currently active workspace ID */
+  activeWorkspaceId: string
+  /** Last modified time */
+  lastModified: number
 }
 
 /**
@@ -65,11 +65,11 @@ export interface SessionMetadata {
 export type FileStatus =
   /** Not modified */
   | 'unmodified'
-  /** Modified by current session */
+  /** Modified by current workspace */
   | 'modified-by-current'
-  /** Modified by other session */
+  /** Modified by another workspace */
   | 'modified-by-other'
-  /** Modified by multiple sessions */
+  /** Modified by multiple workspaces */
   | 'modified-by-multiple'
 
 /**
@@ -139,10 +139,10 @@ export interface SyncResult {
 export interface ConflictInfo {
   /** File path */
   path: string
-  /** Current session */
-  session: string
-  /** Other sessions that modified this file */
-  otherSessions: string[]
+  /** Current workspace id */
+  workspaceId: string
+  /** Other workspaces that modified this file */
+  otherWorkspaces: string[]
   /** OPFS version timestamp */
   opfsMtime: number
   /** Current filesystem file timestamp */
@@ -371,7 +371,8 @@ export interface ValidationResult {
 export interface ConflictDetail {
   path: string
   opfsVersion: {
-    session: string
+    /** Current workspace id */
+    workspaceId: string
     mtime: number
   }
   nativeVersion: {
