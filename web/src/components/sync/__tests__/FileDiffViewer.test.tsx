@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { FileDiffViewer } from '../FileDiffViewer'
 
-const getActiveWorkspaceMock = vi.fn()
+const getActiveConversationMock = vi.fn()
 const getNativeDirectoryHandleMock = vi.fn()
 
 const fileExistsInNativeFSMock = vi.fn()
@@ -13,8 +13,8 @@ vi.mock('../MonacoDiffEditor', () => ({
   default: () => <div data-testid="monaco-diff-editor" />,
 }))
 
-vi.mock('@/store/workspace.store', () => ({
-  getActiveWorkspace: () => getActiveWorkspaceMock(),
+vi.mock('@/store/conversation-context.store', () => ({
+  getActiveConversation: () => getActiveConversationMock(),
 }))
 
 vi.mock('@/opfs', () => ({
@@ -30,9 +30,9 @@ describe('FileDiffViewer', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getNativeDirectoryHandleMock.mockResolvedValue({} as FileSystemDirectoryHandle)
-    getActiveWorkspaceMock.mockResolvedValue({
-      workspaceId: 'ws_1',
-      workspace: {
+    getActiveConversationMock.mockResolvedValue({
+      conversationId: 'conv_1',
+      conversation: {
         getNativeDirectoryHandle: getNativeDirectoryHandleMock,
       },
     })

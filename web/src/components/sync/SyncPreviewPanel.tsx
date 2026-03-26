@@ -11,7 +11,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
-import { useWorkspaceStore, getActiveWorkspace } from '@/store/workspace.store'
+import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
@@ -110,11 +110,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onCancel: _onCancel,
 }) => {
-  const pendingChanges = useWorkspaceStore((state) => state.pendingChanges)
-  const previewSelectedPath = useWorkspaceStore((state) => state.previewSelectedPath)
-  const clearPreviewSelectedPath = useWorkspaceStore((state) => state.clearPreviewSelectedPath)
-  const clearChanges = useWorkspaceStore((state) => state.clearChanges)
-  const discardPendingPath = useWorkspaceStore((state) => state.discardPendingPath)
+  const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
+  const previewSelectedPath = useConversationContextStore((state) => state.previewSelectedPath)
+  const clearPreviewSelectedPath = useConversationContextStore((state) => state.clearPreviewSelectedPath)
+  const clearChanges = useConversationContextStore((state) => state.clearChanges)
+  const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectedFile, setSelectedFile] = useState<FileChange | null>(null)
   const selectedPath = selectedFile?.path
   const [isSyncing, setIsSyncing] = useState(false)
@@ -148,10 +148,10 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
   const generateSummaryWithLLM = useCallback(async (changes: FileChange[]): Promise<string | null> => {
     try {
-      const activeWorkspace = await getActiveWorkspace()
-      if (!activeWorkspace) return null
-      const { workspace, workspaceId } = activeWorkspace
-      const nativeDir = await workspace.getNativeDirectoryHandle()
+      const activeConversation = await getActiveConversation()
+      if (!activeConversation) return null
+      const { conversation, conversationId } = activeConversation
+      const nativeDir = await conversation.getNativeDirectoryHandle()
 
       const settingsState = useSettingsStore.getState()
       const providerType = settingsState.providerType
@@ -197,7 +197,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           beforeText = content ?? ''
         }
         if (change.type !== 'delete') {
-          const content = await readFileFromOPFS(workspaceId, change.path)
+          const content = await readFileFromOPFS(conversationId, change.path)
           afterText = content ?? ''
         }
 
@@ -241,14 +241,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
     try {
       // Get active workspace
-      const activeWorkspace = await getActiveWorkspace()
-      if (!activeWorkspace) {
+      const activeConversation = await getActiveConversation()
+      if (!activeConversation) {
         throw new Error('No active workspace')
       }
 
       // Get Native FS directory handle
-      const { workspace } = activeWorkspace
-      const nativeDir = await workspace.getNativeDirectoryHandle()
+      const { conversation } = activeConversation
+      const nativeDir = await conversation.getNativeDirectoryHandle()
       if (!nativeDir) {
         throw new Error('请先选择项目目录')
       }
@@ -256,14 +256,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       const approvedPaths = filesToSync.map((c) => c.path)
 
       if (approvedPaths.length > 0) {
-        await workspace.createApprovedSnapshotForPaths(
+        await conversation.createApprovedSnapshotForPaths(
           approvedPaths,
           summary.trim(),
           nativeDir
         )
       }
 
-      const pendingResult = await workspace.syncToDisk(
+      const pendingResult = await conversation.syncToDisk(
         nativeDir,
         approvedPaths
       )
@@ -279,8 +279,8 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       }
 
       // Refresh pending snapshot after sync (supports partial sync)
-      await useWorkspaceStore.getState().refreshPendingChanges(true)
-      const latestChanges = useWorkspaceStore.getState().pendingChanges?.changes ?? []
+      await useConversationContextStore.getState().refreshPendingChanges(true)
+      const latestChanges = useConversationContextStore.getState().pendingChanges?.changes ?? []
       if (!latestChanges.some((c) => c.path === selectedPath)) {
         setSelectedFile(null)
       }

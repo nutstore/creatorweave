@@ -28,7 +28,7 @@ import {
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
@@ -89,9 +89,9 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
   } = useConversationStore()
 
   const { directoryHandle, directoryName } = useAgentStore()
-  const workspaceStats = useWorkspaceStore((state) => state.workspaces)
+  const workspaceStats = useConversationContextStore((state) => state.workspaces)
   const workspaceIds = workspaceStats.map((w) => w.id)
-  const currentPendingCount = useWorkspaceStore((state) => state.currentPendingCount)
+  const currentPendingCount = useConversationContextStore((state) => state.currentPendingCount)
   const scopedWorkspaceIdSet = new Set(workspaceIds)
   const scopedConversations = conversations.filter(
     (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeConversationId
@@ -136,7 +136,7 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
 
   // Refresh pending changes when switching to pending tab
   const refreshPending = useCallback(async () => {
-    const { refreshPendingChanges } = useWorkspaceStore.getState()
+    const { refreshPendingChanges } = useConversationContextStore.getState()
     await refreshPendingChanges()
   }, [])
 
@@ -233,14 +233,14 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
       >
         {/* Collapse button */}
         <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1 dark:bg-card">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">对话</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary">工作区</span>
           <div className="flex items-center gap-1">
             <BrandButton
               variant="ghost"
               className="h-6 px-2 text-[11px]"
               disabled={scopedConversationIds.length === 0 || clearingConversations}
               onClick={() => setClearConversationsDialogOpen(true)}
-              title="清空当前项目会话"
+              title="清空当前项目工作区"
             >
               清空
             </BrandButton>
@@ -271,7 +271,7 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
               }}
             >
               <Plus className="h-3 w-3" />
-              新对话
+              新工作区
             </BrandButton>
           </div>
 
@@ -286,7 +286,7 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
                   role="button"
                   tabIndex={0}
                   aria-pressed={isActive}
-                  aria-label={`对话: ${conv.title}`}
+                  aria-label={`工作区: ${conv.title}`}
                   className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
                     isActive
                       ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
@@ -321,13 +321,13 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
                       e.stopPropagation()
                       try {
                         await deleteConversation(conv.id)
-                        toast.success('会话已删除')
+                        toast.success('工作区已删除')
                       } catch (error) {
                         console.error('[Sidebar] Failed to delete conversation:', error)
-                        toast.error('删除会话失败')
+                        toast.error('删除工作区失败')
                       }
                     }}
-                    title="删除对话"
+                    title="删除工作区"
                   >
                     <Trash2 className="h-3 w-3 text-danger" />
                   </BrandButton>
@@ -458,10 +458,10 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
       >
         <BrandDialogContent className="max-w-md">
           <BrandDialogHeader>
-            <BrandDialogTitle>清空会话</BrandDialogTitle>
+            <BrandDialogTitle>清空工作区</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
-            <p className="text-secondary text-sm">确认清空当前项目的所有会话？此操作不可撤销。</p>
+            <p className="text-secondary text-sm">确认清空当前项目的所有工作区？此操作不可撤销。</p>
           </BrandDialogBody>
           <BrandDialogFooter>
             <BrandButton
@@ -478,7 +478,7 @@ export function Sidebar({ onFileSelect, onInspect, selectedFilePath }: SidebarPr
                   setClearingConversations(true)
                   const result = await deleteConversations(scopedConversationIds)
                   if (result.failed.length === 0) {
-                    toast.success(`已清空 ${result.successIds.length} 个会话`)
+                    toast.success(`已清空 ${result.successIds.length} 个工作区`)
                     setClearConversationsDialogOpen(false)
                   } else if (result.successIds.length === 0) {
                     toast.error(`清空失败（${result.failed.length} 个失败）`)

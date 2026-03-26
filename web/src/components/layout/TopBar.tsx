@@ -1,11 +1,11 @@
 /**
- * TopBar - minimal top bar for the workspace.
+ * TopBar - minimal top bar for the conversation area.
  *
  * Left: Logo + product name
- * Right: Folder button, Session badge, Settings gear, Remote status
+ * Right: Folder button, conversation badge, Settings gear, Remote status
  *
  * Phase 3 Integration:
- * - Added SessionBadge to show OPFS session status
+ * - Added conversation badge to show OPFS conversation storage status
  * Phase 4 Integration:
  * - Added i18n support
  * Phase 5 Integration:
@@ -31,7 +31,7 @@ import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
-import { ConversationStorageBadge } from '@/components/session'
+import { ConversationStorageBadge } from '@/components/conversation'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { FolderSelector } from './FolderSelector'
 import { useT } from '@/i18n'
@@ -52,6 +52,8 @@ interface TopBarProps {
   onWebContainerOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
+  activeConversationName?: string
+  /** @deprecated use activeConversationName */
   activeWorkspaceName?: string
   /** Called when menu button is pressed on mobile */
   onMenuOpen?: () => void
@@ -67,6 +69,7 @@ export function TopBar({
   onWebContainerOpen,
   onBackToProjects,
   activeProjectName,
+  activeConversationName,
   activeWorkspaceName,
   onMenuOpen,
   isMobile,
@@ -75,6 +78,7 @@ export function TopBar({
   const [mcpSettingsOpen, setMcpSettingsOpen] = useState(false)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
+  const conversationName = activeConversationName ?? activeWorkspaceName
 
   const ActionTooltip = ({
     label,
@@ -122,12 +126,12 @@ export function TopBar({
                   {activeProjectName}
                 </span>
               </ActionTooltip>
-              {activeWorkspaceName && (
+              {conversationName && (
                 <>
                   <span className="text-xs text-tertiary dark:text-muted">/</span>
-                  <ActionTooltip label={t('topbar.workspaceLabel', { name: activeWorkspaceName })}>
+                  <ActionTooltip label={t('topbar.workspaceLabel', { name: conversationName })}>
                     <span className="rounded-md bg-muted px-2 py-1 text-xs text-secondary dark:bg-muted dark:text-muted">
-                      {activeWorkspaceName}
+                      {conversationName}
                     </span>
                   </ActionTooltip>
                 </>
@@ -160,7 +164,7 @@ export function TopBar({
             <RemoteBadge />
           </RemoteBadgeErrorBoundary>
 
-          {/* Conversation Storage - OPFS workspace status with storage dropdown */}
+          {/* Conversation Storage - OPFS conversation status with storage dropdown */}
           <ConversationStorageBadge compact />
 
           {/* Language Switcher */}

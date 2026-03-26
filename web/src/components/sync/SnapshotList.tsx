@@ -15,7 +15,7 @@ import {
 } from '@/sqlite/repositories/fs-overlay.repository'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
-import { getSessionManager } from '@/opfs/session'
+import { getWorkspaceManager } from '@/opfs'
 
 interface SnapshotListProps {
   limit?: number
@@ -169,8 +169,8 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
       if (!latest) {
         setError('没有可切换到的最新快照')
       } else {
-        const manager = await getSessionManager()
-        const workspace = await manager.getSession(latest.workspaceId)
+        const manager = await getWorkspaceManager()
+        const workspace = await manager.getWorkspace(latest.workspaceId)
         if (!workspace) throw new Error(`工作区不存在: ${latest.workspaceName || latest.workspaceId}`)
         const nativeDir = await workspace.getNativeDirectoryHandle()
         const result = await workspace.switchToSnapshot(latest.id, nativeDir, setSwitchProgress)
@@ -197,8 +197,8 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
     try {
       const target = snapshots.find((item) => item.id === snapshotId)
       if (!target) throw new Error('快照不存在')
-      const manager = await getSessionManager()
-      const workspace = await manager.getSession(target.workspaceId)
+      const manager = await getWorkspaceManager()
+      const workspace = await manager.getWorkspace(target.workspaceId)
       if (!workspace) throw new Error(`工作区不存在: ${target.workspaceName || target.workspaceId}`)
       const nativeDir = await workspace.getNativeDirectoryHandle()
       const result = await workspace.switchToSnapshot(snapshotId, nativeDir, setSwitchProgress)

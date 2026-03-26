@@ -7,7 +7,7 @@
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { type ChangeType, type FileChange } from '@/opfs/types/opfs-types'
-import { getActiveWorkspace } from '@/store/workspace.store'
+import { getActiveConversation } from '@/store/conversation-context.store'
 import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -156,19 +156,19 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       setContent((prev) => ({ ...prev, loading: true, error: null }))
 
       try {
-        const activeWorkspace = await getActiveWorkspace()
-        if (!activeWorkspace) {
+        const activeConversation = await getActiveConversation()
+        if (!activeConversation) {
           throw new Error('未激活的工作区')
         }
 
-        const { workspace, workspaceId } = activeWorkspace
+        const { conversation, conversationId } = activeConversation
         const filePath = fileChange.path
         const isImage = isImageFile(filePath)
         let showNativePanel = fileChange.type !== 'add'
         let nativeDir: FileSystemDirectoryHandle | null = null
 
         if (fileChange.type !== 'add') {
-          nativeDir = await workspace.getNativeDirectoryHandle()
+          nativeDir = await conversation.getNativeDirectoryHandle()
           if (nativeDir) {
             const exists = await fileExistsInNativeFS(nativeDir, filePath)
             showNativePanel = exists
@@ -182,7 +182,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
           try {
             if (fileChange.type !== 'delete') {
-              const opfsBase64 = await readBinaryFileFromOPFS(workspaceId, filePath)
+              const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
               if (opfsBase64) {
                 opfsImageUrl = `data:${mimeType};base64,${opfsBase64}`
               }
@@ -215,7 +215,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           let opfsContent: string | null = null
           try {
             if (fileChange.type !== 'delete') {
-              opfsContent = await readFileFromOPFS(workspaceId, filePath)
+              opfsContent = await readFileFromOPFS(conversationId, filePath)
             }
           } catch (err) {
             console.warn('[FileDiffViewer] Failed to read OPFS content:', err)

@@ -1,39 +1,37 @@
 /**
- * SessionBadge - displays current OPFS session status
- *
- * Shows:
- * - Current session name (active conversation)
- * - Pending changes count
- * Phase 4: Added i18n support
+ * ConversationBadge - displays current OPFS conversation status.
  */
 
 import React, { useCallback, useMemo } from 'react'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { Clock, AlertCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 
-export interface SessionBadgeProps {
+export interface ConversationBadgeProps {
   /** Optional click handler */
   onClick?: () => void
   /** Compact mode (show only counts) */
   compact?: boolean
 }
 
-export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = false }) => {
-  const { activeWorkspaceId, workspaces, currentPendingCount, initialized } =
-    useWorkspaceStore()
+/** @deprecated Use ConversationBadgeProps */
+export type SessionBadgeProps = ConversationBadgeProps
+
+export const ConversationBadge: React.FC<ConversationBadgeProps> = ({ onClick, compact = false }) => {
+  const { activeWorkspaceId: activeConversationId, workspaces: conversations, currentPendingCount, initialized } =
+    useConversationContextStore()
   const t = useT()
 
-  // Get current workspace info
-  const currentWorkspace = useMemo(() => {
-    if (!activeWorkspaceId) return null
-    return workspaces.find((w) => w.id === activeWorkspaceId)
-  }, [activeWorkspaceId, workspaces])
+  // Get current conversation info
+  const currentConversation = useMemo(() => {
+    if (!activeConversationId) return null
+    return conversations.find((w) => w.id === activeConversationId)
+  }, [activeConversationId, conversations])
 
   const displayName = useMemo(() => {
-    if (!currentWorkspace) return t('session.notInitialized')
-    return currentWorkspace.name || activeWorkspaceId?.slice(0, 8) || t('session.unknownSession')
-  }, [currentWorkspace, activeWorkspaceId, t])
+    if (!currentConversation) return t('session.notInitialized')
+    return currentConversation.name || activeConversationId?.slice(0, 8) || t('session.unknownSession')
+  }, [currentConversation, activeConversationId, t])
 
   const hasPending = currentPendingCount > 0
 
@@ -51,8 +49,8 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
     )
   }
 
-  // No active workspace
-  if (!activeWorkspaceId || !currentWorkspace) {
+  // No active conversation
+  if (!activeConversationId || !currentConversation) {
     return (
       <div className="flex items-center gap-2 text-xs text-tertiary dark:text-muted">
         <AlertCircle className="h-3.5 w-3.5" />
@@ -113,3 +111,6 @@ export const SessionBadge: React.FC<SessionBadgeProps> = ({ onClick, compact = f
     </button>
   )
 }
+
+/** @deprecated Use ConversationBadge */
+export const SessionBadge = ConversationBadge

@@ -10,7 +10,7 @@
 
 import { useState, useCallback, useMemo } from 'react'
 import { useOPFSStore } from '@/store/opfs.store'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { Clock, FilePlus, FileEdit, FileX, RefreshCw, Check, X, AlertCircle } from 'lucide-react'
 import type { PendingChange } from '@/opfs/types/opfs-types'
 
@@ -72,7 +72,7 @@ export function PendingPanel({
   onSyncComplete?: (result: { success: number; failed: number; skipped: number }) => void
 }) {
   const { getPendingChanges, syncPendingChanges, isLoading } = useOPFSStore()
-  const { activeWorkspaceId, currentPendingCount } = useWorkspaceStore()
+  const { activeWorkspaceId, currentPendingCount } = useConversationContextStore()
 
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{

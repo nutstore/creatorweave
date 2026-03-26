@@ -1,82 +1,84 @@
 /**
- * SessionSwitcher - dropdown menu for switching between OPFS sessions
- *
- * Displays:
- * - All available sessions
- * - Each session's pending/undo counts
- * - Active session indicator
- * - Switch session functionality
+ * ConversationSwitcher - dropdown menu for switching between OPFS conversations.
  */
 
 import React, { useState, useCallback, useMemo } from 'react'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { ChevronDown, Check, Clock, Trash2, Plus } from 'lucide-react'
 
-export interface SessionSwitcherProps {
-  /** Callback when session is switched */
-  onSessionSwitch?: (sessionId: string) => void
-  /** Show create new session button */
+export interface ConversationSwitcherProps {
+  /** Callback when conversation is switched */
+  onConversationSwitch?: (conversationId: string) => void
+  /** Show create new conversation button */
   showCreate?: boolean
-  /** Show delete session button */
+  /** Show delete conversation button */
   showDelete?: boolean
 }
 
-export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
-  onSessionSwitch,
+/** @deprecated Use ConversationSwitcherProps */
+export type SessionSwitcherProps = ConversationSwitcherProps
+
+export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
+  onConversationSwitch,
   showCreate = false,
   showDelete = false,
 }) => {
   const [open, setOpen] = useState(false)
-  const { activeWorkspaceId, workspaces, switchWorkspace, deleteWorkspace, isLoading } =
-    useWorkspaceStore()
+  const {
+    activeWorkspaceId: activeConversationId,
+    workspaces: conversations,
+    switchWorkspace,
+    deleteWorkspace,
+    isLoading,
+  } = useConversationContextStore()
 
-  // Sort workspaces: active first, then by lastActiveAt
-  const sortedWorkspaces = useMemo(() => {
-    return [...workspaces].sort((a, b) => {
-      if (a.id === activeWorkspaceId) return -1
-      if (b.id === activeWorkspaceId) return 1
+  // Sort conversations: active first, then by lastActiveAt
+  const sortedConversations = useMemo(() => {
+    return [...conversations].sort((a, b) => {
+      if (a.id === activeConversationId) return -1
+      if (b.id === activeConversationId) return 1
       return (b.lastActiveAt || 0) - (a.lastActiveAt || 0)
     })
-  }, [workspaces, activeWorkspaceId])
+  }, [conversations, activeConversationId])
 
   const handleSwitch = useCallback(
-    async (workspaceId: string) => {
+    async (conversationId: string) => {
       try {
-        await switchWorkspace(workspaceId)
-        onSessionSwitch?.(workspaceId)
+        await switchWorkspace(conversationId)
+        onConversationSwitch?.(conversationId)
         setOpen(false)
       } catch (error) {
-        console.error('[SessionSwitcher] Failed to switch workspace:', error)
+        console.error('[ConversationSwitcher] Failed to switch conversation:', error)
       }
     },
-    [switchWorkspace, onSessionSwitch]
+    [switchWorkspace, onConversationSwitch]
   )
 
   const handleDelete = useCallback(
-    async (e: React.MouseEvent, workspaceId: string) => {
+    async (e: React.MouseEvent, conversationId: string) => {
       e.stopPropagation() // Prevent triggering switch
 
-      if (!confirm('确定要删除此对话的缓存吗？所有文件缓存、待同步和撤销记录将被删除。')) {
+      if (!confirm('确定要删除此工作区的缓存吗？所有文件缓存、待同步和撤销记录将被删除。')) {
         return
       }
 
       try {
-        await deleteWorkspace(workspaceId)
+        await deleteWorkspace(conversationId)
       } catch (error) {
-        console.error('[SessionSwitcher] Failed to delete workspace:', error)
+        console.error('[ConversationSwitcher] Failed to delete conversation:', error)
       }
     },
     [deleteWorkspace]
   )
 
-  const activeWorkspace = useMemo(() => {
-    return workspaces.find((w) => w.id === activeWorkspaceId)
-  }, [workspaces, activeWorkspaceId])
+  const activeConversation = useMemo(() => {
+    return conversations.find((w) => w.id === activeConversationId)
+  }, [conversations, activeConversationId])
 
   const displayName = useMemo(() => {
-    if (!activeWorkspace) return '选择对话'
-    return activeWorkspace.name || activeWorkspaceId?.slice(0, 8) || '未知对话'
-  }, [activeWorkspace, activeWorkspaceId])
+    if (!activeConversation) return '选择对话'
+    return activeConversation.name || activeConversationId?.slice(0, 8) || '未知对话'
+  }, [activeConversation, activeConversationId])
 
   return (
     <div className="relative">
@@ -84,12 +86,12 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        disabled={isLoading || workspaces.length === 0}
+        disabled={isLoading || conversations.length === 0}
         className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-muted disabled:opacity-50 dark:border-border dark:bg-card dark:hover:bg-muted"
       >
         <span className="max-w-[120px] truncate text-secondary dark:text-muted">{displayName}</span>
-        {workspaces.length > 0 && (
-          <span className="text-xs text-tertiary">({workspaces.length})</span>
+        {conversations.length > 0 && (
+          <span className="text-xs text-tertiary">({conversations.length})</span>
         )}
         <ChevronDown
           className={`h-4 w-4 text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
@@ -107,42 +109,42 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
             {/* Header */}
             <div className="border-b border px-3 py-2 dark:border-border">
               <span className="text-xs font-medium text-secondary dark:text-muted">
-                对话列表 ({workspaces.length})
+                对话列表 ({conversations.length})
               </span>
             </div>
 
-            {/* Workspace list */}
+            {/* Conversation list */}
             <div className="custom-scrollbar max-h-80 overflow-y-auto">
-              {sortedWorkspaces.length === 0 ? (
+              {sortedConversations.length === 0 ? (
                 <div className="px-3 py-4 text-center text-xs text-tertiary dark:text-muted">暂无对话</div>
               ) : (
                 <ul>
-                  {sortedWorkspaces.map((workspace) => {
-                    const isActive = workspace.id === activeWorkspaceId
-                    const hasPending = workspace.pendingCount > 0
+                  {sortedConversations.map((conversation) => {
+                    const isActive = conversation.id === activeConversationId
+                    const hasPending = conversation.pendingCount > 0
 
                     return (
                       <li
-                        key={workspace.id}
+                        key={conversation.id}
                         className={`flex items-center gap-2 px-3 py-2 hover:bg-muted dark:hover:bg-muted ${
                           isActive ? 'bg-primary-50 dark:bg-primary-950/30' : ''
                         }`}
                       >
-                        {/* Workspace selector */}
+                        {/* Conversation selector */}
                         <button
                           type="button"
-                          onClick={() => handleSwitch(workspace.id)}
+                          onClick={() => handleSwitch(conversation.id)}
                           className="flex flex-1 items-center gap-2 text-left"
                         >
                           {/* Active indicator */}
                           {isActive && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
                           {!isActive && <span className="h-4 w-4 shrink-0" />}
 
-                          {/* Workspace info */}
+                          {/* Conversation info */}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
                               <span className="truncate text-xs font-medium text-secondary dark:text-muted">
-                                {workspace.name || workspace.id.slice(0, 8)}
+                                {conversation.name || conversation.id.slice(0, 8)}
                               </span>
                             </div>
 
@@ -152,10 +154,10 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                               {hasPending && (
                                 <span
                                   className="flex items-center gap-0.5 rounded-full bg-warning-bg px-1.5 text-[10px] text-warning"
-                                  title={`${workspace.pendingCount} 个待同步`}
+                                  title={`${conversation.pendingCount} 个待同步`}
                                 >
                                   <Clock className="h-2.5 w-2.5" />
-                                  {workspace.pendingCount}
+                                  {conversation.pendingCount}
                                 </span>
                               )}
 
@@ -171,7 +173,7 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
                         {showDelete && !isActive && (
                           <button
                             type="button"
-                            onClick={(e) => handleDelete(e, workspace.id)}
+                            onClick={(e) => handleDelete(e, conversation.id)}
                             className="shrink-0 rounded p-1 text-tertiary hover:bg-red-50 hover:text-red-500"
                             title="删除对话缓存"
                           >
@@ -185,7 +187,7 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
               )}
             </div>
 
-            {/* Footer - Create new session */}
+            {/* Footer - Create new conversation */}
             {showCreate && (
               <div className="border-t border p-2">
                 <button
@@ -203,3 +205,6 @@ export const SessionSwitcher: React.FC<SessionSwitcherProps> = ({
     </div>
   )
 }
+
+/** @deprecated Use ConversationSwitcher */
+export const SessionSwitcher = ConversationSwitcher

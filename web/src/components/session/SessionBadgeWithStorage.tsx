@@ -13,7 +13,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { Clock, HardDrive, Trash2, Check, Info, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useStorageInfo, type CleanupPreview } from '@/hooks/useStorageInfo'
 import { useSQLiteMode } from '@/hooks/useSQLiteMode'
@@ -78,7 +78,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   const [cleanupScope, setCleanupScope] = useState<'old' | 'all'>('old')
   const [cleanupLoading, setCleanupLoading] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<string | null>(null)
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -95,16 +95,16 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   }, [])
 
   const {
-    activeWorkspaceId,
-    workspaces,
+    activeWorkspaceId: activeConversationId,
+    workspaces: conversations,
     initialized,
-    error: sessionError,
+    error: contextError,
     switchWorkspace,
-  } = useWorkspaceStore()
+  } = useConversationContextStore()
   const deleteConversation = useConversationStore((state) => state.deleteConversation)
   const {
     storage,
-    sessions: storageSessions,
+    conversations: storageConversations,
     loading: storageLoading,
     refresh,
     getCleanupPreview,
@@ -113,40 +113,40 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   const { isOPFS } = useSQLiteMode()
 
   // Status dot color
-  const statusDotColor = getStatusDotColor(!!sessionError, initialized, isOPFS)
-  const showStatusDot = Boolean(sessionError || !initialized || isOPFS)
+  const statusDotColor = getStatusDotColor(!!contextError, initialized, isOPFS)
+  const showStatusDot = Boolean(contextError || !initialized || isOPFS)
 
-  // Handle workspace switch
+  // Handle conversation switch
   const handleSwitch = useCallback(
-    async (workspaceId: string) => {
+    async (conversationId: string) => {
       try {
-        await switchWorkspace(workspaceId)
+        await switchWorkspace(conversationId)
         setOpen(false)
       } catch (error) {
-        console.error('[ConversationStorageBadge] Failed to switch workspace:', error)
+        console.error('[ConversationStorageBadge] Failed to switch conversation:', error)
       }
     },
     [switchWorkspace]
   )
 
-  // Handle session delete - open dialog
-  const handleDeleteClick = useCallback((workspaceId: string) => {
-    setWorkspaceToDelete(workspaceId)
+  // Handle conversation delete - open dialog
+  const handleDeleteClick = useCallback((conversationId: string) => {
+    setConversationToDelete(conversationId)
     setDeleteDialogOpen(true)
     setOpen(false) // Close dropdown when opening dialog
   }, [])
 
-  // Confirm session delete
+  // Confirm conversation delete
   const handleConfirmDelete = useCallback(async () => {
-    if (!workspaceToDelete) return
+    if (!conversationToDelete) return
 
     setDeleteLoading(true)
 
     try {
-      await deleteConversation(workspaceToDelete)
+      await deleteConversation(conversationToDelete)
       toast.success('会话已删除')
       setDeleteDialogOpen(false)
-      setWorkspaceToDelete(null)
+      setConversationToDelete(null)
       await refresh()
     } catch (error) {
       console.error('[ConversationStorageBadge] Failed to delete conversation:', error)
@@ -154,7 +154,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     } finally {
       setDeleteLoading(false)
     }
-  }, [workspaceToDelete, deleteConversation, refresh])
+  }, [conversationToDelete, deleteConversation, refresh])
 
   // Handle open cleanup dialog
   const handleOpenCleanupDialog = useCallback(
@@ -200,8 +200,8 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     }
   }, [cleanupPreview, cleanupScope, executeCleanup, refresh])
 
-  // Get current workspace info
-  const currentWorkspace = workspaces.find((w) => w.id === activeWorkspaceId)
+  // Get current conversation info
+  const currentConversation = conversations.find((w) => w.id === activeConversationId)
 
   const ActionTooltip = ({
     label,
@@ -229,7 +229,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
         <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusDotColor)} />
       )}
 
-      {open && <SessionDropdown />}
+      {open && <ConversationDropdown />}
 
       {/* Cleanup Confirmation Dialog */}
       <BrandDialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
@@ -254,7 +254,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                   <div>将清理：</div>
                   <div className="ml-4 space-y-1">
                     <div>
-                      • {cleanupPreview.sessionCount} 个会话
+                      • {cleanupPreview.conversationCount} 个对话
                       {cleanupScope === 'old' && ' (30天未活跃)'}
                     </div>
                     <div>• 约 {cleanupPreview.totalSizeFormatted} 文件缓存</div>
@@ -310,7 +310,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                             : 'border-border dark:border-border'
                         )}
                       />
-                      清理所有工作区缓存
+                      清理所有对话缓存
                     </button>
                   </div>
                 </div>
@@ -350,14 +350,14 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           </BrandDialogHeader>
           <BrandDialogBody>
             {(() => {
-              const workspace = workspaces.find((w) => w.id === workspaceToDelete)
-              const hasPending = workspace?.pendingCount ? workspace.pendingCount > 0 : false
+              const conversation = conversations.find((w) => w.id === conversationToDelete)
+              const hasPending = conversation?.pendingCount ? conversation.pendingCount > 0 : false
               const hasData = hasPending
 
               return (
                 <>
                   <p className="text-sm text-secondary">
-                    确定要删除 <span className="font-medium text-primary">"{workspace?.name}"</span> 吗？
+                    确定要删除 <span className="font-medium text-primary">"{conversation?.name}"</span> 吗？
                   </p>
 
                   {hasData && (
@@ -367,7 +367,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                         <span className="font-semibold">注意：有未保存的修改</span>
                       </p>
                       <p className="ml-5 text-[10px] text-amber-700">
-                        {hasPending && `${workspace?.pendingCount ?? 0} 个待同步的修改`}
+                        {hasPending && `${conversation?.pendingCount ?? 0} 个待同步的修改`}
                       </p>
                     </div>
                   )}
@@ -377,7 +377,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       <span className="font-medium text-danger">❌ 将删除</span>
                       <ul className="ml-6 mt-1 list-disc space-y-1 text-secondary">
                         <li>对话记录</li>
-                        <li>文件缓存与工作区</li>
+                        <li>文件缓存</li>
                         <li>未保存的修改（无法恢复）</li>
                       </ul>
                     </div>
@@ -411,18 +411,18 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     </TooltipProvider>
   )
 
-  function SessionDropdown() {
+  function ConversationDropdown() {
     return (
       <>
         {/* Dropdown menu - 使用与 LanguageSwitcher 相同的 z-index */}
         <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-white shadow-lg dark:border-border dark:bg-card">
-          {/* Header - Current session */}
+          {/* Header - Current conversation */}
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
               <span className="text-tertiary text-xs font-medium">当前对话</span>
-              {currentWorkspace && (
+              {currentConversation && (
                 <span className="text-xs font-semibold text-primary-600">
-                  {currentWorkspace.name}
+                  {currentConversation.name}
                 </span>
               )}
             </div>
@@ -469,7 +469,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                     >
                       {STORAGE_STATUS_LABELS[storage.status]}
                     </BrandBadge>
-                    <ActionTooltip label="计算每个会话的缓存大小（可能较慢）">
+                    <ActionTooltip label="计算每个对话的缓存大小（可能较慢）">
                       <button
                         type="button"
                         onClick={() => refresh(true)}
@@ -495,25 +495,25 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
           <BrandSelectSeparator />
 
-          {/* Session list */}
+          {/* Conversation list */}
           <div className="custom-scrollbar max-h-60 overflow-y-auto">
             <div className="px-4 py-2">
               <span className="text-xs font-semibold text-secondary">
-                所有对话 ({workspaces.length})
+                所有对话 ({conversations.length})
               </span>
             </div>
 
-            {storageSessions.length === 0 ? (
+            {storageConversations.length === 0 ? (
               <div className="px-4 py-4 text-center text-xs text-muted">暂无会话</div>
             ) : (
               <ul>
-                {storageSessions.map((session) => {
-                  const isActive = session.id === activeWorkspaceId
-                  const hasPending = session.pendingCount > 0
+                {storageConversations.map((conversation) => {
+                  const isActive = conversation.id === activeConversationId
+                  const hasPending = conversation.pendingCount > 0
 
                   return (
                     <li
-                      key={session.id}
+                      key={conversation.id}
                       className={cn(
                         'flex items-center gap-2 px-4 py-2 transition-colors',
                         isActive ? 'bg-primary-50' : 'hover:bg-muted dark:hover:bg-muted'
@@ -523,19 +523,19 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       {isActive && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
                       {!isActive && <span className="h-4 w-4 shrink-0" />}
 
-                      {/* Session info */}
+                      {/* Conversation info */}
                       <button
                         type="button"
-                        onClick={() => handleSwitch(session.id)}
+                        onClick={() => handleSwitch(conversation.id)}
                         className="flex min-w-0 flex-1 flex-col items-start text-left"
                       >
                         {/* First row: name + size */}
                         <div className="flex w-full min-w-0 items-center gap-2">
                           <span className="truncate text-xs font-medium text-primary">
-                            {session.name}
+                            {conversation.name}
                           </span>
                           <span className="shrink-0 text-[10px] tabular-nums text-muted">
-                            {session.cacheSizeFormatted}
+                            {conversation.cacheSizeFormatted}
                           </span>
                         </div>
 
@@ -548,7 +548,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                               className="!gap-0.5 !px-1.5 !py-0 !text-[10px]"
                             >
                               <Clock className="h-2.5 w-2.5" />
-                              {session.pendingCount}
+                              {conversation.pendingCount}
                             </BrandBadge>
                           )}
                           {!hasPending && <span className="text-muted">无变更</span>}
@@ -557,10 +557,10 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
                       {/* Delete button */}
                       {!isActive && (
-                        <ActionTooltip label="删除会话">
+                        <ActionTooltip label="删除对话">
                           <button
                             type="button"
-                            onClick={() => handleDeleteClick(session.id)}
+                            onClick={() => handleDeleteClick(conversation.id)}
                             className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -578,7 +578,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
           {/* Footer - Cleanup Action */}
           <div className="px-4 py-2">
-            <ActionTooltip label="清理旧会话的文件缓存，释放存储空间">
+            <ActionTooltip label="清理旧对话的文件缓存，释放存储空间">
               <button
                 type="button"
                 onClick={() => handleOpenCleanupDialog('old')}

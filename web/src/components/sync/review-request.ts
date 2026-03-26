@@ -2,7 +2,7 @@ import { createUserMessage } from '@/agent/message-types'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { getActiveWorkspace } from '@/store/workspace.store'
+import { getActiveConversation } from '@/store/conversation-context.store'
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import type { FileChange } from '@/opfs/types/opfs-types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
@@ -27,13 +27,13 @@ function buildReviewPrompt(changeCount: number, changesText: string, diffSection
 }
 
 async function buildReviewMessage(changes: FileChange[]): Promise<string> {
-  const activeWorkspace = await getActiveWorkspace()
-  if (!activeWorkspace) {
+  const activeConversation = await getActiveConversation()
+  if (!activeConversation) {
     throw new Error('当前没有可用工作区')
   }
 
-  const { workspace, workspaceId } = activeWorkspace
-  const nativeDir = await workspace.getNativeDirectoryHandle()
+  const { conversation, conversationId } = activeConversation
+  const nativeDir = await conversation.getNativeDirectoryHandle()
 
   const changesText = changes
     .slice(0, 30)
@@ -65,7 +65,7 @@ async function buildReviewMessage(changes: FileChange[]): Promise<string> {
       beforeText = text ?? ''
     }
     if (change.type !== 'delete') {
-      const text = await readFileFromOPFS(workspaceId, change.path)
+      const text = await readFileFromOPFS(conversationId, change.path)
       afterText = text ?? ''
     }
 

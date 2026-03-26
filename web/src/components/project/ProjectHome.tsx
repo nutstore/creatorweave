@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
-import { formatDistanceToNow } from 'date-fns'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { formatDistanceToNow, isToday, isYesterday, isThisWeek, isThisMonth } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 import type { Project, ProjectStats } from '@/sqlite/repositories/project.repository'
 import {
-  BrandBadge,
   BrandButton,
   BrandCheckbox,
   BrandDialog,
@@ -19,70 +18,298 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@creatorweave/ui'
-import { MoreVertical, Archive, ArchiveRestore, Pencil, Trash2, SearchX, Plus, ShieldCheck, Brain } from 'lucide-react'
+import {
+  MoreHorizontal,
+  Archive,
+  ArchiveRestore,
+  Pencil,
+  Trash2,
+  Plus,
+  ArrowRight,
+  Clock,
+  FolderOpen,
+  Sparkles,
+  Shield,
+  RotateCcw,
+} from 'lucide-react'
 
-// 动画关键帧样式
-const animationStyles = `
-  @keyframes fadeInUp {
+// 设计系统样式
+const designStyles = `
+  /* 字体 - 使用独特的字体组合 */
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Noto+Serif+SC:wght@400;500;600&display=swap');
+
+  :root {
+    --home-serif: 'Fraunces', 'Noto Serif SC', Georgia, serif;
+    --home-sans: system-ui, -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
+  }
+
+  /* 入场动画 */
+  @keyframes revealUp {
     from {
       opacity: 0;
-      transform: translateY(10px);
+      transform: translateY(24px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
   }
-  @keyframes pulse {
-    0%, 100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.8;
-    }
-  }
-  @keyframes slideIn {
+
+  @keyframes revealScale {
     from {
       opacity: 0;
-      transform: translateX(-4px);
+      transform: scale(0.96);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: scale(1);
     }
   }
-  .animate-fade-in-up {
-    animation: fadeInUp 0.4s ease-out forwards;
-    opacity: 0;
-  }
-  .animate-pulse-slow {
-    animation: pulse 2s ease-in-out infinite;
-  }
-  .animate-slide-in {
-    animation: slideIn 0.3s ease-out forwards;
-    opacity: 0;
-  }
-  .ph-duration-100 { animation-duration: 100ms; }
-  .ph-duration-200 { animation-duration: 200ms; }
-  .ph-duration-300 { animation-duration: 300ms; }
-  .ph-duration-400 { animation-duration: 400ms; }
-  .ph-duration-500 { animation-duration: 500ms; }
-  .ph-delay-100 { animation-delay: 100ms; }
-  .ph-delay-200 { animation-delay: 200ms; }
-  .ph-delay-300 { animation-delay: 300ms; }
-  .ph-delay-400 { animation-delay: 400ms; }
 
-  /* 减少动画偏好支持 */
+  @keyframes subtleFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+    80% { transform: translateY(-1px); }
+  }
+
+  @keyframes grain {
+    0%, 100% { transform: translate(0, 0); }
+    10% { transform: translate(-1%, -1%); }
+    20% { transform: translate(1%, 1%); }
+    30% { transform: translate(-0.5%, 0.5%); }
+    40% { transform: translate(0.5%, -0.5%); }
+    50% { transform: translate(-1%, 0.5%); }
+    60% { transform: translate(0.5%, 1%); }
+    70% { transform: translate(-0.5%, -1%); }
+    80% { transform: translate(1%, -0.5%); }
+    90% { transform: translate(-1%, 1%); }
+  }
+
+  @keyframes pulseGlow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.7; }
+  }
+
+  .home-reveal {
+    animation: revealUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .home-reveal-scale {
+    animation: revealScale 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .home-delay-1 { animation-delay: 0.1s; }
+  .home-delay-2 { animation-delay: 0.2s; }
+  .home-delay-3 { animation-delay: 0.3s; }
+  .home-delay-4 { animation-delay: 0.4s; }
+  .home-delay-5 { animation-delay: 0.5s; }
+  .home-delay-6 { animation-delay: 0.6s; }
+
+  /* 减少动画偏好 */
   @media (prefers-reduced-motion: reduce) {
-    .animate-fade-in-up,
-    .animate-pulse-slow,
-    .animate-slide-in {
+    .home-reveal,
+    .home-reveal-scale {
       animation: none;
       opacity: 1;
     }
-    .group:hover {
-      transform: none;
+    .home-float,
+    .home-grain::before {
+      animation: none;
     }
+  }
+
+  /* Hero 背景 */
+  .home-hero-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .home-hero-bg::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -20%;
+    width: 80%;
+    height: 150%;
+    background: radial-gradient(
+      ellipse at center,
+      oklch(var(--primary) / 0.08) 0%,
+      transparent 70%
+    );
+    animation: pulseGlow 8s ease-in-out infinite;
+  }
+
+  .home-hero-bg::after {
+    content: '';
+    position: absolute;
+    bottom: -30%;
+    left: -10%;
+    width: 50%;
+    height: 80%;
+    background: radial-gradient(
+      ellipse at center,
+      oklch(220 0.15 0.5 / 0.05) 0%,
+      transparent 60%
+    );
+  }
+
+  /* 纹理叠加 */
+  .home-grain::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+    animation: grain 20s steps(10) infinite;
+  }
+
+  /* 排版 */
+  .home-title-serif {
+    font-family: var(--home-serif);
+    font-weight: 500;
+    font-optical-sizing: auto;
+    letter-spacing: -0.02em;
+  }
+
+  .home-title-sans {
+    font-family: var(--home-sans);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  .home-body {
+    font-family: var(--home-sans);
+    letter-spacing: 0.01em;
+  }
+
+  .home-mono {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.85em;
+    letter-spacing: 0.02em;
+  }
+
+  /* 项目时间线 */
+  .home-timeline {
+    position: relative;
+  }
+
+  .home-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: linear-gradient(
+      to bottom,
+      transparent,
+      hsl(var(--border)) 10%,
+      hsl(var(--border)) 90%,
+      transparent
+    );
+  }
+
+  .home-timeline-item {
+    position: relative;
+    padding-left: 36px;
+    transition: transform 0.2s ease;
+  }
+
+  .home-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: hsl(var(--background));
+    border: 2px solid hsl(var(--border));
+    transition: all 0.2s ease;
+  }
+
+  .home-timeline-item:hover::before {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary-50));
+  }
+
+  .home-timeline-item.is-active::before {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary));
+  }
+
+  .home-timeline-item.is-archived {
+    opacity: 0.5;
+  }
+
+  .home-timeline-item.is-archived::before {
+    border-style: dashed;
+  }
+
+  /* 快捷操作卡片 */
+  .home-action-card {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .home-action-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      135deg,
+      oklch(var(--primary) / 0.05) 0%,
+      transparent 50%
+    );
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .home-action-card:hover::before {
+    opacity: 1;
+  }
+
+  .home-action-card:hover {
+    transform: translateY(-2px);
+    border-color: hsl(var(--primary) / 0.3);
+  }
+
+  /* 搜索框 */
+  .home-search-input {
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    transition: all 0.2s ease;
+  }
+
+  .home-search-input:focus {
+    border-color: hsl(var(--primary));
+    box-shadow: 0 0 0 3px oklch(var(--primary) / 0.1);
+    outline: none;
+  }
+
+  /* 空状态 */
+  .home-empty-state {
+    position: relative;
+  }
+
+  .home-empty-state::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 50% 50%,
+      oklch(var(--primary) / 0.03) 0%,
+      transparent 50%
+    );
+    pointer-events: none;
   }
 `
 
@@ -90,6 +317,28 @@ const animationStyles = `
 const formatRelativeTime = (date: number | Date) => {
   return formatDistanceToNow(new Date(date), { addSuffix: true, locale: zhCN })
 }
+
+// 时间分组
+type TimeGroup = 'today' | 'yesterday' | 'thisWeek' | 'thisMonth' | 'older'
+
+const getTimeGroup = (date: number | Date): TimeGroup => {
+  const d = new Date(date)
+  if (isToday(d)) return 'today'
+  if (isYesterday(d)) return 'thisWeek'
+  if (isThisWeek(d)) return 'thisWeek'
+  if (isThisMonth(d)) return 'thisMonth'
+  return 'older'
+}
+
+const timeGroupLabels: Record<TimeGroup, string> = {
+  today: '今天',
+  yesterday: '昨天',
+  thisWeek: '本周',
+  thisMonth: '本月',
+  older: '更早',
+}
+
+const timeGroupOrder: TimeGroup[] = ['today', 'thisWeek', 'thisMonth', 'older']
 
 interface ProjectHomeProps {
   projects: Project[]
@@ -101,6 +350,8 @@ interface ProjectHomeProps {
   onRenameProject: (projectId: string, name: string) => void | Promise<void>
   onArchiveProject: (projectId: string, archived: boolean) => void | Promise<void>
   onDeleteProject: (projectId: string) => void | Promise<void>
+  onClearLocalData: () => void | Promise<void>
+  isClearingLocalData?: boolean
 }
 
 const SKIP_ARCHIVE_CONFIRM_KEY = 'project-home:skip-archive-confirm'
@@ -115,8 +366,9 @@ export function ProjectHome({
   onRenameProject,
   onArchiveProject,
   onDeleteProject,
+  onClearLocalData,
+  isClearingLocalData = false,
 }: ProjectHomeProps) {
-  const [draftName, setDraftName] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'archived'>('all')
   const [isCreating, setIsCreating] = useState(false)
@@ -135,32 +387,77 @@ export function ProjectHome({
     projectId: string
     type: 'rename' | 'archive' | 'unarchive' | 'delete'
   } | null>(null)
+  const [showClearDataDialog, setShowClearDataDialog] = useState(false)
+  const [clearDataConfirmText, setClearDataConfirmText] = useState('')
 
-  const visibleProjects = useMemo(() => {
+  const createInputRef = useRef<HTMLInputElement>(null)
+
+  // 清空本地数据确认
+  const handleClearDataConfirm = async () => {
+    if (clearDataConfirmText !== '重新开始') return
+    setIsActionSubmitting(true)
+    try {
+      await onClearLocalData()
+      setShowClearDataDialog(false)
+      setClearDataConfirmText('')
+    } finally {
+      setIsActionSubmitting(false)
+    }
+  }
+
+  const openCreateDialog = () => {
+    if (isLoading || isCreating) return
+    setShowCreateDialog(true)
+    window.setTimeout(() => createInputRef.current?.focus(), 80)
+  }
+
+  // 按时间分组的项目
+  const groupedProjects = useMemo(() => {
     let filtered = [...projects]
 
-    // Apply status filter
+    // 应用状态过滤
     if (statusFilter === 'active') {
       filtered = filtered.filter((p) => p.status !== 'archived')
     } else if (statusFilter === 'archived') {
       filtered = filtered.filter((p) => p.status === 'archived')
     }
 
-    // Sort by update time
+    // 按更新时间排序
     const sorted = filtered.sort((a, b) => b.updatedAt - a.updatedAt)
 
-    // Apply search filter
+    // 应用搜索
     const keyword = search.trim().toLowerCase()
-    return keyword ? sorted.filter((project) => project.name.toLowerCase().includes(keyword)) : sorted
+    const searched = keyword ? sorted.filter((p) => p.name.toLowerCase().includes(keyword)) : sorted
+
+    // 分组
+    const groups: Record<TimeGroup, Project[]> = {
+      today: [],
+      yesterday: [],
+      thisWeek: [],
+      thisMonth: [],
+      older: [],
+    }
+
+    searched.forEach((project) => {
+      const group = getTimeGroup(project.updatedAt)
+      groups[group].push(project)
+    })
+
+    return groups
   }, [projects, search, statusFilter])
 
-  const currentProject = useMemo(() => {
-    return (
-      visibleProjects.find((project) => project.id === activeProjectId) ||
-      visibleProjects[0] ||
-      null
-    )
-  }, [visibleProjects, activeProjectId])
+  // 最近的项目
+  const recentProject = useMemo(() => {
+    const active = projects.filter((p) => p.status !== 'archived')
+    return active.sort((a, b) => b.updatedAt - a.updatedAt)[0] || null
+  }, [projects])
+
+  // 项目统计
+  const totalProjects = projects.filter((p) => p.status !== 'archived').length
+  const totalWorkspaces = Object.values(projectStats).reduce(
+    (sum, stats) => sum + (stats?.workspaceCount || 0),
+    0
+  )
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -168,17 +465,27 @@ export function ProjectHome({
     setSkipArchiveConfirm(saved === '1')
   }, [])
 
-  const handleCreate = async () => {
-    const name = draftName.trim()
-    if (!name) return
-    setIsCreating(true)
-    try {
-      await onCreateProject(name)
-      setDraftName('')
-    } finally {
-      setIsCreating(false)
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'n') return
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (showCreateDialog) return
+
+      const target = event.target
+      if (target instanceof HTMLElement) {
+        const tag = target.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+          return
+        }
+      }
+
+      event.preventDefault()
+      openCreateDialog()
     }
-  }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [showCreateDialog, isLoading, isCreating])
 
   // 从创建对话框提交
   const handleCreateFromDialog = async () => {
@@ -270,299 +577,315 @@ export function ProjectHome({
     }
   }
 
-  return (
-    <div className="relative min-h-screen bg-muted dark:bg-background">
-      <style>{animationStyles}</style>
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-6 py-10">
-        <header className="mb-8 rounded-2xl border border bg-card p-8 relative overflow-hidden animate-fade-in-up dark:border-border dark:bg-card">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-50/50 to-transparent dark:from-primary-900/10 pointer-events-none" />
-          <div className="relative flex items-start justify-between">
-            <div>
-              <div className="mb-3 flex items-center gap-3">
-                <BrandBadge color="primary" shape="pill">
-                  <ShieldCheck className="mr-1.5 h-3 w-3" />
-                  数据仅本地处理
-                </BrandBadge>
-                <div className="text-xs uppercase tracking-[0.18em] text-tertiary dark:text-muted">
-                  Local Workspace
-                </div>
-              </div>
-              <h1 className="text-4xl font-bold tracking-tight text-primary sm:text-5xl dark:text-primary-foreground">
-                你好，让我们开始吧
-              </h1>
-              <p className="mt-2 max-w-3xl text-sm text-secondary sm:text-base dark:text-secondary-foreground">
-                创建或选择一个项目，开启你的本地 AI 工作空间。
-              </p>
+  // 渲染项目时间线项
+  const renderProjectItem = (project: Project, index: number) => {
+    const isActive = project.id === activeProjectId
+    const stats = projectStats[project.id]
+    const isArchived = project.status === 'archived'
+    const isProjectActionPending = pendingProjectAction?.projectId === project.id
+
+    return (
+      <div
+        key={project.id}
+        className={`home-timeline-item py-4 home-reveal ${isActive ? 'is-active' : ''} ${isArchived ? 'is-archived' : ''}`}
+        style={{ animationDelay: `${Math.min(index * 0.05, 0.3)}s` }}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground truncate">
+                {project.name}
+              </h3>
+              {isArchived && (
+                <span className="home-mono text-[10px] uppercase tracking-wider text-tertiary dark:text-muted px-1.5 py-0.5 rounded bg-muted dark:bg-muted">
+                  已归档
+                </span>
+              )}
             </div>
-            <div className="hidden sm:flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-50/80 border border-primary-200/50 dark:border-primary-800/50 dark:bg-primary-900/30">
-              <Brain className="w-8 h-8 text-primary-600" />
+            <div className="home-body flex items-center gap-3 text-xs text-tertiary dark:text-muted">
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {formatRelativeTime(project.updatedAt)}
+              </span>
+              <span className="flex items-center gap-1">
+                <FolderOpen className="w-3 h-3" />
+                {stats?.workspaceCount || 0} 工作区
+              </span>
             </div>
           </div>
-        </header>
-
-        <section className="mb-6 rounded-xl border border bg-card p-4 animate-fade-in-up ph-duration-200 ph-delay-100 dark:border-border dark:bg-card">
-          <div className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">创建或打开 Project</div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <BrandInput
-              id="project-name-input"
-              value={draftName}
-              onChange={(e) => setDraftName(e.target.value)}
-              onCompositionStart={() => setIsComposition(true)}
-              onCompositionEnd={() => setIsComposition(false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isComposition) {
-                  void handleCreate()
-                }
-              }}
-              placeholder="输入项目名称"
-              className="flex-1 transition-shadow focus:shadow-md"
-            />
+          <div className="flex items-center gap-1 shrink-0">
             <BrandButton
-              variant="primary"
-              onClick={() => void handleCreate()}
-              disabled={isCreating || isLoading || !draftName.trim()}
-              className="transition-all duration-150 hover:opacity-90 active:opacity-80"
+              onClick={() => void onOpenProject(project.id)}
+              variant="ghost"
+              disabled={isLoading || isActionSubmitting}
+              className="home-body text-xs"
             >
-              创建项目
+              打开
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </BrandButton>
-          </div>
-        </section>
-
-        <section className="mb-6">
-          <div className="mb-3 text-sm font-medium text-tertiary animate-slide-in dark:text-muted">继续上次工作</div>
-          <div className="rounded-xl border border-border/50 bg-card/50 p-4 animate-fade-in-up ph-duration-200 ph-delay-200 dark:border-border/50 dark:bg-card/50">
-            {currentProject ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="text-base font-medium text-primary truncate dark:text-primary-foreground">{currentProject.name}</h2>
-                    <p className="mt-0.5 text-xs text-tertiary dark:text-muted">
-                      {formatRelativeTime(currentProject.updatedAt)} · {projectStats[currentProject.id]?.workspaceCount || 0} 个工作区
-                    </p>
-                  </div>
-                  <BrandButton
-                    onClick={() => void onOpenProject(currentProject.id)}
-                    variant="primary"
-                    className="ml-3 shrink-0"
-                  >
-                    继续
-                  </BrandButton>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-between py-1">
-                <p className="text-sm text-tertiary dark:text-muted">暂无最近项目</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <BrandButton
                   variant="ghost"
-                  onClick={() => setShowCreateDialog(true)}
+                  iconButton
+                  disabled={isProjectActionPending || isActionSubmitting}
                 >
-                  <Plus className="mr-1 h-3.5 w-3.5" />
-                  创建
+                  <MoreHorizontal className="h-4 w-4" />
+                </BrandButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-36">
+                <DropdownMenuItem
+                  onSelect={() => handleRenameOpen(project)}
+                  disabled={isProjectActionPending || isActionSubmitting}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {isProjectActionPending && pendingProjectAction?.type === 'rename'
+                    ? '处理中...'
+                    : '重命名'}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => void handleArchiveClick(project, isArchived)}
+                  disabled={isProjectActionPending || isActionSubmitting}
+                >
+                  {isArchived ? (
+                    <>
+                      <ArchiveRestore className="mr-2 h-4 w-4" />
+                      取消归档
+                    </>
+                  ) : (
+                    <>
+                      <Archive className="mr-2 h-4 w-4" />
+                      归档
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setDeletingProject(project)
+                    setDeleteConfirmText('')
+                  }}
+                  disabled={isProjectActionPending || isActionSubmitting}
+                  className="text-danger focus:text-danger"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  删除
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative min-h-screen bg-background home-grain">
+      <style>{designStyles}</style>
+
+      {/* Hero 区域 */}
+      <header className="relative overflow-hidden">
+        <div className="home-hero-bg" />
+        <div className="relative z-10 max-w-5xl mx-auto px-6 pt-16 pb-12 sm:pt-24 sm:pb-16">
+          <div className="home-reveal">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary-50 border border-primary/10 dark:border-primary/20">
+                <Shield className="w-3.5 h-3.5 text-primary-600 dark:text-primary-600" />
+                <span className="home-body text-xs text-primary-600 dark:text-primary-600 font-medium">
+                  本地优先
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <h1 className="home-title-serif home-reveal home-delay-1">
+            <span className="block text-4xl sm:text-5xl lg:text-6xl text-primary dark:text-primary-foreground leading-tight">
+              创作从这里开始
+            </span>
+          </h1>
+
+          <p className="home-body home-reveal home-delay-2 mt-4 text-lg sm:text-xl text-secondary dark:text-secondary-foreground max-w-xl leading-relaxed">
+            在本地 AI 工作空间中，用自然语言与你的文件对话。
+            <span className="text-tertiary dark:text-muted">数据始终在你的设备上。</span>
+          </p>
+
+          {/* 快捷统计 */}
+          <div className="home-reveal home-delay-3 mt-8 flex items-center gap-6">
+            <div className="home-mono text-sm">
+              <span className="text-primary dark:text-primary-foreground font-medium">{totalProjects}</span>
+              <span className="text-tertiary dark:text-muted ml-1">项目</span>
+            </div>
+            <div className="w-px h-4 bg-border" />
+            <div className="home-mono text-sm">
+              <span className="text-primary dark:text-primary-foreground font-medium">{totalWorkspaces}</span>
+              <span className="text-tertiary dark:text-muted ml-1">工作区</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 主内容区 */}
+      <main className="relative z-10 max-w-5xl mx-auto px-6 pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+          {/* 左侧：快捷操作 */}
+          <aside className="lg:col-span-4 space-y-4">
+            {/* 继续工作 */}
+            {recentProject && (
+              <div className="home-reveal home-delay-3 home-action-card rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-600" />
+                  <span className="home-mono text-xs uppercase tracking-wider text-tertiary dark:text-muted">
+                    继续工作
+                  </span>
+                </div>
+                <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground mb-1 truncate">
+                  {recentProject.name}
+                </h3>
+                <p className="home-body text-xs text-tertiary dark:text-muted mb-4">
+                  {formatRelativeTime(recentProject.updatedAt)} 更新
+                </p>
+                <BrandButton
+                  onClick={() => void onOpenProject(recentProject.id)}
+                  variant="primary"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  继续编辑
+                  <ArrowRight className="w-4 h-4 ml-1" />
                 </BrandButton>
               </div>
             )}
-          </div>
-        </section>
 
-        <section>
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <div className="text-sm font-medium text-secondary animate-slide-in dark:text-secondary-foreground">最近项目</div>
-              <div className="flex rounded-lg bg-muted p-0.5 relative dark:bg-muted">
-                {/* 滑块背景 */}
-                <div
-                  className="absolute top-0.5 h-[calc(100%-4px)] rounded-md bg-card shadow-sm transition-all duration-300 ease-out dark:bg-card"
-                  style={{
-                    width: 'calc(33.333% - 2px)',
-                    left: statusFilter === 'all' ? '2px' : statusFilter === 'active' ? 'calc(33.333% + 1px)' : 'calc(66.666% + 1px)',
-                  }}
-                />
-                <button
-                  onClick={() => setStatusFilter('all')}
-                  className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
-                    statusFilter === 'all'
-                      ? 'text-primary dark:text-primary-foreground'
-                      : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
-                  }`}
-                >
-                  全部
-                </button>
-                <button
-                  onClick={() => setStatusFilter('active')}
-                  className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
-                    statusFilter === 'active'
-                      ? 'text-primary dark:text-primary-foreground'
-                      : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
-                  }`}
-                >
-                  活跃
-                </button>
-                <button
-                  onClick={() => setStatusFilter('archived')}
-                  className={`relative z-10 rounded-md px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
-                    statusFilter === 'archived'
-                      ? 'text-primary dark:text-primary-foreground'
-                      : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
-                  }`}
-                >
-                  已归档
-                </button>
+            {/* 创建新项目 */}
+            <div
+              className="home-reveal home-delay-4 home-action-card rounded-xl border border-border bg-card p-5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              role="button"
+              tabIndex={0}
+              aria-label="创建新项目"
+              onClick={openCreateDialog}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  openCreateDialog()
+                }
+              }}
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Plus className="w-4 h-4 text-primary-600 dark:text-primary-600" />
+                <span className="home-mono text-xs uppercase tracking-wider text-tertiary dark:text-muted">
+                  新建
+                </span>
               </div>
-            </div>
-            <BrandInput
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索项目"
-              className="w-full sm:max-w-xs transition-shadow focus:shadow-md"
-            />
-          </div>
-
-          {visibleProjects.length === 0 && (
-            <div className="rounded-xl border border-dashed border bg-card p-10 text-center animate-fade-in-up ph-duration-300 dark:border-border dark:bg-card">
-              <div className="mb-3 flex justify-center">
-                <SearchX className="h-8 w-8 text-muted" />
-              </div>
-              <p className="text-sm text-secondary dark:text-muted">
-                {search ? '没有找到匹配的项目试试其他关键词？' : '暂无项目'}
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+                创建一个新项目，开始你的创作之旅。
               </p>
-              {!search && projects.length === 0 && (
-                <BrandButton
-                  variant="primary"
-                  className="mt-4"
-                  onClick={() => setShowCreateDialog(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  创建第一个项目
-                </BrandButton>
-              )}
+              <p className="home-mono text-[11px] text-tertiary dark:text-muted mb-3">快捷键: N</p>
+              <BrandButton
+                variant="outline"
+                className="w-full"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openCreateDialog()
+                }}
+                disabled={isLoading || isCreating}
+              >
+                创建项目
+              </BrandButton>
             </div>
-          )}
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {visibleProjects.map((project, index) => {
-              const isActive = project.id === activeProjectId
-              const stats = projectStats[project.id]
-              const canDelete = true
-              const isArchived = project.status === 'archived'
-              const isProjectActionPending = pendingProjectAction?.projectId === project.id
-              return (
-                <div
-                  key={project.id}
-                  className="group rounded-xl border border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm animate-fade-in-up dark:border-border dark:bg-card"
-                  style={{
-                    animationDelay: `${(index % 4) * 100}ms`,
-                    animationFillMode: 'both',
-                  }}
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-base font-medium text-primary dark:text-primary-foreground">{project.name}</span>
-                    <div className="flex items-center gap-2">
-                      {isArchived && (
-                        <BrandBadge variant="neutral" shape="pill">
-                          已归档
-                        </BrandBadge>
-                      )}
-                      {isActive && (
-                        <BrandBadge type="tag" color="primary">
-                          当前
-                        </BrandBadge>
-                      )}
+            {/* 重新开始 */}
+            <div className="home-reveal home-delay-5 rounded-xl border border-border/60 bg-card/50 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <RotateCcw className="w-4 h-4 text-tertiary" />
+                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                  重新开始
+                </span>
+              </div>
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+                遇到问题？可以从头开始。这会删除所有项目和对话记录。
+              </p>
+              <BrandButton
+                variant="ghost"
+                className="w-full text-tertiary hover:text-danger hover:border-danger/50"
+                onClick={() => setShowClearDataDialog(true)}
+                disabled={isClearingLocalData || isLoading}
+              >
+                {isClearingLocalData ? '重置中...' : '重置应用'}
+              </BrandButton>
+            </div>
+          </aside>
+
+          {/* 右侧：项目列表 */}
+          <section className="lg:col-span-8">
+            {/* 搜索和过滤 */}
+            <div className="home-reveal home-delay-4 flex flex-col sm:flex-row gap-3 mb-6">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="搜索项目..."
+                className="home-search-input home-body flex-1 h-10 px-4 rounded-lg text-sm"
+              />
+              <div className="flex rounded-lg border border-border p-1 bg-muted/30 dark:bg-muted/30">
+                {(['all', 'active', 'archived'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setStatusFilter(filter)}
+                    className={`home-body px-3 py-1.5 text-xs rounded-md transition-all ${
+                      statusFilter === filter
+                        ? 'bg-card dark:bg-card text-primary dark:text-primary-foreground shadow-sm'
+                        : 'text-tertiary dark:text-muted hover:text-secondary dark:hover:text-secondary-foreground'
+                    }`}
+                  >
+                    {filter === 'all' ? '全部' : filter === 'active' ? '活跃' : '已归档'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 项目时间线 */}
+            <div className="home-timeline">
+              {timeGroupOrder.map((group) => {
+                const groupProjects = groupedProjects[group]
+                if (groupProjects.length === 0) return null
+
+                return (
+                  <div key={group} className="mb-8 last:mb-0">
+                    <h2 className="home-reveal home-delay-5 home-mono text-[11px] uppercase tracking-widest text-tertiary dark:text-muted mb-4 pl-9">
+                      {timeGroupLabels[group]}
+                    </h2>
+                    <div className="divide-y divide-border/50">
+                      {groupProjects.map((project, index) => renderProjectItem(project, index))}
                     </div>
                   </div>
-                  <p className="text-xs text-tertiary dark:text-muted">
-                    {formatRelativeTime(project.updatedAt)}
-                  </p>
-                  <div className="mt-2 flex items-center gap-3 text-xs text-tertiary dark:text-muted">
-                    <span>工作区 {stats?.workspaceCount || 0}</span>
-                    <span>
-                      最近活跃{' '}
-                      {stats?.lastWorkspaceAccessAt
-                        ? formatRelativeTime(stats.lastWorkspaceAccessAt)
-                        : '暂无'}
-                    </span>
-                  </div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <BrandButton
-                      onClick={() => void onOpenProject(project.id)}
-                      variant="primary"
-                      disabled={isLoading || isActionSubmitting}
-                      className="transition-all duration-150 hover:opacity-90 active:opacity-80"
-                    >
-                      进入项目
-                    </BrandButton>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <BrandButton
-                          variant="ghost"
-                          iconButton
-                          disabled={isProjectActionPending || isActionSubmitting}
-                          className="transition-colors hover:bg-muted dark:hover:bg-muted"
-                        >
-                          <MoreVertical className="h-4 w-4" />
-                        </BrandButton>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
-                          onSelect={() => handleRenameOpen(project)}
-                          disabled={isProjectActionPending || isActionSubmitting}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          {isProjectActionPending && pendingProjectAction?.type === 'rename'
-                            ? '处理中...'
-                            : '重命名'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onSelect={() => void handleArchiveClick(project, isArchived)}
-                          disabled={isProjectActionPending || isActionSubmitting}
-                        >
-                          {isArchived ? (
-                            <>
-                              <ArchiveRestore className="mr-2 h-4 w-4" />
-                              {isProjectActionPending &&
-                              (pendingProjectAction?.type === 'archive' ||
-                                pendingProjectAction?.type === 'unarchive')
-                                ? '处理中...'
-                                : '取消归档'}
-                            </>
-                          ) : (
-                            <>
-                              <Archive className="mr-2 h-4 w-4" />
-                              {isProjectActionPending &&
-                              (pendingProjectAction?.type === 'archive' ||
-                                pendingProjectAction?.type === 'unarchive')
-                                ? '处理中...'
-                                : '归档'}
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        {canDelete && (
-                          <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onSelect={() => {
-                                setDeletingProject(project)
-                                setDeleteConfirmText('')
-                              }}
-                              disabled={isProjectActionPending || isActionSubmitting}
-                              className="text-danger focus:text-danger"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              {isProjectActionPending && pendingProjectAction?.type === 'delete'
-                                ? '处理中...'
-                                : '删除'}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                )
+              })}
+
+              {/* 空状态 */}
+              {timeGroupOrder.every((g) => groupedProjects[g].length === 0) && (
+                <div className="home-reveal home-delay-5 home-empty-state rounded-xl border border-dashed border-border py-16 text-center">
+                  <div className="relative z-10">
+                    <p className="home-body text-secondary dark:text-secondary-foreground mb-4">
+                      {search ? '没有找到匹配的项目' : '还没有项目'}
+                    </p>
+                    {!search && projects.length === 0 && (
+                      <BrandButton
+                        variant="primary"
+                        onClick={openCreateDialog}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        创建第一个项目
+                      </BrandButton>
+                    )}
                   </div>
                 </div>
-              )
-            })}
-          </div>
-        </section>
-      </div>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
 
+      {/* 对话框们 */}
       <BrandDialog
         open={!!renamingProjectId}
         onOpenChange={(open) => {
@@ -614,10 +937,10 @@ export function ProjectHome({
             <BrandDialogTitle>归档项目</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
-            <p className="text-sm text-secondary">
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground">
               确认归档项目「{archivingProject?.name}」？归档后项目不会默认展示，但可随时取消归档。
             </p>
-            <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-secondary">
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-secondary dark:text-secondary-foreground">
               <BrandCheckbox
                 checked={archiveDontAskAgain}
                 onCheckedChange={(checked) => setArchiveDontAskAgain(Boolean(checked))}
@@ -656,15 +979,16 @@ export function ProjectHome({
             <BrandDialogTitle>删除项目</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
-            <p className="text-sm text-secondary">
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground">
               确认删除项目「{deletingProject?.name}」？该操作会删除项目关联的工作区记录，且不可撤销。
             </p>
-            <p className="mt-2 text-xs text-tertiary">请输入项目名称以确认删除：</p>
+            <p className="home-mono mt-3 text-xs text-tertiary dark:text-muted">请输入项目名称以确认删除：</p>
             <BrandInput
               value={deleteConfirmText}
               onChange={(e) => setDeleteConfirmText(e.target.value)}
               placeholder={deletingProject?.name || ''}
               disabled={isActionSubmitting}
+              className="mt-2"
             />
           </BrandDialogBody>
           <BrandDialogFooter>
@@ -706,10 +1030,11 @@ export function ProjectHome({
             <BrandDialogTitle>创建新项目</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
-            <p className="text-sm text-secondary mb-3">
-              为你的新项目起一个名字，用于组织和区分不同的工作空间。
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+              为你的新项目起一个名字，用于组织和区分不同的工作区。
             </p>
             <BrandInput
+              ref={createInputRef}
               value={createDialogName}
               onChange={(e) => setCreateDialogName(e.target.value)}
               placeholder="输入项目名称"
@@ -721,7 +1046,6 @@ export function ProjectHome({
                 }
               }}
               disabled={isCreating}
-              autoFocus
             />
           </BrandDialogBody>
           <BrandDialogFooter>
@@ -740,6 +1064,66 @@ export function ProjectHome({
               disabled={isCreating || !createDialogName.trim()}
             >
               {isCreating ? '创建中...' : '创建项目'}
+            </BrandButton>
+          </BrandDialogFooter>
+        </BrandDialogContent>
+      </BrandDialog>
+
+      {/* 重新开始确认对话框 */}
+      <BrandDialog
+        modal
+        open={showClearDataDialog}
+        onOpenChange={(open) => {
+          if (!open && !isClearingLocalData) {
+            setShowClearDataDialog(false)
+            setClearDataConfirmText('')
+          }
+        }}
+      >
+        <BrandDialogContent className="max-w-md">
+          <BrandDialogHeader>
+            <BrandDialogTitle>重新开始</BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+              这会删除你在这个应用中创建的所有内容：
+            </p>
+            <ul className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4 space-y-2 pl-4">
+              <li>• 所有项目和工作区</li>
+              <li>• 所有对话记录</li>
+              <li>• 所有上传的文件</li>
+            </ul>
+            <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+              就像第一次打开这个应用一样。
+            </p>
+            <p className="home-mono text-xs text-tertiary dark:text-muted mb-2">
+              输入 <span className="font-bold">重新开始</span> 确认：
+            </p>
+            <BrandInput
+              value={clearDataConfirmText}
+              onChange={(e) => setClearDataConfirmText(e.target.value)}
+              placeholder="重新开始"
+              disabled={isClearingLocalData}
+              className="mt-1"
+            />
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton
+              variant="ghost"
+              onClick={() => {
+                setShowClearDataDialog(false)
+                setClearDataConfirmText('')
+              }}
+              disabled={isClearingLocalData}
+            >
+              取消
+            </BrandButton>
+            <BrandButton
+              variant="danger"
+              onClick={() => void handleClearDataConfirm()}
+              disabled={isClearingLocalData || clearDataConfirmText !== '重新开始'}
+            >
+              {isClearingLocalData ? '重置中...' : '确认重置'}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>

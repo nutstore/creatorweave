@@ -67,6 +67,9 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
             <p className="text-sm text-amber-800">
               浏览器标签页休眠后，数据库文件句柄失效。这是浏览器的正常行为。
             </p>
+            <p className="mt-2 text-sm text-amber-800">
+              如果刚执行过“清空数据”，请先关闭同源的其他标签页/窗口，再刷新当前页面。
+            </p>
           </div>
 
           <p className="mb-4 text-sm text-neutral-700 dark:text-neutral-300">

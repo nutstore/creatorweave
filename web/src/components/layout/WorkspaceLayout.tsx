@@ -21,7 +21,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { useWorkspaceStore } from '@/store/workspace.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useRemoteStore, registerRemoteCallbacks } from '@/store/remote.store'
 import { useMobile } from '@/components/mobile/useMobile'
@@ -59,10 +59,17 @@ import { useWebContainerStore } from '@/store/webcontainer.store'
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
   projectName?: string
+  conversationName?: string
+  /** @deprecated use conversationName */
   workspaceName?: string
 }
 
-export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({
+  onBackToProjects,
+  projectName,
+  conversationName,
+  workspaceName,
+}: WorkspaceLayoutProps) {
   const {
     activeConversationId,
     conversations,
@@ -75,10 +82,10 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   const { directoryHandle } = useAgentStore()
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
   const { role } = useRemoteStore()
-  const showPreview = useWorkspaceStore((state) => state.showPreview)
-  const projectWorkspaceIds = useWorkspaceStore((state) => state.workspaces.map((w) => w.id))
+  const showPreview = useConversationContextStore((state) => state.showPreview)
+  const projectWorkspaceIds = useConversationContextStore((state) => state.workspaces.map((w) => w.id))
   const workspaceCount = projectWorkspaceIds.length
-  const hidePreviewPanel = useWorkspaceStore((state) => state.hidePreviewPanel)
+  const hidePreviewPanel = useConversationContextStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
@@ -122,6 +129,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
   // Mobile sidebar state
   const isMobile = useMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const activeConversationName = conversationName ?? workspaceName
 
   const handleStartConversation = useCallback(
     (text: string) => {
@@ -500,7 +508,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
         onWebContainerOpen={openWebContainerPanel}
         onBackToProjects={onBackToProjects}
         activeProjectName={projectName}
-        activeWorkspaceName={workspaceName}
+        activeConversationName={activeConversationName}
         onMenuOpen={() => setIsSidebarOpen(true)}
         isMobile={isMobile}
       />
@@ -529,7 +537,7 @@ export function WorkspaceLayout({ onBackToProjects, projectName, workspaceName }
                 {workspaceCount === 0 && (
                   <div className="absolute left-4 top-4 z-10 max-w-md rounded-lg border border-primary-200/70 bg-primary-50/85 p-3 text-sm text-primary-800 shadow-sm backdrop-blur-sm dark:border-primary-900/40 dark:bg-primary-950/25 dark:text-primary-200">
                     <p className="mb-2 text-primary-800 dark:text-primary-200">
-                      当前项目还没有工作区，创建首个会话后会自动生成工作区。
+                      当前项目还没有工作区，创建首个会话后会自动生成对应工作区。
                     </p>
                     <BrandButton variant="outline" onClick={handleCreateFirstWorkspace}>
                       创建第一个工作区

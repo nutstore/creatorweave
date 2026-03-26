@@ -9,7 +9,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
-import { useWorkspaceStore, getActiveWorkspace } from '@/store/workspace.store'
+import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
@@ -31,9 +31,9 @@ import { sendChangeReviewToConversation } from './review-request'
 import { toast } from 'sonner'
 
 export function PendingSyncPanel() {
-  const pendingChanges = useWorkspaceStore((state) => state.pendingChanges)
-  const clearChanges = useWorkspaceStore((state) => state.clearChanges)
-  const discardPendingPath = useWorkspaceStore((state) => state.discardPendingPath)
+  const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
+  const clearChanges = useConversationContextStore((state) => state.clearChanges)
+  const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSyncing, setIsSyncing] = useState(false)
@@ -70,7 +70,7 @@ export function PendingSyncPanel() {
   // Refresh pending changes when component mounts
   useReactEffect(() => {
     const refreshOnMount = async () => {
-      const { refreshPendingChanges } = useWorkspaceStore.getState()
+      const { refreshPendingChanges } = useConversationContextStore.getState()
       await refreshPendingChanges()
     }
     refreshOnMount()
@@ -78,18 +78,18 @@ export function PendingSyncPanel() {
 
   // Handle manual refresh
   const handleRefresh = useCallback(async () => {
-    const { refreshPendingChanges } = useWorkspaceStore.getState()
+    const { refreshPendingChanges } = useConversationContextStore.getState()
     await refreshPendingChanges()
   }, [])
 
   // Handle open preview panel
   const handleOpenPreview = useCallback(() => {
-    const { showPreviewPanel } = useWorkspaceStore.getState()
+    const { showPreviewPanel } = useConversationContextStore.getState()
     showPreviewPanel()
   }, [])
 
   const handleOpenPreviewForPath = useCallback((path: string) => {
-    const { showPreviewPanelForPath } = useWorkspaceStore.getState()
+    const { showPreviewPanelForPath } = useConversationContextStore.getState()
     showPreviewPanelForPath(path)
   }, [])
 
@@ -148,10 +148,10 @@ export function PendingSyncPanel() {
 
   const generateSummaryWithLLM = useCallback(async (paths: string[]): Promise<string | null> => {
     try {
-      const activeWorkspace = await getActiveWorkspace()
-      if (!activeWorkspace) return null
-      const { workspace, workspaceId } = activeWorkspace
-      const nativeDir = await workspace.getNativeDirectoryHandle()
+      const activeConversation = await getActiveConversation()
+      if (!activeConversation) return null
+      const { conversation, conversationId } = activeConversation
+      const nativeDir = await conversation.getNativeDirectoryHandle()
 
       const settingsState = useSettingsStore.getState()
       const providerType = settingsState.providerType
@@ -198,7 +198,7 @@ export function PendingSyncPanel() {
           beforeText = text ?? ''
         }
         if (change.type !== 'delete') {
-          const text = await readFileFromOPFS(workspaceId, change.path)
+          const text = await readFileFromOPFS(conversationId, change.path)
           afterText = text ?? ''
         }
         diffInputs.push({
@@ -240,21 +240,21 @@ export function PendingSyncPanel() {
     setIsSyncing(true)
 
     try {
-      const activeWorkspace = await getActiveWorkspace()
+      const activeConversation = await getActiveConversation()
 
-      if (!activeWorkspace) {
+      if (!activeConversation) {
         console.error('[PendingSyncPanel] No active workspace')
         return false
       }
 
-      const { workspace } = activeWorkspace
-      const nativeDir = await workspace.getNativeDirectoryHandle()
+      const { conversation } = activeConversation
+      const nativeDir = await conversation.getNativeDirectoryHandle()
 
       const filesToSync = pendingChanges.changes.filter((c) => pathsToSync.includes(c.path))
       if (filesToSync.length === 0) return false
 
       // 创建审批快照（无论是否有本地目录都可以）
-      const snapshotResult = await workspace.createApprovedSnapshotForPaths(
+      const snapshotResult = await conversation.createApprovedSnapshotForPaths(
         filesToSync.map((c) => c.path),
         summary.trim(),
         nativeDir
@@ -263,14 +263,14 @@ export function PendingSyncPanel() {
       // 只有在有本地目录时才同步到磁盘
       if (nativeDir) {
         // 执行同步（统一走 pending/cache 同步链路）
-        const result = await workspace.syncToDisk(
+        const result = await conversation.syncToDisk(
           nativeDir,
           filesToSync.map((c) => c.path)
         )
 
         // 同步成功后标记快照为已同步
         if (snapshotResult?.snapshotId) {
-          await workspace.markSnapshotAsSynced(snapshotResult.snapshotId)
+          await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
         }
 
         if (result.failed > 0) {
@@ -286,7 +286,7 @@ export function PendingSyncPanel() {
       }
 
       // 同步后刷新列表（支持部分同步）
-      await useWorkspaceStore.getState().refreshPendingChanges(true)
+      await useConversationContextStore.getState().refreshPendingChanges(true)
       setSelectedItems(new Set())
       setSelectAll(false)
 

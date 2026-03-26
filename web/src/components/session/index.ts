@@ -1,11 +1,13 @@
 /**
- * Session components exports
+ * Legacy session/workspace component exports.
+ *
+ * New call sites should import from `@/components/conversation`.
  */
 
-export { SessionBadge } from './SessionBadge'
+export { ConversationBadge, SessionBadge } from './SessionBadge'
 export { ConversationStorageBadge } from './SessionBadgeWithStorage'
-export { SessionSwitcher } from './SessionSwitcher'
+export { ConversationSwitcher, SessionSwitcher } from './SessionSwitcher'
 
-export type { SessionBadgeProps } from './SessionBadge'
+export type { ConversationBadgeProps, SessionBadgeProps } from './SessionBadge'
 export type { ConversationStorageBadgeProps } from './SessionBadgeWithStorage'
-export type { SessionSwitcherProps } from './SessionSwitcher'
+export type { ConversationSwitcherProps, SessionSwitcherProps } from './SessionSwitcher'
