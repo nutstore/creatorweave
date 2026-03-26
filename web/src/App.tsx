@@ -19,6 +19,7 @@ import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
+import { shouldApplyRouteWorkspaceToConversation } from '@/app/route-sync'
 
 type AppRoute =
   | { kind: 'projectsHome' }
@@ -655,7 +656,13 @@ function App() {
       }
 
       if (scopedWorkspaceIds.includes(workspaceId)) {
-        if (useConversationStore.getState().activeConversationId !== workspaceId) {
+        const convState = useConversationStore.getState()
+        const shouldApplyRouteWorkspace = shouldApplyRouteWorkspaceToConversation({
+          routeWorkspaceId: workspaceId,
+          activeConversationId: convState.activeConversationId,
+          switchingWorkspaceId,
+        })
+        if (shouldApplyRouteWorkspace) {
           await useConversationStore.getState().setActive(workspaceId)
         }
         return
