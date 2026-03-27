@@ -55,8 +55,12 @@ function normalizeRelativePath(path: string, options?: { allowEmpty?: boolean })
   return parts.join('/')
 }
 
-function parseVfsPath(rawPath: string, options?: { allowEmptyPath?: boolean }): ParsedPath {
+function parseVfsPath(
+  rawPath: string,
+  options?: { allowEmptyPath?: boolean; allowAgentsNamespaceRoot?: boolean }
+): ParsedPath {
   const allowEmptyPath = options?.allowEmptyPath ?? false
+  const allowAgentsNamespaceRoot = options?.allowAgentsNamespaceRoot ?? false
   if (!rawPath.startsWith('vfs://')) {
     return {
       namespace: 'workspace',
@@ -77,7 +81,17 @@ function parseVfsPath(rawPath: string, options?: { allowEmptyPath?: boolean }): 
 
   if (namespace === 'agents' || namespace === 'agent') {
     const agentId = parts[1] || ''
-    if (!agentId || !isValidAgentId(agentId)) {
+    if (!agentId) {
+      if (allowAgentsNamespaceRoot) {
+        return {
+          namespace: 'agents',
+          agentId: '',
+          path: '',
+        }
+      }
+      throw new Error('Invalid agent id in vfs path')
+    }
+    if (!isValidAgentId(agentId)) {
       throw new Error('Invalid agent id in vfs path')
     }
     return {
@@ -139,7 +153,10 @@ export async function resolveVfsTarget(
   action: VfsAction,
   options?: { allowEmptyPath?: boolean }
 ): Promise<ResolvedVfsTarget> {
-  const parsed = parseVfsPath(rawPath, options)
+  const parsed = parseVfsPath(rawPath, {
+    ...options,
+    allowAgentsNamespaceRoot: action === 'list' && (options?.allowEmptyPath ?? false),
+  })
   if (parsed.namespace === 'workspace') {
     return {
       kind: 'workspace',

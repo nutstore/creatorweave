@@ -98,6 +98,21 @@ describe('vfs-resolver', () => {
     }
   })
 
+  it('supports agents namespace root list path vfs://agents', async () => {
+    const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
+    getProjectMock.mockResolvedValue({ agentManager })
+
+    const result = await resolveVfsTarget('vfs://agents', makeContext(), 'list', {
+      allowEmptyPath: true,
+    })
+
+    expect(result.kind).toBe('agent')
+    if (result.kind === 'agent') {
+      expect(result.path).toBe('')
+      expect(result.agentId).toBe('')
+    }
+  })
+
   it('keeps compatibility with legacy vfs://agent alias', async () => {
     const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
     getProjectMock.mockResolvedValue({ agentManager })

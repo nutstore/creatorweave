@@ -155,13 +155,14 @@ export function Drawer({
           'bg-background border-l shadow-xl',
           'transform transition-transform duration-300 ease-out',
           'animate-in slide-in-from-right',
-          // Responsive width constraints
-          'w-full max-w-[90vw] sm:max-w-[480px] lg:max-w-[600px]',
+          // Width is controlled by the width prop below.
+          // Keep max width to viewport so custom widths never overflow screen.
+          'w-full max-w-full',
           // Respect reduced motion preference
           'motion-reduce:transition-none motion-reduce:animate-in',
           className
         )}
-        style={{ width: width }}
+        style={{ width: width, maxWidth: '100vw' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}

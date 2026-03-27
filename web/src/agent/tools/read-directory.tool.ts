@@ -155,6 +155,15 @@ type DiscoveryScope =
         options?: { allowMissing?: boolean }
       ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
     }
+  | {
+      kind: 'agents-root'
+      listAgents: () => Promise<Array<{ id: string; name: string }>>
+      resolveAgentHandle: (
+        agentId: string,
+        path: string,
+        options?: { allowMissing?: boolean }
+      ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
+    }
 
 async function resolveDiscoveryScope(
   rawPath: unknown,
@@ -172,6 +181,18 @@ async function resolveDiscoveryScope(
         kind: 'workspace',
         subPath: resolved.path,
         resolveHandle: (path, options) => resolveDirectoryHandle(rootHandle, path, options),
+      }
+    }
+
+    if (!resolved.agentId) {
+      return {
+        kind: 'agents-root',
+        listAgents: async () => {
+          const agents = await resolved.agentManager.listAgents()
+          return agents.map((agent) => ({ id: agent.id, name: agent.name }))
+        },
+        resolveAgentHandle: (agentId, path, options) =>
+          resolved.agentManager.getDirectoryHandle(agentId, path, options),
       }
     }
 
@@ -232,6 +253,14 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
   const extraExcludes = parseStringList(args.exclude_dirs ?? args.excludeDirs)
 
   try {
+    if (scope.kind === 'agents-root') {
+      const agents = await scope.listAgents()
+      if (agents.length === 0) {
+        return 'No agents found'
+      }
+      return agents.map((agent) => `${agent.id}/`).join('\n')
+    }
+
     const { handle: searchHandle } = await scope.resolveHandle(scope.subPath)
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs
@@ -372,6 +401,115 @@ async function executeGlobMode(
   const extraExcludes = parseStringList(args.exclude_dirs ?? args.excludeDirs)
 
   try {
+    if (scope.kind === 'agents-root') {
+      const agents = await scope.listAgents()
+      if (agents.length === 0) {
+        return `No files matching pattern "${pattern}" in vfs://agents`
+      }
+
+      const staticPrefix = getStaticGlobPrefix(pattern)
+      const startedAt = Date.now()
+      const deadlineAt = startedAt + deadlineMs
+      const matches: string[] = []
+      let isTruncated = false
+      let timedOut = false
+
+      for (const agent of agents) {
+        if (abortSignal?.aborted) {
+          return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+        }
+        if (Date.now() > deadlineAt) {
+          timedOut = true
+          break
+        }
+
+        const { handle: searchHandle, exists } = await scope.resolveAgentHandle(
+          agent.id,
+          staticPrefix,
+          { allowMissing: !!staticPrefix }
+        )
+        if (!exists) {
+          continue
+        }
+
+        const stack: Array<{ handle: FileSystemDirectoryHandle; fullPath: string; localPath: string; depth: number }> =
+          [{ handle: searchHandle, fullPath: staticPrefix, localPath: '', depth: 0 }]
+
+        while (stack.length > 0) {
+          if (abortSignal?.aborted) {
+            return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+          }
+          const current = stack.pop()!
+          if (Date.now() > deadlineAt) {
+            timedOut = true
+            break
+          }
+
+          const handles = await readDirectoryEntriesSorted(current.handle)
+          for (const handle of handles) {
+            if (abortSignal?.aborted) {
+              return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+            }
+            if (Date.now() > deadlineAt) {
+              timedOut = true
+              break
+            }
+
+            const nextDepth = current.depth + 1
+            if (nextDepth > maxDepth) continue
+
+            const fullPath = current.fullPath ? `${current.fullPath}/${handle.name}` : handle.name
+            const localPath = current.localPath ? `${current.localPath}/${handle.name}` : handle.name
+            const namespacedPath = `${agent.id}/${fullPath}`
+
+            if (handle.kind === 'directory') {
+              if (shouldSkipDirectory(handle.name, includeIgnored, extraExcludes)) continue
+              stack.push({
+                handle: handle as FileSystemDirectoryHandle,
+                fullPath,
+                localPath,
+                depth: nextDepth,
+              })
+              continue
+            }
+
+            const matched =
+              micromatch.isMatch(namespacedPath, pattern) ||
+              micromatch.isMatch(fullPath, pattern) ||
+              micromatch.isMatch(localPath, pattern)
+            if (matched) {
+              matches.push(namespacedPath)
+              if (maxResults !== undefined && matches.length >= maxResults) {
+                isTruncated = true
+                break
+              }
+            }
+          }
+          if (isTruncated || timedOut) break
+        }
+
+        if (isTruncated || timedOut) break
+      }
+
+      if (timedOut) {
+        return JSON.stringify({
+          error: 'deadline_exceeded',
+          message: `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`,
+          matchedSoFar: matches.length,
+        })
+      }
+
+      if (matches.length === 0) {
+        return `No files matching pattern "${pattern}" in vfs://agents`
+      }
+
+      const suffixes: string[] = []
+      if (isTruncated && maxResults !== undefined) {
+        suffixes.push(`... (limited to ${maxResults} results)`)
+      }
+      return matches.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
+    }
+
     const staticPrefix = scope.subPath ? '' : getStaticGlobPrefix(pattern)
     const effectiveRoot = scope.subPath || staticPrefix
     const { handle: searchHandle, exists } = await scope.resolveHandle(effectiveRoot, {

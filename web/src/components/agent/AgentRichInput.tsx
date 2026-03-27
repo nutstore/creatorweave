@@ -396,78 +396,13 @@ export function AgentRichInput({
 
   return (
     <div className="relative">
-      <div className="focus-within:border-primary-300 focus-within:ring-primary-300 w-full rounded-xl border border-neutral-200 bg-neutral-50 text-sm text-neutral-900 shadow-sm transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-offset-2 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-within:bg-neutral-800">
-        {/* Agent selector row - embedded at top of input */}
-        <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setShowAgentSelector((v) => !v)
-                setIsCreatingAgent(false)
-              }}
-              disabled={disabled}
-              className="agent-selector-button flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
-            >
-              <span>@{activeAgentId || 'default'}</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-
-            {/* Inline create agent form */}
-            {isCreatingAgent && (
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={newAgentInput}
-                  onChange={(e) => setNewAgentInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void handleCreateAgent()
-                    } else if (e.key === 'Escape') {
-                      setIsCreatingAgent(false)
-                      setNewAgentInput('')
-                    }
-                  }}
-                  placeholder="agent-id"
-                  autoFocus
-                  className="h-6 w-24 rounded border border-neutral-300 bg-white px-1.5 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCreateAgent()}
-                  disabled={!newAgentInput.trim()}
-                  className="rounded bg-primary-600 px-1.5 py-0.5 text-xs text-white hover:bg-primary-700 disabled:opacity-40"
-                >
-                  Create
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreatingAgent(false)
-                    setNewAgentInput('')
-                  }}
-                  className="rounded p-0.5 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )}
+      <div className="focus-within:border-primary-300 focus-within:ring-primary-300 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all focus-within:bg-white focus-within:ring-2 focus-within:ring-offset-2 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-within:bg-neutral-800">
+        {editor && <EditorContent editor={editor} />}
+        {!isFocused && isEmpty && (
+          <div className="pointer-events-none absolute left-5 top-4 pr-16 text-sm text-neutral-400 dark:text-neutral-500">
+            {placeholder}
           </div>
-
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
-            {t('agent.inputHint')}
-          </span>
-        </div>
-
-        {/* Editor area - reduced top padding */}
-        <div className="relative px-5 py-3 pr-14">
-          {editor && <EditorContent editor={editor} />}
-          {!isFocused && isEmpty && (
-            <div className="pointer-events-none absolute left-5 top-3 pr-16 text-sm text-neutral-400 dark:text-neutral-500">
-              {placeholder}
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Agent selector dropdown - expands downward */}

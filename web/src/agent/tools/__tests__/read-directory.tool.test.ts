@@ -85,4 +85,67 @@ describe('read_directory tool', () => {
     expect(result).toContain('No files matching pattern')
     expect(getDirectoryHandle).toHaveBeenCalledWith('default', 'src', { allowMissing: true })
   })
+
+  it('lists agents for vfs://agents in list mode', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({
+      kind: 'agent',
+      path: '',
+      agentId: '',
+      projectId: 'project-1',
+      agentManager: {
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'default' },
+          { id: 'novel-editor', name: 'novel-editor' },
+        ]),
+      },
+    })
+
+    const result = await readDirectoryExecutor(
+      { path: 'vfs://agents' },
+      { directoryHandle: null } as unknown as ToolContext
+    )
+
+    expect(result).toContain('default/')
+    expect(result).toContain('novel-editor/')
+  })
+
+  it('supports glob scans on vfs://agents root and returns namespaced paths', async () => {
+    const agentRoot = {
+      kind: 'directory',
+      name: 'root',
+      entries: async function* () {
+        yield [
+          'SOUL.md',
+          {
+            kind: 'file',
+            name: 'SOUL.md',
+          } as unknown as FileSystemFileHandle,
+        ] as const
+      },
+    } as unknown as FileSystemDirectoryHandle
+
+    const resolveAgentHandle = vi.fn(async () => ({
+      handle: agentRoot,
+      exists: true,
+    }))
+
+    resolveVfsTargetMock.mockResolvedValueOnce({
+      kind: 'agent',
+      path: '',
+      agentId: '',
+      projectId: 'project-1',
+      agentManager: {
+        listAgents: vi.fn(async () => [{ id: 'novel-editor', name: 'novel-editor' }]),
+        getDirectoryHandle: resolveAgentHandle,
+      },
+    })
+
+    const result = await readDirectoryExecutor(
+      { path: 'vfs://agents', pattern: '**/SOUL.md' },
+      { directoryHandle: null } as unknown as ToolContext
+    )
+
+    expect(result).toContain('novel-editor/SOUL.md')
+    expect(resolveAgentHandle).toHaveBeenCalledWith('novel-editor', '', { allowMissing: false })
+  })
 })

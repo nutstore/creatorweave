@@ -615,6 +615,11 @@ export function ConversationView({
                 disabled={isProcessing || !hasApiKey}
                 resetToken={inputResetToken}
                 agents={mentionAgents}
+                activeAgentId={activeAgentId}
+                allAgents={allAgents}
+                onSetActiveAgent={setActiveAgent}
+                onCreateAgent={createAgent}
+                onDeleteAgent={deleteAgent}
                 onChange={({ text, mentionedAgentIds: mentionedIds }) => {
                   setInput(text)
                   setMentionedAgentIds(mentionedIds)
