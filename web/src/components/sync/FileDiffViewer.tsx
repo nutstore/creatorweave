@@ -6,10 +6,9 @@
  */
 
 import React, { Suspense, useEffect, useMemo, useState } from 'react'
-import { type ChangeType, type FileChange } from '@/opfs/types/opfs-types'
+import { type FileChange } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
-import { BrandButton } from '@creatorweave/ui'
-import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
 import {
   isImageFile,
   fileExistsInNativeFS,
@@ -18,6 +17,7 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFS,
 } from '@/opfs'
+import { Columns2, UnfoldVertical, Copy, X } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
 
@@ -98,6 +98,7 @@ function formatTime(timestamp?: number): string {
 }
 
 export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snapshotDiff = null }) => {
+  const [isSplitView, setIsSplitView] = useState(false)
   const [content, setContent] = useState<FileContentState>({
     opfs: null,
     native: null,
@@ -113,7 +114,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     after: null,
   })
   const [commentsByPath, setCommentsByPath] = useState<Record<string, LineComment[]>>({})
-  const [composer, setComposer] = useState<{ side: CommentSide; startLine: number; endLine: number; text: string } | null>(null)
+  const [composer, setComposer] = useState<{
+    side: CommentSide
+    startLine: number
+    endLine: number
+    text: string
+  } | null>(null)
   const activePath = fileChange?.path ?? ''
   const isSnapshotMode = Boolean(snapshotDiff)
   const hasBinarySnapshot = isSnapshotMode && (
@@ -297,6 +303,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     }
   }, [isSnapshotMode, snapshotDiff, fileChange])
 
+
   if (!fileChange) {
     return (
       <div className="flex h-full flex-col items-center justify-center px-4 py-12 text-center">
@@ -348,30 +355,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     )
   }
 
-  const getChangeTypeLabel = (type: ChangeType) => {
-    switch (type) {
-      case 'add':
-        return '新增文件'
-      case 'modify':
-        return '修改文件'
-      case 'delete':
-        return '删除文件'
-    }
-  }
-
-  const getChangeTypeColor = (type: ChangeType) => {
-    switch (type) {
-      case 'add':
-        return 'green'
-      case 'modify':
-        return 'blue'
-      case 'delete':
-        return 'red'
-    }
-  }
-
   const isImage = !isSnapshotMode && isImageFile(fileChange.path)
-  const color = getChangeTypeColor(fileChange.type)
   const originalText = content.showNativePanel ? (content.native ?? '') : ''
   const modifiedText = content.opfs ?? ''
 
@@ -548,99 +532,165 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     }
 
     return (
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
-            正在加载 Monaco 编辑器...
+      <div className="flex h-full flex-col">
+        <div className="min-h-0 flex-1">
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
+                正在加载 Monaco 编辑器...
+              </div>
+            }
+          >
+            <MonacoDiffEditor
+              original={originalText}
+              modified={modifiedText}
+              path={fileChange.path}
+              renderSideBySide={isSplitView}
+              comments={currentFileComments.map((item) => ({
+                side: item.side,
+                startLine: item.startLine,
+                endLine: item.endLine,
+              }))}
+              selectedTarget={composer ? {
+                side: composer.side,
+                startLine: composer.startLine,
+                endLine: composer.endLine,
+              } : null}
+              onLineSelectForComment={(target) => {
+                setComposer((prev) => ({
+                  side: target.side,
+                  startLine: target.startLine,
+                  endLine: target.endLine,
+                  text: prev && prev.side === target.side ? prev.text : '',
+                }))
+              }}
+            />
+          </Suspense>
+        </div>
+
+        {composer && (
+          <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
+            <div className="flex items-center gap-2 px-3 py-1.5">
+              <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+                {composer.side === 'modified' ? '变更' : '当前'}
+              </span>
+              <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 dark:text-neutral-600">
+                L{composer.startLine}{composer.startLine !== composer.endLine && `-${composer.endLine}`}
+              </span>
+              <div className="flex-1" />
+              <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+              <button
+                type="button"
+                onClick={() => setComposer(null)}
+                className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="flex items-start gap-2 px-3 pb-2.5">
+              <textarea
+                className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-500"
+                placeholder="添加评论..."
+                autoFocus
+                rows={2}
+                value={composer.text}
+                onChange={(e) => setComposer((prev) => (prev ? { ...prev, text: e.target.value } : prev))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setComposer(null)
+                  } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault()
+                    addComment()
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={addComment}
+                disabled={!composer.text.trim()}
+                className="mt-0.5 flex h-8 items-center rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-30 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+              >
+                发送
+              </button>
+            </div>
           </div>
-        }
-      >
-        <MonacoDiffEditor
-          original={originalText}
-          modified={modifiedText}
-          path={fileChange.path}
-          comments={currentFileComments.map((item) => ({
-            side: item.side,
-            startLine: item.startLine,
-            endLine: item.endLine,
-          }))}
-          onLineSelectForComment={(target) => {
-            setComposer({
-              side: target.side,
-              startLine: target.startLine,
-              endLine: target.endLine,
-              text: '',
-            })
-          }}
-        />
-      </Suspense>
+        )}
+      </div>
     )
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border bg-muted px-4 py-3 dark:border-border dark:bg-muted">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className={`rounded-full bg-${color}-100 px-2 py-1 text-xs font-medium text-${color}-700`}>
-                {getChangeTypeLabel(fileChange.type)}
-              </span>
-              <span className="text-sm font-medium text-primary dark:text-primary-foreground" title={fileChange.path}>
-                {fileChange.path.length > 40 ? `...${fileChange.path.slice(-37)}` : fileChange.path}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-tertiary dark:text-muted">
-              {fileChange.size ? `${(fileChange.size / 1024).toFixed(1)} KB` : '-'}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-              {isSnapshotMode && (
-                <Badge variant="outline">{snapshotDiff?.snapshotTitle || '快照对比'}</Badge>
-              )}
-              {isSnapshotMode && (
-                <Badge variant="outline">记录时间 {formatTime(snapshotDiff?.capturedAt)}</Badge>
-              )}
-              <Badge variant="outline">评论 {allComments.length}</Badge>
-              {isSnapshotMode && (
-                <BrandButton variant="outline" onClick={copySnapshotTemplateForLLM}>
-                  复制快照模板
-                </BrandButton>
-              )}
-              <BrandButton variant="outline" onClick={copyCommentsForLLM} disabled={allComments.length === 0}>
-                复制评论
-              </BrandButton>
-          </div>
+      {/* Compact header bar */}
+      <div className="flex h-9 shrink-0 items-center gap-3 border-b border-neutral-200 bg-neutral-50/80 px-3 dark:border-neutral-800 dark:bg-neutral-900/80">
+        {/* Left: change indicator + file path */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className={`shrink-0 rounded-sm px-1.5 py-px text-[11px] font-semibold uppercase tracking-wider ${
+            fileChange.type === 'add' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
+            : fileChange.type === 'delete' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400'
+          }`}>
+            {fileChange.type === 'add' ? 'A' : fileChange.type === 'delete' ? 'D' : 'M'}
+          </span>
+          <span className="min-w-0 truncate font-mono text-[13px] text-neutral-700 dark:text-neutral-300" title={fileChange.path}>
+            {fileChange.path}
+          </span>
+          {fileChange.size ? (
+            <span className="shrink-0 text-[11px tabular-nums text-neutral-400 dark:text-neutral-500">
+              {(fileChange.size / 1024).toFixed(1)}k
+            </span>
+          ) : null}
+          {allComments.length > 0 && (
+            <span className="shrink-0 text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
+              {allComments.length} 条评论
+            </span>
+          )}
+        </div>
+
+        {/* Right: actions */}
+        <div className="flex shrink-0 items-center gap-1">
+          {isSnapshotMode && (
+            <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+              {snapshotDiff?.snapshotTitle || '快照对比'} · {formatTime(snapshotDiff?.capturedAt)}
+            </span>
+          )}
+          {!isImage && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setIsSplitView((v) => !v)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                  >
+                    {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{isSplitView ? '合并视图' : '拆分视图'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {isSnapshotMode && (
+            <button
+              type="button"
+              onClick={copySnapshotTemplateForLLM}
+              className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+            >
+              <Copy className="h-3 w-3" />
+              模板
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={copyCommentsForLLM}
+            disabled={allComments.length === 0}
+            className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+          >
+            <Copy className="h-3 w-3" />
+            评论
+          </button>
         </div>
       </div>
-
-      {composer && (
-        <div className="border-b bg-card px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs text-secondary mb-2">
-            <Badge variant="outline">{composer.side === 'modified' ? '变更版本' : '当前文件'}</Badge>
-            <span>
-              {composer.startLine === composer.endLine
-                ? `第 ${composer.startLine} 行`
-                : `第 ${composer.startLine}-${composer.endLine} 行`}
-            </span>
-            <span>点击行号可单行评论，Shift+点击可选中多行</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              className="h-9 flex-1 rounded border border-input bg-background px-3 text-sm"
-              placeholder="输入此行修改意见..."
-              value={composer.text}
-              onChange={(e) => setComposer((prev) => (prev ? { ...prev, text: e.target.value } : prev))}
-            />
-            <BrandButton variant="outline" onClick={() => setComposer(null)}>
-              取消
-            </BrandButton>
-            <BrandButton variant="primary" onClick={addComment} disabled={!composer.text.trim()}>
-              添加评论
-            </BrandButton>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-1 overflow-hidden">
         {isImage ? (

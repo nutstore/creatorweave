@@ -294,10 +294,40 @@
 }
 
 .cw-comment-glyph {
-  background: color-mix(in oklab, var(--primary, #3b82f6) 80%, white 20%);
+  background: color-mix(in oklab, var(--primary, #3b82f6) 85%, white 15%);
+  border: 1px solid color-mix(in oklab, var(--primary, #3b82f6) 70%, black 30%);
   border-radius: 9999px;
-  width: 8px !important;
-  height: 8px !important;
-  margin-left: 4px;
+  width: 9px !important;
+  height: 9px !important;
+  margin-left: 3px;
   margin-top: 4px;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary, #3b82f6) 20%, transparent);
+}
+
+.cw-comment-line-decoration {
+  border-left: 2px solid color-mix(in oklab, var(--primary, #3b82f6) 72%, transparent);
+}
+
+.cw-comment-line-number {
+  color: color-mix(in oklab, var(--primary, #3b82f6) 78%, currentColor) !important;
+  font-weight: 600;
+}
+
+.cw-comment-selection-line {
+  background-color: color-mix(in oklab, var(--primary, #3b82f6) 16%, transparent);
+}
+
+.cw-comment-selection-decoration {
+  border-left: 2px solid color-mix(in oklab, var(--primary, #3b82f6) 95%, white 5%);
+}
+
+.cw-comment-selection-line-number {
+  color: color-mix(in oklab, var(--primary, #3b82f6) 90%, currentColor) !important;
+  font-weight: 700;
+}
+
+.cw-commentable-diff .monaco-editor .margin .line-numbers,
+.cw-commentable-diff .monaco-editor .margin .glyph-margin,
+.cw-commentable-diff .monaco-editor .margin .line-decoration {
+  cursor: pointer !important;
 }

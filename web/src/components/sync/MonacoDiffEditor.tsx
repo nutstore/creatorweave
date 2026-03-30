@@ -33,6 +33,8 @@ export type DiffCommentTarget = {
   side: 'original' | 'modified'
   startLine: number
   endLine: number
+  anchorClientX?: number
+  anchorClientY?: number
 }
 
 interface LineComment {
@@ -46,7 +48,16 @@ interface MonacoDiffEditorProps {
   modified: string
   path: string
   comments?: LineComment[]
+  selectedTarget?: DiffCommentTarget | null
   onLineSelectForComment?: (target: DiffCommentTarget) => void
+  renderSideBySide?: boolean
+}
+
+type DragSelectionState = {
+  dragging: boolean
+  anchorLine: number
+  anchorClientX?: number
+  anchorClientY?: number
 }
 
 export default function MonacoDiffEditor({
@@ -54,7 +65,9 @@ export default function MonacoDiffEditor({
   modified,
   path,
   comments = [],
+  selectedTarget = null,
   onLineSelectForComment,
+  renderSideBySide = false,
 }: MonacoDiffEditorProps) {
   ensureMonacoLoaderConfigured()
 
@@ -67,12 +80,14 @@ export default function MonacoDiffEditor({
   const monacoRef = useRef<typeof monaco | null>(null)
   const originalMouseDisposableRef = useRef<monaco.IDisposable | null>(null)
   const modifiedMouseDisposableRef = useRef<monaco.IDisposable | null>(null)
-  const originalAnchorRef = useRef<number | null>(null)
-  const modifiedAnchorRef = useRef<number | null>(null)
+  const originalDecorationIdsRef = useRef<string[]>([])
+  const modifiedDecorationIdsRef = useRef<string[]>([])
+  const originalDragSelectionRef = useRef<DragSelectionState | null>(null)
+  const modifiedDragSelectionRef = useRef<DragSelectionState | null>(null)
 
   useEffect(() => {
-    originalAnchorRef.current = null
-    modifiedAnchorRef.current = null
+    originalDragSelectionRef.current = null
+    modifiedDragSelectionRef.current = null
   }, [path])
 
   useEffect(() => {
@@ -111,7 +126,10 @@ export default function MonacoDiffEditor({
           isWholeLine: true,
           className: 'cw-commented-line',
           glyphMarginClassName: 'cw-comment-glyph',
+          linesDecorationsClassName: 'cw-comment-line-decoration',
+          lineNumberClassName: 'cw-comment-line-number',
           glyphMarginHoverMessage: { value: '该行有评论' },
+          lineNumberHoverMessage: { value: '该行有评论' },
         },
       }))
 
@@ -123,25 +141,69 @@ export default function MonacoDiffEditor({
           isWholeLine: true,
           className: 'cw-commented-line',
           glyphMarginClassName: 'cw-comment-glyph',
+          linesDecorationsClassName: 'cw-comment-line-decoration',
+          lineNumberClassName: 'cw-comment-line-number',
           glyphMarginHoverMessage: { value: '该行有评论' },
+          lineNumberHoverMessage: { value: '该行有评论' },
         },
       }))
 
-    originalEditor.deltaDecorations([], originalDecorations)
-    modifiedEditor.deltaDecorations([], modifiedDecorations)
-  }, [comments])
+    const originalSelectionDecoration =
+      selectedTarget?.side === 'original'
+        ? [
+            {
+              range: new monacoNs.Range(selectedTarget.startLine, 1, selectedTarget.endLine, 1),
+              options: {
+                isWholeLine: true,
+                className: 'cw-comment-selection-line',
+                linesDecorationsClassName: 'cw-comment-selection-decoration',
+                lineNumberClassName: 'cw-comment-selection-line-number',
+              },
+            },
+          ]
+        : []
+
+    const modifiedSelectionDecoration =
+      selectedTarget?.side === 'modified'
+        ? [
+            {
+              range: new monacoNs.Range(selectedTarget.startLine, 1, selectedTarget.endLine, 1),
+              options: {
+                isWholeLine: true,
+                className: 'cw-comment-selection-line',
+                linesDecorationsClassName: 'cw-comment-selection-decoration',
+                lineNumberClassName: 'cw-comment-selection-line-number',
+              },
+            },
+          ]
+        : []
+
+    originalDecorationIdsRef.current = originalEditor.deltaDecorations(
+      originalDecorationIdsRef.current,
+      [...originalDecorations, ...originalSelectionDecoration]
+    )
+    modifiedDecorationIdsRef.current = modifiedEditor.deltaDecorations(
+      modifiedDecorationIdsRef.current,
+      [...modifiedDecorations, ...modifiedSelectionDecoration]
+    )
+  }, [comments, selectedTarget])
 
   useEffect(() => {
     return () => {
       originalMouseDisposableRef.current?.dispose()
       modifiedMouseDisposableRef.current?.dispose()
+      const diffEditor = diffEditorRef.current
+      if (diffEditor) {
+        diffEditor.getOriginalEditor().deltaDecorations(originalDecorationIdsRef.current, [])
+        diffEditor.getModifiedEditor().deltaDecorations(modifiedDecorationIdsRef.current, [])
+      }
     }
   }, [])
 
   const theme = isDark ? 'vs-dark' : 'vs'
 
   return (
-    <div className="h-full w-full" data-testid="monaco-diff-editor">
+    <div className="cw-commentable-diff h-full w-full" data-testid="monaco-diff-editor">
       <DiffEditor
         height="100%"
         language={language}
@@ -156,29 +218,63 @@ export default function MonacoDiffEditor({
             targetEditor: monaco.editor.ICodeEditor,
             side: 'original' | 'modified'
           ): monaco.IDisposable => {
-            return targetEditor.onMouseDown((event) => {
-              const targetType = event.target.type
-              const isGutter =
-                targetType === monacoNs.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
-                targetType === monacoNs.editor.MouseTargetType.GUTTER_LINE_NUMBERS
+            const dragSelectionRef = side === 'original' ? originalDragSelectionRef : modifiedDragSelectionRef
+            const isGutterTarget = (targetType: monaco.editor.MouseTargetType): boolean => (
+              targetType === monacoNs.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+              targetType === monacoNs.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+              targetType === monacoNs.editor.MouseTargetType.GUTTER_LINE_DECORATIONS
+            )
 
-              if (!isGutter) return
+            const mouseDownDisposable = targetEditor.onMouseDown((event) => {
+              const targetType = event.target.type
+              if (!isGutterTarget(targetType)) return
               const line = event.target.position?.lineNumber
               if (!line) return
-              const isShiftPressed = Boolean(event.event.browserEvent?.shiftKey)
-              const anchorRef = side === 'original' ? originalAnchorRef : modifiedAnchorRef
-              const anchor = anchorRef.current
+              const browserEvent = event.event.browserEvent as MouseEvent | undefined
+              const isShift = browserEvent?.shiftKey === true
 
-              if (!isShiftPressed || anchor === null) {
-                anchorRef.current = line
-                onLineSelectForComment?.({ side, startLine: line, endLine: line })
-                return
+              const prev = dragSelectionRef.current
+
+              if (isShift && prev) {
+                // Shift+click: extend selection from anchor line
+                const startLine = Math.min(prev.anchorLine, line)
+                const endLine = Math.max(prev.anchorLine, line)
+                onLineSelectForComment?.({
+                  side,
+                  startLine,
+                  endLine,
+                  anchorClientX: prev.anchorClientX,
+                  anchorClientY: prev.anchorClientY,
+                })
+              } else {
+                // Normal click: set new anchor
+                dragSelectionRef.current = {
+                  dragging: false,
+                  anchorLine: line,
+                  anchorClientX: browserEvent?.clientX,
+                  anchorClientY: browserEvent?.clientY,
+                }
+                onLineSelectForComment?.({
+                  side,
+                  startLine: line,
+                  endLine: line,
+                  anchorClientX: browserEvent?.clientX,
+                  anchorClientY: browserEvent?.clientY,
+                })
               }
-
-              const startLine = Math.min(anchor, line)
-              const endLine = Math.max(anchor, line)
-              onLineSelectForComment?.({ side, startLine, endLine })
             })
+
+            // No mouseMove/mouseUp needed for shift+click mode
+            const mouseMoveDisposable = { dispose: () => {} }
+            const mouseUpDisposable = { dispose: () => {} }
+
+            return {
+              dispose: () => {
+                mouseDownDisposable.dispose()
+                mouseMoveDisposable.dispose()
+                mouseUpDisposable.dispose()
+              },
+            }
           }
 
           originalMouseDisposableRef.current?.dispose()
@@ -189,7 +285,7 @@ export default function MonacoDiffEditor({
         options={{
           readOnly: true,
           automaticLayout: true,
-          renderSideBySide: true,
+          renderSideBySide: renderSideBySide,
           scrollBeyondLastLine: false,
           minimap: { enabled: false },
           wordWrap: 'on',
