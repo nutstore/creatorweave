@@ -593,10 +593,7 @@ export function ConversationView({
                         >
                           <button
                             type="button"
-                            onClick={() => {
-                              console.log('[Agent] Switching to:', agent.id)
-                              console.log('[Agent] allAgents:', allAgents)
-                              console.log('[Agent] activeAgentId:', activeAgentId)
+            onClick={() => {
                               void setActiveAgent(agent.id)
                               setIsAgentDropdownOpen(false)
                             }}

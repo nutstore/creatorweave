@@ -111,22 +111,14 @@ export const useAgentsStore = create<AgentsState>()(
     },
 
     setActiveAgent: async (agentId) => {
-      console.log('[AgentsStore] setActiveAgent called with:', agentId)
       const { projectManager, agents } = get()
-      console.log('[AgentsStore] projectManager:', projectManager ? 'exists' : 'null')
-      console.log('[AgentsStore] agents:', agents.map(a => a.id))
-
-      console.log('[AgentsStore] current activeAgentId:', get().activeAgentId)
 
       if (!projectManager) {
-        console.warn('[AgentsStore] setActiveAgent: projectManager not set')
         toast.error('Project not initialized. Please try again.')
         return
       }
 
-      // 先检查是否在列表中
       const meta = agents.find((a) => a.id === agentId)
-      console.log('[AgentsStore] found agent meta:', meta)
       if (!meta) {
         toast.error(`Agent "${agentId}" not found`)
         return
@@ -135,35 +127,26 @@ export const useAgentsStore = create<AgentsState>()(
       set({ isLoading: true })
 
       try {
-        // 从 project store 获取 activeProjectId
         const currentProjectId = useProjectStore.getState().activeProjectId
-        console.log('[AgentsStore] currentProjectId from projectStore:', currentProjectId)
         if (!currentProjectId) {
-          console.warn('[AgentsStore] no activeProjectId in projectStore')
           set({ isLoading: false })
           return
         }
 
         const project = await projectManager.getProject(currentProjectId)
-        console.log('[AgentsStore] project:', project ? 'found' : 'not found')
         if (!project) {
-          console.warn('[AgentsStore] project not found for id:', currentProjectId)
           set({ isLoading: false })
           return
         }
 
         const agentInfo = await project.agentManager.getAgent(agentId)
-        console.log('[AgentsStore] agentInfo loaded:', agentInfo ? 'success' : 'failed')
         if (agentInfo) {
-          console.log('[AgentsStore] setting activeAgentId to:', agentId)
           set({
             activeAgentId: agentId,
             activeAgent: agentInfo,
             isLoading: false,
           })
-          console.log('[AgentsStore] setActiveAgent completed successfully')
         } else {
-          console.error('[AgentsStore] getAgent returned null for:', agentId)
           toast.error(`Failed to load agent "${agentId}"`)
           set({ isLoading: false })
         }
