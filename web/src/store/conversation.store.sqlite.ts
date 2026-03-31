@@ -1575,9 +1575,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c && c.activeRunId === runId) {
-                // Commit completed tool calls from previous turn before resetting
-                commitDraftToMessages(c)
-
                 c.streamingContent = ''
                 c.streamingReasoning = ''
                 c.isReasoningStreaming = false
