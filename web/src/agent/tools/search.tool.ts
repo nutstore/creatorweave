@@ -1,6 +1,9 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
+import type { PendingFileOverlay } from '@/workers/search-worker-manager'
+import { useOPFSStore } from '@/store/opfs.store'
+import { getWorkspaceManager } from '@/opfs'
 
 /**
  * Resolve native directory handle from context or workspaceId
@@ -40,6 +43,58 @@ function parseStructuredError(error: unknown): Record<string, unknown> | null {
     return parsed as Record<string, unknown>
   } catch {
     return null
+  }
+}
+
+/**
+ * Collect pending file overlays from OPFS for the current workspace.
+ * This ensures search results are consistent with the read tool,
+ * which reads from OPFS cache for files with pending modifications.
+ */
+async function collectPendingOverlays(
+  workspaceId?: string | null
+): Promise<Record<string, PendingFileOverlay>> {
+  try {
+    const pendingChanges = useOPFSStore.getState().getPendingChanges()
+    if (!pendingChanges || pendingChanges.length === 0) return {}
+
+    // Get workspace to read cached content
+    let targetWorkspaceId = workspaceId
+    if (!targetWorkspaceId) {
+      const { useWorkspaceStore } = await import('@/store/workspace.store')
+      targetWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
+    }
+    if (!targetWorkspaceId) return {}
+
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(targetWorkspaceId)
+    if (!workspace) return {}
+
+    const overlays: Record<string, PendingFileOverlay> = {}
+    const { readFile } = useOPFSStore.getState()
+
+    for (const change of pendingChanges) {
+      if (change.type === 'delete') {
+        overlays[change.path] = { deleted: true }
+        continue
+      }
+
+      // For modify/create, read the cached content from OPFS
+      try {
+        const result = await workspace.readFile(change.path, null)
+        if (typeof result.content === 'string') {
+          overlays[change.path] = { content: result.content }
+        }
+      } catch {
+        // If we can't read the cached content, skip the overlay
+        // and let the worker fall back to disk content
+      }
+    }
+
+    return overlays
+  } catch {
+    // Non-critical: if overlay collection fails, search still works from disk
+    return {}
   }
 }
 
@@ -163,6 +218,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       contextLines = Math.min(userContextLines, 3)
     }
 
+    // Collect pending overlays from OPFS to ensure search consistency with read tool
+    const pendingOverlays = await collectPendingOverlays(context.workspaceId)
+
     const result = await manager.searchInDirectory(directoryHandle, {
       query,
       path: typeof args.path === 'string' ? args.path : undefined,
@@ -178,6 +236,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       excludeDirs: Array.isArray(args.exclude_dirs)
         ? args.exclude_dirs.filter((v): v is string => typeof v === 'string')
         : undefined,
+      pendingOverlays: Object.keys(pendingOverlays).length > 0 ? pendingOverlays : undefined,
     })
 
     return JSON.stringify({

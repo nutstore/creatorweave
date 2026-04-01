@@ -12,6 +12,16 @@ export interface SearchHit {
   preview: string
 }
 
+/**
+ * Overlay for a pending file change.
+ * - content: the file content to use instead of disk (string for modify/create)
+ * - deleted: if true, the file should be treated as deleted (skip it)
+ */
+export interface PendingFileOverlay {
+  content?: string
+  deleted?: boolean
+}
+
 export interface SearchInDirectoryOptions {
   path?: string
   query: string
@@ -25,6 +35,13 @@ export interface SearchInDirectoryOptions {
   maxFileSize?: number
   includeIgnored?: boolean
   excludeDirs?: string[]
+  /**
+   * OPFS pending overlay map: path -> overlay info.
+   * When provided, the worker will use overlay content instead of disk content
+   * for files that have pending changes. This ensures search results are consistent
+   * with the read tool (which reads from OPFS cache).
+   */
+  pendingOverlays?: Record<string, PendingFileOverlay>
 }
 
 export interface SearchInDirectoryResult {

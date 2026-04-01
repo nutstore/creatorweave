@@ -6,6 +6,11 @@
 
 import micromatch from 'micromatch'
 
+interface PendingFileOverlay {
+  content?: string
+  deleted?: boolean
+}
+
 interface SearchMessage {
   type: 'SEARCH'
   payload: {
@@ -22,6 +27,7 @@ interface SearchMessage {
     maxFileSize?: number
     includeIgnored?: boolean
     excludeDirs?: string[]
+    pendingOverlays?: Record<string, PendingFileOverlay>
   }
 }
 
@@ -118,6 +124,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       maxFileSize = 1024 * 1024,
       includeIgnored = false,
       excludeDirs = [],
+      pendingOverlays,
     } = payload
 
     if (!query || !query.trim()) {
@@ -161,6 +168,21 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
     let deadlineExceeded = false
     let truncated = false
 
+    // Build a set of disk-seen paths to identify new files (pending create, not on disk)
+    const diskSeenPaths = new Set<string>()
+    // Collect overlay paths that are within the search sub-path
+    const relevantOverlayPaths: string[] = []
+
+    if (pendingOverlays && Object.keys(pendingOverlays).length > 0) {
+      for (const overlayPath of Object.keys(pendingOverlays)) {
+        if (normalizedPath && !overlayPath.startsWith(normalizedPath + '/') && overlayPath !== normalizedPath) {
+          continue
+        }
+        if (glob && !micromatch.isMatch(overlayPath, glob)) continue
+        relevantOverlayPaths.push(overlayPath)
+      }
+    }
+
     while (stack.length > 0) {
       if (signal.aborted) break
       if (Date.now() > deadlineAt) {
@@ -198,33 +220,49 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
 
         if (glob && !micromatch.isMatch(rel, glob)) continue
 
+        // Mark this path as seen on disk
+        diskSeenPaths.add(rel)
+
+        // Check pending overlay for this file
+        const overlay = pendingOverlays?.[rel]
+        if (overlay?.deleted) {
+          // File is pending deletion — skip it entirely
+          skippedFiles++
+          continue
+        }
+
         scannedFiles++
-        let file: File
-        try {
-          file = await (entry as FileSystemFileHandle).getFile()
-        } catch (error) {
-          if (isNotFoundError(error)) {
+
+        let text: string
+        if (overlay?.content !== undefined) {
+          // Use overlay content instead of disk content
+          text = overlay.content
+        } else {
+          // Read from disk
+          let file: File
+          try {
+            file = await (entry as FileSystemFileHandle).getFile()
+          } catch (error) {
+            if (isNotFoundError(error)) {
+              skippedFiles++
+              continue
+            }
+            throw error
+          }
+          if (file.size > Math.max(1, maxFileSize)) {
             skippedFiles++
             continue
           }
-          throw error
-        }
-        if (file.size > Math.max(1, maxFileSize)) {
-          skippedFiles++
-          continue
-        }
-
-        let text = ''
-        try {
-          text = await file.text()
-        } catch {
-          skippedFiles++
-          continue
-        }
-
-        if (isProbablyBinary(text)) {
-          skippedFiles++
-          continue
+          try {
+            text = await file.text()
+          } catch {
+            skippedFiles++
+            continue
+          }
+          if (isProbablyBinary(text)) {
+            skippedFiles++
+            continue
+          }
         }
 
         const fileHits = findMatchesInText(rel, text, matcher, contextLines)
@@ -241,6 +279,47 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
 
       if (scannedFiles % 25 === 0) {
         await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+    }
+
+    // Phase 2: Search pending overlays for NEW files (not on disk).
+    // These are files created in OPFS but not yet synced to disk.
+    if (!truncated && !deadlineExceeded && relevantOverlayPaths.length > 0) {
+      for (const overlayPath of relevantOverlayPaths) {
+        if (signal.aborted) break
+        if (Date.now() > deadlineAt) {
+          deadlineExceeded = true
+          break
+        }
+        // Skip files already scanned from disk (or skipped as deleted)
+        if (diskSeenPaths.has(overlayPath)) continue
+
+        const overlay = pendingOverlays![overlayPath]
+        // Skip deleted files or overlays without content
+        if (overlay?.deleted || overlay?.content === undefined) continue
+
+        scannedFiles++
+        const text = overlay.content
+        if (isProbablyBinary(text)) {
+          skippedFiles++
+          continue
+        }
+        // Check maxFileSize for overlay content
+        const byteSize = new TextEncoder().encode(text).length
+        if (byteSize > Math.max(1, maxFileSize)) {
+          skippedFiles++
+          continue
+        }
+
+        const fileHits = findMatchesInText(overlayPath, text, matcher, contextLines)
+        for (const hit of fileHits) {
+          hits.push(hit)
+          if (hits.length >= Math.max(1, maxResults)) {
+            truncated = true
+            break
+          }
+        }
+        if (truncated) break
       }
     }
 
