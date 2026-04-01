@@ -264,6 +264,8 @@ export function ModelSettings({ open }: ModelSettingsProps) {
   const [customBaseUrlDraft, setCustomBaseUrlDraft] = useState('')
   const [customModelDraft, setCustomModelDraft] = useState('')
   const [newModelDraft, setNewModelDraft] = useState('')
+  const [useCustomModelName, setUseCustomModelName] = useState(false)
+  const [customModelInput, setCustomModelInput] = useState('')
 
   const groupedProviders = useMemo(() => getProvidersByCategory(), [])
   const currentProviderMeta = PROVIDER_META[providerType]
@@ -356,6 +358,10 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       setProviderType(provider)
       const config = LLM_PROVIDER_CONFIGS[provider]
       setModelName(config.modelName)
+
+      // Reset custom model input when switching provider
+      setUseCustomModelName(false)
+      setCustomModelInput('')
 
       // Reset custom URL if not custom provider
       if (provider !== 'custom') {
@@ -612,27 +618,57 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       {/* ── Model Selection ── */}
       {availableModels.length > 0 && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-primary">{t('settings.modelName')}</label>
-          <BrandSelect value={modelName} onValueChange={handleModelChange}>
-            <BrandSelectTrigger className="h-10">
-              <BrandSelectValue />
-            </BrandSelectTrigger>
-            <BrandSelectContent>
-              {availableModels.map((model) => (
-                <BrandSelectItem key={model.id} value={model.id}>
-                  <div className="flex items-center gap-2">
-                    <span>{model.name}</span>
-                    <span className="text-[10px] text-tertiary">
-                      {formatContextWindow(model.contextWindow)}
-                    </span>
-                  </div>
-                </BrandSelectItem>
-              ))}
-            </BrandSelectContent>
-          </BrandSelect>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-primary">{t('settings.modelName')}</label>
+            <label className="flex items-center gap-2 text-xs text-secondary">
+              <input
+                type="checkbox"
+                checked={useCustomModelName}
+                onChange={(e) => {
+                  setUseCustomModelName(e.target.checked)
+                  if (e.target.checked) {
+                    setCustomModelInput(modelName)
+                  }
+                }}
+                className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+              />
+              手动输入
+            </label>
+          </div>
+
+          {useCustomModelName ? (
+            <BrandInput
+              type="text"
+              value={customModelInput}
+              onChange={(e) => {
+                setCustomModelInput(e.target.value)
+                setModelName(e.target.value)
+              }}
+              placeholder="输入模型名称，如 gpt-4.1, claude-3-5-sonnet-20241022"
+              className="h-10"
+            />
+          ) : (
+            <BrandSelect value={modelName} onValueChange={handleModelChange}>
+              <BrandSelectTrigger className="h-10">
+                <BrandSelectValue />
+              </BrandSelectTrigger>
+              <BrandSelectContent>
+                {availableModels.map((model) => (
+                  <BrandSelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center gap-2">
+                      <span>{model.name}</span>
+                      <span className="text-[10px] text-tertiary">
+                        {formatContextWindow(model.contextWindow)}
+                      </span>
+                    </div>
+                  </BrandSelectItem>
+                ))}
+              </BrandSelectContent>
+            </BrandSelect>
+          )}
 
           {/* Model capabilities */}
-          {selectedModel && (
+          {!useCustomModelName && selectedModel && (
             <div className="flex flex-wrap gap-1.5">
               {selectedModel.capabilities.map((cap) => (
                 <CapabilityBadge key={cap} capability={cap} />
@@ -642,6 +678,12 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 {formatContextWindow(selectedModel.contextWindow)} tokens
               </span>
             </div>
+          )}
+
+          {useCustomModelName && (
+            <p className="text-xs text-muted">
+              开启后可输入任意模型名称，适用于新发布的模型
+            </p>
           )}
         </div>
       )}
