@@ -120,13 +120,14 @@ async function executeSingleEdit(
     }
 
     const snapshot = readFileState.get(readStateKey)
-    if (!snapshot || snapshot.isPartial) {
+    if (!snapshot || snapshot.isPartialView) {
       return JSON.stringify({
-        error: 'Read file before editing. Use read(path) without line ranges, then retry edit.',
+        error: 'Read file before editing. Use read(path) first, then retry edit.',
       })
     }
 
-    if (snapshot.content !== fileContent) {
+    const isFullRead = snapshot.offset === undefined && snapshot.limit === undefined
+    if (isFullRead && snapshot.content !== fileContent) {
       return JSON.stringify({
         error: 'File has been modified since read. Read it again before attempting to write it.',
       })
@@ -159,7 +160,9 @@ async function executeSingleEdit(
     readFileState.set(readStateKey, {
       content: updatedFile,
       timestamp: Date.now(),
-      isPartial: false,
+      offset: undefined,
+      limit: undefined,
+      isPartialView: false,
     })
 
     const pendingCount = getPendingChanges().length

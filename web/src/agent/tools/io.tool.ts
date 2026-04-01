@@ -169,7 +169,6 @@ async function executeSingleRead(
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
   const readFileState = ensureReadFileState(context)
-  const isPartialRead = hasRangeOptions(options)
 
   try {
     const target = await resolveVfsTarget(path, context, 'read')
@@ -191,11 +190,7 @@ async function executeSingleRead(
         })
       }
       const rendered = applyTextRange(content, options)
-      readFileState.set(readStateKey, {
-        content: rendered,
-        timestamp: Date.now(),
-        isPartial: isPartialRead,
-      })
+      readFileState.set(readStateKey, buildReadStateEntry(rendered, options))
       return rendered
     }
 
@@ -213,11 +208,7 @@ async function executeSingleRead(
 
     if (typeof content === 'string') {
       const formatted = applyTextRange(content, options)
-      readFileState.set(readStateKey, {
-        content: formatted,
-        timestamp: Date.now(),
-        isPartial: isPartialRead,
-      })
+      readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
       return formatted
     }
 
@@ -263,11 +254,7 @@ async function executeSingleRead(
           }
           if (typeof content === 'string') {
             const formatted = applyTextRange(content, options)
-            readFileState.set(readStateKey, {
-              content: formatted,
-              timestamp: Date.now(),
-              isPartial: isPartialRead,
-            })
+            readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
             return formatted
           }
           if (hasRangeOptions(options)) {
@@ -359,9 +346,10 @@ async function executeBatchRead(
           metadata: { size, contentType: 'text' },
         })
         readFileState.set(getReadStateKey(target), {
-          content: rendered,
-          timestamp: Date.now(),
-          isPartial: read.start_line !== undefined || read.line_count !== undefined,
+          ...buildReadStateEntry(rendered, {
+            startLine: read.start_line,
+            lineCount: read.line_count,
+          }),
         })
         successCount++
         continue
@@ -436,9 +424,10 @@ async function executeBatchRead(
         metadata: { size: metadata.size, contentType: metadata.contentType },
       })
       readFileState.set(getReadStateKey(target), {
-        content: rendered,
-        timestamp: Date.now(),
-        isPartial: read.start_line !== undefined || read.line_count !== undefined,
+        ...buildReadStateEntry(rendered, {
+          startLine: read.start_line,
+          lineCount: read.line_count,
+        }),
       })
       successCount++
     } catch (error) {
@@ -462,6 +451,17 @@ async function executeBatchRead(
 
 function hasRangeOptions(options: ReadRangeOptions): boolean {
   return options.startLine !== undefined || options.lineCount !== undefined
+}
+
+function buildReadStateEntry(content: string, options: ReadRangeOptions) {
+  const hasRange = hasRangeOptions(options)
+  return {
+    content,
+    timestamp: Date.now(),
+    offset: hasRange ? (options.startLine ?? 1) : undefined,
+    limit: hasRange ? options.lineCount : undefined,
+    isPartialView: false,
+  }
 }
 
 function validateReadRange(options: ReadRangeOptions): string | null {

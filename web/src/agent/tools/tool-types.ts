@@ -39,7 +39,9 @@ export interface WorkflowProgressHooks {
 export interface ReadFileStateEntry {
   content: string
   timestamp: number
-  isPartial: boolean
+  offset?: number
+  limit?: number
+  isPartialView?: boolean
 }
 
 /** Tool definition in OpenAI function calling format */

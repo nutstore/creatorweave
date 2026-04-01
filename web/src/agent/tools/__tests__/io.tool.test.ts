@@ -44,7 +44,9 @@ describe('io read tool', () => {
     const result = await readExecutor({ path: 'big.txt' }, { ...context, readFileState })
     expect(result).toBe(largeContent)
     const entry = readFileState.get('workspace:big.txt')
-    expect(entry?.isPartial).toBe(false)
+    expect(entry?.isPartialView).toBe(false)
+    expect(entry?.offset).toBeUndefined()
+    expect(entry?.limit).toBeUndefined()
     expect(entry?.content).toBe(largeContent)
   })
 
@@ -72,7 +74,9 @@ describe('io read tool', () => {
     )
     expect(result).toBe('line2\nline3')
     const entry = readFileState.get('workspace:a.txt')
-    expect(entry?.isPartial).toBe(true)
+    expect(entry?.isPartialView).toBe(false)
+    expect(entry?.offset).toBe(2)
+    expect(entry?.limit).toBe(2)
     expect(entry?.content).toBe('line2\nline3')
   })
 

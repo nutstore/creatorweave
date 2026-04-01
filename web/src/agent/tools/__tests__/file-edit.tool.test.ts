@@ -71,7 +71,10 @@ describe('file edit tool', () => {
       metadata: { size: 30, contentType: 'text/plain' },
     })
     const readFileState = new Map([
-      ['workspace:src/a.ts', { content: 'const x = old\nconst y = old\n', timestamp: Date.now(), isPartial: false }],
+      [
+        'workspace:src/a.ts',
+        { content: 'const x = old\nconst y = old\n', timestamp: Date.now(), isPartialView: false },
+      ],
     ])
 
     const result = await editExecutor(
@@ -91,7 +94,10 @@ describe('file edit tool', () => {
       metadata: { size: 30, contentType: 'text/plain' },
     })
     const readFileState = new Map([
-      ['workspace:src/a.ts', { content: 'const x = old\nconst y = old\n', timestamp: Date.now(), isPartial: false }],
+      [
+        'workspace:src/a.ts',
+        { content: 'const x = old\nconst y = old\n', timestamp: Date.now(), isPartialView: false },
+      ],
     ])
 
     const result = await editExecutor(
@@ -135,7 +141,10 @@ describe('file edit tool', () => {
     readPathMock.mockResolvedValueOnce('hello old')
 
     const readFileState = new Map([
-      ['agent:project-1:novel-editor:SOUL.md', { content: 'hello old', timestamp: Date.now(), isPartial: false }],
+      [
+        'agent:project-1:novel-editor:SOUL.md',
+        { content: 'hello old', timestamp: Date.now(), isPartialView: false },
+      ],
     ])
 
     const result = await editExecutor(
@@ -150,5 +159,45 @@ describe('file edit tool', () => {
     const parsed = JSON.parse(result)
     expect(parsed.success).toBe(true)
     expect(writePathMock).toHaveBeenCalledWith('novel-editor', 'SOUL.md', 'hello new')
+  })
+
+  it('allows edit after range read snapshot', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = old\nconst y = old\n',
+      metadata: { size: 30, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      ['workspace:src/a.ts', { content: 'const x = old\n', timestamp: Date.now(), offset: 1, limit: 1 }],
+    ])
+
+    const result = await editExecutor(
+      { path: 'src/a.ts', old_text: 'const x = old', new_text: 'const x = new' },
+      makeContext({ readFileState })
+    )
+    const parsed = JSON.parse(result)
+
+    expect(parsed.success).toBe(true)
+    expect(writeFileMock).toHaveBeenCalled()
+  })
+
+  it('rejects edit when snapshot is partial view', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = old\n',
+      metadata: { size: 14, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      ['workspace:src/a.ts', { content: 'const x = old\n', timestamp: Date.now(), isPartialView: true }],
+    ])
+
+    const result = await editExecutor(
+      { path: 'src/a.ts', old_text: 'old', new_text: 'new' },
+      makeContext({ readFileState })
+    )
+    const parsed = JSON.parse(result)
+
+    expect(parsed.error).toContain('Read file before editing')
+    expect(writeFileMock).not.toHaveBeenCalled()
   })
 })
