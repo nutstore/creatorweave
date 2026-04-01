@@ -12,11 +12,11 @@ import type { LLMProviderType } from '@/agent/providers/types'
 /** Flash model configs for each provider type */
 const FLASH_MODEL_CONFIGS: Partial<Record<LLMProviderType, { model: string; baseURL: string }>> = {
   glm: {
-    model: 'glm-5.1-flash',
+    model: 'glm-4.7-flash',
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
   },
   'glm-coding': {
-    model: 'glm-5.1-flash',
+    model: 'glm-4.7-flash',
     baseURL: 'https://open.bigmodel.cn/api/coding/paas/v4/',
   },
   kimi: {
