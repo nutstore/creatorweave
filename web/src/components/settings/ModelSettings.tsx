@@ -10,7 +10,7 @@
  * - Token usage statistics display
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Eye,
   EyeOff,
@@ -46,6 +46,7 @@ import type {
   ProviderCategory,
 } from '@/agent/providers/types'
 import { useT } from '@/i18n'
+import { getInvalidModelAutoEnableDecision } from './model-auto-enable'
 import { BrandInput } from '@creatorweave/ui'
 import { BrandSlider } from '@creatorweave/ui'
 import { BrandButton } from '@creatorweave/ui'
@@ -266,6 +267,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
   const [newModelDraft, setNewModelDraft] = useState('')
   const [useCustomModelName, setUseCustomModelName] = useState(false)
   const [customModelInput, setCustomModelInput] = useState('')
+  const handledInvalidModelKeysRef = useRef<Set<string>>(new Set())
 
   const groupedProviders = useMemo(() => getProvidersByCategory(), [])
   const currentProviderMeta = PROVIDER_META[providerType]
@@ -310,6 +312,23 @@ export function ModelSettings({ open }: ModelSettingsProps) {
         console.error('[ModelSettings] Failed to load API key:', error)
       })
   }, [providerKey, setHasApiKey, open])
+
+  // Auto-enable custom model input once per invalid provider/model key.
+  // This prevents repeatedly forcing manual mode after users turn it off.
+  useEffect(() => {
+    const decision = getInvalidModelAutoEnableDecision({
+      providerKey,
+      modelName,
+      availableModelIds: availableModels.map((m) => m.id),
+      handledInvalidModelKeys: handledInvalidModelKeysRef.current,
+    })
+
+    if (!decision.shouldEnable || !decision.key) return
+
+    handledInvalidModelKeysRef.current.add(decision.key)
+    setUseCustomModelName(true)
+    setCustomModelInput(decision.normalizedModelName)
+  }, [modelName, availableModels, providerKey])
 
   useEffect(() => {
     if (providerType !== 'custom') return
