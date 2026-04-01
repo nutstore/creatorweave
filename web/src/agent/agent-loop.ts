@@ -43,6 +43,7 @@ import type {
 } from '@mariozechner/pi-ai'
 import { streamSimple as piAiStreamSimple } from '@mariozechner/pi-ai'
 import { PiAIProvider } from './llm/pi-ai-provider'
+import { useSettingsStore } from '@/store/settings.store'
 
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = UNIVERSAL_SYSTEM_PROMPT
@@ -1172,12 +1173,17 @@ export class AgentLoop {
 
     const streamFn = piAiStreamSimple as unknown as StreamFn
 
+    // Read thinking settings from store
+    const settingsState = useSettingsStore.getState()
+    const reasoning = settingsState.enableThinking ? settingsState.thinkingLevel : undefined
+
     const loop = agentLoopContinue(
       context,
       {
         model,
         getApiKey: () => apiKey,
         maxTokens: model.maxTokens,
+        reasoning,
         convertToLlm: async (agentMessages) => {
           this.convertCallCount++
           const internalMessages = agentMessages

@@ -19,6 +19,20 @@ import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm
 import { analyzeDataDefinition, analyzeDataExecutor } from './tools/data-analysis.tool'
 import { runWorkflowDefinition, runWorkflowExecutor } from './tools/workflow.tool'
 
+// Git tools
+import {
+  gitStatusDefinition,
+  gitStatusExecutor,
+  gitDiffDefinition,
+  gitDiffExecutor,
+  gitLogDefinition,
+  gitLogExecutor,
+  gitShowDefinition,
+  gitShowExecutor,
+  gitRestoreDefinition,
+  gitRestoreExecutor,
+} from './tools/git.tool'
+
 // Import skill tools
 import {
   generateReadSkillTool,
@@ -43,6 +57,12 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
   // Workflow orchestration
   { definition: runWorkflowDefinition, executor: runWorkflowExecutor },
+  // Git tools
+  { definition: gitStatusDefinition, executor: gitStatusExecutor },
+  { definition: gitDiffDefinition, executor: gitDiffExecutor },
+  { definition: gitLogDefinition, executor: gitLogExecutor },
+  { definition: gitShowDefinition, executor: gitShowExecutor },
+  { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
 ]
 
 export function getBuiltinToolNames(): string[] {

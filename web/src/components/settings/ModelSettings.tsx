@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
+import type { ThinkingLevel } from '@mariozechner/pi-ai'
 import { saveApiKey, loadApiKey, deleteApiKey } from '@/security/api-key-store'
 import {
   LLM_PROVIDER_CONFIGS,
@@ -48,6 +49,7 @@ import { useT } from '@/i18n'
 import { BrandInput } from '@creatorweave/ui'
 import { BrandSlider } from '@creatorweave/ui'
 import { BrandButton } from '@creatorweave/ui'
+import { BrandSwitch } from '@creatorweave/ui'
 import {
   BrandSelect,
   BrandSelectContent,
@@ -232,6 +234,8 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     activeCustomProviderId,
     temperature,
     maxTokens,
+    enableThinking,
+    thinkingLevel,
     setProviderType,
     setModelName,
     setCustomBaseUrl,
@@ -243,6 +247,8 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     removeCustomProviderModel,
     setTemperature,
     setMaxTokens,
+    setEnableThinking,
+    setThinkingLevel,
     setHasApiKey,
     invalidateApiKeyCache,
   } = useSettingsStore()
@@ -741,6 +747,56 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 step={256}
                 className="h-10"
               />
+            </div>
+
+            {/* Thinking Mode */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-secondary" />
+                  <label className="text-sm font-medium text-primary">思考模式</label>
+                </div>
+                <BrandSwitch
+                  checked={enableThinking}
+                  onCheckedChange={setEnableThinking}
+                />
+              </div>
+
+              {enableThinking && (
+                <div className="space-y-2.5 pl-6">
+                  <div className="relative">
+                    {/* Intensity gradient track */}
+                    <div className="h-1.5 rounded-full bg-gradient-to-r from-primary-200 via-primary-400 to-primary-600 dark:from-primary-800 dark:via-primary-600 dark:to-primary-400" />
+                    {/* Level pills */}
+                    <div className="mt-2 flex gap-1">
+                      {([
+                        { value: 'minimal' as ThinkingLevel, label: '浅度', depth: 1 },
+                        { value: 'low' as ThinkingLevel, label: '低', depth: 2 },
+                        { value: 'medium' as ThinkingLevel, label: '中', depth: 3 },
+                        { value: 'high' as ThinkingLevel, label: '深度', depth: 4 },
+                        { value: 'xhigh' as ThinkingLevel, label: '极深', depth: 5 },
+                      ]).map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setThinkingLevel(value)}
+                          className={`flex-1 rounded-md py-1.5 text-[11px] font-medium transition-all ${
+                            thinkingLevel === value
+                              ? 'bg-primary-600 text-white shadow-sm dark:bg-primary-500'
+                              : 'bg-neutral-50 text-tertiary hover:bg-neutral-100 hover:text-secondary dark:bg-neutral-800/60 dark:text-muted dark:hover:bg-neutral-700 dark:hover:text-secondary'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-1.5 flex justify-between px-0.5">
+                      <span className="text-[10px] text-tertiary">快速</span>
+                      <span className="text-[10px] text-tertiary">深入</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

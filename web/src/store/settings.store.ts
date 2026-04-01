@@ -10,6 +10,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { LLM_PROVIDER_CONFIGS } from '@/agent/providers/types'
+import type { ThinkingLevel } from '@mariozechner/pi-ai'
 
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
@@ -40,6 +41,8 @@ interface SettingsState {
   activeCustomProviderId: string
   temperature: number
   maxTokens: number
+  enableThinking: boolean
+  thinkingLevel: ThinkingLevel
 
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
@@ -60,6 +63,8 @@ interface SettingsState {
   removeCustomProviderModel: (providerId: string, model: string) => void
   setTemperature: (temp: number) => void
   setMaxTokens: (tokens: number) => void
+  setEnableThinking: (v: boolean) => void
+  setThinkingLevel: (v: ThinkingLevel) => void
   setHasApiKey: (has: boolean) => void
   getEffectiveProviderConfig: () => EffectiveProviderConfig | null
 
@@ -86,6 +91,8 @@ export const useSettingsStore = create<SettingsState>()(
       activeCustomProviderId: '',
       temperature: 0.7,
       maxTokens: 4096,
+      enableThinking: false,
+      thinkingLevel: 'medium' as ThinkingLevel,
       hasApiKey: false,
 
       setProviderType: (providerType) => {
@@ -236,6 +243,8 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setTemperature: (temperature) => set({ temperature }),
       setMaxTokens: (maxTokens) => set({ maxTokens }),
+      setEnableThinking: (enableThinking) => set({ enableThinking }),
+      setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
       getEffectiveProviderConfig: () => {
         const state = get()
@@ -325,6 +334,8 @@ export const useSettingsStore = create<SettingsState>()(
         activeCustomProviderId: state.activeCustomProviderId,
         temperature: state.temperature,
         maxTokens: state.maxTokens,
+        enableThinking: state.enableThinking,
+        thinkingLevel: state.thinkingLevel,
       }),
     }
   )
