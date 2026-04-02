@@ -9,7 +9,7 @@
  */
 
 import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
-import { getActiveConversation } from '@/store/conversation-context.store'
+import { resolveNativeDirectoryHandle } from './tool-utils'
 import {
   parseCSV,
   parseJSON,
@@ -20,31 +20,6 @@ import {
   type ParsedData,
   type DataStats,
 } from '@/utils/data-parsing'
-
-/**
- * Resolve native directory handle from context or workspaceId
- */
-async function resolveNativeDirectoryHandle(
-  directoryHandle: FileSystemDirectoryHandle | null | undefined,
-  workspaceId?: string | null
-): Promise<FileSystemDirectoryHandle | null> {
-  if (directoryHandle) return directoryHandle
-  if (workspaceId) {
-    try {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        return await workspace.getNativeDirectoryHandle()
-      }
-    } catch {
-      // fallback below
-    }
-  }
-  const active = await getActiveConversation()
-  if (!active) return null
-  return await active.conversation.getNativeDirectoryHandle()
-}
 
 //=============================================================================
 // analyze_data Tool

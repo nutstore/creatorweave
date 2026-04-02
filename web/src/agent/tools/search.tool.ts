@@ -1,54 +1,9 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
-import { getActiveConversation } from '@/store/conversation-context.store'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
 import type { PendingFileOverlay } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
 import { getWorkspaceManager } from '@/opfs'
-
-/**
- * Resolve directory handle from context or workspaceId.
- * Falls back to OPFS files/ directory when no native directory is available.
- */
-async function resolveNativeDirectoryHandle(
-  directoryHandle: FileSystemDirectoryHandle | null | undefined,
-  workspaceId?: string | null
-): Promise<FileSystemDirectoryHandle | null> {
-  if (directoryHandle) return directoryHandle
-  if (workspaceId) {
-    try {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        const nativeHandle = await workspace.getNativeDirectoryHandle()
-        if (nativeHandle) return nativeHandle
-        // Fallback to OPFS files/ directory if no native directory
-        return await workspace.getFilesDir()
-      }
-    } catch {
-      // fallback below
-    }
-  }
-  const active = await getActiveConversation()
-  if (!active) return null
-  const nativeHandle = await active.conversation.getNativeDirectoryHandle()
-  if (nativeHandle) return nativeHandle
-  // Try to get OPFS files dir from active conversation's workspace
-  try {
-    const activeWorkspaceId = active.conversation.workspaceId
-    if (activeWorkspaceId) {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(activeWorkspaceId)
-      if (workspace) {
-        return await workspace.getFilesDir()
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return null
-}
+import { resolveNativeDirectoryHandle } from './tool-utils'
 
 function looksRegexLikeQuery(query: string): boolean {
   // Guard against common LLM misuse where regex operators are passed while regex=false.

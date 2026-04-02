@@ -1,30 +1,6 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
-
-/**
- * Resolve native directory handle from context or workspaceId
- */
-async function resolveNativeDirectoryHandle(
-  directoryHandle: FileSystemDirectoryHandle | null | undefined,
-  workspaceId?: string | null
-): Promise<FileSystemDirectoryHandle | null> {
-  if (directoryHandle) return directoryHandle
-  if (workspaceId) {
-    try {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        return await workspace.getNativeDirectoryHandle()
-      }
-    } catch {
-      // fallback below
-    }
-  }
-  const active = await getActiveConversation()
-  if (!active) return null
-  return await active.conversation.getNativeDirectoryHandle()
-}
+import { resolveNativeDirectoryHandle } from './tool-utils'
 
 export const createSnapshotDefinition: ToolDefinition = {
   type: 'function',

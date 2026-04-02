@@ -10,8 +10,8 @@
 
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
 import micromatch from 'micromatch'
-import { getActiveConversation } from '@/store/conversation-context.store'
 import { resolveVfsTarget } from './vfs-resolver'
+import { resolveNativeDirectoryHandle, resolveWorkspaceDirectoryHandle } from './tool-utils'
 import {
   getStaticGlobPrefix,
   normalizeSubPath,
@@ -127,18 +127,10 @@ async function resolveDirectoryHandleWithConversationFallback(
   workspaceId?: string | null
 ): Promise<FileSystemDirectoryHandle | null> {
   if (handle) return handle
-  if (workspaceId) {
-    try {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        return await workspace.getNativeDirectoryHandle()
-      }
-    } catch {
-      // fallback below
-    }
-  }
+
+  const workspaceHandle = await resolveWorkspaceDirectoryHandle(workspaceId)
+  if (workspaceHandle) return workspaceHandle
+
   try {
     const { useFolderAccessStore } = await import('@/store/folder-access.store')
     const folderHandle = useFolderAccessStore.getState().getCurrentHandle()
@@ -146,9 +138,8 @@ async function resolveDirectoryHandleWithConversationFallback(
   } catch {
     // ignore folder-access store loading failures and continue fallback chain
   }
-  const active = await getActiveConversation()
-  if (!active) return null
-  return active.conversation.getFilesDir()
+
+  return await resolveNativeDirectoryHandle(null, null)
 }
 
 type DiscoveryScope =
@@ -223,7 +214,10 @@ async function resolveDiscoveryScope(
     throw new Error(`${mode === 'list' ? 'List' : 'Glob search'} failed: path cannot include ".."`)
   }
 
-  const rootHandle = await resolveDirectoryHandleWithConversationFallback(toolContext.directoryHandle)
+  const rootHandle = await resolveDirectoryHandleWithConversationFallback(
+    toolContext.directoryHandle,
+    toolContext.workspaceId
+  )
   if (!rootHandle) {
     throw new Error('No directory selected.')
   }

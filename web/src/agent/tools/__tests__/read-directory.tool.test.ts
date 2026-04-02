@@ -5,6 +5,7 @@ import { readDirectoryExecutor } from '../read-directory.tool'
 const getActiveConversationMock = vi.fn()
 const getCurrentHandleMock = vi.fn()
 const resolveVfsTargetMock = vi.fn()
+const getWorkspaceManagerMock = vi.fn()
 
 vi.mock('@/store/conversation-context.store', () => ({
   getActiveConversation: () => getActiveConversationMock(),
@@ -20,6 +21,10 @@ vi.mock('@/store/folder-access.store', () => ({
 
 vi.mock('../vfs-resolver', () => ({
   resolveVfsTarget: (...args: unknown[]) => resolveVfsTargetMock(...args),
+}))
+
+vi.mock('@/opfs', () => ({
+  getWorkspaceManager: () => getWorkspaceManagerMock(),
 }))
 
 function createEmptyDirectoryHandle(name = 'root'): FileSystemDirectoryHandle {
@@ -60,6 +65,27 @@ describe('read_directory tool', () => {
 
     const parsed = JSON.parse(result)
     expect(parsed.error).toContain('No directory selected.')
+  })
+
+  it('falls back to workspace files dir when native directory is unavailable', async () => {
+    const getNativeDirectoryHandle = vi.fn().mockResolvedValue(null)
+    const getFilesDir = vi.fn().mockResolvedValue(createEmptyDirectoryHandle())
+    getWorkspaceManagerMock.mockResolvedValue({
+      getWorkspace: vi.fn().mockResolvedValue({
+        getNativeDirectoryHandle,
+        getFilesDir,
+      }),
+    })
+
+    const result = await readDirectoryExecutor(
+      { pattern: '**/*.ts' },
+      { directoryHandle: null, workspaceId: 'ws_1' } as unknown as ToolContext
+    )
+
+    expect(result).toContain('No files matching pattern')
+    expect(result).not.toContain('No directory selected.')
+    expect(getNativeDirectoryHandle).toHaveBeenCalled()
+    expect(getFilesDir).toHaveBeenCalled()
   })
 
   it('supports glob scans on vfs agents namespace', async () => {

@@ -66,7 +66,10 @@ describe('snapshot tools', () => {
   it('rollback_snapshot returns unresolved paths', async () => {
     rollbackSnapshotMock.mockResolvedValue({ reverted: 1, unresolved: ['src/a.ts'] })
     getActiveConversationMock.mockResolvedValue({
-      conversation: { rollbackSnapshot: rollbackSnapshotMock },
+      conversation: {
+        rollbackSnapshot: rollbackSnapshotMock,
+        getNativeDirectoryHandle: vi.fn().mockResolvedValue(null),
+      },
     })
 
     const result = await rollbackSnapshotExecutor({ snapshot_id: 'snap_1' }, context)

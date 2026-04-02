@@ -12,9 +12,9 @@
 import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import { getActiveConversation } from '@/store/conversation-context.store'
 import { resolveVfsTarget, type AgentTarget } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
+import { resolveNativeDirectoryHandle } from './tool-utils'
 
 //=============================================================================
 // Read Tool
@@ -137,28 +137,6 @@ function isOPFSWorkspaceMiss(error: unknown): boolean {
     message.includes('File not found in OPFS workspace:') ||
     message.includes('File not found in OPFS cache:')
   )
-}
-
-async function resolveNativeDirectoryHandle(
-  directoryHandle?: FileSystemDirectoryHandle | null,
-  workspaceId?: string | null
-): Promise<FileSystemDirectoryHandle | null> {
-  if (directoryHandle) return directoryHandle
-  if (workspaceId) {
-    try {
-      const { getWorkspaceManager } = await import('@/opfs')
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        return await workspace.getNativeDirectoryHandle()
-      }
-    } catch {
-      // fallback below
-    }
-  }
-  const active = await getActiveConversation()
-  if (!active) return null
-  return await active.conversation.getNativeDirectoryHandle()
 }
 
 async function executeSingleRead(
