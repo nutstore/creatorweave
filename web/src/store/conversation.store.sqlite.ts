@@ -13,7 +13,13 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import { toast } from 'sonner'
-import type { Conversation, Message, ToolCall, ConversationStatus } from '@/agent/message-types'
+import type {
+  Conversation,
+  Message,
+  ToolCall,
+  ConversationStatus,
+  DraftAssistantStep,
+} from '@/agent/message-types'
 import { createAssistantMessage, createConversation, createToolMessage } from '@/agent/message-types'
 import {
   emitThinkingStart,
@@ -79,6 +85,230 @@ function commitDraftToMessages(
     )
   }
   return true
+}
+
+type DraftAssistantState = NonNullable<Conversation['draftAssistant']>
+
+type DraftAssistantEvent =
+  | { type: 'message_start' }
+  | { type: 'reasoning_start' }
+  | { type: 'reasoning_stream_sync'; reasoning: string }
+  | { type: 'reasoning_complete'; reasoning: string }
+  | { type: 'content_start' }
+  | { type: 'content_stream_sync'; content: string }
+  | { type: 'content_complete'; content: string }
+  | { type: 'tool_start'; toolCall: ToolCall }
+  | {
+      type: 'tool_delta'
+      argsDelta: string
+      toolCallId?: string
+      isCurrentToolDelta: boolean
+    }
+  | {
+      type: 'tool_complete'
+      toolCall: ToolCall
+      result: string
+      isCurrentTool: boolean
+      nextToolCall: ToolCall | null
+      streamedArgsByCallId: Record<string, string>
+    }
+  | { type: 'compression_start' }
+  | { type: 'compression_complete'; mode: 'skip' | 'compress' }
+
+function createDraftStepId(prefix: 'reasoning' | 'content' | 'compression'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function findDraftStep(draft: DraftAssistantState, stepId: string): DraftAssistantStep | undefined {
+  return draft.steps.find((s) => s.id === stepId)
+}
+
+function ensureDraftTextStep(
+  draft: DraftAssistantState,
+  stepType: 'reasoning' | 'content'
+): string {
+  const last = draft.steps[draft.steps.length - 1]
+  if (last && last.type === stepType) {
+    last.streaming = true
+    return last.id
+  }
+  const stepId = createDraftStepId(stepType)
+  draft.steps.push({
+    id: stepId,
+    type: stepType,
+    content: '',
+    streaming: true,
+  })
+  return stepId
+}
+
+function syncDraftTextStepContent(
+  draft: DraftAssistantState,
+  stepId: string | null | undefined,
+  content: string,
+  streaming: boolean
+): void {
+  if (!stepId) return
+  const step = findDraftStep(draft, stepId)
+  if (!step) return
+  if (step.type !== 'reasoning' && step.type !== 'content') return
+  step.content = content
+  step.streaming = streaming
+}
+
+function ensureDraftAssistantForMessageStart(conv: Conversation): DraftAssistantState {
+  const previous = conv.draftAssistant
+  const next: DraftAssistantState = {
+    reasoning: '',
+    content: '',
+    toolCalls: [],
+    toolResults: {},
+    toolCall: null,
+    toolArgs: '',
+    // Keep streaming timeline across assistant restarts in one run.
+    steps: previous?.steps || [],
+    activeReasoningStepId: null,
+    activeContentStepId: null,
+    activeToolStepId: null,
+    activeCompressionStepId: previous?.activeCompressionStepId || null,
+  }
+  conv.draftAssistant = next
+  return next
+}
+
+function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent): void {
+  if (event.type === 'message_start') {
+    ensureDraftAssistantForMessageStart(conv)
+    return
+  }
+
+  const draft = conv.draftAssistant
+  if (!draft) return
+
+  switch (event.type) {
+    case 'reasoning_start': {
+      draft.activeReasoningStepId = ensureDraftTextStep(draft, 'reasoning')
+      return
+    }
+    case 'reasoning_stream_sync': {
+      draft.reasoning = event.reasoning
+      syncDraftTextStepContent(draft, draft.activeReasoningStepId, event.reasoning, true)
+      return
+    }
+    case 'reasoning_complete': {
+      draft.reasoning = event.reasoning
+      syncDraftTextStepContent(draft, draft.activeReasoningStepId, event.reasoning, false)
+      draft.activeReasoningStepId = null
+      return
+    }
+    case 'content_start': {
+      draft.activeContentStepId = ensureDraftTextStep(draft, 'content')
+      return
+    }
+    case 'content_stream_sync': {
+      draft.content = event.content
+      syncDraftTextStepContent(draft, draft.activeContentStepId, event.content, true)
+      return
+    }
+    case 'content_complete': {
+      draft.content = event.content
+      syncDraftTextStepContent(draft, draft.activeContentStepId, event.content, false)
+      draft.activeContentStepId = null
+      return
+    }
+    case 'tool_start': {
+      const stepId = `tool-${event.toolCall.id}`
+      draft.toolCall = event.toolCall
+      if (!draft.toolCalls.some((x) => x.id === event.toolCall.id)) {
+        draft.toolCalls.push(event.toolCall)
+      }
+      const existing = findDraftStep(draft, stepId)
+      if (existing && existing.type === 'tool_call') {
+        existing.streaming = true
+        existing.toolCall = event.toolCall
+      } else {
+        draft.steps.push({
+          id: stepId,
+          type: 'tool_call',
+          toolCall: event.toolCall,
+          args: '',
+          streaming: true,
+        })
+      }
+      draft.activeToolStepId = stepId
+      return
+    }
+    case 'tool_delta': {
+      if (event.isCurrentToolDelta) {
+        draft.toolArgs += event.argsDelta
+      }
+      const stepId = event.toolCallId ? `tool-${event.toolCallId}` : draft.activeToolStepId
+      if (!stepId) return
+      const step = findDraftStep(draft, stepId)
+      if (step && step.type === 'tool_call') {
+        step.args += event.argsDelta
+      }
+      return
+    }
+    case 'tool_complete': {
+      const completedStepId = `tool-${event.toolCall.id}`
+      draft.toolResults[event.toolCall.id] = event.result || ''
+      const streamedArgs = event.streamedArgsByCallId[event.toolCall.id] || ''
+      if (streamedArgs && draft.toolCalls) {
+        const toolCallIndex = draft.toolCalls.findIndex((t) => t.id === event.toolCall.id)
+        if (toolCallIndex !== -1) {
+          draft.toolCalls[toolCallIndex] = {
+            ...draft.toolCalls[toolCallIndex],
+            function: {
+              ...draft.toolCalls[toolCallIndex].function,
+              arguments: streamedArgs,
+            },
+          }
+        }
+      }
+      const completedStep = findDraftStep(draft, completedStepId)
+      if (completedStep && completedStep.type === 'tool_call') {
+        completedStep.result = event.result || ''
+        completedStep.streaming = false
+      }
+      if (!event.isCurrentTool) return
+      draft.toolCall = null
+      draft.toolArgs = ''
+      if (draft.activeToolStepId === completedStepId) {
+        draft.activeToolStepId = null
+      }
+      if (event.nextToolCall) {
+        draft.toolCall = event.nextToolCall
+        draft.toolArgs = event.streamedArgsByCallId[event.nextToolCall.id] || ''
+        draft.activeToolStepId = `tool-${event.nextToolCall.id}`
+      }
+      return
+    }
+    case 'compression_start': {
+      const stepId = createDraftStepId('compression')
+      draft.steps.push({
+        id: stepId,
+        type: 'compression',
+        content: '正在压缩历史上下文...',
+        streaming: true,
+      })
+      draft.activeCompressionStepId = stepId
+      return
+    }
+    case 'compression_complete': {
+      const stepId = draft.activeCompressionStepId
+      if (stepId) {
+        const step = findDraftStep(draft, stepId)
+        if (step && step.type === 'compression') {
+          step.content =
+            event.mode === 'skip' ? '上下文压缩评估完成（跳过摘要）' : '上下文已压缩并生成摘要'
+          step.streaming = false
+        }
+      }
+      draft.activeCompressionStepId = null
+      return
+    }
+  }
 }
 
 // Default conversation name when title is not available
@@ -1533,16 +1763,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c && c.activeRunId === runId) {
               c.streamingReasoning = fullReasoningAccumulator
-              if (c.draftAssistant) {
-                c.draftAssistant.reasoning = fullReasoningAccumulator
-                const stepId = c.draftAssistant.activeReasoningStepId
-                if (stepId) {
-                  const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                  if (step && step.type === 'reasoning') {
-                    step.content = fullReasoningAccumulator
-                  }
-                }
-              }
+              applyDraftAssistantEvent(c, {
+                type: 'reasoning_stream_sync',
+                reasoning: fullReasoningAccumulator,
+              })
             }
           })
         })
@@ -1557,16 +1781,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c && c.activeRunId === runId) {
               c.streamingContent = fullContentAccumulator
-              if (c.draftAssistant) {
-                c.draftAssistant.content = fullContentAccumulator
-                const stepId = c.draftAssistant.activeContentStepId
-                if (stepId) {
-                  const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                  if (step && step.type === 'content') {
-                    step.content = fullContentAccumulator
-                  }
-                }
-              }
+              applyDraftAssistantEvent(c, {
+                type: 'content_stream_sync',
+                content: fullContentAccumulator,
+              })
             }
           })
         })
@@ -1601,20 +1819,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.completedReasoning = ''
                 c.isContentStreaming = false
                 c.completedContent = ''
-                c.draftAssistant = {
-                  reasoning: '',
-                  content: '',
-                  toolCalls: [],
-                  toolResults: {},
-                  toolCall: null,
-                  toolArgs: '',
-                  // Keep streaming timeline across assistant restarts in one run.
-                  steps: c.draftAssistant?.steps || [],
-                  activeReasoningStepId: null,
-                  activeContentStepId: null,
-                  activeToolStepId: null,
-                  activeCompressionStepId: c.draftAssistant?.activeCompressionStepId || null,
-                }
+                applyDraftAssistantEvent(c, { type: 'message_start' })
               }
             })
           },
@@ -1625,22 +1830,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               if (c && c.activeRunId === runId) {
                 c.status = 'streaming'
                 c.isReasoningStreaming = true
-                if (c.draftAssistant) {
-                  const last = c.draftAssistant.steps[c.draftAssistant.steps.length - 1]
-                  if (last && last.type === 'reasoning') {
-                    last.streaming = true
-                    c.draftAssistant.activeReasoningStepId = last.id
-                  } else {
-                    const stepId = `reasoning-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-                    c.draftAssistant.steps.push({
-                      id: stepId,
-                      type: 'reasoning',
-                      content: '',
-                      streaming: true,
-                    })
-                    c.draftAssistant.activeReasoningStepId = stepId
-                  }
-                }
+                applyDraftAssistantEvent(c, { type: 'reasoning_start' })
               }
             })
             emitThinkingStart()
@@ -1659,18 +1849,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.isReasoningStreaming = false
                 c.completedReasoning = reasoning
                 c.streamingReasoning = ''
-                if (c.draftAssistant) {
-                  c.draftAssistant.reasoning = reasoning
-                  const stepId = c.draftAssistant.activeReasoningStepId
-                  if (stepId) {
-                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                    if (step && step.type === 'reasoning') {
-                      step.content = reasoning
-                      step.streaming = false
-                    }
-                  }
-                  c.draftAssistant.activeReasoningStepId = null
-                }
+                applyDraftAssistantEvent(c, {
+                  type: 'reasoning_complete',
+                  reasoning,
+                })
               }
             })
           },
@@ -1681,22 +1863,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               if (c && c.activeRunId === runId) {
                 c.status = 'streaming'
                 c.isContentStreaming = true
-                if (c.draftAssistant) {
-                  const last = c.draftAssistant.steps[c.draftAssistant.steps.length - 1]
-                  if (last && last.type === 'content') {
-                    last.streaming = true
-                    c.draftAssistant.activeContentStepId = last.id
-                  } else {
-                    const stepId = `content-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-                    c.draftAssistant.steps.push({
-                      id: stepId,
-                      type: 'content',
-                      content: '',
-                      streaming: true,
-                    })
-                    c.draftAssistant.activeContentStepId = stepId
-                  }
-                }
+                applyDraftAssistantEvent(c, { type: 'content_start' })
               }
             })
           },
@@ -1713,18 +1880,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.isContentStreaming = false
                 c.completedContent = content
                 c.streamingContent = ''
-                if (c.draftAssistant) {
-                  c.draftAssistant.content = content
-                  const stepId = c.draftAssistant.activeContentStepId
-                  if (stepId) {
-                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                    if (step && step.type === 'content') {
-                      step.content = content
-                      step.streaming = false
-                    }
-                  }
-                  c.draftAssistant.activeContentStepId = null
-                }
+                applyDraftAssistantEvent(c, {
+                  type: 'content_complete',
+                  content,
+                })
               }
             })
           },
@@ -1772,27 +1931,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 if (!c.streamingToolArgsByCallId[tc.id]) {
                   c.streamingToolArgsByCallId[tc.id] = ''
                 }
-                if (c.draftAssistant) {
-                  c.draftAssistant.toolCall = tc
-                  if (!c.draftAssistant.toolCalls.some((x) => x.id === tc.id)) {
-                    c.draftAssistant.toolCalls.push(tc)
-                  }
-                  const stepId = `tool-${tc.id}`
-                  const existing = c.draftAssistant.steps.find((s) => s.id === stepId)
-                  if (existing && existing.type === 'tool_call') {
-                    existing.streaming = true
-                    existing.toolCall = tc
-                  } else {
-                    c.draftAssistant.steps.push({
-                      id: stepId,
-                      type: 'tool_call',
-                      toolCall: tc,
-                      args: '',
-                      streaming: true,
-                    })
-                  }
-                  c.draftAssistant.activeToolStepId = stepId
-                }
+                applyDraftAssistantEvent(c, {
+                  type: 'tool_start',
+                  toolCall: tc,
+                })
                 // Keep already streamed args when the same tool transitions
                 // from "stream preview" to actual execution.
                 if (!isSameTool) {
@@ -1820,21 +1962,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   const isCurrentToolDelta = !toolCallId || c.currentToolCall?.id === toolCallId
                   if (isCurrentToolDelta) {
                     c.streamingToolArgs += argsDelta
-                    c.draftAssistant.toolArgs += argsDelta
                   }
                   if (toolCallId) {
                     c.streamingToolArgsByCallId = c.streamingToolArgsByCallId || {}
                     c.streamingToolArgsByCallId[toolCallId] =
                       (c.streamingToolArgsByCallId[toolCallId] || '') + argsDelta
                   }
-
-                  const stepId = toolCallId ? `tool-${toolCallId}` : c.draftAssistant.activeToolStepId
-                  if (stepId) {
-                    const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                    if (step && step.type === 'tool_call') {
-                      step.args += argsDelta
-                    }
-                  }
+                  applyDraftAssistantEvent(c, {
+                    type: 'tool_delta',
+                    argsDelta,
+                    toolCallId,
+                    isCurrentToolDelta: !!isCurrentToolDelta,
+                  })
                 }
               }
             })
@@ -1844,7 +1983,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             set((state) => {
               const c = state.conversations.find((c) => c.id === conversationId)
               if (c && c.activeRunId === runId) {
-                const completedStepId = `tool-${tc.id}`
                 const isCurrentTool = c.currentToolCall?.id === tc.id
 
                 if (isCurrentTool) {
@@ -1869,44 +2007,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
                 c.streamingToolArgsByCallId = c.streamingToolArgsByCallId || {}
 
-                if (c.draftAssistant) {
-                  c.draftAssistant.toolResults[tc.id] = _result || ''
-
-                  // Sync streamed args to the tool call in draftAssistant.toolCalls
-                  // This ensures complete tool call args are preserved when stopped
-                  const streamedArgs = c.streamingToolArgsByCallId[tc.id] || ''
-                  if (streamedArgs && c.draftAssistant.toolCalls) {
-                    const toolCallIndex = c.draftAssistant.toolCalls.findIndex((t) => t.id === tc.id)
-                    if (toolCallIndex !== -1) {
-                      c.draftAssistant.toolCalls[toolCallIndex] = {
-                        ...c.draftAssistant.toolCalls[toolCallIndex],
-                        function: {
-                          ...c.draftAssistant.toolCalls[toolCallIndex].function,
-                          arguments: streamedArgs,
-                        },
-                      }
-                    }
-                  }
-
-                  const completedStep = c.draftAssistant.steps.find((s) => s.id === completedStepId)
-                  if (completedStep && completedStep.type === 'tool_call') {
-                    completedStep.result = _result || ''
-                    completedStep.streaming = false
-                  }
-
-                  if (isCurrentTool) {
-                    c.draftAssistant.toolCall = null
-                    c.draftAssistant.toolArgs = ''
-                    if (c.draftAssistant.activeToolStepId === completedStepId) {
-                      c.draftAssistant.activeToolStepId = null
-                    }
-                    if (c.currentToolCall) {
-                      c.draftAssistant.toolCall = c.currentToolCall
-                      c.draftAssistant.toolArgs = (c.streamingToolArgsByCallId || {})[c.currentToolCall.id] || ''
-                      c.draftAssistant.activeToolStepId = `tool-${c.currentToolCall.id}`
-                    }
-                  }
-                }
+                applyDraftAssistantEvent(c, {
+                  type: 'tool_complete',
+                  toolCall: tc,
+                  result: _result,
+                  isCurrentTool,
+                  nextToolCall: c.currentToolCall,
+                  streamedArgsByCallId: c.streamingToolArgsByCallId,
+                })
 
                 delete c.streamingToolArgsByCallId[tc.id]
               }
@@ -1940,15 +2048,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               if (c.status !== 'streaming' && c.status !== 'tool_calling') {
                 c.status = 'pending'
               }
-              if (!c.draftAssistant) return
-              const stepId = `compression-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-              c.draftAssistant.steps.push({
-                id: stepId,
-                type: 'compression',
-                content: '正在压缩历史上下文...',
-                streaming: true,
-              })
-              c.draftAssistant.activeCompressionStepId = stepId
+              applyDraftAssistantEvent(c, { type: 'compression_start' })
             })
           },
           onContextCompressionComplete: (payload) => {
@@ -1963,19 +2063,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
-              if (!c || c.activeRunId !== runId || !c.draftAssistant) return
-              const stepId = c.draftAssistant.activeCompressionStepId
-              if (stepId) {
-                const step = c.draftAssistant.steps.find((s) => s.id === stepId)
-                if (step && step.type === 'compression') {
-                  step.content =
-                    payload.mode === 'skip'
-                      ? '上下文压缩评估完成（跳过摘要）'
-                      : '上下文已压缩并生成摘要'
-                  step.streaming = false
-                }
-              }
-              c.draftAssistant.activeCompressionStepId = null
+              if (!c || c.activeRunId !== runId) return
+              applyDraftAssistantEvent(c, {
+                type: 'compression_complete',
+                mode: payload.mode === 'skip' ? 'skip' : 'compress',
+              })
             })
             // Summary message is now injected by AgentLoop directly into
             // allMessages via onMessagesUpdated, so no need to collect it here.
@@ -2316,8 +2408,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.isContentStreaming = false
             c.isReasoningStreaming = false
             c.workflowExecution = null
-            // NOTE: Do NOT set status='idle' or activeRunId=null here.
-            // Let finalizeRun (triggered by onComplete) handle run lifecycle cleanup.
+            // Mark run canceled immediately so UI exits running state
+            // even if AgentLoop abort callbacks are delayed or suppressed.
+            c.status = 'idle'
+            c.error = null
+            c.activeRunId = null
           }
         })
         if (committedPartial) {
