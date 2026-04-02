@@ -91,7 +91,6 @@ async function collectPendingOverlays(
     if (!workspace) return {}
 
     const overlays: Record<string, PendingFileOverlay> = {}
-    const { readFile } = useOPFSStore.getState()
 
     for (const change of pendingChanges) {
       if (change.type === 'delete') {
