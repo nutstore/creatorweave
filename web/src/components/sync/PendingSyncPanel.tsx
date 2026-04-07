@@ -11,9 +11,12 @@ import React, { useState, useCallback, useMemo, useEffect as useReactEffect } fr
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { useConversationStore } from '@/store/conversation.store'
+import { useAgentStore } from '@/store/agent.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
+import { createUserMessage } from '@/agent/message-types'
 import {
   BrandButton,
   BrandDialog,
@@ -29,6 +32,7 @@ import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
 import { toast } from 'sonner'
+import type { ConflictInfo, FileChange } from '@/opfs/types/opfs-types'
 
 export function PendingSyncPanel() {
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
@@ -145,6 +149,56 @@ export function PendingSyncPanel() {
     setSelectAll(false)
     setShowClearConfirm(false)
   }, [clearChanges])
+
+  // 发送冲突消息给 Agent 处理
+  const sendConflictsToAgent = useCallback(async (conflicts: ConflictInfo[], changes: FileChange[]) => {
+    const settings = useSettingsStore.getState()
+    if (!settings.hasApiKey) {
+      toast.error('请先配置 API Key')
+      return
+    }
+
+    const conversationStore = useConversationStore.getState()
+    const { directoryHandle } = useAgentStore.getState()
+
+    const conflictPaths = conflicts.map((c) => c.path).join(', ')
+    const conflictFiles = changes.filter((c) => conflicts.some((conf) => conf.path === c.path))
+
+    const messageContent = [
+      `检测到 ${conflicts.length} 个文件冲突，需要在审批前解决：`,
+      '',
+      '冲突文件：',
+      conflictFiles.map((c) => `  - ${c.type}: ${c.path}`).join('\n'),
+      '',
+      '请使用以下方式处理：',
+      '1. 使用 `read` 工具查看磁盘当前版本',
+      '2. 使用 `force_sync_files` 强制覆盖磁盘文件',
+      '3. 或者手动合并后再尝试审批',
+      '',
+      `冲突详情: ${conflictPaths}`,
+    ].join('\n')
+
+    const userMessage = createUserMessage(messageContent)
+
+    let targetConvId = conversationStore.activeConversationId
+    if (!targetConvId) {
+      const conv = conversationStore.createNew('冲突处理')
+      targetConvId = conv.id
+      await conversationStore.setActive(targetConvId)
+    }
+
+    const currentConv = conversationStore.conversations.find((c) => c.id === targetConvId)
+    const currentMessages = currentConv ? [...currentConv.messages, userMessage] : [userMessage]
+    conversationStore.updateMessages(targetConvId, currentMessages)
+
+    await conversationStore.runAgent(
+      targetConvId,
+      settings.providerType,
+      settings.modelName,
+      settings.maxTokens,
+      directoryHandle
+    )
+  }, [])
 
   const generateSummaryWithLLM = useCallback(async (paths: string[]): Promise<string | null> => {
     try {
@@ -314,6 +368,30 @@ export function PendingSyncPanel() {
     const paths = filesToSync.map((c) => c.path)
     if (paths.length === 0) return
 
+    // 先检测冲突
+    try {
+      const activeConversation = await getActiveConversation()
+      if (activeConversation) {
+        const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
+        if (nativeDir) {
+          const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
+
+          if (conflicts.length > 0) {
+            // 有冲突，发送消息给 Agent 处理
+            await sendConflictsToAgent(conflicts, filesToSync)
+            toast.info(
+              `检测到 ${conflicts.length} 个文件冲突，已发送消息给 Agent 处理`,
+              { description: conflicts.slice(0, 3).map((c) => c.path).join(', ') + (conflicts.length > 3 ? '...' : '') }
+            )
+            return
+          }
+        }
+      }
+    } catch {
+      // 冲突检测失败，继续尝试审批
+    }
+
+    // 无冲突，显示审批对话框
     setPendingApprovePaths(paths)
     setSnapshotSummary('')
     setSummaryError(null)
@@ -329,7 +407,7 @@ export function PendingSyncPanel() {
       toast.warning('AI 生成快照描述失败，请手动填写')
     }
     setGeneratingSummary(false)
-  }, [pendingChanges, isSyncing, selectedItems, generateSummaryWithLLM])
+  }, [pendingChanges, isSyncing, selectedItems, generateSummaryWithLLM, sendConflictsToAgent])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
