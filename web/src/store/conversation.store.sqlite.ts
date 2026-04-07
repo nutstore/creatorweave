@@ -334,6 +334,7 @@ import {
 import { getWorkflowTemplateBundle, listWorkflowTemplateBundles } from '@/agent/workflow/templates'
 import { getConversationRepository, initSQLiteDB } from '@/sqlite'
 import { useSettingsStore } from './settings.store'
+import { getCurrentWorkspaceAgentMode } from './workspace-preferences.store'
 
 // Follow-up suggestions are enabled by default
 
@@ -382,6 +383,8 @@ async function loadConversations(): Promise<Conversation[]> {
     contextWindowUsage: conv.lastContextWindowUsage || null,
     lastContextWindowUsage: conv.lastContextWindowUsage || null,
     mountRefCount: 0,
+    // Runtime state - read from workspace-preferences (workspace-level isolation)
+    agentMode: getCurrentWorkspaceAgentMode(),
   }))
 }
 
@@ -1642,7 +1645,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           ? Math.max(1, Math.min(100, Math.floor(configuredMaxIterations)))
           : 20
 
-        const agentMode = useSettingsStore.getState().agentMode
+        // Read agentMode from workspace-preferences store (workspace-level isolation)
+        const agentMode = getCurrentWorkspaceAgentMode()
 
         const agentLoop = new AgentLoop({
           provider,

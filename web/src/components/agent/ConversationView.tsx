@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useProjectStore } from '@/store/project.store'
 import { useAgentsStore } from '@/store/agents.store'
 import { useT } from '@/i18n'
@@ -134,7 +135,8 @@ export function ConversationView({
   const unmountConversation = useConversationStore((s) => s.unmountConversation)
   const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
 
-  const { providerType, modelName, maxTokens, hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel, agentMode, setAgentMode } = useSettingsStore()
+  const { providerType, modelName, maxTokens, hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel } = useSettingsStore()
+  const { agentMode, setAgentMode } = useWorkspacePreferencesStore()
   const t = useT()
 
   // Must be declared before useEffect that uses it

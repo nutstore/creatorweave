@@ -61,6 +61,8 @@ export interface WorkspacePreferences {
   display: DisplayPreferences
   recentFiles: RecentFile[]
   onboardingCompleted: boolean
+  /** Agent execution mode per workspace: 'plan' (read-only) or 'act' (full access) */
+  agentMode: 'plan' | 'act'
 }
 
 /**
@@ -87,6 +89,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   },
   recentFiles: [],
   onboardingCompleted: false,
+  agentMode: 'act',
 }
 
 /**
@@ -119,6 +122,9 @@ interface WorkspacePreferencesState extends WorkspacePreferences {
 
   // Onboarding actions
   setOnboardingCompleted: (completed: boolean) => void
+
+  // Agent mode actions
+  setAgentMode: (mode: 'plan' | 'act') => void
 
   // Reset actions
   resetAll: () => void
@@ -227,6 +233,12 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
           state.onboardingCompleted = completed
         }),
 
+      // Agent mode actions
+      setAgentMode: (mode) =>
+        set((state) => {
+          state.agentMode = mode
+        }),
+
       // Reset actions
       resetAll: () =>
         set((state) => {
@@ -241,10 +253,39 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 1,
+      version: 2, // Bump version for agentMode field
+      partialize: (state) => ({
+        panelSizes: state.panelSizes,
+        panelState: state.panelState,
+        display: state.display,
+        recentFiles: state.recentFiles,
+        onboardingCompleted: state.onboardingCompleted,
+        agentMode: state.agentMode,
+      }),
     }
   )
 )
 
 // Export types
 export type { WorkspacePreferencesState }
+
+// =============================================================================
+// Agent Mode helpers - workspace-aware mode management
+// =============================================================================
+
+/**
+ * Get the current workspace's agent mode.
+ * Reads from workspace store to get activeWorkspaceId.
+ */
+export function getCurrentWorkspaceAgentMode(): 'plan' | 'act' {
+  const state = useWorkspacePreferencesStore.getState()
+  return state.agentMode
+}
+
+/**
+ * Set the current workspace's agent mode.
+ * Reads from workspace store to identify the active workspace.
+ */
+export function setCurrentWorkspaceAgentMode(mode: 'plan' | 'act'): void {
+  useWorkspacePreferencesStore.getState().setAgentMode(mode)
+}

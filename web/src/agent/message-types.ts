@@ -161,6 +161,8 @@ export interface Conversation {
   updatedAt: number
   /** Runtime status (not persisted) */
   status: ConversationStatus
+  /** Agent execution mode per-conversation: 'plan' (read-only) or 'act' (full access). Not persisted. */
+  agentMode: 'plan' | 'act'
   /** Streaming content being received (not persisted) */
   streamingContent: string
   /** Streaming reasoning content (not persisted) */
@@ -275,6 +277,7 @@ export function createConversation(title?: string): Conversation {
     updatedAt: now,
     // Runtime state (not persisted)
     status: 'idle',
+    agentMode: 'act',
     streamingContent: '',
     streamingReasoning: '',
     isReasoningStreaming: false,

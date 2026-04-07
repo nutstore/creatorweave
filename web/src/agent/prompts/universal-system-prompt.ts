@@ -380,7 +380,7 @@ You are currently in **Plan Mode** - a read-only mode designed for analysis, exp
 - Clearly communicate what you find and recommend
 - Suggest next steps for Act mode when appropriate
 
-If you need to make changes, indicate this to the user and suggest switching to Act mode.`
+If you determine that you need to make file changes to fulfill the user's request, use the \`switch_agent_mode\` tool with \`mode="act"\` and a concise \`reason\` (for example: \`reason="Need to edit files to implement requested changes"\`) to switch to Act mode. You will then have immediate access to write tools (write, edit, delete).`
   } else {
     return `
 
@@ -403,6 +403,8 @@ You are currently in **Act Mode** - full read/write access to the workspace.
 **Behavior:**
 - Be decisive and take action
 - Execute changes efficiently
-- Confirm successful operations to the user`
+- Confirm successful operations to the user
+
+If you want to switch back to read-only mode for analysis or review, use the \`switch_agent_mode\` tool with \`mode="plan"\` and a concise \`reason\` (for example: \`reason="Switching back to read-only analysis mode"\`).`
   }
 }

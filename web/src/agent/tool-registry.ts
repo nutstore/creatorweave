@@ -44,6 +44,9 @@ import {
 } from '@/skills/skill-tools'
 import { getAllEnabledSkillNames } from '@/skills/skill-storage'
 
+// Switch mode tool
+import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
+
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
@@ -65,6 +68,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: gitLogDefinition, executor: gitLogExecutor },
   { definition: gitShowDefinition, executor: gitShowExecutor },
   { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
+  // Meta tools
+  { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
 ]
 
 export function getBuiltinToolNames(): string[] {

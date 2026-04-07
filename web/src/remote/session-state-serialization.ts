@@ -209,6 +209,8 @@ export function deserializeConversation(data: SerializedConversation): Conversat
     streamingToolArgs: '',
     streamingToolArgsByCallId: {},
     error: null,
+    // Runtime state
+    agentMode: 'act',
   }
 }
 
