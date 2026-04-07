@@ -249,11 +249,14 @@ export class WorkspacePendingManager {
    * Sync to real filesystem
    * @param directoryHandle Real filesystem directory handle
    * @param cacheManager Cache manager (for reading OPFS content)
+   * @param onlyPaths Optional list of paths to sync (if not provided, sync all)
+   * @param forceOverwrite If true, skip conflict check and overwrite disk files
    */
   async sync(
     directoryHandle: FileSystemDirectoryHandle,
     cacheManager: CacheManager,
-    onlyPaths?: string[]
+    onlyPaths?: string[],
+    forceOverwrite?: boolean
   ): Promise<SyncResult> {
     const result: SyncResult = {
       success: 0,
@@ -283,7 +286,10 @@ export class WorkspacePendingManager {
       }
 
       try {
-        const conflictCheck = await this.checkNativeConflict(directoryHandle, change)
+        // Skip conflict check if forceOverwrite is true
+        const conflictCheck = forceOverwrite
+          ? { isConflict: false, currentFsMtime: 0 }
+          : await this.checkNativeConflict(directoryHandle, change)
         if (conflictCheck.isConflict) {
           result.failed++
           const message =

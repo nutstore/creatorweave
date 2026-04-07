@@ -16,6 +16,7 @@ import type {
   ChangeDetectionResult,
   ErrorDetail,
   SystemLog,
+  ConflictInfo,
 } from '../types/opfs-types'
 import { ErrorCode } from '../types/opfs-types'
 import { getFileContentType } from '../utils/opfs-utils'
@@ -585,9 +586,15 @@ export class WorkspaceRuntime {
   /**
    * Sync pending changes to real filesystem
    * @param directoryHandle Real filesystem directory handle
+   * @param onlyPaths Optional list of paths to sync (if not provided, sync all)
+   * @param forceOverwrite If true, skip conflict check and overwrite disk files
    * @returns Sync result
    */
-  async syncToDisk(directoryHandle: FileSystemDirectoryHandle, onlyPaths?: string[]): Promise<SyncResult> {
+  async syncToDisk(
+    directoryHandle: FileSystemDirectoryHandle,
+    onlyPaths?: string[],
+    forceOverwrite?: boolean
+  ): Promise<SyncResult> {
     if (!this.initialized) await this.initialize()
 
     // Create cache interface for sync operation
@@ -612,7 +619,7 @@ export class WorkspaceRuntime {
       },
     }
 
-    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths)
+    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite)
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -762,17 +769,14 @@ export class WorkspaceRuntime {
     paths: string[],
     summary?: string,
     directoryHandle?: FileSystemDirectoryHandle | null
-  ): Promise<{ snapshotId: string; opCount: number } | null> {
+  ): Promise<{ snapshotId: string; opCount: number; conflicts?: ConflictInfo[] } | null> {
     if (!this.initialized) await this.initialize()
     if (paths.length === 0) return null
+
+    // Detect conflicts but don't block - let the agent handle them
+    let conflicts: ConflictInfo[] = []
     if (directoryHandle) {
-      const conflicts = await this.pendingManager.detectConflicts(directoryHandle, paths)
-      if (conflicts.length > 0) {
-        const sample = conflicts.slice(0, 2).map((item) => item.path).join(', ')
-        throw new Error(
-          `检测到 ${conflicts.length} 个文件冲突，无法审批通过：${sample}${conflicts.length > 2 ? ' ...' : ''}`
-        )
-      }
+      conflicts = await this.pendingManager.detectConflicts(directoryHandle, paths)
     }
 
     const repo = getFSOverlayRepository()
@@ -814,7 +818,7 @@ export class WorkspaceRuntime {
       })
     }
 
-    return snapshot
+    return { ...snapshot, conflicts }
   }
 
   async rollbackSnapshot(

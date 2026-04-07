@@ -47,6 +47,18 @@ import { getAllEnabledSkillNames } from '@/skills/skill-storage'
 // Switch mode tool
 import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
 
+// Changeset tools (snapshot, sync, conflicts)
+import {
+  forceSyncFilesDefinition,
+  forceSyncFilesExecutor,
+  detectConflictsDefinition,
+  detectConflictsExecutor,
+  createSnapshotDefinition,
+  createSnapshotExecutor,
+  rollbackSnapshotDefinition,
+  rollbackSnapshotExecutor,
+} from './tools/changeset.tool'
+
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
@@ -68,6 +80,11 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: gitLogDefinition, executor: gitLogExecutor },
   { definition: gitShowDefinition, executor: gitShowExecutor },
   { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
+  // Changeset & sync tools
+  { definition: createSnapshotDefinition, executor: createSnapshotExecutor },
+  { definition: rollbackSnapshotDefinition, executor: rollbackSnapshotExecutor },
+  { definition: detectConflictsDefinition, executor: detectConflictsExecutor },
+  { definition: forceSyncFilesDefinition, executor: forceSyncFilesExecutor },
   // Meta tools
   { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
 ]

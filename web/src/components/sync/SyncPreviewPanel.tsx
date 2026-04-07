@@ -261,12 +261,22 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       // Unwatch the specific paths that will be written to avoid triggering HMR
       await pauseHmr(approvedPaths)
 
+      let snapshotConflicts: Array<{ path: string }> = []
       if (approvedPaths.length > 0) {
-        await conversation.createApprovedSnapshotForPaths(
+        const snapshotResult = await conversation.createApprovedSnapshotForPaths(
           approvedPaths,
           summary.trim(),
           nativeDir
         )
+        // Capture conflicts detected during snapshot creation (let agent handle them)
+        if (snapshotResult?.conflicts && snapshotResult.conflicts.length > 0) {
+          snapshotConflicts = snapshotResult.conflicts
+          // Notify agent about conflicts via toast - agent will handle resolution
+          toast.warning(
+            `检测到 ${snapshotConflicts.length} 个文件冲突，Agent 将自动处理`,
+            { description: snapshotConflicts.slice(0, 3).map((c) => c.path).join(', ') + (snapshotConflicts.length > 3 ? '...' : '') }
+          )
+        }
       }
 
       const pendingResult = await conversation.syncToDisk(
@@ -274,11 +284,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         approvedPaths
       )
 
+      // Collect all conflicts (from snapshot creation + sync)
+      const allConflicts = [...snapshotConflicts, ...pendingResult.conflicts]
+
       // Show sync result
       if (pendingResult.failed > 0) {
         const conflictHint =
-          pendingResult.conflicts.length > 0
-            ? `，其中 ${pendingResult.conflicts.length} 个存在冲突`
+          allConflicts.length > 0
+            ? `，其中 ${allConflicts.length} 个存在冲突`
             : ''
         setSyncError(`${pendingResult.failed} 个文件审批应用失败${conflictHint}`)
         return false
