@@ -497,18 +497,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setSyncError(null)
     setSummaryError(null)
     setSnapshotSummary('')
-    setApproveDialogOpen(true)
-
-    setGeneratingSummary(true)
-    const aiSummary = await generateSummaryWithLLM(filesToSync)
-    if (aiSummary && aiSummary.trim().length > 0) {
-      setSnapshotSummary(aiSummary.trim())
-      setSummaryError(null)
-    } else if (!snapshotSummary.trim()) {
-      setSummaryError('AI 生成失败，请手动填写')
-    }
     setGeneratingSummary(false)
-  }, [pendingChanges, isSyncing, generateSummaryWithLLM, snapshotSummary])
+    setApproveDialogOpen(true)
+  }, [pendingChanges, isSyncing])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return

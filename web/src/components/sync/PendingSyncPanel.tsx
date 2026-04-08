@@ -475,20 +475,10 @@ export function PendingSyncPanel() {
     // 无冲突，显示审批对话框
     setPendingApprovePaths(paths)
     setSnapshotSummary('')
+    setGeneratingSummary(false)
     setSummaryError(null)
     setApproveDialogOpen(true)
-
-    setGeneratingSummary(true)
-    const aiSummary = await generateSummaryWithLLM(paths)
-    if (aiSummary && aiSummary.trim().length > 0) {
-      setSnapshotSummary(aiSummary.trim())
-      setSummaryError(null)
-    } else {
-      setSummaryError('AI 生成失败，请手动填写')
-      toast.warning('AI 生成快照描述失败，请手动填写')
-    }
-    setGeneratingSummary(false)
-  }, [pendingChanges, isSyncing, selectedItems, generateSummaryWithLLM, sendConflictsToAgent])
+  }, [pendingChanges, isSyncing, selectedItems, sendConflictsToAgent])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
