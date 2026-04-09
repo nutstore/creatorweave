@@ -34,66 +34,6 @@ import { sendChangeReviewToConversation } from './review-request'
 import { toast } from 'sonner'
 import type { ConflictInfo, FileChange } from '@/opfs/types/opfs-types'
 
-/**
- * 生成简化的 unified diff，只显示有变化的行
- * 限制输出行数，避免超出 LLM 上下文
- */
-function buildSimpleDiff(
-  opfsContent: string | null,
-  diskContent: string | null,
-  maxLines: number = 60
-): string {
-  const opfsLines = (opfsContent ?? '').split('\n')
-  const diskLines = (diskContent ?? '').split('\n')
-
-  const diff: string[] = []
-
-  // 找到所有不同的行
-  const changes: Array<{ lineNum: number; type: '+' | '-' | '~'; content: string }> = []
-  const maxLength = Math.max(opfsLines.length, diskLines.length)
-
-  for (let i = 0; i < maxLength; i++) {
-    const opfsLine = opfsLines[i]
-    const diskLine = diskLines[i]
-
-    if (opfsLine !== diskLine) {
-      if (opfsLine !== undefined) {
-        changes.push({ lineNum: i + 1, type: '-', content: opfsLine })
-      }
-      if (diskLine !== undefined) {
-        changes.push({ lineNum: i + 1, type: '+', content: diskLine })
-      }
-    }
-  }
-
-  // 限制变化的行数
-  const limitedChanges = changes.slice(0, maxLines)
-  const hasMore = changes.length > maxLines
-
-  // 分组相邻的变化
-  let lastLineNum = 0
-  for (const change of limitedChanges) {
-    // 如果和上一行行号差距 > 5，增加分隔
-    if (change.lineNum - lastLineNum > 5 && lastLineNum > 0) {
-      diff.push(`... (${change.lineNum - lastLineNum - 1} 行未显示) ...`)
-    }
-    const prefix = change.type === '-' ? '-' : change.type === '+' ? '+' : '~'
-    const lineNumStr = String(change.lineNum).padStart(4, ' ')
-    diff.push(`${lineNumStr}${prefix} ${change.content}`)
-    lastLineNum = change.lineNum
-  }
-
-  if (hasMore) {
-    diff.push(`... (还有 ${changes.length - maxLines} 行变化未显示) ...`)
-  }
-
-  if (diff.length === 0) {
-    return '(两个版本内容相同)'
-  }
-
-  return diff.join('\n')
-}
-
 export function PendingSyncPanel() {
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
   const clearChanges = useConversationContextStore((state) => state.clearChanges)
@@ -110,6 +50,7 @@ export function PendingSyncPanel() {
   const [generatingSummary, setGeneratingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
+  const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
   const listRef = React.useRef<HTMLDivElement>(null)
 
   // Handle keyboard shortcuts
@@ -145,6 +86,37 @@ export function PendingSyncPanel() {
     const { refreshPendingChanges } = useConversationContextStore.getState()
     await refreshPendingChanges()
   }, [])
+
+  const refreshConflictPaths = useCallback(async () => {
+    if (!pendingChanges || pendingChanges.changes.length === 0) {
+      setConflictPaths(new Set())
+      return
+    }
+
+    try {
+      const activeConversation = await getActiveConversation()
+      if (!activeConversation) {
+        setConflictPaths(new Set())
+        return
+      }
+
+      const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
+      if (!nativeDir) {
+        setConflictPaths(new Set())
+        return
+      }
+
+      const paths = pendingChanges.changes.map((c) => c.path)
+      const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
+      setConflictPaths(new Set(conflicts.map((c) => c.path)))
+    } catch {
+      setConflictPaths(new Set())
+    }
+  }, [pendingChanges])
+
+  useReactEffect(() => {
+    void refreshConflictPaths()
+  }, [refreshConflictPaths])
 
   // Handle open preview panel
   const handleOpenPreview = useCallback(() => {
@@ -200,6 +172,11 @@ export function PendingSyncPanel() {
   // 处理删除单个文件 (必须在条件返回之前定义)
   const handleRemoveFile = useCallback(async (path: string) => {
     await discardPendingPath(path)
+    setConflictPaths((prev) => {
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
   }, [discardPendingPath])
 
   // 处理拒绝全部 (必须在条件返回之前定义)
@@ -207,6 +184,7 @@ export function PendingSyncPanel() {
     await clearChanges()
     setSelectedItems(new Set())
     setSelectAll(false)
+    setConflictPaths(new Set())
     setShowClearConfirm(false)
   }, [clearChanges])
 
@@ -221,44 +199,22 @@ export function PendingSyncPanel() {
     const conversationStore = useConversationStore.getState()
     const { directoryHandle } = useAgentStore.getState()
 
-    // 获取 native directory handle
-    const active = await getActiveConversation()
-    const nativeDir = active ? await active.conversation.getNativeDirectoryHandle() : null
-
-    // 获取冲突文件的详细信息
-    const conflictFiles = changes.filter((c) => conflicts.some((conf) => conf.path === c.path))
-    const conflictDetails: string[] = []
-
-    for (const conflict of conflicts) {
-      const fileChange = conflictFiles.find((c) => c.path === conflict.path)
-      if (!fileChange || isImageFile(conflict.path)) continue
-
-      const opfsContent = await readFileFromOPFS(active!.conversationId, conflict.path)
-      const diskContent = nativeDir ? await readFileFromNativeFS(nativeDir, conflict.path) : null
-
-      conflictDetails.push('')
-      conflictDetails.push(`## ${conflict.path}`)
-      conflictDetails.push('')
-      conflictDetails.push('```diff')
-      conflictDetails.push(buildSimpleDiff(opfsContent, diskContent))
-      conflictDetails.push('```')
-      conflictDetails.push('')
-      conflictDetails.push('标注说明: `-` = OPFS版本(待审批), `+` = 磁盘版本')
-      conflictDetails.push('')
-    }
+    // 获取冲突文件列表（不再传输 diff 细节，统一由 OPFS 冲突标记驱动处理）
+    const conflictLines = conflicts.map((conflict) => {
+      const fileChange = changes.find((c) => c.path === conflict.path)
+      return `  - ${fileChange?.type ?? 'modify'}: ${conflict.path}`
+    })
 
     const messageContent = [
       `检测到 ${conflicts.length} 个文件冲突，需要在审批前解决：`,
       '冲突文件：',
-      conflictFiles.map((c) => `  - ${c.type}: ${c.path}`).join('\n'),
+      conflictLines.join('\n'),
       '',
-      '以下是冲突文件的差异（只显示变化的部分）：',
-      ...conflictDetails,
-      '## 合并指引',
-      '请仔细对比 OPFS 版本（待审批的草稿）和磁盘版本（外部的最新修改），',
-      '然后使用 `edit` 或 `write` 工具将合并后的正确内容写入文件。',
-      '如果两个版本内容相同（例如 diff 显示“(两个版本内容相同)”），也必须执行一次 `edit` 工具（允许 old_text 与 new_text 相同）来刷新冲突基线时间。',
-      '完成后请调用 `detect_conflicts` 对这些路径再次检查，确认冲突已消除。',
+      '## 处理要求',
+      '系统已将文本冲突写入 OPFS 文件（<<<<<<< / ======= / >>>>>>> 标记）。',
+      '请逐个打开以上冲突文件并完成合并，然后使用 `edit` 或 `write` 写回最终内容。',
+      '如果两侧内容一致，也必须执行一次 `edit`（可 old_text == new_text）以刷新冲突基线。',
+      '完成后请调用 `detect_conflicts`（传入上述路径）再次检查，确认冲突已消除。',
     ].join('\n')
 
     const userMessage = createUserMessage(messageContent)
@@ -417,6 +373,7 @@ export function PendingSyncPanel() {
               ? `，其中 ${result.conflicts.length} 个存在冲突`
               : ''
           setSyncError(`${result.failed} 个文件审批应用失败${conflictHint}`)
+          setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
           setTimeout(() => setSyncError(null), 6000)
           return false
         }
@@ -424,6 +381,14 @@ export function PendingSyncPanel() {
 
       // 同步后刷新列表（支持部分同步）
       await useConversationContextStore.getState().refreshPendingChanges(true)
+      setConflictPaths((prev) => {
+        const synced = new Set(pathsToSync)
+        const next = new Set<string>()
+        for (const path of prev) {
+          if (!synced.has(path)) next.add(path)
+        }
+        return next
+      })
       setSelectedItems(new Set())
       setSelectAll(false)
 
@@ -460,6 +425,7 @@ export function PendingSyncPanel() {
           const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
 
           if (conflicts.length > 0) {
+            setConflictPaths(new Set(conflicts.map((c) => c.path)))
             // 有冲突，发送消息给 Agent 处理
             await sendConflictsToAgent(conflicts, filesToSync)
             toast.info(
@@ -468,6 +434,7 @@ export function PendingSyncPanel() {
             )
             return
           }
+          setConflictPaths(new Set())
         }
       }
     } catch {
@@ -584,6 +551,7 @@ export function PendingSyncPanel() {
           {pendingChanges.changes.map((change, index) => {
             const typeInfo = getChangeTypeInfo(change.type)
             const isSelected = selectedItems.has(change.path)
+            const hasConflict = conflictPaths.has(change.path)
 
             return (
               <div
@@ -616,6 +584,11 @@ export function PendingSyncPanel() {
                 </span>
 
                 {/* Type Badge */}
+                {hasConflict && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded flex-shrink-0 bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+                    C
+                  </span>
+                )}
                 <span
                   className={`px-1.5 py-0.5 text-[10px] font-semibold rounded flex-shrink-0 ${typeInfo.bg} ${typeInfo.color}`}
                 >

@@ -48,6 +48,8 @@ interface PendingFileListProps {
   selectedItems?: Set<string>
   /** Callback when selection changes */
   onSelectionChange?: (selected: Set<string>) => void
+  /** Paths currently marked as conflicts */
+  conflictPaths?: Set<string>
 }
 
 /** Check if a file path points to an HTML file */
@@ -65,6 +67,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
   isSyncing = false,
   selectedItems: externalSelectedItems,
   onSelectionChange,
+  conflictPaths = new Set<string>(),
 }) => {
   // Internal state for uncontrolled mode (backward compatibility)
   const [internalSelectAll, setInternalSelectAll] = useState(false)
@@ -316,6 +319,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                   const isSelected = selectedItems.has(change.path) || change.path === selectedPath
                   const typeInfo = getChangeTypeInfo(change.type)
                   const isHtml = isHtmlFile(change.path) && change.type !== 'delete'
+                  const hasConflict = conflictPaths.has(change.path)
 
                   return (
                     <div
@@ -350,6 +354,13 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                       <span className="text-xs text-tertiary flex-shrink-0 w-16 text-right">
                         {formatFileSize(change.size)}
                       </span>
+
+                      {/* 冲突标记 */}
+                      {hasConflict && (
+                        <Badge className="flex-shrink-0 bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+                          C
+                        </Badge>
+                      )}
 
                       {/* 变更类型 */}
                       <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>

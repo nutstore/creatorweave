@@ -31,66 +31,6 @@ import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 
 /**
- * 生成简化的 unified diff，只显示有变化的行
- * 限制输出行数，避免超出 LLM 上下文
- */
-function buildSimpleDiff(
-  opfsContent: string | null,
-  diskContent: string | null,
-  maxLines: number = 60
-): string {
-  const opfsLines = (opfsContent ?? '').split('\n')
-  const diskLines = (diskContent ?? '').split('\n')
-
-  const diff: string[] = []
-
-  // 找到所有不同的行
-  const changes: Array<{ lineNum: number; type: '+' | '-' | '~'; content: string }> = []
-  const maxLength = Math.max(opfsLines.length, diskLines.length)
-
-  for (let i = 0; i < maxLength; i++) {
-    const opfsLine = opfsLines[i]
-    const diskLine = diskLines[i]
-
-    if (opfsLine !== diskLine) {
-      if (opfsLine !== undefined) {
-        changes.push({ lineNum: i + 1, type: '-', content: opfsLine })
-      }
-      if (diskLine !== undefined) {
-        changes.push({ lineNum: i + 1, type: '+', content: diskLine })
-      }
-    }
-  }
-
-  // 限制变化的行数
-  const limitedChanges = changes.slice(0, maxLines)
-  const hasMore = changes.length > maxLines
-
-  // 分组相邻的变化
-  let lastLineNum = 0
-  for (const change of limitedChanges) {
-    // 如果和上一行行号差距 > 3，增加分隔
-    if (change.lineNum - lastLineNum > 5 && lastLineNum > 0) {
-      diff.push(`... (${change.lineNum - lastLineNum - 1} 行未显示) ...`)
-    }
-    const prefix = change.type === '-' ? '-' : change.type === '+' ? '+' : '~'
-    const lineNumStr = String(change.lineNum).padStart(4, ' ')
-    diff.push(`${lineNumStr}${prefix} ${change.content}`)
-    lastLineNum = change.lineNum
-  }
-
-  if (hasMore) {
-    diff.push(`... (还有 ${changes.length - maxLines} 行变化未显示) ...`)
-  }
-
-  if (diff.length === 0) {
-    return '(两个版本内容相同)'
-  }
-
-  return diff.join('\n')
-}
-
-/**
  * Send conflict resolution request to agent via conversation
  */
 async function sendConflictsToAgent(
@@ -113,46 +53,24 @@ async function sendConflictsToAgent(
     return
   }
 
-  const nativeDir = await activeConv.conversation.getNativeDirectoryHandle()
-  const conversationId = activeConv.conversationId
-
-  // Build conflict resolution message with actual content
-  const conflictFiles = changes.filter((c) => conflicts.some((conf) => conf.path === c.path))
-
-  const conflictDetails: string[] = []
-  for (const conflict of conflicts) {
-    const fileChange = conflictFiles.find((c) => c.path === conflict.path)
-    if (!fileChange || isImageFile(conflict.path)) continue
-
-    // Read both OPFS and disk versions
-    const opfsContent = await readFileFromOPFS(conversationId, conflict.path)
-    const diskContent = nativeDir ? await readFileFromNativeFS(nativeDir, conflict.path) : null
-
-    conflictDetails.push('')
-    conflictDetails.push(`## ${conflict.path}`)
-    conflictDetails.push('')
-    conflictDetails.push('```diff')
-    conflictDetails.push(buildSimpleDiff(opfsContent, diskContent))
-    conflictDetails.push('```')
-    conflictDetails.push('')
-    conflictDetails.push('标注说明: `-` = OPFS版本(待审批), `+` = 磁盘版本')
-    conflictDetails.push('')
-  }
+  // Build conflict resolution message without diff payload
+  const conflictLines = conflicts.map((conflict) => {
+    const fileChange = changes.find((c) => c.path === conflict.path)
+    return `  - ${fileChange?.type ?? 'modify'}: ${conflict.path}`
+  })
 
   const messageContent = [
     `检测到 ${conflicts.length} 个文件冲突，需要在审批前解决：`,
     '',
     '冲突文件：',
-    conflictFiles.map((c) => `  - ${c.type}: ${c.path}`).join('\n'),
+    conflictLines.join('\n'),
     '',
-    '以下是冲突文件的差异（只显示变化的部分）：',
-    ...conflictDetails,
-    '## 合并指引',
+    '## 处理要求',
     '',
-    '请仔细对比 OPFS 版本（待审批的草稿）和磁盘版本（外部的最新修改），',
-    '然后使用 `edit` 或 `write` 工具将合并后的正确内容写入文件。',
-    '如果两个版本内容相同（例如 diff 显示“(两个版本内容相同)”），也必须执行一次 `edit` 工具（允许 old_text 与 new_text 相同）来刷新冲突基线时间。',
-    '完成后请调用 `detect_conflicts` 对这些路径再次检查，确认冲突已消除。',
+    '系统已将文本冲突写入 OPFS 文件（<<<<<<< / ======= / >>>>>>> 标记）。',
+    '请逐个打开以上冲突文件并完成合并，然后使用 `edit` 或 `write` 写回最终内容。',
+    '如果两侧内容一致，也必须执行一次 `edit`（可 old_text == new_text）以刷新冲突基线。',
+    '完成后请调用 `detect_conflicts`（传入上述路径）再次检查，确认冲突已消除。',
     '',
     '注意：编辑后会更新 OPFS 草稿内容，后续审批将使用新的合并版本。',
   ].join('\n')
@@ -281,6 +199,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   const [generatingSummary, setGeneratingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
+  const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
 
   // Selection state for selective sync
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -301,6 +220,44 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       clearPreviewSelectedPath()
     }
   }, [previewSelectedPath, pendingChanges, clearPreviewSelectedPath])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const refreshConflictPaths = async () => {
+      if (!pendingChanges || pendingChanges.changes.length === 0) {
+        if (!cancelled) setConflictPaths(new Set())
+        return
+      }
+
+      try {
+        const activeConversation = await getActiveConversation()
+        if (!activeConversation) {
+          if (!cancelled) setConflictPaths(new Set())
+          return
+        }
+        const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
+        if (!nativeDir) {
+          if (!cancelled) setConflictPaths(new Set())
+          return
+        }
+        const paths = pendingChanges.changes.map((c) => c.path)
+        const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
+        if (!cancelled) {
+          setConflictPaths(new Set(conflicts.map((c) => c.path)))
+        }
+      } catch {
+        if (!cancelled) {
+          setConflictPaths(new Set())
+        }
+      }
+    }
+
+    void refreshConflictPaths()
+    return () => {
+      cancelled = true
+    }
+  }, [pendingChanges])
 
   const generateSummaryWithLLM = useCallback(async (changes: FileChange[]): Promise<string | null> => {
     try {
@@ -438,6 +395,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
             ? `，其中 ${pendingResult.conflicts.length} 个存在冲突`
             : ''
         setSyncError(`${pendingResult.failed} 个文件审批应用失败${conflictHint}`)
+        setConflictPaths(new Set(pendingResult.conflicts.map((c) => c.path)))
         return false
       }
 
@@ -447,6 +405,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       if (!latestChanges.some((c) => c.path === selectedPath)) {
         setSelectedFile(null)
       }
+      setConflictPaths((prev) => {
+        const approvedPathSet = new Set(approvedPaths)
+        const next = new Set<string>()
+        for (const path of prev) {
+          if (!approvedPathSet.has(path)) next.add(path)
+        }
+        return next
+      })
       onSync?.()
       return true
     } catch (err) {
@@ -480,6 +446,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, filePaths)
 
           if (conflicts.length > 0) {
+            setConflictPaths(new Set(conflicts.map((c) => c.path)))
             // Send conflicts to agent for resolution
             await sendConflictsToAgent(conflicts, filesToSync)
             toast.info(
@@ -488,6 +455,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
             )
             return
           }
+          setConflictPaths(new Set())
         }
       }
     } catch {
@@ -532,6 +500,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setSelectedFile(null)
     setSyncError(null)
     setSelectedItems(new Set())
+    setConflictPaths(new Set())
   }, [clearChanges])
 
   /**
@@ -539,6 +508,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
    */
   const handleRemoveFile = useCallback(async (path: string) => {
     await discardPendingPath(path)
+    setConflictPaths((prev) => {
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
   }, [discardPendingPath])
 
   const hasSelection = Boolean(selectedFile)
@@ -625,6 +599,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               isSyncing={isSyncing}
               selectedItems={selectedItems}
               onSelectionChange={setSelectedItems}
+              conflictPaths={conflictPaths}
             />
           )}
         </div>
