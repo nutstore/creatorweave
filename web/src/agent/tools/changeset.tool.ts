@@ -52,7 +52,10 @@ export const detectConflictsExecutor: ToolExecutor = async (args, context) => {
         opfsMtime: c.opfsMtime,
         currentFsMtime: c.currentFsMtime,
       })),
-      message: `Detected ${conflicts.length} conflict(s). Please read the disk version and merge changes manually, then re-check conflicts.`,
+      message:
+        `Detected ${conflicts.length} conflict(s). ` +
+        'Text conflicts are materialized with <<<<<<< / ======= / >>>>>>> markers in OPFS. ' +
+        'Please resolve markers with edit, then re-run detect_conflicts.',
     })
   } catch (err) {
     return JSON.stringify({

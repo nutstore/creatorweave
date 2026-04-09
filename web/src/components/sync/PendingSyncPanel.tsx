@@ -257,6 +257,8 @@ export function PendingSyncPanel() {
       '## 合并指引',
       '请仔细对比 OPFS 版本（待审批的草稿）和磁盘版本（外部的最新修改），',
       '然后使用 `edit` 或 `write` 工具将合并后的正确内容写入文件。',
+      '如果两个版本内容相同（例如 diff 显示“(两个版本内容相同)”），也必须执行一次 `edit` 工具（允许 old_text 与 new_text 相同）来刷新冲突基线时间。',
+      '完成后请调用 `detect_conflicts` 对这些路径再次检查，确认冲突已消除。',
     ].join('\n')
 
     const userMessage = createUserMessage(messageContent)

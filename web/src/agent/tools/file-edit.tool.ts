@@ -83,17 +83,13 @@ async function executeSingleEdit(
 ): Promise<string> {
   const { path, oldText, newText, replaceAll } = opts
 
-  if (oldText === newText) {
-    return JSON.stringify({
-      error: 'No changes to make: old_text and new_text are exactly the same.',
-    })
-  }
-
   if (oldText.length === 0) {
     return JSON.stringify({
       error: 'old_text cannot be empty. Provide exact existing text to replace.',
     })
   }
+
+  const isNoopEdit = oldText === newText
 
   try {
     const { readFile, writeFile, getPendingChanges } = useOPFSStore.getState()
@@ -140,16 +136,18 @@ async function executeSingleEdit(
       })
     }
 
-    if (matches > 1 && !replaceAll) {
+    if (matches > 1 && !replaceAll && !isNoopEdit) {
       return JSON.stringify({
         error:
           'old_text appears multiple times. Set replace_all=true to replace all occurrences, or provide a more unique snippet.',
       })
     }
 
-    const updatedFile = replaceAll
-      ? fileContent.split(oldText).join(newText)
-      : fileContent.replace(oldText, newText)
+    const updatedFile = isNoopEdit
+      ? fileContent
+      : replaceAll
+        ? fileContent.split(oldText).join(newText)
+        : fileContent.replace(oldText, newText)
 
     if (target.kind === 'workspace') {
       await writeFile(target.path, updatedFile, context.directoryHandle, context.workspaceId)
@@ -180,6 +178,7 @@ async function executeSingleEdit(
 
     return JSON.stringify({
       success: true,
+      noop: isNoopEdit,
       path,
       filePath: path,
       action: 'edited',
@@ -193,8 +192,12 @@ async function executeSingleEdit(
       pendingCount,
       message:
         target.kind === 'workspace'
-          ? `File "${path}" edited. ${pendingCount} change(s) pending review.`
-          : `File "${path}" edited.`,
+          ? isNoopEdit
+            ? `File "${path}" already matched requested content. ${pendingCount} change(s) pending review.`
+            : `File "${path}" edited. ${pendingCount} change(s) pending review.`
+          : isNoopEdit
+            ? `File "${path}" already matched requested content.`
+            : `File "${path}" edited.`,
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'NotFoundError') {

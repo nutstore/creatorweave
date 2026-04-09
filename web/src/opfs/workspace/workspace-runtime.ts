@@ -21,6 +21,10 @@ import type {
 import { ErrorCode } from '../types/opfs-types'
 import { getFileContentType } from '../utils/opfs-utils'
 import { WorkspacePendingManager } from './workspace-pending'
+import {
+  buildConflictMarkerContent,
+  hasConflictMarkers,
+} from './conflict-markers'
 import { scanFilesInWorker } from '@/workers/diff-worker-manager'
 import { getRuntimeDirectoryHandle } from '@/native-fs'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
@@ -675,7 +679,37 @@ export class WorkspaceRuntime {
     onlyPaths?: string[]
   ): Promise<SyncResult['conflicts']> {
     if (!this.initialized) await this.initialize()
-    return await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
+    const conflicts = await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
+    await this.materializeTextConflictMarkers(directoryHandle, conflicts)
+    return conflicts
+  }
+
+  private async materializeTextConflictMarkers(
+    directoryHandle: FileSystemDirectoryHandle,
+    conflicts: SyncResult['conflicts']
+  ): Promise<void> {
+    for (const conflict of conflicts) {
+      const path = this.normalizeWorkspacePath(conflict.path)
+      try {
+        const fromFiles = await this.readFromFilesDir(path)
+        if (!fromFiles || fromFiles.contentType !== 'text' || typeof fromFiles.content !== 'string') {
+          continue
+        }
+        if (hasConflictMarkers(fromFiles.content)) {
+          continue
+        }
+
+        const fromNative = await this.readFromNativeFS(path, directoryHandle)
+        if (fromNative.metadata.contentType !== 'text' || typeof fromNative.content !== 'string') {
+          continue
+        }
+
+        const merged = buildConflictMarkerContent(fromFiles.content, fromNative.content)
+        await this.writeToFilesDir(path, merged)
+      } catch {
+        // Best effort: leave conflict unresolved if marker materialization fails.
+      }
+    }
   }
 
   /**

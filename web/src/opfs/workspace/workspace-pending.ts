@@ -6,6 +6,8 @@
  */
 
 import type { FileContent, PendingChange, SyncResult } from '../types/opfs-types'
+import { getFileContentType } from '../utils/opfs-utils'
+import { hasConflictMarkers } from './conflict-markers'
 import {
   getFSOverlayRepository,
   type PendingOverlayOp,
@@ -144,6 +146,21 @@ export class WorkspacePendingManager {
       if (allowedPaths && !allowedPaths.has(changePathNormalized)) {
         continue
       }
+      if (change.type !== 'delete') {
+        const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path)
+        if (hasMarkers) {
+          const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, change.path)
+          conflicts.push({
+            path: change.path,
+            workspaceId: this.workspaceId,
+            otherWorkspaces: [],
+            opfsMtime: change.fsMtime || change.timestamp,
+            currentFsMtime: currentFsMtime ?? 0,
+          })
+          continue
+        }
+      }
+
       const check = await this.checkNativeConflict(directoryHandle, change)
       if (!check.isConflict) continue
 
@@ -288,6 +305,25 @@ export class WorkspacePendingManager {
       }
 
       try {
+        if (change.type !== 'delete') {
+          const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path, cacheManager)
+          if (hasMarkers) {
+            result.failed++
+            const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, change.path)
+            const message = `检测到未解决冲突标记：${change.path}，请先处理 <<<<<<< / ======= / >>>>>>> 标记后再审批。`
+            await repo.keepOpPending(change.id, message)
+            await repo.recordSyncItem(batchId, change.id, change.path, 'failed', message)
+            result.conflicts.push({
+              path: change.path,
+              workspaceId: this.workspaceId,
+              otherWorkspaces: [],
+              opfsMtime: change.fsMtime || change.timestamp,
+              currentFsMtime: currentFsMtime ?? 0,
+            })
+            continue
+          }
+        }
+
         // Skip conflict check if forceOverwrite is true
         const conflictCheck = forceOverwrite
           ? { isConflict: false, currentFsMtime: 0 }
@@ -605,6 +641,52 @@ export class WorkspacePendingManager {
         return null
       }
       throw err
+    }
+  }
+
+  private async safeReadNativeMtime(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<number | null> {
+    try {
+      return await this.readNativeMtime(directoryHandle, path)
+    } catch {
+      return null
+    }
+  }
+
+  private async hasUnresolvedConflictMarkers(
+    path: string,
+    cacheManager?: CacheManager
+  ): Promise<boolean> {
+    if (getFileContentType(path) !== 'text') {
+      return false
+    }
+
+    if (cacheManager) {
+      const cached = await this.readCacheContent(path, cacheManager)
+      return typeof cached === 'string' && hasConflictMarkers(cached)
+    }
+
+    const fromFiles = await this.readTextFromFilesDir(path)
+    return typeof fromFiles === 'string' && hasConflictMarkers(fromFiles)
+  }
+
+  private async readTextFromFilesDir(path: string): Promise<string | null> {
+    try {
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return await file.text()
+    } catch {
+      return null
     }
   }
 

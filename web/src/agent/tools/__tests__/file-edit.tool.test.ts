@@ -200,4 +200,25 @@ describe('file edit tool', () => {
     expect(parsed.error).toContain('Read file before editing')
     expect(writeFileMock).not.toHaveBeenCalled()
   })
+
+  it('allows no-op edits when old_text equals new_text', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = value\n',
+      metadata: { size: 16, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      ['workspace:src/a.ts', { content: 'const x = value\n', timestamp: Date.now(), isPartialView: false }],
+    ])
+
+    const result = await editExecutor(
+      { path: 'src/a.ts', old_text: 'value', new_text: 'value' },
+      makeContext({ readFileState })
+    )
+    const parsed = JSON.parse(result)
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.noop).toBe(true)
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const x = value\n', null, 'ws-1')
+  })
 })
