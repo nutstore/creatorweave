@@ -3,6 +3,7 @@ import { formatDistanceToNow, isToday, isYesterday, isThisWeek, isThisMonth } fr
 import { zhCN, enUS, ja, ko } from 'date-fns/locale'
 import type { Locale as DateFnsLocale } from 'date-fns'
 import type { Project, ProjectStats } from '@/sqlite/repositories/project.repository'
+import { ActivityHeatmap } from '@/components/activity/ActivityHeatmap'
 import {
   BrandButton,
   BrandCheckbox,
@@ -962,8 +963,10 @@ export function ProjectHome({
             </div>
           </aside>
 
-          {/* Right: Project list */}
-          <section className="lg:col-span-8">
+          {/* Right: Activity heatmap + Project list */}
+          <section className="lg:col-span-8 space-y-6">
+            {/* Activity Heatmap */}
+            <ActivityHeatmap />
             {/* Search and filter */}
             <div className="home-reveal home-delay-4 flex flex-col sm:flex-row gap-3 mb-6">
               <input

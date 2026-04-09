@@ -729,6 +729,12 @@ export const zhCN = {
       emerald: '翡翠',
       slate: '石墨',
     },
+    activity: {
+      title: '活跃度',
+      less: '少',
+      more: '多',
+      count: '次活动',
+    },
     // 项目时间线
     timeline: {
       today: '今天',

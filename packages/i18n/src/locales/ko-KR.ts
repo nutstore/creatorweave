@@ -702,6 +702,12 @@ export const koKR = {
       emerald: '에메랄드',
       slate: '슬레이트',
     },
+    activity: {
+      title: '활동',
+      less: '적음',
+      more: '많음',
+      count: '회 활동',
+    },
     timeline: {
       today: '오늘',
       yesterday: '어제',

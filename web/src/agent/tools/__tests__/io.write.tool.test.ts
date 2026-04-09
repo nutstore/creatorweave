@@ -2,8 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
 import { writeExecutor } from '../io.tool'
 
+type PendingChangeMock = {
+  id: string
+  path: string
+  type: 'create' | 'modify' | 'delete'
+  fsMtime: number
+  timestamp: number
+}
+
 const writeFileMock = vi.fn()
-const getPendingChangesMock = vi.fn(() => [])
+const getPendingChangesMock = vi.fn<() => PendingChangeMock[]>(() => [])
 const hasCachedFileMock = vi.fn(() => false)
 const resolveVfsTargetMock = vi.fn()
 

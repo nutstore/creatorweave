@@ -702,6 +702,12 @@ export const jaJP = {
       emerald: 'エメラルド',
       slate: 'スレート',
     },
+    activity: {
+      title: 'アクティビティ',
+      less: '少ない',
+      more: '多い',
+      count: '件のアクティビティ',
+    },
     timeline: {
       today: '今日',
       yesterday: '昨日',

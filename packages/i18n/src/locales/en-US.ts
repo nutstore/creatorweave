@@ -720,6 +720,12 @@ export const enUS = {
       emerald: 'Emerald',
       slate: 'Slate',
     },
+    activity: {
+      title: 'Activity',
+      less: 'Less',
+      more: 'More',
+      count: 'activities',
+    },
     // Project timeline
     timeline: {
       today: 'Today',
