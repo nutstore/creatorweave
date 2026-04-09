@@ -19,6 +19,7 @@ import { ProjectManager } from '@/opfs'
 //=============================================================================
 
 const PROJECT_CHANGE_CHANNEL = 'creatorweave-project-changes'
+const PROJECT_PASSIVE_REFRESH_INTERVAL_MS = 1000
 
 type ProjectChangeMessage =
   | { type: 'created'; projectId: string }
@@ -27,6 +28,8 @@ type ProjectChangeMessage =
   | { type: 'refresh' }
 
 let projectChangeChannel: BroadcastChannel | null = null
+let projectSyncInitialized = false
+let lastProjectPassiveRefreshAt = 0
 
 function getProjectChangeChannel(): BroadcastChannel | null {
   if (typeof BroadcastChannel === 'undefined') return null
@@ -57,6 +60,33 @@ function setupProjectChangeListener(onChange: () => void): () => void {
   }
   channel.addEventListener('message', handler)
   return () => channel.removeEventListener('message', handler)
+}
+
+function setupProjectSync(onChange: () => void): void {
+  if (projectSyncInitialized) return
+  projectSyncInitialized = true
+
+  setupProjectChangeListener(() => {
+    console.log('[ProjectStore] Received cross-tab change, refreshing...')
+    onChange()
+  })
+
+  if (typeof window === 'undefined' || typeof document === 'undefined') return
+
+  const refreshOnTabActivation = () => {
+    const now = Date.now()
+    if (now - lastProjectPassiveRefreshAt < PROJECT_PASSIVE_REFRESH_INTERVAL_MS) return
+    lastProjectPassiveRefreshAt = now
+    console.log('[ProjectStore] Tab activated, refreshing projects...')
+    onChange()
+  }
+
+  window.addEventListener('focus', refreshOnTabActivation)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      refreshOnTabActivation()
+    }
+  })
 }
 
 interface ProjectState {
@@ -114,6 +144,9 @@ export const useProjectStore = create<ProjectState>()(
     error: null,
 
     initialize: async () => {
+      setupProjectSync(() => {
+        void get().refreshProjects()
+      })
       if (get().initialized) return
 
       const started = performance.now()
@@ -166,15 +199,13 @@ export const useProjectStore = create<ProjectState>()(
           isLoading: false,
         })
 
-        const { useAgentStore } = await import('./agent.store')
-        await useAgentStore.getState().setActiveProject(normalizedActiveProjectId)
+        try {
+          const { useAgentStore } = await import('./agent.store')
+          await useAgentStore.getState().setActiveProject(normalizedActiveProjectId)
+        } catch (error) {
+          console.warn('[ProjectStore] Failed to sync agent store active project:', error)
+        }
         await syncAgentsForProject(normalizedActiveProjectId)
-
-        // Set up cross-tab sync listener
-        setupProjectChangeListener(() => {
-          console.log('[ProjectStore] Received cross-tab change, refreshing...')
-          get().refreshProjects()
-        })
 
         console.log(`[ProjectStore] initialize done (${Math.round(performance.now() - started)}ms)`)
       } catch (e: unknown) {
@@ -241,6 +272,7 @@ export const useProjectStore = create<ProjectState>()(
           conversationContextIds.has(c.id)
         )?.id
         await conversationStore.setActive(nextActiveConversationId || null)
+        broadcastProjectChange({ type: 'updated', projectId })
         return true
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to set active project'

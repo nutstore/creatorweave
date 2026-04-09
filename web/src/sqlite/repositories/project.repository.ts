@@ -121,7 +121,11 @@ export class ProjectRepository {
 
   async deleteProject(id: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM projects WHERE id = ?', [id])
+    await db.transaction(async () => {
+      // active_project uses ON DELETE RESTRICT; clear pointer before deleting the project row.
+      await db.execute('DELETE FROM active_project WHERE singleton_id = 0 AND project_id = ?', [id])
+      await db.execute('DELETE FROM projects WHERE id = ?', [id])
+    })
   }
 
   async findActiveProject(): Promise<Project | null> {

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * SQLite Worker - Runs SQLite in a worker thread using opfs-sahpool VFS
+ * SQLite Worker - Runs SQLite in a worker thread with OPFS-backed SQLite
  *
  * opfs-sahpool advantages over opfs VFS:
  * - Memory-mapped storage for faster reads/writes (2-5x faster)
@@ -9,6 +9,9 @@
  * - Multiple reader support
  *
  * Requires Atomics.wait() which is only available in workers.
+ *
+ * Note: SAH pool is currently disabled because it can cause cross-tab
+ * visibility issues where tabs observe divergent project lists.
  */
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
@@ -16,6 +19,7 @@ import { initializeSchema } from './migrations/index'
 
 const DB_NAME = '/bfosa-unified.sqlite'
 const SAHPOOL_NAME = 'bfosa-pool'
+const ENABLE_OPFS_SAHPOOL = false
 
 // Pool configuration: 1GB max, 4KB pages (same as SQLite default)
 const POOL_CONFIG = {
@@ -67,6 +71,141 @@ let sqlite3: any = null
 let db: any = null
 let dbMode: 'opfs' | 'memory' = 'memory'
 let poolUtil: any = null // Store poolUtil for opfs-sahpool VFS
+
+const EMPTY_DB_IGNORED_TABLES = new Set(['migrations', 'idb_migration_state'])
+
+function quoteSQLiteIdentifier(identifier: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+    throw new Error(`Unsafe SQLite identifier: ${identifier}`)
+  }
+  return `"${identifier}"`
+}
+
+function getUserTableNames(dbHandle: any): string[] {
+  const rows = dbHandle.exec({
+    sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    returnValue: 'resultRows',
+    rowMode: 'object',
+  }) as Array<{ name?: string }>
+  return rows.map((row) => row.name).filter((name): name is string => !!name)
+}
+
+function getTableColumns(dbHandle: any, tableName: string): string[] {
+  const columns: string[] = []
+  const stmt = dbHandle.prepare(`PRAGMA table_info(${quoteSQLiteIdentifier(tableName)})`)
+  try {
+    while (stmt.step()) {
+      const row = stmt.get({}) as { name?: string }
+      if (row.name) columns.push(row.name)
+    }
+  } finally {
+    stmt.finalize()
+  }
+  return columns
+}
+
+function tableRowCount(dbHandle: any, tableName: string): number {
+  const stmt = dbHandle.prepare(`SELECT COUNT(*) AS count FROM ${quoteSQLiteIdentifier(tableName)}`)
+  try {
+    if (!stmt.step()) return 0
+    const row = stmt.get({}) as { count?: number }
+    return Number(row.count || 0)
+  } finally {
+    stmt.finalize()
+  }
+}
+
+function hasMeaningfulData(dbHandle: any): boolean {
+  const tables = getUserTableNames(dbHandle)
+  for (const table of tables) {
+    if (EMPTY_DB_IGNORED_TABLES.has(table)) continue
+    if (tableRowCount(dbHandle, table) > 0) return true
+  }
+  return false
+}
+
+function copyTableRows(sourceDb: any, targetDb: any, tableName: string): number {
+  const columns = getTableColumns(sourceDb, tableName)
+  if (columns.length === 0) return 0
+
+  const quotedTable = quoteSQLiteIdentifier(tableName)
+  const columnList = columns.map((column) => quoteSQLiteIdentifier(column)).join(', ')
+  const placeholders = columns.map((_, index) => `?${index + 1}`).join(', ')
+
+  const selectStmt = sourceDb.prepare(`SELECT ${columnList} FROM ${quotedTable}`)
+  const insertStmt = targetDb.prepare(`INSERT INTO ${quotedTable} (${columnList}) VALUES (${placeholders})`)
+
+  let copied = 0
+  try {
+    while (selectStmt.step()) {
+      const row = selectStmt.get({}) as Record<string, unknown>
+      insertStmt.reset()
+      for (let index = 0; index < columns.length; index++) {
+        insertStmt.bind(index + 1, row[columns[index]])
+      }
+      insertStmt.step()
+      copied++
+    }
+  } finally {
+    selectStmt.finalize()
+    insertStmt.finalize()
+  }
+  return copied
+}
+
+function copyAllUserTables(sourceDb: any, targetDb: any): number {
+  const tables = getUserTableNames(sourceDb)
+  targetDb.exec({ sql: 'PRAGMA foreign_keys = OFF' })
+  targetDb.exec({ sql: 'BEGIN IMMEDIATE' })
+  let totalCopied = 0
+  try {
+    for (const table of tables) {
+      const quoted = quoteSQLiteIdentifier(table)
+      targetDb.exec({ sql: `DELETE FROM ${quoted}` })
+      totalCopied += copyTableRows(sourceDb, targetDb, table)
+    }
+    targetDb.exec({ sql: 'COMMIT' })
+  } catch (error) {
+    try {
+      targetDb.exec({ sql: 'ROLLBACK' })
+    } catch {
+      // Ignore rollback errors after failed copy attempt.
+    }
+    throw error
+  } finally {
+    targetDb.exec({ sql: 'PRAGMA foreign_keys = ON' })
+  }
+  return totalCopied
+}
+
+async function migrateFromLegacySahpoolIfNeeded(currentDb: any): Promise<void> {
+  if (ENABLE_OPFS_SAHPOOL) return
+  if (hasMeaningfulData(currentDb)) return
+  if (typeof sqlite3?.installOpfsSAHPoolVfs !== 'function') return
+
+  let legacyPool: any = null
+  let legacyDb: any = null
+  try {
+    legacyPool = await sqlite3.installOpfsSAHPoolVfs(POOL_CONFIG)
+    legacyDb = new legacyPool.OpfsSAHPoolDb(DB_NAME, 'c')
+    if (!hasMeaningfulData(legacyDb)) return
+
+    const copiedRows = copyAllUserTables(legacyDb, currentDb)
+    console.warn(
+      `[SQLite Worker] Migrated legacy SAH pool data into OPFS database (rows copied: ${copiedRows}).`
+    )
+  } catch (error) {
+    console.warn('[SQLite Worker] Legacy SAH pool migration skipped:', error)
+  } finally {
+    if (legacyDb) {
+      try {
+        legacyDb.close()
+      } catch {
+        // Ignore close errors in migration path.
+      }
+    }
+  }
+}
 
 // Handle messages from main thread
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
@@ -168,7 +307,7 @@ async function handleRecover() {
 
   // Step 1: Try to reconnect to existing database
   // opfs-sahpool can often recover from stale handles without needing refresh
-  if (poolUtil || typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
+  if (ENABLE_OPFS_SAHPOOL && (poolUtil || typeof sqlite3.installOpfsSAHPoolVfs === 'function')) {
     try {
       // Use the stored poolUtil if available, otherwise reinitialize
       if (!poolUtil) {
@@ -242,6 +381,32 @@ async function handleRecover() {
     }
   }
 
+  // Step 2: Try regular OPFS reconnection when SAH pool is disabled/unavailable.
+  if (sqlite3?.oo1?.OpfsDb) {
+    try {
+      db = new sqlite3.oo1.OpfsDb(DB_NAME)
+      dbMode = 'opfs'
+      db.exec({ sql: 'SELECT 1', returnValue: 'resultRows' })
+
+      try {
+        await initializeSchema(db)
+      } catch (schemaError) {
+        console.warn('[SQLite Worker] Schema migration warning:', schemaError)
+      }
+
+      console.log(`[SQLite Worker] ${recoverId}: Recovery SUCCESS via regular OPFS`)
+      return
+    } catch (reconnectError) {
+      const errorMsg = reconnectError instanceof Error ? reconnectError.message : String(reconnectError)
+      console.error(`[SQLite Worker] ${recoverId}: Regular OPFS reconnection FAILED:`, errorMsg)
+      throw new Error(
+        'DATABASE_INACCESSIBLE: Please refresh the page to restore database access. ' +
+          'Your conversation data is safe, but we cannot access it due to a browser OPFS issue. ' +
+          'Refreshing the page will restore the database connection.'
+      )
+    }
+  }
+
   // Step 2: DO NOT fallback to in-memory during recovery!
   // In-memory mode creates an isolated empty database per worker/tab,
   // causing multi-tab data desync (tabs see different data).
@@ -276,7 +441,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
 
   // Try to use opfs-sahpool VFS for better performance and reliability
   // @ts-ignore - installOpfsSAHPoolVfs types are incomplete
-  if (typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
+  if (ENABLE_OPFS_SAHPOOL && typeof sqlite3.installOpfsSAHPoolVfs === 'function') {
     try {
       const isNewPool = !poolUtil
       if (isNewPool) {
@@ -386,6 +551,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
   // Do not run destructive auto-recovery heuristics here.
   try {
     await initializeSchema(db, reportProgress ? createProgressReporter() : undefined)
+    await migrateFromLegacySahpoolIfNeeded(db)
   } catch (error) {
     console.error(`[SQLite Worker] ${initId}: Database initialization failed:`, error)
     const errorMsg = error instanceof Error ? error.message : String(error)
@@ -449,6 +615,14 @@ function handleQueryAll(sql: string, params: unknown[]): unknown[] {
         console.error('[SQLite Worker] Reconnection failed:', reconnectError)
         throw new Error('DATABASE_INACCESSIBLE: Database connection lost. Please refresh the page.')
       }
+    } else if (sqlite3?.oo1?.OpfsDb) {
+      try {
+        db = new sqlite3.oo1.OpfsDb(DB_NAME)
+        dbMode = 'opfs'
+      } catch (reconnectError) {
+        console.error('[SQLite Worker] Reconnection failed:', reconnectError)
+        throw new Error('DATABASE_INACCESSIBLE: Database connection lost. Please refresh the page.')
+      }
     } else {
       throw new Error('Database connection is no longer valid. Please reload the page.')
     }
@@ -501,6 +675,14 @@ function handleExecute(sql: string, params: unknown[]): void {
     if (poolUtil) {
       try {
         db = new poolUtil.OpfsSAHPoolDb(DB_NAME, 'c')
+        dbMode = 'opfs'
+      } catch (reconnectError) {
+        console.error('[SQLite Worker] Reconnection failed:', reconnectError)
+        throw new Error('DATABASE_INACCESSIBLE: Database connection lost. Please refresh the page.')
+      }
+    } else if (sqlite3?.oo1?.OpfsDb) {
+      try {
+        db = new sqlite3.oo1.OpfsDb(DB_NAME)
         dbMode = 'opfs'
       } catch (reconnectError) {
         console.error('[SQLite Worker] Reconnection failed:', reconnectError)
