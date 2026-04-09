@@ -507,6 +507,33 @@ interface FileItem {
   content: string
 }
 
+type PendingChangeType = 'create' | 'modify' | 'delete'
+type PendingChangeLike = { path: string; type: PendingChangeType }
+
+function normalizePendingComparePath(inputPath: string): string {
+  let normalized = inputPath.replace(/\\/g, '/').trim()
+  if (normalized.startsWith('/mnt/')) {
+    normalized = normalized.slice('/mnt/'.length)
+  } else if (normalized === '/mnt') {
+    normalized = ''
+  }
+  return normalized.replace(/^\/+/, '')
+}
+
+function getPendingWriteTypeForPath(
+  pendingChanges: PendingChangeLike[],
+  path: string
+): Exclude<PendingChangeType, 'delete'> | null {
+  const target = normalizePendingComparePath(path)
+  for (let i = pendingChanges.length - 1; i >= 0; i--) {
+    const pending = pendingChanges[i]
+    if (normalizePendingComparePath(pending.path) !== target) continue
+    if (pending.type === 'delete') continue
+    return pending.type
+  }
+  return null
+}
+
 export const writeExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const content = args.content as string | undefined
@@ -539,9 +566,16 @@ async function executeSingleWrite(
     let message = ''
 
     if (target.kind === 'workspace') {
-      isNew = !hasCachedFile(target.path)
-      await writeFile(target.path, content, context.directoryHandle, context.workspaceId)
-      pendingCount = getPendingChanges().length
+      const wasCachedBeforeWrite = hasCachedFile(target.path)
+      const writeDirectoryHandle = await resolveNativeDirectoryHandle(
+        context.directoryHandle,
+        context.workspaceId
+      )
+      await writeFile(target.path, content, writeDirectoryHandle, context.workspaceId)
+      const pendingChanges = getPendingChanges()
+      pendingCount = pendingChanges.length
+      const pendingType = getPendingWriteTypeForPath(pendingChanges, target.path)
+      isNew = pendingType ? pendingType === 'create' : !wasCachedBeforeWrite
       status = 'pending'
       message = isNew
         ? `File "${path}" created. ${pendingCount} change(s) pending review.`
@@ -588,6 +622,10 @@ async function executeBatchWrite(
   let updated = 0
   let hasWorkspaceWrites = false
   const ensuredAgentIds = new Set<string>()
+  const writeDirectoryHandle = await resolveNativeDirectoryHandle(
+    context.directoryHandle,
+    context.workspaceId
+  )
 
   for (const file of files) {
     try {
@@ -595,8 +633,10 @@ async function executeBatchWrite(
       let isNew = false
 
       if (target.kind === 'workspace') {
-        isNew = !hasCachedFile(target.path)
-        await writeFile(target.path, file.content, context.directoryHandle, context.workspaceId)
+        const wasCachedBeforeWrite = hasCachedFile(target.path)
+        await writeFile(target.path, file.content, writeDirectoryHandle, context.workspaceId)
+        const pendingType = getPendingWriteTypeForPath(getPendingChanges(), target.path)
+        isNew = pendingType ? pendingType === 'create' : !wasCachedBeforeWrite
         hasWorkspaceWrites = true
       } else {
         await ensureAgentExistsForWrite(target, ensuredAgentIds)
