@@ -295,7 +295,7 @@ describe('AgentLoop', () => {
       expect(capturedContextMessages[0]?.role).toBe('assistant')
       expect(capturedContextMessages[0]?.content?.[0]?.type).toBe('text')
       expect(capturedContextMessages[0]?.content?.[0]?.text).toContain(
-        'Compressed memory of earlier conversation:'
+        'Earlier conversation summary:'
       )
       expect(capturedContextMessages[0]?.content?.[0]?.text).toContain('compressed summary')
       expect(capturedContextMessages[1]?.role).toBe('user')
@@ -447,7 +447,7 @@ describe('AgentLoop', () => {
           m.content.some(
             (item: any) =>
               item.type === 'text' &&
-              String(item.text).includes('Compressed memory of earlier conversation')
+              String(item.text).includes('Earlier conversation summary')
           )
       )
       expect(hasSummary).toBe(true)
@@ -519,7 +519,7 @@ describe('AgentLoop', () => {
           m.content.some(
             (item: any) =>
               item.type === 'text' &&
-              String(item.text).includes('Compressed memory of earlier conversation')
+              String(item.text).includes('Earlier conversation summary')
           )
       )
       expect(hasSummary).toBe(true)
@@ -594,7 +594,7 @@ describe('AgentLoop', () => {
           Array.isArray(m.content) &&
           m.content.some(
             (item: any) =>
-              item.type === 'text' && String(item.text).includes('Compressed memory of earlier conversation')
+              item.type === 'text' && String(item.text).includes('Earlier conversation summary')
           )
       )
       const hasOldUser = secondConvertMessages.some(

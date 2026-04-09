@@ -13,7 +13,7 @@
 import type { ChatMessage } from './llm/llm-provider'
 import { estimateMessageTokens, estimateStringTokens } from './llm/token-counter'
 
-const COMPRESSED_MEMORY_PREFIX = 'Compressed memory of earlier conversation:'
+const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 
 export interface ContextManagerConfig {
   maxContextTokens: number
@@ -237,21 +237,24 @@ export class ContextManager {
       return ''
     }
 
-    // Extract key content from the last dropped messages
-    const droppedMessages = allGroups.flat().slice(0, droppedCount).slice(-20) // Only summarize last 20 dropped messages
+    // Extract key content from dropped messages - take more messages for better context
+    const droppedMessages = allGroups.flat().slice(0, droppedCount).slice(-50) // Last 50 dropped messages
 
     // Extract key content from dropped messages
     const parts: string[] = []
     for (const msg of droppedMessages) {
       if (msg.role === 'user' && typeof msg.content === 'string') {
-        parts.push(`User: ${msg.content.slice(0, 200)}`)
+        // Preserve full user content - it's critical for understanding intent
+        parts.push(`User: ${msg.content}`)
       } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
         if (msg.content.startsWith(COMPRESSED_MEMORY_PREFIX)) {
           continue
         }
-        parts.push(`Assistant: ${msg.content.slice(0, 300)}`)
+        // Keep more assistant content - reasoning and decisions matter
+        parts.push(`Assistant: ${msg.content.slice(0, 800)}`)
       } else if (msg.role === 'tool' && typeof msg.content === 'string') {
-        parts.push(`Tool result: ${msg.content.slice(0, 200)}`)
+        // Tool results - preserve file paths, search results, errors
+        parts.push(`Tool result: ${msg.content.slice(0, 600)}`)
       }
     }
 

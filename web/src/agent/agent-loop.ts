@@ -58,9 +58,30 @@ const SUMMARY_MIN_INTERVAL_CONVERT_CALLS = 8
 /** After compression, ensure context usage is at or below this ratio of the input budget.
  *  Prevents repeated compression on successive convert calls. */
 const COMPRESSION_TARGET_RATIO = 0.7
-const CONTEXT_SUMMARY_SYSTEM_PROMPT =
-  'You are compressing earlier conversation context for another model call. Keep only durable facts, decisions, constraints, file paths, tool findings, and unresolved tasks. Output plain text only.'
-const COMPRESSED_MEMORY_PREFIX = 'Compressed memory of earlier conversation:'
+const CONTEXT_SUMMARY_SYSTEM_PROMPT = `You are compressing an earlier conversation into a dense memory snapshot. Another AI will continue from this summary, so you must preserve:
+
+1. **User's goals and intentions** - what the user was trying to accomplish
+2. **Key decisions made** - architectural choices, file changes, tool selections
+3. **Important constraints** - requirements, limits, conventions being followed
+4. **File paths and locations** - files created/modified/deleted, important references
+5. **Tool findings and results** - search results, read file contents, critical outputs
+6. **Unresolved tasks** - what still needs to be done, next steps, open questions
+7. **Error context** - failures encountered and how they were addressed
+
+Output format:
+- Use bullet points for scanability
+- Group by topic rather than chronologically
+- Preserve specific names, paths, and numbers (don't generalize)
+- Keep the most recent and relevant information
+- Total output should be dense but complete - prefer specifics over vagaries
+
+Example:
+**User Goal**: Implement user authentication with JWT
+**Decisions**: Use bcrypt for passwords, JWT with 24h expiry, store refresh tokens in httpOnly cookies
+**Files**: src/auth/login.ts (new), src/auth/jwt.ts (new), src/middleware/auth.ts (modified)
+**Progress**: Login endpoint complete, registration WIP, refresh token not yet implemented
+**Errors**: CORS error on first attempt, resolved by adding credentials: 'include'`
+const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 type CompressionSummaryMode = 'llm' | 'fallback' | 'skip'
 type CompressionBaselineState = {
   summary: string
@@ -427,39 +448,38 @@ export class AgentLoop {
       .map((line) => line.trim())
       .filter(Boolean)
 
-    const userHighlights: string[] = []
-    const assistantHighlights: string[] = []
-    const toolHighlights: string[] = []
+    const userGoals: string[] = []
+    const decisions: string[] = []
+    const files: string[] = []
+    const toolFindings: string[] = []
 
     for (const line of lines) {
-      if (line.startsWith('User:') && userHighlights.length < 6) {
-        userHighlights.push(line.slice(5).trim())
-        continue
-      }
-      if (line.startsWith('Assistant:') && assistantHighlights.length < 6) {
-        assistantHighlights.push(line.slice(10).trim())
-        continue
-      }
-      if (line.startsWith('Tool result:') && toolHighlights.length < 4) {
-        toolHighlights.push(line.slice(12).trim())
+      if (line.startsWith('User:') && userGoals.length < 10) {
+        userGoals.push(line.slice(5).trim())
+      } else if (line.startsWith('Assistant:') && decisions.length < 10) {
+        decisions.push(line.slice(10).trim().slice(0, 500))
+      } else if (line.startsWith('Tool result:') && toolFindings.length < 8) {
+        toolFindings.push(line.slice(12).trim().slice(0, 400))
       }
     }
 
     const parts: string[] = [COMPRESSED_MEMORY_PREFIX]
-    if (userHighlights.length > 0) {
-      parts.push('User intents:')
-      parts.push(...userHighlights.map((item) => `- ${item}`))
+    if (userGoals.length > 0) {
+      parts.push('**User Goal**: ' + userGoals[userGoals.length - 1]) // Most recent goal first
     }
-    if (assistantHighlights.length > 0) {
-      parts.push('Assistant outputs:')
-      parts.push(...assistantHighlights.map((item) => `- ${item}`))
+    if (decisions.length > 0) {
+      parts.push('**Key Decisions**:')
+      decisions.slice(-5).forEach((d) => parts.push(`- ${d}`))
     }
-    if (toolHighlights.length > 0) {
-      parts.push('Key tool findings:')
-      parts.push(...toolHighlights.map((item) => `- ${item}`))
+    if (files.length > 0) {
+      parts.push('**Files**: ' + files.join(', '))
+    }
+    if (toolFindings.length > 0) {
+      parts.push('**Tool Findings**:')
+      toolFindings.slice(-5).forEach((f) => parts.push(`- ${f}`))
     }
 
-    const roughMaxChars = Math.max(120, maxSummaryTokens * 3)
+    const roughMaxChars = Math.max(200, maxSummaryTokens * 3)
     const combined = parts.join('\n')
     if (combined.length <= roughMaxChars) return combined
     return combined.slice(0, roughMaxChars) + '\n...[truncated]'
@@ -479,10 +499,16 @@ export class AgentLoop {
 
   /**
    * Find cutoff timestamp for rebuilding context after compression.
-   * We keep messages from the latest prompt boundary (user/tool) onward.
+   * We keep messages from the latest USER message onward.
+   * The user's latest message must always be preserved so the agent knows what to do.
    */
   private getCompressionCutoffTimestamp(messages: Message[]): number | null {
-    const boundary = [...messages].reverse().find((msg) => msg.role === 'user' || msg.role === 'tool')
+    // Find the LAST (most recent) user message to use as the cutoff boundary.
+    // We specifically look for 'user' role, not 'tool', because:
+    // - Tool results come AFTER the user's message and should be summarizable
+    // - The user's latest message must ALWAYS be preserved for the agent to know what to do
+    // - Using a tool timestamp as cutoff would exclude the user's message on subsequent turns
+    const boundary = [...messages].reverse().find((msg) => msg.role === 'user')
     return typeof boundary?.timestamp === 'number' ? boundary.timestamp : null
   }
 
@@ -1336,8 +1362,8 @@ export class AgentLoop {
           const chatMessages = messagesToChatMessages(internalMessages)
           const preTrimTokens = this.provider.estimateTokens(chatMessages)
           const summaryTokenBudget = Math.min(
-            1200,
-            Math.max(256, Math.floor(maxContextTokens * 0.01))
+            2400,
+            Math.max(500, Math.floor(maxContextTokens * 0.02))
           )
           const trimmedResult = this.contextManager.trimMessages(chatMessages, {
             createSummary: true,
