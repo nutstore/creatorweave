@@ -14,6 +14,51 @@ import {
 } from '@/sqlite/repositories/project.repository'
 import { ProjectManager } from '@/opfs'
 
+//=============================================================================
+// Cross-Tab Synchronization
+//=============================================================================
+
+const PROJECT_CHANGE_CHANNEL = 'creatorweave-project-changes'
+
+type ProjectChangeMessage =
+  | { type: 'created'; projectId: string }
+  | { type: 'updated'; projectId: string }
+  | { type: 'deleted'; projectId: string }
+  | { type: 'refresh' }
+
+let projectChangeChannel: BroadcastChannel | null = null
+
+function getProjectChangeChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === 'undefined') return null
+  if (!projectChangeChannel) {
+    projectChangeChannel = new BroadcastChannel(PROJECT_CHANGE_CHANNEL)
+  }
+  return projectChangeChannel
+}
+
+function broadcastProjectChange(message: ProjectChangeMessage): void {
+  const channel = getProjectChangeChannel()
+  if (channel) {
+    try {
+      channel.postMessage(message)
+    } catch (e) {
+      console.warn('[ProjectStore] Failed to broadcast project change:', e)
+    }
+  }
+}
+
+function setupProjectChangeListener(onChange: () => void): () => void {
+  const channel = getProjectChangeChannel()
+  if (!channel) return () => {}
+
+  const handler = (_event: MessageEvent<ProjectChangeMessage>) => {
+    // Always refresh on any change from another tab
+    onChange()
+  }
+  channel.addEventListener('message', handler)
+  return () => channel.removeEventListener('message', handler)
+}
+
 interface ProjectState {
   activeProjectId: string
   projects: Project[]
@@ -124,6 +169,13 @@ export const useProjectStore = create<ProjectState>()(
         const { useAgentStore } = await import('./agent.store')
         await useAgentStore.getState().setActiveProject(normalizedActiveProjectId)
         await syncAgentsForProject(normalizedActiveProjectId)
+
+        // Set up cross-tab sync listener
+        setupProjectChangeListener(() => {
+          console.log('[ProjectStore] Received cross-tab change, refreshing...')
+          get().refreshProjects()
+        })
+
         console.log(`[ProjectStore] initialize done (${Math.round(performance.now() - started)}ms)`)
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to initialize projects'
@@ -247,6 +299,7 @@ export const useProjectStore = create<ProjectState>()(
           projectStats,
           isLoading: false,
         })
+        broadcastProjectChange({ type: 'created', projectId: project.id })
         return project
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to create project'
@@ -278,6 +331,7 @@ export const useProjectStore = create<ProjectState>()(
         })
         await get().refreshProjects()
         set({ isLoading: false })
+        broadcastProjectChange({ type: 'refresh' })
         return true
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to rename project'
@@ -306,6 +360,7 @@ export const useProjectStore = create<ProjectState>()(
         })
         await get().refreshProjects()
         set({ isLoading: false })
+        broadcastProjectChange({ type: 'refresh' })
         return true
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to update project status'
@@ -345,6 +400,7 @@ export const useProjectStore = create<ProjectState>()(
         }
 
         set({ isLoading: false })
+        broadcastProjectChange({ type: 'deleted', projectId })
         return true
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : 'Failed to delete project'
