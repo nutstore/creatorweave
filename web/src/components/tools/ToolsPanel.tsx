@@ -43,7 +43,7 @@ const TOOL_CATEGORIES = [
     icon: FileSearch,
     description: 'Find and explore files in your project',
     descriptionKey: 'tools.categories.discovery.description',
-    toolNames: ['read_directory'],
+    toolNames: ['ls'],
   },
   {
     id: 'operations',

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
-import { readDirectoryExecutor } from '../read-directory.tool'
+import { lsExecutor } from '../ls.tool'
 
 const getActiveConversationMock = vi.fn()
 const getCurrentHandleMock = vi.fn()
@@ -38,7 +38,7 @@ function createEmptyDirectoryHandle(name = 'root'): FileSystemDirectoryHandle {
   } as unknown as FileSystemDirectoryHandle
 }
 
-describe('read_directory tool', () => {
+describe('ls tool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     getActiveConversationMock.mockResolvedValue(undefined)
@@ -48,7 +48,7 @@ describe('read_directory tool', () => {
   it('falls back to folder-access current handle when context handle is missing', async () => {
     getCurrentHandleMock.mockReturnValue(createEmptyDirectoryHandle())
 
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { pattern: '**/*.ts' },
       { directoryHandle: null } as unknown as ToolContext
     )
@@ -58,7 +58,7 @@ describe('read_directory tool', () => {
   })
 
   it('returns no-directory error when all handle sources are unavailable', async () => {
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { pattern: '**/*.ts' },
       { directoryHandle: null } as unknown as ToolContext
     )
@@ -77,7 +77,7 @@ describe('read_directory tool', () => {
       }),
     })
 
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { pattern: '**/*.ts' },
       { directoryHandle: null, workspaceId: 'ws_1' } as unknown as ToolContext
     )
@@ -103,7 +103,7 @@ describe('read_directory tool', () => {
       },
     })
 
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { path: 'vfs://agents/default', pattern: 'src/**/*.ts' },
       { directoryHandle: null } as unknown as ToolContext
     )
@@ -126,7 +126,7 @@ describe('read_directory tool', () => {
       },
     })
 
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { path: 'vfs://agents' },
       { directoryHandle: null } as unknown as ToolContext
     )
@@ -166,7 +166,7 @@ describe('read_directory tool', () => {
       },
     })
 
-    const result = await readDirectoryExecutor(
+    const result = await lsExecutor(
       { path: 'vfs://agents', pattern: '**/SOUL.md' },
       { directoryHandle: null } as unknown as ToolContext
     )

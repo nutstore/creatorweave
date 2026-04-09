@@ -721,7 +721,7 @@ export class FingerprintScanner {
       directories: scanResult.directories,
       size,
       hasTypeScript,
-      recommendedTools: ['read_directory', 'read'],
+      recommendedTools: ['ls', 'read'],
     }
   }
 
@@ -862,7 +862,7 @@ export class FingerprintScanner {
    * Get recommended tools for this project type
    */
   private getRecommendedTools(projectType: ProjectType, _hasTypeScript: boolean): string[] {
-    const base = ['read_directory', 'read']
+    const base = ['ls', 'read']
 
     const typeTools: Record<string, string[]> = {
       react: ['edit'],

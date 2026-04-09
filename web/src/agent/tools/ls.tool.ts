@@ -1,5 +1,5 @@
 /**
- * read_directory tool - Unified directory reading tool.
+ * ls tool - Unified directory reading tool.
  *
  * Combines glob and list_files functionality:
  * - With pattern: Search for files matching glob pattern
@@ -22,88 +22,96 @@ import {
   shouldSkipDirectory,
 } from './file-discovery.helpers'
 
-export const readDirectoryDefinition: ToolDefinition = {
-  type: 'function',
-  function: {
-    name: 'read_directory',
-    description:
-      'Read directory contents. With pattern: search files matching glob. Without pattern: list tree structure. Supports workspace relative paths and vfs://workspace/... or vfs://agents/{id}/... in path.',
-    parameters: {
-      type: 'object',
-      properties: {
-        // Common parameters
-        path: {
-          type: 'string',
-          description: 'Subdirectory to read (default: project root)',
-        },
-        // Glob mode parameters
-        pattern: {
-          type: 'string',
-          description: 'Glob pattern to match files (e.g. "**/*.ts", "src/**/*.tsx"). If provided, searches for matching files.',
-        },
-        // List mode parameters
-        max_depth: {
-          type: 'number',
-          description: 'Maximum depth to traverse (default: 2 for list, 20 for glob)',
-        },
-        maxDepth: {
-          type: 'number',
-          description: 'Alias of max_depth',
-        },
-        max_entries: {
-          type: 'number',
-          description: 'Maximum entries to return. If omitted, no entry-count limit is applied.',
-        },
-        maxEntries: {
-          type: 'number',
-          description: 'Alias of max_entries',
-        },
-        max_results: {
-          type: 'number',
-          description: 'Maximum results for glob search. If omitted, no result-count limit is applied.',
-        },
-        maxResults: {
-          type: 'number',
-          description: 'Alias of max_results',
-        },
-        include_sizes: {
-          type: 'boolean',
-          description: 'Include file sizes in list mode (default: false)',
-        },
-        includeSizes: {
-          type: 'boolean',
-          description: 'Alias of include_sizes',
-        },
-        include_ignored: {
-          type: 'boolean',
-          description: 'Include large ignored directories like node_modules/.git (default: false)',
-        },
-        includeIgnored: {
-          type: 'boolean',
-          description: 'Alias of include_ignored',
-        },
-        exclude_dirs: {
-          type: 'array',
-          description: 'Extra directory names to skip while traversing',
-          items: { type: 'string' },
-        },
-        excludeDirs: {
-          type: 'array',
-          description: 'Alias of exclude_dirs',
-          items: { type: 'string' },
-        },
-        deadline_ms: {
-          type: 'number',
-          description: 'Soft time budget in milliseconds (default: 25000)',
-        },
-        deadlineMs: {
-          type: 'number',
-          description: 'Alias of deadline_ms',
-        },
-      },
+const DIRECTORY_TOOL_PARAMETERS: ToolDefinition['function']['parameters'] = {
+  type: 'object',
+  properties: {
+    // Common parameters
+    path: {
+      type: 'string',
+      description: 'Subdirectory to read (default: project root)',
+    },
+    // Glob mode parameters
+    pattern: {
+      type: 'string',
+      description: 'Glob pattern to match files (e.g. "**/*.ts", "src/**/*.tsx"). If provided, searches for matching files.',
+    },
+    // List mode parameters
+    max_depth: {
+      type: 'number',
+      description: 'Maximum depth to traverse (default: 2 for list, 20 for glob)',
+    },
+    maxDepth: {
+      type: 'number',
+      description: 'Alias of max_depth',
+    },
+    max_entries: {
+      type: 'number',
+      description: 'Maximum entries to return. If omitted, no entry-count limit is applied.',
+    },
+    maxEntries: {
+      type: 'number',
+      description: 'Alias of max_entries',
+    },
+    max_results: {
+      type: 'number',
+      description: 'Maximum results for glob search. If omitted, no result-count limit is applied.',
+    },
+    maxResults: {
+      type: 'number',
+      description: 'Alias of max_results',
+    },
+    include_sizes: {
+      type: 'boolean',
+      description: 'Include file sizes in list mode (default: false)',
+    },
+    includeSizes: {
+      type: 'boolean',
+      description: 'Alias of include_sizes',
+    },
+    include_ignored: {
+      type: 'boolean',
+      description: 'Include large ignored directories like node_modules/.git (default: false)',
+    },
+    includeIgnored: {
+      type: 'boolean',
+      description: 'Alias of include_ignored',
+    },
+    exclude_dirs: {
+      type: 'array',
+      description: 'Extra directory names to skip while traversing',
+      items: { type: 'string' },
+    },
+    excludeDirs: {
+      type: 'array',
+      description: 'Alias of exclude_dirs',
+      items: { type: 'string' },
+    },
+    deadline_ms: {
+      type: 'number',
+      description: 'Soft time budget in milliseconds (default: 25000)',
+    },
+    deadlineMs: {
+      type: 'number',
+      description: 'Alias of deadline_ms',
     },
   },
 }
+
+function createDirectoryToolDefinition(name: string, description: string): ToolDefinition {
+  return {
+    type: 'function',
+    function: {
+      name,
+      description,
+      parameters: DIRECTORY_TOOL_PARAMETERS,
+    },
+  }
+}
+
+export const lsDefinition: ToolDefinition = createDirectoryToolDefinition(
+  'ls',
+  'List directory contents. With pattern: search files matching glob. Without pattern: list tree structure. Supports workspace relative paths and vfs://workspace/... or vfs://agents/{id}/... in path.'
+)
 
 function formatSize(bytes: number): string {
   if (bytes === 0) return ''
@@ -112,7 +120,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
 }
 
-export const readDirectoryExecutor: ToolExecutor = async (args, context) => {
+export const lsExecutor: ToolExecutor = async (args, context) => {
   const pattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
 
   // Smart mode detection: glob mode if pattern provided, list mode otherwise

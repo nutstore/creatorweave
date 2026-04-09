@@ -1,7 +1,7 @@
 /**
  * Agent Mode System - defines read-only (Plan) and full-access (Act) modes.
  *
- * Plan mode: Only read-only tools are available (read, search, read_directory, etc.)
+ * Plan mode: Only read-only tools are available (read, search, ls, etc.)
  * Act mode: All tools are available including write operations (write, edit, delete, etc.)
  */
 
@@ -32,7 +32,7 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   // ============================================================================
   ['read', { name: 'read', category: 'read' }],
   ['search', { name: 'search', category: 'read' }],
-  ['read_directory', { name: 'read_directory', category: 'read' }],
+  ['ls', { name: 'ls', category: 'read' }],
   ['execute', { 
     name: 'execute', 
     category: 'read',

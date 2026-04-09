@@ -181,13 +181,13 @@ const TOOL_METADATA: Record<
     baseExample: string
   }
 > = {
-  read_directory: {
-    name: 'read_directory',
+  ls: {
+    name: 'ls',
     displayName: 'Directory & Search',
     category: 'discovery',
     intents: ['file-discovery', 'batch-operations'],
     description: 'List directory or search files by pattern',
-    baseExample: 'read_directory(pattern="**/*.csv") or read_directory(path="src")',
+    baseExample: 'ls(pattern="**/*.csv") or ls(path="src")',
   },
   read: {
     name: 'read',
@@ -453,14 +453,14 @@ export class RecommendationEngine {
   ): string {
     // Customize example based on detected file types
     if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'execute') {
-      return `First find the file: read_directory(pattern="**/*.csv")\nThen analyze: execute(language="python", code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())")`
+      return `First find the file: ls(pattern="**/*.csv")\nThen analyze: execute(language="python", code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())")`
     }
 
-    if (analysis.primaryIntent === 'file-discovery' && metadata.name === 'read_directory') {
+    if (analysis.primaryIntent === 'file-discovery' && metadata.name === 'ls') {
       if (analysis.fileTypeHints.length > 0) {
-        return `read_directory(pattern="**/*${analysis.fileTypeHints[0]}")`
+        return `ls(pattern="**/*${analysis.fileTypeHints[0]}")`
       }
-      return 'read_directory(pattern="**/*keyword*")'
+      return 'ls(pattern="**/*keyword*")'
     }
 
     return metadata.baseExample

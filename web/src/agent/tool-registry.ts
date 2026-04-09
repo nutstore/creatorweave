@@ -15,7 +15,7 @@ import { readDefinition, readExecutor, writeDefinition, writeExecutor } from './
 import { deleteDefinition, deleteExecutor } from './tools/delete.tool'
 import { editDefinition, editExecutor } from './tools/file-edit.tool'
 import { searchDefinition, searchExecutor } from './tools/search.tool'
-import { readDirectoryDefinition, readDirectoryExecutor } from './tools/read-directory.tool'
+import { lsDefinition, lsExecutor } from './tools/ls.tool'
 import { executeDefinition, executeExecutor } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 import { analyzeDataDefinition, analyzeDataExecutor } from './tools/data-analysis.tool'
@@ -65,7 +65,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: editDefinition, executor: editExecutor },
   { definition: searchDefinition, executor: searchExecutor },
   // Directory & search
-  { definition: readDirectoryDefinition, executor: readDirectoryExecutor },
+  { definition: lsDefinition, executor: lsExecutor },
   // Execution (unified)
   { definition: executeDefinition, executor: executeExecutor },
   // Data

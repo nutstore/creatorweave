@@ -155,7 +155,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
     canRetry: true,
     retryStrategy: RetryStrategy.DIFFERENT_PARAMS,
     suggestedActions: [
-      'First search for the file using read_directory()',
+      'First search for the file using ls()',
       'Then use the resolved path directly in execute(language="python", code="...")',
     ],
   },

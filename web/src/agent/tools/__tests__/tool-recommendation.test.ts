@@ -129,13 +129,13 @@ describe('RecommendationEngine', () => {
       expect(executeTool?.category).toBe('analysis')
     })
 
-    it('should recommend read_directory for finding data files', () => {
+    it('should recommend ls for finding data files', () => {
       const recommendations = engine.recommend('analyze the sales data in my project')
       // Should have some recommendations
       expect(recommendations.length).toBeGreaterThan(0)
     })
 
-    it('should recommend both read_directory and execute for data workflow', () => {
+    it('should recommend both ls and execute for data workflow', () => {
       const recommendations = engine.recommend('analyze CSV files with pandas')
       // Should have recommendations including execute
       const executeTool = recommendations.find((r) => r.toolName === 'execute')
@@ -144,9 +144,9 @@ describe('RecommendationEngine', () => {
   })
 
   describe('tool recommendations for file operations', () => {
-    it('should recommend read_directory for file discovery', () => {
+    it('should recommend ls for file discovery', () => {
       const recommendations = engine.recommend('find all test files')
-      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
+      const readDirTool = recommendations.find((r) => r.toolName === 'ls')
 
       expect(readDirTool).toBeDefined()
       expect(readDirTool?.score).toBeGreaterThan(0)
@@ -154,7 +154,7 @@ describe('RecommendationEngine', () => {
 
     it('should recommend read after file discovery', () => {
       const recommendations = engine.recommend('find and read config files')
-      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
+      const readDirTool = recommendations.find((r) => r.toolName === 'ls')
       const readTool = recommendations.find((r) => r.toolName === 'read')
 
       expect(readDirTool).toBeDefined()
@@ -189,9 +189,9 @@ describe('RecommendationEngine', () => {
       }
     })
 
-    it('should provide file pattern examples for read_directory', () => {
+    it('should provide file pattern examples for ls', () => {
       const recommendations = engine.recommend('find all CSV files')
-      const readDirTool = recommendations.find((r) => r.toolName === 'read_directory')
+      const readDirTool = recommendations.find((r) => r.toolName === 'ls')
 
       expect(readDirTool).toBeDefined()
       if (readDirTool) {
@@ -222,9 +222,9 @@ describe('RecommendationEngine', () => {
       expect(allTools.batch).toBeDefined()
     })
 
-    it('should include read_directory in discovery category', () => {
+    it('should include ls in discovery category', () => {
       const allTools = engine.getAllTools()
-      const readDirTool = allTools.discovery.find((t) => t.toolName === 'read_directory')
+      const readDirTool = allTools.discovery.find((t) => t.toolName === 'ls')
 
       expect(readDirTool).toBeDefined()
       expect(readDirTool?.category).toBe('discovery')
