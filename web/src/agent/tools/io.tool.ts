@@ -82,11 +82,18 @@ interface ReadRangeOptions {
   lineCount?: number
 }
 
+const BASE64_CHUNK_SIZE = 0x8000
+
 export const readExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const paths = args.paths as string[] | undefined
   const reads = args.reads as ReadRequest[] | undefined
   const maxSize = args.max_size as number | undefined
+  if (maxSize !== undefined) {
+    if (typeof maxSize !== 'number' || !Number.isFinite(maxSize) || maxSize <= 0) {
+      return JSON.stringify({ error: 'max_size must be > 0' })
+    }
+  }
   if (args.offset !== undefined || args.limit !== undefined) {
     return JSON.stringify({
       error:
@@ -197,9 +204,7 @@ async function executeSingleRead(
         message: 'offset/limit/start_line/line_count can only be used for text files.',
       })
     }
-    const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
-    const uint8Array = new Uint8Array(buffer)
-    const base64 = btoa(String.fromCharCode(...uint8Array))
+    const base64 = await encodeBinaryContentAsBase64(content)
     return JSON.stringify({
       binary: true,
       content: base64,
@@ -242,9 +247,7 @@ async function executeSingleRead(
               message: 'offset/limit/start_line/line_count can only be used for text files.',
             })
           }
-          const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
-          const uint8Array = new Uint8Array(buffer)
-          const base64 = btoa(String.fromCharCode(...uint8Array))
+          const base64 = await encodeBinaryContentAsBase64(content)
           return JSON.stringify({
             binary: true,
             content: base64,
@@ -285,7 +288,14 @@ async function executeBatchRead(
     }
     return nativeFallbackHandle
   }
-  const results: Array<{ path: string; success: boolean; content?: string; error?: string; metadata?: unknown }> =
+  const results: Array<{
+    path: string
+    success: boolean
+    content?: string
+    binary?: boolean
+    error?: string
+    metadata?: unknown
+  }> =
     []
   let successCount = 0
   let errorCount = 0
@@ -373,18 +383,12 @@ async function executeBatchRead(
           errorCount++
           continue
         }
-        const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
-        const uint8Array = new Uint8Array(buffer)
-        const base64 = btoa(String.fromCharCode(...uint8Array))
+        const base64 = await encodeBinaryContentAsBase64(content)
         results.push({
           path: filePath,
           success: true,
-          content: JSON.stringify({
-            binary: true,
-            content: base64,
-            size: metadata.size,
-            contentType: metadata.contentType,
-          }),
+          binary: true,
+          content: base64,
           metadata: { size: metadata.size, contentType: metadata.contentType },
         })
         successCount++
@@ -429,6 +433,18 @@ async function executeBatchRead(
 
 function hasRangeOptions(options: ReadRangeOptions): boolean {
   return options.startLine !== undefined || options.lineCount !== undefined
+}
+
+async function encodeBinaryContentAsBase64(content: ArrayBuffer | Blob): Promise<string> {
+  const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  if (bytes.length === 0) return ''
+
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE))
+  }
+  return btoa(binary)
 }
 
 function buildReadStateEntry(content: string, options: ReadRangeOptions) {

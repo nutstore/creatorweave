@@ -170,4 +170,40 @@ describe('io read tool', () => {
     expect(readFileMock).toHaveBeenCalledOnce()
     expect(readFileMock).toHaveBeenCalledWith('a.txt', null, undefined)
   })
+
+  it('validates max_size must be greater than 0', async () => {
+    const result = await readExecutor({ path: 'a.txt', max_size: 0 }, context)
+    const parsed = JSON.parse(result)
+    expect(parsed.error).toContain('max_size must be > 0')
+  })
+
+  it('returns binary payload in batch mode without nested JSON encoding', async () => {
+    readFileMock.mockResolvedValueOnce({
+      content: new Uint8Array([1, 2, 3, 4]).buffer,
+      metadata: { size: 4, contentType: 'binary' },
+    })
+
+    const result = await readExecutor({ paths: ['bin.dat'] }, context)
+    const parsed = JSON.parse(result)
+
+    expect(parsed.success).toBe(true)
+    expect(parsed.successCount).toBe(1)
+    expect(parsed.results[0].binary).toBe(true)
+    expect(parsed.results[0].content).toBe('AQIDBA==')
+  })
+
+  it('reads large binary files without stack overflow', async () => {
+    readFileMock.mockResolvedValueOnce({
+      content: new Uint8Array(1_000_000).buffer,
+      metadata: { size: 1_000_000, contentType: 'binary' },
+    })
+
+    const result = await readExecutor({ path: 'large.bin' }, context)
+    const parsed = JSON.parse(result)
+
+    expect(parsed.binary).toBe(true)
+    expect(parsed.size).toBe(1_000_000)
+    expect(typeof parsed.content).toBe('string')
+    expect(parsed.content.length).toBeGreaterThan(0)
+  })
 })
