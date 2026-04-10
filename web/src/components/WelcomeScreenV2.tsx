@@ -22,6 +22,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
   const { directoryHandle, setDirectoryHandle } = useAgentStore()
   const { conversations } = useConversationStore()
   const t = useT()
+  const isInputDisabled = !hasApiKey
 
   const handleSubmit = () => {
     const text = input.trim()
@@ -139,8 +140,12 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             placeholder={hasApiKey ? t('welcome.placeholder') : t('welcome.placeholderNoKey')}
             aria-label="输入消息"
             rows={3}
-            className="focus:border-primary-300 focus:ring-primary-300 w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50 px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all placeholder:text-neutral-400 focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:bg-neutral-800"
-            disabled={!hasApiKey}
+            className={`w-full resize-none rounded-xl border px-5 py-4 pr-14 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
+              isInputDisabled
+                ? 'cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-400 placeholder:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-900/70 dark:text-neutral-500 dark:placeholder:text-neutral-600'
+                : 'border-neutral-300 bg-white text-neutral-900 placeholder:text-neutral-500 hover:border-neutral-400 focus:border-primary-400 focus:bg-white dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:placeholder:text-neutral-400 dark:hover:border-neutral-500 dark:focus:border-primary-500 dark:focus:bg-neutral-800'
+            }`}
+            disabled={isInputDisabled}
           />
 
           {/* Dropped files indicator */}
@@ -188,6 +193,12 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
           >
             <Send className="h-4 w-4" />
           </button>
+
+          {isInputDisabled && (
+            <p className="mt-2 px-1 text-xs text-neutral-500 dark:text-neutral-400">
+              请先在模型设置中配置 API Key 后开始对话
+            </p>
+          )}
         </div>
 
         {/* Quick actions */}
