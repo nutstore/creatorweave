@@ -10,26 +10,16 @@
  * 6. Max 20 iterations
  */
 
-import { produce } from 'immer'
 import type { ToolContext } from './tools/tool-types'
 import type { Message } from './message-types'
-import { createAssistantMessage } from './message-types'
 import { ContextManager } from './context-manager'
 import { ToolRegistry } from './tool-registry'
 import { UNIVERSAL_SYSTEM_PROMPT } from './prompts/universal-system-prompt'
-import { agentLoopContinue, type AgentTool, type StreamFn } from '@mariozechner/pi-agent-core'
-import { streamSimple as piAiStreamSimple } from '@mariozechner/pi-ai'
 import { PiAIProvider } from './llm/pi-ai-provider'
-import { useSettingsStore } from '@/store/settings.store'
 import { type AgentMode } from './agent-mode'
-import { type CompressionBaselineState } from './loop/context-compression'
-import { buildAgentTools } from './loop/build-agent-tools'
-import { convertAgentMessagesToLlm } from './loop/convert-bridge'
 import { generateContextSummaryWithLLM } from './loop/context-summary'
 import { buildRuntimeEnhancedPrompt, triggerPrefetchForMessages } from './loop/enhancements'
-import { extractTextContent, internalToPiMessages, piToInternalMessage } from './loop/message-mappers'
-import { applyPiAssistantUpdate } from './loop/pi-events'
-import { processPiLoopEvents } from './loop/process-loop-events'
+import { executePiCoreLoop } from './loop/pi-core-runner'
 import type { AgentCallbacks, AgentLoopConfig } from './loop/types'
 
 export type {
@@ -121,110 +111,46 @@ export class AgentLoop {
     let allMessages = messages
     let shouldStopForElicitation = false
     let reachedMaxIterations = false
-    let compressionBaseline: CompressionBaselineState | null = null
-    const model = this.provider.getModel()
-    const apiKey = this.provider.getApiKey()
-
-    const agentTools: AgentTool[] = buildAgentTools({
-      toolRegistry: this.toolRegistry,
-      mode: this.mode,
-      callbacks,
-      beforeToolCall: this.beforeToolCall,
-      afterToolCall: this.afterToolCall,
-      getAllMessages: () => allMessages,
-      getAbortSignal: () => this.abortController?.signal,
-      getToolContext: () => this.toolContext,
-      setToolContext: (context) => {
-        this.toolContext = context
-      },
-      provider: this.provider,
-      contextManager: this.contextManager,
-      toolExecutionTimeout: this.toolExecutionTimeout,
-      toolTimeoutExemptions: TOOL_TIMEOUT_EXEMPTIONS,
-      onElicitationDetected: () => {
-        shouldStopForElicitation = true
-        this.abortController?.abort()
-      },
-    })
-
-    const context = {
-      systemPrompt: this.contextManager.getConfig().systemPrompt || this.baseSystemPrompt,
-      messages: internalToPiMessages(messages, model, COMPRESSED_MEMORY_PREFIX),
-      tools: agentTools,
-    }
-
-    const streamFn = piAiStreamSimple as unknown as StreamFn
-
-    // Read thinking settings from store
-    const settingsState = useSettingsStore.getState()
-    const reasoning = settingsState.enableThinking ? settingsState.thinkingLevel : undefined
-
-    const loop = agentLoopContinue(
-      context,
-      {
-        model,
-        getApiKey: () => apiKey,
-        maxTokens: model.maxTokens,
-        reasoning,
-        convertToLlm: async (agentMessages) => {
-          const converted = await convertAgentMessagesToLlm({
-            agentMessages,
-            model,
-            provider: this.provider,
-            contextManager: this.contextManager,
-            callbacks,
-            compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
-            convertCallCount: this.convertCallCount,
-            lastSummaryConvertCall: this.lastSummaryConvertCall,
-            compressionBaseline,
-            summaryMinDroppedGroups: SUMMARY_MIN_DROPPED_GROUPS,
-            summaryMinDroppedContentChars: SUMMARY_MIN_DROPPED_CONTENT_CHARS,
-            summaryMinIntervalConvertCalls: SUMMARY_MIN_INTERVAL_CONVERT_CALLS,
-            compressionTargetRatio: COMPRESSION_TARGET_RATIO,
-            generateContextSummaryWithLLM: (droppedContent, maxSummaryTokens) =>
-              generateContextSummaryWithLLM({
-                provider: this.provider,
-                droppedContent,
-                maxSummaryTokens,
-                compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
-              }),
-            onSummaryInjected: (summary) => {
-              const summaryMessage = createAssistantMessage(
-                `${COMPRESSED_MEMORY_PREFIX}\n${summary}`,
-                undefined,
-                undefined,
-                null,
-                'context_summary'
-              )
-              allMessages = produce(allMessages, (draft) => {
-                draft.push(summaryMessage)
-              })
-              callbacks?.onMessagesUpdated?.(allMessages)
-            },
-          })
-
-          this.convertCallCount = converted.convertCallCount
-          this.lastSummaryConvertCall = converted.lastSummaryConvertCall
-          compressionBaseline = converted.compressionBaseline
-          return converted.piMessages
-        },
-      },
-      signal,
-      streamFn
-    )
-
     try {
-      const processed = await processPiLoopEvents({
-        loop,
-        initialMessages: allMessages,
+      const result = await executePiCoreLoop({
+        signal,
+        initialMessages: messages,
         callbacks,
+        baseSystemPrompt: this.baseSystemPrompt,
+        mode: this.mode,
+        toolRegistry: this.toolRegistry,
+        beforeToolCall: this.beforeToolCall,
+        afterToolCall: this.afterToolCall,
+        getToolContext: () => this.toolContext,
+        setToolContext: (context) => {
+          this.toolContext = context
+        },
+        provider: this.provider,
+        contextManager: this.contextManager,
+        toolExecutionTimeout: this.toolExecutionTimeout,
+        toolTimeoutExemptions: TOOL_TIMEOUT_EXEMPTIONS,
         maxIterations: this.maxIterations,
-        applyAssistantUpdate: applyPiAssistantUpdate,
-        mapPiToInternal: (message) => piToInternalMessage(message),
-        extractTextContent,
+        convertCallCount: this.convertCallCount,
+        lastSummaryConvertCall: this.lastSummaryConvertCall,
+        summaryMinDroppedGroups: SUMMARY_MIN_DROPPED_GROUPS,
+        summaryMinDroppedContentChars: SUMMARY_MIN_DROPPED_CONTENT_CHARS,
+        summaryMinIntervalConvertCalls: SUMMARY_MIN_INTERVAL_CONVERT_CALLS,
+        compressionTargetRatio: COMPRESSION_TARGET_RATIO,
+        compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
+        generateContextSummaryWithLLM: (droppedContent, maxSummaryTokens) =>
+          generateContextSummaryWithLLM({
+            provider: this.provider,
+            droppedContent,
+            maxSummaryTokens,
+            compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
+          }),
+        onAbortRequested: () => this.abortController?.abort(),
       })
-      allMessages = processed.allMessages
-      reachedMaxIterations = processed.reachedMaxIterations
+      allMessages = result.allMessages
+      shouldStopForElicitation = result.shouldStopForElicitation
+      reachedMaxIterations = result.reachedMaxIterations
+      this.convertCallCount = result.convertCallCount
+      this.lastSummaryConvertCall = result.lastSummaryConvertCall
     } catch (error) {
       if (signal.aborted) {
         callbacks?.onComplete?.(allMessages)
