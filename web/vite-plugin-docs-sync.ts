@@ -1,6 +1,7 @@
 /**
  * Vite plugin to sync docs from monorepo root to web/public/docs/
  * This allows the documentation viewer to read docs stored in the project root.
+ * Do not manually maintain docs under web/public/docs; edit root docs/ only.
  *
  * Works in both development and build modes.
  *
@@ -11,7 +12,7 @@
  * ---
  */
 
-import { copyFileSync, mkdirSync, readdirSync, statSync, existsSync, writeFileSync, watch, readFileSync } from 'fs'
+import { copyFileSync, mkdirSync, readdirSync, statSync, existsSync, writeFileSync, watch, readFileSync, rmSync } from 'fs'
 import { join, extname } from 'path'
 import type { ViteDevServer } from 'vite'
 
@@ -48,6 +49,10 @@ function syncDocs() {
     console.warn(`[docs-sync] Source directory not found: ${ROOT_DOCS}`)
     return
   }
+
+  // Rebuild target docs directory from source of truth.
+  rmSync(PUBLIC_DOCS, { recursive: true, force: true })
+  mkdirSync(PUBLIC_DOCS, { recursive: true })
 
   copyDir(ROOT_DOCS, PUBLIC_DOCS)
   generateIndexFiles()

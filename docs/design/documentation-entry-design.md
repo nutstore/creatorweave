@@ -401,11 +401,13 @@ web/src/
 ├── app/
 │   └── route-sync.ts               # [修改] resolveRoute
 
-web/public/docs/                     # [新建]
+docs/                                # [新建/维护源目录]
 ├── user/
 │   ├── _index.json
 │   └── getting-started.md
 └── developer/
     ├── _index.json
     └── api.md
+
+注：`web/public/docs/` 为构建时同步产物，不作为手工维护目录。
 ```

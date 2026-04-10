@@ -191,9 +191,11 @@ interface TopBarProps {
 
 ## Phase 2: 文档渲染 + 内容加载
 
+说明：文档源目录统一维护在仓库根目录 `docs/`，`web/public/docs/` 由同步插件自动生成，不手工维护。
+
 ### 任务 2.1: 创建文档目录结构
 
-**文件**: `web/public/docs/user/_index.json`
+**文件**: `docs/user/_index.json`
 
 ```json
 {
@@ -207,7 +209,7 @@ interface TopBarProps {
 }
 ```
 
-**文件**: `web/public/docs/developer/_index.json`
+**文件**: `docs/developer/_index.json`
 
 ```json
 {
@@ -222,7 +224,7 @@ interface TopBarProps {
 
 ### 任务 2.2: 创建文档内容文件
 
-**文件**: `web/public/docs/user/getting-started.md`
+**文件**: `docs/user/getting-started.md`
 
 ```markdown
 # 快速入门
@@ -243,7 +245,7 @@ interface TopBarProps {
 | Cmd+/ | 命令面板 |
 ```
 
-**文件**: `web/public/docs/developer/api.md`
+**文件**: `docs/developer/api.md`
 
 ```markdown
 # API 参考
@@ -334,11 +336,11 @@ export function DocsSidebar({ category, page, index }: DocsSidebarProps) {
 ### 任务 4.2: 创建剩余文档
 
 创建以下文档文件：
-- `web/public/docs/user/workspace.md`
-- `web/public/docs/user/conversation.md`
-- `web/public/docs/user/sync.md`
-- `web/public/docs/developer/architecture.md`
-- `web/public/docs/developer/contributing.md`
+- `docs/user/workspace.md`
+- `docs/user/conversation.md`
+- `docs/user/sync.md`
+- `docs/developer/architecture.md`
+- `docs/developer/contributing.md`
 
 ---
 
@@ -351,12 +353,12 @@ export function DocsSidebar({ category, page, index }: DocsSidebarProps) {
 | `web/src/pages/docs/DocsPage.tsx` | 文档页面主组件 |
 | `web/src/pages/docs/DocsSidebar.tsx` | 侧边栏导航 |
 | `web/src/components/layout/HelpMenuDropdown.tsx` | 帮助菜单 |
-| `web/public/docs/user/_index.json` | 用户文档索引 |
-| `web/public/docs/user/getting-started.md` | 快速入门文档 |
-| `web/public/docs/user/*.md` | 其他用户文档 |
-| `web/public/docs/developer/_index.json` | 开发者文档索引 |
-| `web/public/docs/developer/api.md` | API 文档 |
-| `web/public/docs/developer/*.md` | 其他开发者文档 |
+| `docs/user/_index.json` | 用户文档索引 |
+| `docs/user/getting-started.md` | 快速入门文档 |
+| `docs/user/*.md` | 其他用户文档 |
+| `docs/developer/_index.json` | 开发者文档索引 |
+| `docs/developer/api.md` | API 文档 |
+| `docs/developer/*.md` | 其他开发者文档 |
 
 ### 修改文件
 

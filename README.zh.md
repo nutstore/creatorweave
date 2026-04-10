@@ -62,8 +62,11 @@ make build
 
 ## 文档索引
 
+- [文档总览](./docs/README.md)
 - [用户指南](./USER_GUIDE.md)
 - [开发者指南](./DEVELOPER_GUIDE.md)
+- [开发者文档入口（中文）](./docs/developer/guides/index.md)
+- [开发指南（English）](./docs/development/README.md)
 - [架构文档](./docs/architecture/overview.md)
 - [SQLite 存储说明](./web/src/sqlite/README.md)
 

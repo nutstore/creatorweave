@@ -37,7 +37,6 @@
   - `web/src/components/layout/FolderSelector.tsx`
   - `web/src/components/layout/TopBar.tsx`
   - `web/src/components/layout/WorkspaceLayout.tsx`
-- WebContainer 试验代码：`test-webcontainer/index.html`
 
 ## 4. 总体架构
 
@@ -286,4 +285,3 @@ interface IWebContainerRuntimeService {
 - 大型 Next 项目
 - 权限恢复场景
 - 手动 Sync 生效场景
-

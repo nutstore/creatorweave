@@ -177,16 +177,16 @@ pnpm -C web run test:e2e
 
 ## Documentation
 
+- [Documentation Index](./docs/README.md) - Central docs entry and maintenance conventions
+
 ### User Documentation
 - [User Guide](./USER_GUIDE.md) - How to use all features
 - [Changelog](./CHANGELOG.md) - Version history and changes
 
 ### Developer Documentation
+- [Developer Portal (CN)](./docs/developer/guides/index.md) - Structured developer docs in Chinese
+- [Quick Start Guide (EN)](./docs/development/quick-start.md) - Get started in 5 minutes
 - [Architecture Overview](./docs/architecture/overview.md) - System architecture and design
-- [Quick Start Guide](./docs/development/quick-start.md) - Get started in 5 minutes
-- [Development Setup](./docs/development/setup.md) - Environment setup and tools
-- [CI/CD Guide](./docs/development/ci-cd.md) - Continuous integration and deployment
-- [Pre-commit Hooks](./docs/development/pre-commit-hooks.md) - Git hooks configuration
 
 ### Technical Documentation
 - [Agent System](./docs/agent-system.md) - AI agent architecture and tools

@@ -74,6 +74,7 @@ playwright/.cache/
 
 # Docs
 # docs/ - allow docs directory
+web/public/docs/
 
 # Node version
 .nvmrc

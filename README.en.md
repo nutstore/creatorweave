@@ -258,9 +258,11 @@ make test-web
 
 ## 📚 Documentation
 
+- [Documentation Index](./docs/README.md) - Central docs entry and maintenance conventions
 - [Architecture Overview](./docs/architecture/overview.md) - Complete technical architecture
 - [SQLite Storage Architecture](./web/src/sqlite/README.md) - SQLite + OPFS VFS storage details
-- [Development Setup](./docs/development/setup.md) - Development environment guide
+- [Development Setup](./docs/development/setup.md) - Development environment guide (English)
+- [Developer Portal (Chinese)](./docs/developer/guides/index.md) - Structured developer docs
 - [Rust/WASM Data Flow](./docs/architecture/rust-wasm-flow.md) - WASM integration details
 
 ## 🔧 Development Commands
