@@ -9,6 +9,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
+import { useWorkspaceStore } from './workspace.store'
 
 // Enable Immer Map/Set support
 enableMapSet()
@@ -63,6 +64,8 @@ export interface WorkspacePreferences {
   onboardingCompleted: boolean
   /** Agent execution mode per workspace: 'plan' (read-only) or 'act' (full access) */
   agentMode: 'plan' | 'act'
+  /** Persisted mode map keyed by workspace ID */
+  agentModeByWorkspace: Record<string, 'plan' | 'act'>
 }
 
 /**
@@ -90,6 +93,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   recentFiles: [],
   onboardingCompleted: false,
   agentMode: 'act',
+  agentModeByWorkspace: {},
 }
 
 /**
@@ -125,6 +129,7 @@ interface WorkspacePreferencesState extends WorkspacePreferences {
 
   // Agent mode actions
   setAgentMode: (mode: 'plan' | 'act') => void
+  syncAgentModeForWorkspace: (workspaceId: string | null) => void
 
   // Reset actions
   resetAll: () => void
@@ -236,7 +241,29 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
       // Agent mode actions
       setAgentMode: (mode) =>
         set((state) => {
+          const workspaceId = useWorkspaceStore.getState().activeWorkspaceId
           state.agentMode = mode
+          if (workspaceId) {
+            state.agentModeByWorkspace[workspaceId] = mode
+          }
+        }),
+
+      syncAgentModeForWorkspace: (workspaceId) =>
+        set((state) => {
+          const hasMappedWorkspaceMode = workspaceId ? state.agentModeByWorkspace[workspaceId] !== undefined : false
+          const hasLegacyGlobalModeOnly =
+            Object.keys(state.agentModeByWorkspace).length === 0 &&
+            state.agentMode !== DEFAULT_PREFERENCES.agentMode
+
+          // One-time migration for users upgrading from global mode storage:
+          // bind legacy mode to the first active workspace we observe.
+          if (workspaceId && !hasMappedWorkspaceMode && hasLegacyGlobalModeOnly) {
+            state.agentModeByWorkspace[workspaceId] = state.agentMode
+          }
+
+          state.agentMode = workspaceId
+            ? state.agentModeByWorkspace[workspaceId] ?? DEFAULT_PREFERENCES.agentMode
+            : DEFAULT_PREFERENCES.agentMode
         }),
 
       // Reset actions
@@ -253,7 +280,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 2, // Bump version for agentMode field
+      version: 3, // Bump version for per-workspace agentMode map
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         panelState: state.panelState,
@@ -261,7 +288,16 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
         recentFiles: state.recentFiles,
         onboardingCompleted: state.onboardingCompleted,
         agentMode: state.agentMode,
+        agentModeByWorkspace: state.agentModeByWorkspace,
       }),
+      migrate: (persistedState) => {
+        const state = (persistedState || {}) as Partial<WorkspacePreferences>
+        return {
+          ...DEFAULT_PREFERENCES,
+          ...state,
+          agentModeByWorkspace: state.agentModeByWorkspace || {},
+        }
+      },
     }
   )
 )
@@ -278,8 +314,12 @@ export type { WorkspacePreferencesState }
  * Reads from workspace store to get activeWorkspaceId.
  */
 export function getCurrentWorkspaceAgentMode(): 'plan' | 'act' {
+  const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
   const state = useWorkspacePreferencesStore.getState()
-  return state.agentMode
+  if (!activeWorkspaceId) {
+    return DEFAULT_PREFERENCES.agentMode
+  }
+  return state.agentModeByWorkspace[activeWorkspaceId] ?? DEFAULT_PREFERENCES.agentMode
 }
 
 /**
@@ -289,3 +329,19 @@ export function getCurrentWorkspaceAgentMode(): 'plan' | 'act' {
 export function setCurrentWorkspaceAgentMode(mode: 'plan' | 'act'): void {
   useWorkspacePreferencesStore.getState().setAgentMode(mode)
 }
+
+// Keep current UI mode in sync with active workspace changes.
+let workspaceModeSyncInitialized = false
+function initializeWorkspaceModeSync() {
+  if (workspaceModeSyncInitialized) return
+  workspaceModeSyncInitialized = true
+
+  useWorkspaceStore.subscribe((state, prevState) => {
+    if (state.activeWorkspaceId === prevState.activeWorkspaceId) return
+    useWorkspacePreferencesStore.getState().syncAgentModeForWorkspace(state.activeWorkspaceId)
+  })
+
+  useWorkspacePreferencesStore.getState().syncAgentModeForWorkspace(useWorkspaceStore.getState().activeWorkspaceId)
+}
+
+initializeWorkspaceModeSync()
