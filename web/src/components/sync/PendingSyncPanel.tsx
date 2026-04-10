@@ -11,12 +11,9 @@ import React, { useState, useCallback, useMemo, useEffect as useReactEffect } fr
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { useConversationStore } from '@/store/conversation.store'
-import { useAgentStore } from '@/store/agent.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
-import { createUserMessage } from '@/agent/message-types'
 import {
   BrandButton,
   BrandDialog,
@@ -31,9 +28,10 @@ import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-help
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
+import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { toast } from 'sonner'
-import type { ConflictInfo, FileChange } from '@/opfs/types/opfs-types'
+import type { ConflictInfo, ConflictDetail, SyncResult } from '@/opfs/types/opfs-types'
 
 export function PendingSyncPanel() {
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
@@ -52,7 +50,12 @@ export function PendingSyncPanel() {
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
   const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
+  const [conflictQueue, setConflictQueue] = useState<ConflictDetail[]>([])
+  const [conflictIndex, setConflictIndex] = useState(0)
+  const [forceOverwritePaths, setForceOverwritePaths] = useState<Set<string>>(new Set())
+  const [skippedConflictPaths, setSkippedConflictPaths] = useState<Set<string>>(new Set())
   const listRef = React.useRef<HTMLDivElement>(null)
+  const activeConflict = conflictQueue[conflictIndex] ?? null
 
   // Handle keyboard shortcuts
   useReactEffect(() => {
@@ -189,56 +192,24 @@ export function PendingSyncPanel() {
     setShowClearConfirm(false)
   }, [clearChanges])
 
-  // 发送冲突消息给 Agent 处理
-  const sendConflictsToAgent = useCallback(async (conflicts: ConflictInfo[], changes: FileChange[]) => {
-    const settings = useSettingsStore.getState()
-    if (!settings.hasApiKey) {
-      toast.error('请先配置 API Key')
-      return
-    }
+  const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
+    path: conflict.path,
+    opfsVersion: {
+      workspaceId: conflict.workspaceId,
+      mtime: conflict.opfsMtime,
+    },
+    nativeVersion: {
+      exists: conflict.currentFsMtime > 0,
+      mtime: conflict.currentFsMtime > 0 ? conflict.currentFsMtime : undefined,
+    },
+  }), [])
 
-    const conversationStore = useConversationStore.getState()
-    const { directoryHandle } = useAgentStore.getState()
-
-    // 获取冲突文件列表（不再传输 diff 细节，统一由 OPFS 冲突标记驱动处理）
-    const conflictLines = conflicts.map((conflict) => {
-      const fileChange = changes.find((c) => c.path === conflict.path)
-      return `  - ${fileChange?.type ?? 'modify'}: ${conflict.path}`
-    })
-
-    const messageContent = [
-      `检测到 ${conflicts.length} 个文件冲突，需要在审批前解决：`,
-      '冲突文件：',
-      conflictLines.join('\n'),
-      '',
-      '## 处理要求',
-      '系统已将文本冲突写入 OPFS 文件（<<<<<<< / ======= / >>>>>>> 标记）。',
-      '请逐个打开以上冲突文件并完成合并，然后使用 `edit` 或 `write` 写回最终内容。',
-      '如果两侧内容一致，也必须执行一次 `edit`（可 old_text == new_text）以刷新冲突基线。',
-      '完成后请调用 `detect_conflicts`（传入上述路径）再次检查，确认冲突已消除。',
-    ].join('\n')
-
-    const userMessage = createUserMessage(messageContent)
-
-    let targetConvId = conversationStore.activeConversationId
-    if (!targetConvId) {
-      const conv = conversationStore.createNew('冲突处理')
-      targetConvId = conv.id
-      await conversationStore.setActive(targetConvId)
-    }
-
-    const currentConv = conversationStore.conversations.find((c) => c.id === targetConvId)
-    const currentMessages = currentConv ? [...currentConv.messages, userMessage] : [userMessage]
-    conversationStore.updateMessages(targetConvId, currentMessages)
-
-    await conversationStore.runAgent(
-      targetConvId,
-      settings.providerType,
-      settings.modelName,
-      settings.maxTokens,
-      directoryHandle
-    )
-  }, [])
+  const mergeSyncResult = useCallback((a: SyncResult, b: SyncResult): SyncResult => ({
+    success: a.success + b.success,
+    failed: a.failed + b.failed,
+    skipped: a.skipped + b.skipped,
+    conflicts: [...a.conflicts, ...b.conflicts],
+  }), [])
 
   const generateSummaryWithLLM = useCallback(async (paths: string[]): Promise<string | null> => {
     try {
@@ -328,7 +299,7 @@ export function PendingSyncPanel() {
     }
   }, [pendingChanges])
 
-  const runSync = useCallback(async (pathsToSync: string[], summary: string) => {
+  const runSync = useCallback(async (pathsToSync: string[], summary: string, overwritePaths: Set<string>) => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isSyncing) return false
 
     setIsSyncing(true)
@@ -356,11 +327,22 @@ export function PendingSyncPanel() {
 
       // 只有在有本地目录时才同步到磁盘
       if (nativeDir) {
-        // 执行同步（统一走 pending/cache 同步链路）
-        const result = await conversation.syncToDisk(
-          nativeDir,
-          filesToSync.map((c) => c.path)
-        )
+        const allPaths = filesToSync.map((c) => c.path)
+        const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
+        const regularList = allPaths.filter((path) => !overwritePaths.has(path))
+
+        let result: SyncResult = {
+          success: 0,
+          failed: 0,
+          skipped: 0,
+          conflicts: [],
+        }
+        if (regularList.length > 0) {
+          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, regularList))
+        }
+        if (forceOverwriteList.length > 0) {
+          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
+        }
 
         // 同步成功后标记快照为已同步
         if (snapshotResult?.snapshotId) {
@@ -406,7 +388,7 @@ export function PendingSyncPanel() {
     } finally {
       setIsSyncing(false)
     }
-  }, [pendingChanges, isSyncing])
+  }, [pendingChanges, isSyncing, mergeSyncResult])
 
   // 处理审批按钮点击：先弹窗
   const handleSync = useCallback(async () => {
@@ -427,12 +409,11 @@ export function PendingSyncPanel() {
 
           if (conflicts.length > 0) {
             setConflictPaths(new Set(conflicts.map((c) => c.path)))
-            // 有冲突，发送消息给 Agent 处理
-            await sendConflictsToAgent(conflicts, filesToSync)
-            toast.info(
-              `检测到 ${conflicts.length} 个文件冲突，已发送消息给 Agent 处理`,
-              { description: conflicts.slice(0, 3).map((c) => c.path).join(', ') + (conflicts.length > 3 ? '...' : '') }
-            )
+            setPendingApprovePaths(paths)
+            setForceOverwritePaths(new Set())
+            setSkippedConflictPaths(new Set())
+            setConflictQueue(conflicts.map(toConflictDetail))
+            setConflictIndex(0)
             return
           }
           setConflictPaths(new Set())
@@ -448,7 +429,76 @@ export function PendingSyncPanel() {
     setGeneratingSummary(false)
     setSummaryError(null)
     setApproveDialogOpen(true)
-  }, [pendingChanges, isSyncing, selectedItems, sendConflictsToAgent])
+  }, [pendingChanges, isSyncing, selectedItems, toConflictDetail])
+
+  const handleConflictResolve = useCallback(async (resolution: 'opfs' | 'native' | 'skip') => {
+    const current = activeConflict
+    if (!current) return
+
+    const nextForce = new Set(forceOverwritePaths)
+    const nextSkipped = new Set(skippedConflictPaths)
+
+    if (resolution === 'opfs') {
+      nextForce.add(current.path)
+    } else {
+      nextSkipped.add(current.path)
+      if (resolution === 'native') {
+        try {
+          await discardPendingPath(current.path)
+          await useConversationContextStore.getState().refreshPendingChanges(true)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '保留本机版本失败'
+          toast.error(message)
+          return
+        }
+      }
+      setConflictPaths((prev) => {
+        const next = new Set(prev)
+        next.delete(current.path)
+        return next
+      })
+    }
+
+    setForceOverwritePaths(nextForce)
+    setSkippedConflictPaths(nextSkipped)
+
+    const nextIndex = conflictIndex + 1
+    if (nextIndex < conflictQueue.length) {
+      setConflictIndex(nextIndex)
+      return
+    }
+
+    setConflictQueue([])
+    setConflictIndex(0)
+
+    const nextPaths = pendingApprovePaths.filter((path) => !nextSkipped.has(path))
+    if (nextPaths.length === 0) {
+      setPendingApprovePaths([])
+      toast.info('冲突处理后没有可同步的文件')
+      return
+    }
+
+    setPendingApprovePaths(nextPaths)
+    setSnapshotSummary('')
+    setGeneratingSummary(false)
+    setSummaryError(null)
+    setApproveDialogOpen(true)
+  }, [
+    activeConflict,
+    conflictIndex,
+    conflictQueue.length,
+    discardPendingPath,
+    forceOverwritePaths,
+    pendingApprovePaths,
+    skippedConflictPaths,
+  ])
+
+  const handleConflictCancel = useCallback(() => {
+    setConflictQueue([])
+    setConflictIndex(0)
+    setForceOverwritePaths(new Set())
+    setSkippedConflictPaths(new Set())
+  }, [])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
@@ -732,10 +782,18 @@ export function PendingSyncPanel() {
           setGeneratingSummary(false)
         }}
         onConfirm={async () => {
-          const ok = await runSync(pendingApprovePaths, snapshotSummary)
+          const ok = await runSync(pendingApprovePaths, snapshotSummary, forceOverwritePaths)
           if (ok) setApproveDialogOpen(false)
         }}
       />
+
+      {activeConflict && (
+        <ConflictResolutionDialog
+          conflict={activeConflict}
+          onResolve={handleConflictResolve}
+          onCancel={handleConflictCancel}
+        />
+      )}
     </div>
   )
 }

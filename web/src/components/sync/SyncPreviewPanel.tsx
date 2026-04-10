@@ -9,16 +9,13 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react'
-import { type FileChange, type ConflictInfo } from '@/opfs/types/opfs-types'
+import { type FileChange, type ConflictInfo, type ConflictDetail, type SyncResult } from '@/opfs/types/opfs-types'
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { useConversationStore } from '@/store/conversation.store'
-import { useAgentStore } from '@/store/agent.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
-import { createUserMessage } from '@/agent/message-types'
 import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
@@ -27,78 +24,9 @@ import { ArrowLeft, AlertCircle, Sparkles } from 'lucide-react'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
+import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
-
-/**
- * Send conflict resolution request to agent via conversation
- */
-async function sendConflictsToAgent(
-  conflicts: ConflictInfo[],
-  changes: FileChange[]
-): Promise<void> {
-  const settings = useSettingsStore.getState()
-  if (!settings.hasApiKey) {
-    toast.error('请先配置 API Key')
-    return
-  }
-
-  const conversationStore = useConversationStore.getState()
-  const { directoryHandle } = useAgentStore.getState()
-
-  // Get active conversation to access workspace
-  const activeConv = await getActiveConversation()
-  if (!activeConv) {
-    toast.error('无法获取活动工作区')
-    return
-  }
-
-  // Build conflict resolution message without diff payload
-  const conflictLines = conflicts.map((conflict) => {
-    const fileChange = changes.find((c) => c.path === conflict.path)
-    return `  - ${fileChange?.type ?? 'modify'}: ${conflict.path}`
-  })
-
-  const messageContent = [
-    `检测到 ${conflicts.length} 个文件冲突，需要在审批前解决：`,
-    '',
-    '冲突文件：',
-    conflictLines.join('\n'),
-    '',
-    '## 处理要求',
-    '',
-    '系统已将文本冲突写入 OPFS 文件（<<<<<<< / ======= / >>>>>>> 标记）。',
-    '请逐个打开以上冲突文件并完成合并，然后使用 `edit` 或 `write` 写回最终内容。',
-    '如果两侧内容一致，也必须执行一次 `edit`（可 old_text == new_text）以刷新冲突基线。',
-    '完成后请调用 `detect_conflicts`（传入上述路径）再次检查，确认冲突已消除。',
-    '',
-    '注意：编辑后会更新 OPFS 草稿内容，后续审批将使用新的合并版本。',
-  ].join('\n')
-
-  const userMessage = createUserMessage(messageContent)
-
-  // Get or create active conversation
-  let targetConvId = conversationStore.activeConversationId
-  if (!targetConvId) {
-    const conv = conversationStore.createNew('冲突处理')
-    targetConvId = conv.id
-    await conversationStore.setActive(targetConvId)
-  }
-
-  // Add message to conversation
-  const currentConv = conversationStore.conversations.find((c) => c.id === targetConvId)
-  const currentMessages = currentConv ? [...currentConv.messages, userMessage] : [userMessage]
-  conversationStore.updateMessages(targetConvId, currentMessages)
-
-  // Run agent to handle conflicts
-  await conversationStore.runAgent(
-    targetConvId,
-    settings.providerType,
-    settings.modelName,
-    settings.maxTokens,
-    directoryHandle
-  )
-}
 
 /**
  * Empty state when no changes detected
@@ -198,9 +126,33 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
   const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
+  const [conflictQueue, setConflictQueue] = useState<ConflictDetail[]>([])
+  const [conflictIndex, setConflictIndex] = useState(0)
+  const [forceOverwritePaths, setForceOverwritePaths] = useState<Set<string>>(new Set())
+  const [skippedConflictPaths, setSkippedConflictPaths] = useState<Set<string>>(new Set())
+  const activeConflict = conflictQueue[conflictIndex] ?? null
 
   // Selection state for selective sync
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+
+  const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
+    path: conflict.path,
+    opfsVersion: {
+      workspaceId: conflict.workspaceId,
+      mtime: conflict.opfsMtime,
+    },
+    nativeVersion: {
+      exists: conflict.currentFsMtime > 0,
+      mtime: conflict.currentFsMtime > 0 ? conflict.currentFsMtime : undefined,
+    },
+  }), [])
+
+  const mergeSyncResult = useCallback((a: SyncResult, b: SyncResult): SyncResult => ({
+    success: a.success + b.success,
+    failed: a.failed + b.failed,
+    skipped: a.skipped + b.skipped,
+    conflicts: [...a.conflicts, ...b.conflicts],
+  }), [])
 
   /**
    * Handle file selection from list
@@ -344,7 +296,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [])
 
-  const doSync = useCallback(async (filesToSync: FileChange[], summary: string): Promise<boolean> => {
+  const doSync = useCallback(async (
+    filesToSync: FileChange[],
+    summary: string,
+    overwritePathSet: Set<string>
+  ): Promise<boolean> => {
     if (!pendingChanges || isSyncing) return false
 
     setIsSyncing(true)
@@ -380,11 +336,24 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         )
       }
 
-      // Sync to disk
-      const pendingResult = await conversation.syncToDisk(
-        nativeDir,
-        approvedPaths
-      )
+      const forceOverwriteList = approvedPaths.filter((path) => overwritePathSet.has(path))
+      const regularList = approvedPaths.filter((path) => !overwritePathSet.has(path))
+
+      let pendingResult: SyncResult = {
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        conflicts: [],
+      }
+      if (regularList.length > 0) {
+        pendingResult = mergeSyncResult(pendingResult, await conversation.syncToDisk(nativeDir, regularList))
+      }
+      if (forceOverwriteList.length > 0) {
+        pendingResult = mergeSyncResult(
+          pendingResult,
+          await conversation.syncToDisk(nativeDir, forceOverwriteList, true)
+        )
+      }
 
       // Show sync result
       if (pendingResult.failed > 0) {
@@ -423,7 +392,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       // Clear selection after sync
       setSelectedItems(new Set())
     }
-  }, [pendingChanges, isSyncing, onSync, selectedPath])
+  }, [pendingChanges, isSyncing, mergeSyncResult, onSync, selectedPath])
 
   const handleSync = useCallback(async (selectedPaths: string[] = []) => {
     if (!pendingChanges || isSyncing) return
@@ -445,12 +414,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
           if (conflicts.length > 0) {
             setConflictPaths(new Set(conflicts.map((c) => c.path)))
-            // Send conflicts to agent for resolution
-            await sendConflictsToAgent(conflicts, filesToSync)
-            toast.info(
-              `检测到 ${conflicts.length} 个文件冲突，已发送消息给 Agent 处理`,
-              { description: conflicts.slice(0, 3).map((c) => c.path).join(', ') + (conflicts.length > 3 ? '...' : '') }
-            )
+            setPendingApproveFiles(filesToSync)
+            setForceOverwritePaths(new Set())
+            setSkippedConflictPaths(new Set())
+            setConflictQueue(conflicts.map(toConflictDetail))
+            setConflictIndex(0)
             return
           }
           setConflictPaths(new Set())
@@ -467,7 +435,76 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setSnapshotSummary('')
     setGeneratingSummary(false)
     setApproveDialogOpen(true)
-  }, [pendingChanges, isSyncing])
+  }, [pendingChanges, isSyncing, toConflictDetail])
+
+  const handleConflictResolve = useCallback(async (resolution: 'opfs' | 'native' | 'skip') => {
+    const current = activeConflict
+    if (!current) return
+
+    const nextForce = new Set(forceOverwritePaths)
+    const nextSkipped = new Set(skippedConflictPaths)
+
+    if (resolution === 'opfs') {
+      nextForce.add(current.path)
+    } else {
+      nextSkipped.add(current.path)
+      if (resolution === 'native') {
+        try {
+          await discardPendingPath(current.path)
+          await useConversationContextStore.getState().refreshPendingChanges(true)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : '保留本机版本失败'
+          toast.error(message)
+          return
+        }
+      }
+      setConflictPaths((prev) => {
+        const next = new Set(prev)
+        next.delete(current.path)
+        return next
+      })
+    }
+
+    setForceOverwritePaths(nextForce)
+    setSkippedConflictPaths(nextSkipped)
+
+    const nextIndex = conflictIndex + 1
+    if (nextIndex < conflictQueue.length) {
+      setConflictIndex(nextIndex)
+      return
+    }
+
+    setConflictQueue([])
+    setConflictIndex(0)
+
+    const nextFiles = pendingApproveFiles.filter((file) => !nextSkipped.has(file.path))
+    if (nextFiles.length === 0) {
+      setPendingApproveFiles([])
+      toast.info('冲突处理后没有可同步的文件')
+      return
+    }
+
+    setPendingApproveFiles(nextFiles)
+    setSnapshotSummary('')
+    setGeneratingSummary(false)
+    setSummaryError(null)
+    setApproveDialogOpen(true)
+  }, [
+    activeConflict,
+    conflictIndex,
+    conflictQueue.length,
+    discardPendingPath,
+    forceOverwritePaths,
+    pendingApproveFiles,
+    skippedConflictPaths,
+  ])
+
+  const handleConflictCancel = useCallback(() => {
+    setConflictQueue([])
+    setConflictIndex(0)
+    setForceOverwritePaths(new Set())
+    setSkippedConflictPaths(new Set())
+  }, [])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
@@ -642,10 +679,18 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           setGeneratingSummary(false)
         }}
         onConfirm={async () => {
-          const ok = await doSync(pendingApproveFiles, snapshotSummary)
+          const ok = await doSync(pendingApproveFiles, snapshotSummary, forceOverwritePaths)
           if (ok) setApproveDialogOpen(false)
         }}
       />
+
+      {activeConflict && (
+        <ConflictResolutionDialog
+          conflict={activeConflict}
+          onResolve={handleConflictResolve}
+          onCancel={handleConflictCancel}
+        />
+      )}
     </>
   )
 }
