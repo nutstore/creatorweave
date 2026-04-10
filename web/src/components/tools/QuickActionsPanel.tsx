@@ -86,16 +86,6 @@ const QUICK_ACTIONS: QuickAction[] = [
     prompt: 'Explain what this file does',
   },
   {
-    id: 'run-javascript',
-    label: 'Run JavaScript',
-    labelKey: 'quickActions.runJavaScript',
-    description: 'Execute JavaScript code',
-    descriptionKey: 'quickActions.runJavaScript.description',
-    icon: Terminal,
-    category: 'code',
-    prompt: 'I want to run some JavaScript code',
-  },
-  {
     id: 'run-python',
     label: 'Run Python',
     labelKey: 'quickActions.runPython',

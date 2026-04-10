@@ -59,9 +59,9 @@ const TOOL_CATEGORIES = [
     name: 'Code Execution',
     nameKey: 'tools.categories.code',
     icon: Terminal,
-    description: 'Run Python and JavaScript code for analysis and automation',
+    description: 'Run Python code for analysis and automation',
     descriptionKey: 'tools.categories.code.description',
-    toolNames: ['execute'],
+    toolNames: ['python'],
   },
   {
     id: 'mcp',

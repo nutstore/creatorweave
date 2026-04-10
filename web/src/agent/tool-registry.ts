@@ -16,7 +16,7 @@ import { deleteDefinition, deleteExecutor } from './tools/delete.tool'
 import { editDefinition, editExecutor } from './tools/file-edit.tool'
 import { searchDefinition, searchExecutor } from './tools/search.tool'
 import { lsDefinition, lsExecutor } from './tools/ls.tool'
-import { executeDefinition, executeExecutor } from './tools/execute.tool'
+import { pythonDefinition, pythonToolExecutor } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 import { analyzeDataDefinition, analyzeDataExecutor } from './tools/data-analysis.tool'
 import { runWorkflowDefinition, runWorkflowExecutor } from './tools/workflow.tool'
@@ -67,7 +67,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   // Directory & search
   { definition: lsDefinition, executor: lsExecutor },
   // Execution (unified)
-  { definition: executeDefinition, executor: executeExecutor },
+  { definition: pythonDefinition, executor: pythonToolExecutor },
   // Data
   { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
   // Workflow orchestration

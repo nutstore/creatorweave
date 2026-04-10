@@ -180,7 +180,7 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
           input.onElicitationDetected?.()
         }
 
-        if (toolDef.function.name === 'execute' && args.language === 'python' && rawResult) {
+        if (toolDef.function.name === 'python' && rawResult) {
           try {
             const parsedResult = JSON.parse(rawResult)
             if (parsedResult.fileChanges) {

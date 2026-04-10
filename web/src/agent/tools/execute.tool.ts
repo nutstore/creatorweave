@@ -1,23 +1,20 @@
 /**
- * execute tool - Unified code execution (Python/JavaScript).
- *
- * Combines run_python_code and run_javascript_code into one tool.
- * Uses 'language' parameter to select execution engine.
+ * python tool - Python code execution.
  */
 
 import type { ToolDefinition, ToolExecutor } from './tool-types'
-import { pythonExecutor } from '@/python'
+import { pythonExecutor as runtimePythonExecutor } from '@/python'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
 
 //=============================================================================
 // Tool Definition
 //=============================================================================
 
-export const executeDefinition: ToolDefinition = {
+export const pythonDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'execute',
-    description: `Execute code in browser. Supports Python and JavaScript.
+    name: 'python',
+    description: `Execute Python code in browser.
 
 LANGUAGE: python
 - Runs via Pyodide (WebAssembly Python runtime)
@@ -25,46 +22,30 @@ LANGUAGE: python
 - For matplotlib: set matplotlib.use('Agg') BEFORE creating figures
 - Files accessible at /mnt/ path (workspace subdirectory)
 
-LANGUAGE: javascript
-- Runs in browser JavaScript engine
-- Available: ES2024+, JSON, Math, Date, RegExp, Array/Object methods
-
 Examples:
-- Python: execute(language="python", code="print('hello')")
-- JS: execute(language="javascript", code="console.log('hello')")`,
+- python(code="print('hello')")`,
     parameters: {
       type: 'object',
       properties: {
-        language: {
-          type: 'string',
-          enum: ['python', 'javascript'],
-          description: 'Programming language to execute',
-        },
         code: {
           type: 'string',
-          description: 'Code to execute',
+          description: 'Python code to execute',
         },
         timeout: {
           type: 'number',
           description: 'Timeout in milliseconds (default: 60000)',
         },
       },
-      required: ['language', 'code'],
+      required: ['code'],
     },
   },
 }
 
-export const executeExecutor: ToolExecutor = async (args, _context) => {
-  const language = args.language as 'python' | 'javascript'
+export const pythonToolExecutor: ToolExecutor = async (args, _context) => {
   const code = args.code as string
   const timeout = (args.timeout as number) || 60000
 
-  if (language === 'python') {
-    return executePython(code, timeout)
-  } else if (language === 'javascript') {
-    return executeJavascript(code, timeout)
-  }
-  return JSON.stringify({ error: 'Unsupported language. Use "python" or "javascript".' })
+  return executePython(code, timeout)
 }
 
 //=============================================================================
@@ -81,7 +62,7 @@ async function executePython(code: string, timeout: number): Promise<string> {
     const beforeSnapshot = await active.conversation.scanFilesWithCache()
 
     // Execute Python code
-    const result = await pythonExecutor.execute({
+    const result = await runtimePythonExecutor.execute({
       code,
       timeout,
     })
@@ -119,74 +100,4 @@ async function executePython(code: string, timeout: number): Promise<string> {
     }
     return JSON.stringify({ error: String(error) })
   }
-}
-
-//=============================================================================
-// JavaScript Execution
-//=============================================================================
-
-async function executeJavascript(code: string, timeout: number): Promise<string> {
-  return new Promise((resolve) => {
-    const timeoutId = setTimeout(() => {
-      resolve(JSON.stringify({ error: `Execution timed out after ${timeout}ms` }))
-    }, timeout)
-
-    try {
-      // Create a sandboxed execution environment
-      const logs: string[] = []
-      const sandbox = {
-        console: {
-          log: (...args: unknown[]) => logs.push(args.map(String).join(' ')),
-          error: (...args: unknown[]) => logs.push('ERROR: ' + args.map(String).join(' ')),
-          warn: (...args: unknown[]) => logs.push('WARN: ' + args.map(String).join(' ')),
-          info: (...args: unknown[]) => logs.push('INFO: ' + args.map(String).join(' ')),
-        },
-        Math,
-        JSON,
-        Date,
-        RegExp,
-        Array: Array.prototype,
-        Object: Object.prototype,
-        String: String.prototype,
-        Number: Number.prototype,
-        Boolean: Boolean.prototype,
-        Map,
-        Set,
-        WeakMap,
-        WeakSet,
-        Promise,
-        Symbol,
-        Error,
-        TypeError,
-        RangeError,
-        SyntaxError,
-        URIError,
-      }
-
-      // Create function with sandboxed globals
-      const fn = new Function(...Object.keys(sandbox), code)
-      const result = fn(...Object.values(sandbox))
-
-      clearTimeout(timeoutId)
-
-      // Return result with logs
-      let output = logs.join('\n')
-      if (output && result !== undefined) {
-        output += '\n' + String(result)
-      } else if (result !== undefined) {
-        output = String(result)
-      } else if (logs.length === 0) {
-        output = 'undefined'
-      }
-
-      resolve(output)
-    } catch (error) {
-      clearTimeout(timeoutId)
-      resolve(
-        JSON.stringify({
-          error: error instanceof Error ? error.message : String(error),
-        })
-      )
-    }
-  })
 }

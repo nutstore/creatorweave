@@ -867,8 +867,8 @@ export class FingerprintScanner {
     const typeTools: Record<string, string[]> = {
       react: ['edit'],
       vue: ['edit'],
-      python: ['execute'],
-      'data-science': ['execute', 'analyze_data'],
+      python: ['python'],
+      'data-science': ['python', 'analyze_data'],
       rust: ['edit'],
       go: ['edit'],
       node: ['edit'],

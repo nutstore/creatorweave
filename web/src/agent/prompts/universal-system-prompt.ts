@@ -69,9 +69,8 @@ Updating agent-space files:
   2. \`edit(path="vfs://agents/default/SOUL.md", old_text="...", new_text="...")\`
 
 ### Code Execution (for data/analysis tasks)
-- \`execute(language="python", code)\` - Execute Python with pandas, numpy, matplotlib
-- \`execute(language="javascript", code)\` - Execute JavaScript
-  Example: execute(language="python", code="print('hello')")
+- \`python(code)\` - Execute Python with pandas, numpy, matplotlib
+  Example: python(code="print('hello')")
 
 ### Workflow Execution
 - \`run_workflow(workflow_id, mode, inputs, ...)\` - Run predefined structured workflows for multi-step content generation/review

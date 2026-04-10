@@ -213,13 +213,13 @@ const TOOL_METADATA: Record<
     description: 'Replace text in files',
     baseExample: 'edit(path="config.ts", old_text="old", new_text="new")',
   },
-  execute: {
-    name: 'execute',
+  python: {
+    name: 'python',
     displayName: 'Code Execution',
     category: 'analysis',
     intents: ['data-analysis', 'data-visualization', 'testing'],
-    description: 'Execute Python or JavaScript code',
-    baseExample: 'execute(language="python", code="print(1+1)") or execute(language="javascript", code="console.log(1+1)")',
+    description: 'Execute Python code',
+    baseExample: 'python(code="print(1+1)")',
   },
 }
 
@@ -452,8 +452,8 @@ export class RecommendationEngine {
     analysis: IntentAnalysis
   ): string {
     // Customize example based on detected file types
-    if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'execute') {
-      return `First find the file: ls(pattern="**/*.csv")\nThen analyze: execute(language="python", code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())")`
+    if (analysis.fileTypeHints.includes('.csv') && metadata.name === 'python') {
+      return `First find the file: ls(pattern="**/*.csv")\nThen analyze: python(code="import pandas as pd; df=pd.read_csv('/mnt/data.csv'); print(df.describe())")`
     }
 
     if (analysis.primaryIntent === 'file-discovery' && metadata.name === 'ls') {

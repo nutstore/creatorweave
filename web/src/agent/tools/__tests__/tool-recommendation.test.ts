@@ -120,13 +120,13 @@ describe('RecommendationEngine', () => {
   const engine = new RecommendationEngine()
 
   describe('tool recommendations for data analysis', () => {
-    it('should recommend execute for CSV analysis', () => {
+    it('should recommend python for CSV analysis', () => {
       const recommendations = engine.recommend('analyze data.csv with pandas')
-      const executeTool = recommendations.find((r) => r.toolName === 'execute')
+      const pythonTool = recommendations.find((r) => r.toolName === 'python')
 
-      expect(executeTool).toBeDefined()
-      expect(executeTool?.score).toBeGreaterThan(0)
-      expect(executeTool?.category).toBe('analysis')
+      expect(pythonTool).toBeDefined()
+      expect(pythonTool?.score).toBeGreaterThan(0)
+      expect(pythonTool?.category).toBe('analysis')
     })
 
     it('should recommend ls for finding data files', () => {
@@ -135,11 +135,11 @@ describe('RecommendationEngine', () => {
       expect(recommendations.length).toBeGreaterThan(0)
     })
 
-    it('should recommend both ls and execute for data workflow', () => {
+    it('should recommend both ls and python for data workflow', () => {
       const recommendations = engine.recommend('analyze CSV files with pandas')
-      // Should have recommendations including execute
-      const executeTool = recommendations.find((r) => r.toolName === 'execute')
-      expect(executeTool).toBeDefined()
+      // Should have recommendations including python
+      const pythonTool = recommendations.find((r) => r.toolName === 'python')
+      expect(pythonTool).toBeDefined()
     })
   })
 
@@ -178,14 +178,14 @@ describe('RecommendationEngine', () => {
   })
 
   describe('recommendation examples', () => {
-    it('should provide contextual examples for execute', () => {
+    it('should provide contextual examples for python', () => {
       const recommendations = engine.recommend('analyze sales.csv')
-      const executeTool = recommendations.find((r) => r.toolName === 'execute')
+      const pythonTool = recommendations.find((r) => r.toolName === 'python')
 
-      expect(executeTool).toBeDefined()
-      if (executeTool) {
-        expect(executeTool.example).toBeDefined()
-        expect(typeof executeTool.example).toBe('string')
+      expect(pythonTool).toBeDefined()
+      if (pythonTool) {
+        expect(pythonTool.example).toBeDefined()
+        expect(typeof pythonTool.example).toBe('string')
       }
     })
 
@@ -201,12 +201,12 @@ describe('RecommendationEngine', () => {
       }
     })
 
-    it('should use language parameter for execute', () => {
+    it('should use python tool example without language parameter', () => {
       const recommendations = engine.recommend('analyze sales.csv with python')
-      const executeTool = recommendations.find((r) => r.toolName === 'execute')
+      const pythonTool = recommendations.find((r) => r.toolName === 'python')
 
-      expect(executeTool).toBeDefined()
-      expect(executeTool?.example).toContain('language="python"')
+      expect(pythonTool).toBeDefined()
+      expect(pythonTool?.example).toContain('python(code=')
     })
   })
 
@@ -230,12 +230,12 @@ describe('RecommendationEngine', () => {
       expect(readDirTool?.category).toBe('discovery')
     })
 
-    it('should include execute in analysis category', () => {
+    it('should include python in analysis category', () => {
       const allTools = engine.getAllTools()
-      const executeTool = allTools.analysis.find((t) => t.toolName === 'execute')
+      const pythonTool = allTools.analysis.find((t) => t.toolName === 'python')
 
-      expect(executeTool).toBeDefined()
-      expect(executeTool?.category).toBe('analysis')
+      expect(pythonTool).toBeDefined()
+      expect(pythonTool?.category).toBe('analysis')
     })
 
     it('should not expose sync tool while it is disabled', () => {
