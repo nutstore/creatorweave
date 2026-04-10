@@ -239,6 +239,7 @@ export const runWorkflowExecutor: ToolExecutor = async (args, context) => {
     // Reuse AgentLoop's enhancement pipeline for each workflow node
     enhanceSystemPrompt: (basePrompt, userMessage) =>
       buildEnhancedWorkflowNodePrompt(basePrompt, userMessage, {
+        projectId: context.projectId ?? null,
         directoryHandle: context.directoryHandle ?? null,
         currentAgentId: context.currentAgentId ?? null,
         workspaceId: context.workspaceId ?? null,

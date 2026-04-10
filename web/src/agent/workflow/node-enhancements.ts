@@ -18,6 +18,8 @@ import { getSkillManager } from '@/skills/skill-manager'
 import type { SkillMatchContext } from '@/skills/skill-types'
 
 export interface NodeEnhancementOptions {
+  /** Explicit project id for this workflow execution */
+  projectId?: string | null
   /** File system access for project fingerprinting */
   directoryHandle?: FileSystemDirectoryHandle | null
   /** Agent ID for loading agent personality */
@@ -52,6 +54,7 @@ export async function buildEnhancedWorkflowNodePrompt(
   try {
     const coordinator = getIntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt(enhanced, {
+      projectId: options.projectId ?? null,
       directoryHandle: options.directoryHandle || undefined,
       userMessage,
       currentAgentId: options.currentAgentId ?? null,

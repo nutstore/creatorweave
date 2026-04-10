@@ -1407,6 +1407,29 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           return
         }
 
+        // Resolve runtime routing context from the current conversation/workspace.
+        // Do not depend on global active-project pointer for agent prompt injection.
+        let activeProjectId: string | null = null
+        let activeAgentId: string | null = null
+        let knownAgentIds: Set<string> | null = null
+
+        try {
+          const { getWorkspaceRepository } = await import('@/sqlite/repositories/workspace.repository')
+          const workspace = await getWorkspaceRepository().findWorkspaceById(conversationId)
+          activeProjectId = workspace?.projectId || null
+        } catch {
+          // Ignore workspace lookup failures; agent prompt injection will be skipped without projectId.
+        }
+
+        try {
+          const { useAgentsStore } = await import('./agents.store')
+          const agentsState = useAgentsStore.getState()
+          activeAgentId = agentsState.activeAgentId || null
+          knownAgentIds = new Set(agentsState.agents.map((agent) => agent.id.toLowerCase()))
+        } catch {
+          // Ignore agents-store read failures and fallback to default.
+        }
+
         // ---- Workflow Real-Run interception ----
         // Detect pending real-run request (triggered by runWorkflowRealRun action).
         // Uses the same provider/model as normal chat — no special model name.
@@ -1457,6 +1480,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               abortSignal: abortController.signal,
               enhanceSystemPrompt: (basePrompt, userMessage) =>
                 buildEnhancedWorkflowNodePrompt(basePrompt, userMessage, {
+                  projectId: activeProjectId ?? null,
                   directoryHandle: directoryHandle ?? null,
                   currentAgentId: activeAgentId ?? null,
                 }),
@@ -1654,28 +1678,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         const toolRegistry = getToolRegistry()
         const toolPolicyHooks = createToolPolicyHooks()
-        let activeProjectId: string | null = null
-        let activeAgentId: string | null = null
-        let knownAgentIds: Set<string> | null = null
-
-        try {
-          const { useProjectStore } = await import('./project.store')
-          activeProjectId = useProjectStore.getState().activeProjectId || null
-        } catch {
-          // Ignore project-store read failures and fallback below.
-        }
-        if (!activeProjectId && typeof localStorage !== 'undefined') {
-          activeProjectId = localStorage.getItem('activeProjectId')
-        }
-
-        try {
-          const { useAgentsStore } = await import('./agents.store')
-          const agentsState = useAgentsStore.getState()
-          activeAgentId = agentsState.activeAgentId || null
-          knownAgentIds = new Set(agentsState.agents.map((agent) => agent.id.toLowerCase()))
-        } catch {
-          // Ignore agents-store read failures and fallback to default.
-        }
 
         const normalizedOverride = agentOverrideId?.trim() || null
         const overrideFromLatestMessage = extractFirstMentionedAgentId(lastUserMessage?.content)

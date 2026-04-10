@@ -35,6 +35,7 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   try {
     const coordinator = getIntelligenceCoordinator()
     const intelligenceResult = await coordinator.enhanceSystemPrompt(enhancedPrompt, {
+      projectId: input.toolContext.projectId ?? null,
       directoryHandle: input.toolContext.directoryHandle || undefined,
       userMessage,
       sessionId: input.sessionId,

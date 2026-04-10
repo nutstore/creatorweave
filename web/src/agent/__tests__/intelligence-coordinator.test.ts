@@ -10,10 +10,7 @@ const {
   processMessageMock,
   getProjectMock,
   buildAgentPromptMock,
-  findActiveProjectMock,
-  projectStoreState,
 } = vi.hoisted(() => {
-  const findActiveProjectMockInner = vi.fn<() => Promise<{ id: string } | null>>(async () => null)
   return {
     recommendMock: vi.fn(() => []),
     getToolRecommendationsForPromptMock: vi.fn(() => ''),
@@ -23,8 +20,6 @@ const {
     processMessageMock: vi.fn(async () => {}),
     getProjectMock: vi.fn(),
     buildAgentPromptMock: vi.fn(() => 'AGENT_PROMPT'),
-    findActiveProjectMock: findActiveProjectMockInner,
-    projectStoreState: { activeProjectId: '' },
   }
 })
 
@@ -64,18 +59,6 @@ vi.mock('../prompt-builder', () => ({
   buildAgentPrompt: buildAgentPromptMock,
 }))
 
-vi.mock('@/sqlite/repositories/project.repository', () => ({
-  getProjectRepository: () => ({
-    findActiveProject: findActiveProjectMock,
-  }),
-}))
-
-vi.mock('@/store/project.store', () => ({
-  useProjectStore: {
-    getState: () => projectStoreState,
-  },
-}))
-
 function createAgentInfo(id = 'default') {
   return {
     id,
@@ -91,13 +74,10 @@ function createAgentInfo(id = 'default') {
 describe('IntelligenceCoordinator', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    projectStoreState.activeProjectId = ''
-    findActiveProjectMock.mockResolvedValue(null)
     getProjectMock.mockResolvedValue(null)
   })
 
-  it('injects agent prompt when project store has activeProjectId', async () => {
-    projectStoreState.activeProjectId = 'proj-store'
+  it('injects agent prompt when projectId is provided', async () => {
     const agentInfo = createAgentInfo('default')
     getProjectMock.mockResolvedValue({
       agentManager: {
@@ -107,32 +87,14 @@ describe('IntelligenceCoordinator', () => {
     })
 
     const coordinator = new IntelligenceCoordinator()
-    const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT')
+    const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', { projectId: 'proj-store' })
 
     expect(result.agentInfo?.id).toBe('default')
     expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
     expect(getProjectMock).toHaveBeenCalledWith('proj-store')
   })
 
-  it('falls back to sqlite active project when project store is empty', async () => {
-    findActiveProjectMock.mockResolvedValue({ id: 'proj-sqlite' })
-    const agentInfo = createAgentInfo('default')
-    getProjectMock.mockResolvedValue({
-      agentManager: {
-        getAgent: vi.fn(async () => agentInfo),
-        readTodayLog: vi.fn(async () => null),
-      },
-    })
-
-    const coordinator = new IntelligenceCoordinator()
-    const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT')
-
-    expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
-    expect(getProjectMock).toHaveBeenCalledWith('proj-sqlite')
-  })
-
   it('injects routed agent prompt when currentAgentId is provided', async () => {
-    projectStoreState.activeProjectId = 'proj-store'
     const routedAgent = createAgentInfo('novel-editor')
     const defaultAgent = createAgentInfo('default')
     const getAgentMock = vi.fn(async (id: string) =>
@@ -147,6 +109,7 @@ describe('IntelligenceCoordinator', () => {
 
     const coordinator = new IntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', {
+      projectId: 'proj-store',
       currentAgentId: 'novel-editor',
     })
 
@@ -156,7 +119,6 @@ describe('IntelligenceCoordinator', () => {
   })
 
   it('falls back to default agent prompt when routed agent is missing', async () => {
-    projectStoreState.activeProjectId = 'proj-store'
     const defaultAgent = createAgentInfo('default')
     const getAgentMock = vi.fn(async (id: string) => (id === 'default' ? defaultAgent : null))
     getProjectMock.mockResolvedValue({
@@ -168,6 +130,7 @@ describe('IntelligenceCoordinator', () => {
 
     const coordinator = new IntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', {
+      projectId: 'proj-store',
       currentAgentId: 'novel-editor',
     })
 
@@ -177,7 +140,7 @@ describe('IntelligenceCoordinator', () => {
     expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
   })
 
-  it('does not inject agent prompt when no active project can be resolved', async () => {
+  it('does not inject agent prompt when no projectId is provided', async () => {
     const coordinator = new IntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT')
 

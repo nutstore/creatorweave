@@ -27,7 +27,6 @@ import {
 } from './context-memory'
 import { ProjectManager, type AgentInfo } from '@/opfs'
 import { buildAgentPrompt, type PromptOptions } from './prompt-builder'
-import { getProjectRepository } from '@/sqlite/repositories/project.repository'
 
 // Re-export AgentInfo for use in this module
 export type { AgentInfo } from '@/opfs'
@@ -52,6 +51,8 @@ export interface IntelligenceEnhancement {
 
 /** Coordinator options */
 export interface CoordinatorOptions {
+  /** Explicit project id for this run (preferred over any global active pointer) */
+  projectId?: string | null
   /** Directory handle for fingerprinting */
   directoryHandle?: FileSystemDirectoryHandle | null
   /** Current user message for intent analysis */
@@ -98,7 +99,7 @@ export class IntelligenceCoordinator {
     // 0. Load Agent Configuration (routed agent, fallback to default)
     const routedAgentId =
       options.currentAgentId?.trim() || extractFirstMentionedAgentId(options.userMessage || undefined)
-    agentInfo = await this.loadAgentForRun(routedAgentId)
+    agentInfo = await this.loadAgentForRun(routedAgentId, options.projectId)
 
     // 1. Project Fingerprint (cached)
     let fingerprint: ProjectFingerprint | null = null
@@ -146,7 +147,7 @@ export class IntelligenceCoordinator {
     if (agentInfo) {
       const promptOptions: PromptOptions = {
         includeTodayLog: true,
-        todayLog: await this.loadTodayLog(agentInfo.id),
+        todayLog: await this.loadTodayLog(agentInfo.id, options.projectId),
       }
       const agentPrompt = buildAgentPrompt(agentInfo, promptOptions)
       // Agent prompt goes first (personality), then base prompt (capabilities & tools)
@@ -171,16 +172,18 @@ export class IntelligenceCoordinator {
    * Falls back to default agent if requested agent is missing.
    * Note: No caching - always read fresh from OPFS so user changes take effect immediately.
    */
-  private async loadAgentForRun(currentAgentId?: string | null): Promise<AgentInfo | null> {
+  private async loadAgentForRun(
+    currentAgentId?: string | null,
+    projectId?: string | null
+  ): Promise<AgentInfo | null> {
     try {
-      const projectManager = await ProjectManager.create()
-      const currentProjectId = await this.resolveActiveProjectId()
-
-      if (!currentProjectId) {
+      const targetProjectId = projectId?.trim() || null
+      if (!targetProjectId) {
         return null
       }
 
-      const project = await projectManager.getProject(currentProjectId)
+      const projectManager = await ProjectManager.create()
+      const project = await projectManager.getProject(targetProjectId)
       if (!project) {
         return null
       }
@@ -203,16 +206,15 @@ export class IntelligenceCoordinator {
   /**
    * Load today's log for an agent
    */
-  private async loadTodayLog(agentId: string): Promise<string | null> {
+  private async loadTodayLog(agentId: string, projectId?: string | null): Promise<string | null> {
     try {
-      const projectManager = await ProjectManager.create()
-      const currentProjectId = await this.resolveActiveProjectId()
-
-      if (!currentProjectId) {
+      const targetProjectId = projectId?.trim() || null
+      if (!targetProjectId) {
         return null
       }
 
-      const project = await projectManager.getProject(currentProjectId)
+      const projectManager = await ProjectManager.create()
+      const project = await projectManager.getProject(targetProjectId)
       if (!project) {
         return null
       }
@@ -222,39 +224,6 @@ export class IntelligenceCoordinator {
       console.warn('[IntelligenceCoordinator] Failed to load today log:', error)
       return null
     }
-  }
-
-  private async resolveActiveProjectId(): Promise<string | null> {
-    // 1) Prefer in-memory project store (current session source of truth)
-    try {
-      const { useProjectStore } = await import('@/store/project.store')
-      const fromStore = useProjectStore.getState().activeProjectId
-      if (fromStore && fromStore.trim()) {
-        return fromStore
-      }
-    } catch {
-      // Ignore dynamic-import or store read failures; continue fallbacks.
-    }
-
-    // 2) Fallback to SQLite active_project pointer
-    try {
-      const activeProject = await getProjectRepository().findActiveProject()
-      if (activeProject?.id) {
-        return activeProject.id
-      }
-    } catch {
-      // Ignore DB access errors; continue fallback.
-    }
-
-    // 3) Legacy fallback for old flows
-    if (typeof localStorage !== 'undefined') {
-      const fromStorage = localStorage.getItem('activeProjectId')
-      if (fromStorage && fromStorage.trim()) {
-        return fromStorage
-      }
-    }
-
-    return null
   }
 
   /**
@@ -371,6 +340,7 @@ export function getIntelligenceCoordinator(): IntelligenceCoordinator {
  */
 export async function enhancePromptForAgentLoop(
   basePrompt: string,
+  projectId: string | null | undefined,
   directoryHandle: FileSystemDirectoryHandle | null | undefined,
   userMessage: string,
   sessionId?: string,
@@ -379,6 +349,7 @@ export async function enhancePromptForAgentLoop(
   const coordinator = getIntelligenceCoordinator()
 
   const result = await coordinator.enhanceSystemPrompt(basePrompt, {
+    projectId,
     directoryHandle,
     userMessage,
     sessionId,
