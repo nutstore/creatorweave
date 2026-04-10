@@ -8,7 +8,9 @@
  */
 
 import React, { useState, useCallback } from 'react'
+import { readFileFromNativeFS, readFileFromOPFS, isImageFile } from '@/opfs'
 import { type ConflictDetail } from '@/opfs/types/opfs-types'
+import { getActiveConversation } from '@/store/conversation-context.store'
 
 export interface ConflictResolutionDialogProps {
   /** Conflict to resolve */
@@ -111,6 +113,25 @@ function formatTimestamp(timestamp: number): string {
   })
 }
 
+const PREVIEW_CHAR_LIMIT = 12000
+
+function formatPreviewContent(
+  source: 'OPFS' | '本机',
+  path: string,
+  content: string | null,
+  unavailableMessage?: string
+): string {
+  if (unavailableMessage) return unavailableMessage
+  if (content === null) {
+    if (isImageFile(path)) return `[${source} 版本为图片或二进制文件，暂不支持文本预览]`
+    return `[${source} 版本无可读文本内容]`
+  }
+  if (content.length === 0) return `[${source} 版本为空文件]`
+  if (content.length <= PREVIEW_CHAR_LIMIT) return content
+  const truncated = content.slice(0, PREVIEW_CHAR_LIMIT)
+  return `${truncated}\n\n...[内容过长，已截断 ${content.length - PREVIEW_CHAR_LIMIT} 字符]`
+}
+
 export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
   conflict,
   onResolve,
@@ -131,12 +152,24 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
   const loadPreviews = useCallback(async () => {
     setLoading(true)
     try {
-      // TODO: Load actual file content from workspace
-      // For now, show placeholder messages
+      const activeConversation = await getActiveConversation()
+      const nativeDir = await activeConversation?.conversation.getNativeDirectoryHandle()
+      const [opfsContent, nativeContent] = await Promise.all([
+        readFileFromOPFS(conflict.opfsVersion.workspaceId, conflict.path),
+        conflict.nativeVersion.exists && nativeDir
+          ? readFileFromNativeFS(nativeDir, conflict.path)
+          : Promise.resolve(null),
+      ])
+
       setPreviewContent({
-        opfs: '[OPFS 版本内容 - 需要实现实际读取]',
+        opfs: formatPreviewContent('OPFS', conflict.path, opfsContent),
         native: conflict.nativeVersion.exists
-          ? '[本机版本内容 - 需要实现实际读取]'
+          ? formatPreviewContent(
+              '本机',
+              conflict.path,
+              nativeContent,
+              nativeDir ? undefined : '[未连接本机目录，无法读取本机版本]'
+            )
           : null,
       })
     } catch (err) {

@@ -269,7 +269,7 @@ export async function executeWorkflowRun(
       // Handle review nodes with repair loop
       if (node.kind === 'review') {
         let reviewAttempt = 0
-        while (true) {
+        for (;;) {
           reviewAttempt += 1
           const result = await options.executeNode({
             node,

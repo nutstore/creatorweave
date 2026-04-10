@@ -535,7 +535,7 @@ export function ConversationView({
     }
 
     return -1
-  }, [activeWorkflowExecution, activeDraftAssistant, activeStreamingState, isProcessing, turns])
+  }, [activeWorkflowExecution, activeDraftAssistant, activeStreamingState, activeMessages, isProcessing, turns])
   // Render draft assistant loading when:
   // 1. Processing AND (no last turn OR last turn is not assistant)
   // 2. OR processing AND last turn is assistant but we're in pending/tool_calling state (meaning new loop iteration)

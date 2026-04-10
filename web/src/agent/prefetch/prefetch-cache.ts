@@ -13,6 +13,7 @@
  */
 
 import type { FileSystemDirectoryHandle } from '@/opfs/types/file-system-types'
+import { getWorkspaceManager } from '@/opfs/workspace'
 import type { FilePrediction } from './file-predictor'
 
 //=============================================================================
@@ -69,8 +70,6 @@ export interface PrefetchStats {
 class PrefetchQueue {
   private tasks: Map<string, PrefetchTask> = new Map()
   private readonly maxQueueSize = 50
-  // @ts-expect-error - reserved for future cache size management
-  private readonly maxCacheSize = 10 * 1024 * 1024 // 10MB
 
   /**
    * Add task to queue
@@ -217,7 +216,6 @@ class PrefetchQueue {
 export class PrefetchCache {
   private queue: PrefetchQueue
   private directoryHandle?: FileSystemDirectoryHandle | null
-  // @ts-expect-error - reserved for future multi-session support
   private sessionId?: string
   private isProcessing: boolean = false
   private processingTimer: number | null = null
@@ -234,6 +232,7 @@ export class PrefetchCache {
 
   // Cached file sizes (for total size tracking)
   private cachedSizes: Map<string, number> = new Map()
+  private textEncoder = new TextEncoder()
 
   constructor() {
     this.queue = new PrefetchQueue()
@@ -393,19 +392,15 @@ export class PrefetchCache {
    * Process a single prefetch task
    */
   private async processTask(task: PrefetchTask): Promise<void> {
-    if (!this.directoryHandle) return
-
     const startTime = performance.now()
     this.queue.updateStatus(task.path, 'loading')
 
     try {
-      // TODO: Integrate with OPFS session cache when available
-      // For now, read directly from directory handle
-      const fileHandle = await this.directoryHandle.getFileHandle(task.path)
-      const file = await fileHandle.getFile()
-      const result = {
-        metadata: { size: file.size },
-        content: await file.arrayBuffer(),
+      const fromSessionCache = await this.readFromSessionCache(task.path)
+      const fromNative = fromSessionCache ? null : await this.readFromNativeDirectory(task.path)
+      const result = fromSessionCache ?? fromNative
+      if (!result) {
+        throw new Error(`File not found: ${task.path}`)
       }
 
       // Update task status
@@ -428,6 +423,79 @@ export class PrefetchCache {
       this.stats.failedTasks++
       console.warn(`[PrefetchCache] Failed to prefetch ${task.path}:`, errorMsg)
     }
+  }
+
+  private async readFromSessionCache(
+    path: string
+  ): Promise<{ metadata: { size: number } } | null> {
+    if (!this.sessionId) return null
+    try {
+      const manager = await getWorkspaceManager()
+      const workspace = await manager.getWorkspace(this.sessionId)
+      if (!workspace) return null
+
+      for (const candidate of this.getPathCandidates(path)) {
+        const cached = await workspace.readCachedFile(candidate)
+        if (cached === null) continue
+        return {
+          metadata: { size: this.getContentSize(cached) },
+        }
+      }
+      return null
+    } catch (error) {
+      console.warn(`[PrefetchCache] Session cache read failed for ${path}:`, error)
+      return null
+    }
+  }
+
+  private async readFromNativeDirectory(
+    path: string
+  ): Promise<{ metadata: { size: number } } | null> {
+    if (!this.directoryHandle) return null
+    const normalizedPath = this.normalizePath(path)
+    const parts = normalizedPath.split('/').filter(Boolean)
+    if (parts.length === 0) return null
+
+    let current: FileSystemDirectoryHandle = this.directoryHandle
+    for (let i = 0; i < parts.length - 1; i++) {
+      try {
+        current = await current.getDirectoryHandle(parts[i])
+      } catch {
+        return null
+      }
+    }
+
+    try {
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return {
+        metadata: { size: file.size },
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private normalizePath(path: string): string {
+    if (path.startsWith('/mnt/')) return path.slice(5)
+    if (path.startsWith('/mnt')) return path.slice(4)
+    return path
+  }
+
+  private getPathCandidates(path: string): string[] {
+    const normalized = this.normalizePath(path)
+    const clean = normalized.replace(/^\/+/, '')
+    const withSlash = clean ? `/${clean}` : '/'
+    const candidates = [path, normalized, clean, withSlash]
+    return Array.from(new Set(candidates.filter(Boolean)))
+  }
+
+  private getContentSize(content: unknown): number {
+    if (typeof content === 'string') return this.textEncoder.encode(content).byteLength
+    if (content instanceof Blob) return content.size
+    if (content instanceof ArrayBuffer) return content.byteLength
+    if (ArrayBuffer.isView(content)) return content.byteLength
+    return 0
   }
 }
 

@@ -406,7 +406,7 @@ export function PendingSyncPanel() {
     } finally {
       setIsSyncing(false)
     }
-  }, [pendingChanges, isSyncing, selectedItems])
+  }, [pendingChanges, isSyncing])
 
   // 处理审批按钮点击：先弹窗
   const handleSync = useCallback(async () => {

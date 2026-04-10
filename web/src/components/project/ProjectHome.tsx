@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatDistanceToNow, isToday, isYesterday, isThisWeek, isThisMonth } from 'date-fns'
 import { zhCN, enUS, ja, ko } from 'date-fns/locale'
 import type { Locale as DateFnsLocale } from 'date-fns'
@@ -397,10 +397,13 @@ export function ProjectHome({
     return formatRelativeTimeWithLocale(date, dateFnsLocale)
   }
 
-  const getProjectActivityAt = (project: Project) => {
-    const workspaceActivityAt = projectStats[project.id]?.lastWorkspaceAccessAt || 0
-    return Math.max(project.updatedAt, workspaceActivityAt)
-  }
+  const getProjectActivityAt = useCallback(
+    (project: Project) => {
+      const workspaceActivityAt = projectStats[project.id]?.lastWorkspaceAccessAt || 0
+      return Math.max(project.updatedAt, workspaceActivityAt)
+    },
+    [projectStats]
+  )
 
   // Time group labels
   const getTimeGroupLabels = (): Record<TimeGroup, string> => ({
@@ -451,11 +454,11 @@ export function ProjectHome({
     }
   }
 
-  const openCreateDialog = () => {
+  const openCreateDialog = useCallback(() => {
     if (isLoading || isCreating) return
     setShowCreateDialog(true)
     window.setTimeout(() => createInputRef.current?.focus(), 80)
-  }
+  }, [isCreating, isLoading])
 
   // Projects grouped by time
   const groupedProjects = useMemo(() => {
@@ -490,13 +493,13 @@ export function ProjectHome({
     })
 
     return groups
-  }, [projects, projectStats, search, statusFilter])
+  }, [getProjectActivityAt, projects, search, statusFilter])
 
   // Recent project
   const recentProject = useMemo(() => {
     const active = projects.filter((p) => p.status !== 'archived')
     return active.sort((a, b) => getProjectActivityAt(b) - getProjectActivityAt(a))[0] || null
-  }, [projects, projectStats])
+  }, [getProjectActivityAt, projects])
 
   // Project stats
   const totalProjects = projects.filter((p) => p.status !== 'archived').length
@@ -531,7 +534,7 @@ export function ProjectHome({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [showCreateDialog, isLoading, isCreating])
+  }, [showCreateDialog, openCreateDialog])
 
   // Submit from create dialog
   const handleCreateFromDialog = async () => {

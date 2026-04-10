@@ -274,7 +274,7 @@ export function AgentRichInput({
     emitValue(editor)
     setMentionContext(null)
     setMentionSelection(0)
-  }, [editor, resetToken])
+  }, [editor, emitValue, resetToken])
 
   useEffect(() => {
     if (!mentionCandidates.length) {

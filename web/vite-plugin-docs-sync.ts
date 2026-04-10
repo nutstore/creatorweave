@@ -138,7 +138,7 @@ function generateIndexFiles() {
     }
 
     // Scan source directory and generate index
-    function scanDir(dir: string, basePath: string = '') {
+    const scanDir = (dir: string, basePath: string = ''): void => {
       const entries = readdirSync(dir)
       for (const entry of entries) {
         const srcPath = join(dir, entry)

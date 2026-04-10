@@ -5,17 +5,20 @@ order: 103
 
 # CI/CD 配置
 
-项目使用 GitHub Actions 进行持续集成和部署。
+当前仓库以本地质量检查为主。
+
+目前代码仓库中未跟踪 `.github/workflows/` 下的 CI 工作流文件。
+如需在 PR/push 上启用远端 CI，请先补充 workflow。
 
 ## CI 流程
 
-每次 PR 和 push 到 main/develop 分支会触发 CI：
+当前建议的提交前检查：
 
-1. 安装依赖
-2. 运行类型检查
-3. 运行 ESLint
-4. 运行单元测试
-5. 运行 E2E 测试
+1. `pnpm -C web run typecheck`
+2. `pnpm -C web run lint`
+3. `pnpm -C web run test:run`（或针对性测试）
+4. `pnpm -C mobile-web run typecheck`
+5. `pnpm -C relay-server run typecheck`
 
 ## 本地验证
 
@@ -27,6 +30,11 @@ pnpm typecheck     # 类型检查
 pnpm test          # 单元测试
 pnpm test:e2e      # E2E 测试
 ```
+
+## 启用远端 CI（可选）
+
+- 建议在 `.github/workflows/ci.yml` 新增 workflow
+- 推荐至少覆盖：类型检查、ESLint、单元测试、构建
 
 ## 相关文档
 

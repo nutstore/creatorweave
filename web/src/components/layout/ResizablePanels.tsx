@@ -109,7 +109,6 @@ export function ResizablePanels({
       setFirstPanelCollapsed(false)
       setSecondPanelCollapsed(false)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey])
 
   // Handle divider drag

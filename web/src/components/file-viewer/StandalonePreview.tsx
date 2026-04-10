@@ -333,7 +333,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [])
+  }, [showToast])
 
   // Refresh iframe
   const handleRefresh = useCallback(() => {

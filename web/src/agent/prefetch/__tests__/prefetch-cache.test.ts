@@ -6,23 +6,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { PrefetchCache, getPrefetchCache } from '../prefetch-cache'
 import type { FilePrediction } from '../file-predictor'
 
-// Mock OPFS manager
-vi.mock('@/opfs', () => ({
-  getWorkspaceManager: vi.fn(() => ({
-    getOrCreateWorkspace: vi.fn(async () => ({
-      getCache: vi.fn(() => ({
-        read: vi.fn(async (path: string) => ({
-          content: `mock content for ${path}`,
-          metadata: {
-            size: 1000,
-            mtime: Date.now(),
-            contentType: 'text' as const,
-            lastModified: Date.now(),
-          },
-        })),
-      })),
-    })),
-  })),
+const { getWorkspaceManagerMock, getWorkspaceMock, readCachedFileMock } = vi.hoisted(() => ({
+  getWorkspaceManagerMock: vi.fn(),
+  getWorkspaceMock: vi.fn(),
+  readCachedFileMock: vi.fn(),
+}))
+
+vi.mock('@/opfs/workspace', () => ({
+  getWorkspaceManager: getWorkspaceManagerMock,
 }))
 
 describe('PrefetchCache', () => {
@@ -31,6 +22,16 @@ describe('PrefetchCache', () => {
 
   beforeEach(() => {
     cache = new PrefetchCache()
+    readCachedFileMock.mockReset()
+    readCachedFileMock.mockResolvedValue(null)
+    getWorkspaceMock.mockReset()
+    getWorkspaceMock.mockResolvedValue({
+      readCachedFile: readCachedFileMock,
+    })
+    getWorkspaceManagerMock.mockReset()
+    getWorkspaceManagerMock.mockResolvedValue({
+      getWorkspace: getWorkspaceMock,
+    })
     // Create a mock directory handle
     mockDirectoryHandle = {
       name: 'test-project',
@@ -172,6 +173,23 @@ describe('PrefetchCache', () => {
       const status = failingCache.getStatus('nonexistent.ts')
       // Status should exist (might be failed or still pending due to error)
       expect(status).toBeDefined()
+    })
+
+    it('should prefer session cache when sessionId is available', async () => {
+      readCachedFileMock.mockResolvedValueOnce('cached content from workspace')
+
+      const predictions: FilePrediction[] = [
+        { path: 'src/App.tsx', confidence: 0.9, reason: 'explicit-reference', context: '' },
+      ]
+
+      await cache.initialize(mockDirectoryHandle, 'ws-test')
+      await cache.prefetch(predictions)
+      await new Promise((resolve) => setTimeout(resolve, 150))
+
+      expect(getWorkspaceManagerMock).toHaveBeenCalled()
+      expect(getWorkspaceMock).toHaveBeenCalledWith('ws-test')
+      expect(readCachedFileMock).toHaveBeenCalled()
+      expect(cache.getStatus('src/App.tsx')?.status).toBe('cached')
     })
   })
 

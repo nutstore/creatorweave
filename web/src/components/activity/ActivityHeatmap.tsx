@@ -103,7 +103,7 @@ function buildGrid(data: Map<string, number>): ActivityData {
   })
 
   const weeks: DayCell[][] = []
-  let cursor = new Date(start)
+  const cursor = new Date(start)
 
   while (cursor <= now) {
     const week: DayCell[] = []

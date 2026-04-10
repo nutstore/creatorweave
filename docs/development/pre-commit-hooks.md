@@ -228,11 +228,10 @@ Average execution time:
 
 ## 🔄 CI/CD Integration
 
-The same checks run in CI/CD:
+These checks can also be mirrored in CI/CD:
 
-- **GitHub Actions**: Run in `.github/workflows/ci.yml`
 - **Pre-commit**: Catch issues locally before pushing
-- **CI**: Double-check on remote (catches cases where hooks were bypassed)
+- **CI**: Double-check on remote (if workflow is configured, catches cases where hooks were bypassed)
 
 ## 💡 Best Practices
 

@@ -2,50 +2,41 @@
 
 ## Overview
 
-This project uses GitHub Actions for continuous integration and deployment. The CI pipeline runs the same checks as the pre-commit hooks, ensuring code quality is maintained even if hooks are bypassed.
+This repository currently relies on local quality gates (pre-commit + manual checks).
+
+At the moment, no CI workflow file is tracked under `.github/workflows/`.
+If you want remote quality gates on PR/push, add a workflow file first.
 
 ## 🔄 CI Pipeline
 
-### Workflow: `.github/workflows/ci.yml`
+### Current Status
 
-The CI workflow runs on:
-- **Push** to `main` or `develop` branches
-- **Pull requests** to `main` or `develop` branches
+- Local checks are the source of truth.
+- Suggested command set before push:
+  - `pnpm -C web run typecheck`
+  - `pnpm -C web run lint`
+  - `pnpm -C web run test:run` (or targeted test commands)
+  - `pnpm -C mobile-web run typecheck`
+  - `pnpm -C relay-server run typecheck`
+  - `cargo -C wasm test` (when Rust code is touched)
 
-### Jobs
+### If You Add CI
 
-#### 1. Rust Checks
+Recommended workflow location: `.github/workflows/ci.yml`
 
-```yaml
-- Check formatting (cargo fmt --check)
-- Run Clippy linter (cargo clippy -D warnings)
-- Run Rust tests (cargo test)
-```
-
-#### 2. Frontend Checks
-
-```yaml
-- TypeScript type check (tsc --noEmit)
-- ESLint (eslint . --ext ts,tsx)
-- Run tests (vitest)
-```
-
-#### 3. Build Project
-
-```yaml
-- Build WASM module (wasm-pack build)
-- Build frontend (vite build)
-- Upload build artifacts
-```
+Suggested jobs:
+- Rust checks (`fmt`, `clippy`, `test`)
+- Web checks (`typecheck`, `lint`, `vitest`)
+- Build checks (`build:wasm`, `web build`)
 
 ## 🚀 Pre-Commit vs CI
 
 | Feature | Pre-Commit Hooks | CI/CD Pipeline |
 |---------|-----------------|----------------|
-| **When** | Before every local commit | On push/PR |
+| **When** | Before every local commit | On push/PR (if configured) |
 | **Speed** | Fast (~7-20s) | Slower (~2-5min) |
 | **Scope** | Only staged files | Entire codebase |
-| **Can Skip** | Yes (--no-verify) | No (blocks PR) |
+| **Can Skip** | Yes (--no-verify) | No (when branch protection is enabled) |
 | **Purpose** | Fast feedback | Quality gate |
 
 ## 📋 Checks Performed
@@ -76,11 +67,11 @@ eslint . --ext ts,tsx
 vitest --run
 ```
 
-## 🐛 Troubleshooting CI Failures
+## 🐛 Troubleshooting (Local/CI)
 
 ### Issue: Clippy fails in CI but passes locally
 
-**Cause**: Different Rust versions or Clippy versions
+**Cause**: Different Rust versions or Clippy versions (same applies to local vs CI)
 
 **Fix**:
 ```bash
@@ -177,27 +168,13 @@ describe('FileAnalyzer', () => {
 });
 ```
 
-## 📊 CI Status Badge
+## 🔄 Branch Protection (Optional)
 
-Add to your README:
-
-```markdown
-[![CI](https://github.com/nutstore/creatorweave/workflows/CI/badge.svg)]
-```
-
-## 🔄 Branch Protection
-
-Configure branch protection in GitHub:
+After adding CI workflows, configure branch protection in GitHub:
 
 1. Go to **Settings** → **Branches**
 2. Edit `main` branch
-3. Enable:
-   - ✅ **Require status checks to pass before merging**
-   - ✅ **Require branches to be up to date before merging**
-   - ✅ Select required checks:
-     - Rust Checks
-     - Frontend Checks
-     - Build Project
+3. Enable required status checks based on your workflow jobs
 
 ## 🚀 Deployment (Future)
 

@@ -72,25 +72,14 @@ vi.mock('@/store/project.store', () => ({
 }))
 
 vi.mock('@/store/settings.store', () => ({
-  useSettingsStore: (
-    selector?: (state: {
-      providerType: string
-      modelName: string
-      maxTokens: number
-      hasApiKey: boolean
-      enableThinking: boolean
-      thinkingLevel: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
-      setEnableThinking: (checked: boolean) => void
-      setThinkingLevel: (level: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh') => void
-    }) => unknown
-  ) => {
+  useSettingsStore: (selector?: (state: unknown) => unknown) => {
     const state = {
       providerType: 'openai',
       modelName: 'gpt-5.4',
       maxTokens: 8000,
       hasApiKey: true,
       enableThinking: false,
-      thinkingLevel: 'medium',
+      thinkingLevel: 'medium' as const,
       setEnableThinking: vi.fn(),
       setThinkingLevel: vi.fn(),
     }
@@ -99,11 +88,9 @@ vi.mock('@/store/settings.store', () => ({
 }))
 
 vi.mock('@/store/workspace-preferences.store', () => ({
-  useWorkspacePreferencesStore: (
-    selector?: (state: { agentMode: 'autonomous'; setAgentMode: (mode: 'autonomous') => void }) => unknown
-  ) => {
+  useWorkspacePreferencesStore: (selector?: (state: unknown) => unknown) => {
     const state = {
-      agentMode: 'autonomous',
+      agentMode: 'act' as const,
       setAgentMode: vi.fn(),
     }
     return selector ? selector(state) : state

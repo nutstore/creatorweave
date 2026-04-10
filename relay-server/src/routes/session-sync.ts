@@ -5,7 +5,7 @@
  * All endpoints support optional device-based authentication.
  */
 
-import { Router, Request, Response } from 'express'
+import { Router, type Request, type Response, type Router as ExpressRouter } from 'express'
 import {
   storeSession,
   getSession,
@@ -99,7 +99,7 @@ interface SessionDeleteResponse {
 // Router
 // ============================================================================
 
-const router = Router()
+const router: ExpressRouter = Router()
 
 // ============================================================================
 // Validation Utilities
@@ -255,8 +255,8 @@ router.get('/sessions', (req: Request, res: Response) => {
       deviceInfo: session.deviceInfo,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
-      uploadedAt: session.uploadedAt,
-      expiresAt: session.expiresAt,
+      uploadedAt: new Date(session.uploadedAt).toISOString(),
+      expiresAt: new Date(session.expiresAt).toISOString(),
       size: session.size,
     }))
 

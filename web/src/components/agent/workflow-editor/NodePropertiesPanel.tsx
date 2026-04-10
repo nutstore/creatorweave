@@ -62,16 +62,16 @@ export function NodePropertiesPanel({
   onDeleteNode,
 }: NodePropertiesPanelProps) {
   const roleInputRef = useRef<HTMLInputElement>(null)
+  const selectedNodeId = selectedNode?.id
 
   // Focus role input when node selection changes
   useEffect(() => {
-    if (selectedNode) {
-      const timer = setTimeout(() => {
-        roleInputRef.current?.focus()
-      }, 100)
-      return () => clearTimeout(timer)
-    }
-  }, [selectedNode?.id])
+    if (!selectedNodeId) return
+    const timer = setTimeout(() => {
+      roleInputRef.current?.focus()
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [selectedNodeId])
 
   const handleChange = useCallback(
     (patch: Partial<WorkflowNodeData>) => {

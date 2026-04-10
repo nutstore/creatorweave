@@ -175,13 +175,11 @@ export interface SyncPreviewPanelProps {
   /** Callback when sync is confirmed */
   onSync?: () => void
   /** Callback when sync is cancelled (kept for compatibility, but drawer handles close) */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onCancel?: () => void
 }
 
 export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   onSync,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onCancel: _onCancel,
 }) => {
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)

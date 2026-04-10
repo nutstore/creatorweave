@@ -251,7 +251,7 @@ export function FolderSelector() {
                   toast.warning(t('folderSelector.storageFailed') || 'Cannot get persistent storage')
                 }
               }
-            } catch (e) {
+            } catch {
               toast.error(t('folderSelector.storageRequestFailed') || 'Request failed')
             } finally {
               setIsRetryingStorage(false)
