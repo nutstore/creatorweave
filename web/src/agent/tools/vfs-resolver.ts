@@ -27,8 +27,20 @@ interface ParsedPath {
 
 let projectManagerPromise: Promise<ProjectManager> | null = null
 
+export const AGENT_ID_FORMAT_HINT =
+  'Allowed agentId chars: letters (including Chinese), numbers, "_" and "-". Disallowed: spaces and "/".'
+
+const AGENT_ID_PATH_EXAMPLES =
+  'Examples: vfs://agents/default/IDENTITY.md, vfs://agents/墨染/IDENTITY.md'
+
+export function withVfsAgentIdHint(message: string): string {
+  if (!message.includes('Invalid agent id in vfs path')) return message
+  if (message.includes(AGENT_ID_PATH_EXAMPLES)) return message
+  return `${message} ${AGENT_ID_PATH_EXAMPLES}`
+}
+
 function isValidAgentId(input: string): boolean {
-  return /^[a-z0-9_-]+$/i.test(input)
+  return /^[\p{L}\p{N}_-]+$/u.test(input)
 }
 
 function normalizeRelativePath(path: string, options?: { allowEmpty?: boolean }): string {
@@ -89,10 +101,10 @@ function parseVfsPath(
           path: '',
         }
       }
-      throw new Error('Invalid agent id in vfs path')
+      throw new Error(`Invalid agent id in vfs path. ${AGENT_ID_FORMAT_HINT}`)
     }
     if (!isValidAgentId(agentId)) {
-      throw new Error('Invalid agent id in vfs path')
+      throw new Error(`Invalid agent id in vfs path: "${agentId}". ${AGENT_ID_FORMAT_HINT}`)
     }
     return {
       namespace: 'agents',

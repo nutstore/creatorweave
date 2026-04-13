@@ -12,7 +12,7 @@
 import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import { resolveVfsTarget, type AgentTarget } from './vfs-resolver'
+import { resolveVfsTarget, type AgentTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandle } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
@@ -91,6 +91,11 @@ interface ReadRangeOptions {
 }
 
 const BASE64_CHUNK_SIZE = 0x8000
+
+function formatToolErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error)
+  return withVfsAgentIdHint(raw)
+}
 
 export const readExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
@@ -366,7 +371,7 @@ async function executeSingleRead(
     return toolErrorJson(
       'read',
       'internal_error',
-      `Failed to read file: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to read file: ${formatToolErrorMessage(error)}`,
       { retryable: true }
     )
   }
@@ -810,7 +815,7 @@ async function executeSingleWrite(
     return toolErrorJson(
       'write',
       'internal_error',
-      `Failed to write file: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to write file: ${formatToolErrorMessage(error)}`,
       { retryable: true }
     )
   }
@@ -887,7 +892,7 @@ async function executeBatchWrite(
         success: false,
         error: {
           code: 'internal_error',
-          message: error instanceof Error ? error.message : String(error),
+          message: formatToolErrorMessage(error),
         },
       })
     }

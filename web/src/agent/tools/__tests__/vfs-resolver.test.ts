@@ -83,6 +83,23 @@ describe('vfs-resolver', () => {
     }
   })
 
+  it('accepts Chinese agent id in vfs path', async () => {
+    const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
+    getProjectMock.mockResolvedValue({ agentManager })
+
+    const result = await resolveVfsTarget(
+      'vfs://agents/墨染/IDENTITY.md',
+      makeContext({ currentAgentId: 'default' }),
+      'write'
+    )
+
+    expect(result.kind).toBe('agent')
+    if (result.kind === 'agent') {
+      expect(result.agentId).toBe('墨染')
+      expect(result.path).toBe('IDENTITY.md')
+    }
+  })
+
   it('supports agents root path when allowEmptyPath is enabled', async () => {
     const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
     getProjectMock.mockResolvedValue({ agentManager })
@@ -146,6 +163,16 @@ describe('vfs-resolver', () => {
         'read'
       )
     ).rejects.toThrow('No active project')
+  })
+
+  it('returns explicit agent id constraints for invalid agent id', async () => {
+    await expect(
+      resolveVfsTarget(
+        'vfs://agents/墨 染/IDENTITY.md',
+        makeContext({ currentAgentId: 'default' }),
+        'read'
+      )
+    ).rejects.toThrow('Allowed agentId chars')
   })
 
   it('uses active agent id from store when context is missing actor id', async () => {

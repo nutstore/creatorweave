@@ -9,7 +9,7 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import { isProtectedAgentCoreFile, resolveVfsTarget } from './vfs-resolver'
+import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -126,7 +126,7 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
     } catch (error) {
       failed.push({
         path: target,
-        error: error instanceof Error ? error.message : String(error),
+        error: withVfsAgentIdHint(error instanceof Error ? error.message : String(error)),
       })
     }
   }

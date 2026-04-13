@@ -182,8 +182,8 @@ export const useAgentsStore = create<AgentsState>()(
       }
 
       // 验证 ID 格式
-      if (!/^[a-z0-9_-]+$/i.test(id)) {
-        toast.error('Agent ID 只能包含字母、数字、下划线和连字符')
+      if (!/^[\p{L}\p{N}_-]+$/u.test(id)) {
+        toast.error('Agent ID 只能包含字母（含中文）、数字、下划线(_)和连字符(-)')
         return null
       }
 

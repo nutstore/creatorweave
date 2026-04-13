@@ -6,7 +6,7 @@ import { structuredPatch } from 'diff'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
-import { resolveVfsTarget } from './vfs-resolver'
+import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 
@@ -387,7 +387,7 @@ async function executeSingleEdit(
     return toolErrorJson(
       'edit',
       'internal_error',
-      `Failed to edit file: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to edit file: ${withVfsAgentIdHint(error instanceof Error ? error.message : String(error))}`,
       { retryable: true }
     )
   }
