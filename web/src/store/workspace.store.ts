@@ -23,6 +23,7 @@ import {
   requestDirectoryAccess,
   releaseDirectoryHandle,
   bindRuntimeDirectoryHandle,
+  getRuntimeDirectoryHandle,
 } from '@/native-fs'
 import { toast } from 'sonner'
 
@@ -193,6 +194,9 @@ interface WorkspaceState {
 
   /** Request directory access for native filesystem sync */
   requestDirectoryAccess: () => Promise<void>
+
+  /** Notify workspace that native directory handle is available (bind + migration rebase). */
+  onNativeDirectoryGranted: (handle: FileSystemDirectoryHandle) => Promise<void>
 
   /** Release directory handle */
   releaseDirectoryHandle: () => Promise<void>
@@ -409,6 +413,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               throw new Error('No active project selected')
             }
             const manager = await getWorkspaceManager()
+            const refreshForWorkspace = async () => {
+              const projectHandle = getRuntimeDirectoryHandle(activeProjectId)
+              if (projectHandle) {
+                await get().onNativeDirectoryGranted(projectHandle)
+              } else {
+                await get().refreshPendingChanges(true)
+              }
+            }
 
             // Check if workspace exists in SQLite first
             const workspaceRecord = await repo.findWorkspaceById(id)
@@ -466,7 +478,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 await convStore.setActive(id)
               }
 
-              await get().refreshPendingChanges(true)
+              await refreshForWorkspace()
 
               return
             }
@@ -530,7 +542,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 await convStore.setActive(id)
               }
 
-              await get().refreshPendingChanges(true)
+              await refreshForWorkspace()
 
               return
             }
@@ -557,7 +569,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               await convStore.setActive(targetConversationId)
             }
 
-            await get().refreshPendingChanges(true)
+            await refreshForWorkspace()
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to switch workspace'
             set({
@@ -826,7 +838,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         requestDirectoryAccess: async () => {
           const activeProjectId = await resolveActiveProjectId()
           if (!activeProjectId) return
-          const activeWorkspaceId = get().activeWorkspaceId
 
           set({ isLoading: true, error: null })
 
@@ -838,21 +849,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             })
 
             if (handle) {
-              // Bind handle for both project scope and active workspace scope.
-              // WorkspaceFiles reads by workspace id.
+              // Native directory handle is project-scoped.
+              // All workspaces in this project share the same handle.
               bindRuntimeDirectoryHandle(activeProjectId, handle)
-              if (activeWorkspaceId) {
-                bindRuntimeDirectoryHandle(activeWorkspaceId, handle)
-              }
-
-              // Store handle and update state
-              set({
-                hasDirectoryHandle: true,
-                isLoading: false,
-              })
-
-              // Check for unsynced snapshots after getting directory handle
-              await get().checkUnsyncedSnapshots()
+              await get().onNativeDirectoryGranted(handle)
+              set({ isLoading: false })
             } else {
               // User cancelled
               set({ isLoading: false })
@@ -864,6 +865,42 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               isLoading: false,
             })
           }
+        },
+
+        onNativeDirectoryGranted: async (handle: FileSystemDirectoryHandle) => {
+          const activeWorkspaceId = get().activeWorkspaceId
+
+          set({ hasDirectoryHandle: true })
+
+          if (activeWorkspaceId) {
+            try {
+              const manager = await getWorkspaceManager()
+              const workspace = await manager.getWorkspace(activeWorkspaceId)
+              if (workspace) {
+                const rebind = await workspace.rebindPendingBaselinesToNative(handle)
+                if (rebind.rebased > 0 || rebind.conflicts > 0) {
+                  const summary =
+                    rebind.conflicts > 0
+                      ? `目录已连接：已重建 ${rebind.rebased} 个变更基线，发现 ${rebind.conflicts} 个潜在冲突`
+                      : `目录已连接：已重建 ${rebind.rebased} 个变更基线`
+                  toast.info(summary, {
+                    action:
+                      rebind.conflicts > 0
+                        ? {
+                            label: '查看',
+                            onClick: () => set({ showPreview: true }),
+                          }
+                        : undefined,
+                  })
+                }
+              }
+            } catch (e) {
+              console.warn('[WorkspaceStore] Failed to rebind pending baselines after native grant:', e)
+            }
+          }
+
+          await get().checkUnsyncedSnapshots()
+          await get().refreshPendingChanges(true)
         },
 
         releaseDirectoryHandle: async () => {

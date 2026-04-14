@@ -11,6 +11,10 @@ const mockNativeFS = vi.hoisted(() => ({
   unbindRuntimeDirectoryHandle: vi.fn(),
 }))
 
+const mockWorkspaceStore = vi.hoisted(() => ({
+  onNativeDirectoryGranted: vi.fn(),
+}))
+
 vi.mock('@/services/folder-access.repository', () => ({
   folderAccessRepo: mockRepo,
 }))
@@ -39,6 +43,14 @@ vi.mock('@/store/remote.store', () => ({
       getRole: vi.fn(() => 'participant'),
       refreshFileTree: vi.fn(),
     })),
+  },
+}))
+
+vi.mock('../workspace.store', () => ({
+  useWorkspaceStore: {
+    getState: () => ({
+      onNativeDirectoryGranted: mockWorkspaceStore.onNativeDirectoryGranted,
+    }),
   },
 }))
 
@@ -76,6 +88,7 @@ describe('folder-access.store runtime handle binding', () => {
     expect(record.status).toBe('ready')
     expect(record.handle).toBe(handle)
     expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, handle)
+    expect(mockWorkspaceStore.onNativeDirectoryGranted).toHaveBeenCalledWith(handle)
   })
 
   it('binds runtime handle after requestPermission succeeds', async () => {
@@ -108,6 +121,6 @@ describe('folder-access.store runtime handle binding', () => {
     expect(record.status).toBe('ready')
     expect(record.handle).toBe(handle)
     expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, handle)
+    expect(mockWorkspaceStore.onNativeDirectoryGranted).toHaveBeenCalledWith(handle)
   })
 })
-

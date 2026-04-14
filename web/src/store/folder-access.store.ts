@@ -31,6 +31,15 @@ function createEmptyRecord(projectId: string): FolderAccessRecord {
   }
 }
 
+async function notifyWorkspaceNativeDirectoryGranted(handle: FileSystemDirectoryHandle): Promise<void> {
+  try {
+    const { useWorkspaceStore } = await import('./workspace.store')
+    await useWorkspaceStore.getState().onNativeDirectoryGranted(handle)
+  } catch (error) {
+    console.warn('[FolderAccessStore] Failed to notify workspace native handle grant:', error)
+  }
+}
+
 export const useFolderAccessStore = create<FolderAccessStore>()(
   immer((set, get) => ({
     activeProjectId: null,
@@ -100,6 +109,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
               }
             })
             bindRuntimeDirectoryHandle(projectId, handle)
+            await notifyWorkspaceNativeDirectoryGranted(handle)
             console.log('[FolderAccessStore] Permission granted, handle ready:', handle.name)
           } else if (permission === 'prompt') {
             // 需要用户激活 -> needs_user_activation
@@ -185,6 +195,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         // 持久化
         await folderAccessRepo.save(record)
         bindRuntimeDirectoryHandle(projectId, handle)
+        await notifyWorkspaceNativeDirectoryGranted(handle)
 
         set((state) => {
           state.records[projectId] = record
@@ -255,6 +266,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       // 持久化
       await folderAccessRepo.save(record)
       bindRuntimeDirectoryHandle(projectId, handle)
+      await notifyWorkspaceNativeDirectoryGranted(handle)
 
       set((state) => {
         state.records[projectId] = record
@@ -299,6 +311,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           // 更新持久化
           await folderAccessRepo.save(get().records[projectId])
           bindRuntimeDirectoryHandle(projectId, handle)
+          await notifyWorkspaceNativeDirectoryGranted(handle)
 
           toast.success('文件夹权限已恢复')
           get().notifyFileTreeRefresh()

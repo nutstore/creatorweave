@@ -113,6 +113,13 @@
 2. 目录句柄通过独立 IndexedDB（结构化克隆）保存。
 3. 文件系统实体读写走 File System Access API / OPFS。
 
+Native 目录句柄作用域约束（强约束）：
+
+1. 目录句柄只允许绑定在 `projectId` 维度。
+2. `workspace` 不允许单独持有或绑定目录句柄。
+3. 同一 `project` 下所有 workspace 共享同一个本地目录句柄。
+4. 释放 `project` 目录句柄后，该 project 的所有 workspace 都必须视为“无本地目录”。
+
 ## 8. 开发与质量门禁
 
 以 `web` 为主的日常质量命令：
