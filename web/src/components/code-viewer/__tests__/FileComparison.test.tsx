@@ -14,7 +14,7 @@ describe('FileComparison', () => {
     render(<FileComparison before={before} after={after} />)
 
     // Check that component renders
-    expect(screen.getByText(/line 1/)).toBeDefined()
+    expect(screen.getAllByText(/line 1/).length).toBeGreaterThan(0)
   })
 
   it('displays filename when provided', () => {
@@ -49,10 +49,10 @@ describe('FileComparison', () => {
     const before = 'line 1\nline 2'
     const after = 'line 1\nline 2'
 
-    const { container } = render(<FileComparison before={before} after={after} />)
+    render(<FileComparison before={before} after={after} />)
 
-    // Navigation buttons should be disabled
-    const buttons = container.querySelectorAll('button[disabled]')
-    expect(buttons.length).toBeGreaterThan(0)
+    // Navigation buttons should be hidden when there are no changes
+    expect(screen.queryByTitle('Previous change')).toBeNull()
+    expect(screen.queryByTitle('Next change')).toBeNull()
   })
 })

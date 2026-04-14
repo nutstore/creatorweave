@@ -286,9 +286,14 @@ describe('mcp-tool-bridge', () => {
 
       await executor({ arg1: 'value1' }, mockContext)
 
-      expect(mockMCPManager.executeTool).toHaveBeenCalledWith('test-server', 'test_tool', {
-        arg1: 'value1',
-      })
+      expect(mockMCPManager.executeTool).toHaveBeenCalledWith(
+        'test-server',
+        'test_tool',
+        {
+          arg1: 'value1',
+        },
+        expect.any(Function)
+      )
     })
 
     it('should extract text content from MCP result', async () => {
@@ -469,18 +474,18 @@ describe('mcp-tool-bridge', () => {
       expect(testRegistry.size).toBeGreaterThan(0)
 
       // Then unregister
-      const count = unregisterAllMCPTools(testRegistry as any)
+      const count = await unregisterAllMCPTools(testRegistry as any)
 
       expect(count).toBe(mockMCPTools.length)
       expect(testRegistry.size).toBe(0)
     })
 
-    it('should return 0 when no MCP tools are registered', () => {
+    it('should return 0 when no MCP tools are registered', async () => {
       // Clear any existing tools first
       testRegistry.clear()
       mockMCPManager.getAllTools.mockReturnValueOnce(new Map())
 
-      const count = unregisterAllMCPTools(testRegistry as any)
+      const count = await unregisterAllMCPTools(testRegistry as any)
       expect(count).toBe(0)
     })
   })

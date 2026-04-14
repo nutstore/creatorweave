@@ -54,9 +54,9 @@ describe('WorkflowQuickActions', () => {
     render(<Wrapper />)
     await user.click(screen.getByRole('button', { name: /工作流/i }))
 
-    expect(screen.getByText('工作流模拟运行')).toBeTruthy()
+    expect(screen.getByText('工作流')).toBeTruthy()
     expect(screen.getByText('短视频脚本')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /开始模拟/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /模拟运行/i })).toBeTruthy()
   })
 
   it('disables trigger when disabled is true', () => {
@@ -93,7 +93,7 @@ describe('WorkflowQuickActions', () => {
 
     render(<Wrapper />)
     await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByRole('button', { name: /开始模拟/i }))
+    await user.click(screen.getByRole('button', { name: /模拟运行/i }))
 
     expect(onRun).toHaveBeenCalledWith('novel_daily_v1', undefined)
   })
@@ -136,12 +136,13 @@ describe('WorkflowQuickActions', () => {
 
     render(<Wrapper />)
     await user.click(screen.getByRole('button', { name: /工作流/i }))
+    await user.click(screen.getByRole('button', { name: /高级设置/i }))
     await user.click(screen.getByLabelText('启用自定义评分规则'))
 
     fireEvent.change(screen.getByLabelText('段落最小句数'), { target: { value: '8' } })
     fireEvent.change(screen.getByLabelText('段落最大句数'), { target: { value: '3' } })
 
-    const runButton = screen.getByRole('button', { name: /开始模拟/ }) as HTMLButtonElement
+    const runButton = screen.getByRole('button', { name: /模拟运行/ }) as HTMLButtonElement
     expect(runButton.disabled).toBe(true)
     expect(screen.getByText(/段落句数范围不合法/)).toBeTruthy()
   })
@@ -165,13 +166,14 @@ describe('WorkflowQuickActions', () => {
 
     render(<Wrapper />)
     await user.click(screen.getByRole('button', { name: /工作流/i }))
+    await user.click(screen.getByRole('button', { name: /高级设置/i }))
     await user.click(screen.getByLabelText('启用自定义评分规则'))
 
     fireEvent.change(screen.getByLabelText('评分规则名称'), { target: { value: '我的评分规则' } })
     fireEvent.change(screen.getByLabelText('通过分'), { target: { value: '85' } })
     fireEvent.change(screen.getByLabelText('最大修复轮次'), { target: { value: '1' } })
 
-    await user.click(screen.getByRole('button', { name: /开始模拟/i }))
+    await user.click(screen.getByRole('button', { name: /模拟运行/i }))
 
     const call = onRun.mock.calls[0]
     expect(call?.[0]).toBe('novel_daily_v1')

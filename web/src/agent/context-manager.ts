@@ -13,7 +13,14 @@
 import type { ChatMessage } from './llm/llm-provider'
 import { estimateMessageTokens, estimateStringTokens } from './llm/token-counter'
 
-const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
+const COMPRESSED_MEMORY_PREFIXES = [
+  'Earlier conversation summary:',
+  'Compressed memory of earlier conversation:',
+]
+
+function isCompressedMemoryMessage(content: string): boolean {
+  return COMPRESSED_MEMORY_PREFIXES.some((prefix) => content.startsWith(prefix))
+}
 
 export interface ContextManagerConfig {
   maxContextTokens: number
@@ -247,7 +254,7 @@ export class ContextManager {
         // Preserve full user content - it's critical for understanding intent
         parts.push(`User: ${msg.content}`)
       } else if (msg.role === 'assistant' && typeof msg.content === 'string') {
-        if (msg.content.startsWith(COMPRESSED_MEMORY_PREFIX)) {
+        if (isCompressedMemoryMessage(msg.content)) {
           continue
         }
         // Keep more assistant content - reasoning and decisions matter

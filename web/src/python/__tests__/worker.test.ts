@@ -7,7 +7,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { PyodideWorkerManager, createTextFile } from '../manager'
 
-describe('PyodideWorkerManager', () => {
+const hasWorkerApi = typeof Worker !== 'undefined'
+
+const describePyodide = hasWorkerApi ? describe : describe.skip
+
+describePyodide('PyodideWorkerManager', () => {
   let manager: PyodideWorkerManager
 
   beforeEach(() => {
