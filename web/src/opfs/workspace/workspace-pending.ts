@@ -14,6 +14,7 @@ import {
 } from '@/sqlite/repositories/fs-overlay.repository'
 
 const FILES_DIR = 'files'
+const BASELINE_DIR = '.baseline'
 
 type CachedContent = FileContent
 
@@ -595,6 +596,10 @@ export class WorkspacePendingManager {
 
     if (change.type === 'modify') {
       if (baselineFsMtime > 0 && currentFsMtime !== baselineFsMtime) {
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path)
+        if (alignedWithBaseline) {
+          return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+        }
         return {
           isConflict: true,
           reason: `检测到冲突：${change.path} 在草稿创建后被磁盘修改。`,
@@ -610,6 +615,10 @@ export class WorkspacePendingManager {
         currentFsMtime !== null &&
         currentFsMtime !== baselineFsMtime
       ) {
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path)
+        if (alignedWithBaseline) {
+          return { isConflict: false, currentFsMtime }
+        }
         return {
           isConflict: true,
           reason: `检测到冲突：${change.path} 在草稿删除前已被磁盘修改。`,
@@ -620,6 +629,76 @@ export class WorkspacePendingManager {
     }
 
     return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
+  }
+
+  /**
+   * Migration fallback:
+   * If mtime drifted after switching from OPFS-only to native binding,
+   * use baseline content equality to decide whether disk truly changed.
+   */
+  private async isNativeAlignedWithBaseline(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<boolean> {
+    try {
+      const baselineBytes = await this.readBaselineBytes(path)
+      if (!baselineBytes) return false
+      const nativeBytes = await this.readNativeBytes(directoryHandle, path)
+      if (!nativeBytes) return false
+      return this.bytesEqual(baselineBytes, nativeBytes)
+    } catch {
+      return false
+    }
+  }
+
+  private async readBaselineBytes(path: string): Promise<Uint8Array | null> {
+    try {
+      const normalizedPath = this.normalizeComparePath(path)
+      const parts = normalizedPath.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = await this.workspaceDir.getDirectoryHandle(BASELINE_DIR, { create: true })
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return new Uint8Array(await file.arrayBuffer())
+    } catch {
+      return null
+    }
+  }
+
+  private async readNativeBytes(
+    directoryHandle: FileSystemDirectoryHandle,
+    path: string
+  ): Promise<Uint8Array | null> {
+    try {
+      const normalizedPath = this.normalizeComparePath(path)
+      const parts = normalizedPath.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = directoryHandle
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      return new Uint8Array(await file.arrayBuffer())
+    } catch (err: unknown) {
+      if (this.getErrorName(err) === 'NotFoundError') {
+        return null
+      }
+      throw err
+    }
+  }
+
+  private bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+    if (left.byteLength !== right.byteLength) return false
+    for (let i = 0; i < left.byteLength; i++) {
+      if (left[i] !== right[i]) return false
+    }
+    return true
   }
 
   private async readNativeMtime(

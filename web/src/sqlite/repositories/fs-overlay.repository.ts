@@ -447,6 +447,56 @@ export class FSOverlayRepository {
     }))
   }
 
+  /**
+   * List all active pending ops regardless of review status.
+   * Used for native-handle migration/rebase flows.
+   */
+  async listActivePendingOps(workspaceId: string): Promise<OverlayOpRecord[]> {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<{
+      id: string
+      workspace_id: string
+      changeset_id: string | null
+      path: string
+      op_type: OpType
+      status: 'pending' | 'synced' | 'discarded' | 'failed'
+      review_status: ReviewStatus | null
+      fs_mtime: number
+      created_at: number
+      updated_at: number
+    }>(
+      `SELECT id, workspace_id, changeset_id, path, op_type, status, review_status, fs_mtime, created_at, updated_at
+       FROM fs_ops
+       WHERE workspace_id = ?
+         AND status = 'pending'
+       ORDER BY updated_at ASC`,
+      [workspaceId]
+    )
+
+    return rows.map((row) => ({
+      id: row.id,
+      workspaceId: row.workspace_id,
+      snapshotId: row.changeset_id || null,
+      path: row.path,
+      type: row.op_type,
+      status: row.status,
+      reviewStatus: row.review_status || undefined,
+      fsMtime: row.fs_mtime,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }))
+  }
+
+  async updatePendingFsMtime(opId: string, fsMtime: number): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute(
+      `UPDATE fs_ops
+       SET fs_mtime = ?, updated_at = ?
+       WHERE id = ? AND status = 'pending'`,
+      [fsMtime, Date.now(), opId]
+    )
+  }
+
   async upsertPendingOp(
     workspaceId: string,
     path: string,

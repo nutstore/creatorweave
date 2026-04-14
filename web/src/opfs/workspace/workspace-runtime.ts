@@ -31,6 +31,7 @@ import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.reposit
 
 const WORKSPACE_METADATA_FILE = 'workspace.json'
 const FILES_DIR = 'files'
+const BASELINE_DIR = '.baseline'
 
 /**
  * Workspace metadata for persistence.
@@ -215,11 +216,10 @@ export class WorkspaceRuntime {
       const fileHandle = await current.getFileHandle(parts[parts.length - 1])
       const file = await fileHandle.getFile()
       let content: FileContent
-      let contentType: 'text' | 'binary' = 'binary'
-      try {
+      const contentType = getFileContentType(path)
+      if (contentType === 'text') {
         content = await file.text()
-        contentType = 'text'
-      } catch {
+      } else {
         content = await file.arrayBuffer()
       }
       return {
@@ -289,6 +289,158 @@ export class WorkspaceRuntime {
   }
 
   /**
+   * Read file content from .baseline/ directory.
+   */
+  private async readFromBaselineDir(
+    path: string
+  ): Promise<{ content: FileContent; mtime: number; size: number; contentType: 'text' | 'binary' } | null> {
+    try {
+      const baselineDir = await this.getBaselineDir()
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return null
+
+      let current = baselineDir
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+
+      const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+      const file = await fileHandle.getFile()
+      let content: FileContent
+      const contentType = getFileContentType(path)
+      if (contentType === 'text') {
+        content = await file.text()
+      } else {
+        content = await file.arrayBuffer()
+      }
+      return {
+        content,
+        mtime: file.lastModified,
+        size: file.size,
+        contentType,
+      }
+    } catch {
+      return null
+    }
+  }
+
+  private async contentToBytes(content: FileContent): Promise<Uint8Array> {
+    if (typeof content === 'string') {
+      return new TextEncoder().encode(content)
+    }
+    if (content instanceof Blob) {
+      return new Uint8Array(await content.arrayBuffer())
+    }
+    return new Uint8Array(content)
+  }
+
+  private async areFileContentsEqual(left: FileContent, right: FileContent): Promise<boolean> {
+    const leftBytes = await this.contentToBytes(left)
+    const rightBytes = await this.contentToBytes(right)
+    if (leftBytes.byteLength !== rightBytes.byteLength) return false
+    for (let i = 0; i < leftBytes.byteLength; i++) {
+      if (leftBytes[i] !== rightBytes[i]) return false
+    }
+    return true
+  }
+
+  /**
+   * Write file content to .baseline/ directory.
+   */
+  private async writeToBaselineDir(path: string, content: FileContent): Promise<void> {
+    const baselineDir = await this.getBaselineDir()
+    const parts = path.split('/').filter(Boolean)
+    if (parts.length === 0) return
+
+    const fileName = parts[parts.length - 1]
+    let currentDir = baselineDir
+
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentDir = await currentDir.getDirectoryHandle(parts[i], { create: true })
+    }
+
+    const targetFile = await currentDir.getFileHandle(fileName, { create: true })
+    const writable = await targetFile.createWritable()
+    await writable.write(content)
+    await writable.close()
+  }
+
+  /**
+   * Delete file from .baseline/ directory if it exists.
+   */
+  private async deleteFromBaselineDirIfExists(path: string): Promise<void> {
+    try {
+      const baselineDir = await this.getBaselineDir()
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return
+
+      let current = baselineDir
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+
+      await current.removeEntry(parts[parts.length - 1])
+    } catch {
+      // Ignore if baseline entry doesn't exist.
+    }
+  }
+
+  /**
+   * Capture baseline content for modify operations.
+   * - First modify in current pending cycle: write baseline.
+   * - Subsequent modifies in same pending cycle: keep original baseline.
+   */
+  private async captureModifyBaseline(path: string, content: FileContent): Promise<void> {
+    const hasPendingPath = this.pendingManager.hasPendingPath(path)
+    const existingBaseline = await this.readFromBaselineDir(path)
+    if (hasPendingPath && existingBaseline) {
+      return
+    }
+
+    await this.writeToBaselineDir(path, content)
+  }
+
+  /**
+   * Restore a modified file from OPFS baseline snapshot.
+   */
+  private async restorePendingModifyFromBaseline(path: string): Promise<boolean> {
+    const baseline = await this.readFromBaselineDir(path)
+    if (!baseline) return false
+
+    await this.writeToFilesDir(path, baseline.content)
+    await this.deleteFromBaselineDirIfExists(path)
+    return true
+  }
+
+  /**
+   * List all baseline file paths in .baseline/ directory.
+   */
+  private async listBaselinePaths(): Promise<string[]> {
+    try {
+      const baselineDir = await this.getBaselineDir()
+      const paths = new Set<string>()
+      await this.scanDirRecursive(baselineDir, '', paths)
+      return Array.from(paths)
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Remove stale baseline files which no longer have pending entries.
+   */
+  private async cleanupStaleBaselines(): Promise<void> {
+    const baselinePaths = await this.listBaselinePaths()
+    if (baselinePaths.length === 0) return
+
+    for (const path of baselinePaths) {
+      if (!this.pendingManager.hasPendingPath(path)) {
+        await this.deleteFromBaselineDirIfExists(path)
+      }
+    }
+  }
+
+  /**
    * Check if file exists in files/ directory (uses in-memory index)
    */
   private hasFileInIndex(path: string): boolean {
@@ -315,6 +467,17 @@ export class WorkspaceRuntime {
     } catch {
       // Directory doesn't exist, just clear index
       this.filesIndex.clear()
+    }
+  }
+
+  /**
+   * Clear all files from .baseline/ directory.
+   */
+  private async clearBaselineDir(): Promise<void> {
+    try {
+      await this.workspaceDir.removeEntry(BASELINE_DIR, { recursive: true })
+    } catch {
+      // Directory doesn't exist, ignore.
     }
   }
 
@@ -374,11 +537,12 @@ export class WorkspaceRuntime {
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<{ content: FileContent; metadata: FileMetadata }> {
     if (!this.initialized) await this.initialize()
+    const normalizedPath = this.normalizeWorkspacePath(path)
 
     // If path has pending changes, check for conflicts first.
     // If disk mtime differs from OPFS baseline, disk is newer - read disk.
     // This handles the conflict scenario where disk has been updated but OPFS hasn't.
-    const isPendingPath = this.pendingManager.hasPendingPath(path)
+    const isPendingPath = this.pendingManager.hasPendingPath(normalizedPath)
     if (directoryHandle && isPendingPath) {
       let fromFilesDir: {
         content: FileContent
@@ -386,8 +550,8 @@ export class WorkspaceRuntime {
         size: number
         contentType: 'text' | 'binary'
       } | null = null
-      if (this.hasFileInIndex(path)) {
-        fromFilesDir = await this.readFromFilesDir(path)
+      if (this.hasFileInIndex(normalizedPath)) {
+        fromFilesDir = await this.readFromFilesDir(normalizedPath)
       }
 
       // If conflict markers are materialized in OPFS, always return OPFS content first
@@ -401,7 +565,7 @@ export class WorkspaceRuntime {
         return {
           content: fromFilesDir.content,
           metadata: {
-            path,
+            path: normalizedPath,
             mtime: fromFilesDir.mtime,
             size: fromFilesDir.size,
             contentType: fromFilesDir.contentType,
@@ -411,21 +575,42 @@ export class WorkspaceRuntime {
 
       // Check if disk has been modified since OPFS recorded baseline
       try {
-        const diskMeta = await this.getFileMetadata(directoryHandle, path)
+        const diskMeta = await this.getFileMetadata(directoryHandle, normalizedPath)
         const pendingChanges = await this.pendingManager.getAll()
-        const pending = pendingChanges.find((p) => p.path === path || p.path === `/${path}`)
+        const pending = pendingChanges.find(
+          (p) => this.normalizeWorkspacePath(p.path) === normalizedPath
+        )
         if (pending && pending.fsMtime && diskMeta.mtime > pending.fsMtime) {
-          // Disk is newer than OPFS baseline - disk has been modified externally
-          // Read disk version to see the latest changes
-          const diskContent = await this.readFromNativeFS(path, directoryHandle)
-          return {
-            content: diskContent.content,
-            metadata: {
-              path,
-              mtime: diskMeta.mtime,
-              size: diskMeta.size,
-              contentType: diskMeta.contentType,
-            },
+          const diskContent = await this.readFromNativeFS(normalizedPath, directoryHandle)
+          const baseline = await this.readFromBaselineDir(normalizedPath)
+          if (baseline) {
+            const diskMatchesBaseline = await this.areFileContentsEqual(baseline.content, diskContent.content)
+            if (diskMatchesBaseline) {
+              // Migration case: pure-OPFS pending baseline rebased to native view.
+              // Keep OPFS draft as source of truth for pending edits.
+            } else {
+              // Disk is newer than OPFS baseline - disk has been modified externally.
+              return {
+                content: diskContent.content,
+                metadata: {
+                  path: normalizedPath,
+                  mtime: diskMeta.mtime,
+                  size: diskMeta.size,
+                  contentType: diskMeta.contentType,
+                },
+              }
+            }
+          } else {
+            // No baseline snapshot available, keep existing safety behavior and prefer disk.
+            return {
+              content: diskContent.content,
+              metadata: {
+                path: normalizedPath,
+                mtime: diskMeta.mtime,
+                size: diskMeta.size,
+                contentType: diskMeta.contentType,
+              },
+            }
           }
         }
       } catch {
@@ -437,7 +622,7 @@ export class WorkspaceRuntime {
         return {
           content: fromFilesDir.content,
           metadata: {
-            path,
+            path: normalizedPath,
             mtime: fromFilesDir.mtime,
             size: fromFilesDir.size,
             contentType: fromFilesDir.contentType,
@@ -449,13 +634,13 @@ export class WorkspaceRuntime {
     if (directoryHandle && !isPendingPath) {
       // For non-pending files, always prefer native disk view so external
       // filesystem changes are visible to tools immediately.
-      const native = await this.readFromNativeFS(path, directoryHandle)
+      const native = await this.readFromNativeFS(normalizedPath, directoryHandle)
 
       // Best-effort cache eviction: once disk is the source of truth for a
       // non-pending path, clear stale OPFS body to reduce storage usage.
-      if (this.hasFileInIndex(path)) {
+      if (this.hasFileInIndex(normalizedPath)) {
         try {
-          await this.deleteFromFilesDirIfExists(path)
+          await this.deleteFromFilesDirIfExists(normalizedPath)
         } catch {
           // Ignore cleanup failures; read should still succeed.
         }
@@ -465,13 +650,13 @@ export class WorkspaceRuntime {
     }
 
     // Read from files/ only (no native FS available or has pending changes without conflict)
-    if (this.hasFileInIndex(path)) {
-      const fromFilesDir = await this.readFromFilesDir(path)
+    if (this.hasFileInIndex(normalizedPath)) {
+      const fromFilesDir = await this.readFromFilesDir(normalizedPath)
       if (fromFilesDir) {
         return {
           content: fromFilesDir.content,
           metadata: {
-            path,
+            path: normalizedPath,
             mtime: fromFilesDir.mtime,
             size: fromFilesDir.size,
             contentType: fromFilesDir.contentType,
@@ -480,7 +665,7 @@ export class WorkspaceRuntime {
       }
     }
 
-    throw new Error(`File not found in OPFS workspace: ${path}`)
+    throw new Error(`File not found in OPFS workspace: ${normalizedPath}`)
   }
 
   /**
@@ -535,10 +720,11 @@ export class WorkspaceRuntime {
    */
   async readCachedFile(path: string): Promise<FileContent | null> {
     if (!this.initialized) await this.initialize()
-    if (!this.hasFileInIndex(path)) {
+    const normalizedPath = this.normalizeWorkspacePath(path)
+    if (!this.hasFileInIndex(normalizedPath)) {
       return null
     }
-    const fromFilesDir = await this.readFromFilesDir(path)
+    const fromFilesDir = await this.readFromFilesDir(normalizedPath)
     return fromFilesDir?.content ?? null
   }
 
@@ -554,27 +740,31 @@ export class WorkspaceRuntime {
     directoryHandle?: FileSystemDirectoryHandle | null
   ): Promise<void> {
     if (!this.initialized) await this.initialize()
+    const normalizedPath = this.normalizeWorkspacePath(path)
 
     // Get baseline mtime for conflict detection
     // Also track if this is a new file (not in files/ index and not in native FS)
     let baselineFsMtime = 0
     let isNewFile = false
+    let baselineContent: FileContent | null = null
     try {
       if (directoryHandle) {
         // Always use native mtime as conflict baseline when directory handle is available.
         // OPFS cache mtime can diverge from native disk mtime after prior approvals/syncs.
-        const fromNative = await this.readFromNativeFS(path, directoryHandle)
+        const fromNative = await this.readFromNativeFS(normalizedPath, directoryHandle)
         baselineFsMtime = fromNative.metadata.mtime
+        baselineContent = fromNative.content
       } else {
         // No directoryHandle (pure OPFS mode): check if file exists in filesIndex
         // If not in index, this is a new file
-        if (!this.hasFileInIndex(path)) {
+        if (!this.hasFileInIndex(normalizedPath)) {
           isNewFile = true
         } else {
           // File exists in index, get mtime from files/
-          const fromFiles = await this.readFromFilesDir(path)
+          const fromFiles = await this.readFromFilesDir(normalizedPath)
           if (fromFiles) {
             baselineFsMtime = fromFiles.mtime
+            baselineContent = fromFiles.content
           }
         }
       }
@@ -590,14 +780,18 @@ export class WorkspaceRuntime {
       }
     }
 
+    if (!isNewFile && baselineContent !== null) {
+      await this.captureModifyBaseline(normalizedPath, baselineContent)
+    }
+
     // Write to files/ directory
-    await this.writeToFilesDir(path, content)
-    this.filesIndex.add(path)
+    await this.writeToFilesDir(normalizedPath, content)
+    this.filesIndex.add(normalizedPath)
 
     // Notify other tabs about the file change
     try {
       const channel = new BroadcastChannel('opfs-file-changes')
-      channel.postMessage({ type: 'opfs-file-changed', path })
+      channel.postMessage({ type: 'opfs-file-changed', path: normalizedPath })
       channel.close()
     } catch (e) {
       console.warn('[WorkspaceRuntime] Failed to broadcast file change:', e)
@@ -605,9 +799,9 @@ export class WorkspaceRuntime {
 
     // Mark as pending - use markAsCreated for new files, add for modifications
     if (isNewFile) {
-      await this.pendingManager.markAsCreated(path, baselineFsMtime)
+      await this.pendingManager.markAsCreated(normalizedPath, baselineFsMtime)
     } else {
-      await this.pendingManager.add(path, baselineFsMtime)
+      await this.pendingManager.add(normalizedPath, baselineFsMtime)
     }
 
     // Update last accessed time
@@ -623,23 +817,43 @@ export class WorkspaceRuntime {
   async deleteFile(path: string, directoryHandle?: FileSystemDirectoryHandle | null): Promise<void> {
     if (!this.initialized) await this.initialize()
 
+    const normalizedPath = this.normalizeWorkspacePath(path)
+    const pendingEntry = this.pendingManager
+      .getAll()
+      .find((change) => this.normalizeWorkspacePath(change.path) === normalizedPath)
+
     // Get baseline mtime for conflict detection
     let baselineFsMtime = 0
+    let baselineContent: FileContent | null = null
     try {
       if (directoryHandle) {
-        const oldData = await this.readFromNativeFS(path, directoryHandle)
+        const oldData = await this.readFromNativeFS(normalizedPath, directoryHandle)
         baselineFsMtime = oldData.metadata.mtime || 0
+        baselineContent = oldData.content
+      } else if (this.hasFileInIndex(normalizedPath)) {
+        const fromFiles = await this.readFromFilesDir(normalizedPath)
+        if (fromFiles) {
+          baselineContent = fromFiles.content
+        }
       }
     } catch {
       // File doesn't exist
     }
 
+    // Keep rollback source for delete rejection in pure OPFS mode.
+    // Skip create->delete cancel-out cycles since no committed baseline is needed.
+    if (pendingEntry?.type !== 'create' && baselineContent !== null) {
+      await this.captureModifyBaseline(normalizedPath, baselineContent)
+    } else if (pendingEntry?.type === 'create') {
+      await this.deleteFromBaselineDirIfExists(normalizedPath)
+    }
+
     // Delete from files/ directory
-    await this.deleteFromFilesDir(path)
-    this.filesIndex.delete(path)
+    await this.deleteFromFilesDir(normalizedPath)
+    this.filesIndex.delete(normalizedPath)
 
     // Mark as pending for deletion
-    await this.pendingManager.markForDeletion(path, baselineFsMtime)
+    await this.pendingManager.markForDeletion(normalizedPath, baselineFsMtime)
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -667,6 +881,72 @@ export class WorkspaceRuntime {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
     return await repo.getApprovedNotSyncedPaths(this.workspaceId)
+  }
+
+  /**
+   * Rebase pending baseline mtimes after switching from OPFS-only to native binding.
+   *
+   * For modify/delete ops, if native content still matches OPFS baseline snapshot,
+   * update fs_mtime to current native mtime so conflict checks stop reporting
+   * migration-only mtime drift as real conflicts.
+   */
+  async rebindPendingBaselinesToNative(
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{ checked: number; rebased: number; skipped: number; conflicts: number }> {
+    if (!this.initialized) await this.initialize()
+
+    const nativeDir = directoryHandle ?? (await this.getNativeDirectoryHandle())
+    if (!nativeDir) {
+      return { checked: 0, rebased: 0, skipped: 0, conflicts: 0 }
+    }
+
+    const repo = getFSOverlayRepository()
+    const activeOps = await repo.listActivePendingOps(this.workspaceId)
+
+    let checked = 0
+    let rebased = 0
+    let skipped = 0
+    let conflicts = 0
+
+    for (const op of activeOps) {
+      if (op.type === 'create') {
+        skipped++
+        continue
+      }
+
+      const path = this.normalizeWorkspacePath(op.path)
+      const baseline = await this.readFromBaselineDir(path)
+      if (!baseline) {
+        skipped++
+        continue
+      }
+
+      try {
+        const native = await this.readFromNativeFS(path, nativeDir)
+        checked++
+
+        const equalsBaseline = await this.areFileContentsEqual(baseline.content, native.content)
+        if (!equalsBaseline) {
+          conflicts++
+          continue
+        }
+
+        if (native.metadata.mtime > 0 && native.metadata.mtime !== op.fsMtime) {
+          await repo.updatePendingFsMtime(op.id, native.metadata.mtime)
+          rebased++
+        } else {
+          skipped++
+        }
+      } catch {
+        skipped++
+      }
+    }
+
+    if (rebased > 0) {
+      await this.pendingManager.reload()
+    }
+
+    return { checked, rebased, skipped, conflicts }
   }
 
   /**
@@ -706,6 +986,10 @@ export class WorkspaceRuntime {
     }
 
     const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite)
+
+    // Successful sync/discard operations remove pending entries from ledger.
+    // Clean up orphaned baselines so next modify cycle snapshots from fresh state.
+    await this.cleanupStaleBaselines()
 
     // Update last accessed time
     this.metadata.lastAccessedAt = Date.now()
@@ -766,19 +1050,34 @@ export class WorkspaceRuntime {
       const normalizedPath = this.normalizeWorkspacePath(change.path)
       if (change.type === 'create') {
         await this.deleteFromFilesDirIfExists(normalizedPath)
+        await this.deleteFromBaselineDirIfExists(normalizedPath)
       } else if (change.type === 'modify') {
-        const restored = await this.restorePendingModifyFromNative(normalizedPath)
+        let restored = await this.restorePendingModifyFromNative(normalizedPath)
+        if (!restored) {
+          restored = await this.restorePendingModifyFromBaseline(normalizedPath)
+        }
         if (!restored) {
           restoreFailures.push(change.path)
           continue
         }
+        await this.deleteFromBaselineDirIfExists(normalizedPath)
+      } else if (change.type === 'delete') {
+        let restored = await this.restorePendingModifyFromNative(normalizedPath)
+        if (!restored) {
+          restored = await this.restorePendingModifyFromBaseline(normalizedPath)
+        }
+        if (!restored) {
+          restoreFailures.push(change.path)
+          continue
+        }
+        await this.deleteFromBaselineDirIfExists(normalizedPath)
       }
       await this.pendingManager.removeByPath(change.path)
     }
 
     if (restoreFailures.length > 0) {
       throw new Error(
-        `无法拒绝 ${restoreFailures.length} 个修改（缺少本地文件基线）: ${restoreFailures.slice(0, 3).join(', ')}${restoreFailures.length > 3 ? ' ...' : ''}`
+        `无法拒绝 ${restoreFailures.length} 个变更（缺少本地文件基线）: ${restoreFailures.slice(0, 3).join(', ')}${restoreFailures.length > 3 ? ' ...' : ''}`
       )
     }
 
@@ -799,13 +1098,27 @@ export class WorkspaceRuntime {
       .find((change) => this.normalizeWorkspacePath(change.path) === normalizedTargetPath)
     if (existing?.type === 'create') {
       await this.deleteFromFilesDirIfExists(normalizedTargetPath)
+      await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
     } else if (existing?.type === 'modify') {
-      const restored = await this.restorePendingModifyFromNative(normalizedTargetPath)
+      let restored = await this.restorePendingModifyFromNative(normalizedTargetPath)
+      if (!restored) {
+        restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
+      }
       if (!restored) {
         throw new Error(`无法拒绝修改 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
       }
+      await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
+    } else if (existing?.type === 'delete') {
+      let restored = await this.restorePendingModifyFromNative(normalizedTargetPath)
+      if (!restored) {
+        restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
+      }
+      if (!restored) {
+        throw new Error(`无法拒绝删除 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
+      }
+      await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
     }
-    await this.pendingManager.removeByPath(existing?.path || path)
+    await this.pendingManager.removeByPath(existing?.path || normalizedTargetPath)
     this.metadata.lastAccessedAt = Date.now()
     await this.saveMetadata()
   }
@@ -840,6 +1153,7 @@ export class WorkspaceRuntime {
   async clear(): Promise<void> {
     await Promise.all([
       this.clearFilesDir(),
+      this.clearBaselineDir(),
       this.pendingManager.clear(),
     ])
 
@@ -1433,6 +1747,13 @@ export class WorkspaceRuntime {
   }
 
   /**
+   * Get the .baseline/ directory handle for OPFS-only modify rollbacks.
+   */
+  private async getBaselineDir(): Promise<FileSystemDirectoryHandle> {
+    return await this.workspaceDir.getDirectoryHandle(BASELINE_DIR, { create: true })
+  }
+
+  /**
    * Get native directory handle for file preparation
    * @returns Native FS directory handle or null if not set
    */
@@ -1440,11 +1761,8 @@ export class WorkspaceRuntime {
     if (!this.metadata.rootDirectory) return null
 
     try {
-      // Handle is managed in native-fs runtime registry.
-      const handle = getRuntimeDirectoryHandle(this.workspaceId)
-      if (handle) return handle
-
-      // Fallback: directory access is granted at project scope in workspace.store.
+      // Directory access is granted at project scope.
+      // All workspaces within the same project share the same native directory handle.
       try {
         const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
         const activeProject = await getProjectRepository().findActiveProject()
@@ -1847,6 +2165,8 @@ export class WorkspaceRuntime {
     const added = changes.filter((c) => c.type === 'add').length
     const modified = changes.filter((c) => c.type === 'modify').length
     const deleted = changes.filter((c) => c.type === 'delete').length
+
+    await this.cleanupStaleBaselines()
 
     console.log('[WorkspaceRuntime] Pending changes refreshed (via worker):', {
       changes: changes.length,

@@ -285,15 +285,15 @@ export function getDirectoryHandleManager(): DirectoryHandleManager {
  * Request directory handle with user prompt
  */
 export async function requestDirectoryAccess(
-  workspaceId: string,
+  scopeId: string,
   options?: DirectoryPickerOptions
 ): Promise<FileSystemDirectoryHandle | null> {
   const manager = getDirectoryHandleManager()
   const handle = await manager.requestHandle(options)
 
   if (handle) {
-    await manager.storeHandle(workspaceId, handle)
-    runtimeHandles.set(workspaceId, handle)
+    await manager.storeHandle(scopeId, handle)
+    runtimeHandles.set(scopeId, handle)
   }
 
   return handle
@@ -301,7 +301,9 @@ export async function requestDirectoryAccess(
 
 /**
  * Bind an in-memory handle alias to an already granted directory handle.
- * Useful when one permission should be reused by multiple IDs (project/workspace).
+ * Application invariant:
+ * - Use project ID as the runtime-handle scope.
+ * - Do not bind per-workspace aliases.
  */
 export function bindRuntimeDirectoryHandle(
   id: string,
@@ -312,6 +314,7 @@ export function bindRuntimeDirectoryHandle(
 
 /**
  * Get currently available in-memory directory handle by ID.
+ * In app flows this ID should be the active project ID.
  */
 export function getRuntimeDirectoryHandle(
   id: string
