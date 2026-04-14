@@ -18,5 +18,7 @@ export {
   importStorage,
   getStorageMode,
 } from './init'
+export { getRuntimeCapability } from './runtime-capability'
 
 export type { InitStorageOptions, InitStorageResult, StorageStatus, StorageMode } from './init'
+export type { RuntimeCapability } from './runtime-capability'

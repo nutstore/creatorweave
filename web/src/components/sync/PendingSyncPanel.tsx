@@ -35,7 +35,6 @@ import type { ConflictInfo, ConflictDetail, SyncResult } from '@/opfs/types/opfs
 
 export function PendingSyncPanel() {
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
-  const clearChanges = useConversationContextStore((state) => state.clearChanges)
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -144,7 +143,6 @@ export function PendingSyncPanel() {
     if (!pendingChanges) return 0
     return pendingChanges.changes.reduce((sum, c) => sum + (c.size || 0), 0)
   }, [pendingChanges])
-
   // 处理单个文件选择/取消选择 (必须在条件返回之前定义)
   const handleToggleSelect = useCallback(
     (path: string) => {
@@ -175,22 +173,54 @@ export function PendingSyncPanel() {
 
   // 处理删除单个文件 (必须在条件返回之前定义)
   const handleRemoveFile = useCallback(async (path: string) => {
-    await discardPendingPath(path)
-    setConflictPaths((prev) => {
-      const next = new Set(prev)
-      next.delete(path)
-      return next
-    })
+    try {
+      await discardPendingPath(path)
+      setConflictPaths((prev) => {
+        const next = new Set(prev)
+        next.delete(path)
+        return next
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '拒绝变更失败，请稍后重试'
+      toast.error(message)
+    }
   }, [discardPendingPath])
 
   // 处理拒绝全部 (必须在条件返回之前定义)
   const handleClear = useCallback(async () => {
-    await clearChanges()
+    if (!pendingChanges || pendingChanges.changes.length === 0) {
+      setSelectedItems(new Set())
+      setSelectAll(false)
+      setConflictPaths(new Set())
+      setShowClearConfirm(false)
+      return
+    }
+
+    // OPFS-only 场景下 modify 可能缺少本地基线；逐项拒绝可避免整批失败。
+    let successCount = 0
+    let failedCount = 0
+    for (const change of pendingChanges.changes) {
+      try {
+        await discardPendingPath(change.path)
+        successCount++
+      } catch {
+        failedCount++
+      }
+    }
+
+    await useConversationContextStore.getState().refreshPendingChanges(true)
     setSelectedItems(new Set())
     setSelectAll(false)
     setConflictPaths(new Set())
     setShowClearConfirm(false)
-  }, [clearChanges])
+
+    if (failedCount > 0) {
+      toast.warning(`已拒绝 ${successCount} 个变更，${failedCount} 个因缺少本地文件基线保留在列表中`)
+      return
+    }
+
+    toast.success('已拒绝全部变更')
+  }, [discardPendingPath, pendingChanges])
 
   const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
     path: conflict.path,

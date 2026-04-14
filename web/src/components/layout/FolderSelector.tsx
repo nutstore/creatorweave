@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { FolderOpen, ChevronDown, Copy, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
 import { useCurrentFolderAccess, useFolderAccessStore } from '@/store/folder-access.store'
 import { useAgentStore } from '@/store/agent.store'
+import { getRuntimeCapability } from '@/storage/runtime-capability'
 import { useT } from '@/i18n'
 import { cn } from '@/lib/utils'
 
@@ -64,6 +65,8 @@ export function FolderSelector() {
   const isMenuOpen = menuState === 'open'
   const isSelecting = folderAccess.isRequesting
   const isLoading = folderAccess.isChecking || folderAccess.isReleasing
+  const runtimeCapability = getRuntimeCapability()
+  const canPickDirectory = runtimeCapability.canPickDirectory
 
   const {
     pickDirectory,
@@ -127,6 +130,9 @@ export function FolderSelector() {
     }
 
     if (!directoryHandle) {
+      if (!canPickDirectory) {
+        return
+      }
       handleSelectFolder()
       return
     }
@@ -137,6 +143,10 @@ export function FolderSelector() {
 
   const handleSelectFolder = async () => {
     if (!projectId) return
+    if (!canPickDirectory) {
+      setLocalError('当前浏览器不支持本地目录授权，已切换为沙箱模式（OPFS）')
+      return
+    }
 
     setMenuState('selecting')
     setLocalError(null)
@@ -225,6 +235,15 @@ export function FolderSelector() {
       )
     }
 
+    if (!canPickDirectory) {
+      return (
+        <>
+          <FolderOpen className="h-[14px] w-[14px]" />
+          <span className="text-xs font-normal text-secondary">沙箱模式 (OPFS)</span>
+        </>
+      )
+    }
+
     return (
       <>
         <FolderOpen className="h-[14px] w-[14px]" />
@@ -291,14 +310,21 @@ export function FolderSelector() {
         <button
           type="button"
           onClick={handleToggle}
-          disabled={isSelecting || isLoading}
+          disabled={isSelecting || isLoading || (!directoryHandle && !canPickDirectory)}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
             'transition-colors hover:bg-primary-50 focus:outline-none dark:border-border dark:bg-card dark:hover:bg-muted',
-            (isSelecting || isLoading) && 'cursor-wait opacity-70'
+            (isSelecting || isLoading) && 'cursor-wait opacity-70',
+            !directoryHandle && !canPickDirectory && 'cursor-not-allowed opacity-70'
           )}
-          title={folderName ? t('folderSelector.switchFolder') : t('folderSelector.openFolder')}
+          title={
+            !canPickDirectory && !directoryHandle
+              ? '当前浏览器不支持本地目录授权（使用 OPFS 沙箱模式）'
+              : folderName
+                ? t('folderSelector.switchFolder')
+                : t('folderSelector.openFolder')
+          }
         >
           {renderButtonContent()}
         </button>
@@ -308,18 +334,20 @@ export function FolderSelector() {
       {isMenuOpen && (
         <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-border bg-white py-1 shadow-lg dark:border-border dark:bg-card">
           {/* Switch folder */}
-          <button
-            type="button"
-            onClick={handleSelectFolder}
-            disabled={isSelecting || isLoading}
-            className={cn(
-              'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
-              'hover:bg-muted dark:hover:bg-muted dark:hover:bg-muted disabled:cursor-wait disabled:opacity-50'
-            )}
-          >
-            <RefreshCw className={cn('h-4 w-4', isSelecting && 'animate-spin')} />
-            <span>{t('folderSelector.switchFolder')}</span>
-          </button>
+          {canPickDirectory && (
+            <button
+              type="button"
+              onClick={handleSelectFolder}
+              disabled={isSelecting || isLoading}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
+                'hover:bg-muted dark:hover:bg-muted dark:hover:bg-muted disabled:cursor-wait disabled:opacity-50'
+              )}
+            >
+              <RefreshCw className={cn('h-4 w-4', isSelecting && 'animate-spin')} />
+              <span>{t('folderSelector.switchFolder')}</span>
+            </button>
+          )}
 
           {/* Release handle - only shown when folder is selected */}
           {directoryHandle && (

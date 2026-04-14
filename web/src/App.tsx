@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
 import { Toaster, toast } from 'sonner'
-import { isSupported } from '@/services/fsAccess.service'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'
 import { MobileLayout } from '@/components/mobile'
@@ -17,6 +16,7 @@ import {
   setupAutoSave,
   clearSQLiteAndProjectsDirectory,
   RESET_REQUIRES_TAB_CLOSURE,
+  getRuntimeCapability,
 } from '@/storage'
 import { useT } from '@/i18n'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
@@ -133,7 +133,7 @@ function toPath(route: AppRoute): string {
 }
 
 function App() {
-  const [isSupportedBrowser, setIsSupportedBrowser] = useState(true)
+  const [isRuntimeSupported, setIsRuntimeSupported] = useState(true)
   const [isStorageReady, setIsStorageReady] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState<number | undefined>(undefined)
   const [storageError, setStorageError] = useState<string | null>(null)
@@ -281,12 +281,11 @@ function App() {
     let toastId: string | number | undefined
 
     async function initializeApp() {
-      // Check browser support
-      const supported = isSupported()
+      const capability = getRuntimeCapability()
       if (!mounted) return
-      setIsSupportedBrowser(supported)
+      setIsRuntimeSupported(capability.canRunApp)
 
-      if (!supported) return
+      if (!capability.canRunApp) return
 
       // Initialize SQLite storage
       toastId = toast.loading(tRef.current('app.initializing'), { id: 'storage-init' })
@@ -834,7 +833,7 @@ function App() {
     }
   }
 
-  if (!isSupportedBrowser) {
+  if (!isRuntimeSupported) {
     return <UnsupportedBrowser />
   }
 

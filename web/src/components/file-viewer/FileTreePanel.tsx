@@ -848,9 +848,9 @@ export function FileTreePanel({
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-tertiary text-center text-xs">
-          选择项目文件夹后
+          未选择本地目录也可继续使用
           <br />
-          文件树将显示在这里
+          纯 OPFS 沙箱模式下，文件变更会显示在这里
         </p>
       </div>
     )
