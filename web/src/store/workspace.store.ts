@@ -380,8 +380,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (get().activeWorkspaceId === id) {
               return
             }
-            const message = get().error || `Failed to switch workspace: ${id}`
-            throw new Error(message)
+            // Another switch to the same workspace failed with error.
+            // Clear error and proceed with our own switch attempt.
+            if (get().error) {
+              console.warn(`[WorkspaceStore] Prior switch to ${id} failed, retrying...`)
+              set({ error: null })
+            } else {
+              const message = `Failed to switch workspace: ${id}`
+              throw new Error(message)
+            }
           }
           if (switchingId && switchingId !== id) {
             console.warn(`[WorkspaceStore] Switching to ${id} while already switching to ${switchingId}, waiting...`)

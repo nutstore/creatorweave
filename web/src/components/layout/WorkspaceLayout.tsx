@@ -87,6 +87,8 @@ export function WorkspaceLayout({
     runAgent,
     isConversationRunning,
     updateMessages,
+    loaded,
+    loadFromDB,
   } = useConversationStore()
   const { directoryHandle } = useAgentStore()
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
@@ -199,6 +201,11 @@ export function WorkspaceLayout({
     const cleanup = initializeTheme()
     return cleanup
   }, [])
+
+  // Phase 4: Load conversations on mount (independent of Sidebar rendering)
+  useEffect(() => {
+    if (!loaded) loadFromDB()
+  }, [loaded, loadFromDB])
 
   // Phase 4: Enhanced command palette commands
   const commands: Command[] = buildEnhancedCommands({

@@ -90,8 +90,6 @@ export function Sidebar({
   const {
     conversations,
     activeConversationId,
-    loaded,
-    loadFromDB,
     createNew,
     setActive,
     deleteConversation,
@@ -115,11 +113,6 @@ export function Sidebar({
     return map
   }, [workspaceStats])
   const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
-
-  // Load conversations on mount
-  useEffect(() => {
-    if (!loaded) loadFromDB()
-  }, [loaded, loadFromDB])
 
   // Sidebar state
   const [collapsed, setCollapsed] = useState(false)
