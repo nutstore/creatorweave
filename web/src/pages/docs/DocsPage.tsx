@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Menu, X, FileText, BookOpen, Code2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Menu, X, FileText, BookOpen, Code2, Github } from 'lucide-react'
 import { MarkdownContent } from '@/components/agent/MarkdownContent'
 import { BrandButton } from '@creatorweave/ui'
 import { cn } from '@/lib/utils'
@@ -169,6 +169,31 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
               )
             })}
           </div>
+
+          {/* GitHub Project Link */}
+          <a
+            href="https://github.com/nutstore/creatorweave"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'group relative mt-6 flex items-center gap-4 overflow-hidden rounded-2xl p-6 transition-all',
+              'border border-[oklch(88%_0.01_60)] bg-white shadow-sm',
+              'hover:border-[oklch(75%_0.05_60)] hover:shadow-md',
+              'dark:border-[oklch(25%_0.01_60)] dark:bg-[oklch(18%_0.01_250)]',
+              'dark:hover:border-[oklch(40%_0.02_250)]'
+            )}
+          >
+            <Github className="h-8 w-8 text-[oklch(50%_0.02_60)]" strokeWidth={1.5} />
+            <div className="flex-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-[oklch(50%_0.02_60)] dark:text-[oklch(55%_0.01_60)]">
+                开源项目
+              </p>
+              <p className="font-semibold text-[oklch(25%_0.02_60)] dark:text-[oklch(95%_0.01_60)]">
+                GitHub 源码
+              </p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-[oklch(70%_0.02_60)] transition-transform group-hover:translate-x-1" />
+          </a>
         </div>
       </div>
     )

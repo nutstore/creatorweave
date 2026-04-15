@@ -39,6 +39,7 @@ import {
   Globe,
   FileText,
   RefreshCw,
+  Github,
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
@@ -768,6 +769,15 @@ export function ProjectHome({
                   <FileText className="w-3.5 h-3.5 mr-1.5" />
                   {t('projectHome.hero.docsHub')}
                 </BrandButton>
+                <a
+                  href="https://github.com/nutstore/creatorweave"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 h-9 px-3 text-xs rounded-md border border-border bg-card hover:bg-muted/50 transition-colors text-secondary dark:text-secondary-foreground"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  GitHub
+                </a>
               </div>
             </div>
           </div>
