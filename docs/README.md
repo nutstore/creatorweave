@@ -5,7 +5,9 @@ This directory is the documentation source of truth for the repository.
 ## Start Here
 
 - User docs: `docs/user/`
+- User docs (English, docs center): `docs/en/user/`
 - Developer docs (Chinese): `docs/developer/`
+- Developer docs (English, docs center): `docs/en/developer/`
 - Developer guides (English): `docs/development/`
 - Architecture: `docs/architecture/`
 - Design and workflow: `docs/design/`, `docs/workflow/`
@@ -15,6 +17,7 @@ This directory is the documentation source of truth for the repository.
 
 - New users:
   - `docs/user/getting-started.md`
+  - `docs/en/user/getting-started.md`
   - `docs/user/workspace.md`
   - `docs/user/conversation.md`
 - New contributors:

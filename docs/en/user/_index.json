@@ -1,0 +1,29 @@
+{
+  "title": "User Documentation",
+  "pages": [
+    {
+      "slug": "getting-started",
+      "title": "Getting Started",
+      "file": "getting-started.md",
+      "order": 1
+    },
+    {
+      "slug": "workspace",
+      "title": "Workspace",
+      "file": "workspace.md",
+      "order": 2
+    },
+    {
+      "slug": "conversation",
+      "title": "Conversations",
+      "file": "conversation.md",
+      "order": 3
+    },
+    {
+      "slug": "sync",
+      "title": "Sync and Remote Control",
+      "file": "sync.md",
+      "order": 4
+    }
+  ]
+}

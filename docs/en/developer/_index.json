@@ -1,0 +1,29 @@
+{
+  "title": "Developer Documentation",
+  "pages": [
+    {
+      "slug": "quick-start",
+      "title": "Quick Start",
+      "file": "quick-start.md",
+      "order": 1
+    },
+    {
+      "slug": "setup",
+      "title": "Environment Setup",
+      "file": "setup.md",
+      "order": 2
+    },
+    {
+      "slug": "ci-cd",
+      "title": "CI/CD",
+      "file": "ci-cd.md",
+      "order": 3
+    },
+    {
+      "slug": "architecture-overview",
+      "title": "Architecture Overview",
+      "file": "architecture-overview.md",
+      "order": 10
+    }
+  ]
+}

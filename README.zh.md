@@ -11,6 +11,8 @@
 
 [English](./README.md) | 简体中文
 
+立即体验在线 Demo：[creatorweave.eo2suite.cn](https://creatorweave.eo2suite.cn/)
+
 </div>
 
 ## 项目简介

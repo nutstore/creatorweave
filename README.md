@@ -11,6 +11,8 @@
 
 English | [简体中文](./README.zh.md)
 
+Try the live demo: [creatorweave.eo2suite.cn](https://creatorweave.eo2suite.cn/)
+
 </div>
 
 ## What is AI Workspace?
