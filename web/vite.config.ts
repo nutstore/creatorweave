@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVitest = process.env.VITEST === 'true'
+const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || new Date().toISOString()
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -21,11 +22,14 @@ export default defineConfig({
     sqlitePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['wasm/**/*.wasm', 'icon-*.png', 'icon.svg'],
       // Disable in dev to avoid COOP/COEP conflicts
       disable: process.env.NODE_ENV === 'development',
-      // Silent auto-update without notification
-      injectRegister: 'inline',
+      // We register SW manually in src/main.tsx to enforce versioned script URL.
+      injectRegister: false,
       manifest: {
         name: 'AI Workspace',
         short_name: 'CWeave',
@@ -59,110 +63,9 @@ export default defineConfig({
           },
         ],
       },
-      workbox: {
-        // Silent auto-update
-        skipWaiting: true,
-        clientsClaim: true,
-        // Precache all static assets
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,wasm}'],
-        // SPA fallback: serve index.html for navigation requests not in precache
-        navigateFallback: '/index.html',
-        // SPA routes start with /projects/ - don't treat as separate precached routes
-        navigateFallbackDenylist: [/\/projects\//],
-        cleanupOutdatedCaches: true,
-        // Runtime caching for offline support
-        // Note: runtimeCaching is compatible with COOP/COEP headers
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        runtimeCaching: [
-          {
-            // HTML (including index.html) - NetworkFirst to always get fresh version
-            // This prevents stale precached HTML from referencing outdated JS hashes
-            urlPattern: /.*\.html$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'html-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day max
-              },
-              networkTimeoutSeconds: 3,
-            },
-          },
-          {
-            // manifest.webmanifest - NetworkFirst to avoid stale manifest
-            urlPattern: /manifest\.webmanifest(\.json)?$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'manifest-cache',
-              expiration: {
-                maxEntries: 2,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
-            },
-          },
-          {
-            // WASM files (SQLite WASM) - CacheFirst for offline support
-            urlPattern: /^https:\/\/.*\.wasm$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'wasm-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-              cacheableResponse: {
-                statuses: [0],
-              },
-            },
-          },
-          {
-            // Images - Cache with longer expiration
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico|avif)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'images-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 90, // 90 days
-              },
-            },
-          },
-          {
-            // Fonts - Cache with long expiration
-            urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'fonts-cache',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-              },
-            },
-          },
-          {
-            // External API responses - StaleWhileRevalidate for fresh data
-            urlPattern: /^https:\/\/api\./i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 24, // 1 day
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            // Exclude hot updates in development
-            urlPattern: /.*\.hot-update\.js$/,
-            handler: 'NetworkOnly',
-            options: {
-              // Don't cache hot updates
-            },
-          },
-        ],
       },
     }),
   ],
@@ -177,6 +80,7 @@ export default defineConfig({
           'process.browser': JSON.stringify(true),
         }),
     __DEV__: process.env.NODE_ENV !== 'production' ? JSON.stringify(true) : JSON.stringify(false),
+    __APP_BUILD_ID__: JSON.stringify(buildId),
   },
   worker: {
     format: 'es',

@@ -17,6 +17,7 @@ import App from './App'
 import './styles/globals.css'
 import './components/plugins/plugin-ui.css'
 import 'sonner/dist/styles.css'
+import { registerServiceWorker } from '@/pwa/register-service-worker'
 
 // Import Python module to initialize window.__executePython
 import '@/python'
@@ -42,6 +43,8 @@ if (import.meta.env.DEV) {
       console.warn('React Grab 加载失败 (可忽略):', err.message)
     })
 }
+
+registerServiceWorker({ buildId: __APP_BUILD_ID__ })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
