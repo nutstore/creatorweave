@@ -47,7 +47,6 @@ import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
 // Design system styles
 const designStyles = `
   /* 字体 - 使用独特的字体组合 */
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Noto+Serif+SC:wght@400;500;600&display=swap');
 
   :root {
     --home-serif: 'Fraunces', 'Noto Serif SC', Georgia, serif;

@@ -168,4 +168,25 @@ describe('ProjectHome docs entry', () => {
 
     expect(onOpenProject).toHaveBeenCalledWith('project-a')
   })
+
+  it('does not inject Google Fonts imports in inline styles', () => {
+    const { container } = render(
+      <ProjectHome
+        projects={[]}
+        projectStats={{}}
+        activeProjectId=""
+        onOpenProject={vi.fn()}
+        onCreateProject={vi.fn()}
+        onRenameProject={vi.fn()}
+        onArchiveProject={vi.fn()}
+        onDeleteProject={vi.fn()}
+        onClearLocalData={vi.fn()}
+      />
+    )
+
+    const inlineStyle = container.querySelector('style')
+
+    expect(inlineStyle?.textContent).not.toContain('fonts.googleapis.com')
+    expect(inlineStyle?.textContent).not.toContain('@import url(')
+  })
 })
