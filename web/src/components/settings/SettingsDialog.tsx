@@ -152,25 +152,25 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function formatDate(timestamp: number): string {
+function formatDate(timestamp: number, t: (key: string) => string): string {
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
 
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000))
-    return `${minutes} 分钟前`
+    return t('settings.syncPanel.minutesAgo').replace('{count}', String(minutes))
   }
   if (diff < 24 * 60 * 60 * 1000) {
     const hours = Math.floor(diff / (60 * 60 * 1000))
-    return `${hours} 小时前`
+    return t('settings.syncPanel.hoursAgo').replace('{count}', String(hours))
   }
   if (diff < 7 * 24 * 60 * 60 * 1000) {
     const days = Math.floor(diff / (24 * 60 * 60 * 1000))
-    return `${days} 天前`
+    return t('settings.syncPanel.daysAgo').replace('{count}', String(days))
   }
 
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -207,6 +207,7 @@ interface SyncPanelProps {
 }
 
 function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }: SyncPanelProps) {
+  const t = useT()
   const [activeTab, setActiveTab] = useState<'upload' | 'list'>('upload')
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -254,10 +255,10 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
         return btoa(String.fromCharCode(...combined))
       } catch (err) {
         console.error('[SyncPanel] Encryption failed:', err)
-        throw new Error('加密失败')
+        throw new Error(t('settings.syncPanel.encryptionFailed'))
       }
     },
-    [getEncryptionKey]
+    [getEncryptionKey, t]
   )
 
   // Decrypt data using AES-GCM
@@ -283,10 +284,10 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
         return new TextDecoder().decode(decrypted)
       } catch (err) {
         console.error('[SyncPanel] Decryption failed:', err)
-        throw new Error('解密失败，数据可能已损坏')
+        throw new Error(t('settings.syncPanel.decryptionFailed'))
       }
     },
-    [getEncryptionKey]
+    [getEncryptionKey, t]
   )
 
   const loadSessions = useCallback(async () => {
@@ -318,7 +319,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
     const state = await manager.loadFromStorage()
 
     if (!state) {
-      throw new Error('没有可同步的会话数据')
+      throw new Error(t('settings.syncPanel.noSessionToSync'))
     }
 
     const sessionData = manager.serialize(state)
@@ -336,7 +337,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
     }
 
     return { encryptedData, metadata }
-  }, [encryptData])
+  }, [encryptData, t])
 
   // Download session callback
   const handleDownloadSession = useCallback(
@@ -344,7 +345,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
       const result = await api.download(syncId)
 
       if (!result.success) {
-        throw new Error(result.error?.message || '下载失败')
+        throw new Error(result.error?.message || t('settings.syncPanel.downloadFailed'))
       }
 
       const decryptedData = await decryptData(result.encryptedData)
@@ -352,18 +353,18 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
       const state = manager.deserialize(decryptedData)
 
       if (!state) {
-        throw new Error('会话数据解析失败')
+        throw new Error(t('settings.syncPanel.sessionParseFailed'))
       }
 
       await manager.saveToStorage(state)
-      toast.success('会话已恢复，请刷新页面查看')
+      toast.success(t('settings.syncPanel.sessionRestored'))
 
       // Trigger page reload after short delay
       setTimeout(() => {
         window.location.reload()
       }, 1500)
     },
-    [api, decryptData]
+    [api, decryptData, t]
   )
 
   const handleUpload = async () => {
@@ -384,13 +385,13 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
       }
 
       setUploadProgress(100)
-      setSuccess(`会话已同步！Sync ID: ${result.syncId}`)
+      setSuccess(t('settings.syncPanel.sessionSynced', { syncId: result.syncId }))
 
       if (activeTab === 'list') {
         loadSessions()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(err instanceof Error ? err.message : t('settings.syncPanel.uploadFailed'))
     } finally {
       setIsUploading(false)
       setUploadProgress(0)
@@ -404,7 +405,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
     try {
       await handleDownloadSession(syncId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '下载失败，请重试')
+      setError(err instanceof Error ? err.message : t('settings.syncPanel.downloadFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -413,7 +414,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
   const handleDelete = async (syncId: string, e: React.MouseEvent) => {
     e.stopPropagation()
 
-    if (!confirm('确定要删除此同步会话吗？此操作不可撤销。')) {
+    if (!confirm(t('settings.syncPanel.confirmDelete'))) {
       return
     }
 
@@ -423,13 +424,13 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
     try {
       const result = await api.delete(syncId)
       if (result.success) {
-        setSuccess('会话已删除')
+        setSuccess(t('settings.syncPanel.sessionDeleted'))
         loadSessions()
       } else {
         throw new Error('Delete failed')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败，请重试')
+      setError(err instanceof Error ? err.message : t('settings.syncPanel.deleteFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -454,7 +455,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
           }`}
         >
           <Upload className="mr-2 inline h-4 w-4" />
-          上传
+          {t('settings.syncPanel.upload')}
         </button>
         <button
           type="button"
@@ -466,7 +467,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
           }`}
         >
           <Download className="mr-2 inline h-4 w-4" />
-          下载/管理
+          {t('settings.syncPanel.downloadManage')}
         </button>
       </div>
 
@@ -477,9 +478,9 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
           <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
             <Lock className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
             <div className="text-sm text-amber-800">
-              <p className="font-medium">端到端加密</p>
+              <p className="font-medium">{t('settings.syncPanel.endToEndEncryption')}</p>
               <p className="mt-1 text-xs">
-                您的会话数据在上传前会被加密。服务器仅存储加密数据，无法访问您的原始内容。
+                {t('settings.syncPanel.encryptionNotice')}
               </p>
             </div>
           </div>
@@ -489,13 +490,13 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Monitor className="h-4 w-4 text-tertiary" />
-                <span className="text-sm font-medium text-secondary">当前设备</span>
+                <span className="text-sm font-medium text-secondary">{t('settings.syncPanel.currentDevice')}</span>
               </div>
               <span className="rounded bg-muted px-2 py-0.5 text-xs text-secondary">
                 {extractBrowserInfo(browserInfo)}
               </span>
             </div>
-            <p className="mt-1 text-xs text-tertiary">设备 ID: {deviceId}</p>
+            <p className="mt-1 text-xs text-tertiary">{t('settings.syncPanel.deviceId')}: {deviceId}</p>
           </div>
 
           {/* Upload Progress */}
@@ -508,7 +509,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
                 />
               </div>
               <p className="text-center text-sm text-tertiary">
-                {uploadProgress < 50 ? '正在准备数据...' : '正在上传到云端...'}
+                {uploadProgress < 50 ? t('settings.syncPanel.preparingData') : t('settings.syncPanel.uploadingToCloud')}
               </p>
             </div>
           )}
@@ -517,7 +518,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
           {!isUploading && (
             <BrandButton variant="default" onClick={handleUpload} className="w-full">
               <Upload className="mr-2 h-4 w-4" />
-              同步当前会话
+              {t('settings.syncPanel.syncCurrentSession')}
             </BrandButton>
           )}
 
@@ -531,7 +532,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
                 onClick={() => setActiveTab('list')}
                 className="ml-auto text-xs text-green-600 hover:underline"
               >
-                查看全部
+                {t('settings.syncPanel.viewAll')}
               </button>
             </div>
           )}
@@ -543,7 +544,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
         <div className="space-y-4">
           {/* Refresh Button */}
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-secondary">已同步的会话</h4>
+            <h4 className="text-sm font-medium text-secondary">{t('settings.syncPanel.syncedSessions')}</h4>
             <BrandButton
               variant="outline"
               className="h-8 px-3 text-xs"
@@ -551,7 +552,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
               disabled={isLoading}
             >
               <RefreshCw className={`mr-2 h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
-              刷新
+              {t('settings.syncPanel.refresh')}
             </BrandButton>
           </div>
 
@@ -574,8 +575,8 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
             ) : sessions.length === 0 ? (
               <div className="py-8 text-center">
                 <Cloud className="mx-auto h-8 w-8 text-tertiary" />
-                <p className="mt-2 text-sm text-tertiary">暂无同步的会话</p>
-                <p className="mt-1 text-xs text-tertiary">上传会话后可以在这里管理</p>
+                <p className="mt-2 text-sm text-tertiary">{t('settings.syncPanel.noSyncedSessions')}</p>
+                <p className="mt-1 text-xs text-tertiary">{t('settings.syncPanel.manageAfterUpload')}</p>
               </div>
             ) : (
               <ul className="space-y-2">
@@ -605,11 +606,11 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
                         <span>-</span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatDate(session.updatedAt)}
+                          {formatDate(session.updatedAt, t)}
                         </span>
                       </div>
                       <p className="mt-0.5 text-[10px] text-tertiary">
-                        过期时间: {formatExpiryDate(session.expiresAt)}
+                        {t('settings.syncPanel.expiresAt')}: {formatExpiryDate(session.expiresAt)}
                       </p>
                     </div>
 
@@ -619,7 +620,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
                       onClick={(e) => handleDelete(session.syncId, e)}
                       disabled={isLoading}
                       className="rounded p-1.5 text-red-500 opacity-0 transition-opacity hover:bg-red-50 group-hover:opacity-100"
-                      title="删除此会话"
+                      title={t('settings.syncPanel.deleteSession')}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -631,14 +632,14 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
 
           {/* Server Info */}
           <div className="flex items-center justify-between rounded-lg border border bg-muted p-2 text-xs text-tertiary">
-            <span>服务器: {relayUrl}</span>
+            <span>{t('settings.syncPanel.server')}: {relayUrl}</span>
             <a
               href={`${relayUrl}/health`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 hover:text-primary-600"
             >
-              状态
+              {t('settings.syncPanel.status')}
               <ExternalLink className="h-3 w-3" />
             </a>
           </div>
@@ -677,9 +678,9 @@ const SettingsDialogContent = forwardRef<
   }, [open])
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'llm', label: t('settings.title') || 'LLM 设置', icon: <Settings className="h-4 w-4" /> },
-    { id: 'sync', label: '跨设备同步', icon: <Cloud className="h-4 w-4" /> },
-    { id: 'offline', label: '离线任务', icon: <Wifi className="h-4 w-4" /> },
+    { id: 'llm', label: t('settings.title'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
+    { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
   ]
 
   return (
@@ -697,7 +698,7 @@ const SettingsDialogContent = forwardRef<
         <BrandDialogClose asChild>
           <button
             type="button"
-            aria-label="关闭设置"
+            aria-label={t('common.close')}
             className="text-tertiary transition-colors hover:text-primary"
           >
             <X className="h-5 w-5" />

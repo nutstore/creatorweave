@@ -111,7 +111,7 @@ async function cacheFirstStrategy(request: Request): Promise<Response> {
       await cache.put(request, networkResponse.clone())
     }
     return networkResponse
-  } catch (error) {
+  } catch {
     console.error('[ServiceWorker] Cache first failed:', error)
     return new Response('Offline', { status: 503 })
   }
@@ -125,7 +125,7 @@ async function networkFirstStrategy(request: Request): Promise<Response> {
       await cache.put(request, networkResponse.clone())
     }
     return networkResponse
-  } catch (error) {
+  } catch {
     const cached = await caches.match(request)
     if (cached) return cached
 
@@ -144,7 +144,7 @@ async function networkFirstWithCacheFallback(request: Request): Promise<Response
       await cache.put(request, networkResponse.clone())
     }
     return networkResponse
-  } catch (error) {
+  } catch {
     const cached = await caches.match(request)
     if (cached) return cached
 

@@ -169,7 +169,7 @@ describe('WorkflowQuickActions', () => {
     await user.click(screen.getByRole('button', { name: /高级设置/i }))
     await user.click(screen.getByLabelText('启用自定义评分规则'))
 
-    fireEvent.change(screen.getByLabelText('评分规则名称'), { target: { value: '我的评分规则' } })
+    fireEvent.change(screen.getByLabelText('自定义评分规则'), { target: { value: '我的评分规则' } })
     fireEvent.change(screen.getByLabelText('通过分'), { target: { value: '85' } })
     fireEvent.change(screen.getByLabelText('最大修复轮次'), { target: { value: '1' } })
 

@@ -1,10 +1,10 @@
 /**
- * PendingSyncPanel - 侧边栏变更面板
+ * PendingSyncPanel - Sidebar change panel
  *
- * 方案 A: 极简紧凑版
- * - 单行紧凑显示，最大化空间利用
- * - 全选/批量操作
- * - 无额外滚动，集成在侧边栏
+ * Approach A: Minimalist compact version
+ * - Single-line compact display, maximize space utilization
+ * - Select all / batch operations
+ * - No extra scrolling, integrated in sidebar
  */
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
@@ -31,9 +31,11 @@ import { sendChangeReviewToConversation } from './review-request'
 import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { toast } from 'sonner'
+import { useT } from '@/i18n'
 import type { ConflictInfo, ConflictDetail, SyncResult } from '@/opfs/types/opfs-types'
 
 export function PendingSyncPanel() {
+  const t = useT()
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectAll, setSelectAll] = useState(false)
@@ -132,18 +134,18 @@ export function PendingSyncPanel() {
     showPreviewPanelForPath(path)
   }, [])
 
-  // 计算选中的数量
+  // Calculate selected count
   const selectedCount = selectedItems.size
 
-  // 空状态
+  // Empty state
   const isEmpty = !pendingChanges || pendingChanges.changes.length === 0
 
-  // 计算总大小 (必须在所有条件返回之前定义，保持hooks顺序一致)
+  // Calculate total size (must be defined before all condition returns to maintain hooks order)
   const totalSize = useMemo(() => {
     if (!pendingChanges) return 0
     return pendingChanges.changes.reduce((sum, c) => sum + (c.size || 0), 0)
   }, [pendingChanges])
-  // 处理单个文件选择/取消选择 (必须在条件返回之前定义)
+  // Handle individual file selection/deselection (must be defined before condition returns)
   const handleToggleSelect = useCallback(
     (path: string) => {
       if (!pendingChanges) return
@@ -159,7 +161,7 @@ export function PendingSyncPanel() {
     [selectedItems, pendingChanges]
   )
 
-  // 处理全选/取消全选 (必须在条件返回之前定义)
+  // Handle select all / deselect all (must be defined before condition returns)
   const handleToggleSelectAll = useCallback(() => {
     if (!pendingChanges) return
     const newSelectAll = !selectAll
@@ -171,7 +173,7 @@ export function PendingSyncPanel() {
     }
   }, [selectAll, pendingChanges])
 
-  // 处理删除单个文件 (必须在条件返回之前定义)
+  // Handle remove single file (must be defined before condition returns)
   const handleRemoveFile = useCallback(async (path: string) => {
     try {
       await discardPendingPath(path)
@@ -181,12 +183,12 @@ export function PendingSyncPanel() {
         return next
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : '拒绝变更失败，请稍后重试'
+      const message = error instanceof Error ? error.message : t('settings.pendingSyncPanel.rejectChangeFailed')
       toast.error(message)
     }
-  }, [discardPendingPath])
+  }, [discardPendingPath, t])
 
-  // 处理拒绝全部 (必须在条件返回之前定义)
+  // Handle reject all (must be defined before condition returns)
   const handleClear = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0) {
       setSelectedItems(new Set())
@@ -196,7 +198,7 @@ export function PendingSyncPanel() {
       return
     }
 
-    // OPFS-only 场景下 modify 可能缺少本地基线；逐项拒绝可避免整批失败。
+    // In OPFS-only scenario, modify may lack local baseline; rejecting item by item avoids total batch failure.
     let successCount = 0
     let failedCount = 0
     for (const change of pendingChanges.changes) {
@@ -215,12 +217,12 @@ export function PendingSyncPanel() {
     setShowClearConfirm(false)
 
     if (failedCount > 0) {
-      toast.warning(`已拒绝 ${successCount} 个变更，${failedCount} 个因缺少本地文件基线保留在列表中`)
+      toast.warning(t('settings.pendingSyncPanel.rejectedCountWithFailure', { successCount, failedCount }))
       return
     }
 
-    toast.success('已拒绝全部变更')
-  }, [discardPendingPath, pendingChanges])
+    toast.success(t('settings.pendingSyncPanel.rejectedAllSuccess'))
+  }, [discardPendingPath, pendingChanges, t])
 
   const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
     path: conflict.path,
@@ -348,14 +350,14 @@ export function PendingSyncPanel() {
       const filesToSync = pendingChanges.changes.filter((c) => pathsToSync.includes(c.path))
       if (filesToSync.length === 0) return false
 
-      // 创建审批快照（无论是否有本地目录都可以）
+      // Create approval snapshot (can do regardless of local directory)
       const snapshotResult = await conversation.createApprovedSnapshotForPaths(
         filesToSync.map((c) => c.path),
         summary.trim(),
         nativeDir
       )
 
-      // 只有在有本地目录时才同步到磁盘
+      // Only sync to disk when local directory exists
       if (nativeDir) {
         const allPaths = filesToSync.map((c) => c.path)
         const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
@@ -374,7 +376,7 @@ export function PendingSyncPanel() {
           result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
         }
 
-        // 同步成功后标记快照为已同步
+        // Mark snapshot as synced after successful sync
         if (snapshotResult?.snapshotId) {
           await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
         }
@@ -383,16 +385,16 @@ export function PendingSyncPanel() {
           console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
           const conflictHint =
             result.conflicts.length > 0
-              ? `，其中 ${result.conflicts.length} 个存在冲突`
+              ? t('settings.pendingSyncPanel.conflictCount', { count: result.conflicts.length })
               : ''
-          setSyncError(`${result.failed} 个文件审批应用失败${conflictHint}`)
+          setSyncError(t('settings.pendingSyncPanel.syncFailedCount', { failed: result.failed, conflicts: conflictHint }))
           setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
           setTimeout(() => setSyncError(null), 6000)
           return false
         }
       }
 
-      // 同步后刷新列表（支持部分同步）
+      // Refresh list after sync (supports partial sync)
       await useConversationContextStore.getState().refreshPendingChanges(true)
       setConflictPaths((prev) => {
         const synced = new Set(pathsToSync)
@@ -412,15 +414,15 @@ export function PendingSyncPanel() {
       return true
     } catch (err) {
       console.error('[PendingSyncPanel] Sync failed:', err)
-      setSyncError(err instanceof Error ? err.message : '审批失败，请重试')
+      setSyncError(err instanceof Error ? err.message : t('settings.pendingSyncPanel.syncFailed'))
       setTimeout(() => setSyncError(null), 5000)
       return false
     } finally {
       setIsSyncing(false)
     }
-  }, [pendingChanges, isSyncing, mergeSyncResult])
+  }, [pendingChanges, isSyncing, mergeSyncResult, t])
 
-  // 处理审批按钮点击：先弹窗
+  // Handle approve button click: show dialog first
   const handleSync = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isSyncing) return
     const filesToSync = selectedItems.size > 0
@@ -429,7 +431,7 @@ export function PendingSyncPanel() {
     const paths = filesToSync.map((c) => c.path)
     if (paths.length === 0) return
 
-    // 先检测冲突
+    // Detect conflicts first
     try {
       const activeConversation = await getActiveConversation()
       if (activeConversation) {
@@ -450,10 +452,10 @@ export function PendingSyncPanel() {
         }
       }
     } catch {
-      // 冲突检测失败，继续尝试审批
+      // Conflict detection failed, continue with approval
     }
 
-    // 无冲突，显示审批对话框
+    // No conflicts, show approval dialog
     setPendingApprovePaths(paths)
     setSnapshotSummary('')
     setGeneratingSummary(false)
@@ -477,7 +479,7 @@ export function PendingSyncPanel() {
           await discardPendingPath(current.path)
           await useConversationContextStore.getState().refreshPendingChanges(true)
         } catch (error) {
-          const message = error instanceof Error ? error.message : '保留本机版本失败'
+          const message = error instanceof Error ? error.message : t('settings.pendingSyncPanel.keepNativeVersionFailed')
           toast.error(message)
           return
         }
@@ -504,7 +506,7 @@ export function PendingSyncPanel() {
     const nextPaths = pendingApprovePaths.filter((path) => !nextSkipped.has(path))
     if (nextPaths.length === 0) {
       setPendingApprovePaths([])
-      toast.info('冲突处理后没有可同步的文件')
+      toast.info(t('settings.pendingSyncPanel.noFilesToSyncAfterConflict'))
       return
     }
 
@@ -521,6 +523,7 @@ export function PendingSyncPanel() {
     forceOverwritePaths,
     pendingApprovePaths,
     skippedConflictPaths,
+    t,
   ])
 
   const handleConflictCancel = useCallback(() => {
@@ -542,27 +545,27 @@ export function PendingSyncPanel() {
     setIsReviewing(true)
     try {
       await sendChangeReviewToConversation(filesToReview)
-      toast.success('已发送变更审阅请求')
+      toast.success(t('settings.pendingSyncPanel.reviewRequestSent'))
     } catch (error) {
-      const message = error instanceof Error ? error.message : '发送审阅请求失败'
+      const message = error instanceof Error ? error.message : t('settings.pendingSyncPanel.sendReviewRequestFailed')
       toast.error(message)
     } finally {
       setIsReviewing(false)
     }
-  }, [pendingChanges, selectedItems, isReviewing])
+  }, [pendingChanges, selectedItems, isReviewing, t])
 
-  // 没有变更文件时显示空状态
+  // Show empty state when no pending changes
   if (isEmpty) {
     return (
       <div className="flex flex-col h-full">
-        <SidebarPanelHeader title="变更文件" />
+        <SidebarPanelHeader title={t('settings.pendingSyncPanel.title')} />
 
         {/* Empty State */}
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-4xl mb-3 opacity-20 transition-opacity duration-500 hover:opacity-30">✓</div>
-            <p className="text-sm font-medium text-secondary">当前没有待审阅变更</p>
-            <p className="text-xs text-tertiary mt-1">新变更会自动显示在此处</p>
+            <p className="text-sm font-medium text-secondary">{t('settings.pendingSyncPanel.noPendingChanges')}</p>
+            <p className="text-xs text-tertiary mt-1">{t('settings.pendingSyncPanel.newChangesAppearHere')}</p>
           </div>
         </div>
       </div>
@@ -575,7 +578,7 @@ export function PendingSyncPanel() {
       {showSyncSuccess && (
         <div className="mx-3 mt-2 px-3 py-2 bg-success/20 text-success text-sm rounded-lg flex items-center gap-2 animate-fade-in-down">
           <Check className="w-4 h-4" />
-          审批成功！
+          {t('settings.pendingSyncPanel.reviewSuccess')}
         </div>
       )}
 
@@ -589,7 +592,7 @@ export function PendingSyncPanel() {
 
       {/* Header with count */}
       <SidebarPanelHeader
-        title="变更文件"
+        title={t('settings.pendingSyncPanel.title')}
         leftExtra={
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 bg-warning/20 text-warning text-xs font-semibold rounded-full animate-pulse-on-change">
@@ -598,7 +601,7 @@ export function PendingSyncPanel() {
             <button
               onClick={handleRefresh}
               className="h-6 w-6 flex items-center justify-center text-tertiary hover:text-primary transition-colors rounded hover:bg-hover/50"
-              title="刷新列表"
+              title={t('settings.pendingSyncPanel.refreshTooltip')}
               type="button"
             >
               <RefreshCw className="w-3 h-3" />
@@ -606,21 +609,21 @@ export function PendingSyncPanel() {
             <button
               onClick={handleOpenPreview}
               className="h-6 w-6 flex items-center justify-center text-tertiary hover:text-primary transition-colors rounded hover:bg-hover/50"
-              title="查看详情"
+              title={t('settings.pendingSyncPanel.viewDetailsTooltip')}
               type="button"
             >
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>
         }
-        right={selectedCount > 0 ? <span className="text-xs text-secondary">{selectedCount} 已选</span> : null}
+        right={selectedCount > 0 ? <span className="text-xs text-secondary">{t('settings.pendingSyncPanel.selectedCount', { count: selectedCount })}</span> : null}
       />
 
       {/* File List */}
       <div
         ref={listRef}
         role="listbox"
-        aria-label="变更文件列表"
+        aria-label={t('settings.pendingSyncPanel.title')}
         className="flex-1 overflow-y-auto custom-scrollbar"
       >
         <div className="divide-y divide-subtle/50">
@@ -646,7 +649,7 @@ export function PendingSyncPanel() {
                   onChange={() => handleToggleSelect(change.path)}
                   className="w-3.5 h-3.5 rounded border-subtle text-primary focus:ring-2 focus:ring-primary/50 focus:ring-offset-0 cursor-pointer transition-shadow"
                   onClick={(e) => e.stopPropagation()}
-                  aria-label={`选择 ${change.path.split('/').pop() || change.path}`}
+                  aria-label={`${t('settings.pendingSyncPanel.selectFile')} ${change.path.split('/').pop() || change.path}`}
                 />
 
                 {/* File Icon */}
@@ -680,7 +683,7 @@ export function PendingSyncPanel() {
                 <button
                   onClick={() => handleRemoveFile(change.path)}
                   className="p-0.5 text-tertiary hover:text-danger transition-colors rounded hover:bg-danger/10 active:bg-danger/20 flex-shrink-0"
-                  title="从列表中移除"
+                  title={t('settings.pendingSyncPanel.removeFromList')}
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -699,9 +702,9 @@ export function PendingSyncPanel() {
               checked={selectAll}
               onChange={handleToggleSelectAll}
               className="w-4 h-4 rounded border-subtle text-primary focus:ring-2 focus:ring-primary/50"
-              aria-label="全选所有文件"
+              aria-label={t('settings.pendingSyncPanel.selectAll')}
             />
-            <span>全选</span>
+            <span>{t('settings.pendingSyncPanel.selectAll')}</span>
           </label>
         </div>
 
@@ -711,14 +714,14 @@ export function PendingSyncPanel() {
             className="h-8 px-3 py-1.5 text-xs"
             onClick={handleReview}
             disabled={isSyncing || isReviewing}
-            aria-label="一键审阅变更"
+            aria-label={t('settings.pendingSyncPanel.reviewInProgress')}
           >
             {isReviewing ? (
-              '审阅中...'
+              t('settings.pendingSyncPanel.reviewInProgress')
             ) : (
               <>
                 <Sparkles className="h-3.5 w-3.5" />
-                审阅
+                {t('settings.pendingSyncPanel.review')}
               </>
             )}
           </BrandButton>
@@ -727,26 +730,26 @@ export function PendingSyncPanel() {
             className="h-8 px-3 py-1.5 text-xs"
             onClick={() => setShowClearConfirm(true)}
             disabled={isSyncing || isReviewing}
-            aria-label="拒绝全部变更"
+            aria-label={t('settings.pendingSyncPanel.rejectAll')}
           >
-            拒绝
+            {t('settings.pendingSyncPanel.reject')}
           </BrandButton>
           <BrandButton
             variant="primary"
             className="h-8 px-4 py-1.5 text-xs"
             onClick={handleSync}
             disabled={isSyncing || isReviewing}
-            aria-label="审批通过所选变更"
+            aria-label={t('settings.pendingSyncPanel.approveSelected')}
           >
             {isSyncing ? (
               <>
                 <div className={`w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin`} />
-                审批中...
+                {t('settings.pendingSyncPanel.approvingInProgress')}
               </>
             ) : (
               <>
                 <RefreshCw className="w-4 h-4" />
-                {showSyncSuccess ? '完成!' : selectedCount > 0 ? `审批选中 (${selectedCount})` : '审批全部'}
+                {showSyncSuccess ? t('settings.pendingSyncPanel.syncComplete') : selectedCount > 0 ? t('settings.pendingSyncPanel.approveSelectedCount', { count: selectedCount }) : t('settings.pendingSyncPanel.approveAll')}
               </>
             )}
           </BrandButton>
@@ -756,7 +759,7 @@ export function PendingSyncPanel() {
       {/* Total Size Info */}
       <div className="border-subtle bg-elevated border-t px-3 py-1.5 text-center">
         <span className="text-xs text-tertiary">
-          总计 {formatFileSize(totalSize)}
+          {t('settings.pendingSyncPanel.totalSize', { size: formatFileSize(totalSize) })}
         </span>
       </div>
 
@@ -764,11 +767,11 @@ export function PendingSyncPanel() {
       <BrandDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
         <BrandDialogContent className="max-w-md">
           <BrandDialogHeader>
-            <BrandDialogTitle>确认拒绝</BrandDialogTitle>
+            <BrandDialogTitle>{t('settings.pendingSyncPanel.confirmRejectTitle')}</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
             <p className="text-sm text-secondary">
-              确定要拒绝所有变更吗？此操作无法撤销。
+              {t('settings.pendingSyncPanel.confirmRejectMessage')}
             </p>
           </BrandDialogBody>
           <BrandDialogFooter>
@@ -776,7 +779,7 @@ export function PendingSyncPanel() {
               variant="ghost"
               onClick={() => setShowClearConfirm(false)}
             >
-              取消
+              {t('settings.pendingSyncPanel.cancel')}
             </BrandButton>
             <BrandButton
               variant="danger"
@@ -785,7 +788,7 @@ export function PendingSyncPanel() {
                 setShowClearConfirm(false)
               }}
             >
-              确认拒绝
+              {t('settings.pendingSyncPanel.confirmReject')}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>
@@ -807,7 +810,7 @@ export function PendingSyncPanel() {
             setSnapshotSummary(aiSummary.trim())
             setSummaryError(null)
           } else {
-            setSummaryError('AI 生成失败，请手动填写')
+            setSummaryError(t('settings.pendingSyncPanel.aiSummaryFailed'))
           }
           setGeneratingSummary(false)
         }}

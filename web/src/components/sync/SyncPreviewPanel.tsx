@@ -27,11 +27,12 @@ import { sendChangeReviewToConversation } from './review-request'
 import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
+import { useT } from '@/i18n'
 
 /**
  * Empty state when no changes detected
  */
-function EmptyState(): React.ReactNode {
+function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-16 px-6">
       <div className="w-16 h-16 rounded-xl bg-primary-50/80 dark:bg-primary-950/20 flex items-center justify-center mb-4 shadow-sm">
@@ -49,10 +50,9 @@ function EmptyState(): React.ReactNode {
           />
         </svg>
       </div>
-      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">变更待审阅</h2>
+      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">{t('syncPanel.syncPreview.emptyStateTitle')}</h2>
       <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
-        执行 Python 代码后，检测到的文件系统变更将在此处显示。
-        您可以预览变更详情，然后选择审批通过或拒绝这些变更。
+        {t('syncPanel.syncPreview.emptyStateDescription')}
       </p>
       <div className="mt-8 grid grid-cols-1 gap-4 max-w-sm">
         <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-950/20 rounded-lg">
@@ -61,10 +61,10 @@ function EmptyState(): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              执行 Python 代码
+              {t('syncPanel.syncPreview.step1Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              在 Agent 对话中执行 Python 文件操作代码
+              {t('syncPanel.syncPreview.step1Desc')}
             </p>
           </div>
         </div>
@@ -74,10 +74,10 @@ function EmptyState(): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              预览文件变更
+              {t('syncPanel.syncPreview.step2Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              查看所有修改、新增和删除的文件
+              {t('syncPanel.syncPreview.step2Desc')}
             </p>
           </div>
         </div>
@@ -87,10 +87,10 @@ function EmptyState(): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              审阅并处理
+              {t('syncPanel.syncPreview.step3Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              检查差异后，审批通过或拒绝变更
+              {t('syncPanel.syncPreview.step3Desc')}
             </p>
           </div>
         </div>
@@ -110,6 +110,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   onSync,
   onCancel: _onCancel,
 }) => {
+  const t = useT()
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
   const previewSelectedPath = useConversationContextStore((state) => state.previewSelectedPath)
   const clearPreviewSelectedPath = useConversationContextStore((state) => state.clearPreviewSelectedPath)
@@ -320,7 +321,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       const { conversation } = activeConversation
       const nativeDir = await conversation.getNativeDirectoryHandle()
       if (!nativeDir) {
-        throw new Error('请先选择项目目录')
+        throw new Error(t('syncPanel.syncPreview.noActiveWorkspace'))
       }
 
       // Pause Vite HMR during sync to prevent mid-sync page reloads
@@ -359,9 +360,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       if (pendingResult.failed > 0) {
         const conflictHint =
           pendingResult.conflicts.length > 0
-            ? `，其中 ${pendingResult.conflicts.length} 个存在冲突`
+            ? t('syncPanel.syncPreview.conflictHint', { count: pendingResult.conflicts.length })
             : ''
-        setSyncError(`${pendingResult.failed} 个文件审批应用失败${conflictHint}`)
+        setSyncError(t('syncPanel.syncPreview.syncFailedCount', { failed: pendingResult.failed, conflicts: conflictHint }))
         setConflictPaths(new Set(pendingResult.conflicts.map((c) => c.path)))
         return false
       }
@@ -383,7 +384,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       onSync?.()
       return true
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : '审批通过失败')
+      setSyncError(err instanceof Error ? err.message : t('syncPanel.syncPreview.approvalFailed'))
       return false
     } finally {
       // Resume HMR — re-add paths and trigger full-reload to apply all suppressed changes
@@ -392,7 +393,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       // Clear selection after sync
       setSelectedItems(new Set())
     }
-  }, [pendingChanges, isSyncing, mergeSyncResult, onSync, selectedPath])
+  }, [pendingChanges, isSyncing, mergeSyncResult, onSync, selectedPath, t])
 
   const handleSync = useCallback(async (selectedPaths: string[] = []) => {
     if (!pendingChanges || isSyncing) return
@@ -453,7 +454,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           await discardPendingPath(current.path)
           await useConversationContextStore.getState().refreshPendingChanges(true)
         } catch (error) {
-          const message = error instanceof Error ? error.message : '保留本机版本失败'
+          const message = error instanceof Error ? error.message : t('syncPanel.syncPreview.keepNativeFailed')
           toast.error(message)
           return
         }
@@ -480,7 +481,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     const nextFiles = pendingApproveFiles.filter((file) => !nextSkipped.has(file.path))
     if (nextFiles.length === 0) {
       setPendingApproveFiles([])
-      toast.info('冲突处理后没有可同步的文件')
+      toast.info(t('syncPanel.syncPreview.noFilesAfterConflict'))
       return
     }
 
@@ -497,6 +498,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     forceOverwritePaths,
     pendingApproveFiles,
     skippedConflictPaths,
+    t,
   ])
 
   const handleConflictCancel = useCallback(() => {
@@ -518,14 +520,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setIsReviewing(true)
     try {
       await sendChangeReviewToConversation(filesToReview)
-      toast.success('已发送变更审阅请求')
+      toast.success(t('syncPanel.syncPreview.reviewRequestSent'))
     } catch (error) {
-      const message = error instanceof Error ? error.message : '发送审阅请求失败'
+      const message = error instanceof Error ? error.message : t('syncPanel.syncPreview.reviewRequestFailed')
       toast.error(message)
     } finally {
       setIsReviewing(false)
     }
-  }, [pendingChanges, selectedItems, isReviewing])
+  }, [pendingChanges, selectedItems, isReviewing, t])
 
   /**
    * Handle clear all pending changes (user decides not to sync)
@@ -555,7 +557,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
   // Show empty state when no changes and no selected snapshot file
   if (!hasPending && !hasSelection) {
-    return <EmptyState />
+    return <EmptyState t={t} />
   }
 
   const totalFiles = pendingChanges?.changes.length || 0
@@ -568,27 +570,25 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         {/* Summary */}
         <div className="flex items-center gap-3 text-sm">
           <span className="text-muted-foreground">
-            检测到{' '}
-            <span className="font-semibold text-foreground">{totalFiles}</span>{' '}
-            个文件变更
+            {t('syncPanel.syncPreview.detectedFiles', { count: totalFiles })}
           </span>
           <div className="flex items-center gap-2 text-xs">
             {(pendingChanges?.added || 0) > 0 && (
               <Badge variant="success" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                {pendingChanges?.added} 新增
+                {pendingChanges?.added} {t('syncPanel.syncPreview.added')}
               </Badge>
             )}
             {(pendingChanges?.modified || 0) > 0 && (
               <Badge variant="outline" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                {pendingChanges?.modified} 修改
+                {pendingChanges?.modified} {t('syncPanel.syncPreview.modified')}
               </Badge>
             )}
             {(pendingChanges?.deleted || 0) > 0 && (
               <Badge variant="error" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                {pendingChanges?.deleted} 删除
+                {pendingChanges?.deleted} {t('syncPanel.syncPreview.deleted')}
               </Badge>
             )}
           </div>
@@ -604,14 +604,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               className="h-7 px-3 text-xs"
               onClick={handleReview}
               disabled={isSyncing || isReviewing || totalFiles === 0}
-              aria-label="一键审阅变更"
+              aria-label={t('syncPanel.syncPreview.reviewChanges')}
             >
               {isReviewing ? (
-                '审阅中...'
+                t('syncPanel.syncPreview.reviewing')
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  审阅
+                  {t('syncPanel.syncPreview.reviewChanges')}
                 </>
               )}
             </BrandButton>
@@ -621,7 +621,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
       {/* Main Content - Split View */}
         {!selectedFile ? (
-        // 显示紧凑列表（未选择文件时）
+        // Show compact list (when no file selected)
         <div className="flex-1 overflow-hidden">
           {pendingChanges && (
             <PendingFileList
@@ -639,13 +639,13 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           )}
         </div>
         ) : (
-        // 显示差分对比（选择文件后）
+        // Show diff comparison (after file selected)
         <div className="flex-1 flex overflow-hidden">
           {/* Back to List Button */}
           <div className="w-12 flex-shrink-0 border-r flex items-center justify-center bg-muted/50">
             <BrandButton variant="ghost" onClick={() => {
               setSelectedFile(null)
-            }} title="返回列表">
+            }} title={t('syncPanel.syncPreview.backToList')}>
               <ArrowLeft className="w-5 h-5" />
             </BrandButton>
           </div>
@@ -674,7 +674,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
             setSnapshotSummary(aiSummary.trim())
             setSummaryError(null)
           } else {
-            setSummaryError('AI 生成失败，请手动填写')
+            setSummaryError(t('syncPanel.syncPreview.aiSummaryFailed'))
           }
           setGeneratingSummary(false)
         }}
