@@ -199,6 +199,10 @@ pnpm -C web run test:e2e
 ### API Documentation
 - [API Index](./docs/api/README.md) - Stores and services API notes
 
+## Roadmap
+
+- [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability. See [LLM Wiki Unified Spec](./docs/design/llm-wiki-mvp-unified-spec.md) and [SubAgent Prerequisite for LLM Wiki](./docs/design/subagent-prerequisite-for-llm-wiki.md).
+
 ## Browser Compatibility
 
 | Browser | Version | File System Access | OPFS | SQLite WASM |

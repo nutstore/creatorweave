@@ -70,6 +70,10 @@ make build
 - [架构文档](./docs/architecture/overview.md)
 - [SQLite 存储说明](./web/src/sqlite/README.md)
 
+## Roadmap（待实现）
+
+- [ ] **LLM Wiki（规划中）**：构建可持续演进的知识库流程（`ingest` / `query` / `lint`），支持结构化 claim 与来源可追溯。参考：[LLM Wiki 统一技术规格](./docs/design/llm-wiki-mvp-unified-spec.md)、[LLM Wiki 的 SubAgent 前置能力](./docs/design/subagent-prerequisite-for-llm-wiki.md)。
+
 ## 参与贡献
 
 欢迎提交 Issue 和 PR。请先阅读：
