@@ -72,6 +72,7 @@ make build
 
 ## Roadmap（待实现）
 
+- [ ] **SubAgent 编排能力（规划中）**：提供原生 SubAgent 分发、并行调度、结果聚合，以及跨代理上下文隔离与交接质量保障能力。
 - [ ] **LLM Wiki（规划中）**：构建可持续演进的知识库流程（`ingest` / `query` / `lint`），支持结构化 claim 与来源可追溯。参考：[LLM Wiki 统一技术规格](./docs/design/llm-wiki-mvp-unified-spec.md)、[LLM Wiki 的 SubAgent 前置能力](./docs/design/subagent-prerequisite-for-llm-wiki.md)。
 
 ## 参与贡献
