@@ -8,7 +8,7 @@
     "build": "pnpm run build:wasm && vite build && pnpm run copy:eo-runtime && pnpm run copy:pyodide",
     "build:wasm": "cd ../wasm && bash scripts/build-wasm.sh",
     "build:vercel": "pnpm run build:wasm && vite build && pnpm run copy:eo-runtime && pnpm run copy:pyodide",
-    "copy:eo-runtime": "cp ../edgeone.json dist/edgeone.json && cp middleware.js dist/middleware.js",
+    "copy:eo-runtime": "cp ../edgeone.json dist/edgeone.json && cp middleware.js dist/middleware.js && cp package.json dist/package.json && mkdir -p dist/cloud-functions && cp 'cloud-functions/[[default]].js' 'dist/cloud-functions/[[default]].js'",
     "copy:pyodide": "mkdir -p dist/assets/pyodide && cp -r node_modules/pyodide/* dist/assets/pyodide/",
     "preview": "vite preview",
     "preview:prod": "pnpm build && vite preview --port 3000",
