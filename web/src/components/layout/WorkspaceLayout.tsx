@@ -622,7 +622,7 @@ export function WorkspaceLayout({
           <Drawer
             open={showPreview}
             onClose={handleClosePreview}
-            title={t('syncPanel.syncPreview.emptyStateTitle')}
+            title={t('settings.syncPanel.syncPreview.emptyStateTitle')}
             width={isMobile ? '100vw' : '85vw'}
           >
             <SyncPreviewPanel onCancel={handleClosePreview} />

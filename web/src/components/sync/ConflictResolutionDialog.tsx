@@ -42,10 +42,10 @@ function getResolutionOptions(conflict: ConflictDetail, t: (key: string) => stri
   // OPFS version (our changes)
   options.push({
     value: 'opfs',
-    label: t('sync.syncPanel.conflictResolution.keepOpfsVersion'),
+    label: t('settings.syncPanel.conflictResolution.keepOpfsVersion'),
     description: conflict.nativeVersion.exists
-      ? t('sync.syncPanel.conflictResolution.keepOpfsDescriptionModified')
-      : t('sync.syncPanel.conflictResolution.keepOpfsDescriptionNew'),
+      ? t('settings.syncPanel.conflictResolution.keepOpfsDescriptionModified')
+      : t('settings.syncPanel.conflictResolution.keepOpfsDescriptionNew'),
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -63,8 +63,8 @@ function getResolutionOptions(conflict: ConflictDetail, t: (key: string) => stri
   if (conflict.nativeVersion.exists) {
     options.push({
       value: 'native',
-      label: t('sync.syncPanel.conflictResolution.keepNativeVersion'),
-      description: t('sync.syncPanel.conflictResolution.keepNativeDescription'),
+      label: t('settings.syncPanel.conflictResolution.keepNativeVersion'),
+      description: t('settings.syncPanel.conflictResolution.keepNativeDescription'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -82,8 +82,8 @@ function getResolutionOptions(conflict: ConflictDetail, t: (key: string) => stri
   // Skip this file
   options.push({
     value: 'skip',
-    label: t('sync.syncPanel.conflictResolution.skipThisFile'),
-    description: t('sync.syncPanel.conflictResolution.skipThisFileDescription'),
+    label: t('settings.syncPanel.conflictResolution.skipThisFile'),
+    description: t('settings.syncPanel.conflictResolution.skipThisFileDescription'),
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -151,26 +151,26 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
   const [loading, setLoading] = useState(false)
 
   const cr = {
-    title: t('sync.syncPanel.conflictResolution.title'),
-    conflictDescription: (path: string) => t('sync.syncPanel.conflictResolution.conflictDescription', { path }),
-    opfsVersionTime: t('sync.syncPanel.conflictResolution.opfsVersionTime'),
-    nativeVersionTime: t('sync.syncPanel.conflictResolution.nativeVersionTime'),
-    selectResolution: t('sync.syncPanel.conflictResolution.selectResolution'),
-    opfsVersion: t('sync.syncPanel.conflictResolution.opfsVersion'),
-    nativeVersion: t('sync.syncPanel.conflictResolution.nativeVersion'),
-    noContent: t('sync.syncPanel.conflictResolution.noContent'),
-    fileNotExist: t('sync.syncPanel.conflictResolution.fileNotExist'),
-    binaryFilePreview: (source: string) => t('sync.syncPanel.conflictResolution.binaryFilePreview', { source }),
-    noReadableContent: (source: string) => t('sync.syncPanel.conflictResolution.noReadableContent', { source }),
-    emptyFile: (source: string) => t('sync.syncPanel.conflictResolution.emptyFile', { source }),
-    contentTruncated: t('sync.syncPanel.conflictResolution.contentTruncated'),
-    whyConflict: t('sync.syncPanel.conflictResolution.whyConflict'),
-    conflictExplanation: t('sync.syncPanel.conflictResolution.conflictExplanation'),
-    ifKeepNativeExists: t('sync.syncPanel.conflictResolution.ifKeepNativeExists'),
-    ifKeepNativeNotExists: t('sync.syncPanel.conflictResolution.ifKeepNativeNotExists'),
-    skipThisConflict: t('sync.syncPanel.conflictResolution.skipThisConflict'),
-    applySelection: t('sync.syncPanel.conflictResolution.applySelection'),
-    nativeNotConnected: t('sync.syncPanel.conflictResolution.nativeNotConnected'),
+    title: t('settings.syncPanel.conflictResolution.title'),
+    conflictDescription: (path: string) => t('settings.syncPanel.conflictResolution.conflictDescription', { path }),
+    opfsVersionTime: t('settings.syncPanel.conflictResolution.opfsVersionTime'),
+    nativeVersionTime: t('settings.syncPanel.conflictResolution.nativeVersionTime'),
+    selectResolution: t('settings.syncPanel.conflictResolution.selectResolution'),
+    opfsVersion: t('settings.syncPanel.conflictResolution.opfsVersion'),
+    nativeVersion: t('settings.syncPanel.conflictResolution.nativeVersion'),
+    noContent: t('settings.syncPanel.conflictResolution.noContent'),
+    fileNotExist: t('settings.syncPanel.conflictResolution.fileNotExist'),
+    binaryFilePreview: (source: string) => t('settings.syncPanel.conflictResolution.binaryFilePreview', { source }),
+    noReadableContent: (source: string) => t('settings.syncPanel.conflictResolution.noReadableContent', { source }),
+    emptyFile: (source: string) => t('settings.syncPanel.conflictResolution.emptyFile', { source }),
+    contentTruncated: t('settings.syncPanel.conflictResolution.contentTruncated'),
+    whyConflict: t('settings.syncPanel.conflictResolution.whyConflict'),
+    conflictExplanation: t('settings.syncPanel.conflictResolution.conflictExplanation'),
+    ifKeepNativeExists: t('settings.syncPanel.conflictResolution.ifKeepNativeExists'),
+    ifKeepNativeNotExists: t('settings.syncPanel.conflictResolution.ifKeepNativeNotExists'),
+    skipThisConflict: t('settings.syncPanel.conflictResolution.skipThisConflict'),
+    applySelection: t('settings.syncPanel.conflictResolution.applySelection'),
+    nativeNotConnected: t('settings.syncPanel.conflictResolution.nativeNotConnected'),
   }
 
   const options = getResolutionOptions(conflict, t)
@@ -190,12 +190,12 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           : Promise.resolve(null),
       ])
 
-      const binaryMessage = t('sync.syncPanel.conflictResolution.binaryFilePreview', { source: 'OPFS' })
-      const noReadableMessage = t('sync.syncPanel.conflictResolution.noReadableContent', { source: 'OPFS' })
-      const emptyMessage = t('sync.syncPanel.conflictResolution.emptyFile', { source: 'OPFS' })
-      const truncatedMessage = t('sync.syncPanel.conflictResolution.contentTruncated')
-      const nativeNotConnected = t('sync.syncPanel.conflictResolution.nativeNotConnected')
-      const nativeVersionLabel = t('sync.syncPanel.conflictResolution.nativeVersion')
+      const binaryMessage = t('settings.syncPanel.conflictResolution.binaryFilePreview', { source: 'OPFS' })
+      const noReadableMessage = t('settings.syncPanel.conflictResolution.noReadableContent', { source: 'OPFS' })
+      const emptyMessage = t('settings.syncPanel.conflictResolution.emptyFile', { source: 'OPFS' })
+      const truncatedMessage = t('settings.syncPanel.conflictResolution.contentTruncated')
+      const nativeNotConnected = t('settings.syncPanel.conflictResolution.nativeNotConnected')
+      const nativeVersionLabel = t('settings.syncPanel.conflictResolution.nativeVersion')
 
       setPreviewContent({
         opfs: formatPreviewContent(
@@ -214,9 +214,9 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               conflict.path,
               nativeContent,
               nativeDir ? '' : nativeNotConnected,
-              t('sync.syncPanel.conflictResolution.binaryFilePreview', { source: nativeVersionLabel }),
-              t('sync.syncPanel.conflictResolution.noReadableContent', { source: nativeVersionLabel }),
-              t('sync.syncPanel.conflictResolution.emptyFile', { source: nativeVersionLabel }),
+              t('settings.syncPanel.conflictResolution.binaryFilePreview', { source: nativeVersionLabel }),
+              t('settings.syncPanel.conflictResolution.noReadableContent', { source: nativeVersionLabel }),
+              t('settings.syncPanel.conflictResolution.emptyFile', { source: nativeVersionLabel }),
               truncatedMessage
             )
           : null,

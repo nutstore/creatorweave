@@ -50,9 +50,9 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
           />
         </svg>
       </div>
-      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">{t('syncPanel.syncPreview.emptyStateTitle')}</h2>
+      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">{t('settings.syncPanel.syncPreview.emptyStateTitle')}</h2>
       <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
-        {t('syncPanel.syncPreview.emptyStateDescription')}
+        {t('settings.syncPanel.syncPreview.emptyStateDescription')}
       </p>
       <div className="mt-8 grid grid-cols-1 gap-4 max-w-sm">
         <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-950/20 rounded-lg">
@@ -61,10 +61,10 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              {t('syncPanel.syncPreview.step1Title')}
+              {t('settings.syncPanel.syncPreview.step1Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              {t('syncPanel.syncPreview.step1Desc')}
+              {t('settings.syncPanel.syncPreview.step1Desc')}
             </p>
           </div>
         </div>
@@ -74,10 +74,10 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              {t('syncPanel.syncPreview.step2Title')}
+              {t('settings.syncPanel.syncPreview.step2Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              {t('syncPanel.syncPreview.step2Desc')}
+              {t('settings.syncPanel.syncPreview.step2Desc')}
             </p>
           </div>
         </div>
@@ -87,10 +87,10 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
           </div>
           <div className="text-left">
             <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
-              {t('syncPanel.syncPreview.step3Title')}
+              {t('settings.syncPanel.syncPreview.step3Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
-              {t('syncPanel.syncPreview.step3Desc')}
+              {t('settings.syncPanel.syncPreview.step3Desc')}
             </p>
           </div>
         </div>
@@ -321,7 +321,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       const { conversation } = activeConversation
       const nativeDir = await conversation.getNativeDirectoryHandle()
       if (!nativeDir) {
-        throw new Error(t('syncPanel.syncPreview.noActiveWorkspace'))
+        throw new Error(t('settings.syncPanel.syncPreview.noActiveWorkspace'))
       }
 
       // Pause Vite HMR during sync to prevent mid-sync page reloads
@@ -360,9 +360,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       if (pendingResult.failed > 0) {
         const conflictHint =
           pendingResult.conflicts.length > 0
-            ? t('syncPanel.syncPreview.conflictHint', { count: pendingResult.conflicts.length })
+            ? t('settings.syncPanel.syncPreview.conflictHint', { count: pendingResult.conflicts.length })
             : ''
-        setSyncError(t('syncPanel.syncPreview.syncFailedCount', { failed: pendingResult.failed, conflicts: conflictHint }))
+        setSyncError(t('settings.syncPanel.syncPreview.syncFailedCount', { failed: pendingResult.failed, conflicts: conflictHint }))
         setConflictPaths(new Set(pendingResult.conflicts.map((c) => c.path)))
         return false
       }
@@ -384,7 +384,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       onSync?.()
       return true
     } catch (err) {
-      setSyncError(err instanceof Error ? err.message : t('syncPanel.syncPreview.approvalFailed'))
+      setSyncError(err instanceof Error ? err.message : t('settings.syncPanel.syncPreview.approvalFailed'))
       return false
     } finally {
       // Resume HMR — re-add paths and trigger full-reload to apply all suppressed changes
@@ -454,7 +454,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           await discardPendingPath(current.path)
           await useConversationContextStore.getState().refreshPendingChanges(true)
         } catch (error) {
-          const message = error instanceof Error ? error.message : t('syncPanel.syncPreview.keepNativeFailed')
+          const message = error instanceof Error ? error.message : t('settings.syncPanel.syncPreview.keepNativeFailed')
           toast.error(message)
           return
         }
@@ -481,7 +481,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     const nextFiles = pendingApproveFiles.filter((file) => !nextSkipped.has(file.path))
     if (nextFiles.length === 0) {
       setPendingApproveFiles([])
-      toast.info(t('syncPanel.syncPreview.noFilesAfterConflict'))
+      toast.info(t('settings.syncPanel.syncPreview.noFilesAfterConflict'))
       return
     }
 
@@ -520,9 +520,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setIsReviewing(true)
     try {
       await sendChangeReviewToConversation(filesToReview)
-      toast.success(t('syncPanel.syncPreview.reviewRequestSent'))
+      toast.success(t('settings.syncPanel.syncPreview.reviewRequestSent'))
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('syncPanel.syncPreview.reviewRequestFailed')
+      const message = error instanceof Error ? error.message : t('settings.syncPanel.syncPreview.reviewRequestFailed')
       toast.error(message)
     } finally {
       setIsReviewing(false)
@@ -570,25 +570,25 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         {/* Summary */}
         <div className="flex items-center gap-3 text-sm">
           <span className="text-muted-foreground">
-            {t('syncPanel.syncPreview.detectedFiles', { count: totalFiles })}
+            {t('settings.syncPanel.syncPreview.detectedFiles', { count: totalFiles })}
           </span>
           <div className="flex items-center gap-2 text-xs">
             {(pendingChanges?.added || 0) > 0 && (
               <Badge variant="success" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                {pendingChanges?.added} {t('syncPanel.syncPreview.added')}
+                {pendingChanges?.added} {t('settings.syncPanel.syncPreview.added')}
               </Badge>
             )}
             {(pendingChanges?.modified || 0) > 0 && (
               <Badge variant="outline" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary-500" />
-                {pendingChanges?.modified} {t('syncPanel.syncPreview.modified')}
+                {pendingChanges?.modified} {t('settings.syncPanel.syncPreview.modified')}
               </Badge>
             )}
             {(pendingChanges?.deleted || 0) > 0 && (
               <Badge variant="error" className="gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                {pendingChanges?.deleted} {t('syncPanel.syncPreview.deleted')}
+                {pendingChanges?.deleted} {t('settings.syncPanel.syncPreview.deleted')}
               </Badge>
             )}
           </div>
@@ -604,14 +604,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               className="h-7 px-3 text-xs"
               onClick={handleReview}
               disabled={isSyncing || isReviewing || totalFiles === 0}
-              aria-label={t('syncPanel.syncPreview.reviewChanges')}
+              aria-label={t('settings.syncPanel.syncPreview.reviewChanges')}
             >
               {isReviewing ? (
-                t('syncPanel.syncPreview.reviewing')
+                t('settings.syncPanel.syncPreview.reviewing')
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  {t('syncPanel.syncPreview.reviewChanges')}
+                  {t('settings.syncPanel.syncPreview.reviewChanges')}
                 </>
               )}
             </BrandButton>
@@ -645,7 +645,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
           <div className="w-12 flex-shrink-0 border-r flex items-center justify-center bg-muted/50">
             <BrandButton variant="ghost" onClick={() => {
               setSelectedFile(null)
-            }} title={t('syncPanel.syncPreview.backToList')}>
+            }} title={t('settings.syncPanel.syncPreview.backToList')}>
               <ArrowLeft className="w-5 h-5" />
             </BrandButton>
           </div>
@@ -674,7 +674,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
             setSnapshotSummary(aiSummary.trim())
             setSummaryError(null)
           } else {
-            setSummaryError(t('syncPanel.syncPreview.aiSummaryFailed'))
+            setSummaryError(t('settings.syncPanel.syncPreview.aiSummaryFailed'))
           }
           setGeneratingSummary(false)
         }}

@@ -26,11 +26,11 @@ interface FileChangeListProps {
 function getChangeTypeStyle(type: ChangeType, t: (key: string) => string): { icon: string; color: string; label: string } {
   switch (type) {
     case 'add':
-      return { icon: '+', color: 'text-green-600', label: t('syncPanel.fileChangeList.added') }
+      return { icon: '+', color: 'text-green-600', label: t('settings.syncPanel.fileChangeList.added') }
     case 'modify':
-      return { icon: '~', color: 'text-blue-600', label: t('syncPanel.fileChangeList.modified') }
+      return { icon: '~', color: 'text-blue-600', label: t('settings.syncPanel.fileChangeList.modified') }
     case 'delete':
-      return { icon: '×', color: 'text-red-600', label: t('syncPanel.fileChangeList.deleted') }
+      return { icon: '×', color: 'text-red-600', label: t('settings.syncPanel.fileChangeList.deleted') }
   }
 }
 
@@ -80,9 +80,9 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">{t('syncPanel.fileChangeList.noFileChanges')}</h3>
+        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">{t('settings.syncPanel.fileChangeList.noFileChanges')}</h3>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm">
-          {t('syncPanel.fileChangeList.noChangesDescription')}
+          {t('settings.syncPanel.fileChangeList.noChangesDescription')}
         </p>
       </div>
     )
@@ -91,8 +91,8 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
   const totalChanges = changes.changes.length
   const summaryText =
     changes.added > 0 || changes.modified > 0 || changes.deleted > 0
-      ? t('syncPanel.fileChangeList.fileChangesCount', { count: `${changes.added} ${t('syncPanel.syncPreview.added')}, ${changes.modified} ${t('syncPanel.syncPreview.modified')}, ${changes.deleted} ${t('syncPanel.syncPreview.deleted')}` })
-      : t('syncPanel.fileChangeList.fileChangesCount', { count: totalChanges })
+      ? t('settings.syncPanel.fileChangeList.fileChangesCount', { count: `${changes.added} ${t('settings.syncPanel.syncPreview.added')}, ${changes.modified} ${t('settings.syncPanel.syncPreview.modified')}, ${changes.deleted} ${t('settings.syncPanel.syncPreview.deleted')}` })
+      : t('settings.syncPanel.fileChangeList.fileChangesCount', { count: totalChanges })
 
   return (
     <div className="flex flex-col h-full">
@@ -100,11 +100,11 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
       <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('pendingSyncPanel.title')}</h3>
+            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('settings.pendingSyncPanel.title')}</h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{summaryText}</p>
           </div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400">
-            {t('syncPanel.fileChangeList.totalCount', { count: totalChanges })}
+            {t('settings.syncPanel.fileChangeList.totalCount', { count: totalChanges })}
           </div>
         </div>
       </div>
@@ -123,7 +123,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                 className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${
                   isSelected ? 'bg-primary-50 dark:bg-primary-950/20 border-l-4 border-primary-500' : ''
                 }`}
-                aria-label={t('syncPanel.fileChangeList.viewChange', { path: change.path })}
+                aria-label={t('settings.syncPanel.fileChangeList.viewChange', { path: change.path })}
               >
                 {/* Type Icon */}
                 <div
@@ -149,11 +149,11 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
-                    <span>{t('syncPanel.fileChangeList.size', { size: formatFileSize(change.size) })}</span>
+                    <span>{t('settings.syncPanel.fileChangeList.size', { size: formatFileSize(change.size) })}</span>
                     {change.mtime && (
                       <>
                         <span>•</span>
-                        <span>{t('syncPanel.fileChangeList.time', { time: formatTime(change.mtime) })}</span>
+                        <span>{t('settings.syncPanel.fileChangeList.time', { time: formatTime(change.mtime) })}</span>
                       </>
                     )}
                   </div>
