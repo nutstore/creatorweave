@@ -129,7 +129,7 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
     return () => {
       cancelled.value = true
     }
-  }, [loadSnapshots, t])
+  }, [loadSnapshots])
 
   const latestRollbackableId = useMemo(
     () => snapshots.find((item) => item.status === 'approved' || item.status === 'committed')?.id ?? null,

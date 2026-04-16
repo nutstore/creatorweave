@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { createUseT } from '@creatorweave/i18n'
 import { useI18nStore } from './store'
 
@@ -9,7 +10,7 @@ import { useI18nStore } from './store'
  */
 export function useT() {
   const locale = useI18nStore((state) => state.locale)
-  return createUseT(locale)
+  return useMemo(() => createUseT(locale), [locale])
 }
 
 /**
