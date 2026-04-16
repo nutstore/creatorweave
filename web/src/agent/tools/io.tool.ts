@@ -72,7 +72,7 @@ export const readDefinition: ToolDefinition = {
         max_size: {
           type: 'number',
           description:
-            'Optional hard limit in bytes. If exceeded, returns too_large error (never truncates content).',
+            '⚠️ Default limit is ~100KB. REQUIRED for files likely exceeding 100KB (e.g. logs, CSV, JSON, large source files). Set to a larger value (e.g. 1048576 for 1MB, 10485760 for 10MB) to read bigger files. If a read returns "content_too_large", increase max_size and retry.',
         },
       },
     },
@@ -91,6 +91,14 @@ interface ReadRangeOptions {
 }
 
 const BASE64_CHUNK_SIZE = 0x8000
+
+/**
+ * Build a retry hint string for content_too_large errors.
+ * Tells the agent exactly what max_size value to use on retry.
+ */
+function buildMaxSizeHint(suggestedMaxSize: number): string {
+  return `Retry with max_size=${suggestedMaxSize} to read the full file.`
+}
 
 function formatToolErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error)
@@ -217,7 +225,10 @@ async function executeSingleRead(
           'read',
           'content_too_large',
           sizeLimitCheck.error,
-          { details: { totalLines: sizeLimitCheck.totalLines } }
+          {
+            details: { totalLines: sizeLimitCheck.totalLines },
+            hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+          }
         )
       }
       const rendered = applyTextRange(content, options)
@@ -255,7 +266,10 @@ async function executeSingleRead(
           'read',
           'content_too_large',
           sizeLimitCheck.error,
-          { details: { totalLines: sizeLimitCheck.totalLines } }
+          {
+            details: { totalLines: sizeLimitCheck.totalLines },
+            hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+          }
         )
       }
       const formatted = applyTextRange(content, options)
@@ -320,7 +334,10 @@ async function executeSingleRead(
                 'read',
                 'content_too_large',
                 sizeLimitCheck.error,
-                { details: { totalLines: sizeLimitCheck.totalLines } }
+                {
+                  details: { totalLines: sizeLimitCheck.totalLines },
+                  hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+                }
               )
             }
             const formatted = applyTextRange(content, options)
@@ -446,7 +463,7 @@ async function executeBatchRead(
             success: false,
             error: {
               code: 'content_too_large',
-              message: sizeLimitCheck.error,
+              message: sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
             },
             metadata: { size, contentType: 'text' },
           })
@@ -541,7 +558,7 @@ async function executeBatchRead(
           success: false,
           error: {
             code: 'content_too_large',
-            message: sizeLimitCheck.error,
+            message: sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
           },
           metadata: { size: metadata.size, contentType: metadata.contentType },
         })

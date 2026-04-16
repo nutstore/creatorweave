@@ -283,8 +283,13 @@ export function checkContentSizeLimit(
   content: string,
   _fileSize: number,
   totalLines?: number
-): { ok: true } | { ok: false; error: string; totalLines?: number } {
+): { ok: true } | { ok: false; error: string; totalLines?: number; suggestedMaxSize: number } {
   if (content.length > MAX_READ_CHARS) {
+    // Suggest a max_size that is 2x the actual file size, rounded up to nearest 1MB
+    const suggestedMaxSize = Math.max(
+      Math.ceil(_fileSize * 2 / 1_048_576) * 1_048_576,
+      1_048_576
+    )
     return {
       ok: false,
       error:
@@ -293,6 +298,7 @@ export function checkContentSizeLimit(
         'Use start_line and line_count to read a smaller range.' +
         (totalLines !== undefined ? ` The file has ${totalLines} lines total.` : ''),
       totalLines,
+      suggestedMaxSize,
     }
   }
   return { ok: true }
