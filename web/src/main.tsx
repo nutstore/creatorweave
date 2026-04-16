@@ -44,7 +44,10 @@ if (import.meta.env.DEV) {
     })
 }
 
-registerServiceWorker({ buildId: __APP_BUILD_ID__ })
+const enableSwInDev = import.meta.env.VITE_ENABLE_SW_IN_DEV === 'true'
+if (import.meta.env.PROD || enableSwInDev) {
+  registerServiceWorker({ buildId: __APP_BUILD_ID__ })
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

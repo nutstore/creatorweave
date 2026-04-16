@@ -48,8 +48,10 @@ export function useServiceWorker(): UseServiceWorkerResult {
   const [needsRefresh, setNeedsRefresh] = useState(false)
 
   useEffect(() => {
+    const enableSwInDev = import.meta.env.VITE_ENABLE_SW_IN_DEV === 'true'
+
     // Check if service workers are supported
-    if (!('serviceWorker' in navigator)) {
+    if (!('serviceWorker' in navigator) || (import.meta.env.DEV && !enableSwInDev)) {
       return
     }
 
