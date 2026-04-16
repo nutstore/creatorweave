@@ -67,6 +67,11 @@
 
 ## 4. API 契约（MVP）
 
+字段约定：
+
+1. 外部 API（请求/响应/通知）统一使用 `agentId`（camelCase）。
+2. 内部持久化结构可使用 `agent_id`（snake_case）。
+
 ### 4.1 spawn_subagent
 
 输入：
@@ -81,6 +86,12 @@
 | mode | string | 否 | "default" \| "plan" \| "acceptEdits" \| "bypassPermissions" \| "dontAsk" |
 | isolation | string | 否 | "none" \| "worktree" |
 | timeout_ms | number | 否 | 超时时间，默认 300000 (5分钟) |
+
+超时约束：
+
+1. 默认 `timeout_ms=300000`（5 分钟）。
+2. 最大 `timeout_ms=3600000`（1 小时）。
+3. 若传入值超过最大值，返回 `TIMEOUT_EXCEEDS_MAX`。
 
 输出（二态）：
 
@@ -126,9 +137,10 @@
    - 消息队列：`Array<{message: string, enqueued_at: number}>`
    - 队列最大长度：100（可配置）
    - 队列满时：`overflow_action: "reject" | "drop_oldest"`
-2. 目标 `failed|killed`：自动触发 `resume_subagent` 并注入 message。
+2. 目标 `failed|killed`：自动触发 `resume_subagent`，并将当前 `message` 原文作为 `resume_subagent.prompt`。
 3. 目标 `completed`：返回 `TASK_ALREADY_COMPLETED`，需显式调用 `resume_subagent` 或重新 `spawn_subagent`。
 4. 目标不存在：返回不可恢复错误。
+5. 若 `message` 为空：返回 `INVALID_MESSAGE`，不触发 `resume_subagent`。
 
 队列规格：
 ```typescript
@@ -146,7 +158,8 @@
   success: boolean,
   message: string,               // 用户可读状态
   queued_at?: number,            // 排队时间戳
-  queue_position?: number        // 当前队列位置
+  queue_position?: number,       // 当前队列位置
+  resumed?: boolean              // 是否通过自动 resume 处理
 }
 ```
 
@@ -156,7 +169,7 @@
 
 | 字段 | 类型 | 必填 | 说明 |
 |-----|------|-----|------|
-| task_id | string | 是 | agentId |
+| agentId | string | 是 | 子代理唯一标识 |
 | force | boolean | 否 | 强制终止，默认 false |
 | timeout_ms | number | 否 | 等待清理时间，默认 10000 |
 
@@ -182,6 +195,7 @@
 | agentId | string | 是 | 任务 ID |
 | prompt | string | 是 | 本次续跑指令 |
 | from_checkpoint | string | 否 | checkpoint ID，默认从头 |
+| timeout_ms | number | 否 | 超时时间，默认 300000（最大 3600000） |
 
 行为：
 
@@ -189,6 +203,12 @@
 2. 清理不完整消息块（如孤立的 tool_use）。
 3. 重建上下文与执行参数。
 4. 进入后台生命周期并发出通知。
+
+超时约束：
+
+1. 默认 `timeout_ms=300000`（5 分钟）。
+2. 最大 `timeout_ms=3600000`（1 小时）。
+3. 若传入值超过最大值，返回 `TIMEOUT_EXCEEDS_MAX`。
 
 失败条件：
 
@@ -256,7 +276,7 @@
 ```typescript
 {
   event_type: "task_notification",
-  task_id: string,
+  agentId: string,
   status: "running" | "completed" | "failed" | "killed",
   summary: string,                    // 摘要（最多 500 字符）
   result?: string,                    // 文本结果（人读）
@@ -443,7 +463,6 @@
   level: "DEBUG" | "INFO" | "WARN" | "ERROR",
   event: string,              // 事件类型
   agentId: string,
-  taskId?: string,
   mode?: string,
   isolation?: string,
   duration_ms?: number,
