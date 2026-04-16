@@ -116,7 +116,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
             <div className="border-subtle flex border-r sm:w-48 sm:flex-col">
               <nav
                 role="tablist"
-                aria-label="设置选项"
+                aria-label={t('workspaceSettings.tabs.ariaLabel')}
                 className="flex space-x-1 p-2 sm:space-x-0 sm:space-y-1 sm:flex-col"
                 onKeyDown={(e) => {
                   const tabIds = tabs.map((t) => t.id)

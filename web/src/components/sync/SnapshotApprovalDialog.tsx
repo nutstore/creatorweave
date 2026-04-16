@@ -8,6 +8,7 @@ import {
   BrandDialogTitle,
 } from '@creatorweave/ui'
 import { Sparkles } from 'lucide-react'
+import { useT } from '@/i18n'
 
 interface SnapshotApprovalDialogProps {
   open: boolean
@@ -34,6 +35,8 @@ export function SnapshotApprovalDialog({
   onGenerateSummary,
   onConfirm,
 }: SnapshotApprovalDialogProps) {
+  const t = useT()
+
   return (
     <BrandDialog
       open={open}
@@ -44,16 +47,17 @@ export function SnapshotApprovalDialog({
     >
       <BrandDialogContent className="max-w-lg">
         <BrandDialogHeader>
-          <BrandDialogTitle>创建快照</BrandDialogTitle>
+          <BrandDialogTitle>{t('sidebar.snapshotApproval.title')}</BrandDialogTitle>
         </BrandDialogHeader>
         <BrandDialogBody>
           <div className="space-y-3">
-            <p className="text-sm text-secondary">
-              将审批通过 <span className="font-semibold text-primary">{pendingCount}</span> 个变更，并创建快照记录。
-            </p>
+            <p
+              className="text-sm text-secondary"
+              dangerouslySetInnerHTML={{ __html: t('sidebar.snapshotApproval.description', { count: pendingCount }) }}
+            />
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-secondary">快照描述</label>
+                <label className="text-xs font-medium text-secondary">{t('sidebar.snapshotApproval.summaryLabel')}</label>
                 <BrandButton
                   variant="ghost"
                   className="h-7 px-2 text-xs"
@@ -61,7 +65,7 @@ export function SnapshotApprovalDialog({
                   onClick={onGenerateSummary}
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  {generatingSummary ? '生成中...' : 'AI 生成'}
+                  {generatingSummary ? t('sidebar.snapshotApproval.generating') : t('sidebar.snapshotApproval.generateAI')}
                 </BrandButton>
               </div>
               <textarea
@@ -69,7 +73,7 @@ export function SnapshotApprovalDialog({
                 onChange={(e) => onSummaryChange(e.target.value)}
                 rows={8}
                 className="w-full resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder="输入快照说明（可多行，首行可作为标题）"
+                placeholder={t('sidebar.snapshotApproval.summaryPlaceholder')}
               />
               {summaryError && (
                 <p className="text-xs text-warning">{summaryError}</p>
@@ -79,14 +83,14 @@ export function SnapshotApprovalDialog({
         </BrandDialogBody>
         <BrandDialogFooter>
           <BrandButton variant="ghost" disabled={isSyncing} onClick={() => onOpenChange(false)}>
-            取消
+            {t('sidebar.snapshotApproval.cancel')}
           </BrandButton>
           <BrandButton
             variant="primary"
             disabled={isSyncing || summary.trim().length === 0}
             onClick={onConfirm}
           >
-            {isSyncing ? '处理中...' : '确认审批通过'}
+            {isSyncing ? t('sidebar.snapshotApproval.processing') : t('sidebar.snapshotApproval.confirm')}
           </BrandButton>
         </BrandDialogFooter>
       </BrandDialogContent>

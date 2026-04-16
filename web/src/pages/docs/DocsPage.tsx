@@ -13,6 +13,8 @@ import { ChevronLeft, ChevronRight, Menu, X, FileText, BookOpen, Code2, Github }
 import { MarkdownContent } from '@/components/agent/MarkdownContent'
 import { BrandButton } from '@creatorweave/ui'
 import { cn } from '@/lib/utils'
+import { useLocale } from '@/i18n'
+import type { Locale } from '@/i18n'
 
 interface DocIndex {
   title: string
@@ -24,7 +26,10 @@ interface DocIndex {
   }>
 }
 
+type DocsLanguage = 'zh' | 'en'
+
 interface DocsPageProps {
+  language?: DocsLanguage
   category?: 'user' | 'developer'
   page?: string
   onBack?: () => void
@@ -35,12 +40,129 @@ const CATEGORY_ICONS = {
   developer: Code2,
 } as const
 
-const CATEGORY_LABELS = {
-  user: '用户文档',
-  developer: '开发者文档',
-} as const
+const CATEGORY_LABELS: Record<DocsLanguage, Record<'user' | 'developer', string>> = {
+  zh: {
+    user: '用户文档',
+    developer: '开发者文档',
+  },
+  en: {
+    user: 'User Docs',
+    developer: 'Developer Docs',
+  },
+}
 
-export function DocsPage({ category, page, onBack }: DocsPageProps) {
+const UI_TEXT: Record<
+  DocsLanguage,
+  {
+    homeTitle: string
+    homeSubtitle: string
+    categoryDescriptions: Record<'user' | 'developer', string>
+    openSourceLabel: string
+    githubSource: string
+    tocLabel: string
+    backToDocsHome: string
+    chooseDocToRead: string
+    docsRootLabel: string
+    backToDirectory: string
+    indexLoadFailed: string
+    docLoadFailed: string
+    docNotFound: string
+  }
+> = {
+  zh: {
+    homeTitle: '文档中心',
+    homeSubtitle: '选择文档类别开始探索',
+    categoryDescriptions: {
+      user: '产品功能使用指南，快速上手',
+      developer: 'API 参考和技术架构文档',
+    },
+    openSourceLabel: '开源项目',
+    githubSource: 'GitHub 源码',
+    tocLabel: '目录',
+    backToDocsHome: '回到文档首页',
+    chooseDocToRead: '选择一个文档开始阅读',
+    docsRootLabel: '文档',
+    backToDirectory: '返回目录',
+    indexLoadFailed: '目录加载失败',
+    docLoadFailed: '文档加载失败',
+    docNotFound: '文档未找到',
+  },
+  en: {
+    homeTitle: 'Documentation',
+    homeSubtitle: 'Choose a section to start reading',
+    categoryDescriptions: {
+      user: 'Product usage guides and quick starts',
+      developer: 'API references and architecture notes',
+    },
+    openSourceLabel: 'Open Source',
+    githubSource: 'GitHub Repository',
+    tocLabel: 'Contents',
+    backToDocsHome: 'Back to docs home',
+    chooseDocToRead: 'Choose a document to start reading',
+    docsRootLabel: 'Docs',
+    backToDirectory: 'Back to directory',
+    indexLoadFailed: 'Failed to load index',
+    docLoadFailed: 'Failed to load document',
+    docNotFound: 'Document not found',
+  },
+}
+
+function localeToDocsLanguage(locale: Locale): DocsLanguage {
+  return locale === 'zh-CN' ? 'zh' : 'en'
+}
+
+function buildIndexCandidates(lang: DocsLanguage, category: 'user' | 'developer'): string[] {
+  return lang === 'zh'
+    ? [`/docs/zh/${category}/_index.json`, `/docs/${category}/_index.json`]
+    : [`/docs/en/${category}/_index.json`, `/docs/${category}/_index.json`]
+}
+
+function buildContentCandidates(
+  lang: DocsLanguage,
+  category: 'user' | 'developer',
+  file: string
+): string[] {
+  return lang === 'zh'
+    ? [`/docs/zh/${category}/${file}`, `/docs/${category}/${file}`]
+    : [`/docs/en/${category}/${file}`, `/docs/${category}/${file}`]
+}
+
+function isHtmlFallback(content: string): boolean {
+  const head = content.trimStart().slice(0, 120).toLowerCase()
+  return head.startsWith('<!doctype html') || head.startsWith('<html')
+}
+
+function stripMarkdownFrontmatter(content: string): string {
+  if (!content.startsWith('---\n')) {
+    return content
+  }
+
+  const end = content.indexOf('\n---\n', 4)
+  if (end === -1) {
+    return content
+  }
+
+  return content.slice(end + 5)
+}
+
+async function fetchDocIndex(lang: DocsLanguage, category: 'user' | 'developer'): Promise<DocIndex | null> {
+  const candidates = buildIndexCandidates(lang, category)
+  for (const path of candidates) {
+    try {
+      const res = await fetch(path)
+      if (!res.ok) continue
+      return (await res.json()) as DocIndex
+    } catch {
+      // try next candidate
+    }
+  }
+  return null
+}
+
+export function DocsPage({ language, category, page, onBack }: DocsPageProps) {
+  const [locale, setLocale] = useLocale()
+  const docsLang = language ?? localeToDocsLanguage(locale)
+  const copy = UI_TEXT[docsLang]
   const [index, setIndex] = useState<DocIndex | null>(null)
   const [content, setContent] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -54,17 +176,34 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
       setIndex(null)
       return
     }
-    fetch(`/docs/${category}/_index.json`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Index not found')
-        return r.json()
-      })
-      .then(setIndex)
-      .catch(() => {
-        setIndex(null)
-        setError('目录加载失败')
-      })
-  }, [category])
+    let active = true
+    const loadIndex = async () => {
+      const candidates = buildIndexCandidates(docsLang, category)
+      for (const path of candidates) {
+        try {
+          const res = await fetch(path)
+          if (!res.ok) continue
+          const data = (await res.json()) as DocIndex
+          if (!active) return
+          setError(null)
+          setIndex(data)
+          return
+        } catch {
+          // try next candidate
+        }
+      }
+
+      if (!active) return
+      setIndex(null)
+      setError(copy.indexLoadFailed)
+    }
+
+    loadIndex()
+
+    return () => {
+      active = false
+    }
+  }, [category, docsLang, copy.indexLoadFailed])
 
   // Load doc content
   useEffect(() => {
@@ -75,23 +214,47 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
     const pageEntry = index.pages.find((p) => p.slug === page)
     if (!pageEntry) {
       setContent('')
-      setError('文档未找到')
+      setError(copy.docNotFound)
       return
     }
     setLoading(true)
     setError(null)
-    fetch(`/docs/${category}/${pageEntry.file}`)
-      .then((r) => {
-        if (!r.ok) throw new Error('Document not found')
-        return r.text()
-      })
-      .then(setContent)
-      .catch(() => {
-        setContent('')
-        setError('文档加载失败')
-      })
-      .finally(() => setLoading(false))
-  }, [category, page, index])
+    let active = true
+
+    const loadContent = async () => {
+      const candidates = buildContentCandidates(docsLang, category, pageEntry.file)
+
+      for (const path of candidates) {
+        try {
+          const res = await fetch(path)
+          if (!res.ok) continue
+          const text = await res.text()
+          if (isHtmlFallback(text)) {
+            continue
+          }
+          if (!active) return
+          setContent(stripMarkdownFrontmatter(text))
+          return
+        } catch {
+          // try next candidate
+        }
+      }
+
+      if (!active) return
+      setContent('')
+      setError(copy.docLoadFailed)
+    }
+
+    loadContent().finally(() => {
+      if (active) {
+        setLoading(false)
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [category, page, index, docsLang, copy.docLoadFailed, copy.docNotFound])
 
   // Close mobile sidebar when navigating to a page
   useEffect(() => {
@@ -100,34 +263,91 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
     }
   }, [page])
 
-  const navigateTo = useCallback((cat: 'user' | 'developer', slug?: string) => {
-    const parts = ['docs', cat, slug].filter(Boolean)
+  const navigateTo = useCallback((cat: 'user' | 'developer', slug?: string, lang?: DocsLanguage) => {
+    const parts = ['docs', lang ?? docsLang, cat, slug].filter(Boolean)
     const path = '/' + parts.join('/')
     window.location.hash = path
-  }, [])
+  }, [docsLang])
 
-  const navigateToHome = useCallback(() => {
-    window.location.hash = '/docs'
-  }, [])
+  const navigateToHome = useCallback((lang?: DocsLanguage) => {
+    window.location.hash = `/docs/${lang ?? docsLang}`
+  }, [docsLang])
+
+  const switchLocale = useCallback(async (nextLocale: Locale) => {
+    if (locale === nextLocale) return
+    const nextLang = localeToDocsLanguage(nextLocale)
+
+    // Keep current page when target locale has same slug; otherwise fallback to category home.
+    if (category && page) {
+      const nextIndex = await fetchDocIndex(nextLang, category)
+      const hasSameSlug = nextIndex?.pages.some((p) => p.slug === page) ?? false
+      setLocale(nextLocale)
+      navigateTo(category, hasSameSlug ? page : undefined, nextLang)
+      return
+    }
+
+    setLocale(nextLocale)
+    if (category) {
+      navigateTo(category, undefined, nextLang)
+      return
+    }
+    navigateToHome(nextLang)
+  }, [category, page, locale, setLocale, navigateTo, navigateToHome])
 
   const pages = index?.pages ?? []
 
   // Get current page info
   const currentPage = index?.pages.find((p) => p.slug === page)
   const CategoryIcon = category ? CATEGORY_ICONS[category] : null
+  const LanguageSwitch = ({ compact = false }: { compact?: boolean }) => (
+    <div
+      className={cn(
+        'inline-flex items-center gap-1 rounded-lg border border-[oklch(88%_0.01_60)] bg-white p-1 dark:border-[oklch(25%_0.01_60)] dark:bg-[oklch(18%_0.01_250)]',
+        compact && 'scale-95'
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => switchLocale('zh-CN')}
+        className={cn(
+          'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+          docsLang === 'zh'
+            ? 'bg-[oklch(94%_0.04_175)] text-[oklch(40%_0.08_175)] dark:bg-[oklch(25%_0.03_175)] dark:text-[oklch(80%_0.05_175)]'
+            : 'text-[oklch(45%_0.015_60)] hover:bg-[oklch(94%_0.01_60)] dark:text-[oklch(60%_0.01_60)] dark:hover:bg-[oklch(22%_0.01_60)]'
+        )}
+      >
+        中文
+      </button>
+      <button
+        type="button"
+        onClick={() => switchLocale('en-US')}
+        className={cn(
+          'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+          docsLang === 'en'
+            ? 'bg-[oklch(94%_0.04_175)] text-[oklch(40%_0.08_175)] dark:bg-[oklch(25%_0.03_175)] dark:text-[oklch(80%_0.05_175)]'
+            : 'text-[oklch(45%_0.015_60)] hover:bg-[oklch(94%_0.01_60)] dark:text-[oklch(60%_0.01_60)] dark:hover:bg-[oklch(22%_0.01_60)]'
+        )}
+      >
+        English
+      </button>
+    </div>
+  )
 
   // ====== HOME PAGE ======
   if (!category) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-[oklch(98%_0.005_60)] p-8 dark:bg-[oklch(12%_0.01_250)]">
         <div className="w-full max-w-3xl">
+          <div className="mb-6 flex justify-end">
+            <LanguageSwitch />
+          </div>
           {/* Header */}
           <header className="mb-16 text-center">
             <h1 className="mb-4 text-5xl font-bold tracking-tight text-[oklch(20%_0.03_60)] dark:text-[oklch(95%_0.01_60)]">
-              文档中心
+              {copy.homeTitle}
             </h1>
             <p className="text-lg text-[oklch(45%_0.02_60)] dark:text-[oklch(65%_0.01_60)]">
-              选择文档类别开始探索
+              {copy.homeSubtitle}
             </p>
           </header>
 
@@ -153,13 +373,11 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
                   <Icon className="mb-6 h-10 w-10 text-[oklch(60%_0.12_175)]" strokeWidth={1.5} />
 
                   <h2 className="mb-2 text-xl font-semibold text-[oklch(25%_0.02_60)] dark:text-[oklch(95%_0.01_60)]">
-                    {CATEGORY_LABELS[cat]}
+                    {CATEGORY_LABELS[docsLang][cat]}
                   </h2>
 
                   <p className="text-sm text-[oklch(50%_0.015_60)] dark:text-[oklch(60%_0.01_60)]">
-                    {cat === 'user'
-                      ? '产品功能使用指南，快速上手'
-                      : 'API 参考和技术架构文档'}
+                    {copy.categoryDescriptions[cat]}
                   </p>
 
                   <ChevronRight className="absolute bottom-6 right-6 h-5 w-5 text-[oklch(70%_0.02_60)] transition-transform group-hover:translate-x-1" />
@@ -184,10 +402,10 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
             <Github className="h-8 w-8 text-[oklch(50%_0.02_60)]" strokeWidth={1.5} />
             <div className="flex-1">
               <p className="text-xs font-medium uppercase tracking-wider text-[oklch(50%_0.02_60)] dark:text-[oklch(55%_0.01_60)]">
-                开源项目
+                {copy.openSourceLabel}
               </p>
               <p className="font-semibold text-[oklch(25%_0.02_60)] dark:text-[oklch(95%_0.01_60)]">
-                GitHub 源码
+                {copy.githubSource}
               </p>
             </div>
             <ChevronRight className="h-5 w-5 text-[oklch(70%_0.02_60)] transition-transform group-hover:translate-x-1" />
@@ -203,7 +421,7 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
       {/* Sidebar Header */}
       <div className="shrink-0 border-b border-[oklch(88%_0.01_60)] px-6 py-5 dark:border-[oklch(25%_0.01_60)]">
         <button
-          onClick={navigateToHome}
+          onClick={() => navigateToHome()}
           className="flex items-center gap-3 text-left"
         >
           {CategoryIcon && (
@@ -213,7 +431,7 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
           )}
           <div>
             <div className="text-xs font-medium uppercase tracking-wider text-[oklch(50%_0.02_60)] dark:text-[oklch(55%_0.01_60)]">
-              {CATEGORY_LABELS[category]}
+              {CATEGORY_LABELS[docsLang][category]}
             </div>
             <div className="font-semibold text-[oklch(25%_0.02_60)] dark:text-[oklch(95%_0.01_60)]">
               {index?.title}
@@ -227,7 +445,7 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
         {pages.length > 0 && (
           <div className="mb-6">
             <h3 className="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-[oklch(50%_0.02_60)] dark:text-[oklch(55%_0.01_60)]">
-              目录
+              {copy.tocLabel}
             </h3>
             <div className="space-y-1">
               {pages.map((p) => (
@@ -253,11 +471,11 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
       {/* Back to Home */}
       <div className="shrink-0 border-t border-[oklch(88%_0.01_60)] px-4 py-4 dark:border-[oklch(25%_0.01_60)]">
         <button
-          onClick={navigateToHome}
+          onClick={() => navigateToHome()}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[oklch(50%_0.015_60)] transition-colors hover:bg-[oklch(94%_0.01_60)] hover:text-[oklch(40%_0.02_60)] dark:text-[oklch(55%_0.01_60)] dark:hover:bg-[oklch(22%_0.01_60)] dark:hover:text-[oklch(90%_0.01_60)]"
         >
           <ChevronLeft className="h-4 w-4" />
-          回到文档首页
+          {copy.backToDocsHome}
         </button>
       </div>
     </div>
@@ -291,15 +509,21 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
               <h1 className="text-2xl font-bold text-[oklch(25%_0.02_60)] dark:text-[oklch(95%_0.01_60)]">
                 {index.title}
               </h1>
+              <div className="ml-auto">
+                <LanguageSwitch compact />
+              </div>
             </div>
 
             {/* Desktop header */}
             <header className="mb-12 hidden lg:block">
-              <h1 className="mb-3 text-4xl font-bold tracking-tight text-[oklch(20%_0.03_60)] dark:text-[oklch(95%_0.01_60)]">
-                {index.title}
-              </h1>
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <h1 className="text-4xl font-bold tracking-tight text-[oklch(20%_0.03_60)] dark:text-[oklch(95%_0.01_60)]">
+                  {index.title}
+                </h1>
+                <LanguageSwitch />
+              </div>
               <p className="text-lg text-[oklch(45%_0.02_60)] dark:text-[oklch(65%_0.01_60)]">
-                选择一个文档开始阅读
+                {copy.chooseDocToRead}
               </p>
             </header>
 
@@ -411,11 +635,11 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm">
               <span className="text-[oklch(50%_0.015_60)] dark:text-[oklch(55%_0.01_60)]">
-                文档
+                {copy.docsRootLabel}
               </span>
               <ChevronRight className="h-4 w-4 text-[oklch(80%_0.01_60)]" />
               <span className="text-[oklch(50%_0.015_60)] dark:text-[oklch(55%_0.01_60)]">
-                {CATEGORY_LABELS[category]}
+                {CATEGORY_LABELS[docsLang][category]}
               </span>
               {currentPage && (
                 <>
@@ -425,6 +649,9 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
                   </span>
                 </>
               )}
+            </div>
+            <div className="ml-auto hidden sm:block">
+              <LanguageSwitch compact />
             </div>
           </div>
         </header>
@@ -447,7 +674,7 @@ export function DocsPage({ category, page, onBack }: DocsPageProps) {
                 onClick={() => navigateTo(category)}
                 className="text-sm font-medium text-[oklch(60%_0.12_175)] hover:underline"
               >
-                返回目录
+                {copy.backToDirectory}
               </button>
             </div>
           ) : content ? (

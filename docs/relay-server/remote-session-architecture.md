@@ -2,7 +2,7 @@
 
 ## Overview
 
-Remote Session enables secure, end-to-end encrypted remote control of AI Workspace from a mobile device. The architecture consists of three main components:
+Remote Session enables secure, end-to-end encrypted remote control of CreatorWeave from a mobile device. The architecture consists of three main components:
 
 ```
 ┌─────────────────┐         ┌─────────────────┐         ┌─────────────────┐
@@ -22,7 +22,7 @@ Remote Session enables secure, end-to-end encrypted remote control of AI Workspa
 
 **Location**: `web/` | **Port**: 3000
 
-The host runs the main AI Workspace application and can create remote sessions that mobile devices can join.
+The host runs the main CreatorWeave application and can create remote sessions that mobile devices can join.
 
 **Key Files**:
 - `src/remote/remote-session.ts` - Core session management

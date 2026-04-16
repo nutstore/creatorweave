@@ -5,7 +5,7 @@ order: 300
 
 # API 参考
 
-AI Workspace 的 API 接口文档。
+CreatorWeave 的 API 接口文档。
 
 ## 目录
 

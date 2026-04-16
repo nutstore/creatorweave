@@ -1,6 +1,7 @@
 import { DiffEditor, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useT } from '@/i18n'
 
 let loaderConfigured = false
 
@@ -69,6 +70,7 @@ export default function MonacoDiffEditor({
   onLineSelectForComment,
   renderSideBySide = false,
 }: MonacoDiffEditorProps) {
+  const t = useT()
   ensureMonacoLoaderConfigured()
 
   const language = useMemo(() => languageFromPath(path), [path])
@@ -128,8 +130,8 @@ export default function MonacoDiffEditor({
           glyphMarginClassName: 'cw-comment-glyph',
           linesDecorationsClassName: 'cw-comment-line-decoration',
           lineNumberClassName: 'cw-comment-line-number',
-          glyphMarginHoverMessage: { value: '该行有评论' },
-          lineNumberHoverMessage: { value: '该行有评论' },
+          glyphMarginHoverMessage: { value: t('sidebar.monacoDiffEditor.lineHasComment') },
+          lineNumberHoverMessage: { value: t('sidebar.monacoDiffEditor.lineHasComment') },
         },
       }))
 
@@ -143,8 +145,8 @@ export default function MonacoDiffEditor({
           glyphMarginClassName: 'cw-comment-glyph',
           linesDecorationsClassName: 'cw-comment-line-decoration',
           lineNumberClassName: 'cw-comment-line-number',
-          glyphMarginHoverMessage: { value: '该行有评论' },
-          lineNumberHoverMessage: { value: '该行有评论' },
+          glyphMarginHoverMessage: { value: t('sidebar.monacoDiffEditor.lineHasComment') },
+          lineNumberHoverMessage: { value: t('sidebar.monacoDiffEditor.lineHasComment') },
         },
       }))
 

@@ -5,6 +5,7 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { ChevronDown, Check, Clock, Trash2, Plus } from 'lucide-react'
+import { useT } from '@/i18n'
 
 export interface ConversationSwitcherProps {
   /** Callback when conversation is switched */
@@ -23,6 +24,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
   showCreate = false,
   showDelete = false,
 }) => {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const {
     activeWorkspaceId: activeConversationId,
@@ -58,7 +60,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
     async (e: React.MouseEvent, conversationId: string) => {
       e.stopPropagation() // Prevent triggering switch
 
-      if (!confirm('确定要删除此工作区的缓存吗？所有文件缓存、待同步和撤销记录将被删除。')) {
+      if (!confirm(t('session.conversationSwitcher.deleteConfirm'))) {
         return
       }
 
@@ -76,9 +78,9 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
   }, [conversations, activeConversationId])
 
   const displayName = useMemo(() => {
-    if (!activeConversation) return '选择对话'
-    return activeConversation.name || activeConversationId?.slice(0, 8) || '未知对话'
-  }, [activeConversation, activeConversationId])
+    if (!activeConversation) return t('session.conversationSwitcher.selectConversation')
+    return activeConversation.name || activeConversationId?.slice(0, 8) || t('session.conversationSwitcher.unknownConversation')
+  }, [activeConversation, activeConversationId, t])
 
   return (
     <div className="relative">
@@ -109,14 +111,14 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
             {/* Header */}
             <div className="border-b border px-3 py-2 dark:border-border">
               <span className="text-xs font-medium text-secondary dark:text-muted">
-                对话列表 ({conversations.length})
+                {t('session.conversationSwitcher.conversationList', { count: conversations.length })}
               </span>
             </div>
 
             {/* Conversation list */}
             <div className="custom-scrollbar max-h-80 overflow-y-auto">
               {sortedConversations.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-tertiary dark:text-muted">暂无对话</div>
+                <div className="px-3 py-4 text-center text-xs text-tertiary dark:text-muted">{t('session.conversationSwitcher.noConversations')}</div>
               ) : (
                 <ul>
                   {sortedConversations.map((conversation) => {
@@ -154,7 +156,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
                               {hasPending && (
                                 <span
                                   className="flex items-center gap-0.5 rounded-full bg-warning-bg px-1.5 text-[10px] text-warning"
-                                  title={`${conversation.pendingCount} 个待同步`}
+                                  title={t('session.conversationSwitcher.pendingSync', { count: conversation.pendingCount })}
                                 >
                                   <Clock className="h-2.5 w-2.5" />
                                   {conversation.pendingCount}
@@ -163,7 +165,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
 
                               {/* No changes */}
                               {!hasPending && (
-                                <span className="text-[10px] text-tertiary">无变更</span>
+                                <span className="text-[10px] text-tertiary">{t('session.conversationSwitcher.noChanges')}</span>
                               )}
                             </div>
                           </div>
@@ -175,7 +177,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
                             type="button"
                             onClick={(e) => handleDelete(e, conversation.id)}
                             className="shrink-0 rounded p-1 text-tertiary hover:bg-red-50 hover:text-red-500"
-                            title="删除对话缓存"
+                            title={t('session.conversationSwitcher.deleteCache')}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -195,7 +197,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
                   className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs font-medium text-secondary hover:bg-muted"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  新建对话
+                  {t('session.conversationSwitcher.newConversation')}
                 </button>
               </div>
             )}

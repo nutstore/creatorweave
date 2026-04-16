@@ -31,7 +31,7 @@ export default defineConfig({
       // We register SW manually in src/main.tsx to enforce versioned script URL.
       injectRegister: false,
       manifest: {
-        name: 'AI Workspace',
+        name: 'CreatorWeave',
         short_name: 'CWeave',
         description: 'AI-native creator workspace with local-first files, knowledge workflows, and multi-agent orchestration',
         theme_color: '#3b82f6',

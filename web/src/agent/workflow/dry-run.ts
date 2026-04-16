@@ -46,16 +46,16 @@ function formatDryRunSummary(
   execution: ExecuteWorkflowRunResult
 ): string {
   const lines: string[] = [
-    `工作流模拟运行: ${label} (${templateId})`,
-    `评分规则: ${rubric.name} (${rubric.id}@v${rubric.version})`,
-    `状态: ${execution.status}`,
-    `执行顺序: ${execution.executionOrder.join(' → ')}`,
-    `已执行节点: ${execution.executedNodeIds.join(' → ') || '(无)'}`,
-    `修复轮次: ${execution.repairRound}`,
+    `Workflow dry run: ${label} (${templateId})`,
+    `Rubric: ${rubric.name} (${rubric.id}@v${rubric.version})`,
+    `Status: ${execution.status}`,
+    `Execution order: ${execution.executionOrder.join(' → ')}`,
+    `Executed nodes: ${execution.executedNodeIds.join(' → ') || '(none)'}`,
+    `Repair rounds: ${execution.repairRound}`,
   ]
 
   if (execution.errors.length > 0) {
-    lines.push('错误:')
+    lines.push('Errors:')
     for (const error of execution.errors) {
       lines.push(`- ${error}`)
     }
@@ -75,7 +75,7 @@ export async function runCustomWorkflowDryRun(
   let rubric: RubricDefinition = {
     id: 'custom_default',
     version: 1,
-    name: '自定义评分规则',
+    name: 'Custom Rubric',
     passCondition: 'total_score >= 80 and hard_fail_count == 0',
     retryPolicy: { maxRepairRounds: 2 },
     rules: [],

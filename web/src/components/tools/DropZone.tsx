@@ -1,7 +1,8 @@
 /**
- * DropZone - 文件拖拽上传区域
+ * DropZone - File Drag and Drop Upload Area
  *
- * 支持拖拽文件和文件夹，自动识别文件类型并提供相应的操作建议。
+ * Supports dragging and dropping files and folders, automatically identifies file types
+ * and provides appropriate operation suggestions.
  */
 
 import { useState, useCallback, useRef } from 'react'

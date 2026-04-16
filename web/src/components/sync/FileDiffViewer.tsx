@@ -10,6 +10,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'reac
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
+import { useT } from '@/i18n'
 import {
   isImageFile,
   fileExistsInNativeFS,
@@ -104,6 +105,7 @@ function formatTime(timestamp?: number): string {
 }
 
 export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snapshotDiff = null }) => {
+  const t = useT()
   const [isSplitView, setIsSplitView] = useState(false)
   const [content, setContent] = useState<FileContentState>({
     opfs: null,
@@ -192,7 +194,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       try {
         const activeConversation = await getActiveConversation()
         if (!activeConversation) {
-          throw new Error('未激活的工作区')
+          throw new Error(t('sidebar.fileDiffViewer.noWorkspace'))
         }
 
         const { conversation, conversationId } = activeConversation
@@ -262,12 +264,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               if (nativeDir) {
                 nativeContent = await readFileFromNativeFS(nativeDir, filePath)
               } else if (showNativePanel) {
-                nativeContent = '[需要选择项目目录以查看本机文件内容]'
+                nativeContent = t('sidebar.fileDiffViewer.cannotReadNativeContent')
               }
             }
           } catch (err) {
             console.warn('[FileDiffViewer] Failed to read native content:', err)
-            nativeContent = '[读取本机文件失败]'
+            nativeContent = t('sidebar.fileDiffViewer.readNativeFileFailed')
           }
 
           setContent({
@@ -288,7 +290,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           nativeImageUrl: null,
           showNativePanel: true,
           loading: false,
-          error: err instanceof Error ? err.message : '加载文件失败',
+          error: err instanceof Error ? err.message : t('sidebar.fileDiffViewer.loadFailedError'),
         })
       }
     }
@@ -345,8 +347,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             />
           </svg>
         </div>
-        <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">选择文件查看详情</h3>
-        <p className="max-w-sm text-sm text-tertiary dark:text-muted">从左侧列表选择一个文件，查看变更版本与当前文件的差异</p>
+        <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">{t('sidebar.fileDiffViewer.selectFile')}</h3>
+        <p className="max-w-sm text-sm text-tertiary dark:text-muted">{t('sidebar.fileDiffViewer.selectFileHint')}</p>
       </div>
     )
   }
@@ -356,7 +358,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       <div className="flex h-full items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
-          <p className="text-sm text-tertiary dark:text-muted">加载文件内容...</p>
+          <p className="text-sm text-tertiary dark:text-muted">{t('sidebar.fileDiffViewer.loadingFile')}</p>
         </div>
       </div>
     )
@@ -376,7 +378,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               />
             </svg>
           </div>
-          <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">加载失败</h3>
+          <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">{t('sidebar.fileDiffViewer.loadFailed')}</h3>
           <p className="text-sm text-tertiary dark:text-muted">{content.error}</p>
         </div>
       </div>
@@ -424,8 +426,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     const payload = allComments
       .map((item) => {
         const sideLabel = item.side === 'modified'
-          ? (isSnapshotMode ? '快照后' : '变更版本')
-          : (isSnapshotMode ? '快照前' : '当前文件')
+          ? (isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshot') : t('sidebar.fileDiffViewer.changedVersion'))
+          : (isSnapshotMode ? t('sidebar.fileDiffViewer.beforeSnapshot') : t('sidebar.fileDiffViewer.currentFile'))
         const lineLabel = item.startLine === item.endLine
           ? `L${item.startLine}`
           : `L${item.startLine}-L${item.endLine}`
@@ -458,11 +460,11 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     const afterContent = afterType === 'text' ? (snapshotDiff?.modifiedText || '') : `[${afterType}]`
 
     const template = [
-      '请基于下面这个文件快照做审阅并给出修改建议：',
-      `文件: ${fileChange.path}`,
-      `变更类型: ${fileChange.type}`,
-      `快照: ${snapshotDiff?.snapshotTitle || '-'}`,
-      `记录时间: ${formatTime(snapshotDiff?.capturedAt)}`,
+      t('sidebar.fileDiffViewer.reviewPromptIntro'),
+      `${t('sidebar.fileDiffViewer.file')}: ${fileChange.path}`,
+      `${t('sidebar.fileDiffViewer.changeType')}: ${fileChange.type}`,
+      `${t('sidebar.fileDiffViewer.snapshot')}: ${snapshotDiff?.snapshotTitle || '-'}`,
+      `${t('sidebar.fileDiffViewer.recordedAt')}: ${formatTime(snapshotDiff?.capturedAt)}`,
       `before(${beforeType}, ${formatSize(snapshotDiff?.beforeSize)}):`,
       '```',
       beforeContent,
@@ -471,10 +473,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       '```',
       afterContent,
       '```',
-      '请输出：',
-      '1) 问题清单（按严重度）',
-      '2) 可直接执行的修改建议',
-      '3) 如需改代码，请给出最小改动补丁',
+      t('sidebar.fileDiffViewer.reviewOutput'),
+      `1) ${t('sidebar.fileDiffViewer.issueList')}`,
+      `2) ${t('sidebar.fileDiffViewer.actionableSuggestions')}`,
+      `3) ${t('sidebar.fileDiffViewer.codePatch')}`,
     ].join('\n')
 
     try {
@@ -495,30 +497,30 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         return (
           <div className="flex h-full">
             <div className="flex flex-1 flex-col border-r border-subtle">
-              <div className="border-b border-subtle bg-muted px-4 py-2 text-sm text-secondary">快照前</div>
+              <div className="border-b border-subtle bg-muted px-4 py-2 text-sm text-secondary">{t('sidebar.fileDiffViewer.beforeSnapshotLabel')}</div>
               <div className="flex flex-1 items-center justify-center bg-card p-4">
                 {snapshotImageUrls.before ? (
                   <img
                     src={snapshotImageUrls.before}
-                    alt={`快照前: ${fileChange.path}`}
+                    alt={`${t('sidebar.fileDiffViewer.beforeSnapshotLabel')}: ${fileChange.path}`}
                     className="max-h-full max-w-full rounded border border-subtle object-contain"
                   />
                 ) : (
-                  <span className="text-sm text-secondary">无图片内容</span>
+                  <span className="text-sm text-secondary">{t('sidebar.fileDiffViewer.noImageContent')}</span>
                 )}
               </div>
             </div>
             <div className="flex flex-1 flex-col">
-              <div className="border-b border-subtle bg-muted px-4 py-2 text-sm text-secondary">快照后</div>
+              <div className="border-b border-subtle bg-muted px-4 py-2 text-sm text-secondary">{t('sidebar.fileDiffViewer.afterSnapshotLabel')}</div>
               <div className="flex flex-1 items-center justify-center bg-card p-4">
                 {snapshotImageUrls.after ? (
                   <img
                     src={snapshotImageUrls.after}
-                    alt={`快照后: ${fileChange.path}`}
+                    alt={`${t('sidebar.fileDiffViewer.afterSnapshotLabel')}: ${fileChange.path}`}
                     className="max-h-full max-w-full rounded border border-subtle object-contain"
                   />
                 ) : (
-                  <span className="text-sm text-secondary">无图片内容</span>
+                  <span className="text-sm text-secondary">{t('sidebar.fileDiffViewer.noImageContent')}</span>
                 )}
               </div>
             </div>
@@ -529,24 +531,24 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       return (
         <div className="flex h-full items-center justify-center p-6">
           <div className="w-full max-w-2xl rounded-lg border border-subtle bg-background p-4">
-            <h4 className="text-sm font-semibold text-primary mb-3">二进制快照对比</h4>
+            <h4 className="text-sm font-semibold text-primary mb-3">{t('sidebar.fileDiffViewer.binarySnapshot')}</h4>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="rounded border border-subtle bg-elevated p-3">
-                <div className="text-xs text-secondary">快照前</div>
+                <div className="text-xs text-secondary">{t('sidebar.fileDiffViewer.beforeSnapshotLabel')}</div>
                 <div className="mt-1 text-sm text-primary">
-                  类型: {snapshotDiff?.beforeKind === 'binary' ? '二进制' : snapshotDiff?.beforeKind === 'text' ? '文本' : '无'}
+                  {t('sidebar.fileDiffViewer.binary')}: {snapshotDiff?.beforeKind === 'binary' ? t('sidebar.fileDiffViewer.binary') : snapshotDiff?.beforeKind === 'text' ? t('sidebar.fileDiffViewer.text') : t('sidebar.fileDiffViewer.none')}
                 </div>
-                <div className="text-sm text-primary">大小: {formatSize(snapshotDiff?.beforeSize)}</div>
+                <div className="text-sm text-primary">{t('sidebar.fileDiffViewer.size')}: {formatSize(snapshotDiff?.beforeSize)}</div>
               </div>
               <div className="rounded border border-subtle bg-elevated p-3">
-                <div className="text-xs text-secondary">快照后</div>
+                <div className="text-xs text-secondary">{t('sidebar.fileDiffViewer.afterSnapshotLabel')}</div>
                 <div className="mt-1 text-sm text-primary">
-                  类型: {snapshotDiff?.afterKind === 'binary' ? '二进制' : snapshotDiff?.afterKind === 'text' ? '文本' : '无'}
+                  {t('sidebar.fileDiffViewer.binary')}: {snapshotDiff?.afterKind === 'binary' ? t('sidebar.fileDiffViewer.binary') : snapshotDiff?.afterKind === 'text' ? t('sidebar.fileDiffViewer.text') : t('sidebar.fileDiffViewer.none')}
                 </div>
-                <div className="text-sm text-primary">大小: {formatSize(snapshotDiff?.afterSize)}</div>
+                <div className="text-sm text-primary">{t('sidebar.fileDiffViewer.size')}: {formatSize(snapshotDiff?.afterSize)}</div>
               </div>
             </div>
-            <p className="mt-3 text-xs text-secondary">二进制内容不支持文本行级 diff，请下载文件或使用专用二进制比对工具。</p>
+            <p className="mt-3 text-xs text-secondary">{t('sidebar.fileDiffViewer.binaryContent')}</p>
           </div>
         </div>
       )
@@ -555,7 +557,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     if (!content.showNativePanel && content.opfs === null) {
       return (
         <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
-          {fileChange.type === 'delete' ? '文件已删除（变更版本中无内容）' : '无法读取变更版本内容'}
+          {fileChange.type === 'delete' ? t('sidebar.fileDiffViewer.fileDeleted') : t('sidebar.fileDiffViewer.cannotReadChangedVersion')}
         </div>
       )
     }
@@ -566,7 +568,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           <Suspense
             fallback={
               <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
-                正在加载 Monaco 编辑器...
+                {t('sidebar.fileDiffViewer.loadingMonaco')}
               </div>
             }
           >
@@ -601,7 +603,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
             <div className="flex items-center gap-2 px-3 py-1.5">
               <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
-                {composer.side === 'modified' ? '变更' : '当前'}
+                {composer.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}
               </span>
               <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 dark:text-neutral-600">
                 L{composer.startLine}{composer.startLine !== composer.endLine && `-${composer.endLine}`}
@@ -619,7 +621,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             <div className="flex items-start gap-2 px-3 pb-2.5">
               <textarea
                 className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-500"
-                placeholder="添加评论..."
+                placeholder={t('sidebar.fileDiffViewer.addComment')}
                 autoFocus
                 rows={2}
                 value={composer.text}
@@ -639,7 +641,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                 disabled={!composer.text.trim()}
                 className="mt-0.5 flex h-8 items-center rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-30 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
               >
-                发送
+                {t('sidebar.fileDiffViewer.send')}
               </button>
             </div>
           </div>
@@ -671,7 +673,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           ) : null}
           {allComments.length > 0 && (
             <span className="shrink-0 text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
-              {allComments.length} 条评论
+              {t('sidebar.fileDiffViewer.commentsCount', { count: allComments.length })}
             </span>
           )}
         </div>
@@ -680,7 +682,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         <div className="flex shrink-0 items-center gap-1">
           {isSnapshotMode && (
             <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
-              {snapshotDiff?.snapshotTitle || '快照对比'} · {formatTime(snapshotDiff?.capturedAt)}
+              {snapshotDiff?.snapshotTitle || t('sidebar.fileDiffViewer.binarySnapshot')} · {formatTime(snapshotDiff?.capturedAt)}
             </span>
           )}
           {/* Inspect Element button for HTML files */}
@@ -694,10 +696,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                     className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-emerald-600 transition-colors hover:bg-emerald-100/60 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
                   >
                     <MousePointer2 className="h-3 w-3" />
-                    审查元素
+                    {t('sidebar.fileDiffViewer.reviewElements')}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>在新标签页中预览 HTML 并审查元素</TooltipContent>
+                <TooltipContent>{t('sidebar.fileDiffViewer.previewHTMLNewTab')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -713,7 +715,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                     {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{isSplitView ? '合并视图' : '拆分视图'}</TooltipContent>
+                <TooltipContent>{isSplitView ? t('sidebar.fileDiffViewer.mergeView') : t('sidebar.fileDiffViewer.splitView')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -724,7 +726,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
             >
               <Copy className="h-3 w-3" />
-              模板
+              {t('sidebar.fileDiffViewer.template')}
             </button>
           )}
           <button
@@ -734,7 +736,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
           >
             <Copy className="h-3 w-3" />
-            评论
+            {t('sidebar.fileDiffViewer.comments')}
           </button>
         </div>
       </div>
@@ -745,9 +747,9 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             <div className={`flex flex-1 flex-col ${content.showNativePanel ? 'border-r border dark:border-border' : ''}`}>
               <div className="border-b border bg-muted px-4 py-2 dark:border-border dark:bg-muted">
                 <h4 className="text-sm font-medium text-secondary dark:text-muted">
-                  {content.showNativePanel ? (isSnapshotMode ? '快照前' : '当前文件') : (isSnapshotMode ? '快照后' : '变更版本')}
+                  {content.showNativePanel ? (isSnapshotMode ? t('sidebar.fileDiffViewer.beforeSnapshotLabel') : t('sidebar.fileDiffViewer.currentFile')) : (isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshotLabel') : t('sidebar.fileDiffViewer.changedVersion'))}
                   {!content.showNativePanel && fileChange.type === 'delete' && (
-                    <span className="ml-2 text-xs text-red-600">(将被删除)</span>
+                    <span className="ml-2 text-xs text-red-600">{t('sidebar.fileDiffViewer.deleteWarning')}</span>
                   )}
                 </h4>
               </div>
@@ -759,8 +761,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                       setLightbox({
                         src: (content.showNativePanel ? content.nativeImageUrl : content.opfsImageUrl)!,
                         title: content.showNativePanel
-                          ? `${isSnapshotMode ? '快照前' : '当前文件'} - ${fileChange.path}`
-                          : `${isSnapshotMode ? '快照后' : '变更版本'} - ${fileChange.path}`,
+                          ? `${isSnapshotMode ? t('sidebar.fileDiffViewer.beforeSnapshotLabel') : t('sidebar.fileDiffViewer.currentFile')} - ${fileChange.path}`
+                          : `${isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshotLabel') : t('sidebar.fileDiffViewer.changedVersion')} - ${fileChange.path}`,
                       })
                     }
                     className="flex h-full w-full items-center justify-center"
@@ -768,8 +770,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                     <img
                       src={(content.showNativePanel ? content.nativeImageUrl : content.opfsImageUrl)!}
                       alt={content.showNativePanel
-                        ? `${isSnapshotMode ? '快照前' : '当前文件'}: ${fileChange.path}`
-                        : `${isSnapshotMode ? '快照后' : '变更版本'}: ${fileChange.path}`}
+                        ? `${isSnapshotMode ? t('sidebar.fileDiffViewer.beforeSnapshotLabel') : t('sidebar.fileDiffViewer.currentFile')}: ${fileChange.path}`
+                        : `${isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshotLabel') : t('sidebar.fileDiffViewer.changedVersion')}: ${fileChange.path}`}
                       className="max-h-full max-w-full rounded border border dark:border-border object-contain"
                       loading="lazy"
                     />
@@ -777,10 +779,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                 ) : (
                   <div className="text-sm text-tertiary dark:text-muted">
                     {content.showNativePanel
-                      ? '无法读取本机图片'
+                      ? t('sidebar.fileDiffViewer.cannotReadNativeImage')
                       : fileChange.type === 'delete'
-                        ? '图片将被删除（变更版本中无内容）'
-                        : '无法读取变更版本图片'}
+                        ? t('sidebar.fileDiffViewer.imageWillBeDeleted')
+                        : t('sidebar.fileDiffViewer.cannotReadChangedImage')}
                   </div>
                 )}
               </div>
@@ -790,8 +792,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               <div className="flex flex-1 flex-col">
                 <div className="border-b border bg-muted px-4 py-2 dark:border-border dark:bg-muted">
                   <h4 className="text-sm font-medium text-secondary dark:text-muted">
-                    {isSnapshotMode ? '快照后' : '变更版本'}
-                    {fileChange.type === 'delete' && <span className="ml-2 text-xs text-red-600">(将被删除)</span>}
+                    {isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshotLabel') : t('sidebar.fileDiffViewer.changedVersion')}
+                    {fileChange.type === 'delete' && <span className="ml-2 text-xs text-red-600">{t('sidebar.fileDiffViewer.deleteWarning')}</span>}
                   </h4>
                 </div>
                 <div className="flex flex-1 items-center justify-center overflow-auto bg-card p-4 dark:bg-card">
@@ -801,21 +803,21 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                       onClick={() =>
                         setLightbox({
                           src: content.opfsImageUrl!,
-                          title: `变更版本 - ${fileChange.path}`,
+                          title: `${t('sidebar.fileDiffViewer.changedVersion')} - ${fileChange.path}`,
                         })
                       }
                       className="flex h-full w-full items-center justify-center"
                     >
                       <img
                         src={content.opfsImageUrl}
-                        alt={`变更版本: ${fileChange.path}`}
+                        alt={`${t('sidebar.fileDiffViewer.changedVersion')}: ${fileChange.path}`}
                         className="max-h-full max-w-full rounded border border dark:border-border object-contain"
                         loading="lazy"
                       />
                     </button>
                   ) : (
                     <div className="text-sm text-tertiary dark:text-muted">
-                      {fileChange.type === 'delete' ? '图片将被删除（变更版本中无内容）' : '无法读取变更版本图片'}
+                      {fileChange.type === 'delete' ? t('sidebar.fileDiffViewer.imageWillBeDeleted') : t('sidebar.fileDiffViewer.cannotReadChangedImage')}
                     </div>
                   )}
                 </div>
@@ -829,12 +831,12 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
       {currentFileComments.length > 0 && (
         <div className="border-t bg-elevated px-4 py-2">
-          <div className="text-xs text-secondary mb-1">当前文件评论</div>
+          <div className="text-xs text-secondary mb-1">{t('sidebar.fileDiffViewer.currentFileComments')}</div>
           <div className="flex flex-wrap gap-2">
             {currentFileComments.map((item) => (
               <div key={item.id} className="inline-flex items-center gap-1 rounded border border-border bg-background px-2 py-1 text-xs">
                 <span className="font-medium">
-                  {item.side === 'modified' ? '变更' : '当前'}{' '}
+                  {item.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}{' '}
                   {item.startLine === item.endLine ? `L${item.startLine}` : `L${item.startLine}-L${item.endLine}`}
                 </span>
                 <span className="max-w-[360px] truncate" title={item.text}>{item.text}</span>
@@ -856,7 +858,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               onClick={() => setLightbox(null)}
               className="rounded-md border border-white/30 px-3 py-1.5 text-xs font-medium transition-colors hover:bg-card/10"
             >
-              关闭
+              {t('sidebar.fileDiffViewer.close')}
             </button>
           </div>
           <div className="flex flex-1 items-center justify-center p-6" onClick={(e) => e.stopPropagation()}>

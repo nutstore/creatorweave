@@ -39,7 +39,7 @@ describe('FileTreePanel', () => {
   it('shows OPFS sandbox hint when no directory, pending, or cached files exist', () => {
     render(<FileTreePanel directoryHandle={null} onFileSelect={vi.fn()} />)
 
-    expect(screen.getByText(/未选择本地目录也可继续使用/)).toBeInTheDocument()
-    expect(screen.getByText(/纯 OPFS 沙箱模式下，文件变更会显示在这里/)).toBeInTheDocument()
+    expect(screen.getByText(/You can continue without selecting a local directory/)).toBeInTheDocument()
+    expect(screen.getByText(/In pure OPFS sandbox mode, file changes will be displayed here/)).toBeInTheDocument()
   })
 })

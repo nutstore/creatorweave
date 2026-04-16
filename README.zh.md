@@ -1,8 +1,8 @@
-# AI Workspace
+# CreatorWeave
 
 <div align="center">
 
-**面向创作与研发团队的 AI 原生工作空间（本地优先）**
+**CreatorWeave：本地优先的 AI 原生创作平台，支持创作、知识沉淀与多代理编排**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -17,7 +17,7 @@
 
 ## 项目简介
 
-AI Workspace 是一个 **AI 原生创作工作空间**。它将本地文件工作流、AI 对话协作、知识沉淀与多代理能力整合在同一套浏览器应用中。
+CreatorWeave 是一款 **本地优先的 AI 原生创作平台**。它将本地文件工作流、AI 对话协作、知识沉淀与多代理能力整合在同一套浏览器应用中。
 
 ## 主要特性
 

@@ -11,6 +11,7 @@ import React, { useState, useCallback } from 'react'
 import { readFileFromNativeFS, readFileFromOPFS, isImageFile } from '@/opfs'
 import { type ConflictDetail } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
+import { useT } from '@/i18n'
 
 export interface ConflictResolutionDialogProps {
   /** Conflict to resolve */
@@ -35,16 +36,16 @@ interface ResolutionOption {
 /**
  * Get resolution options based on conflict state
  */
-function getResolutionOptions(conflict: ConflictDetail): ResolutionOption[] {
+function getResolutionOptions(conflict: ConflictDetail, t: (key: string) => string): ResolutionOption[] {
   const options: ResolutionOption[] = []
 
   // OPFS version (our changes)
   options.push({
     value: 'opfs',
-    label: '保留 OPFS 版本',
+    label: t('sync.syncPanel.conflictResolution.keepOpfsVersion'),
     description: conflict.nativeVersion.exists
-      ? '使用 Python 执行后修改的版本'
-      : '保留新创建的文件',
+      ? t('sync.syncPanel.conflictResolution.keepOpfsDescriptionModified')
+      : t('sync.syncPanel.conflictResolution.keepOpfsDescriptionNew'),
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -62,8 +63,8 @@ function getResolutionOptions(conflict: ConflictDetail): ResolutionOption[] {
   if (conflict.nativeVersion.exists) {
     options.push({
       value: 'native',
-      label: '保留本机版本',
-      description: '保留当前文件系统中的原始版本，放弃 OPFS 中的修改',
+      label: t('sync.syncPanel.conflictResolution.keepNativeVersion'),
+      description: t('sync.syncPanel.conflictResolution.keepNativeDescription'),
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -81,8 +82,8 @@ function getResolutionOptions(conflict: ConflictDetail): ResolutionOption[] {
   // Skip this file
   options.push({
     value: 'skip',
-    label: '跳过此文件',
-    description: '不同步此文件，保持现状',
+    label: t('sync.syncPanel.conflictResolution.skipThisFile'),
+    description: t('sync.syncPanel.conflictResolution.skipThisFileDescription'),
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path
@@ -116,20 +117,24 @@ function formatTimestamp(timestamp: number): string {
 const PREVIEW_CHAR_LIMIT = 12000
 
 function formatPreviewContent(
-  source: 'OPFS' | '本机',
+  _source: 'OPFS' | 'native',
   path: string,
   content: string | null,
-  unavailableMessage?: string
+  unavailableMessage: string,
+  binaryMessage: string,
+  noReadableMessage: string,
+  emptyMessage: string,
+  truncatedMessage: string
 ): string {
   if (unavailableMessage) return unavailableMessage
   if (content === null) {
-    if (isImageFile(path)) return `[${source} 版本为图片或二进制文件，暂不支持文本预览]`
-    return `[${source} 版本无可读文本内容]`
+    if (isImageFile(path)) return binaryMessage
+    return noReadableMessage
   }
-  if (content.length === 0) return `[${source} 版本为空文件]`
+  if (content.length === 0) return emptyMessage
   if (content.length <= PREVIEW_CHAR_LIMIT) return content
   const truncated = content.slice(0, PREVIEW_CHAR_LIMIT)
-  return `${truncated}\n\n...[内容过长，已截断 ${content.length - PREVIEW_CHAR_LIMIT} 字符]`
+  return `${truncated}\n\n${truncatedMessage.replace('{charCount}', String(content.length - PREVIEW_CHAR_LIMIT))}`
 }
 
 export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> = ({
@@ -137,6 +142,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
   onResolve,
   onCancel,
 }) => {
+  const t = useT()
   const [selectedOption, setSelectedOption] = useState<'opfs' | 'native' | 'skip' | null>(null)
   const [previewContent, setPreviewContent] = useState<{
     opfs: string | null
@@ -144,7 +150,30 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
   }>({ opfs: null, native: null })
   const [loading, setLoading] = useState(false)
 
-  const options = getResolutionOptions(conflict)
+  const cr = {
+    title: t('sync.syncPanel.conflictResolution.title'),
+    conflictDescription: (path: string) => t('sync.syncPanel.conflictResolution.conflictDescription', { path }),
+    opfsVersionTime: t('sync.syncPanel.conflictResolution.opfsVersionTime'),
+    nativeVersionTime: t('sync.syncPanel.conflictResolution.nativeVersionTime'),
+    selectResolution: t('sync.syncPanel.conflictResolution.selectResolution'),
+    opfsVersion: t('sync.syncPanel.conflictResolution.opfsVersion'),
+    nativeVersion: t('sync.syncPanel.conflictResolution.nativeVersion'),
+    noContent: t('sync.syncPanel.conflictResolution.noContent'),
+    fileNotExist: t('sync.syncPanel.conflictResolution.fileNotExist'),
+    binaryFilePreview: (source: string) => t('sync.syncPanel.conflictResolution.binaryFilePreview', { source }),
+    noReadableContent: (source: string) => t('sync.syncPanel.conflictResolution.noReadableContent', { source }),
+    emptyFile: (source: string) => t('sync.syncPanel.conflictResolution.emptyFile', { source }),
+    contentTruncated: t('sync.syncPanel.conflictResolution.contentTruncated'),
+    whyConflict: t('sync.syncPanel.conflictResolution.whyConflict'),
+    conflictExplanation: t('sync.syncPanel.conflictResolution.conflictExplanation'),
+    ifKeepNativeExists: t('sync.syncPanel.conflictResolution.ifKeepNativeExists'),
+    ifKeepNativeNotExists: t('sync.syncPanel.conflictResolution.ifKeepNativeNotExists'),
+    skipThisConflict: t('sync.syncPanel.conflictResolution.skipThisConflict'),
+    applySelection: t('sync.syncPanel.conflictResolution.applySelection'),
+    nativeNotConnected: t('sync.syncPanel.conflictResolution.nativeNotConnected'),
+  }
+
+  const options = getResolutionOptions(conflict, t)
 
   /**
    * Load file previews when dialog opens
@@ -161,14 +190,34 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           : Promise.resolve(null),
       ])
 
+      const binaryMessage = t('sync.syncPanel.conflictResolution.binaryFilePreview', { source: 'OPFS' })
+      const noReadableMessage = t('sync.syncPanel.conflictResolution.noReadableContent', { source: 'OPFS' })
+      const emptyMessage = t('sync.syncPanel.conflictResolution.emptyFile', { source: 'OPFS' })
+      const truncatedMessage = t('sync.syncPanel.conflictResolution.contentTruncated')
+      const nativeNotConnected = t('sync.syncPanel.conflictResolution.nativeNotConnected')
+      const nativeVersionLabel = t('sync.syncPanel.conflictResolution.nativeVersion')
+
       setPreviewContent({
-        opfs: formatPreviewContent('OPFS', conflict.path, opfsContent),
+        opfs: formatPreviewContent(
+          'OPFS',
+          conflict.path,
+          opfsContent,
+          '',
+          binaryMessage,
+          noReadableMessage,
+          emptyMessage,
+          truncatedMessage
+        ),
         native: conflict.nativeVersion.exists
           ? formatPreviewContent(
-              '本机',
+              'native',
               conflict.path,
               nativeContent,
-              nativeDir ? undefined : '[未连接本机目录，无法读取本机版本]'
+              nativeDir ? '' : nativeNotConnected,
+              t('sync.syncPanel.conflictResolution.binaryFilePreview', { source: nativeVersionLabel }),
+              t('sync.syncPanel.conflictResolution.noReadableContent', { source: nativeVersionLabel }),
+              t('sync.syncPanel.conflictResolution.emptyFile', { source: nativeVersionLabel }),
+              truncatedMessage
             )
           : null,
       })
@@ -177,7 +226,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
     } finally {
       setLoading(false)
     }
-  }, [conflict])
+  }, [conflict, t])
 
   // Load previews on mount
   React.useEffect(() => {
@@ -223,9 +272,9 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">文件冲突</h2>
+                <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">{cr.title}</h2>
                 <p className="text-sm text-tertiary dark:text-muted mt-0.5">
-                  {conflict.path} 在同步时发生冲突
+                  {cr.conflictDescription(conflict.path)}
                 </p>
               </div>
             </div>
@@ -247,14 +296,14 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           {/* Conflict metadata */}
           <div className="mt-4 flex items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-tertiary dark:text-muted">OPFS 版本时间:</span>
+              <span className="text-tertiary dark:text-muted">{cr.opfsVersionTime}</span>
               <span className="font-medium text-primary dark:text-primary-foreground">
                 {formatTimestamp(conflict.opfsVersion.mtime)}
               </span>
             </div>
             {conflict.nativeVersion.mtime && (
               <div className="flex items-center gap-2">
-                <span className="text-tertiary dark:text-muted">本机版本时间:</span>
+                <span className="text-tertiary dark:text-muted">{cr.nativeVersionTime}</span>
                 <span className="font-medium text-primary dark:text-primary-foreground">
                   {formatTimestamp(conflict.nativeVersion.mtime)}
                 </span>
@@ -268,7 +317,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
             {/* Resolution Options */}
             <div className="lg:col-span-1 space-y-3">
-              <h3 className="text-sm font-medium text-secondary dark:text-muted mb-3">选择解决方案</h3>
+              <h3 className="text-sm font-medium text-secondary dark:text-muted mb-3">{cr.selectResolution}</h3>
               {options.map((option) => (
                 <button
                   key={option.value}
@@ -316,7 +365,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               <div className="flex flex-col bg-muted dark:bg-muted rounded-lg overflow-hidden">
                 <div className="px-3 py-2 border-b border dark:border-border bg-primary-50 dark:bg-primary-900/30">
                   <h4 className="text-sm font-medium text-primary-700">
-                    OPFS 版本
+                    {cr.opfsVersion}
                   </h4>
                 </div>
                 <div className="flex-1 overflow-auto p-4 bg-card dark:bg-card">
@@ -330,7 +379,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                     </pre>
                   ) : (
                     <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                      无内容
+                      {cr.noContent}
                     </div>
                   )}
                 </div>
@@ -340,7 +389,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               <div className="flex flex-col bg-muted dark:bg-muted rounded-lg overflow-hidden">
                 <div className="px-3 py-2 border-b border dark:border-border bg-success-bg dark:bg-success-950/30">
                   <h4 className="text-sm font-medium text-green-900">
-                    本机版本
+                    {cr.nativeVersion}
                   </h4>
                 </div>
                 <div className="flex-1 overflow-auto p-4 bg-card dark:bg-card">
@@ -354,7 +403,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                     </pre>
                   ) : (
                     <div className="flex items-center justify-center h-full text-tertiary dark:text-muted text-sm">
-                      {conflict.nativeVersion.exists ? '无内容' : '文件不存在'}
+                      {conflict.nativeVersion.exists ? cr.noContent : cr.fileNotExist}
                     </div>
                   )}
                 </div>
@@ -380,14 +429,13 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               </svg>
               <div className="flex-1">
                 <h4 className="text-sm font-medium text-warning dark:text-warning-200 mb-1">
-                  为什么会发生冲突？
+                  {cr.whyConflict}
                 </h4>
                 <p className="text-xs text-warning dark:text-warning-300 leading-relaxed">
-                  OPFS 中的文件在本机文件系统中也被修改了。系统检测到两个版本的修改时间不同，
-                  需要您决定保留哪个版本。
+                  {cr.conflictExplanation}
                   {conflict.nativeVersion.exists
-                    ? '选择"保留本机版本"将放弃 OPFS 中的修改。'
-                    : '本机文件不存在，如果选择"保留本机版本"将删除此文件。'}
+                    ? cr.ifKeepNativeExists
+                    : cr.ifKeepNativeNotExists}
                 </p>
               </div>
             </div>
@@ -401,14 +449,14 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               onClick={handleSkipAll}
               className="text-sm text-neutral-600 hover:text-primary dark:text-muted dark:hover:text-muted transition-colors"
             >
-              跳过此冲突
+              {cr.skipThisConflict}
             </button>
             <div className="flex items-center gap-3">
               <button
                 onClick={onCancel}
                 className="px-4 py-2 text-sm font-medium text-secondary bg-card border dark:border-border dark:bg-card dark:text-muted dark:hover:bg-muted rounded-lg hover:bg-muted transition-all"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleResolve}
@@ -423,7 +471,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                     d="M5 13l4 4L19 7m0 0l-7-7 7"
                   />
                 </svg>
-                应用选择
+                {cr.applySelection}
               </button>
             </div>
           </div>

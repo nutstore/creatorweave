@@ -13,6 +13,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { CopyButton } from './CopyButton'
 import { RegenerateButton } from './RegenerateButton'
+import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -46,13 +47,13 @@ interface MessageBubbleProps {
   onDeleteAgentLoop?: (userMessageId: string) => void
   /** Disable delete action */
   disableDeleteActions?: boolean
-  /** 重新生成回调 */
+  /** Regenerate callback */
   onRegenerate?: (userMessageId: string) => void
-  /** 取消当前流式输出的回调 */
+  /** Cancel current streaming output callback */
   onCancel?: () => void
-  /** 是否正在处理（流式输出） */
+  /** Whether is processing (streaming output) */
   isProcessing?: boolean
-  /** 编辑并发送回调 */
+  /** Edit and resend callback */
   onEditAndResend?: (userMessageId: string, newContent: string) => void
 }
 
@@ -69,6 +70,7 @@ export function MessageBubble({
   isProcessing = false,
   onEditAndResend,
 }: MessageBubbleProps) {
+  const t = useT()
   const isUser = message.role === 'user'
   const isStreamingReasoning = streaming?.reasoning ?? false
   const isStreamingContent = streaming?.content ?? false
@@ -143,7 +145,7 @@ export function MessageBubble({
                   onClick={handleCancelEdit}
                   className="rounded px-2.5 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -151,7 +153,7 @@ export function MessageBubble({
                   disabled={!editText.trim() || editText.trim() === message.content}
                   className="rounded bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40"
                 >
-                  发送
+                  {t('conversation.buttons.send')}
                 </button>
               </div>
             </div>
@@ -176,13 +178,13 @@ export function MessageBubble({
                 className="inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                 disabled={isProcessing}
                 onClick={handleStartEdit}
-                title="编辑并重新发送"
-                aria-label="编辑并重新发送"
+                title={t('conversation.editAndResend')}
+                aria-label={t('conversation.editAndResend')}
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
-            {/* 顺序: Regenerate → Copy → Delete */}
+            {/* Order: Regenerate → Copy → Delete */}
             {onRegenerate && !isEditing && (
               <RegenerateButton
                 userMessageId={message.id}
@@ -193,15 +195,15 @@ export function MessageBubble({
                 isRunning={isProcessing}
               />
             )}
-            {!isEditing && <CopyButton content={message.content || ''} title="复制" />}
+            {!isEditing && <CopyButton content={message.content || ''} title={t('common.copy')} />}
             {onDeleteAgentLoop && !isEditing && (
               <button
                 type="button"
                 className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                 disabled={disableDeleteActions}
                 onClick={() => onDeleteAgentLoop(message.id)}
-                title="删除此轮对话"
-                aria-label="删除此轮对话"
+                title={t('conversation.buttons.deleteTurn')}
+                aria-label={t('conversation.buttons.deleteTurn')}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -260,7 +262,7 @@ export function MessageBubble({
         {!isStreamingReasoning && !isStreamingContent && message.usage && (
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span
-              title={`输入 ${message.usage.promptTokens} + 输出 ${message.usage.completionTokens} = ${message.usage.totalTokens} tokens`}
+              title={t('conversation.usage.tokenUsage', { promptTokens: message.usage.promptTokens, completionTokens: message.usage.completionTokens, totalTokens: message.usage.totalTokens })}
             >
               ↑{formatTokens(message.usage.promptTokens)} ↓
               {formatTokens(message.usage.completionTokens)}

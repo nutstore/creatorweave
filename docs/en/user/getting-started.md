@@ -1,6 +1,6 @@
 # Getting Started
 
-AI Workspace is a local-first workspace for creators and engineering teams.
+CreatorWeave is a local-first workspace for creators and engineering teams.
 
 ## Prerequisites
 

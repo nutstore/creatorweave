@@ -5,7 +5,7 @@ order: 100
 
 # 开发指南
 
-本节包含 AI Workspace 的开发指南和最佳实践。
+本节包含 CreatorWeave 的开发指南和最佳实践。
 
 ## 目录
 

@@ -5,7 +5,7 @@ order: 201
 
 # 架构概览
 
-AI Workspace 的系统架构介绍。
+CreatorWeave 的系统架构介绍。
 
 ## 技术架构
 

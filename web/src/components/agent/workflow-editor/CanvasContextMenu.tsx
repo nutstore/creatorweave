@@ -3,6 +3,7 @@ import { Lightbulb, PenTool, ShieldCheck, Wrench, Layers, Maximize } from 'lucid
 import { cn } from '@creatorweave/ui'
 import { nodeKindConfig } from './constants'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 const kindOrder: WorkflowNodeKind[] = ['plan', 'produce', 'review', 'repair', 'assemble']
 
@@ -31,6 +32,19 @@ interface CanvasContextMenuProps {
   onDeleteNode?: (nodeId: string) => void
 }
 
+// Get translated kind label
+function getKindLabel(kind: WorkflowNodeKind, t: (key: string) => string): string {
+  const labels: Record<WorkflowNodeKind, string> = {
+    plan: t('workflowEditor.plan'),
+    produce: t('workflowEditor.produce'),
+    review: t('workflowEditor.review'),
+    repair: t('workflowEditor.repair'),
+    assemble: t('workflowEditor.assemble'),
+    condition: t('workflowEditor.condition') || 'Condition',
+  }
+  return labels[kind] || kind
+}
+
 export function CanvasContextMenu({
   menu,
   onClose,
@@ -40,6 +54,7 @@ export function CanvasContextMenu({
   onSetEntry,
   onDeleteNode,
 }: CanvasContextMenuProps) {
+  const t = useT()
   const ref = useRef<HTMLDivElement>(null)
 
   const handleAddNode = useCallback(
@@ -81,7 +96,7 @@ export function CanvasContextMenu({
       {menu.type === 'pane' ? (
         <>
           <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-            添加节点
+            {t('workflowEditor.addNodes')}
           </div>
           {kindOrder.map((kind) => {
             const config = nodeKindConfig[kind]
@@ -98,7 +113,7 @@ export function CanvasContextMenu({
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
-                {config.label}
+                {getKindLabel(kind, t)}
                 <span
                   className="ml-auto h-1.5 w-1.5 rounded-full"
                   style={{ background: config.accentHex }}
@@ -113,7 +128,7 @@ export function CanvasContextMenu({
             className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
             <Maximize className="h-3.5 w-3.5" />
-            全部适应视图
+            {t('workflowEditor.fitView')}
           </button>
         </>
       ) : (
@@ -124,7 +139,7 @@ export function CanvasContextMenu({
               onClick={() => { onEditNode(menu.nodeId!); onClose() }}
               className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
-              编辑属性
+              {t('workflowEditor.editProperties')}
             </button>
           )}
           {onSetEntry && menu.nodeId && (
@@ -133,7 +148,7 @@ export function CanvasContextMenu({
               onClick={() => { onSetEntry(menu.nodeId!); onClose() }}
               className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
-              设为入口
+              {t('workflowEditor.setAsEntry')}
             </button>
           )}
           <div className="my-1 border-t border-neutral-100 dark:border-neutral-800" />
@@ -143,7 +158,7 @@ export function CanvasContextMenu({
               onClick={() => { onDeleteNode(menu.nodeId!); onClose() }}
               className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/30"
             >
-              删除节点
+              {t('workflowEditor.deleteNodeContext')}
             </button>
           )}
         </>

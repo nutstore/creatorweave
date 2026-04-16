@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import type { SkillMetadata, SkillCategory } from '@/skills/skill-types'
 import { useSkillsStore } from '@/store/skills.store'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 interface SkillEditorProps {
   /** Skill to edit (undefined = create new) */
@@ -24,16 +25,16 @@ interface SkillEditorProps {
   onClose: () => void
 }
 
-const CATEGORY_OPTIONS: { value: SkillCategory; label: string; color: string }[] = [
-  { value: 'code-review', label: '代码审查', color: 'purple' },
-  { value: 'testing', label: '测试', color: 'green' },
-  { value: 'debugging', label: '调试', color: 'red' },
-  { value: 'refactoring', label: '重构', color: 'orange' },
-  { value: 'documentation', label: '文档', color: 'blue' },
-  { value: 'security', label: '安全', color: 'yellow' },
-  { value: 'performance', label: '性能', color: 'pink' },
-  { value: 'architecture', label: '架构', color: 'indigo' },
-  { value: 'general', label: '通用', color: 'gray' },
+const CATEGORY_OPTIONS: { value: SkillCategory; labelKey: string; color: string }[] = [
+  { value: 'code-review', labelKey: 'skillEditor.categories.codeReview', color: 'purple' },
+  { value: 'testing', labelKey: 'skillEditor.categories.testing', color: 'green' },
+  { value: 'debugging', labelKey: 'skillEditor.categories.debugging', color: 'red' },
+  { value: 'refactoring', labelKey: 'skillEditor.categories.refactoring', color: 'orange' },
+  { value: 'documentation', labelKey: 'skillEditor.categories.documentation', color: 'blue' },
+  { value: 'security', labelKey: 'skillEditor.categories.security', color: 'yellow' },
+  { value: 'performance', labelKey: 'skillEditor.categories.performance', color: 'pink' },
+  { value: 'architecture', labelKey: 'skillEditor.categories.architecture', color: 'indigo' },
+  { value: 'general', labelKey: 'skillEditor.categories.general', color: 'gray' },
 ]
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -49,6 +50,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
+  const t = useT()
   const skillsStore = useSkillsStore()
   const [isSaving, setIsSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -134,7 +136,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
     lines.push('---')
     lines.push('')
     lines.push('# Instruction')
-    lines.push(instruction || '*(请输入指令内容)*')
+    lines.push(instruction || t('skillEditor.instructionPlaceholder'))
     if (examples) {
       lines.push('')
       lines.push('# Examples')
@@ -162,11 +164,11 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
   const handleSave = async () => {
     // Validation
     if (!name.trim()) {
-      setError('请输入技能名称')
+      setError(t('skillEditor.nameRequired'))
       return
     }
     if (!description.trim()) {
-      setError('请输入描述')
+      setError(t('skillEditor.descriptionRequired'))
       return
     }
 
@@ -180,7 +182,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
       if (result.success) {
         onClose()
       } else {
-        setError(result.error || '保存失败')
+        setError(result.error || t('skillEditor.saveFailed'))
       }
     } finally {
       setIsSaving(false)
@@ -191,6 +193,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
   const categoryColorClass = currentCategory
     ? CATEGORY_COLORS[currentCategory.color]
     : CATEGORY_COLORS.gray
+  const currentCategoryLabel = currentCategory ? t(currentCategory.labelKey) : t('skillEditor.uncategorized')
 
   return (
     <BrandDialog
@@ -209,10 +212,10 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
               </div>
               <div className="min-w-0 flex-1">
                 <BrandDialogTitle className="px-0 text-base font-semibold text-primary dark:text-primary-foreground">
-                  {skill ? '编辑技能' : '新建技能'}
+                  {skill ? t('skillEditor.editSkill') : t('skillEditor.createSkill')}
                 </BrandDialogTitle>
                 <p className="mt-1 text-xs text-secondary dark:text-muted">
-                  {skill ? '修改现有技能的配置和内容' : '创建自定义技能，扩展 AI 能力'}
+                  {skill ? t('skillEditor.editDescription') : t('skillEditor.createDescription')}
                 </p>
               </div>
             </div>
@@ -224,7 +227,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
                 className="bg-white/80 backdrop-blur-sm hover:bg-white dark:bg-muted dark:hover:bg-muted"
               >
                 {showPreview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                {showPreview ? '编辑' : '预览'}
+                {showPreview ? t('skillEditor.edit') : t('skillEditor.preview')}
               </Button>
               <Button variant="ghost" size="icon" onClick={onClose} className="hover:bg-white/50 dark:hover:bg-muted">
                 <X className="h-4 w-4" />
@@ -244,6 +247,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
         <div className="flex-1 overflow-y-auto">
           {!showPreview ? (
             <EditForm
+              t={t}
               name={name}
               setName={setName}
               description={description}
@@ -264,7 +268,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
               setTemplates={setTemplates}
             />
           ) : (
-            <PreviewPanel content={previewContent()} />
+            <PreviewPanel content={previewContent()} t={t} />
           )}
         </div>
 
@@ -272,17 +276,17 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
         <div className="flex items-center justify-between border-t border bg-muted px-6 py-3 dark:border-border dark:bg-muted">
           <div className="flex items-center gap-2">
             <Badge variant="outline" className={cn('border-2', categoryColorClass)}>
-              {currentCategory?.label || '未分类'}
+              {currentCategoryLabel}
             </Badge>
-            <span className="text-xs text-tertiary dark:text-muted">{skill ? '编辑模式' : '新建模式'}</span>
+            <span className="text-xs text-tertiary dark:text-muted">{skill ? t('skillEditor.editMode') : t('skillEditor.createMode')}</span>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={onClose} className="bg-white hover:bg-muted dark:bg-card dark:hover:bg-muted">
-              取消
+              {t('skillEditor.cancel')}
             </Button>
             <Button onClick={handleSave} disabled={isSaving}>
               <Save className="mr-1.5 h-4 w-4" />
-              {isSaving ? '保存中...' : '保存'}
+              {isSaving ? t('skillEditor.saving') : t('skillEditor.save')}
             </Button>
           </div>
         </div>
@@ -292,6 +296,7 @@ export function SkillEditor({ skill, open, onClose }: SkillEditorProps) {
 }
 
 interface EditFormProps {
+  t: (key: string) => string
   name: string
   setName: (v: string) => void
   description: string
@@ -313,6 +318,7 @@ interface EditFormProps {
 }
 
 function EditForm({
+  t,
   name,
   setName,
   description,
@@ -339,19 +345,19 @@ function EditForm({
     <div className="space-y-6 p-6">
       {/* Basic Info Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">基本信息</h3>
+        <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">{t('skillEditor.basicInfo')}</h3>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="技能名称" required>
+          <FormField label={t('skillEditor.skillName')} required>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="例如: code-reviewer"
+              placeholder={t('skillEditor.skillNamePlaceholder')}
               className="bg-muted focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
             />
           </FormField>
 
-          <FormField label="分类">
+          <FormField label={t('skillEditor.category')}>
             <div className="relative">
               <button
                 type="button"
@@ -361,7 +367,7 @@ function EditForm({
                   'border hover:border focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-border dark:hover:border'
                 )}
               >
-                <span>{currentCategory?.label || '选择分类'}</span>
+                <span>{currentCategory ? t(currentCategory.labelKey) : t('skillEditor.selectCategory')}</span>
                 <ChevronDown
                   className={cn(
                     'h-4 w-4 text-tertiary transition-transform',
@@ -386,7 +392,7 @@ function EditForm({
                           : 'text-secondary hover:bg-muted dark:text-muted dark:hover:bg-muted'
                       )}
                     >
-                      <span>{opt.label}</span>
+                      <span>{t(opt.labelKey)}</span>
                       {category === opt.value && (
                         <div
                           className={cn('h-2 w-2 rounded-full', {
@@ -410,89 +416,89 @@ function EditForm({
           </FormField>
         </div>
 
-        <FormField label="描述" required>
+        <FormField label={t('skillEditor.description')} required>
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="简短描述这个技能的功能"
+            placeholder={t('skillEditor.descriptionPlaceholder')}
             className="bg-muted focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
           />
         </FormField>
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField label="标签">
+          <FormField label={t('skillEditor.tags')}>
             <Input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="review, quality"
               className="bg-muted focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
             />
-            <p className="mt-1 text-xs text-tertiary dark:text-muted">逗号分隔，用于分类和搜索</p>
+            <p className="mt-1 text-xs text-tertiary dark:text-muted">{t('skillEditor.tagsHelp')}</p>
           </FormField>
 
-          <FormField label="触发关键词">
+          <FormField label={t('skillEditor.triggerKeywords')}>
             <Input
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
-              placeholder="审查, 检查"
+              placeholder={t('skillEditor.triggerKeywordsPlaceholder')}
               className="bg-muted focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
             />
-            <p className="mt-1 text-xs text-tertiary dark:text-muted">逗号分隔，匹配时自动激活</p>
+            <p className="mt-1 text-xs text-tertiary dark:text-muted">{t('skillEditor.triggerKeywordsHelp')}</p>
           </FormField>
         </div>
 
-        <FormField label="文件扩展名">
+        <FormField label={t('skillEditor.fileExtensions')}>
           <Input
             value={fileExtensions}
             onChange={(e) => setFileExtensions(e.target.value)}
             placeholder=".ts, .tsx"
             className="bg-muted focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
           />
-          <p className="mt-1 text-xs text-tertiary dark:text-muted">可选，针对特定文件类型激活</p>
+          <p className="mt-1 text-xs text-tertiary dark:text-muted">{t('skillEditor.fileExtensionsHelp')}</p>
         </FormField>
       </div>
 
       {/* Content Section */}
       <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">技能内容</h3>
+        <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">{t('skillEditor.skillContent')}</h3>
 
-        <FormField label="指令" required>
+        <FormField label={t('skillEditor.instruction')} required>
           <Textarea
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
-            placeholder="你是代码审查专家。当用户要求审查代码时：&#10;1. 分析类型安全性&#10;2. 检查性能问题&#10;3. 评估可读性"
+            placeholder={t('skillEditor.instructionPlaceholder')}
             rows={8}
             className="bg-muted font-mono text-sm focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
           />
         </FormField>
 
-        <FormField label="示例对话">
+        <FormField label={t('skillEditor.exampleDialog')}>
           <Textarea
             value={examples}
             onChange={(e) => setExamples(e.target.value)}
-            placeholder="用户: '帮我审查这个组件'&#10;AI: '让我检查一下...'"
+            placeholder={t('skillEditor.exampleDialogPlaceholder')}
             rows={5}
             className="bg-muted font-mono text-sm focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
           />
-          <p className="mt-1 text-xs text-tertiary dark:text-muted">可选，提供使用示例帮助 AI 理解</p>
+          <p className="mt-1 text-xs text-tertiary dark:text-muted">{t('skillEditor.exampleDialogHelp')}</p>
         </FormField>
 
-        <FormField label="输出模板">
+        <FormField label={t('skillEditor.outputTemplate')}>
           <Textarea
             value={templates}
             onChange={(e) => setTemplates(e.target.value)}
-            placeholder="## 审查报告&#10;- 文件: {{filename}}&#10;- 问题: {{issues}}"
+            placeholder={t('skillEditor.outputTemplatePlaceholder')}
             rows={5}
             className="bg-muted font-mono text-sm focus:bg-white dark:bg-muted dark:text-primary-foreground dark:focus:bg-card"
           />
-          <p className="mt-1 text-xs text-tertiary dark:text-muted">可选，定义标准输出格式</p>
+          <p className="mt-1 text-xs text-tertiary dark:text-muted">{t('skillEditor.outputTemplateHelp')}</p>
         </FormField>
       </div>
     </div>
   )
 }
 
-function PreviewPanel({ content }: { content: string }) {
+function PreviewPanel({ content, t }: { content: string; t: (key: string) => string }) {
   const lineCount = content.split('\n').length
   const charCount = content.length
 
@@ -501,14 +507,14 @@ function PreviewPanel({ content }: { content: string }) {
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <FileCode className="h-4 w-4 text-blue-500" />
-          <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">SKILL.md 预览</h3>
+          <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">{t('skillEditor.skillMdPreview')}</h3>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-xs">
-            {lineCount} 行
+            {lineCount} {t('skillEditor.lines')}
           </Badge>
           <Badge variant="outline" className="text-xs">
-            {charCount} 字符
+            {charCount} {t('skillEditor.characters')}
           </Badge>
         </div>
       </div>

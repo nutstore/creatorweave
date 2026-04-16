@@ -10,7 +10,7 @@ YELLOW := \033[0;33m
 NC := \033[0m # No Color
 
 help: ## Show help message
-	@echo '$(BLUE)AI Workspace - Commands$(NC)'
+	@echo '$(BLUE)CreatorWeave - Commands$(NC)'
 	@echo ''
 	@echo '$(GREEN)Quick Start:$(NC)'
 	@echo '  make setup         - First-time setup (install all dependencies)'

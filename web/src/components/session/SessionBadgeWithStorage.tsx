@@ -34,6 +34,7 @@ import {
   TooltipTrigger,
 } from '@creatorweave/ui'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 export interface ConversationStorageBadgeProps {
   /** Compact mode (show only counts) */
@@ -48,12 +49,12 @@ const STORAGE_STATUS_VARIANT: Record<StorageStatus, 'success' | 'warning' | 'err
   critical: 'error',
 }
 
-/** Storage status labels */
+/** Storage status labels - translation keys */
 const STORAGE_STATUS_LABELS: Record<StorageStatus, string> = {
-  ok: '正常',
-  warning: '空间不足',
-  urgent: '急需清理',
-  critical: '严重不足',
+  ok: 'conversationStorage.statusOk',
+  warning: 'conversationStorage.statusWarning',
+  urgent: 'conversationStorage.statusUrgent',
+  critical: 'conversationStorage.statusCritical',
 }
 
 /** Progress color based on usage percentage */
@@ -72,6 +73,7 @@ const getStatusDotColor = (hasError: boolean, isInitialized: boolean, isOPFS: bo
 }
 
 export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> = () => {
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false)
   const [cleanupPreview, setCleanupPreview] = useState<CleanupPreview | null>(null)
@@ -82,7 +84,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   const [deleteLoading, setDeleteLoading] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭 dropdown（与 LanguageSwitcher 相同的模式）
+  // Click outside to close dropdown (same pattern as LanguageSwitcher)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -144,13 +146,13 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
     try {
       await deleteConversation(conversationToDelete)
-      toast.success('会话已删除')
+      toast.success(t('conversationStorage.sessionDeleted'))
       setDeleteDialogOpen(false)
       setConversationToDelete(null)
       await refresh()
     } catch (error) {
       console.error('[ConversationStorageBadge] Failed to delete conversation:', error)
-      toast.error('删除会话失败')
+      toast.error(t('conversationStorage.deleteFailed'))
     } finally {
       setDeleteLoading(false)
     }
@@ -168,11 +170,11 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           setCleanupPreview(preview)
           setCleanupDialogOpen(true)
         } else {
-          toast.info(scope === 'old' ? '没有 30 天未活跃的对话可清理' : '没有可清理的缓存')
+          toast.info(scope === 'old' ? t('conversationStorage.noOldConversations') : t('conversationStorage.noCleanupNeeded'))
         }
       } catch (error) {
         console.error('[ConversationStorageBadge] Failed to get cleanup preview:', error)
-        toast.error('获取清理信息失败')
+        toast.error(t('conversationStorage.getCleanupInfoFailed'))
       } finally {
         setCleanupLoading(false)
       }
@@ -188,13 +190,13 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
     try {
       const cleaned = await executeCleanup(cleanupScope, 30)
-      toast.success(`已清理 ${cleaned} 个对话的文件缓存，释放 ${cleanupPreview.totalSizeFormatted}`)
+      toast.success(t('conversationStorage.cleanupSuccess', { count: cleaned, size: cleanupPreview.totalSizeFormatted }))
       setCleanupDialogOpen(false)
       setCleanupPreview(null)
       await refresh()
     } catch (error) {
       console.error('[ConversationStorageBadge] Failed to execute cleanup:', error)
-      toast.error('清理失败，请重试')
+      toast.error(t('conversationStorage.cleanupFailed'))
     } finally {
       setCleanupLoading(false)
     }
@@ -219,7 +221,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   return (
     <TooltipProvider delayDuration={200}>
       <div className="relative" ref={containerRef}>
-        <ActionTooltip label="存储空间">
+        <ActionTooltip label={t('conversationStorage.storageSpace')}>
           <BrandButton iconButton variant="ghost" onClick={() => setOpen(!open)}>
             <HardDrive className="h-5 w-5" />
           </BrandButton>
@@ -235,7 +237,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
       <BrandDialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
         <BrandDialogContent>
           <BrandDialogHeader>
-            <BrandDialogTitle>清理对话缓存</BrandDialogTitle>
+            <BrandDialogTitle>{t('conversationStorage.cleanupTitle')}</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
             {cleanupPreview && (
@@ -244,33 +246,33 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                   <div className="mb-3 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2">
                     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                     <div className="text-[10px] text-amber-800">
-                      <span className="font-semibold">注意：</span>
-                      将丢弃 {cleanupPreview.pendingCount} 个未保存的修改
+                      <span className="font-semibold">{t('conversationStorage.attention')}</span>
+                      {t('conversationStorage.willDiscard', { count: cleanupPreview.pendingCount })}
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-2 text-xs text-secondary">
-                  <div>将清理：</div>
+                  <div>{t('conversationStorage.willCleanup')}</div>
                   <div className="ml-4 space-y-1">
                     <div>
-                      • {cleanupPreview.conversationCount} 个对话
-                      {cleanupScope === 'old' && ' (30天未活跃)'}
+                      • {t('conversationStorage.conversationCount', { count: cleanupPreview.conversationCount })}
+                      {cleanupScope === 'old' && ` ${t('conversationStorage.daysInactive')}`}
                     </div>
-                    <div>• 约 {cleanupPreview.totalSizeFormatted} 文件缓存</div>
+                    <div>• {t('conversationStorage.fileCacheSize', { size: cleanupPreview.totalSizeFormatted })}</div>
                     <div
                       className={cn(
                         cleanupPreview.hasUnsavedChanges ? 'text-amber-600' : 'text-emerald-600'
                       )}
                     >
-                      • {cleanupPreview.pendingCount} 个未保存的修改
+                      • {t('conversationStorage.unsavedChanges', { count: cleanupPreview.pendingCount })}
                     </div>
                   </div>
                 </div>
 
                 {/* Scope Selection */}
                 <div className="mt-3 space-y-2">
-                  <div className="text-[10px] font-medium uppercase text-muted">选择清理范围</div>
+                  <div className="text-[10px] font-medium uppercase text-muted">{t('conversationStorage.selectScope')}</div>
                   <div className="space-y-1">
                     <button
                       type="button"
@@ -290,7 +292,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                             : 'border-border dark:border-border'
                         )}
                       />
-                      仅清理旧会话 (30天未活跃)
+                      {t('conversationStorage.cleanupOldSessions')}
                     </button>
                     <button
                       type="button"
@@ -310,7 +312,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                             : 'border-border dark:border-border'
                         )}
                       />
-                      清理所有对话缓存
+                      {t('conversationStorage.cleanupAll')}
                     </button>
                   </div>
                 </div>
@@ -318,7 +320,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                 {/* Help text */}
                 <div className="mt-3 flex items-start gap-1.5 text-[9px] leading-tight text-muted">
                   <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                  <p>对话记录不会被删除，下次访问文件时会重新从本地磁盘读取。</p>
+                  <p>{t('conversationStorage.cleanupHelpText')}</p>
                 </div>
               </>
             )}
@@ -329,14 +331,14 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
               onClick={() => setCleanupDialogOpen(false)}
               disabled={cleanupLoading}
             >
-              取消
+              {t('conversationStorage.canceling')}
             </BrandButton>
             <BrandButton
               variant={cleanupPreview?.hasUnsavedChanges ? 'secondary' : 'danger'}
               onClick={handleExecuteCleanup}
               disabled={cleanupLoading}
             >
-              {cleanupLoading ? '清理中...' : '确认清理'}
+              {cleanupLoading ? t('conversationStorage.cleaning') : t('conversationStorage.confirmCleanup')}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>
@@ -346,7 +348,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
       <BrandDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <BrandDialogContent>
           <BrandDialogHeader>
-            <BrandDialogTitle>删除对话</BrandDialogTitle>
+            <BrandDialogTitle>{t('conversationStorage.deleteTitle')}</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
             {(() => {
@@ -357,35 +359,35 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
               return (
                 <>
                   <p className="text-sm text-secondary">
-                    确定要删除 <span className="font-medium text-primary">"{conversation?.name}"</span> 吗？
+                    {t('conversationStorage.deleteConfirm', { name: conversation?.name ?? '' })}
                   </p>
 
                   {hasData && (
                     <div className="mt-3 rounded-md bg-amber-50 px-3 py-2">
                       <p className="flex items-center gap-2 text-[10px] text-amber-800">
                         <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                        <span className="font-semibold">注意：有未保存的修改</span>
+                        <span className="font-semibold">{t('conversationStorage.warningUnsaved')}</span>
                       </p>
                       <p className="ml-5 text-[10px] text-amber-700">
-                        {hasPending && `${conversation?.pendingCount ?? 0} 个待同步的修改`}
+                        {hasPending && t('conversationStorage.pendingSync', { count: conversation?.pendingCount ?? 0 })}
                       </p>
                     </div>
                   )}
 
                   <div className="mt-3 space-y-3 text-sm">
                     <div>
-                      <span className="font-medium text-danger">❌ 将删除</span>
+                      <span className="font-medium text-danger">❌ {t('conversationStorage.willDelete')}</span>
                       <ul className="ml-6 mt-1 list-disc space-y-1 text-secondary">
-                        <li>对话记录</li>
-                        <li>文件缓存</li>
-                        <li>未保存的修改（无法恢复）</li>
+                        <li>{t('conversationStorage.conversationRecords')}</li>
+                        <li>{t('conversationStorage.fileCache')}</li>
+                        <li>{t('conversationStorage.unsavedCannotRecover')}</li>
                       </ul>
                     </div>
 
                     <div className="rounded-md bg-muted dark:bg-muted px-3 py-2 dark:bg-muted">
                       <p className="flex items-center gap-2 text-[10px] text-muted">
                         <Info className="h-3.5 w-3.5 shrink-0" />
-                        <span>删除后不可恢复</span>
+                        <span>{t('conversationStorage.cannotRecover')}</span>
                       </p>
                     </div>
                   </div>
@@ -399,10 +401,10 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
               onClick={() => setDeleteDialogOpen(false)}
               disabled={deleteLoading}
             >
-              取消
+              {t('conversationStorage.canceling')}
             </BrandButton>
             <BrandButton variant="danger" onClick={handleConfirmDelete} disabled={deleteLoading}>
-              {deleteLoading ? '删除中...' : '确认删除'}
+              {deleteLoading ? t('conversationStorage.deleting') : t('conversationStorage.confirmDelete')}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>
@@ -414,12 +416,12 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   function ConversationDropdown() {
     return (
       <>
-        {/* Dropdown menu - 使用与 LanguageSwitcher 相同的 z-index */}
+        {/* Dropdown menu - same z-index pattern as LanguageSwitcher */}
         <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-white shadow-lg dark:border-border dark:bg-card">
           {/* Header - Current conversation */}
           <div className="px-4 py-3">
             <div className="flex items-center justify-between">
-              <span className="text-tertiary text-xs font-medium">当前对话</span>
+              <span className="text-tertiary text-xs font-medium">{t('conversationStorage.currentConversation')}</span>
               {currentConversation && (
                 <span className="text-xs font-semibold text-primary-600">
                   {currentConversation.name}
@@ -434,8 +436,8 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           <div className="px-4 py-3">
             <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-secondary">
               <HardDrive className="h-3.5 w-3.5" />
-              <span>存储空间 (浏览器配额)</span>
-              {storageLoading && <span className="text-muted">加载中...</span>}
+              <span>{t('conversationStorage.storageSpace')} {t('conversationStorage.browserQuota')}</span>
+              {storageLoading && <span className="text-muted">{t('conversationStorage.loading')}</span>}
             </div>
 
             {storage && (
@@ -467,29 +469,29 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       shape="pill"
                       className="!px-1.5 !py-0.5 !text-[10px]"
                     >
-                      {STORAGE_STATUS_LABELS[storage.status]}
+                      {t(STORAGE_STATUS_LABELS[storage.status])}
                     </BrandBadge>
-                    <ActionTooltip label="计算每个对话的缓存大小（可能较慢）">
+                    <ActionTooltip label={t('conversationStorage.calculateSize')}>
                       <button
                         type="button"
                         onClick={() => refresh(true)}
                         className="text-[10px] text-primary-600 hover:underline"
                       >
-                        刷新
+                        {t('conversationStorage.refresh')}
                       </button>
                     </ActionTooltip>
                   </div>
                   {/* Explanatory note */}
                   <div className="flex items-start gap-1.5 text-[9px] leading-tight text-muted">
                     <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                    <p>配额是浏览器允许的上限，不等于实际剩余空间。写入时若超出实际空间会报错。</p>
+                    <p>{t('conversationStorage.quotaExplanation')}</p>
                   </div>
                 </div>
               </>
             )}
 
             {!storage && !storageLoading && (
-              <p className="text-[10px] text-muted">无法获取存储信息</p>
+              <p className="text-[10px] text-muted">{t('conversationStorage.cannotGetStorage')}</p>
             )}
           </div>
 
@@ -499,12 +501,12 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           <div className="custom-scrollbar max-h-60 overflow-y-auto">
             <div className="px-4 py-2">
               <span className="text-xs font-semibold text-secondary">
-                所有对话 ({conversations.length})
+                {t('conversationStorage.allConversations', { count: conversations.length })}
               </span>
             </div>
 
             {storageConversations.length === 0 ? (
-              <div className="px-4 py-4 text-center text-xs text-muted">暂无会话</div>
+              <div className="px-4 py-4 text-center text-xs text-muted">{t('conversationStorage.noSessions')}</div>
             ) : (
               <ul>
                 {storageConversations.map((conversation) => {
@@ -551,13 +553,13 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                               {conversation.pendingCount}
                             </BrandBadge>
                           )}
-                          {!hasPending && <span className="text-muted">无变更</span>}
+                          {!hasPending && <span className="text-muted">{t('conversationStorage.noChanges')}</span>}
                         </div>
                       </button>
 
                       {/* Delete button */}
                       {!isActive && (
-                        <ActionTooltip label="删除对话">
+                        <ActionTooltip label={t('conversationStorage.deleteConversation')}>
                           <button
                             type="button"
                             onClick={() => handleDeleteClick(conversation.id)}
@@ -578,7 +580,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
           {/* Footer - Cleanup Action */}
           <div className="px-4 py-2">
-            <ActionTooltip label="清理旧对话的文件缓存，释放存储空间">
+            <ActionTooltip label={t('conversationStorage.cleanupOldDescription')}>
               <button
                 type="button"
                 onClick={() => handleOpenCleanupDialog('old')}
@@ -586,11 +588,11 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                 className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-muted dark:hover:bg-muted dark:hover:bg-neutral-800 disabled:opacity-50"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                {cleanupLoading ? '加载中...' : '清理文件缓存'}
+                {cleanupLoading ? t('conversationStorage.loading') : t('conversationStorage.cleanupFileCache')}
               </button>
             </ActionTooltip>
             <p className="px-1 pt-1.5 text-[9px] leading-tight text-muted">
-              仅清理文件缓存，不影响对话记录
+              {t('conversationStorage.cleanupFileCacheHelp')}
             </p>
           </div>
         </div>

@@ -30,16 +30,17 @@ import {
   BrandSelectValue,
 } from '@creatorweave/ui'
 import { nodeKindConfig } from './constants'
+import { useT } from '@/i18n'
 import type { WorkflowNodeData, WorkflowFlowNode } from './workflow-to-flow'
 import type { WorkflowNodeKind, ModelProvider } from '@/agent/workflow/types'
 import { getDefaultNodeInstruction } from '@/agent/workflow/node-prompts'
 
-const kindOptions: { value: WorkflowNodeKind; label: string }[] = [
-  { value: 'plan', label: '规划' },
-  { value: 'produce', label: '创作' },
-  { value: 'review', label: '审查' },
-  { value: 'repair', label: '修复' },
-  { value: 'assemble', label: '组装' },
+const kindOptions: { value: WorkflowNodeKind; labelKey: string }[] = [
+  { value: 'plan', labelKey: 'workflowEditor.plan' },
+  { value: 'produce', labelKey: 'workflowEditor.produce' },
+  { value: 'review', labelKey: 'workflowEditor.review' },
+  { value: 'repair', labelKey: 'workflowEditor.repair' },
+  { value: 'assemble', labelKey: 'workflowEditor.assemble' },
 ]
 
 const kindIcons: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -61,6 +62,7 @@ export function NodePropertiesPanel({
   onUpdateNodeData,
   onDeleteNode,
 }: NodePropertiesPanelProps) {
+  const t = useT()
   const roleInputRef = useRef<HTMLInputElement>(null)
   const selectedNodeId = selectedNode?.id
 
@@ -93,7 +95,7 @@ export function NodePropertiesPanel({
         {/* Header */}
         <div className="shrink-0 border-b border-neutral-200/80 px-3 py-2.5 dark:border-neutral-700/80">
           <h3 className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500">
-            属性
+            {t('workflowEditor.properties')}
           </h3>
         </div>
 
@@ -103,10 +105,10 @@ export function NodePropertiesPanel({
             <MousePointer className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
           </div>
           <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-            选择节点以编辑属性
+            {t('workflowEditor.selectNodeToEdit')}
           </p>
           <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
-            点击画布中的节点或从右侧添加新节点
+            {t('workflowEditor.clickCanvasNode')}
           </p>
         </div>
       </div>
@@ -137,7 +139,7 @@ export function NodePropertiesPanel({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
-              {config.label}
+              {t(config.labelKey)}
             </h3>
             <p className="text-[9px] text-neutral-400 dark:text-neutral-500">
               {selectedNode.id.slice(0, 12)}...
@@ -150,7 +152,7 @@ export function NodePropertiesPanel({
       <div className="flex-1 overflow-y-auto">
         <div className="space-y-3 p-3">
           {/* Kind selector */}
-          <Field label="类型">
+          <Field label={t('workflowEditor.kind')}>
             <BrandSelect
               value={data.kind}
               onValueChange={(value) => handleChange({ kind: value as WorkflowNodeKind })}
@@ -161,7 +163,7 @@ export function NodePropertiesPanel({
               <BrandSelectContent>
                 {kindOptions.map((opt) => (
                   <BrandSelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </BrandSelectItem>
                 ))}
               </BrandSelectContent>
@@ -169,7 +171,7 @@ export function NodePropertiesPanel({
           </Field>
 
           {/* Agent Role */}
-          <Field label="角色">
+          <Field label={t('workflowEditor.role')}>
             <BrandInput
               ref={roleInputRef}
               value={data.agentRole}
@@ -180,7 +182,7 @@ export function NodePropertiesPanel({
           </Field>
 
           {/* Output Key */}
-          <Field label="输出键">
+          <Field label={t('workflowEditor.outputKey')}>
             <BrandInput
               value={data.outputKey}
               onChange={(e) => handleChange({ outputKey: e.target.value })}
@@ -190,13 +192,13 @@ export function NodePropertiesPanel({
           </Field>
 
           {/* Task Instruction */}
-          <Field label="任务说明" hint="清空后恢复默认说明">
+          <Field label={t('workflowEditor.taskInstruction')} hint={t('workflowEditor.taskInstructionHint')}>
             <BrandTextarea
               value={effectiveTaskInstruction}
               onChange={(e) => handleChange({ taskInstruction: e.target.value })}
               rows={4}
               className="min-h-[80px] resize-y px-2.5 py-2 text-[11px] leading-relaxed"
-              placeholder="输入任务说明..."
+              placeholder={t('workflowEditor.taskInstruction')}
             />
           </Field>
 
@@ -211,13 +213,13 @@ export function NodePropertiesPanel({
               htmlFor="is-entry"
               className="cursor-pointer text-[11px] text-neutral-600 dark:text-neutral-300"
             >
-              设为工作流入口
+              {t('workflowEditor.setAsWorkflowEntry')}
             </label>
           </div>
 
           {/* Retry + Timeout */}
           <div className="grid grid-cols-2 gap-2">
-            <Field label="最大重试">
+            <Field label={t('workflowEditor.maxRetries')}>
               <BrandInput
                 type="number"
                 min={0}
@@ -229,7 +231,7 @@ export function NodePropertiesPanel({
                 className="h-7 text-[11px]"
               />
             </Field>
-            <Field label="超时(ms)">
+            <Field label={t('workflowEditor.timeout')}>
               <BrandInput
                 type="number"
                 min={1000}
@@ -247,19 +249,19 @@ export function NodePropertiesPanel({
           <div className="my-2 flex items-center gap-2">
             <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
             <span className="text-[9px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-              高级配置
+              {t('workflowEditor.advancedConfig')}
             </span>
             <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
           </div>
 
           {/* Model Configuration Section */}
           <CollapsibleSection
-            title="模型配置"
+            title={t('workflowEditor.modelConfig')}
             icon={Cpu}
             defaultOpen={!!data.modelConfig?.provider}
           >
             <div className="space-y-2">
-              <Field label="模型提供商">
+              <Field label={t('workflowEditor.modelProvider')}>
                 <BrandSelect
                   value={data.modelConfig?.provider || ''}
                   onValueChange={(value) =>
@@ -272,10 +274,10 @@ export function NodePropertiesPanel({
                   }
                 >
                   <BrandSelectTrigger className="h-7 text-[11px]">
-                    <BrandSelectValue placeholder="使用默认" />
+                    <BrandSelectValue placeholder={t('workflowEditor.useDefault')} />
                   </BrandSelectTrigger>
                   <BrandSelectContent>
-                    <BrandSelectItem value="">使用默认</BrandSelectItem>
+                    <BrandSelectItem value="">{t('workflowEditor.useDefault')}</BrandSelectItem>
                     <BrandSelectItem value="glm">智谱 GLM</BrandSelectItem>
                     <BrandSelectItem value="claude">Claude</BrandSelectItem>
                     <BrandSelectItem value="openai">OpenAI</BrandSelectItem>
@@ -285,7 +287,7 @@ export function NodePropertiesPanel({
 
               {data.modelConfig?.provider && (
                 <>
-                  <Field label="模型 ID">
+                  <Field label={t('workflowEditor.modelId')}>
                     <BrandInput
                       value={data.modelConfig?.model || ''}
                       onChange={(e) =>
@@ -302,7 +304,7 @@ export function NodePropertiesPanel({
                   </Field>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="Temperature">
+                    <Field label={t('workflowEditor.temperature')}>
                       <BrandInput
                         type="number"
                         min={0}
@@ -320,7 +322,7 @@ export function NodePropertiesPanel({
                         className="h-7 text-[11px]"
                       />
                     </Field>
-                    <Field label="最大 Token">
+                    <Field label={t('workflowEditor.maxTokens')}>
                       <BrandInput
                         type="number"
                         min={100}
@@ -346,19 +348,19 @@ export function NodePropertiesPanel({
                 onClick={() => handleChange({ modelConfig: undefined })}
                 className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
-                重置为默认
+                {t('workflowEditor.resetToDefault')}
               </button>
             </div>
           </CollapsibleSection>
 
           {/* Prompt Template Section */}
           <CollapsibleSection
-            title="提示词模板"
+            title={t('workflowEditor.promptTemplate')}
             icon={Sparkles}
             defaultOpen={!!data.promptTemplate}
           >
             <div className="space-y-2">
-              <Field label="模板内容" hint="支持 {{变量}} 语法">
+              <Field label={t('workflowEditor.templateContent')} hint={t('workflowEditor.templateContentHint')}>
                 <BrandTextarea
                   value={data.promptTemplate || ''}
                   onChange={(e) =>
@@ -366,16 +368,16 @@ export function NodePropertiesPanel({
                   }
                   rows={4}
                   className="min-h-[80px] resize-y px-2.5 py-2 text-[11px] leading-relaxed font-mono"
-                  placeholder="自定义提示词模板，可使用 {{outputKey}} 引用上游输出..."
+                  placeholder={t('workflowEditor.templatePlaceholder')}
                 />
               </Field>
               <div className="rounded-md bg-neutral-50 px-2 py-1.5 dark:bg-neutral-800">
                 <p className="text-[9px] text-neutral-500 dark:text-neutral-400">
-                  可用变量：{' '}
+                  {t('workflowEditor.availableVariables')}{' '}
                   <code className="text-[9px] text-violet-600 dark:text-violet-400">
                     {'{{input}}'}
                   </code>
-                  {' - 上游节点输出'}
+                  {' - ' + t('workflowEditor.upstreamOutput')}
                 </p>
               </div>
               <button
@@ -383,7 +385,7 @@ export function NodePropertiesPanel({
                 onClick={() => handleChange({ promptTemplate: undefined })}
                 className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
-                使用默认模板
+                {t('workflowEditor.useDefaultTemplate')}
               </button>
             </div>
           </CollapsibleSection>
@@ -398,7 +400,7 @@ export function NodePropertiesPanel({
           className="flex h-8 w-full items-center gap-1.5 text-[11px]"
         >
           <Trash2 className="h-3 w-3" />
-          删除节点
+          {t('workflowEditor.deleteNode')}
         </BrandButton>
       </div>
     </div>

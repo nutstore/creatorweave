@@ -2,16 +2,18 @@
 /**
  * RemoteBadge Error Boundary
  *
- * 捕获 RemoteBadge 组件及其子组件的错误，防止整个应用崩溃
- * 按照 Michael Nygard 的故障模式分析建议实现
+ * Catches errors in RemoteBadge components and their children
+ * to prevent the entire app from crashing
+ * Based on Michael Nygard's fault tolerance patterns
  *
- * 错误处理策略：
- * 1. 记录错误详情到控制台
- * 2. 显示友好的降级 UI
- * 3. 提供"重试"选项
+ * Error handling strategy:
+ * 1. Log error details to console
+ * 2. Show a friendly fallback UI
+ * 3. Provide a "retry" option
  */
 
 import React, { Component, ErrorInfo, ReactNode } from 'react'
+import { useT } from '@/i18n'
 
 interface Props {
   children: ReactNode
@@ -26,9 +28,9 @@ interface State {
 }
 
 /**
- * 默认的错误回退 UI
+ * Default error fallback UI
  */
-function DefaultFallback({ error, onRetry }: { error: Error | null; onRetry: () => void }) {
+function DefaultFallback({ error, onRetry, t }: { error: Error | null; onRetry: () => void; t: (key: string) => string }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 dark:border-red-800 dark:bg-red-950">
       <span className="h-2 w-2 rounded-full bg-red-500" />
@@ -39,10 +41,15 @@ function DefaultFallback({ error, onRetry }: { error: Error | null; onRetry: () 
         onClick={onRetry}
         className="ml-2 rounded px-2 py-0.5 text-xs text-red-700 hover:bg-red-200 dark:text-red-400 dark:hover:bg-red-900"
       >
-        Retry
+        {t('errorBoundary.retry')}
       </button>
     </div>
   )
+}
+
+function DefaultFallbackWithI18n(props: { error: Error | null; onRetry: () => void }) {
+  const t = useT()
+  return <DefaultFallback {...props} t={t} />
 }
 
 export class RemoteBadgeErrorBoundary extends Component<Props, State> {
@@ -56,27 +63,27 @@ export class RemoteBadgeErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(_error: Error): Partial<State> {
-    // 更新 state 使下一次渲染能够显示降级后的 UI
+    // Update state so next render shows fallback UI
     return { hasError: true }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // 记录错误详情
+    // Log error details
     console.error('[RemoteBadgeErrorBoundary] Caught error:', error)
     console.error('[RemoteBadgeErrorBoundary] Error info:', errorInfo)
 
-    // 保存错误信息到 state
+    // Save error info to state
     this.setState({
       error,
       errorInfo,
     })
 
-    // 调用自定义错误处理器（如果提供）
+    // Call custom error handler if provided
     this.props.onError?.(error, errorInfo)
   }
 
   handleRetry = (): void => {
-    // 重置错误状态，尝试重新渲染
+    // Reset error state and try re-rendering
     this.setState({
       hasError: false,
       error: null,
@@ -86,12 +93,12 @@ export class RemoteBadgeErrorBoundary extends Component<Props, State> {
 
   render(): ReactNode {
     if (this.state.hasError) {
-      // 使用自定义 fallback 或默认 fallback
+      // Use custom fallback or default fallback
       if (this.props.fallback) {
         return this.props.fallback
       }
 
-      return <DefaultFallback error={this.state.error} onRetry={this.handleRetry} />
+      return <DefaultFallbackWithI18n error={this.state.error} onRetry={this.handleRetry} />
     }
 
     return this.props.children
@@ -99,9 +106,9 @@ export class RemoteBadgeErrorBoundary extends Component<Props, State> {
 }
 
 /**
- * HOC 包装器：为任何组件添加错误边界
+ * HOC wrapper: Add error boundary to any component
  *
- * 使用示例：
+ * Usage example:
  * ```tsx
  * const SafeRemoteBadge = withRemoteBadgeErrorBoundary(RemoteBadge)
  * ```

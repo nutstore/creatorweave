@@ -7,12 +7,14 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { useT } from '@/i18n'
 
 interface DatabaseRefreshDialogProps {
   isOpen: boolean
 }
 
 export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
+  const t = useT()
   const buttonRef = useRef<HTMLButtonElement>(null)
 
   // Focus the refresh button when dialog opens
@@ -56,29 +58,29 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
 
         {/* Header */}
         <div className="px-6 py-4 text-center">
-          <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">数据库连接已断开</h3>
+          <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{t('app.databaseConnectionLost')}</h3>
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Database Connection Lost</p>
         </div>
 
         {/* Content */}
         <div className="px-6 pb-6 text-center">
           <div className="mb-4 rounded-lg bg-amber-50 p-4 text-left">
-            <p className="mb-2 text-sm font-medium text-amber-900">发生了什么？</p>
+            <p className="mb-2 text-sm font-medium text-amber-900">{t('app.whatHappened')}</p>
             <p className="text-sm text-amber-800">
-              浏览器标签页休眠后，数据库文件句柄失效。这是浏览器的正常行为。
+              {t('app.databaseHandleInvalidExplanation')}
             </p>
             <p className="mt-2 text-sm text-amber-800">
-              如果刚执行过“清空数据”，请先关闭同源的其他标签页/窗口，再刷新当前页面。
+              {t('app.ifJustClearedData')}
             </p>
           </div>
 
           <p className="mb-4 text-sm text-neutral-700 dark:text-neutral-300">
-            <strong>您的对话数据是安全的！</strong>
+            <strong>{t('app.yourDataIsSafe')}</strong>
             <br />
-            数据存储在浏览器的 OPFS 中，只是暂时无法访问。
+            {t('app.dataStoredInOPFS')}
           </p>
 
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">刷新页面后将自动恢复数据库连接。</p>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('app.willAutoRecoverAfterRefresh')}</p>
         </div>
 
         {/* Footer - Only refresh button, no cancel */}
@@ -88,11 +90,11 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
             onClick={handleRefresh}
             className="w-full rounded-lg bg-primary-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
           >
-            刷新页面
+            {t('app.refreshPage')}
             <span className="ml-2 text-sm opacity-80">(Refresh Page)</span>
           </button>
           <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
-            此对话框无法关闭 - 请点击上方按钮刷新页面
+            {t('app.cannotCloseDialog')}
           </p>
         </div>
       </div>

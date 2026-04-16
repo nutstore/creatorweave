@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
- * Change Helpers - 待同步文件变更的公共工具函数
+ * Change Helpers - Common utility functions for pending file changes
  *
- * 用于 PendingSyncPanel 和 PendingFileList 组件共享
+ * Shared between PendingSyncPanel and PendingFileList components
  */
 
 import React from 'react'
@@ -11,7 +11,7 @@ import { Icon } from '@iconify/react'
 import type { ChangeType } from '@/opfs/types/opfs-types'
 
 /**
- * 变更类型信息
+ * Change type information
  */
 export interface ChangeTypeInfo {
   color: string
@@ -20,8 +20,8 @@ export interface ChangeTypeInfo {
 }
 
 /**
- * 获取变更类型的颜色和标签
- * 统一使用 A/M/D 标签，与 FileTreePanel 保持一致
+ * Get color and label for change type
+ * Uses A/M/D labels consistently, matching FileTreePanel
  */
 export function getChangeTypeInfo(type: ChangeType): ChangeTypeInfo {
   switch (type) {
@@ -35,7 +35,7 @@ export function getChangeTypeInfo(type: ChangeType): ChangeTypeInfo {
 }
 
 /**
- * 变更类型图标组件（使用 lucide-react）
+ * Change type icon component (using lucide-react)
  */
 export function ChangeTypeIcon({ type, className = 'w-3.5 h-3.5' }: { type: ChangeType; className?: string }): React.ReactNode {
   switch (type) {
@@ -49,7 +49,7 @@ export function ChangeTypeIcon({ type, className = 'w-3.5 h-3.5' }: { type: Chan
 }
 
 /**
- * 格式化文件大小
+ * Format file size
  */
 export function formatFileSize(bytes?: number): string {
   if (!bytes) return '-'
@@ -59,7 +59,7 @@ export function formatFileSize(bytes?: number): string {
 }
 
 /**
- * 获取文件扩展名对应的 vscode-icons 图标名
+ * Get vscode-icons icon name for file extension
  */
 function getFileIconName(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase()
@@ -145,7 +145,7 @@ function getFileIconName(filename: string): string {
 }
 
 /**
- * 文件图标组件（使用 iconify vscode-icons，与文件树一致）
+ * File icon component (using iconify vscode-icons, consistent with file tree)
  */
 export function FileIcon({ filename, className = 'h-3.5 w-3.5' }: { filename: string; className?: string }): React.ReactNode {
   return <Icon icon={getFileIconName(filename)} className={className} />

@@ -22,25 +22,25 @@ import { registerServiceWorker } from '@/pwa/register-service-worker'
 // Import Python module to initialize window.__executePython
 import '@/python'
 
-// React Grab - 仅开发环境初始化
+// React Grab - Dev environment initialization only
 if (import.meta.env.DEV) {
   import('react-grab')
     .then(({ init }) => {
       init({
         theme: {
           enabled: true,
-          hue: 180, // 青色主题，与项目配色协调
+          hue: 180, // Cyan theme, coordinated with project colors
         },
         onElementSelect: (element) => {
-          console.log('🎯 React Grab: 选中元素', element)
+          console.log('🎯 React Grab: Selected element', element)
         },
         onCopySuccess: () => {
-          console.log('📋 React Grab: 已复制到剪贴板')
+          console.log('📋 React Grab: Copied to clipboard')
         },
       })
     })
     .catch((err) => {
-      console.warn('React Grab 加载失败 (可忽略):', err.message)
+      console.warn('React Grab failed to load (can be ignored):', err.message)
     })
 }
 

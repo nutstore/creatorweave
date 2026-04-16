@@ -3,11 +3,12 @@ import type { WorkflowNodeKind } from '@/agent/workflow/types'
 /**
  * Node kind configuration with refined color palette.
  * Uses warm, muted tones instead of typical AI colors.
+ * Label and description use translation keys - use getKindLabel/getKindDescription for translated strings.
  */
 export const nodeKindConfig: Record<
   WorkflowNodeKind,
   {
-    label: string
+    labelKey: string
     icon: string
     accent: string
     accentHex: string
@@ -16,11 +17,11 @@ export const nodeKindConfig: Record<
     color: string
     border: string
     portFill: string
-    description: string
+    descriptionKey: string
   }
 > = {
   plan: {
-    label: '规划',
+    labelKey: 'workflowEditor.plan',
     icon: 'Lightbulb',
     accent: 'border-indigo-500',
     accentHex: '#6366f1',
@@ -29,10 +30,10 @@ export const nodeKindConfig: Record<
     color: 'text-indigo-600 dark:text-indigo-300',
     border: 'border-indigo-200/80 dark:border-indigo-800/60',
     portFill: '#6366f1',
-    description: '定义目标和策略',
+    descriptionKey: 'workflowEditor.planDescription',
   },
   produce: {
-    label: '创作',
+    labelKey: 'workflowEditor.produce',
     icon: 'PenTool',
     accent: 'border-teal-500',
     accentHex: '#14b8a6',
@@ -41,10 +42,10 @@ export const nodeKindConfig: Record<
     color: 'text-teal-600 dark:text-teal-300',
     border: 'border-teal-200/80 dark:border-teal-800/60',
     portFill: '#14b8a6',
-    description: '执行创作任务',
+    descriptionKey: 'workflowEditor.produceDescription',
   },
   review: {
-    label: '审查',
+    labelKey: 'workflowEditor.review',
     icon: 'ShieldCheck',
     accent: 'border-rose-400',
     accentHex: '#fb7185',
@@ -53,10 +54,10 @@ export const nodeKindConfig: Record<
     color: 'text-rose-600 dark:text-rose-300',
     border: 'border-rose-200/80 dark:border-rose-800/60',
     portFill: '#fb7185',
-    description: '检查输出质量',
+    descriptionKey: 'workflowEditor.reviewDescription',
   },
   repair: {
-    label: '修复',
+    labelKey: 'workflowEditor.repair',
     icon: 'Wrench',
     accent: 'border-amber-500',
     accentHex: '#f59e0b',
@@ -65,10 +66,10 @@ export const nodeKindConfig: Record<
     color: 'text-amber-600 dark:text-amber-300',
     border: 'border-amber-200/80 dark:border-amber-800/60',
     portFill: '#f59e0b',
-    description: '修正审查问题',
+    descriptionKey: 'workflowEditor.repairDescription',
   },
   assemble: {
-    label: '组装',
+    labelKey: 'workflowEditor.assemble',
     icon: 'Layers',
     accent: 'border-violet-400',
     accentHex: '#a78bfa',
@@ -77,10 +78,10 @@ export const nodeKindConfig: Record<
     color: 'text-violet-600 dark:text-violet-300',
     border: 'border-violet-200/80 dark:border-violet-800/60',
     portFill: '#a78bfa',
-    description: '整合最终输出',
+    descriptionKey: 'workflowEditor.assembleDescription',
   },
   condition: {
-    label: '条件',
+    labelKey: 'workflowEditor.condition',
     icon: 'GitBranch',
     accent: 'border-sky-400',
     accentHex: '#38bdf8',
@@ -89,7 +90,7 @@ export const nodeKindConfig: Record<
     color: 'text-sky-600 dark:text-sky-300',
     border: 'border-sky-200/80 dark:border-sky-800/60',
     portFill: '#38bdf8',
-    description: '条件分支判断',
+    descriptionKey: 'workflowEditor.conditionDescription',
   },
 }
 

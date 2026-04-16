@@ -5,7 +5,7 @@ order: 101
 
 # 开发环境搭建
 
-快速搭建 AI Workspace 的本地开发环境。
+快速搭建 CreatorWeave 的本地开发环境。
 
 ## 环境要求
 

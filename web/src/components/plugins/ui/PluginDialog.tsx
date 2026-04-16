@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { useT } from '@/i18n'
 
 interface PluginDialogProps {
   isOpen: boolean
@@ -20,11 +21,12 @@ export function PluginDialog({
   isOpen,
   title,
   message,
-  confirmText = '确定',
-  cancelText = '取消',
+  confirmText,
+  cancelText,
   type = 'confirm',
   onClose,
 }: PluginDialogProps) {
+  const t = useT()
   const dialogRef = useRef<HTMLDivElement>(null)
 
   // Handle ESC key
@@ -55,13 +57,17 @@ export function PluginDialog({
     if (title) return title
     switch (type) {
       case 'alert':
-        return '提示'
+        return t('pluginDialog.alert')
       case 'info':
-        return '信息'
+        return t('pluginDialog.info')
       default:
-        return '确认'
+        return t('pluginDialog.confirm')
     }
   }
+
+  // Default button text if not provided
+  const defaultConfirmText = t('pluginDialog.confirm')
+  const defaultCancelText = t('pluginDialog.cancel')
 
   return (
     <div
@@ -87,11 +93,11 @@ export function PluginDialog({
         <div className="flex justify-end gap-3 bg-neutral-50 px-6 py-4 dark:bg-neutral-800">
           {type === 'confirm' && (
             <button onClick={() => onClose(false)} className="btn-secondary">
-              {cancelText}
+              {cancelText || defaultCancelText}
             </button>
           )}
           <button onClick={() => onClose(true)} className="btn-primary">
-            {confirmText}
+            {confirmText || defaultConfirmText}
           </button>
         </div>
       </div>
@@ -99,21 +105,23 @@ export function PluginDialog({
   )
 }
 
-// Preset dialog configs
-export const DialogPresets = {
-  confirm: {
-    type: 'confirm' as const,
-    confirmText: '确定',
-    cancelText: '取消',
-  },
-  delete: {
-    type: 'confirm' as const,
-    title: '确认删除',
-    confirmText: '删除',
-    cancelText: '取消',
-  },
-  alert: {
-    type: 'alert' as const,
-    confirmText: '知道了',
-  },
+// Preset dialog configs - must be functions to use t()
+export function getDialogPresets(t: (key: string) => string) {
+  return {
+    confirm: {
+      type: 'confirm' as const,
+      confirmText: t('pluginDialog.confirm'),
+      cancelText: t('pluginDialog.cancel'),
+    },
+    delete: {
+      type: 'confirm' as const,
+      title: t('pluginDialog.deleteConfirm'),
+      confirmText: t('pluginDialog.delete'),
+      cancelText: t('pluginDialog.cancel'),
+    },
+    alert: {
+      type: 'alert' as const,
+      confirmText: t('pluginDialog.gotIt'),
+    },
+  }
 }

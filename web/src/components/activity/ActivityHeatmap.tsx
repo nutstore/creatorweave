@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import { getSQLiteDB } from '@/sqlite/sqlite-database'
-import { useT, useLocale } from '@/i18n'
+import { useT } from '@/i18n'
 import { useTheme } from '@/store/theme.store'
 
 //-----------------------------------------------------------------------------
@@ -148,12 +148,9 @@ function buildGrid(data: Map<string, number>): ActivityData {
   return { weeks, maxCount, totalActive, longestStreak, currentStreak }
 }
 
-//-----------------------------------------------------------------------------
+// =============================================
 // Component
-//-----------------------------------------------------------------------------
-
-const MONTH_NAMES_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const MONTH_NAMES_ZH = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+// =============================================
 
 const CELL_SIZE = 11
 const CELL_GAP = 3
@@ -162,7 +159,6 @@ const TOOLTIP_OFFSET_Y = 44
 
 export function ActivityHeatmap() {
   const t = useT()
-  const [locale] = useLocale()
   const { isDark } = useTheme()
   const [data, setData] = useState<Map<string, number>>(new Map())
   const [loaded, setLoaded] = useState(false)
@@ -180,8 +176,8 @@ export function ActivityHeatmap() {
 
   const { weeks, totalActive, currentStreak } = useMemo(() => buildGrid(data), [data])
 
-  const monthNames = locale === 'zh-CN' || locale === 'ja-JP' ? MONTH_NAMES_ZH : MONTH_NAMES_EN
-  const dayLabels = locale === 'zh-CN' ? ['', '一', '', '三', '', '五', ''] : ['', 'Mon', '', 'Wed', '', 'Fri', '']
+  const monthNames = t('activityHeatmap.months') as unknown as string[]
+  const dayLabels = t('activityHeatmap.days') as unknown as string[]
 
   // Theme-aware cell colors using oklch derived from accent hue
   const getCellColor = useCallback(

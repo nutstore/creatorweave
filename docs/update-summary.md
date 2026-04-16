@@ -8,7 +8,7 @@
 ### 1. Main README.md (`/README.md`)
 
 **Changes**:
-- Updated project description to emphasize AI Workspace capabilities
+- Updated project description to emphasize CreatorWeave capabilities
 - Added Python integration (Pyodide) to key features
 - Added MCP integration and WASM acceleration to development tools
 - Expanded project structure with detailed descriptions of each directory
@@ -27,7 +27,7 @@
 ### 2. Architecture Overview (`/docs/architecture/overview.md`)
 
 **Changes**:
-- Updated project overview to reflect AI Workspace nature
+- Updated project overview to reflect CreatorWeave nature
 - Added comprehensive AI Agent System architecture section:
   - Agent Loop Core
   - Context Manager

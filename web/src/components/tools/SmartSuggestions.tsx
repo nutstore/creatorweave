@@ -1,11 +1,11 @@
 /**
- * SmartSuggestions - 智能建议组件
+ * SmartSuggestions - Intelligent Suggestions Component
  *
- * 基于 IntelligenceCoordinator 提供上下文感知的建议：
- * - 根据用户输入推荐工具
- * - 基于项目类型的快捷操作
- * - 最近使用的工作流
- * - 拖拽文件上传支持
+ * Provides context-aware suggestions based on IntelligenceCoordinator:
+ * - Recommend tools based on user input
+ * - Quick actions based on project type
+ * - Recently used workflows
+ * - Drag-and-drop file upload support
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'

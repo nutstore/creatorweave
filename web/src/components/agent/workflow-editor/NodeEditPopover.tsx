@@ -16,6 +16,7 @@ import { nodeKindConfig } from './constants'
 import type { WorkflowNodeData, WorkflowFlowNode } from './workflow-to-flow'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
 import { getDefaultNodeInstruction } from '@/agent/workflow/node-prompts'
+import { useT } from '@/i18n'
 
 interface NodeEditPopoverProps {
   node: WorkflowFlowNode
@@ -25,12 +26,12 @@ interface NodeEditPopoverProps {
   onClose: () => void
 }
 
-const kindOptions: { value: WorkflowNodeKind; label: string }[] = [
-  { value: 'plan', label: '规划' },
-  { value: 'produce', label: '创作' },
-  { value: 'review', label: '审查' },
-  { value: 'repair', label: '修复' },
-  { value: 'assemble', label: '组装' },
+const kindOptions: { value: WorkflowNodeKind; labelKey: string }[] = [
+  { value: 'plan', labelKey: 'workflowEditor.plan' },
+  { value: 'produce', labelKey: 'workflowEditor.produce' },
+  { value: 'review', labelKey: 'workflowEditor.review' },
+  { value: 'repair', labelKey: 'workflowEditor.repair' },
+  { value: 'assemble', labelKey: 'workflowEditor.assemble' },
 ]
 
 export function NodeEditPopover({
@@ -40,6 +41,7 @@ export function NodeEditPopover({
   onDelete,
   onClose,
 }: NodeEditPopoverProps) {
+  const t = useT()
   const ref = useRef<HTMLDivElement>(null)
   const roleInputRef = useRef<HTMLInputElement>(null)
   const [visible, setVisible] = useState(false)
@@ -107,7 +109,7 @@ export function NodeEditPopover({
         {/* Kind selector */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-            类型
+            {t('workflowEditor.kind')}
           </label>
           <BrandSelect
             value={data.kind}
@@ -119,7 +121,7 @@ export function NodeEditPopover({
             <BrandSelectContent>
               {kindOptions.map((opt) => (
                 <BrandSelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </BrandSelectItem>
               ))}
             </BrandSelectContent>
@@ -129,7 +131,7 @@ export function NodeEditPopover({
         {/* Agent Role */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-            角色
+            {t('workflowEditor.role')}
           </label>
           <BrandInput
             ref={roleInputRef}
@@ -142,7 +144,7 @@ export function NodeEditPopover({
         {/* Output Key */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-            输出键
+            {t('workflowEditor.outputKey')}
           </label>
           <BrandInput
             value={data.outputKey}
@@ -154,7 +156,7 @@ export function NodeEditPopover({
         {/* Task Instruction */}
         <div>
           <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-            任务说明
+            {t('workflowEditor.taskInstruction')}
           </label>
           <BrandTextarea
             value={effectiveTaskInstruction}
@@ -163,7 +165,7 @@ export function NodeEditPopover({
             className="min-h-[64px] resize-y px-2.5 py-1.5 text-xs leading-relaxed"
           />
           <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
-            默认说明已填充，可直接修改；清空后会恢复默认说明。
+            {t('workflowEditor.taskInstructionHint')}
           </p>
         </div>
 
@@ -174,7 +176,7 @@ export function NodeEditPopover({
             onCheckedChange={(checked) => handleChange({ isEntry: checked === true })}
           />
           <label className="text-xs text-neutral-600 dark:text-neutral-300">
-            入口节点
+            {t('workflowEditor.setAsWorkflowEntry')}
           </label>
         </div>
 
@@ -182,7 +184,7 @@ export function NodeEditPopover({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-              重试
+              {t('workflowEditor.maxRetries')}
             </label>
             <BrandInput
               type="number"
@@ -195,7 +197,7 @@ export function NodeEditPopover({
           </div>
           <div>
             <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-              超时(ms)
+              {t('workflowEditor.timeout')}
             </label>
             <BrandInput
               type="number"
@@ -215,7 +217,7 @@ export function NodeEditPopover({
             onClick={() => onDelete(node.id)}
             className="h-7 w-full text-xs"
           >
-            删除节点
+            {t('workflowEditor.deleteNode')}
           </BrandButton>
         </div>
       </div>

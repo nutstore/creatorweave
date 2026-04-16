@@ -46,14 +46,14 @@ import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
 
 // Design system styles
 const designStyles = `
-  /* 字体 - 使用独特的字体组合 */
+  /* Typography - local/system font stack only */
 
   :root {
     --home-serif: 'Fraunces', 'Noto Serif SC', Georgia, serif;
     --home-sans: system-ui, -apple-system, 'PingFang SC', 'Noto Sans SC', sans-serif;
   }
 
-  /* 入场动画 */
+  /* Entry animations */
   @keyframes revealUp {
     from {
       opacity: 0;
@@ -117,7 +117,7 @@ const designStyles = `
   .home-delay-5 { animation-delay: 0.5s; }
   .home-delay-6 { animation-delay: 0.6s; }
 
-  /* 减少动画偏好 */
+  /* Reduced motion preference */
   @media (prefers-reduced-motion: reduce) {
     .home-reveal,
     .home-reveal-scale {
@@ -130,7 +130,7 @@ const designStyles = `
     }
   }
 
-  /* Hero 背景 */
+  /* Hero background */
   .home-hero-bg {
     position: absolute;
     inset: 0;
@@ -167,7 +167,7 @@ const designStyles = `
     );
   }
 
-  /* 纹理叠加 */
+  /* Texture overlay */
   .home-grain::before {
     content: '';
     position: fixed;
@@ -178,7 +178,7 @@ const designStyles = `
     animation: grain 20s steps(10) infinite;
   }
 
-  /* 排版 */
+  /* Typography */
   .home-title-serif {
     font-family: var(--home-serif);
     font-weight: 500;
@@ -203,7 +203,7 @@ const designStyles = `
     letter-spacing: 0.02em;
   }
 
-  /* 项目时间线 */
+  /* Project timeline */
   .home-timeline {
     position: relative;
   }
@@ -262,7 +262,7 @@ const designStyles = `
     border-style: dashed;
   }
 
-  /* 快捷操作卡片 */
+  /* Quick action cards */
   .home-action-card {
     position: relative;
     overflow: hidden;
@@ -292,7 +292,7 @@ const designStyles = `
     border-color: hsl(var(--primary) / 0.3);
   }
 
-  /* 搜索框 */
+  /* Search input */
   .home-search-input {
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
@@ -305,7 +305,7 @@ const designStyles = `
     outline: none;
   }
 
-  /* 空状态 */
+  /* Empty state */
   .home-empty-state {
     position: relative;
   }
@@ -745,7 +745,7 @@ export function ProjectHome({
     <div className="relative min-h-screen bg-background home-grain">
       <style>{designStyles}</style>
 
-      {/* Hero 区域 */}
+      {/* Hero section */}
       <header className="relative overflow-hidden">
         <div className="home-hero-bg" />
         <div className="relative z-10 max-w-5xl mx-auto px-6 pt-8 pb-8 sm:pt-10 sm:pb-10">
@@ -792,7 +792,7 @@ export function ProjectHome({
             <span className="text-tertiary dark:text-muted">{t('projectHome.hero.descriptionSuffix')}</span>
           </p>
 
-          {/* 快捷统计 */}
+          {/* Quick stats */}
           <div className="home-reveal home-delay-3 mt-8 flex items-center gap-6">
             <div className="home-mono text-sm">
               <span className="text-primary dark:text-primary-foreground font-medium">{totalProjects}</span>
@@ -807,12 +807,12 @@ export function ProjectHome({
         </div>
       </header>
 
-      {/* 主内容区 */}
+      {/* Main content area */}
       <main className="relative z-10 max-w-5xl mx-auto px-6 pb-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-          {/* 左侧：快捷操作 */}
+          {/* Left sidebar: Quick actions */}
           <aside className="lg:col-span-4 space-y-4">
-            {/* 继续工作 */}
+            {/* Continue working */}
             {recentProject && (
               <div className="home-reveal home-delay-3 home-action-card rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-2 mb-3">
@@ -839,7 +839,7 @@ export function ProjectHome({
               </div>
             )}
 
-            {/* 创建新项目 */}
+            {/* Create new project */}
             <div
               className="home-reveal home-delay-4 home-action-card rounded-xl border border-border bg-card p-5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
               role="button"
@@ -876,7 +876,7 @@ export function ProjectHome({
               </BrandButton>
             </div>
 
-            {/* 重新开始 */}
+            {/* Start fresh */}
             <div className="home-reveal home-delay-5 rounded-xl border border-border/60 bg-card/50 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <RotateCcw className="w-4 h-4 text-tertiary" />
@@ -897,7 +897,7 @@ export function ProjectHome({
               </BrandButton>
             </div>
 
-            {/* 外观设置 */}
+            {/* Appearance settings */}
             <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Palette className="w-4 h-4 text-tertiary" />
@@ -906,7 +906,7 @@ export function ProjectHome({
                 </span>
               </div>
 
-              {/* 主题模式切换 */}
+              {/* Theme mode toggle */}
               <div className="mb-4">
                 <p className="home-body text-xs text-tertiary dark:text-muted mb-2">{t('projectHome.theme.modeTitle')}</p>
                 <div className="flex gap-2">
@@ -935,7 +935,7 @@ export function ProjectHome({
                 </div>
               </div>
 
-              {/* 语言选择 */}
+              {/* Language selection */}
               <div className="mb-4">
                 <p className="home-body text-xs text-tertiary dark:text-muted mb-2">{t('projectHome.theme.languageTitle')}</p>
                 <div className="grid grid-cols-2 gap-2">
@@ -956,7 +956,7 @@ export function ProjectHome({
                 </div>
               </div>
 
-              {/* 主题色选择 */}
+              {/* Accent color selection */}
               <div>
                 <p className="home-body text-xs text-tertiary dark:text-muted mb-2">{t('projectHome.theme.accentColorTitle')}</p>
                 <div className="grid grid-cols-6 gap-2">
@@ -986,7 +986,7 @@ export function ProjectHome({
               </div>
 </div>
 
-            {/* 清除缓存 */}
+            {/* Clear cache */}
             <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <RefreshCw className="w-4 h-4 text-tertiary" />

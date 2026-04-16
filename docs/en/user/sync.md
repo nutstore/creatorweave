@@ -1,6 +1,6 @@
 # Sync and Remote Control
 
-AI Workspace supports remote session workflows through the relay server.
+CreatorWeave supports remote session workflows through the relay server.
 
 ## Typical Use Cases
 

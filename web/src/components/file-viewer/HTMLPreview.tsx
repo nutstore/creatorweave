@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
+import { useT } from '@/i18n'
 
 interface HTMLPreviewProps {
   filePath: string
@@ -8,17 +9,18 @@ interface HTMLPreviewProps {
 }
 
 export function HTMLPreview({ filePath, fileHandle, onClose }: HTMLPreviewProps) {
+  const t = useT()
   const [content, setContent] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 获取文件内容
+  // Get file content
   const readFileContent = useCallback(async () => {
     setLoading(true)
     setError(null)
 
     try {
-      // 直接从 fileHandle 读取文件
+      // Read file directly from fileHandle
       const file = await fileHandle.getFile()
       const text = await file.text()
       setContent(text)
@@ -30,14 +32,14 @@ export function HTMLPreview({ filePath, fileHandle, onClose }: HTMLPreviewProps)
     }
   }, [fileHandle])
 
-  // 创建 Blob URL
+  // Create Blob URL
   const blobUrl = useMemo(() => {
     if (!content) return null
     const blob = new Blob([content], { type: 'text/html' })
     return URL.createObjectURL(blob)
   }, [content])
 
-  // 清理 Blob URL
+  // Clean up Blob URL
   useEffect(() => {
     return () => {
       if (blobUrl) {
@@ -46,7 +48,7 @@ export function HTMLPreview({ filePath, fileHandle, onClose }: HTMLPreviewProps)
     }
   }, [blobUrl])
 
-  // 初始加载
+  // Initial load
   useEffect(() => {
     readFileContent()
   }, [readFileContent])
@@ -56,7 +58,7 @@ export function HTMLPreview({ filePath, fileHandle, onClose }: HTMLPreviewProps)
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-700 px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-neutral-200">预览</span>
+          <span className="text-sm font-medium text-neutral-200">{t('htmlPreview.preview')}</span>
           <span className="text-xs text-neutral-500">{filePath}</span>
         </div>
         <button
@@ -71,7 +73,7 @@ export function HTMLPreview({ filePath, fileHandle, onClose }: HTMLPreviewProps)
       <div className="flex-1 min-h-0">
         {loading ? (
           <div className="flex h-full items-center justify-center text-sm text-neutral-400">
-            加载中...
+            {t('htmlPreview.loading')}
           </div>
         ) : error ? (
           <div className="flex h-full items-center justify-center text-sm text-red-400">

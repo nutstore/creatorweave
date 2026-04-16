@@ -128,8 +128,8 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
           {isDragging && (
             <div className="border-primary-400 absolute inset-0 z-10 -m-2 flex flex-col items-center justify-center rounded-xl border-2 border-dashed bg-primary-50/70">
               <Upload className="mb-4 h-12 w-12 text-primary-500" />
-              <p className="text-lg font-medium text-primary-700">Drop files here</p>
-              <p className="text-sm text-primary-600">Supports CSV, Excel, PDF, images, and more</p>
+              <p className="text-lg font-medium text-primary-700">{t('welcome.dropFilesHere')}</p>
+              <p className="text-sm text-primary-600">{t('welcome.supportsFileTypes')}</p>
             </div>
           )}
 
@@ -138,7 +138,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={hasApiKey ? t('welcome.placeholder') : t('welcome.placeholderNoKey')}
-            aria-label="输入消息"
+            aria-label={t('conversation.input.ariaLabel')}
             rows={3}
             className={`w-full resize-none rounded-xl border px-5 py-4 pr-14 text-sm shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 ${
               isInputDisabled
@@ -154,7 +154,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
               <div className="mb-2 flex items-center gap-2">
                 <Upload className="h-4 w-4 text-primary-600" />
                 <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">
-                  {draggedFiles.length} file{draggedFiles.length > 1 ? 's' : ''} ready
+                  {t('welcome.filesReady', { count: draggedFiles.length })}
                 </span>
                 <button
                   type="button"
@@ -196,7 +196,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
 
           {isInputDisabled && (
             <p className="mt-2 px-1 text-xs text-neutral-500 dark:text-neutral-400">
-              请先在模型设置中配置 API Key 后开始对话
+              {t('welcome.apiKeyRequiredHint')}
             </p>
           )}
         </div>
@@ -220,7 +220,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
             className="flex h-9 items-center gap-2 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-normal text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
             <Sparkles className="h-4 w-4" />
-            {t('welcome.viewCapabilities') || 'View Capabilities'}
+            {t('welcome.viewCapabilities')}
           </button>
         </div>
 

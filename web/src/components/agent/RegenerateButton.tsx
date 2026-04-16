@@ -1,24 +1,25 @@
 /**
- * RegenerateButton - 重新发送用户消息按钮
+ * RegenerateButton - Button to resend user message
  */
 
 import { RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
+import { useT } from '@/i18n'
 
 interface RegenerateButtonProps {
-  /** 用户消息ID */
+  /** User message ID */
   userMessageId: string
-  /** 用户消息内容（用于确认提示）*/
+  /** User message content (for confirmation prompt) */
   messageContent: string
-  /** 对话框ID */
+  /** Conversation ID */
   conversationId: string
-  /** 触发重新生成的回调 */
+  /** Callback to trigger regeneration */
   onRegenerate: (userMessageId: string) => void
-  /** 取消当前流式输出的回调 */
+  /** Callback to cancel current streaming output */
   onCancel?: () => void
-  /** 禁用状态 */
+  /** Disabled state */
   disabled?: boolean
-  /** 是否正在流式输出 */
+  /** Whether is currently streaming output */
   isRunning?: boolean
 }
 
@@ -29,23 +30,21 @@ export function RegenerateButton({
   disabled = false,
   isRunning = false,
 }: RegenerateButtonProps) {
+  const t = useT()
   const handleClick = () => {
     if (isRunning) {
-      // 流式输出时，先停止再重新生成
       onCancel?.()
-      // 延迟一下，确保停止完成后再重新生成
       setTimeout(() => {
         onRegenerate(userMessageId)
       }, 100)
     } else {
-      // 非流式输出时，显示确认 toast
-      toast.warning('确定要重新发送这条消息吗？当前回复将被替换', {
+      toast.warning(t('conversation.regenerateConfirmMessage'), {
         action: {
-          label: '确认',
+          label: t('conversation.regenerateConfirmAction'),
           onClick: () => onRegenerate(userMessageId),
         },
         cancel: {
-          label: '取消',
+          label: t('conversation.regenerateCancelAction'),
           onClick: () => {},
         },
         duration: 5000,
@@ -59,8 +58,8 @@ export function RegenerateButton({
       className="inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
       disabled={disabled}
       onClick={handleClick}
-      title={isRunning ? "停止并重新发送" : "重新发送"}
-      aria-label={isRunning ? "停止并重新发送此消息" : "重新发送此消息"}
+      title={isRunning ? t('conversation.stopAndResend') : t('conversation.resend')}
+      aria-label={isRunning ? t('conversation.stopAndResendMessage') : t('conversation.resendMessage')}
     >
       <RotateCcw className="h-3.5 w-3.5" />
     </button>

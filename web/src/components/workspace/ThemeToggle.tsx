@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { Sun, Moon, Monitor } from 'lucide-react'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
 import { BrandButton, Tooltip, TooltipContent, TooltipTrigger } from '@creatorweave/ui'
+import { useT } from '@/i18n'
 
 const THEME_ICONS = {
   light: Sun,
@@ -26,6 +27,7 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ className = '' }: ThemeToggleProps) {
+  const t = useT()
   const { mode, setTheme, toggleTheme } = useTheme()
   const [showMenu, setShowMenu] = useState(false)
 
@@ -55,7 +57,7 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
           </BrandButton>
         </TooltipTrigger>
         <TooltipContent side="bottom">
-          当前主题：{THEME_LABELS[mode]}（右键打开主题菜单）
+          {t('themeToggle.currentTheme', { theme: THEME_LABELS[mode] })} ({t('themeToggle.rightClickMenu')})
         </TooltipContent>
       </Tooltip>
 

@@ -6,7 +6,7 @@
  *
  * Components:
  * - SyncPreviewPanel: Main control panel
- * - PendingFileList: Compact pending file list (方案 A)
+ * - PendingFileList: Compact pending file list (Approach A)
  * - FileChangeList: List of file changes
  * - FileDiffViewer: Side-by-side diff view
  */

@@ -1,8 +1,8 @@
-# AI Workspace
+# CreatorWeave
 
 <div align="center">
 
-**AI-native creator workspace for local-first creation, knowledge, and multi-agent orchestration**
+**CreatorWeave: a local-first AI-native platform for creation, knowledge workflows, and multi-agent orchestration**
 
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](https://www.rust-lang.org/)
 [![React](https://img.shields.io/badge/React-18%2B-blue.svg)](https://react.dev/)
@@ -15,9 +15,9 @@ Try the live demo: [creatorweave.eo2suite.cn](https://creatorweave.eo2suite.cn/)
 
 </div>
 
-## What is AI Workspace?
+## What is CreatorWeave?
 
-AI Workspace is an **AI-native creator workspace** for content creators and builder teams. It combines local-first file workflows, AI copilots, knowledge-base workflows, and multi-agent orchestration in one browser-native product.
+CreatorWeave is a **local-first AI-native creation platform**. It combines file workflows, AI copilots, knowledge-base workflows, and multi-agent orchestration in one browser-native product.
 
 ### Key Product Description
 

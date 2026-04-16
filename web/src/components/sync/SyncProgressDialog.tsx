@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { useT } from '@/i18n'
 
 export interface SyncFileProgress {
   /** File path */
@@ -120,6 +121,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
   onCancel,
   onClose,
 }) => {
+  const t = useT()
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
 
   /**
@@ -141,25 +143,16 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
   }, [currentFile])
 
   /**
-   * Format estimated time
-   */
-  function formatTime(seconds: number): string {
-    if (seconds < 60) return `${Math.ceil(seconds)}秒`
-    const minutes = Math.ceil(seconds / 60)
-    return `${minutes}分钟`
-  }
-
-  /**
    * Get overall status text
    */
   function getOverallStatus() {
     if (status === 'completed') {
-      return '同步完成'
+      return t('sidebar.syncProgress.syncCompleted')
     }
     if (status === 'error') {
-      return '同步失败'
+      return t('sidebar.syncProgress.syncFailed')
     }
-    return '正在同步...'
+    return t('sidebar.syncProgress.syncing')
   }
 
   return (
@@ -197,7 +190,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                 </div>
               )}
               <div>
-                <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">同步文件</h2>
+                <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">{t('sidebar.syncProgress.syncingFile')}</h2>
                 <p className="text-sm text-tertiary dark:text-muted mt-0.5">
                   {getOverallStatus()}
                 </p>
@@ -227,10 +220,10 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-secondary dark:text-primary-foreground">
-                总体进度
+                {t('sidebar.syncProgress.totalProgress')}
               </span>
               <span className="text-sm text-tertiary dark:text-muted">
-                {completed} / {total} 文件
+                {t('sidebar.syncProgress.filesProgress', { completed, total })}
               </span>
             </div>
             <div className="w-full bg-muted dark:bg-muted rounded-full h-2 overflow-hidden">
@@ -243,7 +236,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
               <span className="text-xs text-tertiary dark:text-muted">{overallProgress.toFixed(0)}%</span>
               {estimatedTime && status === 'syncing' && (
                 <span className="text-xs text-tertiary dark:text-muted">
-                  预计剩余: {formatTime(estimatedTime)}
+                  {t('sidebar.syncProgress.estimatedTime')}: {estimatedTime < 60 ? `${Math.ceil(estimatedTime)}${t('common.seconds')}` : `${Math.ceil(estimatedTime / 60)}${t('common.minutes')}`}
                 </span>
               )}
             </div>
@@ -284,7 +277,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                         </span>
                         {estimatedTime && (
                           <span className="text-xs text-tertiary dark:text-muted">
-                            剩余 {formatTime(estimatedTime)}
+                            {t('sidebar.syncProgress.remaining')} {estimatedTime < 60 ? `${Math.ceil(estimatedTime)}${t('common.seconds')}` : `${Math.ceil(estimatedTime / 60)}${t('common.minutes')}`}
                           </span>
                         )}
                       </div>
@@ -305,7 +298,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                           d="M5 13l4 4L19 7m0 0l-7-7 7"
                         />
                       </svg>
-                      <span className="text-xs">同步成功</span>
+                      <span className="text-xs">{t('sidebar.syncProgress.syncSuccess')}</span>
                     </div>
                   )}
                 </div>
@@ -317,7 +310,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
           {!currentFile && status === 'syncing' && (
             <div className="text-center py-8">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-              <p className="text-sm text-tertiary dark:text-muted">准备同步...</p>
+              <p className="text-sm text-tertiary dark:text-muted">{t('sidebar.syncProgress.preparing')}</p>
             </div>
           )}
         </div>
@@ -330,7 +323,7 @@ export const SyncProgressDialog: React.FC<SyncProgressDialogProps> = ({
                 onClick={onClose}
                 className="px-5 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-all"
               >
-                关闭
+                {t('sidebar.syncProgress.close')}
               </button>
             </div>
           </div>

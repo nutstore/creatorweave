@@ -1,4 +1,4 @@
-# AI Workspace - Developer Guide
+# CreatorWeave - Developer Guide
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@
 
 ## Project Overview
 
-AI Workspace is an AI-native creator workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
+CreatorWeave is an AI-native creator workspace built with React, TypeScript, and Rust/WASM. It enables natural language interaction with local files through modern browser APIs.
 
 ### Technology Stack
 
@@ -473,7 +473,7 @@ pnpm run build:gh-pages
 ```bash
 # .env.production
 VITE_API_ENDPOINT=https://api.example.com
-VITE_APP_NAME=AI Workspace
+VITE_APP_NAME=CreatorWeave
 VITE_ENABLE_ANALYTICS=false
 ```
 

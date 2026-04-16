@@ -206,7 +206,7 @@ function ApprovedNotSyncedIndicator() {
       variant="neutral"
       shape="pill"
       className="h-4 min-w-4 px-1 text-[10px] font-mono"
-      title={t('fileTree.approvedNotSynced') || 'Approved, pending disk sync'}
+      title={t('fileTree.approvedNotSynced')}
     >
       <Cloud className="h-2.5 w-2.5" />
     </BrandBadge>
@@ -241,6 +241,7 @@ function TreeNodeRow({
   onClick: () => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
+  const t = useT()
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
   const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 })
   const rowRef = useRef<HTMLDivElement>(null)
@@ -360,7 +361,7 @@ function TreeNodeRow({
                 onClick={handleCopyPath}
               >
                 <Copy className="h-3 w-3" />
-                <span>复制路径</span>
+                <span>{t('fileTree.copyPath')}</span>
               </button>
             )}
             {!isDir && onInspect && node.path.endsWith('.html') && (
@@ -372,7 +373,7 @@ function TreeNodeRow({
                 }}
               >
                 <MousePointer2 className="h-3 w-3" />
-                <span>元素审查</span>
+                <span>{t('fileTree.inspectElement')}</span>
               </button>
             )}
           </div>,
@@ -460,6 +461,7 @@ export function FileTreePanel({
   mode = 'all',
   showHeader = true,
 }: FileTreePanelProps) {
+  const t = useT()
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -848,9 +850,9 @@ export function FileTreePanel({
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-tertiary text-center text-xs">
-          未选择本地目录也可继续使用
+          {t('fileTree.emptyStateHint')}
           <br />
-          纯 OPFS 沙箱模式下，文件变更会显示在这里
+          {t('fileTree.emptyStateDescription')}
         </p>
       </div>
     )
@@ -860,14 +862,14 @@ export function FileTreePanel({
       <div className="flex h-full flex-col">
       {showHeader && (
         <SidebarPanelHeader
-          title={rootName || directoryHandle?.name || '草稿文件'}
+          title={rootName || directoryHandle?.name || t('fileTree.draftFiles')}
           right={
             <BrandButton
               iconButton
               variant="ghost"
               className="h-6 w-6"
               onClick={handleRefresh}
-              title="刷新"
+              title={t('common.refresh')}
             >
               <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
             </BrandButton>
@@ -879,7 +881,7 @@ export function FileTreePanel({
       <div className="custom-scrollbar flex-1 overflow-y-auto">
         <div className="px-1.5 py-1.5">
           {loading && rootNodes.length === 0 ? (
-            <div className="text-tertiary p-4 text-center text-xs">加载中...</div>
+            <div className="text-tertiary p-4 text-center text-xs">{t('common.loading')}</div>
           ) : (
             <TreeBranch
               nodes={rootNodes}

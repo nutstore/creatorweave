@@ -13,18 +13,19 @@ import { useOPFSStore } from '@/store/opfs.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { Clock, FilePlus, FileEdit, FileX, RefreshCw, Check, X, AlertCircle } from 'lucide-react'
 import type { PendingChange } from '@/opfs/types/opfs-types'
+import { useT } from '@/i18n'
 
-function formatTime(timestamp: number): string {
+function formatTime(timestamp: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const date = new Date(timestamp)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / 60000)
 
-  if (diffMins < 1) return '刚刚'
-  if (diffMins < 60) return `${diffMins} 分钟前`
+  if (diffMins < 1) return t('pendingSync.justNow')
+  if (diffMins < 60) return t('pendingSync.minutesAgo', { count: diffMins })
 
   const diffHours = Math.floor(diffMins / 60)
-  if (diffHours < 24) return `${diffHours} 小时前`
+  if (diffHours < 24) return t('pendingSync.hoursAgo', { count: diffHours })
 
   return date.toLocaleDateString('zh-CN', {
     month: '2-digit',
@@ -45,21 +46,21 @@ function PendingIcon({ type }: { type: PendingChange['type'] }) {
   }
 }
 
-function TypeBadge({ type }: { type: PendingChange['type'] }) {
+function TypeBadge({ type, t }: { type: PendingChange['type']; t: (key: string, params?: Record<string, string | number>) => string }) {
   const styles = {
     create: 'bg-green-100 text-green-700',
     modify: 'bg-amber-100 text-amber-700',
     delete: 'bg-red-100 text-red-700',
   }
-  const labels = {
-    create: '新建',
-    modify: '修改',
-    delete: '删除',
-  }
+  const labelKey = {
+    create: 'pendingSync.create',
+    modify: 'pendingSync.modify',
+    delete: 'pendingSync.delete',
+  }[type]
 
   return (
     <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${styles[type]}`}>
-      {labels[type]}
+      {t(labelKey)}
     </span>
   )
 }
@@ -71,6 +72,7 @@ export function PendingPanel({
   directoryHandle: FileSystemDirectoryHandle | null
   onSyncComplete?: (result: { success: number; failed: number; skipped: number }) => void
 }) {
+  const t = useT()
   const { getPendingChanges, syncPendingChanges, isLoading } = useOPFSStore()
   const { activeWorkspaceId, currentPendingCount } = useConversationContextStore()
 
@@ -115,7 +117,7 @@ export function PendingPanel({
       <div className="flex h-full items-center justify-center p-4">
         <div className="flex flex-col items-center gap-2 text-center">
           <AlertCircle className="h-8 w-8 text-neutral-300" />
-          <p className="text-xs text-neutral-400">无活动对话</p>
+          <p className="text-xs text-neutral-400">{t('pendingSync.noActiveConversations')}</p>
         </div>
       </div>
     )
@@ -127,7 +129,7 @@ export function PendingPanel({
       <div className="flex h-full items-center justify-center p-4">
         <div className="flex flex-col items-center gap-2 text-center">
           <Check className="h-8 w-8 text-green-300" />
-          <p className="text-xs text-neutral-400">所有更改已同步</p>
+          <p className="text-xs text-neutral-400">{t('pendingSync.allChangesSynced')}</p>
         </div>
       </div>
     )
@@ -137,7 +139,7 @@ export function PendingPanel({
     <div className="flex h-full flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-1.5 dark:border-neutral-700">
-        <span className="text-xs font-medium text-neutral-600">待同步 ({currentPendingCount})</span>
+        <span className="text-xs font-medium text-neutral-600">{t('pendingSync.pendingCount', { count: currentPendingCount })}</span>
 
         {/* Sync button */}
         <button
@@ -149,10 +151,10 @@ export function PendingPanel({
               ? 'bg-primary-600 text-white hover:bg-primary-700'
               : 'cursor-not-allowed bg-neutral-100 text-neutral-400'
           }`}
-          title={directoryHandle ? '同步所有待同步更改到磁盘' : '请先选择项目文件夹'}
+          title={directoryHandle ? t('pendingSync.syncAllToDisk') : t('pendingSync.selectProjectFolder')}
         >
           <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
-          {syncing ? '同步中...' : '同步'}
+          {syncing ? t('pendingSync.syncing') : t('pendingSync.sync')}
         </button>
       </div>
 
@@ -170,9 +172,9 @@ export function PendingPanel({
               <X className="h-3.5 w-3.5" />
             )}
             <span>
-              同步完成: {syncResult.success} 成功
-              {syncResult.failed > 0 && `, ${syncResult.failed} 失败`}
-              {syncResult.skipped > 0 && `, ${syncResult.skipped} 跳过`}
+              {t('pendingSync.syncComplete', { success: syncResult.success })}
+              {syncResult.failed > 0 && `, ${syncResult.failed} ${t('pendingSync.failed')}`}
+              {syncResult.skipped > 0 && `, ${syncResult.skipped} ${t('pendingSync.skipped')}`}
             </span>
           </div>
         </div>
@@ -197,7 +199,7 @@ export function PendingPanel({
               {/* Content */}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <TypeBadge type={pending.type} />
+                  <TypeBadge type={pending.type} t={t} />
                   <span
                     className="truncate text-xs font-medium text-neutral-700"
                     title={pending.path}
@@ -219,7 +221,7 @@ export function PendingPanel({
                 {/* Timestamp */}
                 <div className="mt-0.5 flex items-center gap-1 text-[10px] text-neutral-400">
                   <Clock className="h-2.5 w-2.5" />
-                  {formatTime(pending.timestamp)}
+                  {formatTime(pending.timestamp, t)}
                 </div>
               </div>
             </div>
@@ -230,7 +232,7 @@ export function PendingPanel({
       {/* Footer note */}
       <div className="border-t border-neutral-100 px-3 py-2">
         <p className="text-[10px] text-neutral-400">
-          待同步的更改将写入到真实文件系统。请确保已选择正确的项目文件夹。
+          {t('pendingSync.pendingChangesWillBeWritten')}
         </p>
       </div>
     </div>

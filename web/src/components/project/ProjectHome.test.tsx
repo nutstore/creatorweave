@@ -23,60 +23,60 @@ vi.mock('@/store/theme.store', () => ({
 const localeSetter = vi.fn()
 const t = (key: string) => {
   const messages: Record<string, string> = {
-    'projectHome.hero.badge': '本地优先',
-    'projectHome.hero.title': '创作从这里开始',
+    'projectHome.hero.badge': 'Local First',
+    'projectHome.hero.title': 'Start creating here',
     'projectHome.hero.description': 'desc',
     'projectHome.hero.descriptionSuffix': 'suffix',
-    'projectHome.hero.projectCount': '项目',
-    'projectHome.hero.workspaceCount': '工作区',
-    'projectHome.hero.docsHub': '文档中心',
-    'projectHome.hero.userDocs': '用户文档',
-    'projectHome.hero.developerDocs': '开发者文档',
-    'projectHome.sidebar.createNew': '新建',
-    'projectHome.sidebar.createNewDescription': '创建描述',
-    'projectHome.sidebar.shortcutHint': '快捷键: N',
-    'projectHome.sidebar.createProject': '创建项目',
-    'projectHome.sidebar.continueWork': '继续工作',
-    'projectHome.sidebar.startFresh': '重新开始',
-    'projectHome.sidebar.startFreshDescription': '重置描述',
-    'projectHome.sidebar.resetApp': '重置应用',
-    'projectHome.sidebar.helpDocs': '帮助文档',
-    'projectHome.sidebar.helpDocsDescription': '查看用户与开发者文档。',
-    'projectHome.sidebar.openDocs': '打开文档中心',
-    'projectHome.sidebar.appearance': '外观',
-    'projectHome.theme.modeTitle': '主题模式',
-    'projectHome.theme.light': '浅色',
-    'projectHome.theme.dark': '深色',
-    'projectHome.theme.languageTitle': '语言',
-    'projectHome.theme.accentColorTitle': '主题色',
-    'projectHome.filters.searchPlaceholder': '搜索项目...',
-    'projectHome.filters.all': '全部',
-    'projectHome.filters.active': '活跃',
-    'projectHome.filters.archived': '已归档',
-    'projectHome.timeline.today': '今天',
-    'projectHome.timeline.yesterday': '昨天',
-    'projectHome.timeline.thisWeek': '本周',
-    'projectHome.timeline.thisMonth': '本月',
-    'projectHome.timeline.older': '更早',
-    'projectHome.empty.noProjects': '暂无项目',
-    'projectHome.empty.noResults': '无结果',
-    'projectHome.empty.createFirst': '创建首个项目',
-    'projectHome.dialogs.createProject': '创建新项目',
-    'projectHome.dialogs.createProjectDescription': '说明',
-    'projectHome.dialogs.projectNamePlaceholder': '输入项目名称',
-    'projectHome.dialogs.createButton': '创建',
-    'projectHome.dialogs.creating': '创建中',
-    'projectHome.dialogs.startFreshConfirmPlaceholder': '重新开始',
-    'projectHome.project.open': '打开',
-    'projectHome.accentColors.teal': '青色',
-    'projectHome.accentColors.rose': '玫瑰',
-    'projectHome.accentColors.amber': '琥珀',
-    'projectHome.accentColors.violet': '紫罗兰',
-    'projectHome.accentColors.emerald': '翡翠',
-    'projectHome.accentColors.slate': '石墨',
-    'common.cancel': '取消',
-    'common.processing': '处理中',
-    'common.save': '保存',
+    'projectHome.hero.projectCount': 'Projects',
+    'projectHome.hero.workspaceCount': 'Workspaces',
+    'projectHome.hero.docsHub': 'Docs Hub',
+    'projectHome.hero.userDocs': 'User Docs',
+    'projectHome.hero.developerDocs': 'Developer Docs',
+    'projectHome.sidebar.createNew': 'New',
+    'projectHome.sidebar.createNewDescription': 'Create description',
+    'projectHome.sidebar.shortcutHint': 'Shortcut: N',
+    'projectHome.sidebar.createProject': 'Create Project',
+    'projectHome.sidebar.continueWork': 'Continue Work',
+    'projectHome.sidebar.startFresh': 'Start Fresh',
+    'projectHome.sidebar.startFreshDescription': 'Reset description',
+    'projectHome.sidebar.resetApp': 'Reset App',
+    'projectHome.sidebar.helpDocs': 'Help Docs',
+    'projectHome.sidebar.helpDocsDescription': 'View user and developer docs.',
+    'projectHome.sidebar.openDocs': 'Open Docs Hub',
+    'projectHome.sidebar.appearance': 'Appearance',
+    'projectHome.theme.modeTitle': 'Theme Mode',
+    'projectHome.theme.light': 'Light',
+    'projectHome.theme.dark': 'Dark',
+    'projectHome.theme.languageTitle': 'Language',
+    'projectHome.theme.accentColorTitle': 'Accent Color',
+    'projectHome.filters.searchPlaceholder': 'Search projects...',
+    'projectHome.filters.all': 'All',
+    'projectHome.filters.active': 'Active',
+    'projectHome.filters.archived': 'Archived',
+    'projectHome.timeline.today': 'Today',
+    'projectHome.timeline.yesterday': 'Yesterday',
+    'projectHome.timeline.thisWeek': 'This Week',
+    'projectHome.timeline.thisMonth': 'This Month',
+    'projectHome.timeline.older': 'Older',
+    'projectHome.empty.noProjects': 'No projects yet',
+    'projectHome.empty.noResults': 'No results',
+    'projectHome.empty.createFirst': 'Create your first project',
+    'projectHome.dialogs.createProject': 'Create New Project',
+    'projectHome.dialogs.createProjectDescription': 'Description',
+    'projectHome.dialogs.projectNamePlaceholder': 'Enter project name',
+    'projectHome.dialogs.createButton': 'Create',
+    'projectHome.dialogs.creating': 'Creating',
+    'projectHome.dialogs.startFreshConfirmPlaceholder': 'Start fresh',
+    'projectHome.project.open': 'Open',
+    'projectHome.accentColors.teal': 'Teal',
+    'projectHome.accentColors.rose': 'Rose',
+    'projectHome.accentColors.amber': 'Amber',
+    'projectHome.accentColors.violet': 'Violet',
+    'projectHome.accentColors.emerald': 'Emerald',
+    'projectHome.accentColors.slate': 'Slate',
+    'common.cancel': 'Cancel',
+    'common.processing': 'Processing',
+    'common.save': 'Save',
   }
   return messages[key] ?? key
 }
@@ -85,10 +85,10 @@ vi.mock('@/i18n', () => ({
   useT: () => t,
   useLocale: () => ['zh-CN', localeSetter],
   LOCALE_LABELS: {
-    'zh-CN': '简体中文',
+    'zh-CN': 'Simplified Chinese',
     'en-US': 'English',
-    'ja-JP': '日本語',
-    'ko-KR': '한국어',
+    'ja-JP': 'Japanese',
+    'ko-KR': 'Korean',
   },
 }))
 
@@ -112,11 +112,11 @@ describe('ProjectHome docs entry', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: '文档中心' }))
+    await user.click(screen.getByRole('button', { name: 'Docs Hub' }))
 
     expect(onOpenDocs).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('button', { name: '用户文档' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '开发者文档' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'User Docs' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Developer Docs' })).not.toBeInTheDocument()
   })
 
   it('prefers recent project activity for continue work', async () => {
@@ -129,14 +129,14 @@ describe('ProjectHome docs entry', () => {
         projects={[
           {
             id: 'project-a',
-            name: '最近工作项目',
+            name: 'Recent Work Project',
             status: 'active',
             createdAt: now - 86400000 * 30,
             updatedAt: now - 86400000 * 30,
           },
           {
             id: 'project-b',
-            name: '刚创建项目',
+            name: 'Just Created Project',
             status: 'active',
             createdAt: now - 1000 * 60 * 10,
             updatedAt: now - 1000 * 60 * 10,
@@ -164,7 +164,7 @@ describe('ProjectHome docs entry', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: '继续工作' }))
+    await user.click(screen.getByRole('button', { name: 'Continue Work' }))
 
     expect(onOpenProject).toHaveBeenCalledWith('project-a')
   })

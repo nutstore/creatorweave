@@ -17,7 +17,7 @@ import { resolveNativeDirectoryHandle } from './tool-utils'
  */
 export function pluginToToolDefinition(metadata: PluginMetadata): ToolDefinition {
   const extensions = metadata.capabilities.file_extensions
-  const extList = extensions.length > 0 ? extensions.join(', ') : '所有文件'
+  const extList = extensions.length > 0 ? extensions.join(', ') : 'All files'
 
   return {
     type: 'function',
@@ -26,19 +26,19 @@ export function pluginToToolDefinition(metadata: PluginMetadata): ToolDefinition
       description: [
         `[WASM Plugin] ${metadata.name} (v${metadata.version})`,
         metadata.description,
-        `支持文件类型: ${extList}`,
+        `Supported file types: ${extList}`,
       ].join(' — '),
       parameters: {
         type: 'object',
         properties: {
           paths: {
             type: 'array',
-            description: '要处理的文件路径列表',
+            description: 'List of file paths to process',
             items: { type: 'string' },
           },
           pattern: {
             type: 'string',
-            description: '文件 glob 匹配模式（如 "src/**/*.ts"），与 paths 二选一',
+            description: 'File glob pattern (e.g. "src/**/*.ts"), mutually exclusive with paths',
           },
         },
       },
@@ -62,13 +62,13 @@ export function createPluginBridgeExecutor(pluginId: string): ToolExecutor {
 
     const dirHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
     if (!dirHandle) {
-      return JSON.stringify({ error: '未选择项目文件夹，无法执行插件' })
+      return JSON.stringify({ error: 'No project folder selected, cannot execute plugin' })
     }
 
     // Resolve file list from paths or pattern
     const files = await resolveFiles(args, dirHandle, instance)
     if (files.length === 0) {
-      return JSON.stringify({ error: '没有匹配的文件' })
+      return JSON.stringify({ error: 'No matching files found' })
     }
 
     // Execute via PluginExecutorService
@@ -187,29 +187,29 @@ function formatExecutionResult(
   metadata: PluginMetadata
 ): string {
   const lines: string[] = [
-    `## ${metadata.name} 插件执行结果`,
+    `## ${metadata.name} Plugin Execution Result`,
     '',
-    `- 处理文件数: ${result.results.length}`,
-    `- 耗时: ${result.duration}ms`,
+    `- Files processed: ${result.results.length}`,
+    `- Duration: ${result.duration}ms`,
   ]
 
   if (result.errors.length > 0) {
-    lines.push(`- 错误: ${result.errors.length} 个`)
+    lines.push(`- Errors: ${result.errors.length}`)
   }
 
   if (result.finalResult) {
     const fr = result.finalResult
     lines.push('')
-    lines.push(`### 汇总`)
+    lines.push(`### Summary`)
     lines.push(fr.summary)
     lines.push('')
-    lines.push(`- 成功: ${fr.filesProcessed}`)
-    lines.push(`- 跳过: ${fr.filesSkipped}`)
-    lines.push(`- 失败: ${fr.filesWithErrors}`)
+    lines.push(`- Success: ${fr.filesProcessed}`)
+    lines.push(`- Skipped: ${fr.filesSkipped}`)
+    lines.push(`- Failed: ${fr.filesWithErrors}`)
 
     if (fr.metrics) {
       lines.push('')
-      lines.push('### 指标')
+      lines.push('### Metrics')
       lines.push('```json')
       lines.push(JSON.stringify(fr.metrics, null, 2))
       lines.push('```')
@@ -217,7 +217,7 @@ function formatExecutionResult(
 
     if (fr.warnings.length > 0) {
       lines.push('')
-      lines.push('### 警告')
+      lines.push('### Warnings')
       for (const w of fr.warnings) {
         lines.push(`- ${w}`)
       }
@@ -228,13 +228,13 @@ function formatExecutionResult(
   const fileResults = result.results.filter((r) => r.output)
   if (fileResults.length > 0) {
     lines.push('')
-    lines.push('### 文件详情 (前20个)')
+    lines.push('### File Details (first 20)')
     for (const fr of fileResults.slice(0, 20)) {
       const status = fr.success ? '✓' : '✗'
       lines.push(`${status} ${fr.path} (${fr.duration}ms)`)
     }
     if (fileResults.length > 20) {
-      lines.push(`... 还有 ${fileResults.length - 20} 个文件`)
+      lines.push(`... ${fileResults.length - 20} more files`)
     }
   }
 

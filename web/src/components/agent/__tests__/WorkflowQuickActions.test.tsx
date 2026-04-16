@@ -30,8 +30,8 @@ if (!('toggleAttribute' in Element.prototype)) {
 
 describe('WorkflowQuickActions', () => {
   const templates = [
-    { id: 'novel_daily_v1', label: '小说日更', pipeline: ['plan', 'produce', 'review'] },
-    { id: 'short_video_script_v1', label: '短视频脚本', pipeline: ['plan', 'produce', 'review', 'assemble'] },
+    { id: 'novel_daily_v1', label: 'Novel Daily', pipeline: ['plan', 'produce', 'review'] },
+    { id: 'short_video_script_v1', label: 'Short Video Script', pipeline: ['plan', 'produce', 'review', 'assemble'] },
   ]
 
   it('opens popover and renders workflow options', async () => {
@@ -52,11 +52,11 @@ describe('WorkflowQuickActions', () => {
     }
 
     render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
 
-    expect(screen.getByText('工作流')).toBeTruthy()
-    expect(screen.getByText('短视频脚本')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /模拟运行/i })).toBeTruthy()
+    expect(screen.getByText('Workflow')).toBeTruthy()
+    expect(screen.getByText('Short Video Script')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /simulate run/i })).toBeTruthy()
   })
 
   it('disables trigger when disabled is true', () => {
@@ -70,7 +70,7 @@ describe('WorkflowQuickActions', () => {
       />
     )
 
-    const trigger = screen.getByRole('button', { name: /工作流/i }) as HTMLButtonElement
+    const trigger = screen.getByRole('button', { name: /workflow/i }) as HTMLButtonElement
     expect(trigger.disabled).toBe(true)
   })
 
@@ -92,8 +92,8 @@ describe('WorkflowQuickActions', () => {
     }
 
     render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByRole('button', { name: /模拟运行/i }))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
+    await user.click(screen.getByRole('button', { name: /simulate run/i }))
 
     expect(onRun).toHaveBeenCalledWith('novel_daily_v1', undefined)
   })
@@ -112,8 +112,8 @@ describe('WorkflowQuickActions', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByText('短视频脚本'))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
+    await user.click(screen.getByText('Short Video Script'))
 
     expect(onTemplateChange).toHaveBeenCalledWith('short_video_script_v1')
   })
@@ -135,16 +135,16 @@ describe('WorkflowQuickActions', () => {
     }
 
     render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByRole('button', { name: /高级设置/i }))
-    await user.click(screen.getByLabelText('启用自定义评分规则'))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
+    await user.click(screen.getByRole('button', { name: /advanced settings/i }))
+    await user.click(screen.getByLabelText('Enable custom scoring rules'))
 
-    fireEvent.change(screen.getByLabelText('段落最小句数'), { target: { value: '8' } })
-    fireEvent.change(screen.getByLabelText('段落最大句数'), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('Min sentences per paragraph'), { target: { value: '8' } })
+    fireEvent.change(screen.getByLabelText('Max sentences per paragraph'), { target: { value: '3' } })
 
-    const runButton = screen.getByRole('button', { name: /模拟运行/ }) as HTMLButtonElement
+    const runButton = screen.getByRole('button', { name: /simulate run/i }) as HTMLButtonElement
     expect(runButton.disabled).toBe(true)
-    expect(screen.getByText(/段落句数范围不合法/)).toBeTruthy()
+    expect(screen.getByText(/Invalid sentence count range/)).toBeTruthy()
   })
 
   it('builds rubric DSL from form and passes it to onRun', async () => {
@@ -165,22 +165,22 @@ describe('WorkflowQuickActions', () => {
     }
 
     render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByRole('button', { name: /高级设置/i }))
-    await user.click(screen.getByLabelText('启用自定义评分规则'))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
+    await user.click(screen.getByRole('button', { name: /advanced settings/i }))
+    await user.click(screen.getByLabelText('Enable custom scoring rules'))
 
-    fireEvent.change(screen.getByLabelText('自定义评分规则'), { target: { value: '我的评分规则' } })
-    fireEvent.change(screen.getByLabelText('通过分'), { target: { value: '85' } })
-    fireEvent.change(screen.getByLabelText('最大修复轮次'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText('Custom scoring rules'), { target: { value: 'My scoring rules' } })
+    fireEvent.change(screen.getByLabelText('Pass score'), { target: { value: '85' } })
+    fireEvent.change(screen.getByLabelText('Max revision rounds'), { target: { value: '1' } })
 
-    await user.click(screen.getByRole('button', { name: /模拟运行/i }))
+    await user.click(screen.getByRole('button', { name: /simulate run/i }))
 
     const call = onRun.mock.calls[0]
     expect(call?.[0]).toBe('novel_daily_v1')
     expect(typeof call?.[1]).toBe('string')
 
     const rubric = JSON.parse(call?.[1] as string)
-    expect(rubric.name).toBe('我的评分规则')
+    expect(rubric.name).toBe('My scoring rules')
     expect(rubric.passCondition).toContain('85')
     expect(rubric.retryPolicy.maxRepairRounds).toBe(1)
     expect(Array.isArray(rubric.rules)).toBe(true)
@@ -202,8 +202,8 @@ describe('WorkflowQuickActions', () => {
       />
     )
 
-    await user.click(screen.getByRole('button', { name: /工作流/i }))
-    await user.click(screen.getByRole('button', { name: /自定义工作流编辑器/i }))
+    await user.click(screen.getByRole('button', { name: /workflow/i }))
+    await user.click(screen.getByRole('button', { name: /custom workflow editor/i }))
 
     expect(onOpenEditor).toHaveBeenCalledTimes(1)
   })

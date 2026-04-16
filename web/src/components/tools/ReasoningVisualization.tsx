@@ -1,10 +1,10 @@
 /**
- * ReasoningVisualization - AI 思考过程可视化组件
+ * ReasoningVisualization - AI Reasoning Process Visualization Component
  *
- * 展示 AI 的推理过程，包括：
- * - 思考步骤
- * - 工具调用状态
- * - 进度指示器
+ * Displays AI's reasoning process, including:
+ * - Thinking steps
+ * - Tool call status
+ * - Progress indicator
  */
 
 import { useState, useEffect, useMemo } from 'react'

@@ -22,6 +22,7 @@ import type {
   WorkflowNodeStep,
 } from '@/agent/message-types'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 const nodeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   plan: Lightbulb,
@@ -76,6 +77,7 @@ const segmentStyles = {
 /* ------------------------------------------------------------------ */
 
 function NodeStepReasoning({ step }: { step: Extract<WorkflowNodeStep, { type: 'reasoning' }> }) {
+  const t = useT()
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -90,7 +92,7 @@ function NodeStepReasoning({ step }: { step: Extract<WorkflowNodeStep, { type: '
     <div className="space-y-0">
       <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
         <Brain className="h-3 w-3" />
-        <span>{step.streaming ? '思考中...' : '思考过程'}</span>
+        <span>{step.streaming ? t('workflow.thinking') : t('workflow.thinkingProcess')}</span>
       </div>
       <div
         ref={contentRef}
@@ -144,6 +146,7 @@ function PipelineSegment({
   isExpanded: boolean
   onToggle: () => void
 }) {
+  const t = useT()
   const cfg = nodeKindConfig[node.kind as WorkflowNodeKind]
   const Icon = nodeIcons[node.kind]
   const style = segmentStyles[node.status]
@@ -192,7 +195,7 @@ function PipelineSegment({
 
         {/* Label */}
         <span className={cn('truncate text-[11px] font-medium', style.label)}>
-          {node.label || cfg?.label || node.kind}
+          {node.label || (cfg?.labelKey && t(cfg.labelKey)) || node.kind}
         </span>
 
         {/* Status badge */}
@@ -251,7 +254,7 @@ function PipelineSegment({
             <div className="flex items-center gap-2 px-3 py-2.5">
               <Loader2 className="h-3 w-3 animate-spin text-primary-500" />
               <span className="text-[11px] text-primary-600 dark:text-primary-400">
-                正在执行，请稍候...
+                {t('workflow.executing')}
               </span>
             </div>
           )}
@@ -294,6 +297,7 @@ export function WorkflowExecutionProgress({
   execution,
   onStop,
 }: WorkflowExecutionProgressProps) {
+  const t = useT()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const completedCount = execution.nodes.filter((n) => n.status === 'completed').length
@@ -324,19 +328,19 @@ export function WorkflowExecutionProgress({
           {hasRunning && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
-              运行中
+              {t('workflow.running')}
             </span>
           )}
           {isDone && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
               <CheckCircle2 className="h-2.5 w-2.5" />
-              已完成
+              {t('workflow.completed')}
             </span>
           )}
           {hasFailed && !hasRunning && (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:bg-red-500/10 dark:text-red-400">
               <XCircle className="h-2.5 w-2.5" />
-              失败
+              {t('workflow.failed')}
             </span>
           )}
         </div>
@@ -358,7 +362,7 @@ export function WorkflowExecutionProgress({
               type="button"
               onClick={onStop}
               className="rounded-md p-1 text-neutral-300 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-neutral-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-              title="停止运行"
+              title={t('workflow.stopRunning')}
             >
               <StopCircle className="h-3.5 w-3.5" />
             </button>

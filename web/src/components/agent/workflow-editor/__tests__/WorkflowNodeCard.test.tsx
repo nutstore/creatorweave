@@ -54,6 +54,6 @@ describe('WorkflowNodeCard', () => {
 
     render(<MemoizedWorkflowNodeCard {...props} />)
 
-    expect(screen.getByText('条件')).toBeInTheDocument()
+    expect(screen.getByText('Condition')).toBeInTheDocument()
   })
 })

@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'
+import { useT } from '@/i18n'
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall
@@ -22,6 +23,7 @@ export function ToolCallDisplay({
   isExecuting,
   streamingArgs,
 }: ToolCallDisplayProps) {
+  const t = useT()
   const [expanded, setExpanded] = useState(false)
 
   const rawArgs = streamingArgs ?? toolCall.function.arguments
@@ -73,7 +75,7 @@ export function ToolCallDisplay({
           {isStreaming ? (
             <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
           ) : isExecuting ? (
-            <span className="text-blue-500">执行中...</span>
+            <span className="text-blue-500">{t('toolCallDisplay.executing')}</span>
           ) : isError ? (
             <XCircle className="h-4 w-4 text-red-500" />
           ) : result ? (
@@ -86,7 +88,7 @@ export function ToolCallDisplay({
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <div className="mb-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">参数</span>
+              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
               <CopyIconButton
                 content={Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
               />
@@ -101,7 +103,7 @@ export function ToolCallDisplay({
           {result && (
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">结果</span>
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
                 <CopyIconButton content={result} />
               </div>
               <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">

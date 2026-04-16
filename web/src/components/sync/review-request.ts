@@ -7,6 +7,14 @@ import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import type { FileChange } from '@/opfs/types/opfs-types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 
+// Error message keys for i18n - these are translated at the call site
+export const ReviewErrorKey = {
+  NO_ACTIVE_WORKSPACE: 'noActiveWorkspace',
+  NO_CHANGES_TO_REVIEW: 'noChangesToReview',
+  PLEASE_CONFIGURE_API_KEY: 'pleaseConfigureApiKey',
+  CONVERSATION_RUNNING: 'conversationRunningPleaseWait',
+} as const
+
 function buildReviewPrompt(changeCount: number, changesText: string, diffSections: string[]): string {
   return [
     'Please review the following code/file changes.',
@@ -29,7 +37,7 @@ function buildReviewPrompt(changeCount: number, changesText: string, diffSection
 async function buildReviewMessage(changes: FileChange[]): Promise<string> {
   const activeConversation = await getActiveConversation()
   if (!activeConversation) {
-    throw new Error('当前没有可用工作区')
+    throw new Error(ReviewErrorKey.NO_ACTIVE_WORKSPACE)
   }
 
   const { conversation, conversationId } = activeConversation
@@ -93,12 +101,12 @@ async function buildReviewMessage(changes: FileChange[]): Promise<string> {
 
 export async function sendChangeReviewToConversation(changes: FileChange[]): Promise<void> {
   if (changes.length === 0) {
-    throw new Error('没有可审阅的变更')
+    throw new Error(ReviewErrorKey.NO_CHANGES_TO_REVIEW)
   }
 
   const settings = useSettingsStore.getState()
   if (!settings.hasApiKey) {
-    throw new Error('请先配置 API Key')
+    throw new Error(ReviewErrorKey.PLEASE_CONFIGURE_API_KEY)
   }
 
   const conversationStore = useConversationStore.getState()
@@ -106,13 +114,13 @@ export async function sendChangeReviewToConversation(changes: FileChange[]): Pro
 
   let targetConvId = conversationStore.activeConversationId
   if (!targetConvId) {
-    const conv = conversationStore.createNew('变更审阅')
+    const conv = conversationStore.createNew('Change Review')
     targetConvId = conv.id
     await conversationStore.setActive(targetConvId)
   }
 
   if (conversationStore.isConversationRunning(targetConvId)) {
-    throw new Error('当前会话正在运行，请稍后再试')
+    throw new Error(ReviewErrorKey.CONVERSATION_RUNNING)
   }
 
   const reviewMessage = await buildReviewMessage(changes)

@@ -28,6 +28,7 @@ import {
 import { useOfflineQueueStore, OfflineTask, OfflineTaskType } from '@/store/offline-queue.store'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
+import { useT } from '@/i18n'
 
 //=============================================================================
 // Types
@@ -65,21 +66,21 @@ function getTaskTypeIcon(type: OfflineTaskType): React.ReactNode {
   }
 }
 
-function formatTime(timestamp: number): string {
+function formatTime(timestamp: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
 
   if (diff < 60 * 1000) {
-    return '刚刚'
+    return t('offlineQueue.justNow')
   }
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000))
-    return `${minutes} 分钟前`
+    return t('offlineQueue.minutesAgo', { count: minutes })
   }
   if (diff < 24 * 60 * 60 * 1000) {
     const hours = Math.floor(diff / (60 * 60 * 1000))
-    return `${hours} 小时前`
+    return t('offlineQueue.hoursAgo', { count: hours })
   }
 
   return date.toLocaleDateString('zh-CN', {
@@ -99,9 +100,10 @@ interface TaskItemProps {
   onRetry?: () => void
   onDelete?: () => void
   onClick?: (task: OfflineTask) => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
-function TaskItem({ task, onRetry, onDelete, onClick }: TaskItemProps) {
+function TaskItem({ task, onRetry, onDelete, onClick, t }: TaskItemProps) {
   return (
     <div
       className={clsx(
@@ -143,7 +145,7 @@ function TaskItem({ task, onRetry, onDelete, onClick }: TaskItemProps) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-slate-900">{task.name}</p>
         <p className="truncate text-xs text-slate-500">
-          {task.description || formatTime(task.updatedAt)}
+          {task.description || formatTime(task.updatedAt, t)}
         </p>
 
         {/* Progress Bar */}
@@ -170,7 +172,7 @@ function TaskItem({ task, onRetry, onDelete, onClick }: TaskItemProps) {
                 onRetry()
               }}
               className="rounded-lg p-2 text-blue-500 transition-colors hover:bg-blue-100"
-              title="重试"
+              title={t('offlineQueue.retry')}
             >
               <RefreshCw className="h-4 w-4" />
             </button>
@@ -182,7 +184,7 @@ function TaskItem({ task, onRetry, onDelete, onClick }: TaskItemProps) {
                 onDelete()
               }}
               className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-100"
-              title="删除"
+              title={t('offlineQueue.delete')}
             >
               <Trash2 className="h-4 w-4" />
             </button>
@@ -192,7 +194,7 @@ function TaskItem({ task, onRetry, onDelete, onClick }: TaskItemProps) {
 
       {/* Timestamp */}
       {task.status !== 'syncing' && (
-        <span className="text-xs text-slate-400">{formatTime(task.updatedAt)}</span>
+        <span className="text-xs text-slate-400">{formatTime(task.updatedAt, t)}</span>
       )}
     </div>
   )
@@ -207,9 +209,10 @@ interface SectionHeaderProps {
   title: string
   count: number
   onClear?: () => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
-function SectionHeader({ icon, title, count, onClear }: SectionHeaderProps) {
+function SectionHeader({ icon, title, count, onClear, t }: SectionHeaderProps) {
   return (
     <div className="flex items-center justify-between py-2">
       <div className="flex items-center gap-2">
@@ -221,7 +224,7 @@ function SectionHeader({ icon, title, count, onClear }: SectionHeaderProps) {
       </div>
       {onClear && count > 0 && (
         <button onClick={onClear} className="text-xs text-slate-500 hover:text-slate-700">
-          清除已完成
+          {t('offlineQueue.clearCompleted')}
         </button>
       )}
     </div>
@@ -234,9 +237,10 @@ function SectionHeader({ icon, title, count, onClear }: SectionHeaderProps) {
 
 interface CompactViewProps {
   onClick?: (task?: OfflineTask) => void
+  t: (key: string, params?: Record<string, string | number>) => string
 }
 
-function CompactView({ onClick }: CompactViewProps) {
+function CompactView({ onClick, t }: CompactViewProps) {
   const { isOnline, getTaskCounts } = useOfflineQueueStore()
   const counts = getTaskCounts()
   const totalPending = counts.pending + counts.syncing
@@ -260,11 +264,11 @@ function CompactView({ onClick }: CompactViewProps) {
           )}
         </div>
         <div className="text-left">
-          <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{isOnline ? '在线' : '离线'}</p>
+          <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{isOnline ? t('offlineQueue.online') : t('offlineQueue.offline')}</p>
           {totalPending > 0 && (
             <p className="text-xs text-slate-500">
-              {counts.syncing > 0 && `同步中 ${counts.syncing}, `}
-              {counts.pending > 0 && `等待中 ${counts.pending}`}
+              {counts.syncing > 0 && `${t('offlineQueue.syncingCount', { count: counts.syncing })}, `}
+              {counts.pending > 0 && t('offlineQueue.pendingCount', { count: counts.pending })}
             </p>
           )}
         </div>
@@ -273,7 +277,7 @@ function CompactView({ onClick }: CompactViewProps) {
         <div className="flex items-center gap-2">
           {counts.failed > 0 && (
             <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-600">
-              {counts.failed} 失败
+              {counts.failed} {t('offlineQueue.failedCount', { count: counts.failed })}
             </span>
           )}
           <Cloud className="h-5 w-5 text-slate-400" />
@@ -294,6 +298,7 @@ export function OfflineQueue({
   onTaskClick,
   className,
 }: OfflineQueueProps) {
+  const t = useT()
   const {
     isOnline,
     isSyncing,
@@ -340,7 +345,7 @@ export function OfflineQueue({
   }
 
   if (compact) {
-    return <CompactView onClick={onTaskClick} />
+    return <CompactView onClick={onTaskClick} t={t} />
   }
 
   return (
@@ -362,10 +367,10 @@ export function OfflineQueue({
           </div>
           <div>
             <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">
-              {isOnline ? '已连接网络' : '离线模式'}
+              {isOnline ? t('offlineQueue.connectedToNetwork') : t('offlineQueue.offlineMode')}
             </p>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
-              {isOnline ? '任务将自动同步' : '任务将在恢复网络后同步'}
+              {isOnline ? t('offlineQueue.tasksWillSyncAutomatically') : t('offlineQueue.tasksWillSyncWhenReconnected')}
             </p>
           </div>
         </div>
@@ -377,14 +382,14 @@ export function OfflineQueue({
           tasks.some((t) => t.status !== 'completed') && (
             <Button size="sm" onClick={handleSyncAll}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              同步全部
+              {t('offlineQueue.syncAll')}
             </Button>
           )}
 
         {isSyncing && (
           <div className="flex items-center gap-2 text-sm text-blue-600">
             <RefreshCw className="h-4 w-4 animate-spin" />
-            同步中...
+            {t('offlineQueue.syncing')}
           </div>
         )}
       </div>
@@ -397,12 +402,13 @@ export function OfflineQueue({
             <div className="space-y-2">
               <SectionHeader
                 icon={<RefreshCw className="h-4 w-4 text-blue-600" />}
-                title="同步中"
+                title={t('offlineQueue.syncing')}
                 count={syncingTasks.length}
+                t={t}
               />
               <div className="space-y-2">
                 {syncingTasks.slice(0, maxItems).map((task) => (
-                  <TaskItem key={task.id} task={task} onClick={() => onTaskClick?.(task)} />
+                  <TaskItem key={task.id} task={task} onClick={() => onTaskClick?.(task)} t={t} />
                 ))}
               </div>
             </div>
@@ -413,12 +419,13 @@ export function OfflineQueue({
             <div className="space-y-2">
               <SectionHeader
                 icon={<Clock className="h-4 w-4 text-slate-500" />}
-                title="等待中"
+                title={t('offlineQueue.pending')}
                 count={pendingTasks.length}
+                t={t}
               />
               <div className="space-y-2">
                 {pendingTasks.slice(0, maxItems).map((task) => (
-                  <TaskItem key={task.id} task={task} onClick={() => onTaskClick?.(task)} />
+                  <TaskItem key={task.id} task={task} onClick={() => onTaskClick?.(task)} t={t} />
                 ))}
               </div>
             </div>
@@ -429,11 +436,12 @@ export function OfflineQueue({
             <div className="space-y-2">
               <SectionHeader
                 icon={<AlertCircle className="h-4 w-4 text-red-500" />}
-                title="失败"
+                title={t('offlineQueue.failed')}
                 count={failedTasks.length}
                 onClear={() => {
                   failedTasks.forEach((t) => removeTask(t.id))
                 }}
+                t={t}
               />
               <div className="space-y-2">
                 {failedTasks.slice(0, maxItems).map((task) => (
@@ -443,6 +451,7 @@ export function OfflineQueue({
                     onRetry={() => handleRetry(task.id)}
                     onDelete={() => handleDelete(task.id)}
                     onClick={() => onTaskClick?.(task)}
+                    t={t}
                   />
                 ))}
               </div>
@@ -454,9 +463,10 @@ export function OfflineQueue({
             <div className="space-y-2">
               <SectionHeader
                 icon={<Check className="h-4 w-4 text-green-500" />}
-                title="已完成"
+                title={t('offlineQueue.completed')}
                 count={completedTasks.length}
                 onClear={clearCompleted}
+                t={t}
               />
               {completedTasks.length <= 3 && (
                 <div className="space-y-2">
@@ -466,6 +476,7 @@ export function OfflineQueue({
                       task={task}
                       onDelete={() => handleDelete(task.id)}
                       onClick={() => onTaskClick?.(task)}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -479,8 +490,8 @@ export function OfflineQueue({
       {tasks.length === 0 && (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 py-8">
           <Cloud className="h-12 w-12 text-slate-300" />
-          <p className="mt-2 text-sm text-slate-500">暂无离线任务</p>
-          <p className="text-xs text-slate-400">网络中断时任务将自动保存到队列</p>
+          <p className="mt-2 text-sm text-slate-500">{t('offlineQueue.noOfflineTasks')}</p>
+          <p className="text-xs text-slate-400">{t('offlineQueue.tasksSavedAutomatically')}</p>
         </div>
       )}
     </div>

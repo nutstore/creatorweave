@@ -56,7 +56,7 @@ export function StorageLoading({
               </div>
 
               <BrandCardTitle className="text-xl text-red-900 dark:text-red-100">
-                数据库初始化失败
+                {t('common.databaseInitFailed')}
               </BrandCardTitle>
               <BrandCardDescription className="mt-2 text-sm text-red-700 dark:text-red-300">
                 {error}
@@ -67,14 +67,14 @@ export function StorageLoading({
               {canReset && (
                 <>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    这可能由于数据库损坏或迁移失败导致。重置数据库将清除所有数据并重新创建。
+                    {t('common.databaseResetExplanation')}
                   </p>
                   <button
                     className="bg-danger-600 hover:bg-danger-700 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
                     onClick={onReset}
                   >
                     <Database className="h-4 w-4" />
-                    重置数据库
+                    {t('common.resetDatabase')}
                   </button>
                 </>
               )}
@@ -85,7 +85,7 @@ export function StorageLoading({
                   onClick={() => window.location.reload()}
                 >
                   <RefreshCw className="h-4 w-4" />
-                  重新加载页面
+                  {t('common.reloadPage')}
                 </button>
               </div>
             </div>

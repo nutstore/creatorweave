@@ -9,6 +9,7 @@ import { useReactFlow } from '@xyflow/react'
 import { cn } from '@creatorweave/ui'
 import { nodeKindConfig } from './constants'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 const kindOrder: WorkflowNodeKind[] = ['plan', 'produce', 'review', 'repair', 'assemble']
 
@@ -25,7 +26,33 @@ function buildNodeId(kind: WorkflowNodeKind): string {
   return `${kind}_${Date.now()}_${rand}`
 }
 
+// Get translated kind config
+function getKindLabel(kind: WorkflowNodeKind, t: (key: string) => string): string {
+  const labels: Record<WorkflowNodeKind, string> = {
+    plan: t('workflowEditor.plan'),
+    produce: t('workflowEditor.produce'),
+    review: t('workflowEditor.review'),
+    repair: t('workflowEditor.repair'),
+    assemble: t('workflowEditor.assemble'),
+    condition: t('workflowEditor.condition') || 'Condition',
+  }
+  return labels[kind] || kind
+}
+
+function getKindDescription(kind: WorkflowNodeKind, t: (key: string) => string): string {
+  const descriptions: Record<WorkflowNodeKind, string> = {
+    plan: t('workflowEditor.planDescription') || 'Define goals and strategy',
+    produce: t('workflowEditor.produceDescription') || 'Execute creation tasks',
+    review: t('workflowEditor.reviewDescription') || 'Check output quality',
+    repair: t('workflowEditor.repairDescription') || 'Fix review issues',
+    assemble: t('workflowEditor.assembleDescription') || 'Integrate final output',
+    condition: t('workflowEditor.conditionDescription') || 'Conditional branching',
+  }
+  return descriptions[kind] || ''
+}
+
 export function AddNodeToolbar() {
+  const t = useT()
   const { screenToFlowPosition, addNodes, getNodes } = useReactFlow()
 
   const addNode = useCallback(
@@ -73,7 +100,7 @@ export function AddNodeToolbar() {
         )}
       >
         <span className="px-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-          添加
+          {t('workflowEditor.add')}
         </span>
 
         <div className="flex items-center gap-0.5">
@@ -92,10 +119,13 @@ export function AddNodeToolbar() {
                   'hover:shadow-sm active:scale-95',
                   config.bg, config.bgHover, config.color
                 )}
-                title={`添加${config.label}节点 - ${config.description}`}
+                title={t('workflowEditor.addNodeTooltip', {
+                  kind: getKindLabel(kind, t),
+                  description: getKindDescription(kind, t),
+                })}
               >
                 <Icon className="h-3.5 w-3.5" />
-                <span>{config.label}</span>
+                <span>{getKindLabel(kind, t)}</span>
 
                 {/* Tooltip on hover */}
                 <div
@@ -107,7 +137,7 @@ export function AddNodeToolbar() {
                     'dark:bg-neutral-200 dark:text-neutral-800'
                   )}
                 >
-                  {config.description}
+                  {getKindDescription(kind, t)}
                 </div>
               </button>
             )

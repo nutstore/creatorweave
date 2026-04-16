@@ -112,7 +112,7 @@ function Component() {
 
 | 键 | 中文 | 英文 |
 |---|------|------|
-| title | AI Workspace | AI Workspace |
+| title | CreatorWeave | CreatorWeave |
 | tagline | AI 原生创作者工作台 | AI-Native Creator Workspace |
 | placeholder | 输入消息开始对话... | Type a message to start... |
 

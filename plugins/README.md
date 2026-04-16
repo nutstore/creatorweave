@@ -1,6 +1,6 @@
-# AI Workspace - Plugin Development Guide
+# CreatorWeave - Plugin Development Guide
 
-This guide explains how to create, build, and integrate plugins for the AI Workspace.
+This guide explains how to create, build, and integrate plugins for the CreatorWeave.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This guide explains how to create, build, and integrate plugins for the AI Works
 
 ## Overview
 
-Plugins are WASM modules that extend the file analysis capabilities of the AI Workspace. Each plugin runs in an isolated Web Worker for security and performance.
+Plugins are WASM modules that extend the file analysis capabilities of the CreatorWeave. Each plugin runs in an isolated Web Worker for security and performance.
 
 ### Key Features
 
@@ -312,7 +312,7 @@ pub struct PluginInfo {
     pub id: String,           // Unique identifier (e.g., "md5-calculator")
     pub name: String,         // Human-readable name
     pub version: String,      // Semver version
-    pub api_version: String,  // Required AI Workspace API version (must be "2.0.0")
+    pub api_version: String,  // Required CreatorWeave API version (must be "2.0.0")
     pub description: String,  // Short description
     pub author: String,       // Plugin author/maintainer
     pub capabilities: PluginCapabilities,

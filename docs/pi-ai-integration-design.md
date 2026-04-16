@@ -1,4 +1,4 @@
-# `pi-ai` 接入设计（AI Workspace）
+# `pi-ai` 接入设计（CreatorWeave）
 
 ## 1. 目标
 

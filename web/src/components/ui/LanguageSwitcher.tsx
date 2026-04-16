@@ -1,7 +1,7 @@
 /**
- * LanguageSwitcher - 语言切换组件
+ * LanguageSwitcher - Language switcher component
  *
- * 点击式语言切换按钮，支持中英日韩切换
+ * Click-type language switch button, supports zh/en/ja/ko switching
  * Phase 5: Refactored to use brand components
  */
 
@@ -17,7 +17,7 @@ export function LanguageSwitcher() {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭
+  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {

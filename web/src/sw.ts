@@ -111,7 +111,7 @@ async function cacheFirstStrategy(request: Request): Promise<Response> {
       await cache.put(request, networkResponse.clone())
     }
     return networkResponse
-  } catch {
+  } catch (error) {
     console.error('[ServiceWorker] Cache first failed:', error)
     return new Response('Offline', { status: 503 })
   }
@@ -195,7 +195,7 @@ async function syncMessages(): Promise<void> {
 
 self.addEventListener('push', (event) => {
   let data = {
-    title: 'AI Workspace',
+    title: 'CreatorWeave',
     body: 'You have a new notification',
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-72.png',

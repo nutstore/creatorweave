@@ -7,6 +7,7 @@
 
 import { RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 export interface StorageStatusBannerProps {
   /**
@@ -42,6 +43,8 @@ export function StorageStatusBanner({
   onDismiss,
   className,
 }: StorageStatusBannerProps) {
+  const t = useT()
+
   if (isPersisted || !isVisible) {
     return null
   }
@@ -57,13 +60,13 @@ export function StorageStatusBanner({
       aria-label="Storage status"
     >
       <RefreshCw className="h-3 w-3 flex-shrink-0" aria-hidden="true" />
-      <span>缓存不稳定</span>
+      <span>{t('storageStatusBanner.cacheUnstable')}</span>
       <button
         onClick={onRetry}
         className="ml-0.5 hover:underline"
-        aria-label="Retry"
+        aria-label={t('storageStatusBanner.retry')}
       >
-        重试
+        {t('storageStatusBanner.retry')}
       </button>
       <button
         onClick={onDismiss}

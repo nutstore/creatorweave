@@ -33,6 +33,7 @@ import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
+import { useT } from '@/i18n'
 
 type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
@@ -87,6 +88,8 @@ export function Sidebar({
   isMobile = false,
   onRequestClose,
 }: SidebarProps) {
+  const t = useT()
+
   const {
     conversations,
     activeConversationId,
@@ -233,7 +236,7 @@ export function Sidebar({
           iconButton
           variant="ghost"
           onClick={() => setCollapsed(false)}
-          title="展开侧栏"
+          title={t('sidebar.expandSidebar')}
         >
           <PanelLeft className="h-4 w-4" />
         </BrandButton>
@@ -252,16 +255,16 @@ export function Sidebar({
       >
         {/* Collapse button */}
         <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1 dark:bg-card">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">工作区</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-primary">{t('sidebar.workspace')}</span>
           <div className="flex items-center gap-1">
             <BrandButton
               variant="ghost"
               className="h-6 px-2 text-[11px]"
               disabled={scopedConversationIds.length === 0 || clearingConversations}
               onClick={() => setClearConversationsDialogOpen(true)}
-              title="清空当前项目工作区"
+              title={t('sidebar.clearWorkspace')}
             >
-              清空
+              {t('sidebar.clear')}
             </BrandButton>
             <BrandButton
               iconButton
@@ -274,7 +277,7 @@ export function Sidebar({
                 }
                 setCollapsed(true)
               }}
-              title={isMobile ? '关闭侧栏' : '折叠侧栏'}
+              title={isMobile ? t('sidebar.closeSidebar') : t('sidebar.collapseSidebar')}
             >
               <PanelLeftClose className="h-3 w-3" />
             </BrandButton>
@@ -297,7 +300,7 @@ export function Sidebar({
               }}
             >
               <Plus className="h-3 w-3" />
-              新工作区
+              {t('sidebar.newWorkspace')}
             </BrandButton>
           </div>
 
@@ -312,7 +315,7 @@ export function Sidebar({
                   role="button"
                   tabIndex={0}
                   aria-pressed={isActive}
-                  aria-label={`工作区: ${conv.title}`}
+                  aria-label={t('sidebar.workspaceLabel', { name: conv.title })}
                   className={`group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
                     isActive
                       ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
@@ -338,7 +341,7 @@ export function Sidebar({
                   {pendingReviewCount > 0 && (
                     <span
                       className="rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning"
-                      title={`${pendingReviewCount} 个变更待审阅`}
+                      title={t('sidebar.pendingReviewCount', { count: pendingReviewCount })}
                     >
                       {pendingReviewCount}
                     </span>
@@ -351,13 +354,13 @@ export function Sidebar({
                       e.stopPropagation()
                       try {
                         await deleteConversation(conv.id)
-                        toast.success('工作区已删除')
+                        toast.success(t('sidebar.workspaceDeleted'))
                       } catch (error) {
                         console.error('[Sidebar] Failed to delete conversation:', error)
-                        toast.error('删除工作区失败')
+                        toast.error(t('sidebar.deleteWorkspaceFailed'))
                       }
                     }}
-                    title="删除工作区"
+                    title={t('sidebar.deleteWorkspace')}
                   >
                     <Trash2 className="h-3 w-3 text-danger" />
                   </BrandButton>
@@ -372,9 +375,9 @@ export function Sidebar({
           <div
             className="group relative flex h-2 shrink-0 cursor-row-resize items-center justify-center bg-neutral-50/50 transition-colors hover:bg-neutral-100/80 dark:bg-muted dark:hover:bg-muted"
             onMouseDown={handleVerticalDragStart}
-            title="拖动调整高度"
+            title={t('sidebar.dragToResizeHeight')}
           >
-            {/* 中心圆点 */}
+            {/* center dot */}
             <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
           </div>
         )}
@@ -396,7 +399,7 @@ export function Sidebar({
                 onClick={() => setResourceTab('files')}
               >
                 <FolderTree className="h-3 w-3" />
-                文件
+                {t('sidebar.files')}
               </BrandButton>
               <BrandButton
                 variant="ghost"
@@ -411,7 +414,7 @@ export function Sidebar({
                 }}
               >
                 <Clock className="h-3 w-3" />
-                变更
+                {t('sidebar.changes')}
                 {currentPendingCount > 0 && (
                   <span className="min-w-[1.1rem] rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning">
                     {currentPendingCount}
@@ -428,7 +431,7 @@ export function Sidebar({
                 onClick={() => setResourceTab('snapshots')}
               >
                 <History className="h-3 w-3" />
-                快照
+                {t('sidebar.snapshots')}
               </BrandButton>
               <BrandButton
                 variant="ghost"
@@ -440,7 +443,7 @@ export function Sidebar({
                 onClick={() => setResourceTab('plugins')}
               >
                 <Puzzle className="h-3 w-3" />
-                插件
+                {t('sidebar.plugins')}
               </BrandButton>
             </div>
 
@@ -458,10 +461,10 @@ export function Sidebar({
 
               {resourceTab === 'plugins' && (
                 <div className="flex h-full flex-col">
-                  <SidebarPanelHeader title="插件" />
+                  <SidebarPanelHeader title={t('sidebar.pluginTitle')} />
                   <div className="flex flex-1 items-center justify-center p-4">
                     <p className="text-xs text-secondary">
-                      插件管理功能将在此显示
+                      {t('sidebar.pluginManagerHint')}
                     </p>
                   </div>
                 </div>
@@ -488,10 +491,10 @@ export function Sidebar({
       >
         <BrandDialogContent className="max-w-md">
           <BrandDialogHeader>
-            <BrandDialogTitle>清空工作区</BrandDialogTitle>
+            <BrandDialogTitle>{t('sidebar.clearWorkspaceTitle')}</BrandDialogTitle>
           </BrandDialogHeader>
           <BrandDialogBody>
-            <p className="text-secondary text-sm">确认清空当前项目的所有工作区？此操作不可撤销。</p>
+            <p className="text-secondary text-sm">{t('sidebar.confirmClearWorkspace')}</p>
           </BrandDialogBody>
           <BrandDialogFooter>
             <BrandButton
@@ -499,7 +502,7 @@ export function Sidebar({
               disabled={clearingConversations}
               onClick={() => setClearConversationsDialogOpen(false)}
             >
-              取消
+              {t('common.cancel')}
             </BrandButton>
             <BrandButton
               variant="danger"
@@ -508,12 +511,12 @@ export function Sidebar({
                   setClearingConversations(true)
                   const result = await deleteConversations(scopedConversationIds)
                   if (result.failed.length === 0) {
-                    toast.success(`已清空 ${result.successIds.length} 个工作区`)
+                    toast.success(t('sidebar.clearedCount', { count: result.successIds.length }))
                     setClearConversationsDialogOpen(false)
                   } else if (result.successIds.length === 0) {
-                    toast.error(`清空失败（${result.failed.length} 个失败）`)
+                    toast.error(t('sidebar.clearFailed', { count: result.failed.length }))
                   } else {
-                    toast.error(`已删除 ${result.successIds.length} 个，失败 ${result.failed.length} 个`)
+                    toast.error(t('sidebar.deletePartial', { success: result.successIds.length, failed: result.failed.length }))
                   }
                 } finally {
                   setClearingConversations(false)
@@ -521,7 +524,7 @@ export function Sidebar({
               }}
               disabled={scopedConversationIds.length === 0 || clearingConversations}
             >
-              {clearingConversations ? '清空中...' : '清空'}
+              {clearingConversations ? t('sidebar.clearing') : t('sidebar.clear')}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>
@@ -532,9 +535,9 @@ export function Sidebar({
         <div
           className="group relative flex w-2 shrink-0 cursor-col-resize flex-col items-center justify-center bg-neutral-50/50 transition-colors hover:bg-neutral-100/80 dark:bg-muted dark:hover:bg-muted"
           onMouseDown={handleDragStart}
-          title="拖动调整宽度"
+          title={t('sidebar.dragToResizeWidth')}
         >
-          {/* 中心圆点 */}
+          {/* center dot */}
           <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
         </div>
       )}

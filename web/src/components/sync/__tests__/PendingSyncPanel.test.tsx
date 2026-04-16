@@ -161,15 +161,15 @@ describe('PendingSyncPanel', () => {
     }
     storeMock.discardPendingPath.mockImplementation(async (path: unknown) => {
       if (path === 'b.txt') {
-        throw new Error('缺少本地文件基线')
+        throw new Error('Missing local file baseline')
       }
     })
 
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: '拒绝全部变更' }))
-    await user.click(screen.getByRole('button', { name: '确认拒绝' }))
+    await user.click(screen.getByRole('button', { name: 'Discard all changes' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm discard' }))
 
     await waitFor(() => {
       expect(storeMock.discardPendingPath).toHaveBeenCalledTimes(2)
@@ -178,7 +178,7 @@ describe('PendingSyncPanel', () => {
     expect(storeMock.discardPendingPath).toHaveBeenNthCalledWith(2, 'b.txt')
     expect(storeMock.refreshPendingChanges).toHaveBeenCalledWith(true)
     expect(toastMock.warning).toHaveBeenCalledWith(
-      '已拒绝 1 个变更，1 个因缺少本地文件基线保留在列表中'
+      'Discarded 1 change, 1 retained in list due to missing local file baseline'
     )
     expect(toastMock.success).not.toHaveBeenCalled()
   })
@@ -194,14 +194,14 @@ describe('PendingSyncPanel', () => {
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: '拒绝全部变更' }))
-    await user.click(screen.getByRole('button', { name: '确认拒绝' }))
+    await user.click(screen.getByRole('button', { name: 'Discard all changes' }))
+    await user.click(screen.getByRole('button', { name: 'Confirm discard' }))
 
     await waitFor(() => {
       expect(storeMock.discardPendingPath).toHaveBeenCalledTimes(2)
     })
     expect(storeMock.refreshPendingChanges).toHaveBeenCalledWith(true)
-    expect(toastMock.success).toHaveBeenCalledWith('已拒绝全部变更')
+    expect(toastMock.success).toHaveBeenCalledWith('All changes discarded')
     expect(toastMock.warning).not.toHaveBeenCalled()
   })
 
@@ -209,17 +209,17 @@ describe('PendingSyncPanel', () => {
     storeMock.pendingChanges = {
       changes: [{ type: 'modify', path: 'broken.txt', size: 8 }],
     }
-    storeMock.discardPendingPath.mockRejectedValue(new Error('无法拒绝修改 "broken.txt"：缺少本地文件基线'))
+    storeMock.discardPendingPath.mockRejectedValue(new Error('Cannot discard changes to "broken.txt": missing local file baseline'))
 
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByTitle('从列表中移除'))
+    await user.click(screen.getByTitle('Remove from list'))
 
     await waitFor(() => {
       expect(storeMock.discardPendingPath).toHaveBeenCalledWith('broken.txt')
     })
-    expect(toastMock.error).toHaveBeenCalledWith('无法拒绝修改 "broken.txt"：缺少本地文件基线')
+    expect(toastMock.error).toHaveBeenCalledWith('Cannot discard changes to "broken.txt": missing local file baseline')
   })
 })
 

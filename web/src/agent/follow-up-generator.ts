@@ -113,7 +113,7 @@ function buildFollowUpMessages(messages: Message[]): Array<{
   chatMessages.push({
     role: 'user',
     content:
-      '请生成用户接下来可能会说的内容（不超过15字）。可以是问题、要求或指令，比如"帮我继续写"、"详细解释一下"、"改成中文"、"为什么这样"。直接输出，不要前缀。',
+      'Generate what the user might say next (no more than 15 characters). Can be a question, request, or instruction, like "continue writing", "explain in detail", "change to Chinese", "why is it like this". Output directly, no prefix.',
   })
 
   return chatMessages
@@ -167,7 +167,7 @@ export async function generateFollowUp(
     let cleaned = content.trim()
 
     // Remove common prefixes if AI added them
-    const prefixes = ['追问:', '问题:', '建议:', 'Q:', 'Q。', '问：']
+    const prefixes = ['follow-up:', 'question:', 'suggestion:', 'Q:', 'Q.', 'Q：']
     for (const prefix of prefixes) {
       if (cleaned.startsWith(prefix)) {
         cleaned = cleaned.slice(prefix.length).trim()

@@ -27,7 +27,7 @@ import { RefreshCw, Sparkles, ChevronRight, X, Check, AlertTriangle } from 'luci
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
-import { sendChangeReviewToConversation } from './review-request'
+import { sendChangeReviewToConversation, ReviewErrorKey } from './review-request'
 import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { toast } from 'sonner'
@@ -547,7 +547,15 @@ export function PendingSyncPanel() {
       await sendChangeReviewToConversation(filesToReview)
       toast.success(t('settings.pendingSyncPanel.reviewRequestSent'))
     } catch (error) {
-      const message = error instanceof Error ? error.message : t('settings.pendingSyncPanel.sendReviewRequestFailed')
+      let message = t('settings.pendingSyncPanel.sendReviewRequestFailed')
+      if (error instanceof Error) {
+        const errorKey = error.message as (typeof ReviewErrorKey)[keyof typeof ReviewErrorKey]
+        if (Object.values(ReviewErrorKey).includes(errorKey)) {
+          message = t(`settings.pendingSyncPanel.${errorKey}`)
+        } else {
+          message = error.message
+        }
+      }
       toast.error(message)
     } finally {
       setIsReviewing(false)

@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { X, FileText, Copy, Check } from 'lucide-react'
 import { Editor } from '@monaco-editor/react'
 import { formatBytes } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 interface FilePreviewProps {
   filePath: string | null
@@ -80,6 +81,7 @@ function getFileType(path: string): 'text' | 'image' | 'binary' {
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps) {
+  const t = useT()
   const [content, setContent] = useState<string | null>(null)
   const [fileSize, setFileSize] = useState<number>(0)
   const [loading, setLoading] = useState(false)
@@ -186,7 +188,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
             // Disk read failed, rely on OPFS if available
           }
         } else if (!text && !blob) {
-          setError('无法读取文件')
+          setError(t('filePreview.cannotReadFile'))
           setLoading(false)
           return
         }
@@ -194,7 +196,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         if (cancelled) return
 
         if (fileSize > MAX_FILE_SIZE) {
-          setError(`文件过大 (${formatBytes(fileSize)})，最大支持 ${formatBytes(MAX_FILE_SIZE)}`)
+          setError(t('filePreview.fileTooLarge', { size: formatBytes(fileSize), maxSize: formatBytes(MAX_FILE_SIZE) }))
           setLoading(false)
           return
         }
@@ -209,7 +211,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         }
       } catch (err) {
         if (!cancelled) {
-          setError(`读取文件失败: ${err instanceof Error ? err.message : String(err)}`)
+          setError(t('filePreview.readFileFailed', { error: err instanceof Error ? err.message : String(err) }))
         }
       } finally {
         if (!cancelled) {
@@ -240,7 +242,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       <div className="flex h-full items-center justify-center bg-white dark:bg-neutral-950">
         <div className="text-center text-neutral-400">
           <FileText className="mx-auto mb-2 h-6 w-6" />
-          <p className="text-xs">点击文件树中的文件进行预览</p>
+          <p className="text-xs">{t('filePreview.clickFileTreeToPreview')}</p>
         </div>
       </div>
     )
@@ -257,9 +259,9 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           {diskNewer && (
             <span
               className="shrink-0 rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold text-warning"
-              title="磁盘文件比 OPFS 变更更新，可能存在冲突"
+              title={t('filePreview.diskFileNewer')}
             >
-              冲突
+              {t('filePreview.conflict')}
             </span>
           )}
           <span className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200" title={filePath}>
@@ -273,7 +275,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               type="button"
               onClick={handleCopy}
               className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              title="复制内容"
+              title={t('filePreview.copyContent')}
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
             </button>
@@ -282,7 +284,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
             type="button"
             onClick={onClose}
             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-            title="关闭"
+            title={t('filePreview.close')}
           >
             <X className="h-3 w-3" />
           </button>
@@ -311,7 +313,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         {fileType === 'binary' && !loading && !error && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
             <FileText className="h-8 w-8 text-neutral-300" />
-            <p className="text-xs text-neutral-500">二进制文件</p>
+            <p className="text-xs text-neutral-500">{t('filePreview.binaryFile')}</p>
             <p className="text-[10px] text-neutral-400">
               {fileName} ({formatBytes(fileSize)})
             </p>

@@ -34,7 +34,7 @@ const { useConversationStoreMock } = vi.hoisted(() => {
     runWorkflowRealRun: vi.fn(),
     runCustomWorkflowDryRun: vi.fn(),
     listWorkflowTemplates: vi.fn(() => [
-      { id: 'novel_daily_v1', label: '小说日更', pipeline: ['plan', 'produce', 'review'] },
+      { id: 'novel_daily_v1', label: 'Novel Daily', pipeline: ['plan', 'produce', 'review'] },
     ]),
     cancelAgent: vi.fn(),
     isConversationRunning: vi.fn(() => false),
@@ -123,8 +123,8 @@ vi.mock('@/store/agents.store', () => ({
 vi.mock('@/i18n', () => ({
   useT: () => (key: string) => {
     const map: Record<string, string> = {
-      'conversation.empty.title': '开始新的对话',
-      'conversation.empty.description': '我可以帮助你处理代码、分析数据、编写文档等各种任务。',
+      'conversation.empty.title': 'Start a new conversation',
+      'conversation.empty.description': 'I can help you with code, data analysis, documentation, and more.',
       'conversation.usage.highRisk': 'high-risk',
       'conversation.usage.nearLimit': 'near-limit',
       'conversation.usage.comfortable': 'comfortable',
@@ -174,8 +174,8 @@ describe('ConversationView empty state', () => {
   it('does not render workflow templates in empty state', () => {
     render(<ConversationView />)
 
-    expect(screen.getByText('开始新的对话')).toBeInTheDocument()
-    expect(screen.queryByText('或选择一个工作流模板')).not.toBeInTheDocument()
-    expect(screen.queryByText('小说日更')).not.toBeInTheDocument()
+    expect(screen.getByText('Start a new conversation')).toBeInTheDocument()
+    expect(screen.queryByText('or select a workflow template')).not.toBeInTheDocument()
+    expect(screen.queryByText('Novel Daily')).not.toBeInTheDocument()
   })
 })

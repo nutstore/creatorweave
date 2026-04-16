@@ -1,13 +1,24 @@
 import type { ConditionConfig, WorkflowNodeKind } from './types'
 
 const kindInstructions: Record<WorkflowNodeKind, string> = {
-  plan: '请根据以下输入制定详细的大纲。大纲应条理清晰、层次分明，为后续创作提供完整框架。',
-  produce: '请根据以下大纲创作内容。创作应紧扣大纲要点，语言流畅，结构完整。',
-  review:
-    '请评审以下内容并给出评分。请以 JSON 格式返回评审结果，包含以下字段：\n- "score": 总体评分 (0-100)\n- "passed": 是否通过 (boolean)\n- "issues": 发现的问题列表\n- "suggestions": 改进建议列表\n\n示例格式：\n```json\n{"score": 85, "passed": true, "issues": [], "suggestions": ["可以增加更多细节描写"]}\n```',
-  repair: '请根据评审意见修复以下内容中的问题。修复后保持原有风格和结构，仅针对指出的不足进行改进。',
-  assemble: '请整合以下素材，输出最终版本。最终版本应融合所有输入的优点，保持一致的风格和完整的结构。',
-  condition: '请根据以下输入判断条件分支。返回格式：\n```json\n{"branch": "分支名称", "reason": "选择原因"}\n```',
+  plan: 'Based on the input below, create a detailed outline. The outline should be well-structured and hierarchical, providing a complete framework for subsequent content creation.',
+  produce: 'Create content based on the outline below. The content should closely follow the outline points with fluent language and complete structure.',
+  review: `Please review the content below and provide a score. Return the review result in JSON format with the following fields:
+- "score": Overall score (0-100)
+- "passed": Whether passed (boolean)
+- "issues": List of issues found
+- "suggestions": List of improvement suggestions
+
+Example format:
+\`\`\`json
+{"score": 85, "passed": true, "issues": [], "suggestions": ["Could add more descriptive details"]}
+\`\`\``,
+  repair: 'Based on the review feedback, fix the issues in the content below. Maintain the original style and structure, only improving the identified shortcomings.',
+  assemble: 'Integrate the following materials and output the final version. The final version should combine the advantages of all inputs while maintaining consistent style and complete structure.',
+  condition: `Based on the input below, determine the condition branch. Return format:
+\`\`\`json
+{"branch": "branch_name", "reason": "reason_for_choice"}
+\`\`\``,
 }
 
 export function getDefaultNodeInstruction(kind: WorkflowNodeKind): string {
@@ -15,16 +26,16 @@ export function getDefaultNodeInstruction(kind: WorkflowNodeKind): string {
 }
 
 const roleLabel: Record<string, string> = {
-  plot_planner: '剧情规划师',
-  chapter_writer: '章节写手',
-  style_reviewer: '风格审稿人',
-  campaign_planner: '营销策划师',
-  script_writer: '脚本写手',
-  video_script_reviewer: '视频脚本审稿人',
-  script_packager: '脚本打包师',
-  lesson_planner: '课程规划师',
-  educator_writer: '教案撰写人',
-  pedagogy_reviewer: '教学法审稿人',
+  plot_planner: 'Plot Planner',
+  chapter_writer: 'Chapter Writer',
+  style_reviewer: 'Style Reviewer',
+  campaign_planner: 'Marketing Planner',
+  script_writer: 'Script Writer',
+  video_script_reviewer: 'Video Script Reviewer',
+  script_packager: 'Script Packager',
+  lesson_planner: 'Lesson Planner',
+  educator_writer: 'Lesson Writer',
+  pedagogy_reviewer: 'Pedagogy Reviewer',
 }
 
 /**
@@ -32,19 +43,19 @@ const roleLabel: Record<string, string> = {
  */
 function buildConditionInstruction(config: ConditionConfig): string {
   const modeDesc = config.mode === 'rule'
-    ? '根据以下规则条件选择分支：'
-    : '根据以下描述选择最合适的分支：'
+    ? 'Select a branch based on the following rule conditions:'
+    : 'Select the most appropriate branch based on the following description:'
 
   const branchLines = config.branches.map((branch) => {
     if (config.mode === 'rule') {
-      return `  - "${branch.label}": 条件 ${branch.condition || '(fallback)'}`
+      return `  - "${branch.label}": condition ${branch.condition || '(fallback)'}`
     }
-    return `  - "${branch.label}": ${branch.description || '(无描述)'}`
+    return `  - "${branch.label}": ${branch.description || '(no description)'}`
   })
 
-  const customPrompt = config.prompt ? `\n\n判断提示：${config.prompt}` : ''
+  const customPrompt = config.prompt ? `\n\nDecision hint: ${config.prompt}` : ''
   const fallbackNote = config.fallbackBranch
-    ? `\n如果没有匹配的分支，请选择 "${config.fallbackBranch}"。`
+    ? `\nIf no branch matches, select "${config.fallbackBranch}".`
     : ''
 
   return `${modeDesc}
@@ -52,9 +63,9 @@ ${branchLines.join('\n')}
 ${fallbackNote}
 ${customPrompt}
 
-请以 JSON 格式返回选择的分支：
+Return the selected branch in JSON format:
 \`\`\`json
-{"branch": "分支名称", "reason": "选择原因"}
+{"branch": "branch_name", "reason": "reason_for_choice"}
 \`\`\``
 }
 
@@ -76,7 +87,7 @@ export function buildNodeSystemPrompt(
     instruction = getDefaultNodeInstruction(kind)
   }
 
-  return `你是一个${label}。${instruction}`
+  return `You are a ${label}. ${instruction}`
 }
 
 /**
@@ -86,10 +97,10 @@ export function buildNodeUserMessage(
   inputs: Map<string, unknown>,
 ): string {
   if (inputs.size === 0) {
-    return '请开始工作。'
+    return 'Please begin work.'
   }
 
-  const parts: string[] = ['以下是上游节点的输出：\n']
+  const parts: string[] = ['Outputs from upstream nodes:\n']
   for (const [key, content] of inputs) {
     const contentStr =
       typeof content === 'string' ? content : JSON.stringify(content, null, 2)

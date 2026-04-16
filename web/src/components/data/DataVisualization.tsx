@@ -1,13 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
- * DataVisualization - 数据可视化组件
+ * DataVisualization - Data visualization component
  *
- * 支持展示：
- * - Python matplotlib 生成的图片
- * - 数据表格（带排序、筛选）
- * - 简单统计图表（柱状图、折线图、饼图）
- * - 图表导出功能
- * - Chart.js 集成
+ * Supports:
+ * - Python matplotlib generated images
+ * - Data tables (with sorting, filtering)
+ * - Simple stat charts (bar, line, pie)
+ * - Chart export functionality
+ * - Chart.js integration
  */
 
 import { useState, useMemo, useRef } from 'react'

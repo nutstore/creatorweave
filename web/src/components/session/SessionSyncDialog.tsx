@@ -29,6 +29,7 @@ import {
   CheckCircle,
   X as XIcon,
 } from 'lucide-react'
+import { useT } from '@/i18n'
 
 // =============================================================================
 // Types
@@ -159,7 +160,9 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function formatDate(timestamp: number): string {
+type TranslationFunction = (key: string, params?: Record<string, string | number>) => string
+
+function formatDate(timestamp: number, t: TranslationFunction): string {
   const date = new Date(timestamp)
   const now = new Date()
   const diff = now.getTime() - date.getTime()
@@ -167,23 +170,23 @@ function formatDate(timestamp: number): string {
   // Less than 1 hour
   if (diff < 60 * 60 * 1000) {
     const minutes = Math.floor(diff / (60 * 1000))
-    return `${minutes} 分钟前`
+    return t('sidebar.syncPanel.minutesAgo', { count: minutes })
   }
 
   // Less than 24 hours
   if (diff < 24 * 60 * 60 * 1000) {
     const hours = Math.floor(diff / (60 * 60 * 1000))
-    return `${hours} 小时前`
+    return t('sidebar.syncPanel.hoursAgo', { count: hours })
   }
 
   // Less than 7 days
   if (diff < 7 * 24 * 60 * 60 * 1000) {
     const days = Math.floor(diff / (24 * 60 * 60 * 1000))
-    return `${days} 天前`
+    return t('sidebar.syncPanel.daysAgo', { count: days })
   }
 
   // Default format
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -193,7 +196,7 @@ function formatDate(timestamp: number): string {
 
 function formatExpiryDate(isoString: string): string {
   const date = new Date(isoString)
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
@@ -324,6 +327,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
   onDownloadSession,
   relayUrl = 'http://localhost:3001',
 }) => {
+  const t = useT()
   const [activeTab, setActiveTab] = useState<'upload' | 'list'>('upload')
   const [isLoading, setIsLoading] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -389,14 +393,14 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
 
       // Phase 3: Complete
       setUploadProgress(100)
-      setSuccess(`会话已同步！Sync ID: ${result.syncId}`)
+      setSuccess(t('sidebar.syncPanel.sessionSynced', { syncId: result.syncId }))
 
       // Refresh list if visible
       if (activeTab === 'list') {
         loadSessions()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '上传失败，请重试')
+      setError(err instanceof Error ? err.message : t('sidebar.syncPanel.uploadFailed'))
     } finally {
       setIsUploading(false)
       setUploadProgress(0)
@@ -410,10 +414,10 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
 
     try {
       await onDownloadSession(syncId)
-      setSuccess('会话下载成功！')
+      setSuccess(t('sidebar.syncPanel.sessionDownloadSuccess'))
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : '下载失败，请重试')
+      setError(err instanceof Error ? err.message : t('sidebar.syncPanel.downloadFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -423,7 +427,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
   const handleDelete = async (syncId: string, e: React.MouseEvent) => {
     e.stopPropagation()
 
-    if (!confirm('确定要删除此同步会话吗？此操作不可撤销。')) {
+    if (!confirm(t('sidebar.syncPanel.confirmDelete'))) {
       return
     }
 
@@ -433,13 +437,13 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
     try {
       const result = await api.delete(syncId)
       if (result.success) {
-        setSuccess('会话已删除')
+        setSuccess(t('sidebar.syncPanel.sessionDeleted'))
         loadSessions()
       } else {
         throw new Error('Delete failed')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '删除失败，请重试')
+      setError(err instanceof Error ? err.message : t('sidebar.syncPanel.deleteFailed'))
     } finally {
       setIsLoading(false)
     }
@@ -458,10 +462,10 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Cloud className="h-5 w-5" />
-            跨设备同步
+            {t('sidebar.syncPanel.crossDeviceSync')}
           </DialogTitle>
           <DialogDescription>
-            将当前会话同步到云端，或从云端下载会话。支持端到端加密，仅存储加密数据。
+            {t('sidebar.syncPanel.syncDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -477,7 +481,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
             }`}
           >
             <Upload className="mr-2 inline h-4 w-4" />
-            上传
+            {t('sidebar.syncPanel.upload')}
           </button>
           <button
             type="button"
@@ -492,7 +496,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
             }`}
           >
             <Download className="mr-2 inline h-4 w-4" />
-            下载/管理
+            {t('sidebar.syncPanel.downloadManage')}
           </button>
         </div>
 
@@ -505,9 +509,9 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
               <div className="flex items-start gap-3 rounded-lg border border-warning bg-warning-bg p-3">
                 <Lock className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
                 <div className="text-sm text-warning">
-                  <p className="font-medium">端到端加密</p>
+                  <p className="font-medium">{t('sidebar.syncPanel.endToEndEncryption')}</p>
                   <p className="mt-1 text-xs">
-                    您的会话数据在上传前会被加密。服务器仅存储加密数据，无法访问您的原始内容。
+                    {t('sidebar.syncPanel.encryptionNotice')}
                   </p>
                 </div>
               </div>
@@ -517,11 +521,11 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Monitor className="h-4 w-4 text-tertiary" />
-                    <span className="text-sm font-medium text-secondary">当前设备</span>
+                    <span className="text-sm font-medium text-secondary">{t('sidebar.syncPanel.currentDevice')}</span>
                   </div>
                   <Badge variant="neutral">{extractBrowserInfo(browserInfo)}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-tertiary">设备 ID: {deviceId}</p>
+                <p className="mt-1 text-xs text-tertiary">{t('sidebar.syncPanel.deviceId')}: {deviceId}</p>
               </div>
 
               {/* Upload Progress */}
@@ -529,7 +533,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                 <div className="space-y-2">
                   <Progress value={uploadProgress} className="h-2" />
                   <p className="text-center text-sm text-tertiary">
-                    {uploadProgress < 50 ? '正在准备数据...' : '正在上传到云端...'}
+                    {uploadProgress < 50 ? t('sidebar.syncPanel.preparingData') : t('sidebar.syncPanel.uploadingToCloud')}
                   </p>
                 </div>
               )}
@@ -538,7 +542,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
               {!isUploading && (
                 <Button onClick={handleUpload} className="w-full">
                   <Upload className="mr-2 h-4 w-4" />
-                  同步当前会话
+                  {t('sidebar.syncPanel.syncCurrentSession')}
                 </Button>
               )}
 
@@ -552,7 +556,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                     onClick={() => setActiveTab('list')}
                     className="ml-auto text-xs text-success hover:underline"
                   >
-                    查看全部
+                    {t('sidebar.syncPanel.viewAll')}
                   </button>
                 </div>
               )}
@@ -564,10 +568,10 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
             <div className="space-y-4">
               {/* Refresh Button */}
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-medium text-secondary">已同步的会话</h4>
+                <h4 className="text-sm font-medium text-secondary">{t('sidebar.syncPanel.syncedSessions')}</h4>
                 <Button variant="outline" size="sm" onClick={loadSessions} disabled={isLoading}>
                   <RefreshCw className={`mr-2 h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
-                  刷新
+                  {t('sidebar.syncPanel.refresh')}
                 </Button>
               </div>
 
@@ -587,13 +591,13 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                 {isLoading && sessions.length === 0 ? (
                   <div className="flex items-center justify-center py-8" role="status">
                     <Loader2 className="h-6 w-6 animate-spin text-tertiary" aria-hidden="true" />
-                    <span className="sr-only">加载中...</span>
+                    <span className="sr-only">{t('sidebar.syncPanel.loading')}</span>
                   </div>
                 ) : sessions.length === 0 ? (
                   <div className="py-8 text-center">
                     <CloudOff className="mx-auto h-8 w-8 text-tertiary" />
-                    <p className="mt-2 text-sm text-tertiary">暂无同步的会话</p>
-                    <p className="mt-1 text-xs text-tertiary">上传会话后可以在这里管理</p>
+                    <p className="mt-2 text-sm text-tertiary">{t('sidebar.syncPanel.noSyncedSessions')}</p>
+                    <p className="mt-1 text-xs text-tertiary">{t('sidebar.syncPanel.manageAfterUpload')}</p>
                   </div>
                 ) : (
                   <ul className="space-y-2">
@@ -620,11 +624,11 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                             <span>-</span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {formatDate(session.updatedAt)}
+                              {formatDate(session.updatedAt, t)}
                             </span>
                           </div>
                           <p className="mt-0.5 text-[10px] text-tertiary">
-                            过期时间: {formatExpiryDate(session.expiresAt)}
+                            {t('sidebar.syncPanel.expiresAt')}: {formatExpiryDate(session.expiresAt)}
                           </p>
                         </div>
 
@@ -635,7 +639,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                             size="sm"
                             onClick={() => handleDownload(session.syncId)}
                             disabled={isLoading}
-                            title="下载此会话"
+                            title={t('sidebar.syncPanel.downloadSession')}
                           >
                             <Download className="h-4 w-4" />
                           </Button>
@@ -644,7 +648,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                             size="sm"
                             onClick={(e) => handleDelete(session.syncId, e)}
                             disabled={isLoading}
-                            title="删除此会话"
+                            title={t('sidebar.syncPanel.deleteSession')}
                             className="text-red-500 hover:bg-red-50 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -658,14 +662,14 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
 
               {/* Server Info */}
               <div className="flex items-center justify-between rounded-lg border border bg-muted p-2 text-xs text-tertiary">
-                <span>服务器: {relayUrl}</span>
+                <span>{t('sidebar.syncPanel.server')}: {relayUrl}</span>
                 <a
                   href={`${relayUrl}/health`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 hover:text-primary-600"
                 >
-                  状态
+                  {t('sidebar.syncPanel.status')}
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -676,7 +680,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
         {/* Footer */}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            关闭
+            {t('sidebar.syncPanel.close')}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -604,7 +604,7 @@ export function ConversationView({
         {/* Token count - muted */}
         <span
           className="text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500"
-          title={`有效输入预算 ${effectiveBudget} = 总上限 ${modelMaxTokens} - 预留 ${reserveTokens}`}
+          title={t('conversation.tokenBudget', { effectiveBudget, modelMaxTokens, reserveTokens })}
         >
           {formatTokenCompact(contextWindowUsage.usedTokens)}
           <span className="mx-0.5 opacity-50">/</span>
@@ -942,8 +942,8 @@ export function ConversationView({
                 <Brain className="h-3 w-3" />
                 <span className="max-w-[48px] truncate">
                   {enableThinking
-                    ? ({ minimal: '浅', low: '低', medium: '中', high: '深', xhigh: '极深' } as Record<ThinkingLevel, string>)[thinkingLevel]
-                    : '思考'}
+                    ? t(`conversation.thinkingLevels.${thinkingLevel}`)
+                    : t('conversation.thinking')}
                 </span>
                 <ChevronDown className={`h-3 w-3 transition-transform ${isThinkingDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
@@ -952,7 +952,7 @@ export function ConversationView({
               {isThinkingDropdownOpen && (
                 <div className="absolute bottom-full right-0 z-50 mb-1.5 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
                   <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-xs font-medium text-secondary dark:text-neutral-300">思考模式</span>
+                    <span className="text-xs font-medium text-secondary dark:text-neutral-300">{t('conversation.thinkingMode')}</span>
                     <BrandSwitch
                       checked={enableThinking}
                       onCheckedChange={(checked) => {
@@ -964,11 +964,11 @@ export function ConversationView({
                     <div className="border-t border-neutral-100 px-2 py-1.5 dark:border-neutral-800">
                       <div className="grid grid-cols-5 gap-1">
                         {([
-                          { value: 'minimal' as ThinkingLevel, label: '浅' },
-                          { value: 'low' as ThinkingLevel, label: '低' },
-                          { value: 'medium' as ThinkingLevel, label: '中' },
-                          { value: 'high' as ThinkingLevel, label: '深' },
-                          { value: 'xhigh' as ThinkingLevel, label: '极深' },
+                          { value: 'minimal' as ThinkingLevel, label: t('conversation.thinkingLevels.minimal') },
+                          { value: 'low' as ThinkingLevel, label: t('conversation.thinkingLevels.low') },
+                          { value: 'medium' as ThinkingLevel, label: t('conversation.thinkingLevels.medium') },
+                          { value: 'high' as ThinkingLevel, label: t('conversation.thinkingLevels.high') },
+                          { value: 'xhigh' as ThinkingLevel, label: t('conversation.thinkingLevels.xhigh') },
                         ]).map(({ value, label }) => (
                           <button
                             key={value}

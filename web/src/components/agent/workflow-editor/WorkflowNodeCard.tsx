@@ -18,6 +18,7 @@ import { cn } from '@creatorweave/ui'
 import { nodeKindConfig } from './constants'
 import type { WorkflowNodeData } from './workflow-to-flow'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 const kindIcons: Record<WorkflowNodeKind, React.ComponentType<{ className?: string }>> = {
   plan: Lightbulb,
@@ -28,7 +29,21 @@ const kindIcons: Record<WorkflowNodeKind, React.ComponentType<{ className?: stri
   condition: GitBranch,
 }
 
+// Get translated kind label
+function getKindLabel(kind: WorkflowNodeKind, t: (key: string) => string): string {
+  const labels: Record<WorkflowNodeKind, string> = {
+    plan: t('workflowEditor.plan'),
+    produce: t('workflowEditor.produce'),
+    review: t('workflowEditor.review'),
+    repair: t('workflowEditor.repair'),
+    assemble: t('workflowEditor.assemble'),
+    condition: t('workflowEditor.condition') || 'Condition',
+  }
+  return labels[kind] || kind
+}
+
 function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>) {
+  const t = useT()
   const kind = data.kind as WorkflowNodeKind
   const config = nodeKindConfig[kind]
   const Icon = kindIcons[kind]
@@ -77,7 +92,7 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
 
           <div className="min-w-0 flex-1">
             <div className={cn('text-[11px] font-semibold tracking-wide', config.color)}>
-              {config.label}
+              {getKindLabel(kind, t)}
             </div>
             <div className="truncate text-[10px] text-neutral-400 dark:text-neutral-500">
               {data.agentRole}
@@ -89,7 +104,7 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
             <div className="flex h-5 items-center gap-0.5 rounded bg-amber-50 px-1.5 dark:bg-amber-950/50">
               <Flag className="h-2.5 w-2.5 text-amber-500" />
               <span className="text-[9px] font-medium text-amber-600 dark:text-amber-400">
-                入口
+                {t('workflowEditor.entry')}
               </span>
             </div>
           )}
@@ -107,12 +122,12 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
         {/* Config summary */}
         <div className="flex items-center gap-2 border-t border-neutral-100 px-4 py-1.5 dark:border-neutral-800">
           <div className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-500">
-            <span>重试</span>
+            <span>{t('workflowEditor.retry')}</span>
             <span className="font-medium text-neutral-500 dark:text-neutral-400">{data.maxRetries}</span>
           </div>
           <div className="h-2 w-px bg-neutral-100 dark:bg-neutral-800" />
           <div className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-500">
-            <span>超时</span>
+            <span>{t('workflowEditor.timeoutSec')}</span>
             <span className="font-medium text-neutral-500 dark:text-neutral-400">
               {data.timeoutMs >= 1000 ? `${data.timeoutMs / 1000}s` : `${data.timeoutMs}ms`}
             </span>

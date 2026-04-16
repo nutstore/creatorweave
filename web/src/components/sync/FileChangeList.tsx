@@ -9,6 +9,7 @@
 
 import React from 'react'
 import { type ChangeDetectionResult, type FileChange, type ChangeType } from '@/opfs/types/opfs-types'
+import { useT } from '@/i18n'
 
 interface FileChangeListProps {
   /** Change detection result from workspace store */
@@ -22,14 +23,14 @@ interface FileChangeListProps {
 /**
  * Get icon and color for change type
  */
-function getChangeTypeStyle(type: ChangeType): { icon: string; color: string; label: string } {
+function getChangeTypeStyle(type: ChangeType, t: (key: string) => string): { icon: string; color: string; label: string } {
   switch (type) {
     case 'add':
-      return { icon: '+', color: 'text-green-600', label: '新增' }
+      return { icon: '+', color: 'text-green-600', label: t('syncPanel.fileChangeList.added') }
     case 'modify':
-      return { icon: '~', color: 'text-blue-600', label: '修改' }
+      return { icon: '~', color: 'text-blue-600', label: t('syncPanel.fileChangeList.modified') }
     case 'delete':
-      return { icon: '×', color: 'text-red-600', label: '删除' }
+      return { icon: '×', color: 'text-red-600', label: t('syncPanel.fileChangeList.deleted') }
   }
 }
 
@@ -59,6 +60,8 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
   onSelectFile,
   selectedPath,
 }) => {
+  const t = useT()
+
   if (!changes || changes.changes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
@@ -77,9 +80,9 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">无文件变更</h3>
+        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">{t('syncPanel.fileChangeList.noFileChanges')}</h3>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm">
-          Python 执行后没有检测到文件系统变更
+          {t('syncPanel.fileChangeList.noChangesDescription')}
         </p>
       </div>
     )
@@ -88,8 +91,8 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
   const totalChanges = changes.changes.length
   const summaryText =
     changes.added > 0 || changes.modified > 0 || changes.deleted > 0
-      ? `${changes.added} 新增, ${changes.modified} 修改, ${changes.deleted} 删除`
-      : `${totalChanges} 个文件变更`
+      ? t('syncPanel.fileChangeList.fileChangesCount', { count: `${changes.added} ${t('syncPanel.syncPreview.added')}, ${changes.modified} ${t('syncPanel.syncPreview.modified')}, ${changes.deleted} ${t('syncPanel.syncPreview.deleted')}` })
+      : t('syncPanel.fileChangeList.fileChangesCount', { count: totalChanges })
 
   return (
     <div className="flex flex-col h-full">
@@ -97,11 +100,11 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
       <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">文件变更列表</h3>
+            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('pendingSyncPanel.title')}</h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{summaryText}</p>
           </div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400">
-            总计: {totalChanges}
+            {t('syncPanel.fileChangeList.totalCount', { count: totalChanges })}
           </div>
         </div>
       </div>
@@ -110,7 +113,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
       <div className="flex-1 overflow-y-auto">
         <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
           {changes.changes.map((change, index) => {
-            const style = getChangeTypeStyle(change.type)
+            const style = getChangeTypeStyle(change.type, t)
             const isSelected = change.path === selectedPath
 
             return (
@@ -120,7 +123,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                 className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${
                   isSelected ? 'bg-primary-50 dark:bg-primary-950/20 border-l-4 border-primary-500' : ''
                 }`}
-                aria-label={`查看 ${change.path} 的变更`}
+                aria-label={t('syncPanel.fileChangeList.viewChange', { path: change.path })}
               >
                 {/* Type Icon */}
                 <div
@@ -146,11 +149,11 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
-                    <span>大小: {formatFileSize(change.size)}</span>
+                    <span>{t('syncPanel.fileChangeList.size', { size: formatFileSize(change.size) })}</span>
                     {change.mtime && (
                       <>
                         <span>•</span>
-                        <span>时间: {formatTime(change.mtime)}</span>
+                        <span>{t('syncPanel.fileChangeList.time', { time: formatTime(change.mtime) })}</span>
                       </>
                     )}
                   </div>

@@ -14,6 +14,7 @@
 import { useEffect, useCallback, useRef, useId } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useT } from '@/i18n'
 
 export interface DrawerProps {
   /** Whether the drawer is open */
@@ -50,6 +51,7 @@ export function Drawer({
   className,
   width = '480px',
 }: DrawerProps) {
+  const t = useT()
   const drawerRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
   const previousActiveElement = useRef<HTMLElement | null>(null)
@@ -180,7 +182,7 @@ export function Drawer({
               type="button"
               onClick={onClose}
               className="p-1.5 rounded-md hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="关闭"
+              aria-label={t('common.close')}
             >
               <X className="w-5 h-5" />
             </button>

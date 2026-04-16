@@ -17,6 +17,7 @@ import {
   getRuntimeCapability,
 } from '@/storage'
 import { useT } from '@/i18n'
+import { useLocale } from '@/i18n'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
@@ -30,8 +31,16 @@ type AppRoute =
   | { kind: 'legacyWorkspace' }
   | { kind: 'webcontainerPreview' }
   | { kind: 'filePreview'; path: string }
-  | { kind: 'docs'; category?: 'user' | 'developer'; page?: string }
+  | { kind: 'docs'; language?: 'zh' | 'en'; category?: 'user' | 'developer'; page?: string }
   | { kind: 'unknown' }
+
+function isDocsLanguage(value: string | undefined): value is 'zh' | 'en' {
+  return value === 'zh' || value === 'en'
+}
+
+function isDocsCategory(value: string | undefined): value is 'user' | 'developer' {
+  return value === 'user' || value === 'developer'
+}
 
 function getCurrentRoutePath(): string {
   const hash = window.location.hash.startsWith('#')
@@ -72,12 +81,24 @@ function resolveRoute(routePath: string): AppRoute {
 
   const segments = normalized.split('/').filter(Boolean)
 
-  // Docs route: /docs, /docs/user, /docs/user/getting-started
+  // Docs route: /docs, /docs/zh, /docs/en/user, /docs/user (legacy)
   if (segments[0] === 'docs') {
+    const second = segments[1]
+    if (isDocsLanguage(second)) {
+      const category = isDocsCategory(segments[2]) ? segments[2] : undefined
+      return {
+        kind: 'docs',
+        language: second,
+        category,
+        page: category ? segments[3] : undefined,
+      }
+    }
+
+    const legacyCategory = isDocsCategory(second) ? second : undefined
     return {
       kind: 'docs',
-      category: segments[1] as 'user' | 'developer' | undefined,
-      page: segments[2],
+      category: legacyCategory,
+      page: legacyCategory ? segments[2] : undefined,
     }
   }
 
@@ -132,7 +153,7 @@ function toPath(route: AppRoute): string {
   }
 
   if (route.kind === 'docs') {
-    const parts = ['docs', route.category, route.page].filter(Boolean)
+    const parts = ['docs', route.language, route.category, route.page].filter(Boolean)
     return '/' + parts.join('/')
   }
 
@@ -166,6 +187,8 @@ function App() {
   const activeConversationId = useConversationStore((s) => s.activeConversationId)
   const conversations = useConversationStore((s) => s.conversations)
   const t = useT() // i18n hook
+  const [locale] = useLocale()
+  const docsLanguage: 'zh' | 'en' = locale === 'zh-CN' ? 'zh' : 'en'
   const tRef = useRef(t)
   tRef.current = t
 
@@ -206,7 +229,7 @@ function App() {
       await resetSQLiteDB()
     } catch (error) {
       console.error('[App] Failed to reset database:', error)
-      toast.error('重置数据库失败，请手动刷新页面')
+      toast.error(t('app.resetDatabaseFailed'))
     }
   }
 
@@ -267,14 +290,14 @@ function App() {
       await runInitStep('reinitializeOPFSAfterReset', () => useOPFSStore.getState().initialize())
 
       navigateToRoute({ kind: 'projectsHome' }, true)
-      toast.success('已清空本地数据，可以重新开始了')
+      toast.success(t('app.localDataCleared'))
     } catch (error) {
       console.error('[App] Failed to clear local data:', error)
       const message = error instanceof Error ? error.message : String(error)
       if (message.includes(RESET_REQUIRES_TAB_CLOSURE)) {
-        toast.error('清空失败：请先关闭该应用的其他标签页/窗口后重试')
+        toast.error(t('app.clearFailedCloseOtherTabs'))
       } else {
-        toast.error('清空本地数据失败')
+        toast.error(t('app.clearLocalDataFailed'))
       }
     } finally {
       setIsClearingLocalData(false)
@@ -423,7 +446,7 @@ function App() {
           setStorageError(errorMsg)
         }
 
-        toast.error(`存储初始化错误: ${errorMsg}`, { id: 'storage-init' })
+        toast.error(t('app.storageInitError') + `: ${errorMsg}`, { id: 'storage-init' })
 
         // Don't proceed with initialization on storage failure
         return
@@ -675,7 +698,7 @@ function App() {
 
       const projectExists = projects.some((project) => project.id === projectId)
       if (!projectExists) {
-        toast.error('项目不存在或已删除')
+        toast.error(t('app.projectNotFound'))
         navigateToRoute({ kind: 'projectsHome' }, true)
         return
       }
@@ -684,7 +707,7 @@ function App() {
         const switched = await setActiveProject(projectId)
         if (!switched) {
           if (!cancelled) {
-            toast.error('切换项目失败，请稍后重试')
+            toast.error(t('app.switchProjectFailed'))
             navigateToRoute({ kind: 'projectsHome' }, true)
           }
           return
@@ -740,7 +763,7 @@ function App() {
         return
       }
 
-      toast.error('当前项目还没有工作区')
+      toast.error(t('app.noWorkspaceInProject'))
       navigateToRoute({ kind: 'projectWorkspace', projectId }, true)
     }
 
@@ -803,7 +826,7 @@ function App() {
         navigateToRoute({ kind: 'projectWorkspace', projectId })
       }
     } else {
-      toast.error('切换项目失败，请稍后重试')
+      toast.error(t('app.switchProjectFailed'))
     }
   }
 
@@ -813,39 +836,39 @@ function App() {
       const switched = await setActiveProject(project.id)
       if (switched) {
         navigateToRoute({ kind: 'projectWorkspace', projectId: project.id })
-        toast.success(`项目「${project.name}」已创建`)
+        toast.success(t('app.projectCreated', { name: project.name }))
       } else {
-        toast.error('项目已创建，但切换失败，请手动重试')
+        toast.error(t('app.projectCreatedButSwitchFailed'))
       }
     } else {
-      toast.error('创建项目失败，请稍后重试')
+      toast.error(t('app.createProjectFailed'))
     }
   }
 
   const handleRenameProject = async (projectId: string, name: string) => {
     const ok = await renameProject(projectId, name)
     if (ok) {
-      toast.success('项目已重命名')
+      toast.success(t('app.projectRenamed'))
     } else {
-      toast.error('重命名失败，请稍后重试')
+      toast.error(t('app.renameFailed'))
     }
   }
 
   const handleArchiveProject = async (projectId: string, archived: boolean) => {
     const ok = await setProjectArchived(projectId, archived)
     if (ok) {
-      toast.success(archived ? '项目已归档' : '项目已取消归档')
+      toast.success(archived ? t('app.projectArchived') : t('app.projectUnarchived'))
     } else {
-      toast.error(archived ? '归档失败，请稍后重试' : '取消归档失败，请稍后重试')
+      toast.error(archived ? t('app.archiveFailed') : t('app.unarchiveFailed'))
     }
   }
 
   const handleDeleteProject = async (projectId: string) => {
     const ok = await deleteProject(projectId)
     if (ok) {
-      toast.success('项目已删除')
+      toast.success(t('app.projectDeleted'))
     } else {
-      toast.error('删除失败，请稍后重试')
+      toast.error(t('app.deleteFailed'))
     }
   }
 
@@ -900,7 +923,7 @@ function App() {
       onArchiveProject={handleArchiveProject}
       onDeleteProject={handleDeleteProject}
       onClearLocalData={handleClearLocalData}
-      onOpenDocs={() => navigateToRoute({ kind: 'docs' })}
+      onOpenDocs={() => navigateToRoute({ kind: 'docs', language: docsLanguage })}
       isClearingLocalData={isClearingLocalData}
     />
   ) : currentRoute.kind === 'webcontainerPreview' ? (
@@ -909,6 +932,7 @@ function App() {
     <StandalonePreview filePath={currentRoute.path} />
   ) : currentRoute.kind === 'docs' ? (
     <DocsPage
+      language={currentRoute.language}
       category={currentRoute.category}
       page={currentRoute.page}
       onBack={() => navigateToRoute({ kind: 'projectsHome' })}

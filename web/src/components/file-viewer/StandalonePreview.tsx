@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react'
+import { useT } from '@/i18n'
 
 // Inspector script injected into iframe
 const INSPECTOR_SCRIPT = `
@@ -217,6 +218,7 @@ interface StandalonePreviewProps {
 }
 
 export function StandalonePreview({ content, filePath }: StandalonePreviewProps) {
+  const t = useT()
   const [htmlContent, setHtmlContent] = useState<string | null>(content || null)
   const [loading, setLoading] = useState(!content)
   const [inspectorActive, setInspectorActive] = useState(true)
@@ -326,7 +328,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
     function handleMessage(event: MessageEvent) {
       if (event.data?.type === 'element-inspector-selected') {
         if (event.data.elementInfo) {
-          showToast('已复制到剪贴板')
+          showToast(t('standalonePreview.copiedToClipboard'))
         }
       }
     }
@@ -344,7 +346,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-900 text-neutral-400">
-        加载中...
+        {t('common.loading')}
       </div>
     )
   }
@@ -354,9 +356,9 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-900 text-neutral-400">
         <div className="text-center">
-          <p className="mb-2">无法加载预览内容</p>
+          <p className="mb-2">{t('standalonePreview.cannotLoadPreview')}</p>
           <button onClick={handleRefresh} className="text-blue-400 hover:underline">
-            点击重试
+            {t('standalonePreview.clickToRetry')}
           </button>
         </div>
       </div>
@@ -365,7 +367,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-neutral-900">
-      {/* 预览区域 */}
+      {/* Preview area */}
       <div className="h-full w-full">
         {blobUrl && (
           <iframe
@@ -380,14 +382,14 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
         )}
       </div>
 
-      {/* 浮动工具栏 - 右下角 Technical Brutalist Style */}
+      {/* Floating toolbar - bottom right, Technical Brutalist Style */}
       <div className="absolute bottom-6 right-6 z-50 flex items-center border border-white/20 bg-neutral-900/95 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-        {/* 刷新按钮 */}
+        {/* Refresh button */}
         <button
           type="button"
-          onClick={() => { handleRefresh(); showToast('已刷新') }}
+          onClick={() => { handleRefresh(); showToast(t('standalonePreview.refreshed')) }}
           className="group flex h-10 items-center gap-2 px-4 text-neutral-500 transition-all hover:bg-white/10 hover:text-neutral-200 active:bg-white/5"
-          title="刷新"
+          title={t('standalonePreview.refresh')}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -404,28 +406,28 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
             <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
             <path d="M21 3v5h-5" />
           </svg>
-          <span className="font-mono text-[10px] uppercase tracking-widest">刷新</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest">{t('standalonePreview.refresh')}</span>
         </button>
 
-        {/* 分隔线 - 技术感 */}
+        {/* Divider */}
         <div className="h-6 w-px bg-gradient-to-b from-transparent via-white/30 to-transparent" />
 
-        {/* 审查开关 */}
+        {/* Inspector toggle */}
         <button
           type="button"
           onClick={() => {
             const newState = !inspectorActive
             setInspectorActive(newState)
-            showToast(newState ? '已启用审查 - 点击页面元素复制信息' : '已关闭审查')
+            showToast(newState ? t('standalonePreview.inspectorEnabled') : t('standalonePreview.inspectorDisabled'))
           }}
           className={`relative flex h-10 items-center gap-2 px-4 transition-all ${
             inspectorActive
               ? 'bg-emerald-500/20 text-emerald-400'
               : 'text-neutral-500 hover:bg-white/10 hover:text-neutral-300'
           }`}
-          title={inspectorActive ? '审查中 - 点击关闭' : '点击启用审查'}
+          title={inspectorActive ? t('standalonePreview.inspectorActive') : t('standalonePreview.clickToEnableInspector')}
         >
-          {/* 活性指示灯 */}
+          {/* Active indicator */}
           <span
             className={`absolute left-2 top-1/2 h-1.5 w-1.5 -translate-y-1/2 ${
               inspectorActive
@@ -434,7 +436,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
             }`}
           />
 
-          {/* 准星图标 */}
+          {/* Crosshair icon */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="14"
@@ -447,22 +449,22 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
             strokeLinejoin="miter"
             className={inspectorActive ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''}
           >
-            {/* 靶心十字丝 */}
+            {/* Crosshair lines */}
             <line x1="12" y1="2" x2="12" y2="8" />
             <line x1="12" y1="16" x2="12" y2="22" />
             <line x1="2" y1="12" x2="8" y2="12" />
             <line x1="16" y1="12" x2="22" y2="12" />
-            {/* 中心圆 */}
+            {/* Center circle */}
             <circle cx="12" cy="12" r="4" />
-            {/* 角落标记 */}
+            {/* Corner marks */}
             <path d="M12 12 L10 10 M12 12 L14 10 M12 12 L10 14 M12 12 L14 14" strokeWidth="1" />
           </svg>
 
           <span className="font-mono text-[10px] uppercase tracking-widest">
-            {inspectorActive ? '审查中' : '审查'}
+            {inspectorActive ? t('standalonePreview.inspecting') : t('standalonePreview.inspect')}
           </span>
 
-          {/* 扫描线效果 - 仅激活时显示 */}
+          {/* Scanline effect - only shown when active */}
           {inspectorActive && (
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
               <div className="absolute inset-0 animate-[scan_2s_linear_infinite] bg-gradient-to-b from-transparent via-emerald-500/10 to-transparent" />
@@ -471,7 +473,7 @@ export function StandalonePreview({ content, filePath }: StandalonePreviewProps)
         </button>
       </div>
 
-      {/* Toast 提示 */}
+      {/* Toast notification */}
       {toast && (
         <div className="absolute bottom-20 left-1/2 z-50 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <div className="rounded-xl border border-white/10 bg-neutral-800/95 px-4 py-2.5 shadow-2xl backdrop-blur-md">

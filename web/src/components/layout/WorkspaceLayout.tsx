@@ -593,10 +593,10 @@ export function WorkspaceLayout({
                     }`}
                   >
                     <p className="mb-2 text-primary-800 dark:text-primary-200">
-                      当前项目还没有工作区，创建首个会话后会自动生成对应工作区。
+                      {t('sidebar.emptyStateNoWorkspace')}
                     </p>
                     <BrandButton variant="outline" onClick={handleCreateFirstWorkspace}>
-                      创建第一个工作区
+                      {t('sidebar.createFirstWorkspace')}
                     </BrandButton>
                   </div>
                 )}
@@ -622,7 +622,7 @@ export function WorkspaceLayout({
           <Drawer
             open={showPreview}
             onClose={handleClosePreview}
-            title="变更待审阅"
+            title={t('syncPanel.syncPreview.emptyStateTitle')}
             width={isMobile ? '100vw' : '85vw'}
           >
             <SyncPreviewPanel onCancel={handleClosePreview} />

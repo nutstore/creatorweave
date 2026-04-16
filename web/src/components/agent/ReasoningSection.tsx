@@ -5,14 +5,16 @@
 
 import { useEffect, useState } from 'react'
 import { Brain, ChevronDown, ChevronRight } from 'lucide-react'
+import { useT } from '@/i18n'
 
 interface ReasoningSectionProps {
   reasoning: string
-  /** If true, show "思考中..." label instead of "思考过程" */
+  /** If true, show "Thinking..." label instead of "Thinking Process" */
   streaming?: boolean
 }
 
 export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps) {
+  const t = useT()
   const [open, setOpen] = useState(!!streaming)
 
   useEffect(() => {
@@ -34,7 +36,7 @@ export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <Brain className="h-3.5 w-3.5" />
-        <span>{streaming ? '思考中...' : '思考过程'}</span>
+        <span>{streaming ? t('workflow.thinking') : t('workflow.thinkingProcess')}</span>
       </button>
       {open && (
         <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">

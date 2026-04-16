@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AI Workspace is an **AI-native creator workspace** that enables natural language interaction with local files. Built with React, TypeScript, Rust/WASM, and Python (Pyodide).
+CreatorWeave is an **AI-native creator workspace** that enables natural language interaction with local files. Built with React, TypeScript, Rust/WASM, and Python (Pyodide).
 
 ### Key Features
 - AI-powered conversations with multi-agent collaboration

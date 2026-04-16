@@ -2,6 +2,7 @@ import { Play, Zap, Lightbulb, PenTool, ShieldCheck, Wrench, Layers } from 'luci
 import { cn } from '@creatorweave/ui'
 import { nodeKindConfig } from './workflow-editor/constants'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 export interface WorkflowTemplateInfo {
   id: string
@@ -36,6 +37,7 @@ export function WorkflowTemplateCard({
   onRealRun,
   compact = false,
 }: WorkflowTemplateCardProps) {
+  const t = useT()
   const pipeline = template.pipeline || []
 
   if (compact) {
@@ -64,7 +66,7 @@ export function WorkflowTemplateCard({
             {pipeline.map((kind, i) => {
               const cfg = nodeKindConfig[kind as WorkflowNodeKind]
               const Icon = nodeIcons[kind]
-              const label = cfg?.label || kind
+              const label = cfg?.labelKey ? t(cfg.labelKey) : kind
               return (
                 <span key={`${kind}-${i}`} className="flex items-center gap-0.5">
                   {i > 0 && <span className="mx-0.5 h-px w-2 bg-neutral-300 dark:bg-neutral-600" />}
@@ -107,7 +109,7 @@ export function WorkflowTemplateCard({
           {pipeline.map((kind, i) => {
             const cfg = nodeKindConfig[kind as WorkflowNodeKind]
             const Icon = nodeIcons[kind]
-            const label = cfg?.label || kind
+            const label = cfg?.labelKey ? t(cfg.labelKey) : kind
             return (
               <span key={`${kind}-${i}`} className="flex items-center gap-1">
                 {i > 0 && (
@@ -144,7 +146,7 @@ export function WorkflowTemplateCard({
           )}
         >
           <Play className="h-3 w-3" />
-          模拟运行
+          {t('workflow.simulateRun')}
         </button>
         <button
           type="button"
@@ -159,7 +161,7 @@ export function WorkflowTemplateCard({
           )}
         >
           <Zap className="h-3 w-3" />
-          真实运行
+          {t('workflow.realRun')}
         </button>
       </div>
     </div>

@@ -119,7 +119,7 @@ function evaluateReviewResult(
   if (!review) {
     return {
       status: 'review_failed',
-      reason: '无法解析评审结果，LLM 未返回有效的 JSON 评分',
+      reason: 'Cannot parse review result, LLM did not return valid JSON score',
     }
   }
 
@@ -129,7 +129,7 @@ function evaluateReviewResult(
 
   const issues = review.issues?.length
     ? review.issues.join('; ')
-    : `评分 ${review.score} 未达到通过标准`
+    : `Score ${review.score} did not meet passing standard`
 
   return {
     status: 'review_failed',
@@ -144,16 +144,16 @@ function formatRealRunSummary(
   totalTokens: number
 ): string {
   const lines: string[] = [
-    `工作流真实运行: ${label} (${templateId})`,
-    `状态: ${execution.status}`,
-    `执行顺序: ${execution.executionOrder.join(' → ')}`,
-    `已执行节点: ${execution.executedNodeIds.join(' → ') || '(无)'}`,
-    `修复轮次: ${execution.repairRound}`,
-    `Token 消耗: ${totalTokens}`,
+    `Workflow real run: ${label} (${templateId})`,
+    `Status: ${execution.status}`,
+    `Execution order: ${execution.executionOrder.join(' → ')}`,
+    `Executed nodes: ${execution.executedNodeIds.join(' → ') || '(none)'}`,
+    `Repair rounds: ${execution.repairRound}`,
+    `Token consumption: ${totalTokens}`,
   ]
 
   if (execution.errors.length > 0) {
-    lines.push('错误:')
+    lines.push('Errors:')
     for (const error of execution.errors) {
       lines.push(`- ${error}`)
     }

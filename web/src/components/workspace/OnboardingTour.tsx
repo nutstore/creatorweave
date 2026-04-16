@@ -47,7 +47,7 @@ export function OnboardingTour({
   const [isOpen, setIsOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)
 
-  // 根据当前语言获取引导步骤
+  // Get tour steps based on current language
   const steps = useMemo(() => {
     if (propSteps) return propSteps
     return getDefaultOnboardingSteps(locale)
@@ -109,7 +109,7 @@ export function OnboardingTour({
   })
 
   const handleComplete = useCallback(() => {
-    // 修复：无论是否勾选"不再显示"，完成引导都保存状态
+    // Fix: Always save state when completing tour, regardless of "don't show again" checkbox
     setOnboardingCompleted(true)
     setIsOpen(false)
     setCurrentStepIndex(0)
@@ -132,7 +132,7 @@ export function OnboardingTour({
   }, [isFirstStep])
 
   const handleSkip = useCallback(() => {
-    // 修复：无论是否勾选"不再显示"，跳过引导都保存状态
+    // Fix: Always save state when skipping tour, regardless of "don't show again" checkbox
     setOnboardingCompleted(true)
     setIsOpen(false)
     setCurrentStepIndex(0)
@@ -183,7 +183,7 @@ export function OnboardingTour({
             </div>
             <div className="mt-2 text-xs text-neutral-400">
               {stepProgressText === 'onboarding.stepProgress'
-                ? `第 ${currentStepIndex + 1} / ${steps.length} 步`
+                ? `Step ${currentStepIndex + 1} of ${steps.length}`
                 : stepProgressText}
             </div>
           </div>
@@ -233,7 +233,7 @@ export function OnboardingTour({
 }
 
 /**
- * 静态翻译函数（用于模块级别）
+ * Static translation function (for module level)
  */
 function getStepTitle(locale: Locale, step: string, fallback: string): string {
   const key = `onboarding.steps.${step}.title` as const
@@ -254,7 +254,7 @@ export function getDefaultOnboardingSteps(locale: Locale = DEFAULT_LOCALE): Tour
   return [
     {
       id: 'welcome',
-      title: getStepTitle(locale, 'welcome', 'Welcome to AI Workspace!'),
+      title: getStepTitle(locale, 'welcome', 'Welcome to CreatorWeave!'),
       description: getStepDescription(locale, 'welcome', 'Let us show you around the key features.'),
       position: 'center',
     },

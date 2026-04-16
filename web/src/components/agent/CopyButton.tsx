@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import { Copy, Check } from 'lucide-react'
+import { useT } from '@/i18n'
 
 interface CopyButtonProps {
   /** Content to copy to clipboard */
@@ -16,7 +17,8 @@ interface CopyButtonProps {
   title?: string
 }
 
-export function CopyButton({ content, className, title = '复制' }: CopyButtonProps) {
+export function CopyButton({ content, className, title }: CopyButtonProps) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -34,8 +36,8 @@ export function CopyButton({ content, className, title = '复制' }: CopyButtonP
       type="button"
       onClick={handleCopy}
       className={`inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 ${className || ''}`}
-      title={copied ? '已复制' : title}
-      aria-label={copied ? '已复制' : title}
+      title={copied ? t('common.copied') : (title ?? t('common.copy'))}
+      aria-label={copied ? t('common.copied') : (title ?? t('common.copy'))}
     >
       {copied ? (
         <Check className="h-3.5 w-3.5" />

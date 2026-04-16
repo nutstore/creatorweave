@@ -63,48 +63,24 @@ import {
 // Constants
 // =============================================================================
 
-const CATEGORY_LABELS: Record<ProviderCategory, string> = {
-  international: '国际服务商',
-  chinese: '国内服务商',
-  custom: '自定义',
-}
-
 const CATEGORY_ORDER: ProviderCategory[] = ['international', 'chinese', 'custom']
 
-const CAPABILITY_CONFIG: Record<
-  ModelCapability,
-  { icon: typeof Code; label: string; color: string }
-> = {
-  code: {
-    icon: Code,
-    label: '代码',
-    color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  },
-  writing: {
-    icon: PenTool,
-    label: '写作',
-    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  },
-  reasoning: {
-    icon: Brain,
-    label: '推理',
-    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  },
-  vision: {
-    icon: ScanEye,
-    label: '视觉',
-    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  },
-  fast: {
-    icon: Zap,
-    label: '快速',
-    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  },
-  'long-context': {
-    icon: BookOpen,
-    label: '长上下文',
-    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
-  },
+const CAPABILITY_COLORS: Record<ModelCapability, string> = {
+  code: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  writing: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  reasoning: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  vision: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+  fast: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+  'long-context': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+}
+
+const CAPABILITY_ICONS: Record<ModelCapability, typeof Code> = {
+  code: Code,
+  writing: PenTool,
+  reasoning: Brain,
+  vision: ScanEye,
+  fast: Zap,
+  'long-context': BookOpen,
 }
 
 // =============================================================================
@@ -112,15 +88,19 @@ const CAPABILITY_CONFIG: Record<
 // =============================================================================
 
 function CapabilityBadge({ capability }: { capability: ModelCapability }) {
-  const config = CAPABILITY_CONFIG[capability]
-  if (!config) return null
-  const Icon = config.icon
+  const t = useT()
+  const color = CAPABILITY_COLORS[capability]
+  const Icon = CAPABILITY_ICONS[capability]
+  const label = t(`settings.capabilities.${capability}` as const)
+
+  if (!color || !Icon) return null
+
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${config.color}`}
+      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${color}`}
     >
       <Icon className="h-2.5 w-2.5" />
-      {config.label}
+      {label}
     </span>
   )
 }
@@ -170,6 +150,7 @@ function useTokenStats(): TokenStats {
 }
 
 function TokenStatsDisplay() {
+  const t = useT()
   const stats = useTokenStats()
 
   if (stats.requestCount === 0) {
@@ -177,7 +158,7 @@ function TokenStatsDisplay() {
       <div className="rounded-lg border border bg-muted p-3 dark:border-border dark:bg-muted/50">
         <div className="flex items-center gap-2 text-sm text-tertiary dark:text-muted">
           <Info className="h-4 w-4" />
-          <span>暂无使用统计</span>
+          <span>{t('settings.tokenStats.noUsage')}</span>
         </div>
       </div>
     )
@@ -187,13 +168,13 @@ function TokenStatsDisplay() {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">总 Tokens</p>
+          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.totalTokens')}</p>
           <p className="mt-1 text-lg font-semibold text-secondary dark:text-muted">
             {stats.totalTokens.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">请求次数</p>
+          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.requestCount')}</p>
           <p className="mt-1 text-lg font-semibold text-secondary dark:text-muted">
             {stats.requestCount.toLocaleString()}
           </p>
@@ -201,13 +182,13 @@ function TokenStatsDisplay() {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">输入 Tokens</p>
+          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.inputTokens')}</p>
           <p className="mt-1 text-sm font-medium text-secondary dark:text-muted">
             {stats.promptTokens.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">输出 Tokens</p>
+          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.outputTokens')}</p>
           <p className="mt-1 text-sm font-medium text-secondary dark:text-muted">
             {stats.completionTokens.toLocaleString()}
           </p>
@@ -360,7 +341,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       await deleteApiKey(providerKey)
       setHasApiKey(false)
       invalidateApiKeyCache(providerKey)
-      toast.success('API Key 已清空')
+      toast.success(t('settings.toast.apiKeyCleared'))
       return
     }
 
@@ -369,7 +350,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     setSaved(true)
     invalidateApiKeyCache(providerKey)
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKey, providerKey, setHasApiKey, invalidateApiKeyCache])
+  }, [apiKey, providerKey, setHasApiKey, invalidateApiKeyCache, t])
 
   const handleProviderChange = useCallback(
     (type: string) => {
@@ -409,12 +390,12 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       model: customModelDraft,
     })
     if (!ok) {
-      toast.error('请填写服务商名称、Base URL 和模型名称')
+      toast.error(t('settings.toast.providerNameRequired'))
       return
     }
     setNewModelDraft('')
-    toast.success('已添加自定义服务商')
-  }, [createCustomProvider, customNameDraft, customBaseUrlDraft, customModelDraft])
+    toast.success(t('settings.toast.customProviderAdded'))
+  }, [createCustomProvider, customNameDraft, customBaseUrlDraft, customModelDraft, t])
 
   const handleSaveCustomProvider = useCallback(() => {
     if (!activeCustomProvider) return
@@ -424,13 +405,13 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       model: customModelDraft,
     })
     if (!ok) {
-      toast.error('请填写有效的服务商信息')
+      toast.error(t('settings.toast.invalidProviderInfo'))
       return
     }
     if (customModelDraft.trim()) {
       setModelName(customModelDraft.trim())
     }
-    toast.success('自定义服务商已更新')
+    toast.success(t('settings.toast.customProviderUpdated'))
   }, [
     activeCustomProvider,
     updateCustomProvider,
@@ -438,22 +419,23 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     customBaseUrlDraft,
     customModelDraft,
     setModelName,
+    t,
   ])
 
   const handleAddCustomModel = useCallback(() => {
     if (!activeCustomProvider) {
-      toast.error('请先创建并选择一个服务商')
+      toast.error(t('settings.toast.selectProviderFirst'))
       return
     }
     const ok = addCustomProviderModel(activeCustomProvider.id, newModelDraft)
     if (!ok) {
-      toast.error('模型名称不能为空')
+      toast.error(t('settings.toast.modelNameRequired'))
       return
     }
     setModelName(newModelDraft.trim())
     setNewModelDraft('')
-    toast.success('模型已添加')
-  }, [activeCustomProvider, addCustomProviderModel, newModelDraft, setModelName])
+    toast.success(t('settings.toast.modelAdded'))
+  }, [activeCustomProvider, addCustomProviderModel, newModelDraft, setModelName, t])
 
   const handleModelChange = useCallback(
     (modelId: string) => {
@@ -493,7 +475,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
               return (
                 <div key={category}>
                   <div className="px-2 py-1.5 text-xs font-semibold text-tertiary dark:text-muted">
-                    {CATEGORY_LABELS[category]}
+                    {t(`settings.categories.${category}` as const)}
                   </div>
                   {providers.map(({ type, meta }) => (
                     <BrandSelectItem key={type} value={type}>
@@ -514,15 +496,15 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             rel="noopener noreferrer"
             className="dark:text-primary-400 inline-flex items-center gap-1 text-xs text-primary-600 hover:underline"
           >
-            获取 API Key
+            {t('settings.getApiKey')}
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
 
         <div className="rounded-md border border bg-muted/30 p-2 dark:border-border dark:bg-muted/30">
-          <p className="text-[11px] font-medium text-secondary">API Base URL</p>
+          <p className="text-[11px] font-medium text-secondary">{t('settings.customBaseUrl.label')}</p>
           <p className="mt-1 break-all font-mono text-[11px] text-tertiary">
-            {effectiveBaseUrl || '未配置'}
+            {effectiveBaseUrl || t('settings.notConfigured')}
           </p>
         </div>
       </div>
@@ -531,14 +513,14 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       {providerType === 'custom' && (
         <div className="space-y-3 rounded-lg border border p-3 dark:border-border">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-primary">自定义服务商</label>
+            <label className="text-sm font-medium text-primary">{t('settings.modelManagement.title')}</label>
             {customProviders.length > 0 ? (
               <BrandSelect
                 value={activeCustomProvider?.id || ''}
                 onValueChange={(id) => setActiveCustomProvider(id)}
               >
                 <BrandSelectTrigger className="h-10">
-                  <BrandSelectValue placeholder="选择服务商" />
+                  <BrandSelectValue placeholder={t('settings.modelManagement.selectProvider')} />
                 </BrandSelectTrigger>
                 <BrandSelectContent>
                   {customProviders.map((provider) => (
@@ -549,7 +531,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 </BrandSelectContent>
               </BrandSelect>
             ) : (
-              <p className="text-xs text-muted">尚未添加自定义服务商</p>
+              <p className="text-xs text-muted">{t('settings.modelManagement.noCustomProviders')}</p>
             )}
           </div>
 
@@ -557,13 +539,13 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             <BrandInput
               value={customNameDraft}
               onChange={(e) => setCustomNameDraft(e.target.value)}
-              placeholder="服务商名称"
+              placeholder={t('settings.modelManagement.providerName')}
               className="h-10"
             />
             <BrandInput
               value={customBaseUrlDraft}
               onChange={(e) => setCustomBaseUrlDraft(e.target.value)}
-              placeholder="https://api.example.com/v1"
+              placeholder={t('settings.customBaseUrl.placeholder')}
               className="h-10 md:col-span-2"
             />
           </div>
@@ -571,18 +553,18 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             <BrandInput
               value={customModelDraft}
               onChange={(e) => setCustomModelDraft(e.target.value)}
-              placeholder="默认模型，如 gpt-4o-mini"
+              placeholder={t('settings.modelManagement.defaultModel')}
               className="h-10 flex-1"
             />
             {activeCustomProvider ? (
               <>
                 <BrandButton variant="outline" onClick={handleSaveCustomProvider}>
-                  保存
+                  {t('settings.modelManagement.save')}
                 </BrandButton>
                 <BrandButton
                   variant="ghost"
                   onClick={() => removeCustomProvider(activeCustomProvider.id)}
-                  title="删除服务商"
+                  title={t('settings.modelManagement.deleteProvider')}
                 >
                   <Trash2 className="h-4 w-4" />
                 </BrandButton>
@@ -590,23 +572,23 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             ) : (
               <BrandButton onClick={handleCreateCustomProvider}>
                 <Plus className="mr-1 h-4 w-4" />
-                添加
+                {t('settings.modelManagement.add')}
               </BrandButton>
             )}
           </div>
 
           {activeCustomProvider && (
             <div className="space-y-2">
-              <label className="text-xs font-medium text-secondary">模型列表</label>
+              <label className="text-xs font-medium text-secondary">{t('settings.modelManagement.modelList')}</label>
               <div className="flex gap-2">
                 <BrandInput
                   value={newModelDraft}
                   onChange={(e) => setNewModelDraft(e.target.value)}
-                  placeholder="新增模型名称"
+                  placeholder={t('settings.modelManagement.newModelName')}
                   className="h-9 flex-1"
                 />
                 <BrandButton variant="outline" className="h-9 px-3" onClick={handleAddCustomModel}>
-                  添加模型
+                  {t('settings.modelManagement.addModel')}
                 </BrandButton>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -621,7 +603,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                         type="button"
                         className="text-tertiary hover:text-red-500"
                         onClick={() => removeCustomProviderModel(activeCustomProvider.id, item)}
-                        aria-label={`移除模型 ${item}`}
+                        aria-label={t('settings.modelManagement.removeModel', { name: item })}
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -651,7 +633,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 }}
                 className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
               />
-              手动输入
+              {t('settings.modelSelection.useCustomModelName')}
             </label>
           </div>
 
@@ -663,7 +645,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 setCustomModelInput(e.target.value)
                 setModelName(e.target.value)
               }}
-              placeholder="输入模型名称，如 gpt-4.1, claude-3-5-sonnet-20241022"
+              placeholder={t('settings.modelSelection.customModelPlaceholder')}
               className="h-10"
             />
           ) : (
@@ -701,7 +683,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
 
           {useCustomModelName && (
             <p className="text-xs text-muted">
-              开启后可输入任意模型名称，适用于新发布的模型
+              {t('settings.modelSelection.customModelHint')}
             </p>
           )}
         </div>
@@ -725,15 +707,15 @@ export function ModelSettings({ open }: ModelSettingsProps) {
       {/* ── Custom Base URL ── */}
       {providerType === 'custom' && !activeCustomProvider && (
         <div className="space-y-2">
-          <label className="text-sm font-medium text-primary">API Base URL</label>
+          <label className="text-sm font-medium text-primary">{t('settings.customBaseUrl.label')}</label>
           <BrandInput
             type="text"
             value={customBaseUrl}
             onChange={(e) => setCustomBaseUrl(e.target.value)}
-            placeholder="https://api.example.com/v1"
+            placeholder={t('settings.customBaseUrl.placeholder')}
             className="h-10"
           />
-          <p className="text-xs text-muted">支持 OpenAI 兼容的 API 端点</p>
+          <p className="text-xs text-muted">{t('settings.customBaseUrl.hint')}</p>
         </div>
       )}
 
@@ -779,7 +761,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
           <ChevronDown
             className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
           />
-          高级参数
+          {t('settings.advancedParameters')}
         </button>
 
         {showAdvanced && (
@@ -799,8 +781,8 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 step={1}
               />
               <div className="flex justify-between text-[10px] text-tertiary">
-                <span>精确</span>
-                <span>创意</span>
+                <span>{t('settings.temperatureOptions.precise')}</span>
+                <span>{t('settings.temperatureOptions.creative')}</span>
               </div>
             </div>
 
@@ -821,7 +803,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             {/* Max Iterations */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-primary">最大迭代次数</label>
+                <label className="text-sm font-medium text-primary">{t('settings.maxIterations')}</label>
                 <span className="text-sm text-secondary">{maxIterations}</span>
               </div>
               <BrandSlider
@@ -831,7 +813,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 max={100}
                 step={1}
               />
-              <p className="text-[10px] text-tertiary">限制单次 Agent Loop 的最大 assistant 回合数</p>
+              <p className="text-[10px] text-tertiary">{t('settings.maxIterationsHint')}</p>
             </div>
 
             {/* Thinking Mode */}
@@ -839,7 +821,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Brain className="h-4 w-4 text-secondary" />
-                  <label className="text-sm font-medium text-primary">思考模式</label>
+                  <label className="text-sm font-medium text-primary">{t('settings.thinkingMode')}</label>
                 </div>
                 <BrandSwitch
                   checked={enableThinking}
@@ -855,11 +837,11 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                     {/* Level pills */}
                     <div className="mt-2 flex gap-1">
                       {([
-                        { value: 'minimal' as ThinkingLevel, label: '浅度', depth: 1 },
-                        { value: 'low' as ThinkingLevel, label: '低', depth: 2 },
-                        { value: 'medium' as ThinkingLevel, label: '中', depth: 3 },
-                        { value: 'high' as ThinkingLevel, label: '深度', depth: 4 },
-                        { value: 'xhigh' as ThinkingLevel, label: '极深', depth: 5 },
+                        { value: 'minimal' as ThinkingLevel, label: t('settings.thinkingLevels.minimal'), depth: 1 },
+                        { value: 'low' as ThinkingLevel, label: t('settings.thinkingLevels.low'), depth: 2 },
+                        { value: 'medium' as ThinkingLevel, label: t('settings.thinkingLevels.medium'), depth: 3 },
+                        { value: 'high' as ThinkingLevel, label: t('settings.thinkingLevels.high'), depth: 4 },
+                        { value: 'xhigh' as ThinkingLevel, label: t('settings.thinkingLevels.xhigh'), depth: 5 },
                       ]).map(({ value, label }) => (
                         <button
                           key={value}
@@ -876,8 +858,8 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                       ))}
                     </div>
                     <div className="mt-1.5 flex justify-between px-0.5">
-                      <span className="text-[10px] text-tertiary">快速</span>
-                      <span className="text-[10px] text-tertiary">深入</span>
+                      <span className="text-[10px] text-tertiary">{t('settings.thinkingModeFast')}</span>
+                      <span className="text-[10px] text-tertiary">{t('settings.thinkingModeDeep')}</span>
                     </div>
                   </div>
                 </div>
@@ -889,7 +871,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
 
       {/* ── Token Usage Stats ── */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-primary">使用统计</h4>
+        <h4 className="text-sm font-medium text-primary">{t('settings.tokenStats.title')}</h4>
         <TokenStatsDisplay />
       </div>
     </div>

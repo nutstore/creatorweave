@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { SkillMetadata } from '@/skills/skill-types'
+import { useT } from '@/i18n'
 
 interface SkillCardProps {
   skill: SkillMetadata
@@ -29,19 +30,21 @@ const CATEGORY_COLORS: Record<string, string> = {
   general: 'border-neutral-200 bg-neutral-50 text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  'code-review': '代码审查',
-  testing: '测试',
-  debugging: '调试',
-  refactoring: '重构',
-  documentation: '文档',
-  security: '安全',
-  performance: '性能',
-  architecture: '架构',
-  general: '通用',
+const CATEGORY_KEYS: Record<string, string> = {
+  'code-review': 'skillCard.category.codeReview',
+  testing: 'skillCard.category.testing',
+  debugging: 'skillCard.category.debugging',
+  refactoring: 'skillCard.category.refactoring',
+  documentation: 'skillCard.category.documentation',
+  security: 'skillCard.category.security',
+  performance: 'skillCard.category.performance',
+  architecture: 'skillCard.category.architecture',
+  general: 'skillCard.category.general',
 }
 
 export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: SkillCardProps) {
+  const t = useT()
+
   const handleToggle = () => {
     onToggle(skill.id, !skill.enabled)
   }
@@ -85,7 +88,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
               skill.enabled ? 'bg-green-600 dark:bg-green-400' : 'bg-neutral-400 dark:bg-neutral-500'
             )}
           />
-          {skill.enabled ? '已启用' : '已禁用'}
+          {skill.enabled ? t('skillCard.enabled') : t('skillCard.disabled')}
         </button>
       </div>
 
@@ -108,7 +111,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
             CATEGORY_COLORS[skill.category] || CATEGORY_COLORS.general
           )}
         >
-          {CATEGORY_LABELS[skill.category] || skill.category}
+          {t(CATEGORY_KEYS[skill.category] || CATEGORY_KEYS.general)}
         </Badge>
         {skill.tags.slice(0, 3).map((tag) => (
           <span
@@ -128,7 +131,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
         <div className="flex items-center gap-3 text-xs text-neutral-400 dark:text-neutral-500">
           {skill.author !== 'Unknown' && <span>{skill.author}</span>}
           {skill.source === 'project' && <span className="text-neutral-300 dark:text-neutral-600">|</span>}
-          {skill.source === 'project' && <span>项目</span>}
+          {skill.source === 'project' && <span>{t('skillCard.project')}</span>}
         </div>
         <div className="flex items-center gap-0.5">
           <Button
@@ -136,7 +139,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
             size="sm"
             className="h-7 w-7 p-0 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
             onClick={() => onEdit(skill)}
-            title="查看详情"
+            title={t('skillCard.viewDetails')}
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>
@@ -147,7 +150,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
                 size="sm"
                 className="h-7 w-7 p-0 text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
                 onClick={() => onEdit(skill)}
-                title="编辑"
+                title={t('skillCard.edit')}
               >
                 <Pencil className="h-3.5 w-3.5" />
               </Button>
@@ -157,7 +160,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onEdit, onDelete }: Ski
                   size="sm"
                   className="h-7 w-7 p-0 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
                   onClick={() => onDelete(skill.id)}
-                  title="删除"
+                  title={t('skillCard.delete')}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>

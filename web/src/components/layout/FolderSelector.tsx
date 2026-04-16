@@ -101,11 +101,11 @@ export function FolderSelector() {
       console.log('[FolderSelector] Requesting permission for folder')
       const granted = await requestPermission(projectId)
       if (!granted) {
-        setLocalError('权限被拒绝')
+        setLocalError(t('folderSelector.permissionDenied'))
         return
       }
 
-      // 同步到 agent.store
+      // Sync to agent.store
       const folderRecord = useFolderAccessStore.getState().getRecord()
       if (folderRecord) {
         useAgentStore.setState({
@@ -116,7 +116,7 @@ export function FolderSelector() {
       }
     } catch (err) {
       console.error('[FolderSelector] Permission request error:', err)
-      setLocalError(err instanceof Error ? err.message : '权限请求失败')
+      setLocalError(err instanceof Error ? err.message : t('folderSelector.permissionDenied'))
     }
   }
 
@@ -144,7 +144,7 @@ export function FolderSelector() {
   const handleSelectFolder = async () => {
     if (!projectId) return
     if (!canPickDirectory) {
-      setLocalError('当前浏览器不支持本地目录授权，已切换为沙箱模式（OPFS）')
+      setLocalError(t('folderSelector.sandboxMode'))
       return
     }
 
@@ -155,7 +155,7 @@ export function FolderSelector() {
       const success = await pickDirectory(projectId)
 
       if (success) {
-        // 成功时同步状态并关闭菜单
+        // On success, sync state and close menu
         const folderRecord = useFolderAccessStore.getState().getRecord()
         if (folderRecord) {
           useAgentStore.setState({
@@ -166,13 +166,13 @@ export function FolderSelector() {
         }
         setMenuState('closed')
       } else {
-        // 用户取消或失败，保持菜单打开或恢复之前状态
+        // On user cancel or failure, keep menu open or restore previous state
         setMenuState(directoryHandle ? 'open' : 'closed')
-        setLocalError('选择文件夹失败，请重试')
+        setLocalError(t('folderSelector.selectionFailed'))
       }
     } catch (err) {
       console.error('[FolderSelector] Select folder error:', err)
-      setLocalError(err instanceof Error ? err.message : '选择文件夹失败')
+      setLocalError(err instanceof Error ? err.message : t('folderSelector.selectionFailed'))
       setMenuState(directoryHandle ? 'open' : 'closed')
     }
   }
@@ -182,7 +182,7 @@ export function FolderSelector() {
 
     await release(projectId)
 
-    // 同步清空状态到 agent.store
+    // Sync clear state to agent.store
     useAgentStore.setState({
       directoryHandle: null,
       directoryName: null,
@@ -206,7 +206,7 @@ export function FolderSelector() {
       return (
         <>
           <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" />
-          <span className="text-xs font-normal text-secondary">加载中...</span>
+          <span className="text-xs font-normal text-secondary">{t('folderSelector.loading')}</span>
         </>
       )
     }
@@ -215,7 +215,7 @@ export function FolderSelector() {
       return (
         <>
           <AlertCircle className="h-[14px] w-[14px] text-warning" />
-          <span className="text-xs font-normal text-warning">需要恢复权限</span>
+          <span className="text-xs font-normal text-warning">{t('folderSelector.needsPermissionRestore')}</span>
         </>
       )
     }
@@ -239,7 +239,7 @@ export function FolderSelector() {
       return (
         <>
           <FolderOpen className="h-[14px] w-[14px]" />
-          <span className="text-xs font-normal text-secondary">沙箱模式 (OPFS)</span>
+          <span className="text-xs font-normal text-secondary">{t('folderSelector.sandboxMode')}</span>
         </>
       )
     }
@@ -297,10 +297,10 @@ export function FolderSelector() {
             'transition-colors hover:bg-warning focus:outline-none focus:ring-2 focus:ring-warning',
             isSelecting && 'cursor-wait opacity-70'
           )}
-          title={`恢复文件夹访问权限 (${folderName || '未知'})`}
+          title={`${t('folderSelector.restorePermission')} (${folderName || t('folderSelector.unknown')})`}
         >
           <AlertCircle className="h-[14px] w-[14px] text-warning" />
-          <span>恢复权限</span>
+          <span>{t('folderSelector.restorePermission')}</span>
           {folderName && <span className="text-warning">({folderName})</span>}
         </button>
       )}
@@ -320,7 +320,7 @@ export function FolderSelector() {
           )}
           title={
             !canPickDirectory && !directoryHandle
-              ? '当前浏览器不支持本地目录授权（使用 OPFS 沙箱模式）'
+              ? t('folderSelector.sandboxMode')
               : folderName
                 ? t('folderSelector.switchFolder')
                 : t('folderSelector.openFolder')

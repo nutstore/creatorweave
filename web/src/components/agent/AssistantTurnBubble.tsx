@@ -13,6 +13,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -69,6 +70,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   runtimeSteps,
   workflowProgress,
 }: AssistantTurnBubbleProps) {
+  const t = useT()
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
   const committedToolCallIds = new Set(
@@ -237,7 +239,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             </span>
             {turn.totalUsage && (
               <span
-                title={`输入 ${turn.totalUsage.promptTokens} + 输出 ${turn.totalUsage.completionTokens} = ${turn.totalUsage.totalTokens} tokens`}
+                title={`${t('workflow.input')} ${turn.totalUsage.promptTokens} + ${t('workflow.output')} ${turn.totalUsage.completionTokens} = ${turn.totalUsage.totalTokens} tokens`}
               >
                 ↑{formatTokens(turn.totalUsage.promptTokens)} ↓
                 {formatTokens(turn.totalUsage.completionTokens)}
@@ -305,6 +307,7 @@ const AssistantStep = memo(function AssistantStep({
   toolResults: Map<string, string>
   showDivider: boolean
 }) {
+  const t = useT()
   const hasReasoning = !!message.reasoning
   const hasContent = !!message.content
   const hasToolCalls = !!(message.toolCalls && message.toolCalls.length > 0)
@@ -337,19 +340,19 @@ const AssistantStep = memo(function AssistantStep({
             >
               {isContextSummary && (
                 <div className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  上下文压缩摘要
+                  {t('workflow.contextSummary')}
                 </div>
               )}
               {isWorkflowDryRun && (
                 <div className="mb-2 space-y-1">
                   <div className="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                    工作流模拟运行
+                    {t('workflow.simulateRun')}
                   </div>
                   {message.workflowDryRun && (
                     <div className="text-xs text-sky-800/90 dark:text-sky-200/90">
-                      <span className="mr-2">状态: {message.workflowDryRun.status}</span>
-                      <span className="mr-2">模板: {message.workflowDryRun.templateId}</span>
-                      <span>修复轮次: {message.workflowDryRun.repairRound}</span>
+                      <span className="mr-2">{t('workflow.status')}: {message.workflowDryRun.status}</span>
+                      <span className="mr-2">{t('workflow.template')}: {message.workflowDryRun.templateId}</span>
+                      <span>{t('workflow.repairRounds')}: {message.workflowDryRun.repairRound}</span>
                     </div>
                   )}
                 </div>
@@ -389,17 +392,18 @@ function CompressionStatusCard({ text, streaming }: { text: string; streaming: b
 }
 
 function WorkflowRealRunHeader({ payload }: { payload?: WorkflowRealRunPayload }) {
+  const t = useT()
   return (
     <div className="mb-2 space-y-1">
       <div className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-        工作流真实运行
+        {t('workflow.realRun')}
       </div>
       {payload && (
         <div className="space-y-1 text-xs text-emerald-800/90 dark:text-emerald-200/90">
           <div>
-            <span className="mr-2">状态: {payload.status}</span>
-            <span className="mr-2">模板: {payload.templateId}</span>
-            <span className="mr-2">修复轮次: {payload.repairRound}</span>
+            <span className="mr-2">{t('workflow.status')}: {payload.status}</span>
+            <span className="mr-2">{t('workflow.template')}: {payload.templateId}</span>
+            <span className="mr-2">{t('workflow.repairRounds')}: {payload.repairRound}</span>
             {payload.totalTokens != null && (
               <span>Tokens: {payload.totalTokens}</span>
             )}

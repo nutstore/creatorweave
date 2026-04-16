@@ -1,11 +1,11 @@
-# AI Workspace - Phase 2 Direction A
+# CreatorWeave - Phase 2 Direction A
 # Dynamic Plugin System Architecture
 
 ## Document Information
 
 | Project | Content |
 |---------|---------|
-| Product Name | AI Workspace |
+| Product Name | CreatorWeave |
 | Phase | Phase 2 - Direction A: Dynamic Plugin System |
 | Version | v2.0.0-arch |
 | Created | 2026-01-28 |
@@ -18,7 +18,7 @@
 
 ### Overview
 
-This document defines the technical architecture for implementing a **Dynamic Plugin System** that allows users to extend the AI Workspace with custom analysis capabilities. Users can upload external WASM plugin files to perform specific file analysis operations (MD5 calculation, code line counting, duplicate file detection, etc.) without modifying the core application.
+This document defines the technical architecture for implementing a **Dynamic Plugin System** that allows users to extend the CreatorWeave with custom analysis capabilities. Users can upload external WASM plugin files to perform specific file analysis operations (MD5 calculation, code line counting, duplicate file detection, etc.) without modifying the core application.
 
 ### Key Design Principles
 
@@ -120,7 +120,7 @@ pub struct PluginInfo {
     /// Plugin version (semver)
     pub version: String,
 
-    /// AI Workspace core version required (semver range)
+    /// CreatorWeave core version required (semver range)
     pub api_version: String,
 
     /// Plugin description
@@ -927,7 +927,7 @@ creatorweave/
 ```rust
 // wasm/crates/plugin-api/src/lib.rs
 
-//! AI Workspace - Plugin SDK
+//! CreatorWeave - Plugin SDK
 //!
 //! This crate provides the SDK for developing plugins.
 
@@ -1085,7 +1085,7 @@ bfosa_plugin!(
     name: "MD5 Calculator",
     version: "1.0.0",
     description: "Calculate MD5 hash for each file",
-    author: "AI Workspace Team",
+    author: "CreatorWeave Team",
     capabilities: PluginCapabilities {
         metadata_only: false,
         requires_content: true,
@@ -1167,7 +1167,7 @@ bfosa_plugin!(
     name: "Code Line Counter",
     version: "1.0.0",
     description: "Count lines of code by programming language",
-    author: "AI Workspace Team",
+    author: "CreatorWeave Team",
     capabilities: PluginCapabilities {
         metadata_only: false,
         requires_content: true,
@@ -1648,4 +1648,4 @@ pnpm run package:plugin
 
 **Document End**
 
-This architecture document provides the technical foundation for implementing a secure, performant, and extensible Dynamic Plugin System for the AI Workspace. All design decisions prioritize security, user privacy, and developer experience.
+This architecture document provides the technical foundation for implementing a secure, performant, and extensible Dynamic Plugin System for the CreatorWeave. All design decisions prioritize security, user privacy, and developer experience.

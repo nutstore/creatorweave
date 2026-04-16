@@ -1,13 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * PendingFileList Component - 紧凑变更列表
+ * PendingFileList Component - Compact change list
  *
- * 方案 A: 紧凑内联列表
- * - 单行紧凑显示文件
- * - 支持全选/批量操作
- * - 支持单个文件删除
- * - hover 预览效果
- * - HTML 文件右键审查元素
+ * Approach A: Compact inline list
+ * - Single-line compact file display
+ * - Support select all / batch operations
+ * - Support single file removal
+ * - Hover preview effect
+ * - HTML file right-click inspect element
  */
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { RefreshCw, Trash2, X, ChevronDown, ChevronRight, MousePointer2, Copy } from 'lucide-react'
 import { readFileFromOPFS } from '@/opfs'
 import { getActiveConversation } from '@/store/conversation-context.store'
+import { useT } from '@/i18n'
 
 type SnapshotGroup = {
   key: string
@@ -69,10 +70,11 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
   onSelectionChange,
   conflictPaths = new Set<string>(),
 }) => {
+  const t = useT()
   // Internal state for uncontrolled mode (backward compatibility)
   const [internalSelectAll, setInternalSelectAll] = useState(false)
   const [internalSelectedItems, setInternalSelectedItems] = useState<Set<string>>(new Set())
-  // snapshot 分组展开/折叠状态
+  // Snapshot group expand/collapse state
   const [groupExpanded, setGroupExpanded] = useState<Record<string, boolean>>({
     draft: true,
   })
@@ -109,7 +111,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     }
   }, [contextMenu])
 
-  // 按 snapshot 分组
+  // Group by snapshot
   const groupedChanges = useMemo(() => {
     const groupsMap = new Map<string, Omit<SnapshotGroup, 'expanded'>>()
     for (const change of changes.changes) {
@@ -123,7 +125,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
       }
       groupsMap.set(key, {
         key,
-        title: status === 'draft' ? '当前草稿' : `快照 ${key.slice(-8)}`,
+        title: status === 'draft' ? t('sidebar.pendingSyncPanel.currentDraft') : t('sidebar.pendingSyncPanel.snapshotLabel', { id: key.slice(-8) }),
         status,
         summary: status === 'draft' ? undefined : change.snapshotSummary,
         count: 1,
@@ -137,7 +139,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     }))
   }, [changes.changes, groupExpanded])
 
-  // 切换 snapshot 分组展开/折叠
+  // Toggle snapshot group expand/collapse
   const toggleGroup = useCallback((key: string) => {
     setGroupExpanded((prev) => ({
       ...prev,
@@ -152,10 +154,10 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     : internalSelectAll
   const selectedItems = isControlled ? externalSelectedItems : internalSelectedItems
 
-  // 计算选中的数量
+  // Calculate selected count
   const selectedCount = selectedItems.size
 
-  // 处理单个文件选择/取消选择
+  // Handle single file select/deselect
   const handleToggleSelect = useCallback(
     (path: string) => {
       if (isControlled && onSelectionChange) {
@@ -182,7 +184,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     [selectedItems, changes.changes.length, isControlled, onSelectionChange]
   )
 
-  // 处理全选/取消全选
+  // Handle select all / deselect all
   const handleToggleSelectAll = useCallback(() => {
     const newSelectAll = !selectAll
     if (isControlled && onSelectionChange) {
@@ -203,10 +205,10 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     }
   }, [selectAll, changes.changes, isControlled, onSelectionChange])
 
-  // 处理删除单个文件
+  // Handle remove single file
   const handleRemoveFile = useCallback(
     (path: string, e: React.MouseEvent) => {
-      e.stopPropagation() // 防止触发选择
+      e.stopPropagation() // Prevent triggering selection
       onRemoveFile?.(path)
     },
     [onRemoveFile]
@@ -240,43 +242,43 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     }
   }, [])
 
-  // 检查是否有选中项
+  // Check if there are selected items
   const hasSelection = selectedCount > 0
 
   return (
     <div className="flex flex-col h-full">
-      {/* 紧凑标题栏 */}
+      {/* Compact header */}
       <div className="border-subtle flex items-center justify-between border-b bg-elevated px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-primary">变更文件</span>
+          <span className="text-sm font-medium text-primary">{t('sidebar.pendingSyncPanel.title')}</span>
           <Badge variant="warning">{changes.changes.length}</Badge>
         </div>
         {hasSelection && (
           <span className="text-xs text-secondary">
-            已选 {selectedCount} 项
+            {t('sidebar.pendingSyncPanel.selectedCount', { count: selectedCount })}
           </span>
         )}
       </div>
 
-      {/* 紧凑文件列表 - 按变更类型分组显示 */}
+      {/* Compact file list - grouped by change type */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="divide-y divide-subtle/50">
           {groupedChanges.map((group) => {
             return (
               <div key={group.key}>
-                {/* 分组标题 */}
+                {/* Group title */}
                 <div
                   className="flex items-center gap-2 px-3 py-2 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => toggleGroup(group.key)}
                 >
-                  {/* 展开/折叠图标 */}
+                  {/* Expand/collapse icon */}
                   {group.expanded ? (
                     <ChevronDown className="w-4 h-4 text-tertiary" />
                   ) : (
                     <ChevronRight className="w-4 h-4 text-tertiary" />
                   )}
-                  
-                  {/* 分组标签 */}
+
+                  {/* Group label */}
                   <Badge
                     className={`flex-shrink-0 ${
                       group.status === 'committed'
@@ -289,15 +291,15 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                     }`}
                   >
                     {group.status === 'committed'
-                      ? '已保存'
+                      ? t('sidebar.pendingSyncPanel.saved')
                       : group.status === 'approved'
-                        ? '已审批'
+                        ? t('sidebar.pendingSyncPanel.approved')
                         : group.status === 'rolled_back'
-                          ? '已回滚'
-                          : '草稿'}
+                          ? t('sidebar.pendingSyncPanel.rolledBack')
+                          : t('sidebar.pendingSyncPanel.draft')}
                   </Badge>
                   
-                  {/* 分组标题 */}
+                  {/* Group title */}
                   <span className="text-sm font-medium text-primary">
                     {group.title}
                   </span>
@@ -307,14 +309,14 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                       {group.summary}
                     </span>
                   )}
-                  
-                  {/* 文件数量 */}
+
+                  {/* File count */}
                   <span className="text-xs text-secondary">
                     ({group.count})
                   </span>
                 </div>
 
-                {/* 分组内的文件列表 */}
+                {/* File list within group */}
                 {group.expanded && group.changes.map((change, index) => {
                   const isSelected = selectedItems.has(change.path) || change.path === selectedPath
                   const typeInfo = getChangeTypeInfo(change.type)
@@ -329,19 +331,19 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                       }`}
                       onContextMenu={isHtml ? (e) => handleContextMenu(e, change) : undefined}
                     >
-                      {/* 选择框 */}
+                      {/* Checkbox */}
                       <BrandCheckbox
                         checked={isSelected}
                         onCheckedChange={() => handleToggleSelect(change.path)}
                         className="shrink-0 ml-6"
                       />
 
-                      {/* 文件图标 */}
+                      {/* File icon */}
                       <span className="text-tertiary flex-shrink-0">
                         <FileIcon filename={change.path} className="w-4 h-4" />
                       </span>
 
-                      {/* 文件名 */}
+                      {/* File name */}
                       <span
                         className="flex-1 text-sm text-primary truncate min-w-0 cursor-pointer"
                         onClick={() => onSelectFile?.(change)}
@@ -350,19 +352,19 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                         {change.path.split('/').pop() || change.path}
                       </span>
 
-                      {/* 文件大小 */}
+                      {/* File size */}
                       <span className="text-xs text-tertiary flex-shrink-0 w-16 text-right">
                         {formatFileSize(change.size)}
                       </span>
 
-                      {/* 冲突标记 */}
+                      {/* Conflict marker */}
                       {hasConflict && (
                         <Badge className="flex-shrink-0 bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
                           C
                         </Badge>
                       )}
 
-                      {/* 变更类型 */}
+                      {/* Change type */}
                       <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>
                         {typeInfo.label}
                       </Badge>
@@ -375,18 +377,18 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                             handleInspectElement(change)
                           }}
                           className="shrink-0 p-1 text-emerald-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300"
-                          title="审查元素"
+                          title={t('sidebar.pendingSyncPanel.reviewElements')}
                         >
                           <MousePointer2 className="w-3.5 h-3.5" />
                         </button>
                       )}
 
-                      {/* 删除按钮 */}
+                      {/* Delete button */}
                       <BrandButton
                         variant="ghost"
                         onClick={(e) => handleRemoveFile(change.path, e as any)}
                         className="shrink-0 text-tertiary hover:text-destructive p-1"
-                        title="从列表中移除"
+                        title="Remove from list"
                       >
                         <X className="w-3.5 h-3.5" />
                       </BrandButton>
@@ -413,7 +415,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
               onClick={() => handleInspectElement(contextMenu.change)}
             >
               <MousePointer2 className="w-4 h-4 text-emerald-500" />
-              审查元素
+              {t('sidebar.pendingSyncPanel.reviewElements')}
             </button>
           )}
           {/* Copy Path */}
@@ -425,7 +427,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             }}
           >
             <Copy className="w-4 h-4 text-neutral-400" />
-            复制路径
+            {t('sidebar.pendingSyncPanel.copyPath')}
           </button>
           {/* Remove from list */}
           <button
@@ -436,12 +438,12 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             }}
           >
             <X className="w-4 h-4" />
-            从列表移除
+            {t('sidebar.pendingSyncPanel.removeFromList')}
           </button>
         </div>
       )}
 
-      {/* 底部操作栏 */}
+      {/* Bottom action bar */}
       <div className="border-subtle flex items-center justify-between border-t bg-elevated px-3 py-2">
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">
@@ -449,7 +451,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
               checked={selectAll}
               onCheckedChange={handleToggleSelectAll}
             />
-            <span>全选</span>
+            <span>{t('sidebar.pendingSyncPanel.selectAll')}</span>
           </label>
         </div>
 
@@ -460,7 +462,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             disabled={isSyncing}
           >
             <Trash2 className="w-4 h-4" />
-            拒绝
+            {t('sidebar.pendingSyncPanel.reject')}
           </BrandButton>
           <BrandButton
             variant="primary"
@@ -470,12 +472,12 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             {isSyncing ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                处理中...
+                {t('sidebar.pendingSyncPanel.processing')}
               </>
             ) : (
               <>
                 <RefreshCw className="w-4 h-4" />
-                {hasSelection ? `审批通过选中 (${selectedCount})` : '审批通过全部'}
+                {hasSelection ? t('sidebar.pendingSyncPanel.approveSelectedCount', { count: selectedCount }) : t('sidebar.pendingSyncPanel.approveAll')}
               </>
             )}
           </BrandButton>

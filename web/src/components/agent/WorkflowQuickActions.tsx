@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
   cn,
 } from '@creatorweave/ui'
+import { useT } from '@/i18n'
 import { nodeKindConfig } from './workflow-editor/constants'
 import type { WorkflowNodeKind } from '@/agent/workflow/types'
 
@@ -42,6 +43,7 @@ const nodeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 function MiniPipeline({ kinds }: { kinds: string[] }) {
+  const t = useT()
   if (kinds.length === 0) return null
 
   return (
@@ -49,7 +51,7 @@ function MiniPipeline({ kinds }: { kinds: string[] }) {
       {kinds.map((kind, i) => {
         const cfg = nodeKindConfig[kind as WorkflowNodeKind]
         const Icon = nodeIcons[kind]
-        const label = cfg?.label || kind
+        const label = cfg?.labelKey ? t(cfg.labelKey) : kind
         return (
           <span key={`${kind}-${i}`} className="flex items-center gap-0.5">
             {i > 0 && (
@@ -95,12 +97,13 @@ export function WorkflowQuickActions({
   onOpenEditor,
   onOpenManager,
 }: WorkflowQuickActionsProps) {
+  const t = useT()
   const [popoverOpen, setPopoverOpen] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Advanced rubric state (collapsed by default)
   const [customRubricEnabled, setCustomRubricEnabled] = useState(false)
-  const [rubricName, setRubricName] = useState('自定义评分规则')
+  const [rubricName, setRubricName] = useState(t('workflow.customRubricName'))
   const [passScore, setPassScore] = useState(80)
   const [maxRepairRounds, setMaxRepairRounds] = useState(2)
   const [paragraphRuleEnabled, setParagraphRuleEnabled] = useState(true)
@@ -111,22 +114,23 @@ export function WorkflowQuickActions({
   const [hookRuleEnabled, setHookRuleEnabled] = useState(false)
   const [ctaRuleEnabled, setCtaRuleEnabled] = useState(false)
 
-  const selectedLabel = templates.find((t) => t.id === selectedTemplateId)?.label
-  const selectedPipeline = templates.find((t) => t.id === selectedTemplateId)?.pipeline || []
+  const selectedLabel = templates.find((tmpl) => tmpl.id === selectedTemplateId)?.label
+  const selectedPipeline = templates.find((tmpl) => tmpl.id === selectedTemplateId)?.pipeline || []
 
   const customRubricError = useMemo(() => {
     if (!customRubricEnabled) return null
-    if (!rubricName.trim()) return '请填写评分规则名称'
-    if (passScore < 0 || passScore > 100) return '通过分需在 0-100 之间'
-    if (maxRepairRounds < 0 || maxRepairRounds > 10) return '修复轮次需在 0-10 之间'
+    if (!rubricName.trim()) return t('workflow.validation.rubricNameRequired')
+    if (passScore < 0 || passScore > 100) return t('workflow.validation.passScoreRange')
+    if (maxRepairRounds < 0 || maxRepairRounds > 10) return t('workflow.validation.repairRoundsRange')
     if (paragraphRuleEnabled && (paragraphMin < 1 || paragraphMax < 1 || paragraphMin > paragraphMax)) {
-      return '段落句数范围不合法'
+      return t('workflow.validation.paragraphRangeInvalid')
     }
     if (!paragraphRuleEnabled && !dialogueRuleEnabled && !hookRuleEnabled && !ctaRuleEnabled) {
-      return '至少启用一条评分规则'
+      return t('workflow.validation.atLeastOneRule')
     }
     return null
   }, [
+    t,
     customRubricEnabled,
     rubricName,
     passScore,
@@ -226,7 +230,7 @@ export function WorkflowQuickActions({
         <button
           type="button"
           disabled={disabled}
-          aria-label="工作流"
+          aria-label={t('workflow.label')}
           className={cn(
             'inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs font-medium transition-colors',
             'border-neutral-200 bg-neutral-50 text-neutral-600',
@@ -238,7 +242,7 @@ export function WorkflowQuickActions({
           )}
         >
           <Workflow className="h-3.5 w-3.5" />
-          <span>{selectedLabel || '工作流'}</span>
+          <span>{selectedLabel || t('workflow.label')}</span>
           <ChevronDown className={cn('h-3 w-3 transition-transform', popoverOpen && 'rotate-180')} />
         </button>
       </PopoverTrigger>
@@ -252,9 +256,9 @@ export function WorkflowQuickActions({
         <div className="space-y-3">
           {/* Header */}
           <div>
-            <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">工作流</h4>
+            <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('workflow.label')}</h4>
             <p className="mt-0.5 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
-              多步骤 AI 协作，自动规划、创作、审查。
+              {t('workflow.description')}
             </p>
           </div>
 
@@ -313,7 +317,7 @@ export function WorkflowQuickActions({
                         )}
                       >
                         {Icon && <Icon className="h-3 w-3" />}
-                        {cfg?.label || kind}
+                        {cfg?.labelKey ? t(cfg.labelKey) : kind}
                       </span>
                     </span>
                   )
@@ -330,7 +334,7 @@ export function WorkflowQuickActions({
               className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
             >
               <Settings2 className="h-3 w-3" />
-              <span>高级设置</span>
+              <span>{t('workflow.advancedSettings')}</span>
               <ChevronDown
                 className={cn('ml-auto h-3 w-3 transition-transform', showAdvanced && 'rotate-180')}
               />
@@ -346,14 +350,14 @@ export function WorkflowQuickActions({
                     size="sm"
                   />
                   <label htmlFor="wf-custom-rubric" className="text-[11px] text-neutral-600 dark:text-neutral-300">
-                    启用自定义评分规则
+                    {t('workflow.enableCustomRubric')}
                   </label>
                 </div>
 
                 {customRubricEnabled && (
                   <div className="space-y-2">
                     <BrandInput
-                      aria-label="评分规则名称"
+                      aria-label={t('workflow.customRubricName')}
                       value={rubricName}
                       onChange={(e) => setRubricName(e.target.value)}
                       className="h-8 text-xs"
@@ -361,9 +365,9 @@ export function WorkflowQuickActions({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="mb-0.5 block text-[10px] text-neutral-500">通过分数</label>
+                        <label className="mb-0.5 block text-[10px] text-neutral-500">{t('workflow.passScore')}</label>
                         <BrandInput
-                          aria-label="通过分"
+                          aria-label={t('workflow.passScoreAria')}
                           type="number"
                           min={0}
                           max={100}
@@ -373,9 +377,9 @@ export function WorkflowQuickActions({
                         />
                       </div>
                       <div>
-                        <label className="mb-0.5 block text-[10px] text-neutral-500">最大修复轮次</label>
+                        <label className="mb-0.5 block text-[10px] text-neutral-500">{t('workflow.maxRepairRounds')}</label>
                         <BrandInput
-                          aria-label="最大修复轮次"
+                          aria-label={t('workflow.maxRepairRoundsAria')}
                           type="number"
                           min={0}
                           max={10}
@@ -394,13 +398,13 @@ export function WorkflowQuickActions({
                           onCheckedChange={(checked) => setParagraphRuleEnabled(checked === true)}
                           size="sm"
                         />
-                        <label htmlFor="wf-rule-paragraph">段落句数规则</label>
+                        <label htmlFor="wf-rule-paragraph">{t('workflow.paragraphRule')}</label>
                       </div>
 
                       {paragraphRuleEnabled && (
                         <div className="grid grid-cols-2 gap-2 pl-5">
                           <BrandInput
-                            aria-label="段落最小句数"
+                            aria-label={t('workflow.paragraphMinAria')}
                             type="number"
                             min={1}
                             value={String(paragraphMin)}
@@ -408,7 +412,7 @@ export function WorkflowQuickActions({
                             className="h-8 text-xs"
                           />
                           <BrandInput
-                            aria-label="段落最大句数"
+                            aria-label={t('workflow.paragraphMaxAria')}
                             type="number"
                             min={1}
                             value={String(paragraphMax)}
@@ -425,7 +429,7 @@ export function WorkflowQuickActions({
                           onCheckedChange={(checked) => setDialogueRuleEnabled(checked === true)}
                           size="sm"
                         />
-                        <label htmlFor="wf-rule-dialogue">对话段策略</label>
+                        <label htmlFor="wf-rule-dialogue">{t('workflow.dialoguePolicy')}</label>
                       </div>
 
                       {dialogueRuleEnabled && (
@@ -436,7 +440,7 @@ export function WorkflowQuickActions({
                             onCheckedChange={(checked) => setAllowSingleDialogue(checked === true)}
                             size="sm"
                           />
-                          <label htmlFor="wf-rule-dialogue-single">允许单句对话段</label>
+                          <label htmlFor="wf-rule-dialogue-single">{t('workflow.allowSingleDialogue')}</label>
                         </div>
                       )}
 
@@ -447,7 +451,7 @@ export function WorkflowQuickActions({
                           onCheckedChange={(checked) => setHookRuleEnabled(checked === true)}
                           size="sm"
                         />
-                        <label htmlFor="wf-rule-hook">开场钩子规则</label>
+                        <label htmlFor="wf-rule-hook">{t('workflow.hookRule')}</label>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -457,7 +461,7 @@ export function WorkflowQuickActions({
                           onCheckedChange={(checked) => setCtaRuleEnabled(checked === true)}
                           size="sm"
                         />
-                        <label htmlFor="wf-rule-cta">CTA 完整性规则</label>
+                        <label htmlFor="wf-rule-cta">{t('workflow.ctaRule')}</label>
                       </div>
                     </div>
 
@@ -487,7 +491,7 @@ export function WorkflowQuickActions({
               )}
             >
               <Workflow className="h-3.5 w-3.5" />
-              自定义工作流编辑器
+              {t('workflow.customEditor')}
             </button>
           )}
 
@@ -508,7 +512,7 @@ export function WorkflowQuickActions({
               )}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              管理我的工作流
+              {t('workflow.manageWorkflows')}
             </button>
           )}
 
@@ -521,7 +525,7 @@ export function WorkflowQuickActions({
               className="h-8 flex-1 gap-1.5 text-xs"
             >
               <Play className="h-3 w-3" />
-              模拟运行
+              {t('workflow.simulateRun')}
             </BrandButton>
 
             {onRealRun && (
@@ -539,7 +543,7 @@ export function WorkflowQuickActions({
                 )}
               >
                 <Zap className="h-3 w-3" />
-                真实运行
+                {t('workflow.realRun')}
               </button>
             )}
           </div>

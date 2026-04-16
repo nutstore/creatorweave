@@ -31,6 +31,7 @@ import { useWorkflowEditor } from './useWorkflowEditor'
 import { WorkflowCanvas } from './WorkflowCanvas'
 import { NodePropertiesPanel } from './NodePropertiesPanel'
 import type { WorkflowNodeData } from './workflow-to-flow'
+import { useT } from '@/i18n'
 
 export type { WorkflowNodeData }
 
@@ -77,6 +78,7 @@ function WorkflowEditorInner({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
+  const t = useT()
   const {
     nodes,
     edges,
@@ -171,7 +173,7 @@ function WorkflowEditorInner({
   const handleTemplateSelect = useCallback(
     (id: string) => {
       if (!id) return
-      if (isDirty && !window.confirm('当前有未保存改动，确认切换模板吗？')) {
+      if (isDirty && !window.confirm(t('workflowEditorDialog.unsavedChangesConfirm'))) {
         return
       }
 
@@ -240,19 +242,19 @@ function WorkflowEditorInner({
 
   // Get display name for current selection
   const getDisplayName = useCallback(() => {
-    if (!templateId) return '未命名工作流'
+    if (!templateId) return t('workflowEditorDialog.untitledWorkflow')
 
-    if (templateId === '__new__') return '新建工作流'
+    if (templateId === '__new__') return t('workflowEditorDialog.newWorkflow')
 
     if (templateId.startsWith(CUSTOM_PREFIX)) {
       const workflowId = templateId.slice(CUSTOM_PREFIX.length)
       const workflow = customWorkflows.find((w) => w.id === workflowId)
-      return workflow?.name || '自定义工作流'
+      return workflow?.name || t('workflowEditorDialog.customWorkflow')
     }
 
     const template = builtInTemplates.find((t) => t.id === templateId)
-    return template?.label || '工作流'
-  }, [templateId, builtInTemplates, customWorkflows])
+    return template?.label || t('workflowEditorDialog.workflow')
+  }, [templateId, builtInTemplates, customWorkflows, t])
 
   return (
     <div className="flex h-full flex-col">
@@ -265,7 +267,7 @@ function WorkflowEditorInner({
             className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
-            返回
+            {t('workflowEditorDialog.back')}
           </button>
 
           <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
@@ -275,7 +277,7 @@ function WorkflowEditorInner({
               <div className="h-3 w-3 rounded-sm bg-neutral-400 dark:bg-neutral-500" />
             </div>
             <h1 className="text-[13px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
-              工作流编辑器
+              {t('workflowEditorDialog.workflowEditor')}
             </h1>
           </div>
 
@@ -293,7 +295,7 @@ function WorkflowEditorInner({
           <div className="w-[180px]">
             <BrandSelect value={templateId} onValueChange={handleTemplateSelect}>
               <BrandSelectTrigger className="h-8 text-xs bg-neutral-100 dark:bg-neutral-800 border-0">
-                <BrandSelectValue placeholder="切换模板" />
+                <BrandSelectValue placeholder={t('workflowEditorDialog.switchTemplate')} />
               </BrandSelectTrigger>
               <BrandSelectContent>
                 {/* New workflow option */}
@@ -301,7 +303,7 @@ function WorkflowEditorInner({
                   <BrandSelectItem value="__new__">
                     <div className="flex items-center gap-2">
                       <Plus className="h-3 w-3" />
-                      <span>新建工作流</span>
+                      <span>{t('workflowEditorDialog.newWorkflow')}</span>
                     </div>
                   </BrandSelectItem>
                 </BrandSelectGroup>
@@ -313,7 +315,7 @@ function WorkflowEditorInner({
                   <>
                     <BrandSelectGroup>
                       <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-                        我的工作流
+                        {t('workflowEditorDialog.myWorkflows')}
                       </div>
                       {customWorkflows.map((workflow) => (
                         <BrandSelectItem
@@ -334,7 +336,7 @@ function WorkflowEditorInner({
                 {/* Built-in templates group */}
                 <BrandSelectGroup>
                   <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
-                    内置模板
+                    {t('workflowEditorDialog.builtInTemplates')}
                   </div>
                   {builtInTemplates.map((template) => (
                     <BrandSelectItem key={template.id} value={template.id}>
@@ -350,7 +352,7 @@ function WorkflowEditorInner({
             <button
               type="button"
               className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-              aria-label="关闭"
+              aria-label={t('workflowEditorDialog.close')}
             >
               <X className="h-4 w-4" />
             </button>
@@ -384,14 +386,14 @@ function WorkflowEditorInner({
                   <>
                     <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                     <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                      有效
+                      {t('workflowEditorDialog.valid')}
                     </span>
                   </>
                 ) : (
                   <>
                     <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
                     <span className="text-[11px] font-medium text-red-600 dark:text-red-400">
-                      {validationResult.errors.length} 个错误
+                      {t('workflowEditorDialog.errors', { count: validationResult.errors.length })}
                     </span>
                   </>
                 )}
@@ -407,7 +409,7 @@ function WorkflowEditorInner({
                   className="h-7 gap-1.5 px-2.5 text-[11px] font-medium"
                 >
                 <RotateCcw className="h-3 w-3" />
-                重置
+                {t('workflowEditorDialog.reset')}
               </BrandButton>
 
                 <BrandButton
@@ -421,7 +423,7 @@ function WorkflowEditorInner({
                 ) : (
                   <Save className="h-3 w-3" />
                 )}
-                保存
+                {t('workflowEditorDialog.save')}
               </BrandButton>
 
                 <BrandButton
@@ -430,7 +432,7 @@ function WorkflowEditorInner({
                   className="h-7 gap-1.5 px-2.5 text-[11px] font-medium"
                 >
                 <Play className="h-3 w-3" />
-                运行模拟
+                {t('workflowEditorDialog.runSimulation')}
               </BrandButton>
             </div>
           </div>

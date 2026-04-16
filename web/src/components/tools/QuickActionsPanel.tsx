@@ -1,12 +1,12 @@
 /**
- * QuickActionsPanel - 快捷操作面板
+ * QuickActionsPanel - Quick Actions Panel
  *
- * 提供常用操作的快速入口，按场景分类。
- * 功能：
- * - 快速命令模板
- * - 最近使用的文件
- * - 快速代码执行
- * - 可折叠/展开
+ * Provides quick access to common operations, categorized by scenario.
+ * Features:
+ * - Quick command templates
+ * - Recently used files
+ * - Quick code execution
+ * - Collapsible/expandable
  */
 
 import { useState, useCallback, useEffect } from 'react'

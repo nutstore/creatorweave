@@ -36,7 +36,7 @@ import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBo
 import { ConversationStorageBadge } from '@/components/conversation'
 import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { FolderSelector } from './FolderSelector'
-import { useT } from '@/i18n'
+import { useLocale, useT } from '@/i18n'
 import {
   BrandButton,
   Tooltip,
@@ -97,7 +97,9 @@ export function TopBar({
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
+  const [locale] = useLocale()
   const conversationName = activeConversationName ?? activeWorkspaceName
+  const docsUrl = locale === 'zh-CN' ? '/#/docs/zh' : '/#/docs/en'
 
   const ActionTooltip = ({
     label,
@@ -209,7 +211,7 @@ export function TopBar({
               </BrandButton>
             </ActionTooltip>
 
-            <ActionTooltip label="More">
+            <ActionTooltip label={t('topbar.tooltips.more')}>
               <BrandButton iconButton onClick={() => setMobileMoreOpen((prev) => !prev)}>
                 <MoreHorizontal className="h-[14px] w-[14px]" />
               </BrandButton>
@@ -275,7 +277,7 @@ export function TopBar({
             </ActionTooltip>
 
             {/* WebContainer */}
-            <ActionTooltip label="WebContainer">
+            <ActionTooltip label={t('topbar.tooltips.webContainer')}>
               <BrandButton iconButton onClick={onWebContainerOpen}>
                 <Terminal className="h-[14px] w-[14px]" />
               </BrandButton>
@@ -304,7 +306,7 @@ export function TopBar({
 
             {/* Documentation */}
             <ActionTooltip label={t('topbar.tooltips.docs')}>
-              <BrandButton iconButton onClick={() => window.open('/#/docs', '_blank')}>
+              <BrandButton iconButton onClick={() => window.open(docsUrl, '_blank')}>
                 <BookOpen className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
@@ -332,7 +334,7 @@ export function TopBar({
         >
           <div className="mb-2 rounded-lg border border-neutral-200 bg-neutral-50/60 p-2 dark:border-neutral-700 dark:bg-neutral-800/60">
             <div className="mb-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-              工作目录
+              {t('topbar.mobile.workDirectory')}
             </div>
             <FolderSelector />
           </div>
@@ -347,7 +349,7 @@ export function TopBar({
               }}
             >
               <SlidersHorizontal className="h-3.5 w-3.5" />
-              工作区设置
+              {t('topbar.mobile.workspaceSettings')}
             </BrandButton>
             <BrandButton
               variant="ghost"
@@ -358,7 +360,7 @@ export function TopBar({
               }}
             >
               <Wrench className="h-3.5 w-3.5" />
-              技能
+              {t('topbar.mobile.skills')}
             </BrandButton>
             <BrandButton
               variant="ghost"
@@ -369,7 +371,7 @@ export function TopBar({
               }}
             >
               <Keyboard className="h-3.5 w-3.5" />
-              命令面板
+              {t('topbar.mobile.commandPalette')}
             </BrandButton>
             <BrandButton
               variant="ghost"
@@ -380,7 +382,7 @@ export function TopBar({
               }}
             >
               <Terminal className="h-3.5 w-3.5" />
-              WebContainer
+              {t('topbar.mobile.webContainer')}
             </BrandButton>
             <BrandButton
               variant="ghost"
@@ -391,38 +393,38 @@ export function TopBar({
               }}
             >
               <Server className="h-3.5 w-3.5" />
-              MCP 设置
+              {t('topbar.mobile.mcpSettings')}
             </BrandButton>
             <BrandButton
               variant="ghost"
               className="h-9 justify-start gap-2 text-xs"
               onClick={() => {
-                window.open('/#/docs', '_blank')
+                window.open(docsUrl, '_blank')
                 closeMobileMorePanel()
               }}
             >
               <BookOpen className="h-3.5 w-3.5" />
-              文档
+              {t('topbar.mobile.docs')}
             </BrandButton>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">连接</div>
+              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.connection')}</div>
               <RemoteBadgeErrorBoundary>
                 <RemoteBadge />
               </RemoteBadgeErrorBoundary>
             </div>
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">存储</div>
+              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.storage')}</div>
               <ConversationStorageBadge compact />
             </div>
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">语言</div>
+              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.language')}</div>
               <LanguageSwitcher />
             </div>
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">主题</div>
+              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.theme')}</div>
               <ThemeToggle />
             </div>
           </div>

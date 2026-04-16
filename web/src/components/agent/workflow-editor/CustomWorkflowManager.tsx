@@ -26,6 +26,7 @@ import {
   createEmptyWorkflow,
 } from '@/store/custom-workflow.store'
 import type { CustomWorkflowTemplate } from '@/agent/workflow/types'
+import { useT } from '@/i18n'
 
 interface CustomWorkflowManagerProps {
   open: boolean
@@ -38,6 +39,7 @@ export function CustomWorkflowManager({
   onOpenChange,
   onEditWorkflow,
 }: CustomWorkflowManagerProps) {
+  const t = useT()
   const {
     workflows,
     loadWorkflows,
@@ -92,21 +94,13 @@ export function CustomWorkflowManager({
     [onEditWorkflow, onOpenChange]
   )
 
-  // Format date
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString('zh-CN', {
-      month: 'short',
-      day: 'numeric',
-    })
-  }
-
   // Get domain label
   const domainLabels: Record<string, string> = {
-    generic: '通用',
-    novel: '小说创作',
-    video: '视频脚本',
-    course: '课程制作',
-    custom: '自定义',
+    generic: t('customWorkflowManager.generic'),
+    novel: t('customWorkflowManager.novel'),
+    video: t('customWorkflowManager.video'),
+    course: t('customWorkflowManager.course'),
+    custom: t('customWorkflowManager.custom'),
   }
 
   return (
@@ -120,10 +114,10 @@ export function CustomWorkflowManager({
             </div>
             <div>
               <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-                工作流管理
+                {t('customWorkflowManager.title')}
               </h1>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                管理您的自定义工作流
+                {t('customWorkflowManager.subtitle')}
               </p>
             </div>
           </div>
@@ -131,7 +125,7 @@ export function CustomWorkflowManager({
           <div className="flex items-center gap-2">
             <BrandButton onClick={handleCreateNew} className="h-9 gap-2 px-4 text-sm font-medium">
               <Plus className="h-4 w-4" />
-              新建工作流
+              {t('customWorkflowManager.createNew')}
             </BrandButton>
           </div>
         </header>
@@ -145,7 +139,7 @@ export function CustomWorkflowManager({
               <BrandInput
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索工作流..."
+                placeholder={t('customWorkflowManager.searchPlaceholder')}
                 className="h-9 w-full pl-9 text-sm"
               />
             </div>
@@ -160,18 +154,18 @@ export function CustomWorkflowManager({
                 </div>
                 <div>
                   <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                    {searchQuery ? '未找到匹配的工作流' : '暂无自定义工作流'}
+                    {searchQuery ? t('customWorkflowManager.noResultsWithSearch') : t('customWorkflowManager.noResultsWithoutSearch')}
                   </h3>
                   <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
                     {searchQuery
-                      ? '尝试使用其他关键词搜索'
-                      : '点击「新建工作流」创建您的第一个工作流'}
+                      ? t('customWorkflowManager.tryDifferentKeyword')
+                      : t('customWorkflowManager.clickToCreateFirst')}
                   </p>
                 </div>
                 {!searchQuery && (
                   <BrandButton onClick={handleCreateNew} className="h-8 gap-2 px-4 text-sm font-medium">
                     <Plus className="h-4 w-4" />
-                    新建工作流
+                    {t('customWorkflowManager.createNew')}
                   </BrandButton>
                 )}
               </div>
@@ -194,13 +188,13 @@ export function CustomWorkflowManager({
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {domainLabels[workflow.domain] || '通用'}
+                              {domainLabels[workflow.domain] || t('customWorkflowManager.generic')}
                             </span>
                             <span className="text-xs text-neutral-300 dark:text-neutral-600">
                               •
                             </span>
                             <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                              {workflow.nodes.length} 个节点
+                              {t('customWorkflowManager.nodesCount', { count: workflow.nodes.length })}
                             </span>
                           </div>
                         </div>
@@ -243,9 +237,9 @@ export function CustomWorkflowManager({
                     <div className="mt-3 flex items-center justify-between text-xs text-neutral-400 dark:text-neutral-500">
                       <div className="flex items-center gap-1">
                         <span className={`h-2 w-2 rounded-full ${workflow.enabled ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'}`} />
-                        {workflow.enabled ? '已启用' : '已禁用'}
+                        {workflow.enabled ? t('customWorkflowManager.enabled') : t('customWorkflowManager.disabled')}
                       </div>
-                      <span>更新于 {formatDate(workflow.updatedAt)}</span>
+                      <span>{t('customWorkflowManager.updatedAt', { date: new Date(workflow.updatedAt).toLocaleDateString() })}</span>
                     </div>
                   </div>
                 ))}
@@ -259,10 +253,10 @@ export function CustomWorkflowManager({
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm dark:bg-black/40">
             <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-700 dark:bg-neutral-800">
               <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
-                确认删除
+                {t('customWorkflowManager.confirmDelete')}
               </h3>
               <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                确定要删除工作流 &quot;{workflows.find((w) => w.id === deleteConfirmId)?.name}&quot; 吗？此操作不可撤销。
+                {t('customWorkflowManager.deleteConfirmMessage', { name: workflows.find((w) => w.id === deleteConfirmId)?.name ?? '' })}
               </p>
               <div className="mt-4 flex justify-end gap-2">
                 <BrandButton
@@ -270,13 +264,13 @@ export function CustomWorkflowManager({
                   onClick={() => setDeleteConfirmId(null)}
                   className="h-8 px-3 text-sm"
                 >
-                  取消
+                  {t('customWorkflowManager.cancel')}
                 </BrandButton>
                 <BrandButton
                   onClick={confirmDelete}
                   className="h-8 bg-red-600 px-3 text-sm hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
                 >
-                  删除
+                  {t('customWorkflowManager.delete')}
                 </BrandButton>
               </div>
             </div>
@@ -286,11 +280,11 @@ export function CustomWorkflowManager({
         {/* Footer */}
         <footer className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-200 bg-neutral-50 px-6 dark:border-neutral-800 dark:bg-neutral-900">
           <span className="text-xs text-neutral-500 dark:text-neutral-400">
-            共 {workflows.length} 个工作流
+            {t('customWorkflowManager.totalWorkflows', { count: workflows.length })}
           </span>
           <BrandDialogClose asChild>
             <BrandButton variant="ghost" className="h-8 px-3 text-sm">
-              关闭
+              {t('customWorkflowManager.close')}
             </BrandButton>
           </BrandDialogClose>
         </footer>
