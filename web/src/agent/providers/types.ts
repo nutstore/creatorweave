@@ -83,7 +83,7 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
   // Chinese providers
   glm: {
     baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
-    modelName: 'glm-5',
+    modelName: 'glm-5.1',
     headers: {},
   },
   'glm-coding': {
@@ -259,6 +259,12 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
     website: 'https://open.bigmodel.cn',
     models: [
       {
+        id: 'glm-5.1',
+        name: 'GLM-5.1',
+        capabilities: ['code', 'writing', 'reasoning'],
+        contextWindow: 200000,
+      },
+      {
         id: 'glm-5',
         name: 'GLM-5',
         capabilities: ['code', 'writing', 'reasoning'],
@@ -283,6 +289,12 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
     displayName: '智谱 GLM (Coding)',
     website: 'https://open.bigmodel.cn',
     models: [
+      {
+        id: 'glm-5.1',
+        name: 'GLM-5.1 (Code)',
+        capabilities: ['code', 'reasoning'],
+        contextWindow: 200000,
+      },
       {
         id: 'glm-5',
         name: 'GLM-5 (Code)',
