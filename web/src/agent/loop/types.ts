@@ -124,4 +124,13 @@ export interface AgentLoopConfig {
   ) => Promise<AfterToolCallHookResult | undefined> | AfterToolCallHookResult | undefined
   /** Agent execution mode: 'plan' (read-only) or 'act' (full access). Defaults to 'act'. */
   mode?: AgentMode
+  /** Initial convert call counter for context compression cadence (cross-run continuity). */
+  initialConvertCallCount?: number
+  /** Initial summary convert-call marker for compression cadence (cross-run continuity). */
+  initialLastSummaryConvertCall?: number
+  /** Callback when compression counters are updated after a run. */
+  onCompressionStateUpdate?: (state: {
+    convertCallCount: number
+    lastSummaryConvertCall: number
+  }) => void
 }

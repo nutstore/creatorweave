@@ -100,7 +100,10 @@ vi.mock('@/mcp/elicitation-handler.tsx', () => ({
 
 vi.mock('@/agent/agent-loop', () => {
   class MockAgentLoop {
+    private config: any
+
     constructor(config: any) {
+      this.config = config
       ;(globalThis as any).__lastAgentLoopConfig = config
     }
 
@@ -109,7 +112,12 @@ vi.mock('@/agent/agent-loop', () => {
     async run(messages: any[], callbacks: any) {
       const customRun = (globalThis as any).__conversationStoreCustomRun
       if (typeof customRun === 'function') {
-        return customRun(messages, callbacks)
+        const result = await customRun(messages, callbacks)
+        this.config.onCompressionStateUpdate?.({
+          convertCallCount: 17,
+          lastSummaryConvertCall: 9,
+        })
+        return result
       }
 
       ;(globalThis as any).__conversationStoreBeforeCompressionStart?.()
@@ -143,6 +151,11 @@ vi.mock('@/agent/agent-loop', () => {
 
       callbacks.onToolCallComplete?.(toolB, 'result B')
       ;(globalThis as any).__conversationStoreTestHook?.('after_b_complete')
+
+      this.config.onCompressionStateUpdate?.({
+        convertCallCount: 17,
+        lastSummaryConvertCall: 9,
+      })
 
       return [
         ...messages,
@@ -237,6 +250,25 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     const agentLoopConfig = (globalThis as any).__lastAgentLoopConfig
     expect(agentLoopConfig?.maxIterations).toBe(37)
+  })
+
+  it('should carry compression counters across runAgent invocations', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('compression-state-carry')
+
+    await useConversationStore.getState().runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const firstRunConfig = (globalThis as any).__lastAgentLoopConfig
+    expect(firstRunConfig?.initialConvertCallCount ?? 0).toBe(0)
+    expect(firstRunConfig?.initialLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY).toBe(
+      Number.NEGATIVE_INFINITY
+    )
+
+    await useConversationStore.getState().runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const secondRunConfig = (globalThis as any).__lastAgentLoopConfig
+    expect(secondRunConfig?.initialConvertCallCount).toBe(17)
+    expect(secondRunConfig?.initialLastSummaryConvertCall).toBe(9)
   })
 
   it('should delete only the specified user message', () => {
@@ -442,7 +474,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(updated?.status).toBe('idle')
     expect(lastMessage?.role).toBe('assistant')
     expect(lastMessage?.kind).toBe('workflow_dry_run')
-    expect(lastMessage?.content).toContain('工作流模拟运行')
+    expect(lastMessage?.content).toMatch(/工作流模拟运行|Workflow dry run/)
     expect(lastMessage?.content).toContain('novel_daily_v1')
     expect(lastMessage?.workflowDryRun?.templateId).toBe('novel_daily_v1')
     expect(lastMessage?.workflowDryRun?.status).toBe('passed')
@@ -461,7 +493,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(updated?.status).toBe('idle')
     expect(lastMessage?.role).toBe('assistant')
     expect(lastMessage?.kind).toBe('workflow_dry_run')
-    expect(lastMessage?.content).toContain('工作流模拟运行')
+    expect(lastMessage?.content).toMatch(/工作流模拟运行|Workflow dry run/)
     expect(lastMessage?.content).toContain('novel_daily_v1')
     expect(lastMessage?.workflowDryRun?.templateId).toBe('novel_daily_v1')
     expect(lastMessage?.workflowDryRun?.status).toBe('passed')

@@ -68,6 +68,7 @@ export async function executePiCoreLoop(
   }
 
   let allMessages = input.initialMessages
+  const messageState = { allMessages }
   let shouldStopForElicitation = false
   let reachedMaxIterations = false
   let compressionBaseline: CompressionBaselineState | null = null
@@ -139,10 +140,12 @@ export async function executePiCoreLoop(
               null,
               'context_summary'
             )
-            allMessages = produce(allMessages, (draft) => {
+            const nextMessages = produce(messageState.allMessages, (draft) => {
               draft.push(summaryMessage)
             })
-            input.callbacks?.onMessagesUpdated?.(allMessages)
+            messageState.allMessages = nextMessages
+            allMessages = nextMessages
+            input.callbacks?.onMessagesUpdated?.(nextMessages)
           },
         })
 
@@ -158,7 +161,8 @@ export async function executePiCoreLoop(
 
   const processed = await processPiLoopEvents({
     loop,
-    initialMessages: allMessages,
+    initialMessages: messageState.allMessages,
+    messageState,
     callbacks: input.callbacks,
     maxIterations: input.maxIterations,
     applyAssistantUpdate: applyPiAssistantUpdate,

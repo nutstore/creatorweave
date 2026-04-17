@@ -4,9 +4,18 @@ import type { AssistantMessageEvent as PiAssistantMessageEvent, ToolResultMessag
 import type { AgentCallbacks } from './types'
 import type { Message, ToolCall } from '../message-types'
 
+export interface PiLoopMessageState {
+  allMessages: Message[]
+}
+
 export interface ProcessPiLoopEventsInput {
   loop: AsyncIterable<PiAgentEvent>
   initialMessages: Message[]
+  /**
+   * Optional shared message state synchronized with external message injections
+   * (e.g. context summary emitted during convertToLlm).
+   */
+  messageState?: PiLoopMessageState
   callbacks?: AgentCallbacks
   maxIterations: number
   applyAssistantUpdate: (
@@ -27,10 +36,18 @@ export interface ProcessPiLoopEventsResult {
 export async function processPiLoopEvents(
   input: ProcessPiLoopEventsInput
 ): Promise<ProcessPiLoopEventsResult> {
-  let allMessages = input.initialMessages
+  let allMessages = input.messageState?.allMessages || input.initialMessages
   let assistantMessageCount = 0
   let reachedMaxIterations = false
   let assistantMessageStarted = false
+
+  const getAllMessages = (): Message[] => input.messageState?.allMessages || allMessages
+  const setAllMessages = (messages: Message[]): void => {
+    allMessages = messages
+    if (input.messageState) {
+      input.messageState.allMessages = messages
+    }
+  }
 
   const emittedToolCallSignatures = new Map<string, string>()
   const toolCallIdByIndex = new Map<number, string>()
@@ -108,10 +125,11 @@ export async function processPiLoopEvents(
           break
         }
       }
-      allMessages = produce(allMessages, (draft) => {
+      const nextMessages = produce(getAllMessages(), (draft) => {
         draft.push(mapped)
       })
-      input.callbacks?.onMessagesUpdated?.(allMessages)
+      setAllMessages(nextMessages)
+      input.callbacks?.onMessagesUpdated?.(nextMessages)
       if (mapped.role === 'tool' && mapped.toolCallId) {
         const pending = pendingToolCompletions.get(mapped.toolCallId)
         if (pending) {
@@ -126,5 +144,5 @@ export async function processPiLoopEvents(
     input.callbacks?.onToolCallComplete?.(pending.toolCall, pending.resultText)
   }
 
-  return { allMessages, reachedMaxIterations }
+  return { allMessages: getAllMessages(), reachedMaxIterations }
 }

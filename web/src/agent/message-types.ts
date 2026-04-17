@@ -213,6 +213,10 @@ export interface Conversation {
   mountRefCount?: number
   /** Runtime workflow execution progress (not persisted) */
   workflowExecution?: WorkflowExecutionState | null
+  /** Runtime convert call counter for context compression cadence (not persisted) */
+  compressionConvertCallCount?: number
+  /** Runtime marker for last summary convert call (not persisted) */
+  compressionLastSummaryConvertCall?: number
 }
 
 /** Generate a unique message ID */
@@ -307,5 +311,7 @@ export function createConversation(title?: string): Conversation {
     contextWindowUsage: null,
     lastContextWindowUsage: null,
     mountRefCount: 0,
+    compressionConvertCallCount: 0,
+    compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
   }
 }

@@ -57,6 +57,7 @@ export class AgentLoop {
   private toolExecutionTimeout: number
   private beforeToolCall?: AgentLoopConfig['beforeToolCall']
   private afterToolCall?: AgentLoopConfig['afterToolCall']
+  private onCompressionStateUpdate?: AgentLoopConfig['onCompressionStateUpdate']
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
   private mode: AgentMode
@@ -76,7 +77,11 @@ export class AgentLoop {
     this.toolExecutionTimeout = config.toolExecutionTimeout || DEFAULT_TOOL_TIMEOUT
     this.beforeToolCall = config.beforeToolCall
     this.afterToolCall = config.afterToolCall
+    this.onCompressionStateUpdate = config.onCompressionStateUpdate
     this.mode = config.mode || 'act'
+    this.convertCallCount = config.initialConvertCallCount ?? 0
+    this.lastSummaryConvertCall =
+      config.initialLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY
     this.contextManager.setSystemPrompt(this.baseSystemPrompt)
   }
 
@@ -151,6 +156,10 @@ export class AgentLoop {
       reachedMaxIterations = result.reachedMaxIterations
       this.convertCallCount = result.convertCallCount
       this.lastSummaryConvertCall = result.lastSummaryConvertCall
+      this.onCompressionStateUpdate?.({
+        convertCallCount: this.convertCallCount,
+        lastSummaryConvertCall: this.lastSummaryConvertCall,
+      })
     } catch (error) {
       if (signal.aborted) {
         callbacks?.onComplete?.(allMessages)

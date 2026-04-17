@@ -441,6 +441,8 @@ async function loadConversations(): Promise<Conversation[]> {
     contextWindowUsage: conv.lastContextWindowUsage || null,
     lastContextWindowUsage: conv.lastContextWindowUsage || null,
     mountRefCount: 0,
+    compressionConvertCallCount: 0,
+    compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
     // Runtime state - read from workspace-preferences (workspace-level isolation)
     agentMode: getCurrentWorkspaceAgentMode(),
   }))
@@ -797,6 +799,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             contextWindowUsage: conv.lastContextWindowUsage || null,
             lastContextWindowUsage: conv.lastContextWindowUsage || null,
             mountRefCount: 0,
+            compressionConvertCallCount: conv.compressionConvertCallCount ?? 0,
+            compressionLastSummaryConvertCall:
+              conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
           }))
           state.activeConversationId = activeId
           state.loaded = true
@@ -1779,6 +1784,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             workflowProgress: workflowProgressHooks,
           },
           maxIterations,
+          initialConvertCallCount: conv.compressionConvertCallCount ?? 0,
+          initialLastSummaryConvertCall:
+            conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
+          onCompressionStateUpdate: (compressionState) => {
+            if (!isCurrentRun()) return
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (!c || c.activeRunId !== runId) return
+              c.compressionConvertCallCount = compressionState.convertCallCount
+              c.compressionLastSummaryConvertCall = compressionState.lastSummaryConvertCall
+            })
+          },
           beforeToolCall: toolPolicyHooks.beforeToolCall,
           afterToolCall: async (context) => {
             if (context.isError) return undefined
