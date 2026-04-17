@@ -1789,9 +1789,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
         }
         const configuredMaxIterations = useSettingsStore.getState().maxIterations
-        const maxIterations = Number.isFinite(configuredMaxIterations)
-          ? Math.max(1, Math.min(100, Math.floor(configuredMaxIterations)))
-          : 20
+        const maxIterations =
+          configuredMaxIterations === 0
+            ? 0
+            : Number.isFinite(configuredMaxIterations)
+              ? Math.max(1, Math.min(100, Math.floor(configuredMaxIterations)))
+              : 20
 
         const agentMode = getCurrentWorkspaceAgentMode()
 

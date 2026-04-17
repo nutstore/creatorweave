@@ -248,7 +248,10 @@ export const useSettingsStore = create<SettingsState>()(
       setMaxTokens: (maxTokens) => set({ maxTokens }),
       setMaxIterations: (maxIterations) =>
         set({
-          maxIterations: Math.max(1, Math.min(100, Math.round(maxIterations))),
+          maxIterations:
+            maxIterations === 0
+              ? 0
+              : Math.max(1, Math.min(100, Math.round(maxIterations))),
         }),
       setEnableThinking: (enableThinking) => set({ enableThinking }),
       setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),

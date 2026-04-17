@@ -804,16 +804,37 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-primary">{t('settings.maxIterations')}</label>
-                <span className="text-sm text-secondary">{maxIterations}</span>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-medium tabular-nums ${
+                      maxIterations === 0 ? 'text-brand-500' : 'text-secondary'
+                    }`}
+                  >
+                    {maxIterations === 0 ? '∞' : maxIterations}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] text-tertiary">{t('settings.maxIterationsUnlimited')}</span>
+                    <BrandSwitch
+                      checked={maxIterations === 0}
+                      onCheckedChange={(checked) => setMaxIterations(checked ? 0 : 20)}
+                    />
+                  </div>
+                </div>
               </div>
-              <BrandSlider
-                value={[maxIterations]}
-                onValueChange={handleMaxIterationsChange}
-                min={1}
-                max={100}
-                step={1}
-              />
-              <p className="text-[10px] text-tertiary">{t('settings.maxIterationsHint')}</p>
+              {maxIterations !== 0 && (
+                <BrandSlider
+                  value={[maxIterations]}
+                  onValueChange={handleMaxIterationsChange}
+                  min={1}
+                  max={100}
+                  step={1}
+                />
+              )}
+              <p className="text-[10px] text-tertiary">
+                {maxIterations === 0
+                  ? t('settings.maxIterationsUnlimitedHint')
+                  : t('settings.maxIterationsHint')}
+              </p>
             </div>
 
             {/* Thinking Mode */}
