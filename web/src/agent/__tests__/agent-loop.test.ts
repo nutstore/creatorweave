@@ -1050,5 +1050,32 @@ describe('AgentLoop', () => {
       expect(callbacks.onComplete).toHaveBeenCalledOnce()
       expect(onLoopComplete).toHaveBeenCalledOnce()
     })
+
+    it('treats maxIterations=0 as unlimited in Pi loop', async () => {
+      mockAgentLoopContinue.mockImplementation(() => {
+        return (async function* () {
+          for (let i = 1; i <= 25; i += 1) {
+            yield { type: 'message_end', message: assistantMessage(String(i)) }
+          }
+        })()
+      })
+
+      const loop = new AgentLoop({
+        provider: mockProvider,
+        toolRegistry: mockTools,
+        contextManager: mockContextManager,
+        toolContext: createMockToolContext(),
+        maxIterations: 0,
+      })
+
+      const callbacks = {
+        onIterationLimitReached: vi.fn(),
+        onComplete: vi.fn(),
+      }
+      const result = await loop.run([createUserMessage('test')], callbacks)
+      expect(result.filter((m) => m.role === 'assistant')).toHaveLength(25)
+      expect(callbacks.onIterationLimitReached).not.toHaveBeenCalled()
+      expect(callbacks.onComplete).toHaveBeenCalledOnce()
+    })
   })
 })

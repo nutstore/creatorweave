@@ -120,7 +120,8 @@ export async function processPiLoopEvents(
       }
       if (mapped.role === 'assistant') {
         assistantMessageCount++
-        if (assistantMessageCount > input.maxIterations) {
+        const hasIterationLimit = input.maxIterations > 0
+        if (hasIterationLimit && assistantMessageCount > input.maxIterations) {
           console.warn('[#LoopStop] max_iterations_reached', {
             assistantMessageCount,
             maxIterations: input.maxIterations,

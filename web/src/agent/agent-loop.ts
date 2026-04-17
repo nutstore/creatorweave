@@ -70,7 +70,7 @@ export class AgentLoop {
     if (!this.toolContext.readFileState) {
       this.toolContext.readFileState = new Map()
     }
-    this.maxIterations = config.maxIterations || MAX_ITERATIONS
+    this.maxIterations = config.maxIterations ?? MAX_ITERATIONS
     this.baseSystemPrompt = config.systemPrompt || DEFAULT_SYSTEM_PROMPT
     this.sessionId = config.sessionId
     this.onLoopComplete = config.onLoopComplete

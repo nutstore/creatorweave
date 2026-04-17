@@ -38,4 +38,58 @@ describe('process-loop-events', () => {
     expect(result.allMessages).toHaveLength(2)
     expect(result.reachedMaxIterations).toBe(false)
   })
+
+  it('treats maxIterations=0 as unlimited', async () => {
+    let nextId = 1
+    async function* events() {
+      yield {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '1' }],
+          usage: { input: 1, output: 1, totalTokens: 2 },
+          timestamp: Date.now(),
+        },
+      }
+      yield {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '2' }],
+          usage: { input: 1, output: 1, totalTokens: 2 },
+          timestamp: Date.now(),
+        },
+      }
+      yield {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: '3' }],
+          usage: { input: 1, output: 1, totalTokens: 2 },
+          timestamp: Date.now(),
+        },
+      }
+    }
+
+    const result = await processPiLoopEvents({
+      loop: events() as never,
+      initialMessages: [{ id: 'u1', role: 'user', content: 'hi', timestamp: Date.now() }],
+      callbacks: {} as never,
+      maxIterations: 0,
+      applyAssistantUpdate: applyPiAssistantUpdate,
+      mapPiToInternal: (message) =>
+        ({
+          id: `a-${nextId++}`,
+          role: message.role,
+          content:
+            (message as { content?: Array<{ type?: string; text?: string }> }).content?.[0]?.text ||
+            'done',
+          timestamp: Date.now(),
+        }) as never,
+      extractTextContent: () => null,
+    })
+
+    expect(result.allMessages.filter((m) => m.role === 'assistant')).toHaveLength(3)
+    expect(result.reachedMaxIterations).toBe(false)
+  })
 })
