@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
 import { readExecutor } from '../io.tool'
 
-const readFileMock = vi.fn<
-  (
-    path: string,
-    directoryHandle?: FileSystemDirectoryHandle | null,
-    workspaceId?: string | null
-  ) => Promise<{ content: string | ArrayBuffer; metadata: { size: number; contentType: string } }>
->()
+const readFileMock =
+  vi.fn<
+    (
+      path: string,
+      directoryHandle?: FileSystemDirectoryHandle | null,
+      workspaceId?: string | null
+    ) => Promise<{ content: string | ArrayBuffer; metadata: { size: number; contentType: string } }>
+  >()
 const getNativeDirectoryHandleMock = vi.fn<() => Promise<FileSystemDirectoryHandle | null>>()
 const getActiveConversationMock = vi.fn()
 
@@ -101,8 +102,14 @@ describe('io read tool', () => {
   it('supports advanced batch reads with per-file ranges', async () => {
     readFileMock.mockReset()
     readFileMock
-      .mockResolvedValueOnce({ content: 'a1\na2\na3\na4', metadata: { size: 11, contentType: 'text' } })
-      .mockResolvedValueOnce({ content: 'line1\nline2\nline3', metadata: { size: 17, contentType: 'text' } })
+      .mockResolvedValueOnce({
+        content: 'a1\na2\na3\na4',
+        metadata: { size: 11, contentType: 'text' },
+      })
+      .mockResolvedValueOnce({
+        content: 'line1\nline2\nline3',
+        metadata: { size: 17, contentType: 'text' },
+      })
 
     const result = await readExecutor(
       {
@@ -135,10 +142,42 @@ describe('io read tool', () => {
     expect(error.details.maxSize).toBe(5)
   })
 
+  it('keeps character safety limit even when max_size is provided', async () => {
+    const oversizedText = 'x'.repeat(100_001)
+    readFileMock.mockResolvedValueOnce({
+      content: oversizedText,
+      metadata: { size: oversizedText.length, contentType: 'text' },
+    })
+
+    const result = await readExecutor({ path: 'huge.txt', max_size: 200_000 }, context)
+    const error = unwrapError(result)
+    expect(error.code).toBe('content_too_large')
+    expect(error.message).toContain('safety limit')
+  })
+
+  it('allows range read from large file when sliced output is under safety limit', async () => {
+    const line = 'x'.repeat(1000)
+    const largeMultiLine = Array.from({ length: 150 }, () => line).join('\n')
+    readFileMock.mockResolvedValueOnce({
+      content: largeMultiLine,
+      metadata: { size: largeMultiLine.length, contentType: 'text' },
+    })
+
+    const result = await readExecutor(
+      { path: 'large.txt', start_line: 1, line_count: 1, max_size: largeMultiLine.length + 1024 },
+      context
+    )
+    const data = unwrapOk(result)
+    expect(data.kind).toBe('text')
+    expect(data.content).toBe(line)
+  })
+
   it('falls back to native directory when file is missing in OPFS workspace and syncs via read cache', async () => {
     const nativeHandle = {} as FileSystemDirectoryHandle
     readFileMock
-      .mockRejectedValueOnce(new Error('File not found in OPFS workspace: src/components/agent/ConversationView.tsx'))
+      .mockRejectedValueOnce(
+        new Error('File not found in OPFS workspace: src/components/agent/ConversationView.tsx')
+      )
       .mockResolvedValueOnce({
         content: 'export const ConversationView = () => null',
         metadata: { size: 40, contentType: 'text' },
@@ -151,7 +190,10 @@ describe('io read tool', () => {
       conversationId: 'conv_1',
     })
 
-    const result = await readExecutor({ path: 'src/components/agent/ConversationView.tsx' }, { directoryHandle: null })
+    const result = await readExecutor(
+      { path: 'src/components/agent/ConversationView.tsx' },
+      { directoryHandle: null }
+    )
     const data = unwrapOk(result)
     expect(data.content).toBe('export const ConversationView = () => null')
     expect(getNativeDirectoryHandleMock).toHaveBeenCalledOnce()

@@ -127,7 +127,8 @@ export const readExecutor: ToolExecutor = async (args, context) => {
     lineCount: args.line_count as number | undefined,
   }
 
-  const modeCount = Number(Boolean(path)) + Number(Boolean(paths?.length)) + Number(Boolean(reads?.length))
+  const modeCount =
+    Number(Boolean(path)) + Number(Boolean(paths?.length)) + Number(Boolean(reads?.length))
   if (modeCount !== 1) {
     return toolErrorJson('read', 'invalid_arguments', 'Provide exactly one of: path, paths, reads')
   }
@@ -139,7 +140,11 @@ export const readExecutor: ToolExecutor = async (args, context) => {
 
   // Batch mode: multiple files
   if (paths && Array.isArray(paths) && paths.length > 0) {
-    return executeBatchRead(paths.map((p) => ({ path: p })), maxSize, context)
+    return executeBatchRead(
+      paths.map((p) => ({ path: p })),
+      maxSize,
+      context
+    )
   }
 
   if (reads && Array.isArray(reads) && reads.length > 0) {
@@ -151,7 +156,12 @@ export const readExecutor: ToolExecutor = async (args, context) => {
         startLine: read.start_line,
         lineCount: read.line_count,
       })
-      if (err) return toolErrorJson('read', 'invalid_arguments', `Invalid reads for "${read.path}": ${err}`)
+      if (err)
+        return toolErrorJson(
+          'read',
+          'invalid_arguments',
+          `Invalid reads for "${read.path}": ${err}`
+        )
     }
     return executeBatchRead(reads, maxSize, context)
   }
@@ -187,7 +197,12 @@ async function executeSingleRead(
 
     // Loop guard: check consecutive read counter before reading
     resolvedPathForLoopGuard = getResolvedPathForLoopGuard(target)
-    loopCheckResult = checkReadLoop(context, resolvedPathForLoopGuard, options.startLine ?? 1, options.lineCount ?? 0)
+    loopCheckResult = checkReadLoop(
+      context,
+      resolvedPathForLoopGuard,
+      options.startLine ?? 1,
+      options.lineCount ?? 0
+    )
     if (loopCheckResult.isBlocked) {
       return toolErrorJson(
         'read',
@@ -218,33 +233,34 @@ async function executeSingleRead(
           { details: { path, fileSize: size, maxSize } }
         )
       }
-      // Safety limit: prevent huge content from overflowing context
-      const sizeLimitCheck = checkContentSizeLimit(content, size, content.split('\n').length)
-      if (!sizeLimitCheck.ok) {
-        return toolErrorJson(
-          'read',
-          'content_too_large',
-          sizeLimitCheck.error,
-          {
-            details: { totalLines: sizeLimitCheck.totalLines },
-            hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
-          }
-        )
-      }
+      const totalLines = content.split('\n').length
       const rendered = applyTextRange(content, options)
+      // Safety limit: cap the actual payload returned to the model.
+      // For range reads, validate the sliced content instead of full file text.
+      const sizeLimitCheck = checkContentSizeLimit(rendered, size, totalLines)
+      if (!sizeLimitCheck.ok) {
+        return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+          details: { totalLines: sizeLimitCheck.totalLines },
+          hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+        })
+      }
       readFileState.set(readStateKey, buildReadStateEntry(rendered, options))
       // Agent reads don't have real filesystem mtime — use wall clock as approximation
       recordReadMtime(context, loopCheckResult!.dedupKey, Date.now(), size)
-      return toolOkJson('read', {
-        path,
-        kind: 'text',
-        content: rendered,
-        metadata: { size, contentType: 'text' },
-        range: {
-          start_line: options.startLine,
-          line_count: options.lineCount,
+      return toolOkJson(
+        'read',
+        {
+          path,
+          kind: 'text',
+          content: rendered,
+          metadata: { size, contentType: 'text' },
+          range: {
+            start_line: options.startLine,
+            line_count: options.lineCount,
+          },
         },
-      }, buildMeta({ source: 'agent' }))
+        buildMeta({ source: 'agent' })
+      )
     }
 
     const result = await readFile(target.path, context.directoryHandle, context.workspaceId)
@@ -259,33 +275,33 @@ async function executeSingleRead(
     }
 
     if (typeof content === 'string') {
-      // Safety limit: prevent huge content from overflowing context
-      const sizeLimitCheck = checkContentSizeLimit(content, metadata.size, content.split('\n').length)
-      if (!sizeLimitCheck.ok) {
-        return toolErrorJson(
-          'read',
-          'content_too_large',
-          sizeLimitCheck.error,
-          {
-            details: { totalLines: sizeLimitCheck.totalLines },
-            hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
-          }
-        )
-      }
+      const totalLines = content.split('\n').length
       const formatted = applyTextRange(content, options)
+      // Safety limit: cap the actual payload returned to the model.
+      const sizeLimitCheck = checkContentSizeLimit(formatted, metadata.size, totalLines)
+      if (!sizeLimitCheck.ok) {
+        return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+          details: { totalLines: sizeLimitCheck.totalLines },
+          hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+        })
+      }
       readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
       // Record mtime for future dedup — OPFS returns metadata.mtime
       recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
-      return toolOkJson('read', {
-        path,
-        kind: 'text',
-        content: formatted,
-        metadata: { size: metadata.size, contentType: metadata.contentType },
-        range: {
-          start_line: options.startLine,
-          line_count: options.lineCount,
+      return toolOkJson(
+        'read',
+        {
+          path,
+          kind: 'text',
+          content: formatted,
+          metadata: { size: metadata.size, contentType: metadata.contentType },
+          range: {
+            start_line: options.startLine,
+            line_count: options.lineCount,
+          },
         },
-      }, buildMeta({ source: 'workspace' }))
+        buildMeta({ source: 'workspace' })
+      )
     }
 
     if (hasRangeOptions(options)) {
@@ -297,12 +313,16 @@ async function executeSingleRead(
       )
     }
     const base64 = await encodeBinaryContentAsBase64(content)
-    return toolOkJson('read', {
-      path,
-      kind: 'binary_base64',
-      content: base64,
-      metadata: { size: metadata.size, contentType: metadata.contentType },
-    }, buildMeta({ source: 'workspace' }))
+    return toolOkJson(
+      'read',
+      {
+        path,
+        kind: 'binary_base64',
+        content: base64,
+        metadata: { size: metadata.size, contentType: metadata.contentType },
+      },
+      buildMeta({ source: 'workspace' })
+    )
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
       try {
@@ -327,36 +347,36 @@ async function executeSingleRead(
             )
           }
           if (typeof content === 'string') {
-            // Safety limit: prevent huge content from overflowing context
-            const sizeLimitCheck = checkContentSizeLimit(content, metadata.size, content.split('\n').length)
-            if (!sizeLimitCheck.ok) {
-              return toolErrorJson(
-                'read',
-                'content_too_large',
-                sizeLimitCheck.error,
-                {
-                  details: { totalLines: sizeLimitCheck.totalLines },
-                  hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
-                }
-              )
-            }
+            const totalLines = content.split('\n').length
             const formatted = applyTextRange(content, options)
+            // Safety limit: cap the actual payload returned to the model.
+            const sizeLimitCheck = checkContentSizeLimit(formatted, metadata.size, totalLines)
+            if (!sizeLimitCheck.ok) {
+              return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+                details: { totalLines: sizeLimitCheck.totalLines },
+                hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+              })
+            }
             readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
             // Record mtime for future dedup
             recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
-            return toolOkJson('read', {
-              path,
-              kind: 'text',
-              content: formatted,
-              metadata: { size: metadata.size, contentType: metadata.contentType },
-              range: {
-                start_line: options.startLine,
-                line_count: options.lineCount,
+            return toolOkJson(
+              'read',
+              {
+                path,
+                kind: 'text',
+                content: formatted,
+                metadata: { size: metadata.size, contentType: metadata.contentType },
+                range: {
+                  start_line: options.startLine,
+                  line_count: options.lineCount,
+                },
               },
-            }, {
-              ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
-              source: 'native_fallback',
-            })
+              {
+                ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
+                source: 'native_fallback',
+              }
+            )
           }
           if (hasRangeOptions(options)) {
             return toolErrorJson(
@@ -367,15 +387,19 @@ async function executeSingleRead(
             )
           }
           const base64 = await encodeBinaryContentAsBase64(content)
-          return toolOkJson('read', {
-            path,
-            kind: 'binary_base64',
-            content: base64,
-            metadata: { size: metadata.size, contentType: metadata.contentType },
-          }, {
-            ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
-            source: 'native_fallback',
-          })
+          return toolOkJson(
+            'read',
+            {
+              path,
+              kind: 'binary_base64',
+              content: base64,
+              metadata: { size: metadata.size, contentType: metadata.contentType },
+            },
+            {
+              ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
+              source: 'native_fallback',
+            }
+          )
         }
       } catch (fallbackError) {
         // eslint-disable-next-line no-ex-assign -- intentionally propagates to outer error handler
@@ -424,8 +448,7 @@ async function executeBatchRead(
       message: string
     }
     metadata?: unknown
-  }> =
-    []
+  }> = []
   let successCount = 0
   let errorCount = 0
 
@@ -455,15 +478,21 @@ async function executeBatchRead(
           continue
         }
 
-        // Safety limit: prevent huge content from overflowing context
-        const sizeLimitCheck = checkContentSizeLimit(agentContent, size, agentContent.split('\n').length)
+        const totalLines = agentContent.split('\n').length
+        const rendered = applyTextRange(agentContent, {
+          startLine: read.start_line,
+          lineCount: read.line_count,
+        })
+        // Safety limit: cap the actual payload returned to the model.
+        const sizeLimitCheck = checkContentSizeLimit(rendered, size, totalLines)
         if (!sizeLimitCheck.ok) {
           results.push({
             path: filePath,
             success: false,
             error: {
               code: 'content_too_large',
-              message: sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+              message:
+                sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
             },
             metadata: { size, contentType: 'text' },
           })
@@ -471,10 +500,6 @@ async function executeBatchRead(
           continue
         }
 
-        const rendered = applyTextRange(agentContent, {
-          startLine: read.start_line,
-          lineCount: read.line_count,
-        })
         results.push({
           path: filePath,
           success: true,
@@ -522,10 +547,12 @@ async function executeBatchRead(
       }
 
       if (typeof content !== 'string') {
-        if (hasRangeOptions({
-          startLine: read.start_line,
-          lineCount: read.line_count,
-        })) {
+        if (
+          hasRangeOptions({
+            startLine: read.start_line,
+            lineCount: read.line_count,
+          })
+        ) {
           results.push({
             path: filePath,
             success: false,
@@ -550,8 +577,13 @@ async function executeBatchRead(
         continue
       }
 
-      // Safety limit: prevent huge content from overflowing context
-      const sizeLimitCheck = checkContentSizeLimit(content, metadata.size, content.split('\n').length)
+      const totalLines = content.split('\n').length
+      const rendered = applyTextRange(content, {
+        startLine: read.start_line,
+        lineCount: read.line_count,
+      })
+      // Safety limit: cap the actual payload returned to the model.
+      const sizeLimitCheck = checkContentSizeLimit(rendered, metadata.size, totalLines)
       if (!sizeLimitCheck.ok) {
         results.push({
           path: filePath,
@@ -566,10 +598,6 @@ async function executeBatchRead(
         continue
       }
 
-      const rendered = applyTextRange(content, {
-        startLine: read.start_line,
-        lineCount: read.line_count,
-      })
       results.push({
         path: filePath,
         success: true,
@@ -736,7 +764,11 @@ export const writeExecutor: ToolExecutor = async (args, context) => {
 
   // Single file mode
   if (!path || content === undefined) {
-    return toolErrorJson('write', 'invalid_arguments', 'Either (path + content) or files must be provided')
+    return toolErrorJson(
+      'write',
+      'invalid_arguments',
+      'Either (path + content) or files must be provided'
+    )
   }
   return executeSingleWrite(path, content, context)
 }
@@ -761,10 +793,9 @@ async function executeSingleWrite(
           context.workspaceId
         )
         if (nativeHandle) {
-          const fileHandle = await nativeHandle.getFileHandle(
-            target.path.split('/').pop()!,
-            { create: false }
-          ).catch(() => null)
+          const fileHandle = await nativeHandle
+            .getFileHandle(target.path.split('/').pop()!, { create: false })
+            .catch(() => null)
           if (fileHandle) {
             // getFile() returns a File object with lastModified
             const file = await fileHandle.getFile()
@@ -820,14 +851,18 @@ async function executeSingleWrite(
     // Refresh timestamp after successful write to avoid false staleness on consecutive edits
     refreshReadTimestamp(context, resolvedPath, Date.now())
 
-    return toolOkJson('write', {
-      path,
-      action: isNew ? 'create' : 'modify',
-      size: content.length,
-      status,
-      pendingCount,
-      message,
-    }, buildMeta())
+    return toolOkJson(
+      'write',
+      {
+        path,
+        action: isNew ? 'create' : 'modify',
+        size: content.length,
+        status,
+        pendingCount,
+        message,
+      },
+      buildMeta()
+    )
   } catch (error) {
     return toolErrorJson(
       'write',
@@ -838,12 +873,13 @@ async function executeSingleWrite(
   }
 }
 
-async function executeBatchWrite(
-  files: FileItem[],
-  context: ToolContext
-): Promise<string> {
+async function executeBatchWrite(files: FileItem[], context: ToolContext): Promise<string> {
   const { writeFile, getPendingChanges, hasCachedFile } = useOPFSStore.getState()
-  const results: Array<{ path: string; success: boolean; error?: { code: string; message: string } }> = []
+  const results: Array<{
+    path: string
+    success: boolean
+    error?: { code: string; message: string }
+  }> = []
   let created = 0
   let updated = 0
   let hasWorkspaceWrites = false
@@ -861,10 +897,9 @@ async function executeBatchWrite(
       // Staleness check (best-effort)
       if (target.kind === 'workspace') {
         try {
-          const fileHandle = await writeDirectoryHandle?.getFileHandle(
-            target.path.split('/').pop()!,
-            { create: false }
-          ).catch(() => null)
+          const fileHandle = await writeDirectoryHandle
+            ?.getFileHandle(target.path.split('/').pop()!, { create: false })
+            .catch(() => null)
           if (fileHandle) {
             // getFile() returns a File object with lastModified
             const file = await fileHandle.getFile()
@@ -918,7 +953,11 @@ async function executeBatchWrite(
   const pendingChanges = getPendingChanges()
   const session = useRemoteStore.getState().session
   if (session) {
-    session.broadcastFileChange('batch', 'modify', `Batch write: ${created} created, ${updated} updated`)
+    session.broadcastFileChange(
+      'batch',
+      'modify',
+      `Batch write: ${created} created, ${updated} updated`
+    )
   }
 
   return toolOkJson('write', {

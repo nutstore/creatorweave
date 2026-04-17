@@ -158,7 +158,12 @@ export function checkReadLoop(
 /**
  * Record mtime after a successful read (for future dedup and stale-file detection).
  */
-export function recordReadMtime(context: ToolContext, dedupKey: string, mtime: number, _contentLength: number): void {
+export function recordReadMtime(
+  context: ToolContext,
+  dedupKey: string,
+  mtime: number,
+  _contentLength: number
+): void {
   const state = getState(context)
   state.dedup.set(dedupKey, { mtime, contentLength: _contentLength })
   state.readTimestamps.set(dedupKey, mtime)
@@ -170,7 +175,11 @@ export function recordReadMtime(context: ToolContext, dedupKey: string, mtime: n
  *
  * @returns Warning string if file is stale, null if fresh or never read
  */
-export function checkFileStaleness(context: ToolContext, resolvedPath: string, currentMtime?: number): string | null {
+export function checkFileStaleness(
+  context: ToolContext,
+  resolvedPath: string,
+  currentMtime?: number
+): string | null {
   const state = getState(context)
   const recordedMtime = state.readTimestamps.get(resolvedPath)
   if (recordedMtime === undefined) return null // Never read
@@ -189,7 +198,11 @@ export function checkFileStaleness(context: ToolContext, resolvedPath: string, c
  * Refresh stored timestamp after a successful write (so consecutive edits by the
  * same agent don't trigger false staleness warnings).
  */
-export function refreshReadTimestamp(context: ToolContext, resolvedPath: string, mtime: number): void {
+export function refreshReadTimestamp(
+  context: ToolContext,
+  resolvedPath: string,
+  mtime: number
+): void {
   const state = getState(context)
   state.readTimestamps.set(resolvedPath, mtime)
 }
@@ -285,11 +298,7 @@ export function checkContentSizeLimit(
   totalLines?: number
 ): { ok: true } | { ok: false; error: string; totalLines?: number; suggestedMaxSize: number } {
   if (content.length > MAX_READ_CHARS) {
-    // Suggest a max_size that is 2x the actual file size, rounded up to nearest 1MB
-    const suggestedMaxSize = Math.max(
-      Math.ceil(_fileSize * 2 / 1_048_576) * 1_048_576,
-      1_048_576
-    )
+    const suggestedMaxSize = Math.max(Math.ceil((_fileSize * 2) / 1_048_576) * 1_048_576, 1_048_576)
     return {
       ok: false,
       error:
