@@ -6,7 +6,16 @@
  */
 
 import { Fragment, useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, StopCircle, MessageSquare, ChevronDown, Plus, Trash2, Check, Brain } from 'lucide-react'
+import {
+  Send,
+  StopCircle,
+  MessageSquare,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Check,
+  Brain,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
@@ -135,7 +144,16 @@ export function ConversationView({
   const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
   const editAndResendUserMessage = useConversationStore((s) => s.editAndResendUserMessage)
 
-  const { providerType, modelName, maxTokens, hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel } = useSettingsStore()
+  const {
+    providerType,
+    modelName,
+    maxTokens,
+    hasApiKey,
+    enableThinking,
+    thinkingLevel,
+    setEnableThinking,
+    setThinkingLevel,
+  } = useSettingsStore()
   const { agentMode, setAgentMode } = useWorkspacePreferencesStore()
   const t = useT()
 
@@ -279,9 +297,7 @@ export function ConversationView({
 
     // StrictMode in dev can re-run mount effects. If the same initial message
     // has already been appended to this conversation, do not send it again.
-    const currentConv = useConversationStore
-      .getState()
-      .conversations.find((c) => c.id === convId)
+    const currentConv = useConversationStore.getState().conversations.find((c) => c.id === convId)
     const lastMessage = currentConv?.messages[currentConv.messages.length - 1]
     if (lastMessage?.role === 'user' && lastMessage.content === initialMessage) {
       initialMessageHandled.current = true
@@ -423,9 +439,7 @@ export function ConversationView({
           const reasoning = draft?.reasoning || activeStreamingState.streamingReasoning
           const content = draft?.content || activeStreamingState.streamingContent
           if (!reasoning && !content) return undefined
-          const lastAssistant = [...activeMessages]
-            .reverse()
-            .find((m) => m.role === 'assistant')
+          const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant')
           if (
             lastAssistant &&
             (lastAssistant.reasoning || '') === (reasoning || '') &&
@@ -535,19 +549,18 @@ export function ConversationView({
     }
 
     return -1
-  }, [activeWorkflowExecution, activeDraftAssistant, activeStreamingState, activeMessages, isProcessing, turns])
-  // Render draft assistant loading when:
-  // 1. Processing AND (no last turn OR last turn is not assistant)
-  // 2. OR processing AND last turn is assistant but we're in pending/tool_calling state (meaning new loop iteration)
-  const shouldRenderDraftAssistant = isProcessing && (
-    !lastTurn ||
-    lastTurn.type !== 'assistant' ||
-    status === 'pending' ||
-    status === 'tool_calling'
-  )
-  const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant && (
-    !lastTurn || lastTurn.type !== 'assistant'
-  )
+  }, [
+    activeWorkflowExecution,
+    activeDraftAssistant,
+    activeStreamingState,
+    activeMessages,
+    isProcessing,
+    turns,
+  ])
+  // Render draft assistant bubble only when there is no committed assistant turn yet.
+  // If last turn is already assistant, attach runtime/waiting state to that turn.
+  const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
+  const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant
   const isWaitingForModel =
     status === 'pending' ||
     (status === 'tool_calling' &&
@@ -562,9 +575,15 @@ export function ConversationView({
       return { text: 'text-red-600 dark:text-red-400', label: t('conversation.usage.highRisk') }
     }
     if (usagePercent >= 85) {
-      return { text: 'text-amber-600 dark:text-amber-400', label: t('conversation.usage.nearLimit') }
+      return {
+        text: 'text-amber-600 dark:text-amber-400',
+        label: t('conversation.usage.nearLimit'),
+      }
     }
-    return { text: 'text-emerald-600 dark:text-emerald-400', label: t('conversation.usage.comfortable') }
+    return {
+      text: 'text-emerald-600 dark:text-emerald-400',
+      label: t('conversation.usage.comfortable'),
+    }
   }
 
   const usageTone = contextWindowUsage ? getUsageToneClass(contextWindowUsage.usagePercent) : null
@@ -616,7 +635,7 @@ export function ConversationView({
 
         {/* Processing indicator */}
         {isProcessing && (
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500 dark:bg-primary-400" />
+          <span className="dark:bg-primary-400 h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500" />
         )}
       </div>
     )
@@ -655,62 +674,114 @@ export function ConversationView({
           ) : (
             <div className="min-h-0 px-4 py-4">
               <div className="mx-auto w-full max-w-3xl space-y-4">
-              {turns.map((turn, idx) => {
-                const shouldAttachRuntimeToTurn =
-                  isProcessing && idx === turns.length - 1
-                const hasCompressionRuntime =
-                  shouldAttachRuntimeToTurn &&
-                  !!activeDraftAssistant?.steps?.some((step) => step.type === 'compression')
+                {turns.map((turn, idx) => {
+                  const shouldAttachRuntimeToTurn = isProcessing && idx === turns.length - 1
 
-                return turn.type === 'user' ? (
-                  <MessageBubble
-                    key={turn.message.id}
-                    message={turn.message}
-                    onDeleteAgentLoop={handleDeleteAgentLoop}
-                    onEditAndResend={handleEditAndResend}
-                    onRegenerate={
-                      convId ? (userMessageId: string) => regenerateUserMessage(convId, userMessageId) : undefined
-                    }
-                    onCancel={handleCancel}
-                    disableDeleteActions={isProcessing}
-                    isProcessing={isProcessing}
-                  />
-                ) : (
-                  <Fragment key={turn.messages[0].id}>
-                    <AssistantTurnBubble
-                      turn={turn}
-                      toolResults={toolResults}
-                      showAvatar={!hasCompressionRuntime}
-                      isProcessing={isProcessing}
-                      isWaiting={false}
-                      streamingState={
-                        // Only pass runtime streaming state to the single active bubble.
-                        shouldAttachRuntimeToTurn ? streamingState : undefined
+                  return turn.type === 'user' ? (
+                    <MessageBubble
+                      key={turn.message.id}
+                      message={turn.message}
+                      onDeleteAgentLoop={handleDeleteAgentLoop}
+                      onEditAndResend={handleEditAndResend}
+                      onRegenerate={
+                        convId
+                          ? (userMessageId: string) => regenerateUserMessage(convId, userMessageId)
+                          : undefined
                       }
+                      onCancel={handleCancel}
+                      disableDeleteActions={isProcessing}
+                      isProcessing={isProcessing}
+                    />
+                  ) : (
+                    <Fragment key={turn.messages[0].id}>
+                      <AssistantTurnBubble
+                        turn={turn}
+                        toolResults={toolResults}
+                        isProcessing={isProcessing}
+                        isWaiting={shouldAttachRuntimeToTurn ? isWaitingForModel : false}
+                        streamingState={
+                          // Only pass runtime streaming state to the single active bubble.
+                          shouldAttachRuntimeToTurn ? streamingState : undefined
+                        }
+                        streamingContent={
+                          shouldAttachRuntimeToTurn ? streamingContentMessage : undefined
+                        }
+                        currentToolCall={
+                          shouldAttachRuntimeToTurn && status === 'tool_calling'
+                            ? activeStreamingState?.currentToolCall
+                            : undefined
+                        }
+                        streamingToolArgs={
+                          shouldAttachRuntimeToTurn && status === 'tool_calling'
+                            ? activeStreamingState?.streamingToolArgs
+                            : undefined
+                        }
+                        streamingToolArgsByCallId={
+                          shouldAttachRuntimeToTurn
+                            ? activeStreamingState?.streamingToolArgsByCallId
+                            : undefined
+                        }
+                        runtimeToolCalls={
+                          shouldAttachRuntimeToTurn ? activeDraftAssistant?.toolCalls : undefined
+                        }
+                        runtimeSteps={
+                          shouldAttachRuntimeToTurn ? activeDraftAssistant?.steps : undefined
+                        }
+                        workflowProgress={
+                          activeWorkflowExecution && idx === workflowProgressAnchorTurnIndex ? (
+                            <WorkflowExecutionProgress
+                              execution={activeWorkflowExecution}
+                              onStop={handleCancel}
+                            />
+                          ) : undefined
+                        }
+                      />
+                    </Fragment>
+                  )
+                })}
+
+                {/* Draft assistant turn while waiting for current run's first committed assistant message */}
+                {shouldRenderDraftAssistant && (
+                  <Fragment>
+                    <AssistantTurnBubble
+                      key="draft-assistant"
+                      turn={{
+                        type: 'assistant',
+                        messages: [],
+                        timestamp: Date.now(),
+                        totalUsage: null,
+                      }}
+                      toolResults={toolResults}
+                      showAvatar={false}
+                      isProcessing={true}
+                      isWaiting={isWaitingForModel}
+                      streamingState={shouldAttachRuntimeToDraft ? streamingState : undefined}
                       streamingContent={
-                        shouldAttachRuntimeToTurn ? streamingContentMessage : undefined
+                        shouldAttachRuntimeToDraft ? streamingContentMessage : undefined
                       }
                       currentToolCall={
-                        shouldAttachRuntimeToTurn && status === 'tool_calling'
+                        shouldAttachRuntimeToDraft && status === 'tool_calling'
                           ? activeStreamingState?.currentToolCall
                           : undefined
                       }
                       streamingToolArgs={
-                        shouldAttachRuntimeToTurn && status === 'tool_calling'
+                        shouldAttachRuntimeToDraft && status === 'tool_calling'
                           ? activeStreamingState?.streamingToolArgs
                           : undefined
                       }
                       streamingToolArgsByCallId={
-                        shouldAttachRuntimeToTurn ? activeStreamingState?.streamingToolArgsByCallId : undefined
+                        shouldAttachRuntimeToDraft
+                          ? activeStreamingState?.streamingToolArgsByCallId
+                          : undefined
                       }
                       runtimeToolCalls={
-                        shouldAttachRuntimeToTurn ? activeDraftAssistant?.toolCalls : undefined
+                        shouldAttachRuntimeToDraft ? activeDraftAssistant?.toolCalls : undefined
                       }
                       runtimeSteps={
-                        shouldAttachRuntimeToTurn ? activeDraftAssistant?.steps : undefined
+                        shouldAttachRuntimeToDraft ? activeDraftAssistant?.steps : undefined
                       }
                       workflowProgress={
-                        activeWorkflowExecution && idx === workflowProgressAnchorTurnIndex ? (
+                        activeWorkflowExecution && workflowProgressAnchorTurnIndex === -1 ? (
                           <WorkflowExecutionProgress
                             execution={activeWorkflowExecution}
                             onStop={handleCancel}
@@ -719,64 +790,17 @@ export function ConversationView({
                       }
                     />
                   </Fragment>
-                )
-              })}
+                )}
 
-              {/* Draft assistant turn while waiting for current run's first committed assistant message */}
-              {shouldRenderDraftAssistant && (
-                <Fragment>
-                  <AssistantTurnBubble
-                    key="draft-assistant"
-                    turn={{
-                      type: 'assistant',
-                      messages: [],
-                      timestamp: Date.now(),
-                      totalUsage: null,
-                    }}
-                    toolResults={toolResults}
-                    showAvatar={false}
-                    isProcessing={true}
-                    isWaiting={isWaitingForModel}
-                    streamingState={shouldAttachRuntimeToDraft ? streamingState : undefined}
-                    streamingContent={shouldAttachRuntimeToDraft ? streamingContentMessage : undefined}
-                    currentToolCall={
-                      shouldAttachRuntimeToDraft && status === 'tool_calling'
-                        ? activeStreamingState?.currentToolCall
-                        : undefined
-                    }
-                    streamingToolArgs={
-                      shouldAttachRuntimeToDraft && status === 'tool_calling'
-                        ? activeStreamingState?.streamingToolArgs
-                        : undefined
-                    }
-                    streamingToolArgsByCallId={
-                      shouldAttachRuntimeToDraft
-                        ? activeStreamingState?.streamingToolArgsByCallId
-                        : undefined
-                    }
-                    runtimeToolCalls={shouldAttachRuntimeToDraft ? activeDraftAssistant?.toolCalls : undefined}
-                    runtimeSteps={shouldAttachRuntimeToDraft ? activeDraftAssistant?.steps : undefined}
-                    workflowProgress={
-                      activeWorkflowExecution && workflowProgressAnchorTurnIndex === -1 ? (
-                        <WorkflowExecutionProgress
-                          execution={activeWorkflowExecution}
-                          onStop={handleCancel}
-                        />
-                      ) : undefined
-                    }
-                  />
-                </Fragment>
-              )}
-
-              {/* Fallback: when no anchor turn is found and no draft assistant is shown */}
-              {activeWorkflowExecution &&
-                workflowProgressAnchorTurnIndex === -1 &&
-                !shouldRenderDraftAssistant && (
-                  <WorkflowExecutionProgress
-                    execution={activeWorkflowExecution}
-                    onStop={handleCancel}
-                  />
-              )}
+                {/* Fallback: when no anchor turn is found and no draft assistant is shown */}
+                {activeWorkflowExecution &&
+                  workflowProgressAnchorTurnIndex === -1 &&
+                  !shouldRenderDraftAssistant && (
+                    <WorkflowExecutionProgress
+                      execution={activeWorkflowExecution}
+                      onStop={handleCancel}
+                    />
+                  )}
 
                 <div ref={messagesEndRef} />
               </div>
@@ -800,7 +824,9 @@ export function ConversationView({
               <AgentRichInput
                 placeholder={
                   suggestedFollowUp ||
-                  (hasApiKey ? t('conversation.input.placeholder') : t('conversation.input.placeholderNoKey'))
+                  (hasApiKey
+                    ? t('conversation.input.placeholder')
+                    : t('conversation.input.placeholderNoKey'))
                 }
                 ariaLabel={t('conversation.input.ariaLabel')}
                 disabled={isProcessing || !hasApiKey}
@@ -844,189 +870,213 @@ export function ConversationView({
           <div className="mx-auto mt-2 flex max-w-3xl flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
             {/* Left: agent selector + thinking toggle + workflow selector */}
             <div className="flex flex-wrap items-center gap-2 pt-0.5 sm:flex-nowrap sm:pt-0">
-            <div className="agent-dropdown-container relative">
-              <button
-                type="button"
-                onClick={() => setIsAgentDropdownOpen((v) => !v)}
-                className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-700"
-              >
-                <span className={`h-1.5 w-1.5 rounded-full ${activeAgentId ? 'bg-emerald-500' : 'bg-neutral-400'}`} />
-                <span className="max-w-[120px] truncate">@{activeAgentId || 'default'}</span>
-                <ChevronDown className={`h-3 w-3 transition-transform ${isAgentDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
+              <div className="agent-dropdown-container relative">
+                <button
+                  type="button"
+                  onClick={() => setIsAgentDropdownOpen((v) => !v)}
+                  className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-600 dark:hover:bg-neutral-700"
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${activeAgentId ? 'bg-emerald-500' : 'bg-neutral-400'}`}
+                  />
+                  <span className="max-w-[120px] truncate">@{activeAgentId || 'default'}</span>
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${isAgentDropdownOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
 
-              {/* Dropdown menu */}
-              {isAgentDropdownOpen && (
-                <div className="absolute bottom-full left-0 z-50 mb-1 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                  <div className="max-h-48 overflow-y-auto py-1">
-                    {allAgents.map((agent) => {
-                      const isActive = activeAgentId === agent.id
-                      return (
-                        <div
-                          key={agent.id}
-                          className="flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                        >
+                {/* Dropdown menu */}
+                {isAgentDropdownOpen && (
+                  <div className="absolute bottom-full left-0 z-50 mb-1 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                    <div className="max-h-48 overflow-y-auto py-1">
+                      {allAgents.map((agent) => {
+                        const isActive = activeAgentId === agent.id
+                        return (
+                          <div
+                            key={agent.id}
+                            className="flex w-full items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void setActiveAgent(agent.id)
+                                setIsAgentDropdownOpen(false)
+                              }}
+                              className="min-w-0 flex-1 text-left"
+                            >
+                              <span
+                                className={`font-medium ${isActive ? 'dark:text-primary-400 text-primary-600' : 'text-neutral-700 dark:text-neutral-300'}`}
+                              >
+                                @{agent.id}
+                              </span>
+                            </button>
+                            <div className="ml-2 flex items-center gap-1">
+                              {isActive && <Check className="h-3 w-3 text-primary-500" />}
+                              {agent.id !== 'default' && (
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteAgent(agent.id)}
+                                  className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-red-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400"
+                                  title={`Delete ${agent.id}`}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Create new agent */}
+                    <div className="border-t border-neutral-200 p-2 dark:border-neutral-700">
+                      {isCreatingAgent ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            value={newAgentId}
+                            onChange={(e) => setNewAgentId(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                void handleCreateAgent()
+                              } else if (e.key === 'Escape') {
+                                setIsCreatingAgent(false)
+                                setNewAgentId('')
+                              }
+                            }}
+                            placeholder="agent-id"
+                            autoFocus
+                            className="h-7 flex-1 rounded border border-neutral-300 bg-white px-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+                          />
                           <button
                             type="button"
-            onClick={() => {
-                              void setActiveAgent(agent.id)
-                              setIsAgentDropdownOpen(false)
-                            }}
-                            className="min-w-0 flex-1 text-left"
+                            onClick={() => void handleCreateAgent()}
+                            disabled={!newAgentId.trim()}
+                            className="rounded bg-primary-600 px-2 py-1 text-xs text-white hover:bg-primary-700 disabled:opacity-40"
                           >
-                            <span className={`font-medium ${isActive ? 'text-primary-600 dark:text-primary-400' : 'text-neutral-700 dark:text-neutral-300'}`}>
-                              @{agent.id}
-                            </span>
+                            Add
                           </button>
-                          <div className="ml-2 flex items-center gap-1">
-                            {isActive && <Check className="h-3 w-3 text-primary-500" />}
-                            {agent.id !== 'default' && (
-                              <button
-                                type="button"
-                                onClick={() => void handleDeleteAgent(agent.id)}
-                                className="rounded p-0.5 text-neutral-400 hover:bg-neutral-200 hover:text-red-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400"
-                                title={`Delete ${agent.id}`}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
                         </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Create new agent */}
-                  <div className="border-t border-neutral-200 p-2 dark:border-neutral-700">
-                    {isCreatingAgent ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          value={newAgentId}
-                          onChange={(e) => setNewAgentId(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              void handleCreateAgent()
-                            } else if (e.key === 'Escape') {
-                              setIsCreatingAgent(false)
-                              setNewAgentId('')
-                            }
-                          }}
-                          placeholder="agent-id"
-                          autoFocus
-                          className="h-7 flex-1 rounded border border-neutral-300 bg-white px-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-                        />
+                      ) : (
                         <button
                           type="button"
-                          onClick={() => void handleCreateAgent()}
-                          disabled={!newAgentId.trim()}
-                          className="rounded bg-primary-600 px-2 py-1 text-xs text-white hover:bg-primary-700 disabled:opacity-40"
+                          onClick={() => setIsCreatingAgent(true)}
+                          className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
                         >
-                          Add
+                          <Plus className="h-3 w-3" />
+                          New agent
                         </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Compact thinking mode toggle */}
+              <div className="thinking-dropdown-container relative">
+                <button
+                  type="button"
+                  onClick={() => setIsThinkingDropdownOpen((v) => !v)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+                    enableThinking
+                      ? 'border-primary-200 dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700 dark:border-primary-800'
+                      : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-500'
+                  }`}
+                >
+                  <Brain className="h-3 w-3" />
+                  <span className="max-w-[48px] truncate">
+                    {enableThinking
+                      ? t(`conversation.thinkingLevels.${thinkingLevel}`)
+                      : t('conversation.thinking')}
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${isThinkingDropdownOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+
+                {/* Dropdown */}
+                {isThinkingDropdownOpen && (
+                  <div className="absolute bottom-full right-0 z-50 mb-1.5 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-xs font-medium text-secondary dark:text-neutral-300">
+                        {t('conversation.thinkingMode')}
+                      </span>
+                      <BrandSwitch
+                        checked={enableThinking}
+                        onCheckedChange={(checked) => {
+                          setEnableThinking(checked)
+                        }}
+                      />
+                    </div>
+                    {enableThinking && (
+                      <div className="border-t border-neutral-100 px-2 py-1.5 dark:border-neutral-800">
+                        <div className="grid grid-cols-5 gap-1">
+                          {[
+                            {
+                              value: 'minimal' as ThinkingLevel,
+                              label: t('conversation.thinkingLevels.minimal'),
+                            },
+                            {
+                              value: 'low' as ThinkingLevel,
+                              label: t('conversation.thinkingLevels.low'),
+                            },
+                            {
+                              value: 'medium' as ThinkingLevel,
+                              label: t('conversation.thinkingLevels.medium'),
+                            },
+                            {
+                              value: 'high' as ThinkingLevel,
+                              label: t('conversation.thinkingLevels.high'),
+                            },
+                            {
+                              value: 'xhigh' as ThinkingLevel,
+                              label: t('conversation.thinkingLevels.xhigh'),
+                            },
+                          ].map(({ value, label }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => {
+                                setThinkingLevel(value)
+                                setIsThinkingDropdownOpen(false)
+                              }}
+                              className={`rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
+                                thinkingLevel === value
+                                  ? 'bg-primary-600 text-white'
+                                  : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsCreatingAgent(true)}
-                        className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                      >
-                        <Plus className="h-3 w-3" />
-                        New agent
-                      </button>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+
+              <WorkflowQuickActions
+                templates={workflowTemplates}
+                selectedTemplateId={selectedWorkflowTemplateId}
+                disabled={isProcessing}
+                onTemplateChange={setSelectedWorkflowTemplateId}
+                onRun={(templateId, rubricDsl) => void handleRunWorkflow(templateId, rubricDsl)}
+                onRealRun={(templateId, rubricDsl) =>
+                  void handleRealRunWorkflow(templateId, rubricDsl)
+                }
+                onOpenEditor={() => setWorkflowEditorOpen(true)}
+              />
+
+              {/* Agent Mode Switch */}
+              <AgentModeSwitchCompact
+                mode={agentMode}
+                onModeChange={setAgentMode}
+                disabled={isProcessing}
+              />
             </div>
 
-            {/* Compact thinking mode toggle */}
-            <div className="thinking-dropdown-container relative">
-              <button
-                type="button"
-                onClick={() => setIsThinkingDropdownOpen((v) => !v)}
-                className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                  enableThinking
-                    ? 'border-primary-200 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-500'
-                }`}
-              >
-                <Brain className="h-3 w-3" />
-                <span className="max-w-[48px] truncate">
-                  {enableThinking
-                    ? t(`conversation.thinkingLevels.${thinkingLevel}`)
-                    : t('conversation.thinking')}
-                </span>
-                <ChevronDown className={`h-3 w-3 transition-transform ${isThinkingDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Dropdown */}
-              {isThinkingDropdownOpen && (
-                <div className="absolute bottom-full right-0 z-50 mb-1.5 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-                  <div className="flex items-center justify-between px-3 py-2">
-                    <span className="text-xs font-medium text-secondary dark:text-neutral-300">{t('conversation.thinkingMode')}</span>
-                    <BrandSwitch
-                      checked={enableThinking}
-                      onCheckedChange={(checked) => {
-                        setEnableThinking(checked)
-                      }}
-                    />
-                  </div>
-                  {enableThinking && (
-                    <div className="border-t border-neutral-100 px-2 py-1.5 dark:border-neutral-800">
-                      <div className="grid grid-cols-5 gap-1">
-                        {([
-                          { value: 'minimal' as ThinkingLevel, label: t('conversation.thinkingLevels.minimal') },
-                          { value: 'low' as ThinkingLevel, label: t('conversation.thinkingLevels.low') },
-                          { value: 'medium' as ThinkingLevel, label: t('conversation.thinkingLevels.medium') },
-                          { value: 'high' as ThinkingLevel, label: t('conversation.thinkingLevels.high') },
-                          { value: 'xhigh' as ThinkingLevel, label: t('conversation.thinkingLevels.xhigh') },
-                        ]).map(({ value, label }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => {
-                              setThinkingLevel(value)
-                              setIsThinkingDropdownOpen(false)
-                            }}
-                            className={`rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
-                              thinkingLevel === value
-                                ? 'bg-primary-600 text-white'
-                                : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <WorkflowQuickActions
-              templates={workflowTemplates}
-              selectedTemplateId={selectedWorkflowTemplateId}
-              disabled={isProcessing}
-              onTemplateChange={setSelectedWorkflowTemplateId}
-              onRun={(templateId, rubricDsl) => void handleRunWorkflow(templateId, rubricDsl)}
-              onRealRun={(templateId, rubricDsl) => void handleRealRunWorkflow(templateId, rubricDsl)}
-              onOpenEditor={() => setWorkflowEditorOpen(true)}
-            />
-
-            {/* Agent Mode Switch */}
-            <AgentModeSwitchCompact
-              mode={agentMode}
-              onModeChange={setAgentMode}
-              disabled={isProcessing}
-            />
-
-            </div>
-
-            <div className="self-start sm:self-auto">
-              {renderContextUsage()}
-            </div>
+            <div className="self-start sm:self-auto">{renderContextUsage()}</div>
           </div>
         </div>
       </div>

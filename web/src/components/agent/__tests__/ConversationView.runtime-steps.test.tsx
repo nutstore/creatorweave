@@ -93,7 +93,9 @@ const {
   }
 
   const useConversationStoreMock = ((selector: (state: typeof conversationState) => unknown) =>
-    selector(conversationState)) as unknown as typeof import('@/store/conversation.store').useConversationStore
+    selector(
+      conversationState
+    )) as unknown as typeof import('@/store/conversation.store').useConversationStore
   ;(useConversationStoreMock as unknown as { getState: () => typeof conversationState }).getState =
     () => conversationState
 
@@ -111,7 +113,12 @@ const {
     return selector ? selector(state) : state
   }
 
-  return { useConversationStoreMock, useSettingsStoreMock, assistantTurnBubbleSpy, conversationState }
+  return {
+    useConversationStoreMock,
+    useSettingsStoreMock,
+    assistantTurnBubbleSpy,
+    conversationState,
+  }
 })
 
 vi.mock('@/store/conversation.store', () => ({
@@ -215,7 +222,7 @@ describe('ConversationView runtime step placement', () => {
     const calls = assistantTurnBubbleSpy.mock.calls.map((call) => call[0])
     const callsWithRuntimeSteps = calls.filter((props) => (props.runtimeSteps?.length || 0) > 0)
 
-    expect(calls.length).toBe(2)
+    expect(calls.length).toBe(1)
     expect(callsWithRuntimeSteps.length).toBe(1)
   })
 })
