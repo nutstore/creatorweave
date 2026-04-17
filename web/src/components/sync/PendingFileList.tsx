@@ -116,7 +116,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
     const groupsMap = new Map<string, Omit<SnapshotGroup, 'expanded'>>()
     for (const change of changes.changes) {
       const status = change.snapshotStatus || 'draft'
-      const key = status === 'draft' ? 'draft' : (change.snapshotId || 'draft')
+      const key = status === 'draft' ? 'draft' : change.snapshotId || 'draft'
       const existing = groupsMap.get(key)
       if (existing) {
         existing.changes.push(change)
@@ -125,7 +125,10 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
       }
       groupsMap.set(key, {
         key,
-        title: status === 'draft' ? t('sidebar.pendingSyncPanel.currentDraft') : t('sidebar.pendingSyncPanel.snapshotLabel', { id: key.slice(-8) }),
+        title:
+          status === 'draft'
+            ? t('settings.pendingSyncPanel.currentDraft')
+            : t('settings.pendingSyncPanel.snapshotLabel', { id: key.slice(-8) }),
         status,
         summary: status === 'draft' ? undefined : change.snapshotSummary,
         count: 1,
@@ -149,7 +152,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
 
   // Use external state if provided (controlled mode), otherwise use internal state
   const isControlled = externalSelectedItems !== undefined && onSelectionChange !== undefined
-  const selectAll = isControlled 
+  const selectAll = isControlled
     ? externalSelectedItems.size === changes.changes.length
     : internalSelectAll
   const selectedItems = isControlled ? externalSelectedItems : internalSelectedItems
@@ -246,36 +249,38 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
   const hasSelection = selectedCount > 0
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       {/* Compact header */}
-      <div className="border-subtle flex items-center justify-between border-b bg-elevated px-3 py-2">
+      <div className="border-subtle bg-elevated flex items-center justify-between border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-primary">{t('sidebar.pendingSyncPanel.title')}</span>
+          <span className="text-sm font-medium text-primary">
+            {t('settings.pendingSyncPanel.title')}
+          </span>
           <Badge variant="warning">{changes.changes.length}</Badge>
         </div>
         {hasSelection && (
           <span className="text-xs text-secondary">
-            {t('sidebar.pendingSyncPanel.selectedCount', { count: selectedCount })}
+            {t('settings.pendingSyncPanel.selectedCount', { count: selectedCount })}
           </span>
         )}
       </div>
 
       {/* Compact file list - grouped by change type */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="divide-y divide-subtle/50">
+      <div className="custom-scrollbar flex-1 overflow-y-auto">
+        <div className="divide-subtle/50 divide-y">
           {groupedChanges.map((group) => {
             return (
               <div key={group.key}>
                 {/* Group title */}
                 <div
-                  className="flex items-center gap-2 px-3 py-2 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
+                  className="flex cursor-pointer items-center gap-2 bg-muted/30 px-3 py-2 transition-colors hover:bg-muted/50"
                   onClick={() => toggleGroup(group.key)}
                 >
                   {/* Expand/collapse icon */}
                   {group.expanded ? (
-                    <ChevronDown className="w-4 h-4 text-tertiary" />
+                    <ChevronDown className="text-tertiary h-4 w-4" />
                   ) : (
-                    <ChevronRight className="w-4 h-4 text-tertiary" />
+                    <ChevronRight className="text-tertiary h-4 w-4" />
                   )}
 
                   {/* Group label */}
@@ -291,110 +296,111 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
                     }`}
                   >
                     {group.status === 'committed'
-                      ? t('sidebar.pendingSyncPanel.saved')
+                      ? t('settings.pendingSyncPanel.saved')
                       : group.status === 'approved'
-                        ? t('sidebar.pendingSyncPanel.approved')
+                        ? t('settings.pendingSyncPanel.approved')
                         : group.status === 'rolled_back'
-                          ? t('sidebar.pendingSyncPanel.rolledBack')
-                          : t('sidebar.pendingSyncPanel.draft')}
+                          ? t('settings.pendingSyncPanel.rolledBack')
+                          : t('settings.pendingSyncPanel.draft')}
                   </Badge>
-                  
+
                   {/* Group title */}
-                  <span className="text-sm font-medium text-primary">
-                    {group.title}
-                  </span>
+                  <span className="text-sm font-medium text-primary">{group.title}</span>
 
                   {group.summary && (
-                    <span className="text-xs text-secondary truncate max-w-[220px]" title={group.summary}>
+                    <span
+                      className="max-w-[220px] truncate text-xs text-secondary"
+                      title={group.summary}
+                    >
                       {group.summary}
                     </span>
                   )}
 
                   {/* File count */}
-                  <span className="text-xs text-secondary">
-                    ({group.count})
-                  </span>
+                  <span className="text-xs text-secondary">({group.count})</span>
                 </div>
 
                 {/* File list within group */}
-                {group.expanded && group.changes.map((change, index) => {
-                  const isSelected = selectedItems.has(change.path) || change.path === selectedPath
-                  const typeInfo = getChangeTypeInfo(change.type)
-                  const isHtml = isHtmlFile(change.path) && change.type !== 'delete'
-                  const hasConflict = conflictPaths.has(change.path)
+                {group.expanded &&
+                  group.changes.map((change, index) => {
+                    const isSelected =
+                      selectedItems.has(change.path) || change.path === selectedPath
+                    const typeInfo = getChangeTypeInfo(change.type)
+                    const isHtml = isHtmlFile(change.path) && change.type !== 'delete'
+                    const hasConflict = conflictPaths.has(change.path)
 
-                  return (
-                    <div
-                      key={`${change.path}-${index}`}
-                      className={`group flex items-center gap-2 px-3 py-2 transition-colors hover:bg-hover ${
-                        isSelected ? 'bg-primary-50/50' : ''
-                      }`}
-                      onContextMenu={isHtml ? (e) => handleContextMenu(e, change) : undefined}
-                    >
-                      {/* Checkbox */}
-                      <BrandCheckbox
-                        checked={isSelected}
-                        onCheckedChange={() => handleToggleSelect(change.path)}
-                        className="shrink-0 ml-6"
-                      />
-
-                      {/* File icon */}
-                      <span className="text-tertiary flex-shrink-0">
-                        <FileIcon filename={change.path} className="w-4 h-4" />
-                      </span>
-
-                      {/* File name */}
-                      <span
-                        className="flex-1 text-sm text-primary truncate min-w-0 cursor-pointer"
-                        onClick={() => onSelectFile?.(change)}
-                        title={change.path}
+                    return (
+                      <div
+                        key={`${change.path}-${index}`}
+                        className={`hover:bg-hover group flex items-center gap-2 px-3 py-2 transition-colors ${
+                          isSelected ? 'bg-primary-50/50' : ''
+                        }`}
+                        onContextMenu={isHtml ? (e) => handleContextMenu(e, change) : undefined}
                       >
-                        {change.path.split('/').pop() || change.path}
-                      </span>
+                        {/* Checkbox */}
+                        <BrandCheckbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleToggleSelect(change.path)}
+                          className="ml-6 shrink-0"
+                        />
 
-                      {/* File size */}
-                      <span className="text-xs text-tertiary flex-shrink-0 w-16 text-right">
-                        {formatFileSize(change.size)}
-                      </span>
+                        {/* File icon */}
+                        <span className="text-tertiary flex-shrink-0">
+                          <FileIcon filename={change.path} className="h-4 w-4" />
+                        </span>
 
-                      {/* Conflict marker */}
-                      {hasConflict && (
-                        <Badge className="flex-shrink-0 bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
-                          C
-                        </Badge>
-                      )}
-
-                      {/* Change type */}
-                      <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>
-                        {typeInfo.label}
-                      </Badge>
-
-                      {/* HTML inspect button (visible on hover for HTML files) */}
-                      {isHtml && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleInspectElement(change)
-                          }}
-                          className="shrink-0 p-1 text-emerald-500 opacity-0 transition-opacity group-hover:opacity-100 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300"
-                          title={t('sidebar.pendingSyncPanel.reviewElements')}
+                        {/* File name */}
+                        <span
+                          className="min-w-0 flex-1 cursor-pointer truncate text-sm text-primary"
+                          onClick={() => onSelectFile?.(change)}
+                          title={change.path}
                         >
-                          <MousePointer2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                          {change.path.split('/').pop() || change.path}
+                        </span>
 
-                      {/* Delete button */}
-                      <BrandButton
-                        variant="ghost"
-                        onClick={(e) => handleRemoveFile(change.path, e as any)}
-                        className="shrink-0 text-tertiary hover:text-destructive p-1"
-                        title="Remove from list"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </BrandButton>
-                    </div>
-                  )
-                })}
+                        {/* File size */}
+                        <span className="text-tertiary w-16 flex-shrink-0 text-right text-xs">
+                          {formatFileSize(change.size)}
+                        </span>
+
+                        {/* Conflict marker */}
+                        {hasConflict && (
+                          <Badge className="flex-shrink-0 border border-red-200 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300">
+                            C
+                          </Badge>
+                        )}
+
+                        {/* Change type */}
+                        <Badge className={`${typeInfo.bg} ${typeInfo.color} flex-shrink-0`}>
+                          {typeInfo.label}
+                        </Badge>
+
+                        {/* HTML inspect button (visible on hover for HTML files) */}
+                        {isHtml && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleInspectElement(change)
+                            }}
+                            className="shrink-0 p-1 text-emerald-500 opacity-0 transition-opacity hover:text-emerald-600 group-hover:opacity-100 dark:text-emerald-400 dark:hover:text-emerald-300"
+                            title={t('settings.pendingSyncPanel.reviewElements')}
+                          >
+                            <MousePointer2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+
+                        {/* Delete button */}
+                        <BrandButton
+                          variant="ghost"
+                          onClick={(e) => handleRemoveFile(change.path, e as any)}
+                          className="text-tertiary shrink-0 p-1 hover:text-destructive"
+                          title="Remove from list"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </BrandButton>
+                      </div>
+                    )
+                  })}
               </div>
             )
           })}
@@ -414,8 +420,8 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
               className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
               onClick={() => handleInspectElement(contextMenu.change)}
             >
-              <MousePointer2 className="w-4 h-4 text-emerald-500" />
-              {t('sidebar.pendingSyncPanel.reviewElements')}
+              <MousePointer2 className="h-4 w-4 text-emerald-500" />
+              {t('settings.pendingSyncPanel.reviewElements')}
             </button>
           )}
           {/* Copy Path */}
@@ -426,8 +432,8 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
               setContextMenu(null)
             }}
           >
-            <Copy className="w-4 h-4 text-neutral-400" />
-            {t('sidebar.pendingSyncPanel.copyPath')}
+            <Copy className="h-4 w-4 text-neutral-400" />
+            {t('settings.pendingSyncPanel.copyPath')}
           </button>
           {/* Remove from list */}
           <button
@@ -437,32 +443,25 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
               setContextMenu(null)
             }}
           >
-            <X className="w-4 h-4" />
-            {t('sidebar.pendingSyncPanel.removeFromList')}
+            <X className="h-4 w-4" />
+            {t('settings.pendingSyncPanel.removeFromList')}
           </button>
         </div>
       )}
 
       {/* Bottom action bar */}
-      <div className="border-subtle flex items-center justify-between border-t bg-elevated px-3 py-2">
+      <div className="border-subtle bg-elevated flex items-center justify-between border-t px-3 py-2">
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">
-            <BrandCheckbox
-              checked={selectAll}
-              onCheckedChange={handleToggleSelectAll}
-            />
-            <span>{t('sidebar.pendingSyncPanel.selectAll')}</span>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-secondary">
+            <BrandCheckbox checked={selectAll} onCheckedChange={handleToggleSelectAll} />
+            <span>{t('settings.pendingSyncPanel.selectAll')}</span>
           </label>
         </div>
 
         <div className="flex items-center gap-2">
-          <BrandButton
-            variant="outline"
-            onClick={onClear}
-            disabled={isSyncing}
-          >
-            <Trash2 className="w-4 h-4" />
-            {t('sidebar.pendingSyncPanel.reject')}
+          <BrandButton variant="outline" onClick={onClear} disabled={isSyncing}>
+            <Trash2 className="h-4 w-4" />
+            {t('settings.pendingSyncPanel.reject')}
           </BrandButton>
           <BrandButton
             variant="primary"
@@ -471,13 +470,15 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
           >
             {isSyncing ? (
               <>
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                {t('sidebar.pendingSyncPanel.processing')}
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                {t('settings.pendingSyncPanel.processing')}
               </>
             ) : (
               <>
-                <RefreshCw className="w-4 h-4" />
-                {hasSelection ? t('sidebar.pendingSyncPanel.approveSelectedCount', { count: selectedCount }) : t('sidebar.pendingSyncPanel.approveAll')}
+                <RefreshCw className="h-4 w-4" />
+                {hasSelection
+                  ? t('settings.pendingSyncPanel.approveSelectedCount', { count: selectedCount })
+                  : t('settings.pendingSyncPanel.approveAll')}
               </>
             )}
           </BrandButton>
