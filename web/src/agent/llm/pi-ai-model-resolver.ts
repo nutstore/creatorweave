@@ -1,6 +1,7 @@
 import { getModel } from '@mariozechner/pi-ai'
 import type { Api, KnownProvider, Model } from '@mariozechner/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
+import { getModelsForProvider } from '@/agent/providers/types'
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
@@ -76,6 +77,11 @@ function tryGetNativeModel(
   return null
 }
 
+function lookupContextWindow(providerType: LLMProviderType, modelName: string): number {
+  const models = getModelsForProvider(providerType)
+  return models.find((m) => m.id === modelName)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+}
+
 function createOpenAICompatibleFallback(
   providerType: LLMProviderType,
   modelName: string,
@@ -85,6 +91,7 @@ function createOpenAICompatibleFallback(
     providerType === 'minimax' || providerType === 'minimax-cn'
       ? CW_OPENAI_FETCH_API
       : 'openai-completions'
+  const contextWindow = lookupContextWindow(providerType, modelName)
 
   return {
     id: modelName,
@@ -100,7 +107,7 @@ function createOpenAICompatibleFallback(
       cacheRead: 0,
       cacheWrite: 0,
     },
-    contextWindow: DEFAULT_CONTEXT_WINDOW,
+    contextWindow,
     maxTokens: DEFAULT_MAX_TOKENS,
   }
 }

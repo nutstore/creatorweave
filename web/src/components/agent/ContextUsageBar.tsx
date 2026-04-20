@@ -40,13 +40,10 @@ export function ContextUsageBar({
 
   if (!contextWindowUsage) return null
 
-  const usageTone = getUsageToneClass(contextWindowUsage.usagePercent)
-  const percent = contextWindowUsage.usagePercent
-  const isHigh = percent >= 85
-  const isCritical = percent >= 95
-  const effectiveBudget = contextWindowUsage.maxTokens
   const reserveTokens = contextWindowUsage.reserveTokens
-  const modelMaxTokens = contextWindowUsage.modelMaxTokens ?? effectiveBudget + reserveTokens
+  const modelMaxTokens = contextWindowUsage.modelMaxTokens ?? contextWindowUsage.maxTokens + reserveTokens
+  const displayPercent = Math.max(0, Math.min(100, (contextWindowUsage.usedTokens / modelMaxTokens) * 100))
+  const usageTone = getUsageToneClass(displayPercent)
 
   return (
     <div className="flex items-center gap-2.5 sm:mt-0">
@@ -54,23 +51,23 @@ export function ContextUsageBar({
         <div
           className={cn(
             'h-full rounded-full transition-all duration-500',
-            isCritical ? 'bg-red-500' : isHigh ? 'bg-amber-500' : 'bg-emerald-500'
+            displayPercent >= 95 ? 'bg-red-500' : displayPercent >= 85 ? 'bg-amber-500' : 'bg-emerald-500'
           )}
-          style={{ width: `${Math.min(percent, 100)}%` }}
+          style={{ width: `${Math.min(displayPercent, 100)}%` }}
         />
       </div>
 
       <span className={cn('text-xs font-semibold tabular-nums', usageTone.text)}>
-        {percent.toFixed(0)}%
+        {displayPercent.toFixed(0)}%
       </span>
 
       <span
         className="text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500"
-        title={t('conversation.tokenBudget', { effectiveBudget, modelMaxTokens, reserveTokens })}
+        title={t('conversation.tokenBudget', { effectiveBudget: contextWindowUsage.maxTokens, modelMaxTokens, reserveTokens })}
       >
         {formatTokenCompact(contextWindowUsage.usedTokens)}
         <span className="mx-0.5 opacity-50">/</span>
-        {formatTokenCompact(effectiveBudget)}
+        {formatTokenCompact(modelMaxTokens)}
       </span>
 
       {isProcessing && (

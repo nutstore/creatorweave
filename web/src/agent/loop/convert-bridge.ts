@@ -255,10 +255,11 @@ export async function convertAgentMessagesToLlm(
   const usagePercent = Math.max(0, Math.min(100, (usedTokens / Math.max(1, inputBudget)) * 100))
   input.callbacks?.onContextUsageUpdate?.({
     usedTokens,
-    // Report the effective input budget (M - R), not raw model context limit.
+    // maxTokens is the effective input budget (M - R), modelMaxTokens is the raw model limit M.
     maxTokens: inputBudget,
     reserveTokens,
     usagePercent,
+    modelMaxTokens: maxContextTokens,
   })
 
   return {

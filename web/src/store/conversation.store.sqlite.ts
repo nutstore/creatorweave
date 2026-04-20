@@ -2201,7 +2201,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 maxTokens: payload.maxTokens,
                 reserveTokens: payload.reserveTokens,
                 usagePercent: payload.usagePercent,
-                modelMaxTokens: payload.maxTokens + payload.reserveTokens,
+                modelMaxTokens: payload.modelMaxTokens ?? payload.maxTokens + payload.reserveTokens,
               }
               c.lastContextWindowUsage = c.contextWindowUsage
             })

@@ -98,6 +98,8 @@ export interface AgentCallbacks {
     reserveTokens: number
     /** usagePercent = usedTokens / maxTokens * 100 */
     usagePercent: number
+    /** Raw model context limit M */
+    modelMaxTokens?: number
   }) => void
 }
 
