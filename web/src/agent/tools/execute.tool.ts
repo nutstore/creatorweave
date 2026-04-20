@@ -61,10 +61,14 @@ async function executePython(code: string, timeout: number): Promise<string> {
   try {
     const beforeSnapshot = await active.conversation.scanFilesWithCache()
 
+    // Mount OPFS files/ directory to /mnt so Python writes sync to OPFS directly
+    const filesDirHandle = await active.conversation.getFilesDir()
+
     // Execute Python code
     const result = await runtimePythonExecutor.execute({
       code,
       timeout,
+      mountDir: filesDirHandle,
     })
 
     // Register OPFS delta into overlay ledger for pending/review/sync.
