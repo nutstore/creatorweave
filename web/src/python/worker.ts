@@ -345,7 +345,22 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
     await pyodide.loadPackage('matplotlib')
 
     // Auto-load packages based on imports in the user code
-    await pyodide.loadPackagesFromImports(code)
+    try {
+      await pyodide.loadPackagesFromImports(code)
+    } catch (pkgError) {
+      const pkgErrorMsg = pkgError instanceof Error ? pkgError.message : String(pkgError)
+      // Extract package names from import statements for the hint
+      const importMatches = code.match(/(?:^|\n)\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/g)
+      const packages = (importMatches || [])
+        .map(m => m.replace(/.*?(?:import|from)\s+/, '').trim())
+        .filter(p => !['os', 'sys', 'io', 'json', 'math', 're', 'pathlib', 'datetime', 'collections', 'itertools', 'functools', 'typing', 'dataclasses', 'abc', 'copy', 'base64', 'hashlib', 'hmac', 'struct', 'textwrap', 'string', 'random', 'statistics', 'fractions', 'decimal', 'csv', 'enum', 'logging', 'contextlib', 'unittest', 'time', 'traceback', 'inspect', 'importlib', 'warnings', 'tempfile', 'shutil', 'glob', 'fnmatch', 'operator', 'heapq', 'bisect', 'array', 'queue', 'threading', 'multiprocessing', 'socket', 'http', 'urllib', 'email', 'html', 'xml', 'configparser', 'argparse', 'subprocess', 'signal'].includes(p))
+
+      const hint = packages.length > 0
+        ? `\n\nTip: Try installing the missing package(s) with micropip before importing:\nimport micropip\nawait micropip.install('${packages.join("', '")}')\nThen retry the import.`
+        : `\n\nTip: Try installing the missing package with micropip:\nimport micropip\nawait micropip.install('package_name')`
+
+      throw new Error(pkgErrorMsg + hint)
+    }
 
     // Execute code with timeout (properly cleanup timeout)
     const executePromise = pyodide.runPythonAsync(code)
