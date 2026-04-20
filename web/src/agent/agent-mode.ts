@@ -60,6 +60,9 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   
   // Git write tools
   ['git_restore', { name: 'git_restore', category: 'write' }],
+
+  // Sync tools (writes to OPFS)
+  ['sync', { name: 'sync', category: 'write' }],
 ])
 
 /**

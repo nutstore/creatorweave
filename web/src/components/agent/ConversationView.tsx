@@ -30,11 +30,13 @@ import { ContextUsageBar } from './ContextUsageBar'
 interface ConversationViewProps {
   initialMessage?: string | null
   onInitialMessageConsumed?: () => void
+  disabled?: boolean
 }
 
 export function ConversationView({
   initialMessage,
   onInitialMessageConsumed,
+  disabled = false,
 }: ConversationViewProps) {
   const t = useT()
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
@@ -140,7 +142,7 @@ export function ConversationView({
                   (hasApiKey ? t('conversation.input.placeholder') : t('conversation.input.placeholderNoKey'))
                 }
                 ariaLabel={t('conversation.input.ariaLabel')}
-                disabled={isProcessing || !hasApiKey}
+                disabled={isProcessing || !hasApiKey || disabled}
                 resetToken={inputResetToken}
                 agents={mentionAgents}
                 activeAgentId={activeAgentId}
@@ -167,7 +169,7 @@ export function ConversationView({
                 <button
                   type="button"
                   onClick={handleSend}
-                  disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey}
+                  disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey || disabled}
                   className="absolute bottom-4 right-4 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-30 disabled:hover:bg-primary-600"
                   title={t('conversation.buttons.send')}
                 >

@@ -21,6 +21,8 @@ LANGUAGE: python
 - Built-in packages: pandas, numpy, matplotlib, openpyxl, pillow, scipy, sklearn
 - For matplotlib: set matplotlib.use('Agg') BEFORE creating figures
 - Files accessible at /mnt/ path (workspace subdirectory)
+- Project skill resources (.skills/ directory) are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
+  Example: if .skills/word-processor/scripts/convert.py exists, use \`exec(open('/mnt/.skills/word-processor/scripts/convert.py').read())\` or \`import sys; sys.path.insert(0, '/mnt/.skills/word-processor/scripts')\`
 
 Examples:
 - python(code="print('hello')")`,

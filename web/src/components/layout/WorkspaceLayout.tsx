@@ -35,7 +35,7 @@ import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ProjectSkillsDialog } from '@/components/skills/ProjectSkillsDialog'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
-import { scanProjectSkills, syncResourcesToOPFS } from '@/skills/skill-scanner'
+import { scanProjectSkills, syncResourcesToOPFS, syncProjectSkillsToActiveWorkspace } from '@/skills/skill-scanner'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { createUserMessage } from '@/agent/message-types'
@@ -108,6 +108,7 @@ export function WorkspaceLayout({
   const [showProjectSkillsDialog, setShowProjectSkillsDialog] = useState(false)
   const [toolsPanelOpen, setToolsPanelOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
+  const [skillsSyncing, setSkillsSyncing] = useState(false)
   const skillsStore = useSkillsStore()
   const skillsLoaded = useSkillsStore((s) => s.loaded) // Reactive state
 
@@ -305,6 +306,8 @@ export function WorkspaceLayout({
 
         // Sync skill resources to OPFS so Pyodide can access them at /mnt/.skills/
         await syncResourcesToOPFS(result)
+        // Also sync .skills/ directory directly from disk (covers all workspaces)
+        await syncProjectSkillsToActiveWorkspace(directoryHandle)
       } catch (error) {
         console.error('Failed to scan project skills:', error)
       }
@@ -312,6 +315,18 @@ export function WorkspaceLayout({
 
     scanForSkills()
   }, [directoryHandle, skillsLoaded, skillsStore.skills])
+
+  // Sync .skills/ to OPFS when workspace changes (new workspace created or switched)
+  useEffect(() => {
+    if (!directoryHandle || !activeConversationId) return
+
+    setSkillsSyncing(true)
+    syncProjectSkillsToActiveWorkspace(directoryHandle)
+      .catch((err) => {
+        console.warn('[WorkspaceLayout] Failed to sync skills to workspace:', err)
+      })
+      .finally(() => setSkillsSyncing(false))
+  }, [directoryHandle, activeConversationId])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -584,6 +599,7 @@ export function WorkspaceLayout({
               <ConversationView
                 initialMessage={pendingMessage}
                 onInitialMessageConsumed={handleInitialMessageConsumed}
+                disabled={skillsSyncing}
               />
             ) : (
               <div className="relative h-full min-h-0 w-full overflow-hidden">

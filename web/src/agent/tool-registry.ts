@@ -43,6 +43,9 @@ import {
   readSkillResourceExecutor,
 } from '@/skills/skill-tools'
 
+// Sync-to-OPFS tool
+import { syncToOPFSDefinition, syncToOPFSExecutor } from './tools/sync-opfs.tool'
+
 // Switch mode tool
 import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
 
@@ -77,6 +80,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: gitLogDefinition, executor: gitLogExecutor },
   { definition: gitShowDefinition, executor: gitShowExecutor },
   { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
+  // Sync native files to OPFS
+  { definition: syncToOPFSDefinition, executor: syncToOPFSExecutor },
   // Changeset & sync tools
   { definition: createSnapshotDefinition, executor: createSnapshotExecutor },
   { definition: rollbackSnapshotDefinition, executor: rollbackSnapshotExecutor },

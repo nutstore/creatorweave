@@ -71,6 +71,10 @@ Updating agent-space files:
 ### Code Execution (for data/analysis tasks)
 - \`python(code)\` - Execute Python with pandas, numpy, matplotlib
   Example: python(code="print('hello')")
+- Project skill scripts in \`.skills/\` are auto-synced to \`/mnt/.skills/{skill-dir}/\` and can be used directly in Python
+
+### File Sync (disk → OPFS)
+- \`sync(paths)\` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before \`python\` when the script needs workspace files not yet in OPFS. Example: \`sync(paths=["data/*.csv", "config.json"])\`
 
 ### Workflow Execution
 - \`run_workflow(workflow_id, mode, inputs, ...)\` - Run predefined structured workflows for multi-step content generation/review

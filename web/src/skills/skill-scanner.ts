@@ -245,7 +245,7 @@ async function resolveDirectory(
 
 /**
  * Sync skill resource files to OPFS so Pyodide can access them at /mnt/.skills/.
- * Writes directly to OPFS files/ directory without triggering pending sync.
+ * Uses existing scan result. Called after skill scanning in WorkspaceLayout.
  */
 export async function syncResourcesToOPFS(
   result: SkillScanResult
@@ -259,29 +259,96 @@ export async function syncResourcesToOPFS(
     return
   }
 
-  const filesDir = await active.workspace.getFilesDir()
+  await syncResourcesToFilesDir(result.resources, await active.workspace.getFilesDir())
+}
 
-  for (const resource of result.resources) {
-    // skillId format: "project:.skills/word-processor" → extract ".skills/word-processor"
+/**
+ * Sync .skills/ directory from native FS to the current active workspace's OPFS.
+ * Called from WorkspaceLayout to ensure all workspaces have skill files available.
+ */
+export async function syncProjectSkillsToActiveWorkspace(
+  rootHandle: FileSystemDirectoryHandle
+): Promise<void> {
+  const { getActiveWorkspace } = await import('@/store/workspace.store')
+  const active = await getActiveWorkspace()
+  if (!active) return
+
+  await syncSkillsDirToOPFS(await active.workspace.getFilesDir(), rootHandle)
+}
+
+/**
+ * Sync .skills/ directory from native FS directly to a workspace's OPFS files/ dir.
+ * Used when creating a new workspace so skills are available immediately in Pyodide.
+ */
+export async function syncSkillsDirToOPFS(
+  filesDir: FileSystemDirectoryHandle,
+  rootHandle: FileSystemDirectoryHandle
+): Promise<void> {
+  const ignoredDirs = new Set(['.git', 'node_modules', '__pycache__'])
+
+  for (const skillDirPath of ['.skills']) {
+    const dirHandle = await resolveDirectory(rootHandle, [skillDirPath])
+    if (!dirHandle) continue
+
+    console.log(`[SkillScanner] Syncing ${skillDirPath}/ to OPFS for new workspace`)
+    let count = 0
+
+    const syncRecursive = async (
+      srcDir: FileSystemDirectoryHandle,
+      destDir: FileSystemDirectoryHandle
+    ): Promise<void> => {
+      for await (const [name, entry] of srcDir.entries()) {
+        if (name.toUpperCase() === 'SKILL.MD') continue
+
+        if (entry.kind === 'directory') {
+          if (ignoredDirs.has(name)) continue
+          const subSrc = await srcDir.getDirectoryHandle(name)
+          const subDest = await destDir.getDirectoryHandle(name, { create: true })
+          await syncRecursive(subSrc, subDest)
+        } else if (entry.kind === 'file') {
+          const file = await entry.getFile()
+          if (file.size > RESOURCE_LIMITS.MAX_FILE_SIZE) continue
+
+          const content = await file.text()
+          const fileHandle = await destDir.getFileHandle(name, { create: true })
+          const writable = await fileHandle.createWritable()
+          await writable.write(content)
+          await writable.close()
+          count++
+        }
+      }
+    }
+
+    // Create .skills/ in files/ and sync
+    const opfsSkillsDir = await filesDir.getDirectoryHandle(skillDirPath, { create: true })
+    await syncRecursive(dirHandle, opfsSkillsDir)
+    console.log(`[SkillScanner] Synced ${count} files from ${skillDirPath}/ to OPFS`)
+  }
+}
+
+/**
+ * Write resource list to OPFS files/ directory.
+ */
+async function syncResourcesToFilesDir(
+  resources: SkillResource[],
+  filesDir: FileSystemDirectoryHandle
+): Promise<void> {
+  for (const resource of resources) {
     const skillDir = resource.skillId.replace(/^project:/, '')
     const opfsPath = `${skillDir}/${resource.resourcePath}`
 
     try {
-      // Create parent directories
       const parts = opfsPath.split('/')
       let currentDir = filesDir
       for (let i = 0; i < parts.length - 1; i++) {
         currentDir = await currentDir.getDirectoryHandle(parts[i], { create: true })
       }
 
-      // Write file
       const fileName = parts[parts.length - 1]
       const fileHandle = await currentDir.getFileHandle(fileName, { create: true })
       const writable = await fileHandle.createWritable()
       await writable.write(resource.content)
       await writable.close()
-
-      console.log(`[SkillScanner] Synced to OPFS: ${opfsPath} (${resource.size} bytes)`)
     } catch (err) {
       console.warn(
         `[SkillScanner] Failed to sync ${opfsPath}:`,
@@ -289,8 +356,5 @@ export async function syncResourcesToOPFS(
       )
     }
   }
-
-  console.log(
-    `[SkillScanner] OPFS sync complete: ${result.resources.length} resources`
-  )
+  console.log(`[SkillScanner] OPFS sync complete: ${resources.length} resources`)
 }
