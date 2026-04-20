@@ -655,18 +655,18 @@ export class WorkspaceRuntime {
     }
 
     // Read from files/ only (no native FS available or has pending changes without conflict)
-    if (this.hasFileInIndex(normalizedPath)) {
-      const fromFilesDir = await this.readFromFilesDir(normalizedPath)
-      if (fromFilesDir) {
-        return {
-          content: fromFilesDir.content,
-          metadata: {
-            path: normalizedPath,
-            mtime: fromFilesDir.mtime,
-            size: fromFilesDir.size,
-            contentType: fromFilesDir.contentType,
-          },
-        }
+    // Always try readFromFilesDir — files may exist without being in the index
+    // (e.g., written directly by Pyodide via /mnt/ mount)
+    const fromFilesDir = await this.readFromFilesDir(normalizedPath)
+    if (fromFilesDir) {
+      return {
+        content: fromFilesDir.content,
+        metadata: {
+          path: normalizedPath,
+          mtime: fromFilesDir.mtime,
+          size: fromFilesDir.size,
+          contentType: fromFilesDir.contentType,
+        },
       }
     }
 
