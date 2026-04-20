@@ -341,11 +341,12 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
       }
     }
 
-    // Load matplotlib first (it's imported in the wrapper code)
-    await pyodide.loadPackage('matplotlib')
-
-    // Auto-load packages based on imports in the user code
+    // Auto-load packages based on imports in the user code (includes matplotlib if needed)
     try {
+      // Pre-load matplotlib only when code imports it (it's a large package)
+      if (code.includes('matplotlib') || code.includes('pyplot')) {
+        await pyodide.loadPackage('matplotlib')
+      }
       await pyodide.loadPackagesFromImports(code)
     } catch (pkgError) {
       const pkgErrorMsg = pkgError instanceof Error ? pkgError.message : String(pkgError)
