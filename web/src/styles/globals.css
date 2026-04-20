@@ -575,3 +575,19 @@
     background-color: hsl(var(--muted)/50);
   }
 }
+
+/* DOCX preview styles */
+.docx-preview-container {
+  overflow: auto;
+  background: white;
+  padding: 8px;
+}
+
+.docx-preview-container > .docx-wrapper {
+  background: white !important;
+}
+
+.docx-preview-container .docx-wrapper > section.docx {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  margin-bottom: 16px;
+}

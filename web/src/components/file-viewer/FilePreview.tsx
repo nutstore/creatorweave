@@ -3,7 +3,7 @@
  * Supports text files with syntax highlighting and images with direct display.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { X, FileText, Copy, Check } from 'lucide-react'
 import { Editor } from '@monaco-editor/react'
 import { formatBytes } from '@/lib/utils'
@@ -52,9 +52,12 @@ function getMonacoLanguage(path: string): string {
 /** Image extensions for direct display */
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg'])
 
-/** Binary (non-image) extensions */
+/** DOCX extensions for docx-preview rendering */
+const DOCX_EXTS = new Set(['docx'])
+
+/** Binary (non-image, non-docx) extensions */
 const BINARY_EXTS = new Set([
-  'wasm', 'zip', 'gz', 'tar', 'br', 'zst', 'pdf', 'doc', 'docx', 'xls', 'xlsx',
+  'wasm', 'zip', 'gz', 'tar', 'br', 'zst', 'pdf', 'doc', 'xls', 'xlsx',
   'mp3', 'mp4', 'webm', 'ogg', 'wav', 'avi', 'woff', 'woff2', 'ttf', 'eot', 'otf',
   'exe', 'dll', 'so', 'dylib',
 ])
@@ -69,9 +72,10 @@ const TEXT_EXTS = new Set([
   'lock', 'gitignore', 'editorconfig', 'dockerfile', 'makefile',
 ])
 
-function getFileType(path: string): 'text' | 'image' | 'binary' {
+function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   if (IMAGE_EXTS.has(ext)) return 'image'
+  if (DOCX_EXTS.has(ext)) return 'docx'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
   // Unknown extension - try text
@@ -89,6 +93,8 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   const [copied, setCopied] = useState(false)
   const [diskNewer, setDiskNewer] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
+  const docxContainerRef = useRef<HTMLDivElement>(null)
   const [isDark, setIsDark] = useState(
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   )
@@ -121,6 +127,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
     if (!filePath) {
       setContent(null)
       setImageUrl(null)
+      setDocxBlob(null)
       setError(null)
       setDiskNewer(false)
       return
@@ -134,6 +141,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       setError(null)
       setContent(null)
       setImageUrl(null)
+      setDocxBlob(null)
       setDiskNewer(false)
 
       try {
@@ -170,7 +178,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
 
             if (opfsMtime !== null && diskMtime > opfsMtime) {
               fileSize = diskFile.size
-              if (fileType === 'image') {
+              if (fileType === 'image' || fileType === 'docx') {
                 blob = diskFile
               } else {
                 text = await diskFile.text()
@@ -178,7 +186,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               setDiskNewer(true)
             } else if (opfsMtime === null) {
               fileSize = diskFile.size
-              if (fileType === 'image') {
+              if (fileType === 'image' || fileType === 'docx') {
                 blob = diskFile
               } else {
                 text = await diskFile.text()
@@ -206,6 +214,8 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         if (fileType === 'image' && blob) {
           objectUrl = URL.createObjectURL(blob)
           setImageUrl(objectUrl)
+        } else if (fileType === 'docx' && blob) {
+          setDocxBlob(blob)
         } else if (text !== undefined) {
           setContent(text)
         }
@@ -229,6 +239,35 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       }
     }
   }, [filePath, fileHandle, fileType])
+
+  // Render docx into container
+  useEffect(() => {
+    if (fileType !== 'docx' || !docxBlob || !docxContainerRef.current) return
+
+    let cancelled = false
+    const container = docxContainerRef.current
+
+    import('docx-preview').then(({ renderAsync }) => {
+      if (cancelled) return
+      renderAsync(docxBlob, container, undefined, {
+        className: 'docx-preview',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+      }).catch((err: unknown) => {
+        if (!cancelled) {
+          setError(t('filePreview.readFileFailed', { error: err instanceof Error ? err.message : String(err) }))
+        }
+      })
+    })
+
+    return () => {
+      cancelled = true
+      container.innerHTML = ''
+    }
+  }, [fileType, docxBlob, t])
 
   const handleCopy = useCallback(async () => {
     if (!content) return
@@ -307,6 +346,11 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               style={{ imageRendering: fileName.endsWith('.ico') ? 'pixelated' : 'auto' }}
             />
           </div>
+        )}
+
+        {/* DOCX preview */}
+        {fileType === 'docx' && docxBlob && !loading && !error && (
+          <div ref={docxContainerRef} className="docx-preview-container h-full" />
         )}
 
         {/* Binary (non-image) file */}
