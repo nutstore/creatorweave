@@ -393,7 +393,8 @@ export const gitRestoreDefinition: ToolDefinition = {
         paths: {
           type: 'array',
           items: { type: 'string' },
-          description: 'File paths to restore (supports glob patterns like "src/*.ts")',
+          description:
+            'File paths to restore (supports glob patterns like "src/*.ts"). If omitted or empty, apply to all eligible paths.',
         },
         staged: {
           type: 'boolean',
@@ -409,7 +410,6 @@ export const gitRestoreDefinition: ToolDefinition = {
           description: 'Output format. Default: text',
         },
       },
-      required: ['paths'],
     },
   },
 }
@@ -420,7 +420,8 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
     if (!workspaceId) {
       return toolErrorJson('git_restore', 'no_active_workspace', 'No active workspace')
     }
-    const paths = args.paths as string[]
+    const rawPaths = args.paths
+    const paths = Array.isArray(rawPaths) ? (rawPaths as string[]) : []
     const staged = args.staged as boolean
     const snapshotId = args.snapshot_id as string | undefined
     const parsedFormat = parseFormat(args.format)
@@ -428,8 +429,11 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('git_restore', 'invalid_arguments', parsedFormat.error)
     }
 
-    if (!Array.isArray(paths) || paths.length === 0 || paths.some((path) => typeof path !== 'string' || !path)) {
-      return toolErrorJson('git_restore', 'invalid_arguments', 'paths must be a non-empty string array')
+    if (rawPaths !== undefined && !Array.isArray(rawPaths)) {
+      return toolErrorJson('git_restore', 'invalid_arguments', 'paths must be an array of strings')
+    }
+    if (paths.some((path) => typeof path !== 'string' || !path)) {
+      return toolErrorJson('git_restore', 'invalid_arguments', 'paths must be a string array')
     }
     if (args.staged !== undefined && typeof args.staged !== 'boolean') {
       return toolErrorJson('git_restore', 'invalid_arguments', 'staged must be boolean')

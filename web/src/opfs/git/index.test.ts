@@ -17,6 +17,8 @@ const executeMock = vi.fn()
 
 const workspaceWriteFileMock = vi.fn()
 const workspaceDeleteFileMock = vi.fn()
+const workspaceDiscardPendingPathMock = vi.fn()
+const workspaceDiscardAllPendingChangesMock = vi.fn()
 const getWorkspaceMock = vi.fn()
 
 vi.mock('@/sqlite/repositories/fs-overlay.repository', () => ({
@@ -440,11 +442,15 @@ describe('opfs/git gitRestore', () => {
     executeMock.mockReset()
     workspaceWriteFileMock.mockReset()
     workspaceDeleteFileMock.mockReset()
+    workspaceDiscardPendingPathMock.mockReset()
+    workspaceDiscardAllPendingChangesMock.mockReset()
     getWorkspaceMock.mockReset()
 
     getWorkspaceMock.mockResolvedValue({
       writeFile: workspaceWriteFileMock,
       deleteFile: workspaceDeleteFileMock,
+      discardPendingPath: workspaceDiscardPendingPathMock,
+      discardAllPendingChanges: workspaceDiscardAllPendingChangesMock,
     })
   })
 
@@ -511,5 +517,102 @@ describe('opfs/git gitRestore', () => {
     expect(workspaceWriteFileMock).toHaveBeenCalledWith('src/a.ts', 'new', undefined)
     expect(workspaceDeleteFileMock).toHaveBeenCalledWith('src/b.ts', undefined)
     expect(result.restored).toBe(2)
+  })
+
+  it('unstages all approved pending ops when paths is empty', async () => {
+    queryAllMock.mockResolvedValue([
+      { id: 'op1', path: 'src/a.ts' },
+      { id: 'op2', path: 'src/b.ts' },
+    ])
+    getOrCreateDraftChangesetMock.mockResolvedValue('draft_1')
+
+    const result = await gitRestore('ws_1', {
+      paths: [],
+      staged: true,
+    })
+
+    expect(executeMock).toHaveBeenCalledTimes(2)
+    expect(result.unstaged).toBe(2)
+    expect(result.message).toBe('Unstaged 2 of 2 path(s)')
+  })
+
+  it('restores all snapshot paths when paths is empty', async () => {
+    listSnapshotOpsMock.mockResolvedValue([
+      {
+        id: 'op_mod',
+        workspaceId: 'ws_1',
+        snapshotId: 'snap_1',
+        path: 'src/a.ts',
+        type: 'modify',
+        status: 'pending',
+        fsMtime: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+      {
+        id: 'op_del',
+        workspaceId: 'ws_1',
+        snapshotId: 'snap_1',
+        path: 'src/b.ts',
+        type: 'delete',
+        status: 'pending',
+        fsMtime: 0,
+        createdAt: 0,
+        updatedAt: 0,
+      },
+    ])
+    getSnapshotFileContentMock.mockResolvedValue({
+      snapshotId: 'snap_1',
+      workspaceId: 'ws_1',
+      path: 'src/a.ts',
+      opType: 'modify',
+      beforeContentKind: 'text',
+      beforeContentText: 'old',
+      beforeContentBlob: null,
+      afterContentKind: 'text',
+      afterContentText: 'new',
+      afterContentBlob: null,
+    })
+
+    const result = await gitRestore('ws_1', {
+      paths: [],
+      snapshotId: 'snap_1',
+    })
+
+    expect(workspaceWriteFileMock).toHaveBeenCalledWith('src/a.ts', 'new', undefined)
+    expect(workspaceDeleteFileMock).toHaveBeenCalledWith('src/b.ts', undefined)
+    expect(result.restored).toBe(2)
+    expect(result.message).toBe('Restored 2 of 2 file(s) from snapshot')
+  })
+
+  it('discards all pending paths through workspace runtime when paths is empty', async () => {
+    listPendingOpsMock.mockResolvedValue([
+      {
+        id: 'op1',
+        workspaceId: 'ws_1',
+        path: 'src/new.ts',
+        type: 'create',
+        fsMtime: 0,
+        timestamp: 0,
+      },
+      {
+        id: 'op2',
+        workspaceId: 'ws_1',
+        path: 'src/existing.ts',
+        type: 'modify',
+        fsMtime: 0,
+        timestamp: 0,
+      },
+    ])
+
+    const result = await gitRestore('ws_1', {
+      paths: [],
+    })
+
+    expect(workspaceDiscardAllPendingChangesMock).toHaveBeenCalledTimes(1)
+    expect(workspaceDiscardPendingPathMock).not.toHaveBeenCalled()
+    expect(discardPendingPathMock).not.toHaveBeenCalled()
+    expect(result.discarded).toBe(2)
+    expect(result.message).toBe('Discarded 2 of 2 file(s) from working tree')
   })
 })

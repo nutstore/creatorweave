@@ -103,11 +103,28 @@ describe('git.tool envelope + validation', () => {
     expect(parsed.error.code).toBe('invalid_arguments')
   })
 
-  it('git_restore validates empty paths', async () => {
+  it('git_restore accepts empty paths and applies to all eligible paths', async () => {
     const raw = await gitRestoreExecutor({ paths: [] }, context)
     const parsed = JSON.parse(raw)
-    expect(parsed.ok).toBe(false)
-    expect(parsed.error.code).toBe('invalid_arguments')
+    expect(parsed.ok).toBe(true)
+    expect(mocked.gitRestoreMock).toHaveBeenCalledWith(
+      'ws_1',
+      expect.objectContaining({
+        paths: [],
+      })
+    )
+  })
+
+  it('git_restore accepts omitted paths and applies to all eligible paths', async () => {
+    const raw = await gitRestoreExecutor({}, context)
+    const parsed = JSON.parse(raw)
+    expect(parsed.ok).toBe(true)
+    expect(mocked.gitRestoreMock).toHaveBeenCalledWith(
+      'ws_1',
+      expect.objectContaining({
+        paths: [],
+      })
+    )
   })
 
   it('returns no_active_workspace when workspace missing', async () => {

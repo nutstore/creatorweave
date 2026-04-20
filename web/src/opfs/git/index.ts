@@ -539,16 +539,16 @@ export async function gitRestore(
   const repo = getFSOverlayRepository()
   const db = getSQLiteDB()
   const paths = options?.paths || []
+  const hasPathFilter = paths.length > 0
   const staged = options?.staged || false
   const worktree = options?.worktree !== false
-
-  if (paths.length === 0) {
-    throw new Error('No paths specified')
-  }
 
   let restored = 0
   let discarded = 0
   let unstaged = 0
+  let total = hasPathFilter ? paths.length : 0
+  let usedSnapshotRestore = false
+  let usedWorktreeDiscard = false
   const unresolved: string[] = []
   const matchedPaths = new Set<string>()
 
@@ -562,7 +562,8 @@ export async function gitRestore(
          AND review_status = 'approved'`,
       [workspaceId]
     )
-    const matched = selectPathMatchedItems(approvedRows, paths)
+    const matched = hasPathFilter ? selectPathMatchedItems(approvedRows, paths) : approvedRows
+    if (!hasPathFilter) total = approvedRows.length
     if (matched.length > 0) {
       const draftChangesetId = await repo.getOrCreateDraftChangeset(workspaceId, 'tool')
       const now = Date.now()
@@ -585,6 +586,7 @@ export async function gitRestore(
     const targetSnapshotId = options?.snapshotId
 
     if (targetSnapshotId) {
+      usedSnapshotRestore = true
       // Restore specific files from a snapshot
       const manager = await getWorkspaceManager()
       const workspace = await manager.getWorkspace(workspaceId)
@@ -593,7 +595,8 @@ export async function gitRestore(
       }
 
       const ops = await repo.listSnapshotOps(workspaceId, targetSnapshotId)
-      const targetOps = selectPathMatchedItems(ops, paths)
+      const targetOps = hasPathFilter ? selectPathMatchedItems(ops, paths) : ops
+      if (!hasPathFilter) total = ops.length
       for (const op of targetOps) matchedPaths.add(op.path)
 
       for (const op of targetOps) {
@@ -613,20 +616,36 @@ export async function gitRestore(
         restored++
       }
     } else {
+      usedWorktreeDiscard = true
       // Discard pending changes
       const pending = await repo.listPendingOps(workspaceId)
-      const targetPending = selectPathMatchedItems(pending, paths)
-      for (const change of targetPending) {
-        matchedPaths.add(change.path)
-        await repo.discardPendingPath(workspaceId, change.path)
-        discarded++
+      const targetPending = hasPathFilter ? selectPathMatchedItems(pending, paths) : pending
+      if (!hasPathFilter) total = pending.length
+      if (targetPending.length > 0) {
+        const manager = await getWorkspaceManager()
+        const workspace = await manager.getWorkspace(workspaceId)
+        if (!workspace) {
+          throw new Error(`Workspace ${workspaceId} not found`)
+        }
+
+        if (!hasPathFilter) {
+          await workspace.discardAllPendingChanges()
+          for (const change of targetPending) matchedPaths.add(change.path)
+          discarded = targetPending.length
+        } else {
+          for (const change of targetPending) {
+            matchedPaths.add(change.path)
+            await workspace.discardPendingPath(change.path)
+            discarded++
+          }
+        }
       }
     }
   }
 
-  const unmatchedPatterns = paths.filter((pattern) =>
-    !Array.from(matchedPaths).some((path) => isPathPatternMatch(path, pattern))
-  )
+  const unmatchedPatterns = hasPathFilter
+    ? paths.filter((pattern) => !Array.from(matchedPaths).some((path) => isPathPatternMatch(path, pattern)))
+    : []
 
   return {
     restored,
@@ -640,7 +659,9 @@ export async function gitRestore(
       discarded,
       unstaged,
       unresolved: unresolved.length,
-      total: paths.length,
+      total,
+      usedSnapshotRestore,
+      usedWorktreeDiscard,
     }),
   }
 }
@@ -673,12 +694,15 @@ function formatRestoreMessage(params: {
   unstaged: number
   unresolved: number
   total: number
+  usedSnapshotRestore: boolean
+  usedWorktreeDiscard: boolean
 }): string {
-  const { staged, restored, discarded, unstaged, unresolved, total } = params
+  const { staged, restored, discarded, unstaged, unresolved, total, usedSnapshotRestore, usedWorktreeDiscard } =
+    params
   if (staged) {
     return `Unstaged ${unstaged} of ${total} path(s)`
   }
-  if (discarded > 0 && restored === 0) {
+  if (usedWorktreeDiscard) {
     return `Discarded ${discarded} of ${total} file(s) from working tree`
   }
   if (restored > 0 && discarded > 0) {
@@ -686,6 +710,9 @@ function formatRestoreMessage(params: {
   }
   if (unresolved > 0) {
     return `Restored ${restored} of ${total} file(s), ${unresolved} unresolved`
+  }
+  if (usedSnapshotRestore) {
+    return `Restored ${restored} of ${total} file(s) from snapshot`
   }
   return `Restored ${restored} of ${total} file(s) from snapshot`
 }
