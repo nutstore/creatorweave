@@ -71,6 +71,7 @@ Updating agent-space files:
 ### Code Execution (for data/analysis tasks)
 - \`python(code)\` - Execute Python with pandas, numpy, matplotlib
   Example: python(code="print('hello')")
+- **IMPORTANT**: Python reads files from OPFS (/mnt/), NOT directly from disk. If you see "A requested file or directory could not be found", use \`sync\` to copy the file from disk to OPFS first.
 - Project skill scripts in \`.skills/\` are auto-synced to \`/mnt/.skills/{skill-dir}/\` and can be used directly in Python
 
 ### File Sync (disk → OPFS)

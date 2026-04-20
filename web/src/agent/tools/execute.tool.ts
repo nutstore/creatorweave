@@ -20,7 +20,8 @@ LANGUAGE: python
 - Runs via Pyodide (WebAssembly Python runtime)
 - Built-in packages: pandas, numpy, matplotlib, openpyxl, pillow, scipy, sklearn
 - For matplotlib: set matplotlib.use('Agg') BEFORE creating figures
-- Files accessible at /mnt/ path (workspace subdirectory)
+- Files accessible at /mnt/ path (workspace OPFS directory)
+- IMPORTANT: /mnt/ reads from OPFS, NOT directly from disk. If you see errors like "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
 - Project skill resources (.skills/ directory) are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
   Example: if .skills/word-processor/scripts/convert.py exists, use \`exec(open('/mnt/.skills/word-processor/scripts/convert.py').read())\` or \`import sys; sys.path.insert(0, '/mnt/.skills/word-processor/scripts')\`
 
