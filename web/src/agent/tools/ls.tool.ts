@@ -5,7 +5,8 @@
  * - With pattern: Search for files matching glob pattern
  * - Without pattern: List directory contents in tree format
  *
- * Smart mode detection based on parameters.
+ * For workspace scope, lists from OPFS files/ directory (mounted at /mnt/ in Python)
+ * so agent sees the same files as Pyodide, including pending changes and synced resources.
  */
 
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
@@ -118,6 +119,30 @@ function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes}B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
+}
+
+/**
+ * Get the OPFS files/ directory handle for the active workspace.
+ * Used so ls sees the same files as Pyodide at /mnt/.
+ */
+async function getOPFSFilesHandle(workspaceId?: string | null): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const manager = await getWorkspaceManager()
+    let workspace
+    if (workspaceId) {
+      workspace = await manager.getWorkspace(workspaceId)
+    }
+    if (!workspace) {
+      const { getActiveWorkspace } = await import('@/store/workspace.store')
+      const active = await getActiveWorkspace()
+      workspace = active?.workspace
+    }
+    if (!workspace) return null
+    return await workspace.getFilesDir()
+  } catch {
+    return null
+  }
 }
 
 export const lsExecutor: ToolExecutor = async (args, context) => {
@@ -276,71 +301,77 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
       return agents.map((agent) => `${agent.id}/`).join('\n')
     }
 
-    const { handle: searchHandle } = await scope.resolveHandle(scope.subPath)
+    // Resolve native FS handle (disk files)
+    const { handle: nativeHandle } = await scope.resolveHandle(scope.subPath)
+
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs
     const entries: Array<{ path: string; type: 'file' | 'directory'; size: number; depth: number }> = []
-    const queue: Array<{ handle: FileSystemDirectoryHandle; path: string; depth: number }> = [
-      { handle: searchHandle, path: '', depth: 0 },
-    ]
-
+    const seenPaths = new Set<string>()
     let isTruncated = false
     let timedOut = false
 
-    while (queue.length > 0) {
-      if (abortSignal?.aborted) {
-        return JSON.stringify({ error: 'List failed: operation aborted' })
-      }
-      const current = queue.shift()!
-      if (Date.now() > deadlineAt) {
-        timedOut = true
-        break
-      }
+    // Helper to scan a directory tree and collect entries
+    const scanTree = async (rootHandle: FileSystemDirectoryHandle) => {
+      const queue: Array<{ handle: FileSystemDirectoryHandle; path: string; depth: number }> = [
+        { handle: rootHandle, path: '', depth: 0 },
+      ]
 
-      const handles = await readDirectoryEntriesSorted(current.handle)
-      for (const handle of handles) {
-        if (abortSignal?.aborted) {
-          return JSON.stringify({ error: 'List failed: operation aborted' })
-        }
-        if (Date.now() > deadlineAt) {
-          timedOut = true
-          break
-        }
+      while (queue.length > 0) {
+        if (abortSignal?.aborted) return
+        const current = queue.shift()!
+        if (Date.now() > deadlineAt) { timedOut = true; break }
 
-        const childDepth = current.depth + 1
-        if (childDepth > maxDepth) continue
+        const handles = await readDirectoryEntriesSorted(current.handle)
+        for (const handle of handles) {
+          if (abortSignal?.aborted) return
+          if (Date.now() > deadlineAt) { timedOut = true; break }
 
-        const relPath = current.path ? `${current.path}/${handle.name}` : handle.name
-        if (handle.kind === 'directory') {
-          if (shouldSkipDirectory(handle.name, includeIgnored, extraExcludes)) continue
-          entries.push({ path: relPath, type: 'directory', size: 0, depth: childDepth })
-          queue.push({
-            handle: handle as FileSystemDirectoryHandle,
-            path: relPath,
-            depth: childDepth,
-          })
-        } else {
-          let size = 0
-          if (includeSizes) {
-            try {
-              if (abortSignal?.aborted) {
-                return JSON.stringify({ error: 'List failed: operation aborted' })
-              }
-              const file = await (handle as FileSystemFileHandle).getFile()
-              size = file.size
-            } catch {
-              size = 0
+          const childDepth = current.depth + 1
+          if (childDepth > maxDepth) continue
+
+          const relPath = current.path ? `${current.path}/${handle.name}` : handle.name
+
+          // Skip if already seen (native takes precedence)
+          if (seenPaths.has(relPath)) continue
+          seenPaths.add(relPath)
+
+          if (handle.kind === 'directory') {
+            if (shouldSkipDirectory(handle.name, includeIgnored, extraExcludes)) continue
+            entries.push({ path: relPath, type: 'directory', size: 0, depth: childDepth })
+            queue.push({ handle: handle as FileSystemDirectoryHandle, path: relPath, depth: childDepth })
+          } else {
+            let size = 0
+            if (includeSizes) {
+              try {
+                const file = await (handle as FileSystemFileHandle).getFile()
+                size = file.size
+              } catch { size = 0 }
             }
+            entries.push({ path: relPath, type: 'file', size, depth: childDepth })
           }
-          entries.push({ path: relPath, type: 'file', size, depth: childDepth })
-        }
 
-        if (maxEntries !== undefined && entries.length >= maxEntries) {
-          isTruncated = true
-          break
+          if (maxEntries !== undefined && entries.length >= maxEntries) {
+            isTruncated = true
+            break
+          }
+        }
+        if (isTruncated || timedOut) break
+      }
+    }
+
+    // 1. Scan native FS (disk files — base)
+    await scanTree(nativeHandle)
+
+    // 2. Merge OPFS-only files (pending changes, .skills/, etc.)
+    if (!isTruncated && !timedOut && scope.kind === 'workspace') {
+      const opfsHandle = await getOPFSFilesHandle(toolContext.workspaceId)
+      if (opfsHandle) {
+        const resolved = await resolveDirectoryHandle(opfsHandle, scope.subPath, { allowMissing: true })
+        if (resolved.exists) {
+          await scanTree(resolved.handle)
         }
       }
-      if (isTruncated || timedOut) break
     }
 
     if (timedOut) {
@@ -527,9 +558,27 @@ async function executeGlobMode(
 
     const staticPrefix = scope.subPath ? '' : getStaticGlobPrefix(pattern)
     const effectiveRoot = scope.subPath || staticPrefix
-    const { handle: searchHandle, exists } = await scope.resolveHandle(effectiveRoot, {
-      allowMissing: !scope.subPath && !!staticPrefix,
-    })
+
+    // For workspace scope, prefer OPFS files/ so glob sees the same files as Pyodide at /mnt/
+    let searchHandle: FileSystemDirectoryHandle
+    let exists = true
+    if (scope.kind === 'workspace') {
+      const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
+      if (opfsFilesHandle) {
+        const resolved = await resolveDirectoryHandle(opfsFilesHandle, effectiveRoot, { allowMissing: true })
+        searchHandle = resolved.handle
+        exists = resolved.exists
+      } else {
+        const r = await scope.resolveHandle(effectiveRoot, { allowMissing: true })
+        searchHandle = r.handle
+        exists = r.exists
+      }
+    } else {
+      const r = await scope.resolveHandle(effectiveRoot, { allowMissing: true })
+      searchHandle = r.handle
+      exists = r.exists
+    }
+
     if (!exists) {
       return `No files matching pattern "${pattern}"`
     }
