@@ -3,7 +3,7 @@
  * draft assistant bubble, and workflow progress panels.
  */
 
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, type RefObject } from 'react'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
