@@ -2214,12 +2214,11 @@ export class WorkspaceRuntime {
           nativeFsMtime = file.lastModified
 
           if (change.type === 'modify') {
-            // Compare OPFS content with native content.
-            // If identical (only mtime drifted), skip — no real change to sync.
-            const contentType = getFileContentType(normalizedPath)
-            const nativeContent = contentType === 'text'
-              ? await file.text()
-              : await file.arrayBuffer()
+            // Compare OPFS content with native content as raw bytes.
+            // Always use ArrayBuffer to avoid encoding round-trip issues
+            // (e.g. GBK/Latin1 text decoded via file.text() would not
+            // survive a TextEncoder re-encode).
+            const nativeContent = await file.arrayBuffer()
 
             const opfsContent = await this.readFromFilesDir(normalizedPath)
             if (opfsContent && await this.areFileContentsEqual(nativeContent, opfsContent.content)) {
