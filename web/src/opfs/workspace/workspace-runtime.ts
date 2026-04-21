@@ -2206,9 +2206,6 @@ export class WorkspaceRuntime {
     for (const change of changes) {
       let nativeFsMtime: number | undefined
 
-      // Read native FS mtime as baseline when available.
-      // OPFS mtime from detectChanges is NOT the same as native FS mtime —
-      // using it as baseline causes false conflict detections.
       if (directoryHandle) {
         try {
           const normalizedPath = this.normalizeWorkspacePath(change.path)
@@ -2216,13 +2213,22 @@ export class WorkspaceRuntime {
           const file = await fileHandle.getFile()
           nativeFsMtime = file.lastModified
 
-          // Capture baseline snapshot for content-comparison fallback
           if (change.type === 'modify') {
+            // Compare OPFS content with native content.
+            // If identical (only mtime drifted), skip — no real change to sync.
             const contentType = getFileContentType(normalizedPath)
-            const baselineContent = contentType === 'text'
+            const nativeContent = contentType === 'text'
               ? await file.text()
               : await file.arrayBuffer()
-            await this.captureModifyBaseline(normalizedPath, baselineContent)
+
+            const opfsContent = await this.readFromFilesDir(normalizedPath)
+            if (opfsContent && await this.areFileContentsEqual(nativeContent, opfsContent.content)) {
+              console.log(`[WorkspaceRuntime] Skipping no-op mtime change: ${normalizedPath}`)
+              continue
+            }
+
+            // Content differs — capture baseline for conflict resolution fallback
+            await this.captureModifyBaseline(normalizedPath, nativeContent)
           }
         } catch {
           // File may not exist on native FS (genuinely new file) — use OPFS mtime
