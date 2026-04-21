@@ -97,13 +97,15 @@ export class SkillManager {
     let added = 0
     let resourcesAdded = 0
 
-    // First, save all skills
+    // Save all skills — upsert keeps project skills in sync with disk
     for (const skill of skills) {
       const existing = await storage.getSkillById(skill.id)
+      await storage.saveSkill(skill, '')
       if (!existing) {
-        await storage.saveSkill(skill, '')
         added++
         console.log(`[SkillManager] Imported skill: ${skill.name} (${skill.id})`)
+      } else {
+        console.log(`[SkillManager] Updated skill: ${skill.name} (${skill.id})`)
       }
     }
 

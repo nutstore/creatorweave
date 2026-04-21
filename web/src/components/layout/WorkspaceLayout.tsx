@@ -36,6 +36,8 @@ import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ProjectSkillsDialog } from '@/components/skills/ProjectSkillsDialog'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
 import { scanProjectSkills, syncResourcesToOPFS, syncProjectSkillsToActiveWorkspace } from '@/skills/skill-scanner'
+import { getSkillManager } from '@/skills/skill-manager'
+import * as skillStorage from '@/skills/skill-storage'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { createUserMessage } from '@/agent/message-types'
@@ -280,19 +282,33 @@ export function WorkspaceLayout({
         }
 
         if (result.skills.length > 0) {
-          // Filter out skills that already exist in store
+          // Sync all scanned skills to SQLite (upsert keeps disk → DB in sync)
+          const manager = getSkillManager()
+          for (const skill of result.skills) {
+            const existing = await skillStorage.getSkillById(skill.id)
+            await skillStorage.saveSkill(skill, '')
+            if (!existing) {
+              console.log(`[WorkspaceLayout] Imported skill: ${skill.name} (${skill.id})`)
+            } else {
+              console.log(`[WorkspaceLayout] Updated skill: ${skill.name} (${skill.id})`)
+            }
+          }
+
+          // Refresh resources for scanned skills
+          for (const skill of result.skills) {
+            await skillStorage.deleteSkillResources(skill.id)
+          }
+          for (const resource of result.resources) {
+            await skillStorage.saveSkillResource(resource)
+          }
+
+          // Refresh SkillManager in-memory cache + UI store
+          await manager.refreshCache()
+          await skillsStore.loadSkills()
+
+          // Only show dialog for brand-new skills the user hasn't seen yet
           const existingIds = new Set(skillsStore.skills.map((s) => s.id))
           const newSkills = result.skills.filter((s) => !existingIds.has(s.id))
-
-          console.log(
-            '[WorkspaceLayout] Found skills:',
-            result.skills.map((s) => ({ id: s.id, name: s.name }))
-          )
-          console.log('[WorkspaceLayout] Already loaded skill IDs:', Array.from(existingIds))
-          console.log(
-            '[WorkspaceLayout] New skills (not loaded yet):',
-            newSkills.map((s) => ({ id: s.id, name: s.name }))
-          )
 
           if (newSkills.length > 0) {
             setProjectSkills(newSkills)
