@@ -48,6 +48,20 @@ import { syncToOPFSDefinition, syncToOPFSExecutor } from './tools/sync-opfs.tool
 
 // Switch mode tool
 import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
+import {
+  getSubagentStatusDefinition,
+  getSubagentStatusExecutor,
+  listSubagentsDefinition,
+  listSubagentsExecutor,
+  resumeSubagentDefinition,
+  resumeSubagentExecutor,
+  sendMessageToSubagentDefinition,
+  sendMessageToSubagentExecutor,
+  spawnSubagentDefinition,
+  spawnSubagentExecutor,
+  stopSubagentDefinition,
+  stopSubagentExecutor,
+} from './tools/subagent.tool'
 
 // Changeset tools (snapshot, sync, conflicts)
 import {
@@ -88,6 +102,12 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: detectConflictsDefinition, executor: detectConflictsExecutor },
   // Meta tools
   { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
+  { definition: spawnSubagentDefinition, executor: spawnSubagentExecutor },
+  { definition: sendMessageToSubagentDefinition, executor: sendMessageToSubagentExecutor },
+  { definition: stopSubagentDefinition, executor: stopSubagentExecutor },
+  { definition: resumeSubagentDefinition, executor: resumeSubagentExecutor },
+  { definition: getSubagentStatusDefinition, executor: getSubagentStatusExecutor },
+  { definition: listSubagentsDefinition, executor: listSubagentsExecutor },
 ]
 
 export function getBuiltinToolNames(): string[] {

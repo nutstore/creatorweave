@@ -50,6 +50,13 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   // Skill tools (read-only)
   ['read_skill', { name: 'read_skill', category: 'read' }],
   ['read_skill_resource', { name: 'read_skill_resource', category: 'read' }],
+  // Subagent orchestration tools (read-only orchestration surface)
+  ['spawn_subagent', { name: 'spawn_subagent', category: 'read' }],
+  ['send_message_to_subagent', { name: 'send_message_to_subagent', category: 'read' }],
+  ['stop_subagent', { name: 'stop_subagent', category: 'read' }],
+  ['resume_subagent', { name: 'resume_subagent', category: 'read' }],
+  ['get_subagent_status', { name: 'get_subagent_status', category: 'read' }],
+  ['list_subagents', { name: 'list_subagents', category: 'read' }],
   
   // ============================================================================
   // WRITE TOOLS (Only available in Act mode)

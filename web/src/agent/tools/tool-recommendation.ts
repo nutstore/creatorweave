@@ -221,6 +221,14 @@ const TOOL_METADATA: Record<
     description: 'Execute Python code',
     baseExample: 'python(code="print(1+1)")',
   },
+  spawn_subagent: {
+    name: 'spawn_subagent',
+    displayName: 'Subagent Delegation',
+    category: 'batch',
+    intents: ['batch-operations', 'debugging', 'refactoring', 'documentation'],
+    description: 'Delegate independent subtasks for parallel execution',
+    baseExample: 'spawn_subagent(description="Audit API handlers", prompt="Find all TODOs in api/** and summarize risk by file")',
+  },
 }
 
 //=============================================================================

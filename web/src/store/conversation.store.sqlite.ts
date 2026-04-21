@@ -393,6 +393,7 @@ import { createToolPolicyHooks } from '@/agent/tool-policy'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
 import { ContextManager } from '@/agent/context-manager'
 import { getToolRegistry } from '@/agent/tool-registry'
+import { getOrCreateSubagentRuntime } from '@/agent/subagent/runtime'
 import { getApiKeyRepository } from '@/sqlite'
 import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
 import { generateFollowUp } from '@/agent/follow-up-generator'
@@ -406,6 +407,7 @@ import { getWorkflowTemplateBundle, listWorkflowTemplateBundles } from '@/agent/
 import { getConversationRepository, initSQLiteDB } from '@/sqlite'
 import { useSettingsStore } from './settings.store'
 import { getCurrentWorkspaceAgentMode } from './workspace-preferences.store'
+import type { SubagentTaskNotification } from '@/agent/tools/tool-types'
 
 // Follow-up suggestions are enabled by default
 
@@ -1797,6 +1799,32 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               : 20
 
         const agentMode = getCurrentWorkspaceAgentMode()
+        const subagentRuntime = getOrCreateSubagentRuntime({
+          workspaceId: conversationId,
+          provider,
+          toolRegistry,
+          contextManager,
+          baseToolContext: {
+            directoryHandle,
+            workspaceId: conversationId,
+            projectId: activeProjectId,
+            currentAgentId: activeAgentId,
+            agentMode,
+          },
+          onNotification: (event: SubagentTaskNotification) => {
+            const line = `[task_notification] ${event.status} ${event.agentId} - ${event.summary}`
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (!c) return
+              c.messages.push(createAssistantMessage(line))
+              c.updatedAt = Date.now()
+            })
+            const snapshot = get().conversations.find((c) => c.id === conversationId)
+            if (snapshot) {
+              void persistConversation(snapshot)
+            }
+          },
+        })
 
         const agentLoop = new AgentLoop({
           provider,
@@ -1808,6 +1836,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             workspaceId: conversationId,
             projectId: activeProjectId,
             currentAgentId: activeAgentId,
+            agentMode,
+            subagentRuntime,
             workflowProgress: workflowProgressHooks,
           },
           maxIterations,
