@@ -14,6 +14,7 @@ import micromatch from 'micromatch'
 import { resolveVfsTarget } from './vfs-resolver'
 import { resolveNativeDirectoryHandle, resolveWorkspaceDirectoryHandle } from './tool-utils'
 import {
+  DOT_GLOB_WHITELIST,
   getStaticGlobPrefix,
   normalizeSubPath,
   parseBoundedInt,
@@ -560,14 +561,20 @@ async function executeGlobMode(
     const effectiveRoot = scope.subPath || staticPrefix
 
     // For workspace scope, prefer OPFS files/ so glob sees the same files as Pyodide at /mnt/
+    // Fall back to native FS when OPFS cannot resolve the requested path.
     let searchHandle: FileSystemDirectoryHandle
     let exists = true
     if (scope.kind === 'workspace') {
       const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
       if (opfsFilesHandle) {
         const resolved = await resolveDirectoryHandle(opfsFilesHandle, effectiveRoot, { allowMissing: true })
-        searchHandle = resolved.handle
-        exists = resolved.exists
+        if (resolved.exists) {
+          searchHandle = resolved.handle
+        } else {
+          const r = await scope.resolveHandle(effectiveRoot, { allowMissing: true })
+          searchHandle = r.handle
+          exists = r.exists
+        }
       } else {
         const r = await scope.resolveHandle(effectiveRoot, { allowMissing: true })
         searchHandle = r.handle
@@ -582,6 +589,10 @@ async function executeGlobMode(
     if (!exists) {
       return `No files matching pattern "${pattern}"`
     }
+
+    // Enable dot matching when the search root contains a whitelisted dot-directory
+    const globDot = effectiveRoot.split('/').some((seg) => DOT_GLOB_WHITELIST.has(seg))
+    const micromatchOpts = globDot ? { dot: true } : undefined
 
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs
@@ -628,7 +639,7 @@ async function executeGlobMode(
           continue
         }
 
-        if (micromatch.isMatch(fullPath, pattern) || micromatch.isMatch(localPath, pattern)) {
+        if (micromatch.isMatch(fullPath, pattern, micromatchOpts) || micromatch.isMatch(localPath, pattern, micromatchOpts)) {
           matches.push(fullPath)
           if (maxResults !== undefined && matches.length >= maxResults) {
             isTruncated = true

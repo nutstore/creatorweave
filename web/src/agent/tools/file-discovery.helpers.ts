@@ -4,6 +4,13 @@
 
 const GLOB_META_RE = /[*?[\]{}()!+@]/
 
+/**
+ * Dot-prefixed directories allowed in glob matching.
+ * micromatch's `**` skips dot-prefixed segments by default;
+ * directories listed here will enable `{ dot: true }` so they are traversed.
+ */
+export const DOT_GLOB_WHITELIST = new Set(['.skills'])
+
 export const DEFAULT_EXCLUDED_DIRS = new Set([
   '.git',
   'node_modules',
