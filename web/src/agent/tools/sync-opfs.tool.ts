@@ -66,7 +66,25 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   // Expand globs and collect actual file paths
   const resolvedPaths = await resolvePaths(nativeHandle, paths as string[])
   if (resolvedPaths.length === 0) {
-    return toolErrorJson('sync', 'no_files', 'No files found matching the given paths')
+    // If none are found on native FS, check whether paths already exist in OPFS.
+    // In that case syncing is unnecessary and returning no_files is misleading.
+    const alreadyInOPFS = await resolvePaths(filesDir, paths as string[])
+    if (alreadyInOPFS.length > 0) {
+      return toolOkJson('sync', {
+        synced: 0,
+        skipped: alreadyInOPFS.length,
+        skippedReason: 'Files already exist in OPFS (sync not required)',
+      })
+    }
+    return toolErrorJson(
+      'sync',
+      'no_files',
+      'No files found on native filesystem matching the given paths',
+      {
+        hint: 'Paths are resolved relative to workspace root.',
+        details: { requested_paths: paths },
+      }
+    )
   }
 
   // Sync files
@@ -120,8 +138,10 @@ async function resolvePaths(
   const seen = new Set<string>()
 
   for (const pattern of patterns) {
+    const raw = String(pattern ?? '').trim()
+    if (!raw) continue
     // Normalize: remove leading ./
-    const normalized = pattern.replace(/^\.\//, '')
+    const normalized = raw.replace(/^(\.\/)+/, '')
 
     if (normalized.includes('*') || normalized.includes('?')) {
       // Glob pattern - expand
