@@ -74,10 +74,21 @@ export function getStaticGlobPrefix(pattern: string): string {
   if (!normalized) return ''
   const parts = normalized.split('/').filter(Boolean)
   const prefix: string[] = []
+  let encounteredMeta = false
   for (const part of parts) {
-    if (GLOB_META_RE.test(part)) break
+    if (GLOB_META_RE.test(part)) {
+      encounteredMeta = true
+      break
+    }
     prefix.push(part)
   }
+
+  // For exact-path patterns (no glob meta), only use the parent directory as
+  // search root. Otherwise we'd try resolving a file name as a directory.
+  if (!encounteredMeta && prefix.length > 0) {
+    prefix.pop()
+  }
+
   return prefix.join('/')
 }
 
@@ -114,4 +125,3 @@ export async function readDirectoryEntriesSorted(dir: FileSystemDirectoryHandle)
   })
   return entries
 }
-

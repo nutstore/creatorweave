@@ -38,6 +38,25 @@ function createEmptyDirectoryHandle(name = 'root'): FileSystemDirectoryHandle {
   } as unknown as FileSystemDirectoryHandle
 }
 
+function createDirectoryHandleWithFiles(fileNames: string[], name = 'root'): FileSystemDirectoryHandle {
+  return {
+    kind: 'directory',
+    name,
+    entries: async function* () {
+      for (const fileName of fileNames) {
+        yield [
+          fileName,
+          {
+            kind: 'file',
+            name: fileName,
+          } as unknown as FileSystemFileHandle,
+        ] as const
+      }
+    },
+    getDirectoryHandle: vi.fn(async () => createEmptyDirectoryHandle('child')),
+  } as unknown as FileSystemDirectoryHandle
+}
+
 describe('ls tool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -173,5 +192,37 @@ describe('ls tool', () => {
 
     expect(result).toContain('novel-editor/SOUL.md')
     expect(resolveAgentHandle).toHaveBeenCalledWith('novel-editor', '', { allowMissing: false })
+  })
+
+  it('matches exact Chinese filename pattern at workspace root', async () => {
+    const rootHandle = createDirectoryHandleWithFiles([
+      '贷款合同模板.docx',
+      'AI智能助手简介（丰富版）.docx',
+      'AI助手简介.docx',
+    ])
+
+    const result = await lsExecutor(
+      { pattern: '贷款合同模板.docx' },
+      { directoryHandle: rootHandle } as unknown as ToolContext
+    )
+
+    expect(result).toContain('贷款合同模板.docx')
+    expect(result).not.toContain('No files matching pattern')
+  })
+
+  it('matches exact Chinese filename pattern when path is "./"', async () => {
+    const rootHandle = createDirectoryHandleWithFiles([
+      '贷款合同模板.docx',
+      'AI智能助手简介（丰富版）.docx',
+      'AI助手简介.docx',
+    ])
+
+    const result = await lsExecutor(
+      { path: './', pattern: '贷款合同模板.docx' },
+      { directoryHandle: rootHandle } as unknown as ToolContext
+    )
+
+    expect(result).toContain('贷款合同模板.docx')
+    expect(result).not.toContain('No files matching pattern')
   })
 })
