@@ -5,6 +5,7 @@ import { createUserMessage, generateId, type Message } from '@/agent/message-typ
 import type { PiAIProvider } from '@/agent/llm/pi-ai-provider'
 import type { ToolRegistry } from '@/agent/tool-registry'
 import type {
+  BatchSpawnSubagentInput,
   SpawnSubagentInput,
   SpawnSubagentSyncResult,
   SubagentRuntime,
@@ -49,6 +50,7 @@ If you encounter errors, describe them clearly including what you tried and what
 
 const SUBAGENT_CONTROL_TOOLS = new Set([
   'spawn_subagent',
+  'batch_spawn',
   'send_message_to_subagent',
   'stop_subagent',
   'resume_subagent',
@@ -60,10 +62,11 @@ class SubagentRuntimeImpl implements SubagentRuntime {
   private tasks = new Map<string, SubagentTaskInternal>()
   private nameToId = new Map<string, string>()
   private deps: RuntimeDeps
+  private hydrationPromise: Promise<void>
 
   constructor(deps: RuntimeDeps) {
     this.deps = deps
-    this.hydrateFromStorage()
+    this.hydrationPromise = this.hydrateFromSQLite()
   }
 
   updateDeps(deps: RuntimeDeps): void {
@@ -73,6 +76,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
   async spawn(
     input: SpawnSubagentInput
   ): Promise<SpawnSubagentSyncResult | { status: 'async_launched'; agentId: string }> {
+    await this.ensureHydrated()
     const description = (input.description || '').trim()
     const prompt = (input.prompt || '').trim()
     const name = typeof input.name === 'string' ? input.name.trim() : undefined
@@ -111,7 +115,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
 
     this.tasks.set(agentId, task)
     if (name) this.nameToId.set(name, agentId)
-    this.persistToStorage()
+    this.persistToSQLite()
 
     if (runInBackground) {
       this.ensureProcessing(task)
@@ -147,6 +151,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     resumed?: boolean
     resume_error?: { code: string; message: string; recoverable: boolean }
   }> {
+    await this.ensureHydrated()
     const to = (input.to || '').trim()
     const message = (input.message || '').trim()
     if (!message) {
@@ -178,7 +183,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       task.queue.push({ message, enqueued_at: queuedAt })
       task.updated_at = queuedAt
       task.last_activity_at = queuedAt
-      this.persistToStorage()
+      this.persistToSQLite()
       this.ensureProcessing(task)
       return {
         success: true,
@@ -192,7 +197,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     task.queue.push({ message, enqueued_at: queuedAt })
     task.updated_at = queuedAt
     task.last_activity_at = queuedAt
-    this.persistToStorage()
+    this.persistToSQLite()
     this.ensureProcessing(task)
     return {
       success: true,
@@ -206,6 +211,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     agentId: string
     force?: boolean
   }): Promise<{ success: boolean; already_stopped?: boolean }> {
+    await this.ensureHydrated()
     const task = this.getByIdOrName((input.agentId || '').trim())
     if (!task) {
       throw new Error('TASK_NOT_FOUND')
@@ -220,7 +226,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     task.error = input.force
       ? { code: 'STOPPED_FORCE', message: 'Subagent stopped by force.' }
       : { code: 'STOPPED', message: 'Subagent stopped.' }
-    this.persistToStorage()
+    this.persistToSQLite()
     this.emitNotification({
       event_type: 'task_notification',
       agentId: task.agentId,
@@ -247,6 +253,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     resumed_from: string | null
     transcript_entries_recovered: number
   }> {
+    await this.ensureHydrated()
     const task = this.getByIdOrName((input.agentId || '').trim())
     if (!task) {
       throw new Error('TASK_NOT_FOUND')
@@ -262,7 +269,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     task.queue.push({ message: prompt, enqueued_at: Date.now() })
     task.updated_at = Date.now()
     task.last_activity_at = task.updated_at
-    this.persistToStorage()
+    this.persistToSQLite()
     this.ensureProcessing(task)
     return {
       status: 'resumed',
@@ -285,6 +292,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     usage?: SubagentTaskUsage
     error?: { code: string; message: string }
   }> {
+    await this.ensureHydrated()
     const task = this.getByIdOrName((input.agentId || '').trim())
     if (!task) {
       throw new Error('TASK_NOT_FOUND')
@@ -310,6 +318,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     agents: SubagentTaskSummary[]
     total: number
   }> {
+    await this.ensureHydrated()
     const statusFilter = typeof input.status === 'string' ? input.status.trim() : ''
     const limit = Number.isFinite(input.limit) ? Math.max(1, Math.min(200, Number(input.limit))) : 50
     const offset = Number.isFinite(input.offset) ? Math.max(0, Math.floor(Number(input.offset))) : 0
@@ -331,6 +340,65 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     }
   }
 
+  async batchSpawn(input: BatchSpawnSubagentInput): Promise<{
+    launched: Array<{
+      task_index: number
+      agentId: string
+    }>
+    rejected: Array<{
+      task_index: number
+      reason: string
+      error_code: string
+    }>
+  }> {
+    await this.ensureHydrated()
+    const tasks = Array.isArray(input.tasks) ? input.tasks : []
+    const maxConcurrency = Number.isFinite(input.max_concurrency)
+      ? Math.max(1, Math.min(20, Math.floor(Number(input.max_concurrency))))
+      : 5
+    const runInBackground = input.run_in_background !== false
+
+    const launched: Array<{ task_index: number; agentId: string }> = []
+    const rejected: Array<{ task_index: number; reason: string; error_code: string }> = []
+
+    let cursor = 0
+    const workers = Array.from({ length: Math.min(maxConcurrency, Math.max(tasks.length, 1)) }).map(
+      async () => {
+        while (cursor < tasks.length) {
+          const taskIndex = cursor
+          cursor += 1
+          const task = tasks[taskIndex]
+          try {
+            const result = await this.spawn({
+              ...task,
+              run_in_background: runInBackground,
+            })
+            if (result.status === 'async_launched') {
+              launched.push({ task_index: taskIndex, agentId: result.agentId })
+            } else {
+              const existing = this.findByDescriptionAndLatest(task.description)
+              launched.push({ task_index: taskIndex, agentId: existing?.agentId || '' })
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            rejected.push({
+              task_index: taskIndex,
+              reason: message,
+              error_code: message.includes('NAME_CONFLICT')
+                ? 'NAME_CONFLICT'
+                : message.includes('INVALID_INPUT')
+                  ? 'INVALID_INPUT'
+                  : 'BATCH_SPAWN_FAILED',
+            })
+          }
+        }
+      }
+    )
+    await Promise.all(workers)
+
+    return { launched, rejected }
+  }
+
   private getByIdOrName(idOrName: string): SubagentTaskInternal | undefined {
     if (!idOrName) return undefined
     const direct = this.tasks.get(idOrName)
@@ -347,7 +415,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     task.processingPromise = this.processQueue(task).finally(() => {
       task.processing = false
       task.processingPromise = undefined
-      this.persistToStorage()
+      this.persistToSQLite()
     })
     return task.processingPromise
   }
@@ -363,7 +431,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       task.status = 'running'
       task.updated_at = Date.now()
       task.last_activity_at = task.updated_at
-      this.persistToStorage()
+      this.persistToSQLite()
       this.emitNotification({
         event_type: 'task_notification',
         agentId: task.agentId,
@@ -392,13 +460,17 @@ class SubagentRuntimeImpl implements SubagentRuntime {
             tool_calls: task.messages.filter((msg) => msg.role === 'tool').length,
           }
         }
-        this.persistToStorage()
+        const finalResult = this.extractLatestAssistantContent(task.messages)
+        const structured = this.parseStructuredResult(finalResult)
+        this.persistToSQLite()
         this.emitNotification({
           event_type: 'task_notification',
           agentId: task.agentId,
           status: 'completed',
           summary: `Subagent "${task.description}" completed.`,
-          result: this.extractLatestAssistantContent(task.messages),
+          result: finalResult,
+          result_schema_id: structured ? 'subagent.result.v1' : undefined,
+          result_json: structured || undefined,
           exit_reason: 'completed',
           usage: task.usage,
           timestamp: completedAt,
@@ -412,7 +484,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
         task.updated_at = Date.now()
         task.last_activity_at = task.updated_at
         task.error = { code: 'SUBAGENT_FAILED', message }
-        this.persistToStorage()
+        this.persistToSQLite()
         this.emitNotification({
           event_type: 'task_notification',
           agentId: task.agentId,
@@ -475,6 +547,20 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     return (assistant?.content || '').trim()
   }
 
+  private parseStructuredResult(content: string): Record<string, unknown> | null {
+    const trimmed = content.trim()
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null
+    try {
+      const parsed = JSON.parse(trimmed) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+      return null
+    } catch {
+      return null
+    }
+  }
+
   private emitNotification(event: SubagentTaskNotification): void {
     try {
       this.deps.onNotification?.(event)
@@ -483,63 +569,48 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     }
   }
 
-  private getStorageKey(): string {
-    return `creatorweave:subagents:${this.deps.workspaceId}`
+  private async ensureHydrated(): Promise<void> {
+    await this.hydrationPromise
   }
 
-  private persistToStorage(): void {
-    if (typeof localStorage === 'undefined') return
+  private persistToSQLite(): void {
+    void this.persistToSQLiteInternal()
+  }
+
+  private async persistToSQLiteInternal(): Promise<void> {
     try {
-      const serializable = Array.from(this.tasks.values()).map((task) => ({
-        agentId: task.agentId,
-        name: task.name,
-        description: task.description,
-        status: task.status,
-        created_at: task.created_at,
-        updated_at: task.updated_at,
-        last_activity_at: task.last_activity_at,
-        mode: task.mode,
-        messages: task.messages,
-        queue: task.queue,
-        usage: task.usage,
-        error: task.error,
-        stopped: task.stopped,
-      }))
-      localStorage.setItem(this.getStorageKey(), JSON.stringify(serializable))
+      const { getSubagentRepository } = await import('@/sqlite')
+      const repo = getSubagentRepository()
+      const serializable = Array.from(this.tasks.values()).map((task) => this.toStoredTask(task))
+      await repo.saveBatch(this.deps.workspaceId, serializable)
     } catch {
-      // ignore storage write failures
+      // ignore persistence failures for runtime continuity
     }
   }
 
-  private hydrateFromStorage(): void {
-    if (typeof localStorage === 'undefined') return
+  private async hydrateFromSQLite(): Promise<void> {
     try {
-      const raw = localStorage.getItem(this.getStorageKey())
-      if (!raw) return
-      const parsed = JSON.parse(raw) as Array<{
-        agentId: string
-        name?: string
-        description: string
-        status: SubagentTaskStatus
-        created_at: number
-        updated_at: number
-        last_activity_at: number
-        mode: AgentMode
-        messages: Message[]
-        queue: Array<{ message: string; enqueued_at: number }>
-        usage?: SubagentTaskUsage
-        error?: { code: string; message: string }
-        stopped?: boolean
-      }>
+      const { getSubagentRepository } = await import('@/sqlite')
+      const repo = getSubagentRepository()
+      const parsed = await repo.findByWorkspaceId(this.deps.workspaceId)
       for (const item of parsed) {
         const revived: SubagentTaskInternal = {
-          ...item,
+          agentId: item.agentId,
+          name: item.name,
+          description: item.description,
           status:
             item.status === 'running' || item.status === 'pending' ? 'failed' : item.status,
           error:
             item.status === 'running' || item.status === 'pending'
               ? { code: 'SESSION_INTERRUPTED', message: 'Subagent interrupted by session restart.' }
               : item.error,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          last_activity_at: item.last_activity_at,
+          mode: item.mode,
+          messages: item.messages,
+          queue: item.queue,
+          usage: item.usage,
           processing: false,
           processingPromise: undefined,
           loop: undefined,
@@ -549,8 +620,48 @@ class SubagentRuntimeImpl implements SubagentRuntime {
         if (revived.name) this.nameToId.set(revived.name, revived.agentId)
       }
     } catch {
-      // ignore malformed storage
+      // ignore hydration failures; runtime remains usable in-memory
     }
+  }
+
+  private toStoredTask(task: SubagentTaskInternal): {
+    agentId: string
+    workspaceId: string
+    name?: string
+    description: string
+    status: SubagentTaskStatus
+    mode: AgentMode
+    messages: Message[]
+    queue: Array<{ message: string; enqueued_at: number }>
+    usage?: SubagentTaskUsage
+    error?: { code: string; message: string }
+    stopped: boolean
+    created_at: number
+    updated_at: number
+    last_activity_at: number
+  } {
+    return {
+      agentId: task.agentId,
+      workspaceId: this.deps.workspaceId,
+      name: task.name,
+      description: task.description,
+      status: task.status,
+      mode: task.mode,
+      messages: task.messages,
+      queue: task.queue,
+      usage: task.usage,
+      error: task.error,
+      stopped: task.stopped,
+      created_at: task.created_at,
+      updated_at: task.updated_at,
+      last_activity_at: task.last_activity_at,
+    }
+  }
+
+  private findByDescriptionAndLatest(description: string): SubagentTaskInternal | undefined {
+    return Array.from(this.tasks.values())
+      .filter((task) => task.description === description)
+      .sort((a, b) => b.created_at - a.created_at)[0]
   }
 }
 

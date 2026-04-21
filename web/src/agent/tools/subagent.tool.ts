@@ -2,6 +2,7 @@ import { toolErrorJson, toolOkJson } from './tool-envelope'
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 
 const TOOL_NAME_SPAWN = 'spawn_subagent'
+const TOOL_NAME_BATCH_SPAWN = 'batch_spawn'
 const TOOL_NAME_SEND = 'send_message_to_subagent'
 const TOOL_NAME_STOP = 'stop_subagent'
 const TOOL_NAME_RESUME = 'resume_subagent'
@@ -71,6 +72,44 @@ export const sendMessageToSubagentDefinition: ToolDefinition = {
         },
       },
       required: ['to', 'message'],
+    },
+  },
+}
+
+export const batchSpawnDefinition: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: TOOL_NAME_BATCH_SPAWN,
+    description:
+      'Launch multiple independent subagent tasks in one call. Useful for parallelizable subtasks.',
+    parameters: {
+      type: 'object',
+      properties: {
+        tasks: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              description: { type: 'string' },
+              prompt: { type: 'string' },
+              name: { type: 'string' },
+              mode: { type: 'string', enum: ['plan', 'act'] },
+              run_in_background: { type: 'boolean' },
+            },
+            required: ['description', 'prompt'],
+          },
+          description: 'Subagent tasks to launch.',
+        },
+        run_in_background: {
+          type: 'boolean',
+          description: 'When true (default), launch tasks asynchronously.',
+        },
+        max_concurrency: {
+          type: 'number',
+          description: 'Max parallel launches per batch (default 5, max 20).',
+        },
+      },
+      required: ['tasks'],
     },
   },
 }
@@ -184,6 +223,31 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
       isNameConflict ? 'NAME_CONFLICT' : isInputError ? 'INVALID_INPUT' : 'SUBAGENT_SPAWN_FAILED',
       message
     )
+  }
+}
+
+export const batchSpawnExecutor: ToolExecutor = async (args, context) => {
+  const runtime = context.subagentRuntime
+  if (!runtime) return runtimeMissing(TOOL_NAME_BATCH_SPAWN)
+
+  try {
+    const result = await runtime.batchSpawn({
+      tasks: Array.isArray(args.tasks)
+        ? (args.tasks as Array<Record<string, unknown>>).map((task) => ({
+            description: typeof task.description === 'string' ? task.description : '',
+            prompt: typeof task.prompt === 'string' ? task.prompt : '',
+            name: typeof task.name === 'string' ? task.name : undefined,
+            mode: task.mode === 'plan' || task.mode === 'act' ? task.mode : undefined,
+            run_in_background: task.run_in_background === false ? false : true,
+          }))
+        : [],
+      run_in_background: args.run_in_background === false ? false : true,
+      max_concurrency: typeof args.max_concurrency === 'number' ? args.max_concurrency : undefined,
+    })
+    return toolOkJson(TOOL_NAME_BATCH_SPAWN, result)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return toolErrorJson(TOOL_NAME_BATCH_SPAWN, 'BATCH_SPAWN_FAILED', message)
   }
 }
 

@@ -61,6 +61,8 @@ export interface SubagentTaskNotification {
   status: SubagentTaskStatus
   summary: string
   result?: string
+  result_schema_id?: string
+  result_json?: Record<string, unknown>
   exit_reason?: 'completed' | 'error' | 'signal' | 'timeout' | 'rejected' | 'stopped'
   usage?: SubagentTaskUsage
   error?: {
@@ -77,6 +79,12 @@ export interface SpawnSubagentInput {
   name?: string
   mode?: 'plan' | 'act'
   run_in_background?: boolean
+}
+
+export interface BatchSpawnSubagentInput {
+  tasks: Array<SpawnSubagentInput>
+  run_in_background?: boolean
+  max_concurrency?: number
 }
 
 export interface SpawnSubagentSyncResult {
@@ -136,6 +144,17 @@ export interface SubagentRuntime {
   }): Promise<{
     agents: SubagentTaskSummary[]
     total: number
+  }>
+  batchSpawn(input: BatchSpawnSubagentInput): Promise<{
+    launched: Array<{
+      task_index: number
+      agentId: string
+    }>
+    rejected: Array<{
+      task_index: number
+      reason: string
+      error_code: string
+    }>
   }>
 }
 

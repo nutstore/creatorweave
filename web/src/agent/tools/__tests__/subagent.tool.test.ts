@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SubagentRuntime, ToolContext } from '../tool-types'
 import {
+  batchSpawnDefinition,
+  batchSpawnExecutor,
   getSubagentStatusDefinition,
   getSubagentStatusExecutor,
   sendMessageToSubagentDefinition,
@@ -45,12 +47,17 @@ function createMockRuntime(): SubagentRuntime {
       agents: [],
       total: 0,
     }),
+    batchSpawn: vi.fn().mockResolvedValue({
+      launched: [{ task_index: 0, agentId: 'subagent_1' }],
+      rejected: [],
+    }),
   }
 }
 
 describe('subagent tools', () => {
   it('exposes expected tool names', () => {
     expect(spawnSubagentDefinition.function.name).toBe('spawn_subagent')
+    expect(batchSpawnDefinition.function.name).toBe('batch_spawn')
     expect(sendMessageToSubagentDefinition.function.name).toBe('send_message_to_subagent')
     expect(getSubagentStatusDefinition.function.name).toBe('get_subagent_status')
   })
@@ -86,5 +93,19 @@ describe('subagent tools', () => {
     const parsed = parseJson(result)
     expect(parsed.ok).toBe(false)
     expect((parsed.error as { code: string }).code).toBe('TASK_NOT_FOUND')
+  })
+
+  it('supports batch spawn tool', async () => {
+    const runtime = createMockRuntime()
+    const result = await batchSpawnExecutor(
+      {
+        tasks: [{ description: 't1', prompt: 'p1' }],
+        max_concurrency: 2,
+      },
+      { directoryHandle: null, subagentRuntime: runtime } as ToolContext
+    )
+    const parsed = parseJson(result)
+    expect(parsed.ok).toBe(true)
+    expect((runtime.batchSpawn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
   })
 })

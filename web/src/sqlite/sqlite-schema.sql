@@ -61,6 +61,34 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON conversations(updated_at DESC);
 
 -- ============================================================================
+-- Subagent Tasks Table
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS subagent_tasks (
+    agent_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    name TEXT,
+    description TEXT NOT NULL,
+    status TEXT NOT NULL,                   -- 'pending' | 'running' | 'completed' | 'failed' | 'killed'
+    mode TEXT NOT NULL DEFAULT 'act',       -- 'plan' | 'act'
+    messages_json TEXT NOT NULL DEFAULT '[]',
+    queue_json TEXT NOT NULL DEFAULT '[]',
+    usage_json TEXT,
+    error_json TEXT,
+    stopped INTEGER NOT NULL DEFAULT 0,     -- BOOLEAN (0 or 1)
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    last_activity_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_subagent_tasks_workspace_updated
+  ON subagent_tasks(workspace_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subagent_tasks_workspace_status
+  ON subagent_tasks(workspace_id, status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_subagent_tasks_workspace_name
+  ON subagent_tasks(workspace_id, name)
+  WHERE name IS NOT NULL AND name != '';
+
+-- ============================================================================
 -- Skills Table
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS skills (

@@ -84,6 +84,7 @@ Updating agent-space files:
 
 ### Subagent Delegation
 - \`spawn_subagent(description, prompt, ...)\` - Delegate an independent sub-task to a child agent
+- \`batch_spawn(tasks, max_concurrency?, ...)\` - Launch multiple independent child tasks in one call
 - \`send_message_to_subagent(to, message)\` - Send follow-up instruction to a running/pending child
 - \`stop_subagent(agentId)\` - Stop a child task when scope changes
 - \`resume_subagent(agentId, prompt)\` - Resume a stopped/failed/completed child with new instructions

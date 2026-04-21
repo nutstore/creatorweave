@@ -49,6 +49,8 @@ import { syncToOPFSDefinition, syncToOPFSExecutor } from './tools/sync-opfs.tool
 // Switch mode tool
 import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
 import {
+  batchSpawnDefinition,
+  batchSpawnExecutor,
   getSubagentStatusDefinition,
   getSubagentStatusExecutor,
   listSubagentsDefinition,
@@ -103,6 +105,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   // Meta tools
   { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
   { definition: spawnSubagentDefinition, executor: spawnSubagentExecutor },
+  { definition: batchSpawnDefinition, executor: batchSpawnExecutor },
   { definition: sendMessageToSubagentDefinition, executor: sendMessageToSubagentExecutor },
   { definition: stopSubagentDefinition, executor: stopSubagentExecutor },
   { definition: resumeSubagentDefinition, executor: resumeSubagentExecutor },

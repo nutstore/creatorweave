@@ -63,3 +63,6 @@ export type { StoredPlugin } from './repositories/plugin.repository'
 
 export { MCPRepository, getMCPRepository } from './repositories/mcp.repository'
 export type { StoredMCPServer } from './repositories/mcp.repository'
+
+export { SubagentRepository, getSubagentRepository } from './repositories/subagent.repository'
+export type { StoredSubagentTask } from './repositories/subagent.repository'

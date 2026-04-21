@@ -229,6 +229,15 @@ const TOOL_METADATA: Record<
     description: 'Delegate independent subtasks for parallel execution',
     baseExample: 'spawn_subagent(description="Audit API handlers", prompt="Find all TODOs in api/** and summarize risk by file")',
   },
+  batch_spawn: {
+    name: 'batch_spawn',
+    displayName: 'Batch Subagent Delegation',
+    category: 'batch',
+    intents: ['batch-operations', 'refactoring', 'documentation'],
+    description: 'Launch multiple independent subagent tasks in one call',
+    baseExample:
+      'batch_spawn(tasks=[{description:"Scan api",prompt:"..."},{description:"Scan ui",prompt:"..."}], max_concurrency=2)',
+  },
 }
 
 //=============================================================================

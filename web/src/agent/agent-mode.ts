@@ -52,6 +52,7 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['read_skill_resource', { name: 'read_skill_resource', category: 'read' }],
   // Subagent orchestration tools (read-only orchestration surface)
   ['spawn_subagent', { name: 'spawn_subagent', category: 'read' }],
+  ['batch_spawn', { name: 'batch_spawn', category: 'read' }],
   ['send_message_to_subagent', { name: 'send_message_to_subagent', category: 'read' }],
   ['stop_subagent', { name: 'stop_subagent', category: 'read' }],
   ['resume_subagent', { name: 'resume_subagent', category: 'read' }],
