@@ -48,18 +48,22 @@ Examples:
   },
 }
 
-export const pythonToolExecutor: ToolExecutor = async (args, _context) => {
+export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const code = args.code as string
   const timeout = (args.timeout as number) || 60000
 
-  return executePython(code, timeout)
+  return executePython(code, timeout, context.directoryHandle)
 }
 
 //=============================================================================
 // Python Execution
 //=============================================================================
 
-async function executePython(code: string, timeout: number): Promise<string> {
+async function executePython(
+  code: string,
+  timeout: number,
+  directoryHandle?: FileSystemDirectoryHandle | null
+): Promise<string> {
   const active = await getActiveConversation()
   if (!active) {
     return JSON.stringify({ error: 'No active workspace' })
@@ -82,7 +86,7 @@ async function executePython(code: string, timeout: number): Promise<string> {
     await active.conversation.scanFilesWithCache()
     const detected = active.conversation.detectChanges(beforeSnapshot)
     if (detected.changes.length > 0) {
-      await active.conversation.registerDetectedChanges(detected.changes)
+      await active.conversation.registerDetectedChanges(detected.changes, directoryHandle)
     }
     await useConversationContextStore.getState().refreshPendingChanges(true)
 

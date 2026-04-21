@@ -2197,16 +2197,47 @@ export class WorkspaceRuntime {
     return { changes, added, modified, deleted }
   }
 
-  async registerDetectedChanges(changes: FileChange[]): Promise<void> {
+  async registerDetectedChanges(
+    changes: FileChange[],
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     for (const change of changes) {
+      let nativeFsMtime: number | undefined
+
+      // Read native FS mtime as baseline when available.
+      // OPFS mtime from detectChanges is NOT the same as native FS mtime —
+      // using it as baseline causes false conflict detections.
+      if (directoryHandle) {
+        try {
+          const normalizedPath = this.normalizeWorkspacePath(change.path)
+          const fileHandle = await this.getFileHandle(directoryHandle, normalizedPath)
+          const file = await fileHandle.getFile()
+          nativeFsMtime = file.lastModified
+
+          // Capture baseline snapshot for content-comparison fallback
+          if (change.type === 'modify') {
+            const contentType = getFileContentType(normalizedPath)
+            const baselineContent = contentType === 'text'
+              ? await file.text()
+              : await file.arrayBuffer()
+            await this.captureModifyBaseline(normalizedPath, baselineContent)
+          }
+        } catch {
+          // File may not exist on native FS (genuinely new file) — use OPFS mtime
+          nativeFsMtime = change.mtime
+        }
+      } else {
+        nativeFsMtime = change.mtime
+      }
+
       if (change.type === 'add') {
-        await this.pendingManager.markAsCreated(change.path, change.mtime)
+        await this.pendingManager.markAsCreated(change.path, nativeFsMtime)
       } else if (change.type === 'modify') {
-        await this.pendingManager.add(change.path, change.mtime)
+        await this.pendingManager.add(change.path, nativeFsMtime)
       } else if (change.type === 'delete') {
-        await this.pendingManager.markForDeletion(change.path, change.mtime)
+        await this.pendingManager.markForDeletion(change.path, nativeFsMtime)
       }
     }
   }
