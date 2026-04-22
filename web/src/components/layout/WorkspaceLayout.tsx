@@ -286,6 +286,9 @@ export function WorkspaceLayout({
         }
 
         if (result.skills.length > 0) {
+          // Capture existing IDs BEFORE saving, so we can detect brand-new skills later
+          const preExistingIds = new Set(skillsStore.skills.map((s) => s.id))
+
           // Sync all scanned skills to SQLite (upsert keeps disk → DB in sync)
           const manager = getSkillManager()
           for (const skill of result.skills) {
@@ -311,8 +314,7 @@ export function WorkspaceLayout({
           await skillsStore.loadSkills()
 
           // Only show dialog for brand-new skills the user hasn't seen yet
-          const existingIds = new Set(skillsStore.skills.map((s) => s.id))
-          const newSkills = result.skills.filter((s) => !existingIds.has(s.id))
+          const newSkills = result.skills.filter((s) => !preExistingIds.has(s.id))
 
           if (newSkills.length > 0) {
             setProjectSkills(newSkills)
@@ -334,7 +336,10 @@ export function WorkspaceLayout({
     }
 
     scanForSkills()
-  }, [directoryHandle, skillsLoaded, skillsStore.skills])
+    // NOTE: Do NOT add skillsStore.skills to deps — loadSkills() inside this effect
+    // updates skills state, which would re-trigger the effect and cause an infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [directoryHandle, skillsLoaded])
 
   // Sync .skills/ to OPFS when workspace changes (new workspace created or switched)
   useEffect(() => {
