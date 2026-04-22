@@ -1897,11 +1897,27 @@ export const enUS = {
       text: "Text",
       none: "None",
       size: "Size",
+      // Lazy diff viewer mode
+      changesOnly: "Changes Only",
+      fullEditor: "Full Editor",
+      switchToChangesOnly: "Switch to changes-only view",
+      switchToFullEditor: "Switch to full editor",
     },
 
     // Monaco Diff Editor
     monacoDiffEditor: {
       lineHasComment: "This line has a comment",
+    },
+
+    // Lazy Diff Viewer (hunk-based)
+    lazyDiffViewer: {
+      noChanges: "No changes",
+      oneChangeBlock: "1 change block (+{additions} −{deletions})",
+      changeBlocks: "{count} change blocks (+{additions} −{deletions})",
+      loadMore: "Load {count} lines",
+      remaining: "remaining",
+      fullEditor: "Full Editor",
+      openInFullEditor: "Open in full editor",
     },
   },
 

@@ -1858,11 +1858,27 @@ export const koKR = {
       text: "텍스트",
       none: "없음",
       size: "크기",
+      // Lazy diff viewer mode
+      changesOnly: "변경만",
+      fullEditor: "전체 에디터",
+      switchToChangesOnly: "변경만 보기로 전환",
+      switchToFullEditor: "전체 에디터로 전환",
     },
 
     // Monaco Diff Editor
     monacoDiffEditor: {
       lineHasComment: "이 줄에는 댓글이 있습니다",
+    },
+
+    // Lazy Diff Viewer (hunk-based)
+    lazyDiffViewer: {
+      noChanges: "변경 없음",
+      oneChangeBlock: "1개 변경 블록（+{additions} −{deletions}）",
+      changeBlocks: "{count}개 변경 블록（+{additions} −{deletions}）",
+      loadMore: "{count}줄 불러오기",
+      remaining: "남음",
+      fullEditor: "전체 에디터",
+      openInFullEditor: "전체 에디터에서 열기",
     },
   },
 

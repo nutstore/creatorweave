@@ -1876,11 +1876,27 @@ export const jaJP = {
       text: "テキスト",
       none: "なし",
       size: "サイズ",
+      // Lazy diff viewer mode
+      changesOnly: "変更のみ",
+      fullEditor: "フルエディタ",
+      switchToChangesOnly: "変更のみ表示に切り替え",
+      switchToFullEditor: "フルエディタに切り替え",
     },
 
     // Monaco Diff Editor
     monacoDiffEditor: {
       lineHasComment: "この行にはコメントがあります",
+    },
+
+    // Lazy Diff Viewer (hunk-based)
+    lazyDiffViewer: {
+      noChanges: "変更なし",
+      oneChangeBlock: "1つの変更ブロック（+{additions} −{deletions}）",
+      changeBlocks: "{count}つの変更ブロック（+{additions} −{deletions}）",
+      loadMore: "{count}行を読み込む",
+      remaining: "残り",
+      fullEditor: "フルエディタ",
+      openInFullEditor: "フルエディタで開く",
     },
   },
 

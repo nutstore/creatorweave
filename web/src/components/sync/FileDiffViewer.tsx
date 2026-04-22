@@ -19,9 +19,10 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFS,
 } from '@/opfs'
-import { Columns2, UnfoldVertical, Copy, X, MousePointer2 } from 'lucide-react'
+import { Columns2, UnfoldVertical, Copy, X, MousePointer2, FileText } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
+const LazyDiffViewer = React.lazy(() => import('./LazyDiffViewer'))
 
 type CommentSide = 'original' | 'modified'
 
@@ -107,6 +108,7 @@ function formatTime(timestamp?: number): string {
 export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snapshotDiff = null }) => {
   const t = useT()
   const [isSplitView, setIsSplitView] = useState(false)
+  const [useFullEditor, setUseFullEditor] = useState(false)
   const [content, setContent] = useState<FileContentState>({
     opfs: null,
     native: null,
@@ -562,6 +564,100 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       )
     }
 
+    // Default: use LazyDiffViewer (only shows changed hunks)
+    // Switch to Monaco full editor when user clicks the button
+    if (!useFullEditor) {
+      return (
+        <div className="flex h-full flex-col">
+          <div className="min-h-0 flex-1">
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
+                  {t('sidebar.fileDiffViewer.loadingFile')}
+                </div>
+              }
+            >
+              <LazyDiffViewer
+                original={originalText}
+                modified={modifiedText}
+                path={fileChange.path}
+                isSplitView={isSplitView}
+                onToggleSplitView={() => setIsSplitView((v) => !v)}
+                onSwitchToMonaco={() => setUseFullEditor(true)}
+                comments={currentFileComments.map((item) => ({
+                  side: item.side,
+                  startLine: item.startLine,
+                  endLine: item.endLine,
+                }))}
+                selectedTarget={composer ? {
+                  side: composer.side,
+                  startLine: composer.startLine,
+                  endLine: composer.endLine,
+                } : null}
+                onLineSelectForComment={(target) => {
+                  setComposer((prev) => ({
+                    side: target.side,
+                    startLine: target.startLine,
+                    endLine: target.endLine,
+                    text: prev && prev.side === target.side ? prev.text : '',
+                  }))
+                }}
+              />
+            </Suspense>
+          </div>
+
+          {composer && (
+            <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
+              <div className="flex items-center gap-2 px-3 py-1.5">
+                <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+                  {composer.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}
+                </span>
+                <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 dark:text-neutral-600">
+                  L{composer.startLine}{composer.startLine !== composer.endLine && `-${composer.endLine}`}
+                </span>
+                <div className="flex-1" />
+                <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+                <button
+                  type="button"
+                  onClick={() => setComposer(null)}
+                  className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="flex items-start gap-2 px-3 pb-2.5">
+                <textarea
+                  className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-500"
+                  placeholder={t('sidebar.fileDiffViewer.addComment')}
+                  autoFocus
+                  rows={2}
+                  value={composer.text}
+                  onChange={(e) => setComposer((prev) => (prev ? { ...prev, text: e.target.value } : prev))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setComposer(null)
+                    } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault()
+                      addComment()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addComment}
+                  disabled={!composer.text.trim()}
+                  className="mt-0.5 flex h-8 items-center rounded-md bg-neutral-900 px-3 text-[12px] font-medium text-white transition-colors hover:bg-neutral-700 disabled:opacity-30 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+                >
+                  {t('sidebar.fileDiffViewer.send')}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    // Full Monaco editor
     return (
       <div className="flex h-full flex-col">
         <div className="min-h-0 flex-1">
@@ -704,20 +800,45 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             </TooltipProvider>
           )}
           {!isImage && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setIsSplitView((v) => !v)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
-                  >
-                    {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{isSplitView ? t('sidebar.fileDiffViewer.mergeView') : t('sidebar.fileDiffViewer.splitView')}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <>
+              {/* Switch between Lazy and Full editor */}
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setUseFullEditor((v) => !v)}
+                      className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+                        useFullEditor
+                          ? 'text-blue-600 hover:bg-blue-100/60 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300'
+                          : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300'
+                      }`}
+                    >
+                      <FileText className="h-3 w-3" />
+                      {useFullEditor ? t('sidebar.fileDiffViewer.changesOnly') : t('sidebar.fileDiffViewer.fullEditor')}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {useFullEditor ? t('sidebar.fileDiffViewer.switchToChangesOnly') : t('sidebar.fileDiffViewer.switchToFullEditor')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {/* Split/Merge view toggle */}
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setIsSplitView((v) => !v)}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                    >
+                      {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{isSplitView ? t('sidebar.fileDiffViewer.mergeView') : t('sidebar.fileDiffViewer.splitView')}</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </>
           )}
           {isSnapshotMode && (
             <button

@@ -1850,11 +1850,27 @@ export const zhCN = {
       text: "文本",
       none: "无",
       size: "大小",
+      // Lazy diff viewer mode
+      changesOnly: "仅变更",
+      fullEditor: "完整编辑器",
+      switchToChangesOnly: "切换到仅显示变更区域",
+      switchToFullEditor: "切换到完整编辑器",
     },
 
     // Monaco Diff Editor
     monacoDiffEditor: {
       lineHasComment: "该行有评论",
+    },
+
+    // Lazy Diff Viewer (hunk-based)
+    lazyDiffViewer: {
+      noChanges: "没有变更",
+      oneChangeBlock: "1 个变更块（+{additions} −{deletions}）",
+      changeBlocks: "{count} 个变更块（+{additions} −{deletions}）",
+      loadMore: "加载 {count} 行",
+      remaining: "剩余",
+      fullEditor: "完整编辑器",
+      openInFullEditor: "在完整编辑器中打开",
     },
   },
 
