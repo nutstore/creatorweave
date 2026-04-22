@@ -651,6 +651,7 @@ export const zhCN = {
     skillNamePlaceholder: "例如: code-reviewer",
     description: "描述",
     descriptionPlaceholder: "简短描述这个技能的功能",
+    tags: "标签",
     tagsPlaceholder: "review, quality",
     tagsHelp: "逗号分隔，用于分类和搜索",
     triggerKeywords: "触发关键词",
