@@ -17,6 +17,7 @@ import type {
   ErrorDetail,
   SystemLog,
   ConflictInfo,
+  ReadPolicy,
 } from '../types/opfs-types'
 import { ErrorCode } from '../types/opfs-types'
 import { getFileContentType, shouldSkipScanEntry } from '../utils/opfs-utils'
@@ -531,14 +532,28 @@ export class WorkspaceRuntime {
    * Read file from workspace
    * @param path File path
    * @param directoryHandle Real filesystem directory handle
+   * @param options Read policy options
    * @returns File content and metadata
    */
   async readFile(
     path: string,
-    directoryHandle?: FileSystemDirectoryHandle | null
-  ): Promise<{ content: FileContent; metadata: FileMetadata }> {
+    directoryHandle?: FileSystemDirectoryHandle | null,
+    options: { policy?: ReadPolicy } = {}
+  ): Promise<{ content: FileContent; metadata: FileMetadata; source: 'native' | 'opfs' }> {
     if (!this.initialized) await this.initialize()
     const normalizedPath = this.normalizeWorkspacePath(path)
+    const readPolicy = options.policy ?? 'auto'
+    const preferOpfs = readPolicy === 'prefer_opfs'
+    const preferNative = readPolicy === 'prefer_native'
+
+    if (directoryHandle && preferNative) {
+      try {
+        const native = await this.readFromNativeFS(normalizedPath, directoryHandle)
+        return { ...native, source: 'native' }
+      } catch {
+        // Fallback to OPFS branch below.
+      }
+    }
 
     // If path has pending changes, check for conflicts first.
     // If disk mtime differs from OPFS baseline, disk is newer - read disk.
@@ -565,6 +580,7 @@ export class WorkspaceRuntime {
       ) {
         return {
           content: fromFilesDir.content,
+          source: 'opfs',
           metadata: {
             path: normalizedPath,
             mtime: fromFilesDir.mtime,
@@ -574,25 +590,40 @@ export class WorkspaceRuntime {
         }
       }
 
-      // Check if disk has been modified since OPFS recorded baseline
-      try {
-        const diskMeta = await this.getFileMetadata(directoryHandle, normalizedPath)
-        const pendingChanges = await this.pendingManager.getAll()
-        const pending = pendingChanges.find(
-          (p) => this.normalizeWorkspacePath(p.path) === normalizedPath
-        )
-        if (pending && pending.fsMtime && diskMeta.mtime > pending.fsMtime) {
-          const diskContent = await this.readFromNativeFS(normalizedPath, directoryHandle)
-          const baseline = await this.readFromBaselineDir(normalizedPath)
-          if (baseline) {
-            const diskMatchesBaseline = await this.areFileContentsEqual(baseline.content, diskContent.content)
-            if (diskMatchesBaseline) {
-              // Migration case: pure-OPFS pending baseline rebased to native view.
-              // Keep OPFS draft as source of truth for pending edits.
+      if (!preferOpfs) {
+        // Check if disk has been modified since OPFS recorded baseline
+        try {
+          const diskMeta = await this.getFileMetadata(directoryHandle, normalizedPath)
+          const pendingChanges = await this.pendingManager.getAll()
+          const pending = pendingChanges.find(
+            (p) => this.normalizeWorkspacePath(p.path) === normalizedPath
+          )
+          if (pending && pending.fsMtime && diskMeta.mtime > pending.fsMtime) {
+            const diskContent = await this.readFromNativeFS(normalizedPath, directoryHandle)
+            const baseline = await this.readFromBaselineDir(normalizedPath)
+            if (baseline) {
+              const diskMatchesBaseline = await this.areFileContentsEqual(baseline.content, diskContent.content)
+              if (diskMatchesBaseline) {
+                // Migration case: pure-OPFS pending baseline rebased to native view.
+                // Keep OPFS draft as source of truth for pending edits.
+              } else {
+                // Disk is newer than OPFS baseline - disk has been modified externally.
+                return {
+                  content: diskContent.content,
+                  source: 'native',
+                  metadata: {
+                    path: normalizedPath,
+                    mtime: diskMeta.mtime,
+                    size: diskMeta.size,
+                    contentType: diskMeta.contentType,
+                  },
+                }
+              }
             } else {
-              // Disk is newer than OPFS baseline - disk has been modified externally.
+              // No baseline snapshot available, keep existing safety behavior and prefer disk.
               return {
                 content: diskContent.content,
+                source: 'native',
                 metadata: {
                   path: normalizedPath,
                   mtime: diskMeta.mtime,
@@ -601,27 +632,17 @@ export class WorkspaceRuntime {
                 },
               }
             }
-          } else {
-            // No baseline snapshot available, keep existing safety behavior and prefer disk.
-            return {
-              content: diskContent.content,
-              metadata: {
-                path: normalizedPath,
-                mtime: diskMeta.mtime,
-                size: diskMeta.size,
-                contentType: diskMeta.contentType,
-              },
-            }
           }
+        } catch {
+          // Ignore errors, fall through to OPFS read
         }
-      } catch {
-        // Ignore errors, fall through to OPFS read
       }
 
       // Pending path defaults to OPFS draft content.
       if (fromFilesDir) {
         return {
           content: fromFilesDir.content,
+          source: 'opfs',
           metadata: {
             path: normalizedPath,
             mtime: fromFilesDir.mtime,
@@ -632,23 +653,12 @@ export class WorkspaceRuntime {
       }
     }
 
-    if (directoryHandle && !isPendingPath) {
+    if (directoryHandle && !isPendingPath && !preferOpfs) {
       // For non-pending files, always prefer native disk view so external
       // filesystem changes are visible to tools immediately.
       try {
         const native = await this.readFromNativeFS(normalizedPath, directoryHandle)
-
-        // Best-effort cache eviction: once disk is the source of truth for a
-        // non-pending path, clear stale OPFS body to reduce storage usage.
-        if (this.hasFileInIndex(normalizedPath)) {
-          try {
-            await this.deleteFromFilesDirIfExists(normalizedPath)
-          } catch {
-            // Ignore cleanup failures; read should still succeed.
-          }
-        }
-
-        return native
+        return { ...native, source: 'native' }
       } catch {
         // Disk read failed (e.g. file only exists in OPFS, not yet synced).
         // Fall through to OPFS read below.
@@ -662,12 +672,23 @@ export class WorkspaceRuntime {
     if (fromFilesDir) {
       return {
         content: fromFilesDir.content,
+        source: 'opfs',
         metadata: {
           path: normalizedPath,
           mtime: fromFilesDir.mtime,
           size: fromFilesDir.size,
           contentType: fromFilesDir.contentType,
         },
+      }
+    }
+
+    // prefer_opfs can still fall back to native when OPFS body is missing.
+    if (directoryHandle) {
+      try {
+        const native = await this.readFromNativeFS(normalizedPath, directoryHandle)
+        return { ...native, source: 'native' }
+      } catch {
+        // Fall through to not-found error below.
       }
     }
 

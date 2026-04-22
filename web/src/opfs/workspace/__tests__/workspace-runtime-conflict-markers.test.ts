@@ -137,6 +137,7 @@ describe('WorkspaceRuntime conflict marker materialization', () => {
     const result = await runtime.readFile('src/a.ts', {} as FileSystemDirectoryHandle)
 
     expect(result.content).toBe(markerContent)
+    expect(result.source).toBe('opfs')
     expect(runtime.readFromNativeFS).not.toHaveBeenCalled()
   })
 
@@ -167,7 +168,87 @@ describe('WorkspaceRuntime conflict marker materialization', () => {
     const result = await runtime.readFile('src/a.ts', {} as FileSystemDirectoryHandle)
 
     expect(result.content).toBe('fresh disk content')
+    expect(result.source).toBe('native')
     expect(runtime.readFromNativeFS).toHaveBeenCalledTimes(1)
-    expect(runtime.deleteFromFilesDirIfExists).toHaveBeenCalledWith('src/a.ts')
+    expect(runtime.deleteFromFilesDirIfExists).not.toHaveBeenCalled()
+  })
+
+  it('supports prefer_opfs policy for pending files', async () => {
+    const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
+    runtime.initialized = true
+    runtime.filesIndex = new Set(['src/a.ts'])
+    runtime.pendingManager = {
+      hasPendingPath: vi.fn(() => true),
+      getAll: vi.fn(() => [
+        {
+          id: 'p1',
+          path: 'src/a.ts',
+          type: 'modify',
+          fsMtime: 100,
+          timestamp: 100,
+        },
+      ]),
+    }
+    runtime.readFromFilesDir = vi.fn(async () => ({
+      content: 'opfs draft content',
+      mtime: 101,
+      size: 18,
+      contentType: 'text',
+    }))
+    runtime.getFileMetadata = vi.fn(async () => ({
+      mtime: 200,
+      size: 20,
+      contentType: 'text',
+    }))
+    runtime.readFromNativeFS = vi.fn(async () => ({
+      content: 'native content',
+      metadata: {
+        path: 'src/a.ts',
+        mtime: 200,
+        size: 13,
+        contentType: 'text',
+      },
+    }))
+
+    const result = await runtime.readFile('src/a.ts', {} as FileSystemDirectoryHandle, {
+      policy: 'prefer_opfs',
+    })
+
+    expect(result.content).toBe('opfs draft content')
+    expect(result.source).toBe('opfs')
+    expect(runtime.readFromNativeFS).not.toHaveBeenCalled()
+  })
+
+  it('supports prefer_native policy for pending files', async () => {
+    const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
+    runtime.initialized = true
+    runtime.filesIndex = new Set(['src/a.ts'])
+    runtime.pendingManager = {
+      hasPendingPath: vi.fn(() => true),
+      getAll: vi.fn(() => []),
+    }
+    runtime.readFromFilesDir = vi.fn(async () => ({
+      content: `${CONFLICT_MARKER_START}\nleft\n${CONFLICT_MARKER_MIDDLE}\nright\n${CONFLICT_MARKER_END}\n`,
+      mtime: 101,
+      size: 42,
+      contentType: 'text',
+    }))
+    runtime.readFromNativeFS = vi.fn(async () => ({
+      content: 'fresh disk content',
+      metadata: {
+        path: 'src/a.ts',
+        mtime: 200,
+        size: 17,
+        contentType: 'text',
+      },
+    }))
+
+    const result = await runtime.readFile('src/a.ts', {} as FileSystemDirectoryHandle, {
+      policy: 'prefer_native',
+    })
+
+    expect(result.content).toBe('fresh disk content')
+    expect(result.source).toBe('native')
+    expect(runtime.readFromFilesDir).not.toHaveBeenCalled()
   })
 })

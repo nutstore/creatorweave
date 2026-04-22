@@ -17,6 +17,7 @@ import type {
   FileMetadata,
   PendingChange,
   SyncResult,
+  ReadPolicy,
 } from '@/opfs/types/opfs-types'
 import { getWorkspaceManager } from '@/opfs'
 
@@ -49,6 +50,7 @@ function showQuotaAlert(): void {
 export interface FileReadResult {
   content: FileContent
   metadata: FileMetadata
+  source?: 'native' | 'opfs'
 }
 
 /**
@@ -85,7 +87,8 @@ interface OPFSState {
   readFile: (
     path: string,
     directoryHandle?: FileSystemDirectoryHandle | null,
-    workspaceId?: string | null
+    workspaceId?: string | null,
+    readPolicy?: ReadPolicy
   ) => Promise<FileReadResult>
 
   /** Write file to current workspace (cache + pending) */
@@ -206,12 +209,12 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    readFile: async (path, directoryHandle, workspaceId) => {
+    readFile: async (path, directoryHandle, workspaceId, readPolicy) => {
       set({ isLoading: true, error: null })
 
       try {
         const { workspace } = await getWorkspaceForOperation(workspaceId)
-        const result = await workspace.readFile(path, directoryHandle)
+        const result = await workspace.readFile(path, directoryHandle, { policy: readPolicy })
 
         set({ isLoading: false })
 

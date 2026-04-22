@@ -297,6 +297,11 @@ export interface FileReadResult {
   cachedAt?: number
 }
 
+/**
+ * Read policy for selecting data source in dual-storage reads.
+ */
+export type ReadPolicy = 'auto' | 'prefer_native' | 'prefer_opfs'
+
 // ============ Error Handling Types ============
 
 /**

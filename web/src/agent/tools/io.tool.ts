@@ -12,6 +12,7 @@
 import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
+import type { ReadPolicy } from '@/opfs/types/opfs-types'
 import { resolveVfsTarget, type AgentTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandle } from './tool-utils'
@@ -74,6 +75,12 @@ export const readDefinition: ToolDefinition = {
           description:
             '⚠️ Default limit is ~100KB. REQUIRED for files likely exceeding 100KB (e.g. logs, CSV, JSON, large source files). Set to a larger value (e.g. 1048576 for 1MB, 10485760 for 10MB) to read bigger files. If a read returns "content_too_large", increase max_size and retry.',
         },
+        read_policy: {
+          type: 'string',
+          description:
+            'Optional source strategy: auto (default), prefer_opfs, prefer_native.',
+          enum: ['auto', 'prefer_opfs', 'prefer_native'],
+        },
       },
     },
   },
@@ -88,6 +95,10 @@ interface ReadRequest {
 interface ReadRangeOptions {
   startLine?: number
   lineCount?: number
+}
+
+function isReadPolicy(value: unknown): value is ReadPolicy {
+  return value === 'auto' || value === 'prefer_opfs' || value === 'prefer_native'
 }
 
 const BASE64_CHUNK_SIZE = 0x8000
@@ -110,6 +121,16 @@ export const readExecutor: ToolExecutor = async (args, context) => {
   const paths = args.paths as string[] | undefined
   const reads = args.reads as ReadRequest[] | undefined
   const maxSize = args.max_size as number | undefined
+  const readPolicyArg = args.read_policy
+  const readPolicy: ReadPolicy | undefined =
+    readPolicyArg === undefined ? undefined : (readPolicyArg as ReadPolicy)
+  if (readPolicyArg !== undefined && !isReadPolicy(readPolicyArg)) {
+    return toolErrorJson(
+      'read',
+      'invalid_arguments',
+      'read_policy must be one of: auto, prefer_opfs, prefer_native'
+    )
+  }
   if (maxSize !== undefined) {
     if (typeof maxSize !== 'number' || !Number.isFinite(maxSize) || maxSize <= 0) {
       return toolErrorJson('read', 'invalid_arguments', 'max_size must be > 0')
@@ -143,6 +164,7 @@ export const readExecutor: ToolExecutor = async (args, context) => {
     return executeBatchRead(
       paths.map((p) => ({ path: p })),
       maxSize,
+      readPolicy,
       context
     )
   }
@@ -163,11 +185,11 @@ export const readExecutor: ToolExecutor = async (args, context) => {
           `Invalid reads for "${read.path}": ${err}`
         )
     }
-    return executeBatchRead(reads, maxSize, context)
+    return executeBatchRead(reads, maxSize, readPolicy, context)
   }
 
   // Single file mode
-  return executeSingleRead(path!, context, rangeOptions, maxSize)
+  return executeSingleRead(path!, context, rangeOptions, maxSize, readPolicy)
 }
 
 function isOPFSWorkspaceMiss(error: unknown): boolean {
@@ -182,7 +204,8 @@ async function executeSingleRead(
   path: string,
   context: ToolContext,
   options: ReadRangeOptions = {},
-  maxSize?: number
+  maxSize?: number,
+  readPolicy?: ReadPolicy
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
   const readFileState = ensureReadFileState(context)
@@ -244,7 +267,7 @@ async function executeSingleRead(
           hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
         })
       }
-      readFileState.set(readStateKey, buildReadStateEntry(rendered, options))
+      readFileState.set(readStateKey, buildReadStateEntry(rendered, options, 'agent'))
       // Agent reads don't have real filesystem mtime — use wall clock as approximation
       recordReadMtime(context, loopCheckResult!.dedupKey, Date.now(), size)
       return toolOkJson(
@@ -263,7 +286,9 @@ async function executeSingleRead(
       )
     }
 
-    const result = await readFile(target.path, context.directoryHandle, context.workspaceId)
+    const result = readPolicy
+      ? await readFile(target.path, context.directoryHandle, context.workspaceId, readPolicy)
+      : await readFile(target.path, context.directoryHandle, context.workspaceId)
     const { content, metadata } = result
     if (maxSize && metadata.size > maxSize) {
       return toolErrorJson(
@@ -285,7 +310,10 @@ async function executeSingleRead(
           hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
         })
       }
-      readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
+      readFileState.set(
+        readStateKey,
+        buildReadStateEntry(formatted, options, result.source || 'workspace')
+      )
       // Record mtime for future dedup — OPFS returns metadata.mtime
       recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
       return toolOkJson(
@@ -300,7 +328,7 @@ async function executeSingleRead(
             line_count: options.lineCount,
           },
         },
-        buildMeta({ source: 'workspace' })
+        buildMeta({ source: result.source || 'workspace' })
       )
     }
 
@@ -321,7 +349,7 @@ async function executeSingleRead(
         content: base64,
         metadata: { size: metadata.size, contentType: metadata.contentType },
       },
-      buildMeta({ source: 'workspace' })
+      buildMeta({ source: result.source || 'workspace' })
     )
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
@@ -336,7 +364,9 @@ async function executeSingleRead(
           context.workspaceId
         )
         if (nativeHandle) {
-          const result = await readFile(target.path, nativeHandle, context.workspaceId)
+          const result = readPolicy
+            ? await readFile(target.path, nativeHandle, context.workspaceId, readPolicy)
+            : await readFile(target.path, nativeHandle, context.workspaceId)
           const { content, metadata } = result
           if (maxSize && metadata.size > maxSize) {
             return toolErrorJson(
@@ -357,7 +387,10 @@ async function executeSingleRead(
                 hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
               })
             }
-            readFileState.set(readStateKey, buildReadStateEntry(formatted, options))
+            readFileState.set(
+              readStateKey,
+              buildReadStateEntry(formatted, options, result.source || 'workspace')
+            )
             // Record mtime for future dedup
             recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
             return toolOkJson(
@@ -421,6 +454,7 @@ async function executeSingleRead(
 async function executeBatchRead(
   reads: ReadRequest[],
   maxSize: number | undefined,
+  readPolicy: ReadPolicy | undefined,
   context: ToolContext
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
@@ -506,12 +540,13 @@ async function executeBatchRead(
           kind: 'text',
           content: rendered,
           metadata: { size, contentType: 'text' },
+          source: 'agent',
         })
         readFileState.set(getReadStateKey(target), {
           ...buildReadStateEntry(rendered, {
             startLine: read.start_line,
             lineCount: read.line_count,
-          }),
+          }, 'agent'),
         })
         successCount++
         continue
@@ -519,7 +554,9 @@ async function executeBatchRead(
 
       let readResult: Awaited<ReturnType<ReturnType<typeof useOPFSStore.getState>['readFile']>>
       try {
-        readResult = await readFile(target.path, context.directoryHandle, context.workspaceId)
+        readResult = readPolicy
+          ? await readFile(target.path, context.directoryHandle, context.workspaceId, readPolicy)
+          : await readFile(target.path, context.directoryHandle, context.workspaceId)
       } catch (error) {
         if (!isOPFSWorkspaceMiss(error)) {
           throw error
@@ -528,7 +565,9 @@ async function executeBatchRead(
         if (!fallbackHandle) {
           throw error
         }
-        readResult = await readFile(target.path, fallbackHandle, context.workspaceId)
+        readResult = readPolicy
+          ? await readFile(target.path, fallbackHandle, context.workspaceId, readPolicy)
+          : await readFile(target.path, fallbackHandle, context.workspaceId)
       }
       const { content, metadata } = readResult
 
@@ -572,6 +611,7 @@ async function executeBatchRead(
           kind: 'binary_base64',
           content: base64,
           metadata: { size: metadata.size, contentType: metadata.contentType },
+          source: readResult.source || 'workspace',
         })
         successCount++
         continue
@@ -604,12 +644,13 @@ async function executeBatchRead(
         kind: 'text',
         content: rendered,
         metadata: { size: metadata.size, contentType: metadata.contentType },
+        source: readResult.source || 'workspace',
       })
       readFileState.set(getReadStateKey(target), {
-        ...buildReadStateEntry(rendered, {
-          startLine: read.start_line,
-          lineCount: read.line_count,
-        }),
+          ...buildReadStateEntry(rendered, {
+            startLine: read.start_line,
+            lineCount: read.line_count,
+          }, readResult.source || 'workspace'),
       })
       successCount++
     } catch (error) {
@@ -649,7 +690,11 @@ async function encodeBinaryContentAsBase64(content: ArrayBuffer | Blob): Promise
   return btoa(binary)
 }
 
-function buildReadStateEntry(content: string, options: ReadRangeOptions) {
+function buildReadStateEntry(
+  content: string,
+  options: ReadRangeOptions,
+  source: 'workspace' | 'native' | 'opfs' | 'agent' = 'workspace'
+) {
   const hasRange = hasRangeOptions(options)
   return {
     content,
@@ -657,6 +702,7 @@ function buildReadStateEntry(content: string, options: ReadRangeOptions) {
     offset: hasRange ? (options.startLine ?? 1) : undefined,
     limit: hasRange ? options.lineCount : undefined,
     isPartialView: false,
+    source,
   }
 }
 

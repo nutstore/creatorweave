@@ -211,6 +211,7 @@ export interface ReadFileStateEntry {
   offset?: number
   limit?: number
   isPartialView?: boolean
+  source?: 'workspace' | 'native' | 'opfs' | 'agent'
 }
 
 /** Tool definition in OpenAI function calling format */

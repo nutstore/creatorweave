@@ -7,8 +7,13 @@ const readFileMock =
     (
       path: string,
       directoryHandle?: FileSystemDirectoryHandle | null,
-      workspaceId?: string | null
-    ) => Promise<{ content: string | ArrayBuffer; metadata: { size: number; contentType: string } }>
+      workspaceId?: string | null,
+      readPolicy?: 'auto' | 'prefer_native' | 'prefer_opfs'
+    ) => Promise<{
+      content: string | ArrayBuffer
+      metadata: { size: number; contentType: string }
+      source?: 'native' | 'opfs'
+    }>
   >()
 const getNativeDirectoryHandleMock = vi.fn<() => Promise<FileSystemDirectoryHandle | null>>()
 const getActiveConversationMock = vi.fn()
@@ -53,6 +58,7 @@ describe('io read tool', () => {
     readFileMock.mockResolvedValueOnce({
       content: largeContent,
       metadata: { size: 5 * 1024 * 1024, contentType: 'text' },
+      source: 'opfs',
     })
 
     const readFileState = new Map()
@@ -83,6 +89,7 @@ describe('io read tool', () => {
     readFileMock.mockResolvedValueOnce({
       content: 'line1\nline2\nline3\nline4',
       metadata: { size: 24, contentType: 'text' },
+      source: 'opfs',
     })
 
     const readFileState = new Map()
@@ -134,6 +141,7 @@ describe('io read tool', () => {
     readFileMock.mockResolvedValueOnce({
       content: '0123456789',
       metadata: { size: 10, contentType: 'text' },
+      source: 'opfs',
     })
 
     const result = await readExecutor({ path: 'a.txt', max_size: 5 }, context)
@@ -235,6 +243,39 @@ describe('io read tool', () => {
     const error = unwrapError(result)
     expect(error.code).toBe('invalid_arguments')
     expect(error.message).toContain('max_size must be > 0')
+  })
+
+  it('validates read_policy values', async () => {
+    const result = await readExecutor({ path: 'a.txt', read_policy: 'random' }, context)
+    const error = unwrapError(result)
+    expect(error.code).toBe('invalid_arguments')
+    expect(error.message).toContain('read_policy must be one of')
+  })
+
+  it('passes read_policy through to workspace readFile', async () => {
+    readFileMock.mockResolvedValueOnce({
+      content: 'opfs data',
+      metadata: { size: 9, contentType: 'text' },
+      source: 'opfs',
+    })
+
+    await readExecutor({ path: 'a.txt', read_policy: 'prefer_opfs' }, context)
+
+    expect(readFileMock).toHaveBeenCalledWith('a.txt', null, undefined, 'prefer_opfs')
+  })
+
+  it('surfaces read source in envelope meta', async () => {
+    readFileMock.mockResolvedValueOnce({
+      content: 'native content',
+      metadata: { size: 14, contentType: 'text' },
+      source: 'native',
+    })
+
+    const result = await readExecutor({ path: 'a.txt' }, context)
+    const parsed = JSON.parse(result)
+
+    expect(parsed.ok).toBe(true)
+    expect(parsed.meta?.source).toBe('native')
   })
 
   it('returns binary payload in batch mode without nested JSON encoding', async () => {
