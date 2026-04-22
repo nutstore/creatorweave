@@ -344,33 +344,40 @@ export function Sidebar({
           className="flex flex-col overflow-hidden"
           style={{ height: `${conversationRatio}%` }}
         >
-          {/* Workspace tab filter */}
-          <div className="flex items-center gap-0.5 px-2 pt-2 pb-1">
-            <BrandButton
-              variant="ghost"
-              className={`h-6 flex-1 justify-center px-1 text-[11px] ${
+          {/* Workspace tab filter with sliding indicator */}
+          <div className="relative mx-2 mt-2 mb-1 flex rounded-md bg-muted/60 p-0.5">
+            <div
+              className="absolute top-0.5 bottom-0.5 rounded-[5px] bg-card shadow-sm transition-transform duration-200 ease-[cubic-bezier(0.25,0.1,0.25,1)]"
+              style={{
+                width: 'calc(50% - 2px)',
+                transform: workspaceTab === 'archived' ? 'translateX(calc(100% + 2px))' : 'translateX(0)',
+              }}
+            />
+            <button
+              type="button"
+              className={`relative z-10 flex-1 rounded-md py-1 text-center text-[11px] transition-colors duration-200 ${
                 workspaceTab === 'active'
-                  ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                  : 'text-secondary'
+                  ? 'font-semibold text-primary'
+                  : 'text-tertiary hover:text-secondary'
               }`}
               onClick={() => setWorkspaceTab('active')}
             >
               {t('sidebar.activeTab')}
-            </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className={`h-6 flex-1 justify-center gap-1 px-1 text-[11px] ${
+            </button>
+            <button
+              type="button"
+              className={`relative z-10 flex-1 items-center justify-center gap-1 rounded-md py-1 text-center text-[11px] transition-colors duration-200 ${
                 workspaceTab === 'archived'
-                  ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                  : 'text-secondary'
+                  ? 'font-semibold text-primary'
+                  : 'text-tertiary hover:text-secondary'
               }`}
               onClick={() => setWorkspaceTab('archived')}
             >
               {t('sidebar.archivedTab')}
               {archivedCount > 0 && (
-                <span className="text-[10px] text-tertiary">({archivedCount})</span>
+                <span className="ml-0.5 text-[10px] text-tertiary">({archivedCount})</span>
               )}
-            </BrandButton>
+            </button>
           </div>
 
           {workspaceTab === 'active' && (
