@@ -217,8 +217,19 @@ function ensureDraftAssistantForMessageStart(conv: Conversation): DraftAssistant
     toolResults: {},
     toolCall: null,
     toolArgs: '',
-    // Keep streaming timeline across assistant restarts in one run.
-    steps: previous?.steps || [],
+    // Keep streaming timeline across assistant restarts in one run,
+    // but discard completed text/tool steps (they have already been
+    // committed to messages and would otherwise cause duplicate renders
+    // when committedContentSet hasn't caught up yet).
+    steps: previous?.steps.filter((s) => {
+      if (s.streaming) return true
+      // Completed text steps (content/reasoning) are already committed
+      if (s.type === 'content' || s.type === 'reasoning') return false
+      // Completed tool_call steps are also committed
+      if (s.type === 'tool_call') return false
+      // Keep compression steps for status continuity
+      return true
+    }) || [],
     activeReasoningStepId: null,
     activeContentStepId: null,
     activeToolStepId: null,
