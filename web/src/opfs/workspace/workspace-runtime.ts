@@ -2206,6 +2206,7 @@ export class WorkspaceRuntime {
 
     for (const change of changes) {
       let nativeFsMtime: number | undefined
+      let effectiveType: FileChange['type'] = change.type
 
       if (directoryHandle) {
         try {
@@ -2214,7 +2215,13 @@ export class WorkspaceRuntime {
           const file = await fileHandle.getFile()
           nativeFsMtime = file.lastModified
 
-          if (change.type === 'modify') {
+          // Diff snapshots are OPFS-only. If native file already exists, this should
+          // be treated as a modify, not a newly created file.
+          if (change.type === 'add') {
+            effectiveType = 'modify'
+          }
+
+          if (effectiveType === 'modify') {
             // Compare OPFS content with native content as raw bytes.
             // Always use ArrayBuffer to avoid encoding round-trip issues
             // (e.g. GBK/Latin1 text decoded via file.text() would not
@@ -2238,9 +2245,9 @@ export class WorkspaceRuntime {
         nativeFsMtime = change.mtime
       }
 
-      if (change.type === 'add') {
+      if (effectiveType === 'add') {
         await this.pendingManager.markAsCreated(change.path, nativeFsMtime)
-      } else if (change.type === 'modify') {
+      } else if (effectiveType === 'modify') {
         await this.pendingManager.add(change.path, nativeFsMtime)
       } else if (change.type === 'delete') {
         await this.pendingManager.markForDeletion(change.path, nativeFsMtime)
