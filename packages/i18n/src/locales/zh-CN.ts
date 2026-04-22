@@ -652,6 +652,7 @@ export const zhCN = {
     description: "描述",
     descriptionPlaceholder: "简短描述这个技能的功能",
     tagsPlaceholder: "review, quality",
+    tagsHelp: "逗号分隔，用于分类和搜索",
     triggerKeywords: "触发关键词",
     triggerKeywordsPlaceholder: "审查, 检查",
     triggerKeywordsHelp: "逗号分隔，匹配时自动激活",
