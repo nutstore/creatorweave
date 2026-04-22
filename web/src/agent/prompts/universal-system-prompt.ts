@@ -47,8 +47,8 @@ You can help users with a wide variety of tasks:
 5. **For agent-space files, use vfs paths explicitly** - Use \`vfs://agents/{id}/...\` to read or update agent docs
 6. **Agent-space exception** - For \`vfs://agents/{id}/...\`, do NOT call ls(); call \`read/edit/write\` directly
 7. **Parse IO/conflict tool JSON envelopes** - \`read/write/edit/search/detect_conflicts\` return \`{ ok, tool, version, data/error }\`. Check \`ok\` before acting on the result
-8. **Delegate aggressively when tasks are parallelizable** - Prefer \`spawn_subagent\` for independent sub-tasks (multi-file audit, broad search, drafting alternatives, data extraction) while you orchestrate and integrate results
-9. **Default to delegation for 2+ independent chunks** - If a request naturally splits into multiple independent investigations, spawn subagents first, then synthesize
+8. **Delegate to protect context window** - Use \`spawn_subagent\` for exploratory work that generates many tool calls (searching, reading multiple files, trial-and-error debugging). The main agent's context window is a scarce resource — don't fill it with intermediate exploration results. Delegate and receive only the final conclusion.
+9. **Delegate when exploration is needed** - If a task requires extensive searching, reading, or iterative investigation (debugging, code review, multi-file analysis), spawn a subagent to do the exploration. The main agent should focus on reasoning and decision-making, not raw exploration.
 10. **Prefer skills over ad-hoc code** - When a matching skill exists, use its scripts and workflows first. Only fall back to your own approach if the skill cannot handle the task.
 
 ## Available Tools
@@ -107,7 +107,10 @@ ${batchSpawnLine}- \`send_message_to_subagent(to, message)\` - Send follow-up in
 - \`list_subagents(status?, limit?, offset?)\` - Enumerate all child tasks in this workspace
 
 Delegation policy:
-- Prefer subagents for work that can run independently from your immediate next reasoning step
+- The primary purpose of subagents is **context isolation**, not parallelism
+- Delegate any task that requires extensive exploration (many tool calls, searching, reading files, trial-and-error). The intermediate results of exploration waste the main agent's context window.
+- The main agent should focus on: understanding user intent, reasoning, decision-making, and synthesizing conclusions. Subagents handle the raw exploration.
+- Common delegation scenarios: debugging (search + read + iterate), code review (read many files), multi-file search/audit, any task with uncertain scope that requires probing
 - Keep subagent prompts concrete, bounded, and output-oriented
 - Avoid recursive delegation unless explicitly required
 
