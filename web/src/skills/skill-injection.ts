@@ -99,22 +99,10 @@ export function buildAvailableSkillsBlock(
     return ''
   }
 
-  // Group by category for better organization
-  const byCategory = new Map<string, SkillMetadata[]>()
-  for (const skill of enabledSkills) {
-    if (!byCategory.has(skill.category)) {
-      byCategory.set(skill.category, [])
-    }
-    byCategory.get(skill.category)!.push(skill)
-  }
-
-  // Generate skills list
+  // Generate skills list (flat, no category headings that could be mistaken for skill names)
   let skillsList = ''
-  for (const [category, skills] of byCategory.entries()) {
-    skillsList += `\n#### ${category}\n\n`
-    for (const skill of skills) {
-      skillsList += formatSkillMetadata(skill)
-    }
+  for (const skill of enabledSkills) {
+    skillsList += formatSkillMetadata(skill)
   }
 
   // Generate recommendations (placeholder - actual matching happens elsewhere)
@@ -128,10 +116,11 @@ export function buildAvailableSkillsBlock(
 When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively.
 
 How to use skills:
-- Use the read_skill tool to load the full skill content
+- Use the read_skill tool with the <name> value to load the full skill content
 - The skill content will provide detailed instructions on how to complete the task
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already loaded in your context
+- Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry
 
 ${recommendedString}
 </usage>
@@ -192,22 +181,10 @@ export function buildAvailableSkillsBlockWithRecommendations(
     return ''
   }
 
-  // Group by category
-  const byCategory = new Map<string, SkillMetadata[]>()
-  for (const skill of enabledSkills) {
-    if (!byCategory.has(skill.category)) {
-      byCategory.set(skill.category, [])
-    }
-    byCategory.get(skill.category)!.push(skill)
-  }
-
-  // Generate skills list
+  // Generate skills list (flat, no category headings that could be mistaken for skill names)
   let skillsList = ''
-  for (const [category, skills] of byCategory.entries()) {
-    skillsList += `\n#### ${category}\n\n`
-    for (const skill of skills) {
-      skillsList += formatSkillMetadata(skill)
-    }
+  for (const skill of enabledSkills) {
+    skillsList += formatSkillMetadata(skill)
   }
 
   return `<skills_system priority="1">
@@ -218,10 +195,11 @@ export function buildAvailableSkillsBlockWithRecommendations(
 When users ask you to perform tasks, check if any of the available skills below can help complete the task more effectively.
 
 How to use skills:
-- Use the read_skill tool to load the full skill content
+- Use the read_skill tool with the <name> value to load the full skill content
 - The skill content will provide detailed instructions on how to complete the task
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already loaded in your context
+- Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry
 
 ${recommendedString}
 </usage>

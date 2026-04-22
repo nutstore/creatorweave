@@ -6,6 +6,7 @@
  */
 
 import type { ToolDefinition, ToolExecutor, ToolContext } from '@/agent/tools/tool-types'
+import { toolOkJson, toolErrorJson } from '@/agent/tools/tool-envelope'
 import * as storage from './skill-storage'
 import { formatResourceList } from './skill-resources'
 
@@ -27,7 +28,7 @@ export const readSkillDefinition: ToolDefinition = {
       properties: {
         skill_name: {
           type: 'string',
-          description: 'The name of the skill to load (e.g., "code-review", "debugging")',
+          description: 'The name of the skill to load (e.g., \"code-review\", \"debugging\")',
         },
       },
       required: ['skill_name'],
@@ -51,7 +52,7 @@ export const readSkillExecutor: ToolExecutor = async (
 
   if (!skill) {
     const availableSkills = await storage.getAllEnabledSkillNames()
-    return `Error: Skill '${skill_name}' not found. Available skills: ${availableSkills.join(', ')}`
+    return toolErrorJson('read_skill', 'skill_not_found', `Skill '${skill_name}' not found. Available skills: ${availableSkills.join(', ')}`)
   }
 
   // Get associated resources
@@ -107,7 +108,7 @@ ${skill.instruction}
 
   output += `\n---\n*Skill: ${skill.name}*`
 
-  return output
+  return toolOkJson('read_skill', output)
 }
 
 //=============================================================================
@@ -134,7 +135,7 @@ export const readSkillResourceDefinition: ToolDefinition = {
         resource_path: {
           type: 'string',
           description:
-            'The path to the resource (e.g., "references/api-docs.md", "scripts/analyze.py")',
+            'The path to the resource (e.g., \"references/api-docs.md\", \"scripts/analyze.py\")',
         },
       },
       required: ['skill_name', 'resource_path'],
@@ -157,7 +158,7 @@ export const readSkillResourceExecutor: ToolExecutor = async (
   const skill = await storage.getSkillByName(skillName)
 
   if (!skill) {
-    return `Error: Skill '${skill_name}' not found. Please check the skill name and try again.`
+    return toolErrorJson('read_skill_resource', 'skill_not_found', `Skill '${skill_name}' not found. Please check the skill name and try again.`)
   }
 
   // Get the resource
@@ -167,15 +168,16 @@ export const readSkillResourceExecutor: ToolExecutor = async (
     // List available resources for helpful error message
     const available = await storage.getSkillResources(skill.id)
     const availablePaths = available.map((r) => `  - ${r.resourcePath}`).join('\n')
-    return `Error: Resource '${resource_path}' not found in skill '${skill_name}'.
-
-Available resources in this skill:
-${availablePaths || '  (none)'}`
+    return toolErrorJson(
+      'read_skill_resource',
+      'resource_not_found',
+      `Resource '${resource_path}' not found in skill '${skill_name}'.\n\nAvailable resources in this skill:\n${availablePaths || '  (none)'}`
+    )
   }
 
   // Format output with content type information
   const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
-  return `# ${resource.skillId}/${resource.resourcePath}
+  const output = `# ${resource.skillId}/${resource.resourcePath}
 
 **Type:** ${typeLabel}
 **Content-Type:** ${resource.contentType}
@@ -184,4 +186,6 @@ ${availablePaths || '  (none)'}`
 ---
 
 ${resource.content}`
+
+  return toolOkJson('read_skill_resource', output)
 }
