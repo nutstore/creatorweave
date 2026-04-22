@@ -13,10 +13,11 @@
 //=============================================================================
 
 /**
- * Pyodide CDN URL for loading the WASM module
- * Uses jsDelivr CDN with version pinning for stability
+ * Pyodide files are served locally from /assets/pyodide
+ * Dev: served from node_modules/pyodide via pyodideServePlugin
+ * Prod: copied from node_modules/pyodide via copy:pyodide script
  */
-export const PYODIDE_CDN_URL = 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/'
+export const PYODIDE_BASE_URL = '/assets/pyodide'
 
 /**
  * Default execution timeout in milliseconds (3 minutes)

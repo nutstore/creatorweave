@@ -81,9 +81,10 @@ async function initPyodide() {
     // Dynamic import for classic worker compatibility
     const { loadPyodide } = await import('pyodide')
 
-    // Use CDN in development, local files in production
-    const isDev = import.meta.env?.DEV ?? false
-    const indexURL = isDev ? 'https://cdn.jsdelivr.net/pyodide/v0.29.3/full/' : '/assets/pyodide'
+    // Always use local pyodide files (served from /assets/pyodide)
+    // Dev: proxied from node_modules/pyodide via vite config
+    // Prod: copied from node_modules/pyodide via copy:pyodide script
+    const indexURL = '/assets/pyodide'
 
     const instance = await loadPyodide({
       indexURL,

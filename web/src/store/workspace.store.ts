@@ -155,6 +155,12 @@ interface WorkspaceState {
   /** Update workspace name */
   updateWorkspaceName: (id: string, name: string) => Promise<void>
 
+  /** Archive a workspace (hide from active list) */
+  archiveWorkspace: (id: string) => Promise<void>
+
+  /** Unarchive a workspace (restore to active list) */
+  unarchiveWorkspace: (id: string) => Promise<void>
+
   /** Refresh all workspaces from SQLite */
   refreshWorkspaces: () => Promise<void>
 
@@ -665,6 +671,58 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               error: message,
               isLoading: false,
             })
+            throw new Error(message)
+          }
+        },
+
+        archiveWorkspace: async (id) => {
+          try {
+            const repo = getWorkspaceRepository()
+            await repo.updateWorkspaceStatus(id, 'archived')
+
+            const currentWorkspaces = get().workspaces
+            const wasActive = get().activeWorkspaceId === id
+            const remaining = currentWorkspaces.filter((w) => w.id !== id)
+            const newActiveId = wasActive
+              ? remaining.length > 0
+                ? remaining[0].id
+                : null
+              : get().activeWorkspaceId
+
+            set({
+              workspaces: currentWorkspaces.map((w) =>
+                w.id === id ? { ...w, status: 'archived' as const } : w
+              ),
+              activeWorkspaceId: newActiveId,
+              currentPendingCount:
+                newActiveId && remaining.length > 0 ? remaining[0]?.pendingCount || 0 : 0,
+            })
+
+            // Switch active conversation if we archived the current one
+            if (wasActive && newActiveId) {
+              const { useConversationStore } = await import('./conversation.store')
+              await useConversationStore.getState().setActive(newActiveId)
+            }
+          } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Failed to archive workspace'
+            set({ error: message })
+            throw new Error(message)
+          }
+        },
+
+        unarchiveWorkspace: async (id) => {
+          try {
+            const repo = getWorkspaceRepository()
+            await repo.updateWorkspaceStatus(id, 'active')
+
+            set({
+              workspaces: get().workspaces.map((w) =>
+                w.id === id ? { ...w, status: 'active' as const } : w
+              ),
+            })
+          } catch (e: unknown) {
+            const message = e instanceof Error ? e.message : 'Failed to unarchive workspace'
+            set({ error: message })
             throw new Error(message)
           }
         },

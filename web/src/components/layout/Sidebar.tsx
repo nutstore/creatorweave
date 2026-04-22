@@ -15,7 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -116,12 +116,32 @@ export function Sidebar({
     }
     return map
   }, [workspaceStats])
-  const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
+  const workspaceStatusMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const ws of workspaceStats) {
+      map.set(ws.id, ws.status || 'active')
+    }
+    return map
+  }, [workspaceStats])
 
   // Sidebar state
   const [collapsed, setCollapsed] = useState(false)
   const [width, setWidth] = useState(320)
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
+  const [workspaceTab, setWorkspaceTab] = useState<'active' | 'archived'>('active')
+
+  const displayedConversations = useMemo(
+    () => scopedConversations.filter((conv) => {
+      const status = workspaceStatusMap.get(conv.id) || 'active'
+      return workspaceTab === 'active' ? status !== 'archived' : status === 'archived'
+    }),
+    [scopedConversations, workspaceTab, workspaceStatusMap]
+  )
+  const archivedCount = useMemo(
+    () => scopedConversations.filter((conv) => workspaceStatusMap.get(conv.id) === 'archived').length,
+    [scopedConversations, workspaceStatusMap]
+  )
+  const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
   const [conversationRatio, _setConversationRatio] = useState(loadConversationRatio)
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
   const [clearingConversations, setClearingConversations] = useState(false)
@@ -324,7 +344,7 @@ export function Sidebar({
           className="flex flex-col overflow-hidden"
           style={{ height: `${conversationRatio}%` }}
         >
-          <div className="p-2">
+          <div className="p-2 pb-1">
             <BrandButton
               variant="ghost"
               className="h-7 w-full justify-start gap-1.5 bg-muted px-2 text-xs"
@@ -339,12 +359,42 @@ export function Sidebar({
             </BrandButton>
           </div>
 
+          {/* Workspace tab filter */}
+          <div className="flex items-center gap-0.5 px-2 pb-1">
+            <BrandButton
+              variant="ghost"
+              className={`h-6 flex-1 justify-center px-1 text-[11px] ${
+                workspaceTab === 'active'
+                  ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                  : 'text-secondary'
+              }`}
+              onClick={() => setWorkspaceTab('active')}
+            >
+              {t('sidebar.activeTab')}
+            </BrandButton>
+            <BrandButton
+              variant="ghost"
+              className={`h-6 flex-1 justify-center gap-1 px-1 text-[11px] ${
+                workspaceTab === 'archived'
+                  ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                  : 'text-secondary'
+              }`}
+              onClick={() => setWorkspaceTab('archived')}
+            >
+              {t('sidebar.archivedTab')}
+              {archivedCount > 0 && (
+                <span className="text-[10px] text-tertiary">({archivedCount})</span>
+              )}
+            </BrandButton>
+          </div>
+
           <div className="custom-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
-            {scopedConversations.map((conv) => {
+            {displayedConversations.map((conv) => {
               const isRunning = isConversationRunning(conv.id)
               const isActive = conv.id === activeConversationId
               const pendingReviewCount = pendingCountByConversationId.get(conv.id) || 0
               const isEditing = editingId === conv.id
+              const isArchived = workspaceStatusMap.get(conv.id) === 'archived'
               return (
                 <div
                   key={conv.id}
@@ -424,6 +474,36 @@ export function Sidebar({
                       title={t('sidebar.renameWorkspace')}
                     >
                       <Pencil className="h-3 w-3" />
+                    </BrandButton>
+                  )}
+                  {/* Archive/Unarchive button */}
+                  {!isEditing && (
+                    <BrandButton
+                      iconButton
+                      variant="ghost"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        const { archiveWorkspace, unarchiveWorkspace } = useConversationContextStore.getState()
+                        try {
+                          if (isArchived) {
+                            await unarchiveWorkspace(conv.id)
+                            toast.success(t('sidebar.workspaceUnarchived'))
+                          } else {
+                            await archiveWorkspace(conv.id)
+                            toast.success(t('sidebar.workspaceArchived'))
+                          }
+                        } catch (error) {
+                          console.error('[Sidebar] Failed to toggle archive:', error)
+                          toast.error(isArchived ? t('sidebar.unarchiveFailed') : t('sidebar.archiveFailed'))
+                        }
+                      }}
+                      title={isArchived ? t('sidebar.unarchiveWorkspace') : t('sidebar.archiveWorkspace')}
+                    >
+                      {isArchived
+                        ? <ArchiveRestore className="h-3 w-3" />
+                        : <Archive className="h-3 w-3" />
+                      }
                     </BrandButton>
                   )}
                   <BrandButton

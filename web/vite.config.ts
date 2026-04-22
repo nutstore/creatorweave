@@ -1,6 +1,7 @@
-import { defineConfig } from 'vite'
+import { defineConfig, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import fs from 'fs'
 import { sqlitePlugin } from './src/sqlite/vite-plugin-sqlite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { syncGuardPlugin } from './vite-plugin-sync-guard'
@@ -12,11 +13,57 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const isVitest = process.env.VITEST === 'true'
 const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || new Date().toISOString()
 
+/**
+ * Vite plugin to serve pyodide files from node_modules in dev mode.
+ * In production, files are copied via copy:pyodide script instead.
+ */
+function pyodideServePlugin(): Plugin {
+  return {
+    name: 'serve-pyodide',
+    configureServer(server) {
+      const pyodideDir = path.resolve(__dirname, 'node_modules/pyodide')
+      server.middlewares.use('/assets/pyodide', (req: any, res: any, next: any) => {
+        // Strip the /assets/pyodide prefix to get the file path within pyodide package
+        const filePath = path.join(pyodideDir, req.url || '')
+        const resolved = path.resolve(filePath)
+        // Security: ensure we don't serve files outside pyodide dir
+        if (!resolved.startsWith(pyodideDir)) {
+          res.statusCode = 403
+          res.end('Forbidden')
+          return
+        }
+        fs.stat(resolved, (err: any, stat: any) => {
+          if (err || !stat.isFile()) {
+            next()
+            return
+          }
+          // Set correct MIME types for common pyodide files
+          const ext = path.extname(resolved)
+          const mimeTypes: Record<string, string> = {
+            '.wasm': 'application/wasm',
+            '.js': 'application/javascript',
+            '.json': 'application/json',
+            '.tar': 'application/x-tar',
+            '.whl': 'application/zip',
+            '.data': 'application/octet-stream',
+          }
+          res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+          // Cross-origin headers needed for SharedArrayBuffer / WASM
+          res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+          fs.createReadStream(resolved).pipe(res)
+        })
+      })
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
   plugins: [
     react(),
+    pyodideServePlugin(),
     syncGuardPlugin(),
     ...(isVitest ? [] : [docsSyncPlugin()]),
     sqlitePlugin(),

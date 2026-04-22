@@ -25,6 +25,7 @@ import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useRemoteStore, registerRemoteCallbacks } from '@/store/remote.store'
 import { useMobile } from '@/components/mobile/useMobile'
+import { useUnloadGuard } from '@/hooks/useUnloadGuard'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { ConversationView } from '@/components/agent/ConversationView'
@@ -145,6 +146,9 @@ export function WorkspaceLayout({
   const isMobile = useMobile()
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const activeConversationName = conversationName ?? workspaceName
+
+  // Guard against accidental page close when there are unsaved changes or running agent loops
+  useUnloadGuard()
 
   const handleStartConversation = useCallback(
     (text: string) => {

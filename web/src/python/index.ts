@@ -85,7 +85,7 @@ export type {
 
 // Constants
 export {
-  PYODIDE_CDN_URL,
+  PYODIDE_BASE_URL,
   DEFAULT_TIMEOUT,
   MOUNT_POINT,
   MAX_FILE_SIZE,

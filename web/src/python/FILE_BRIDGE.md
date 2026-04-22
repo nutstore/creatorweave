@@ -33,7 +33,7 @@ OPFS (持久化存储)
 
 定义了所有配置常量:
 
-- **PYODIDE_CDN_URL**: Pyodide CDN 地址
+- **PYODIDE_BASE_URL**: Pyodide 本地文件路径 (`/assets/pyodide`)
 - **DEFAULT_TIMEOUT**: 执行超时时间(3分钟)
 - **MOUNT_POINT**: 虚拟文件系统挂载点 (`/mnt`)
 - **MAX_FILE_SIZE**: 最大文件大小(50MB)
