@@ -261,6 +261,12 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
     case 'reasoning_complete': {
       draft.reasoning = event.reasoning
       syncDraftTextStepContent(draft, draft.activeReasoningStepId, event.reasoning, false)
+      // Don't remove the completed reasoning step here — defer cleanup to
+      // message_start (ensureDraftAssistantForMessageStart). Removing it now
+      // causes a render gap between reasoning_complete and message_end, because
+      // messages[] is only committed on message_end, not on reasoning_complete.
+      // The orderedRuntimeSteps filter in AssistantTurnBubble deduplicates
+      // against committedReasoningSet, so keeping the step is safe.
       draft.activeReasoningStepId = null
       return
     }
@@ -292,9 +298,15 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
         draft.reasoning = parsedThink.reasoning
         const reasoningStepId = ensureImplicitReasoningStepForContentStream(draft)
         syncDraftTextStepContent(draft, reasoningStepId, parsedThink.reasoning, false)
+        // Don't remove the implicit reasoning step here — same rationale as
+        // the reasoning_complete change: defer cleanup to message_start.
         draft.activeReasoningStepId = null
       }
       syncDraftTextStepContent(draft, draft.activeContentStepId, draft.content, false)
+      // Don't remove the completed content step here — defer cleanup to
+      // message_start. The orderedRuntimeSteps filter deduplicates against
+      // committedContentSet, and removing now causes a render gap while tools
+      // are executing between content_complete and message_end.
       draft.activeContentStepId = null
       return
     }
@@ -1357,6 +1369,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.streamingToolArgsByCallId = {}
             c.streamingContent = ''
             c.streamingReasoning = ''
+          })
+        }
+
+        // Persist conversation to SQLite immediately when a block completes
+        // (each assistant message end or tool result). This ensures that a page
+        // refresh does not lose any completed steps.
+        const persistAfterBlockComplete = () => {
+          const current = get().conversations.find((c) => c.id === conversationId)
+          if (!current) return
+          persistConversation(current).catch((err) => {
+            console.warn('[conversation.store] Block-complete persist failed:', err)
           })
         }
 
@@ -2457,6 +2480,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               c.messages = msgs
               c.updatedAt = Date.now()
             })
+            // Persist immediately — this callback fires at block boundaries
+            // (message_end), so it's the right time to save.
+            persistAfterBlockComplete()
           },
           onComplete: async (msgs: Message[]) => {
             if (!isCurrentRun()) return
