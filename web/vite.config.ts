@@ -15,6 +15,8 @@ const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || n
 
 /**
  * Vite plugin to serve pyodide files from node_modules in dev mode.
+ * Core files (pyodide.asm.wasm etc.) are served locally.
+ * Package files (.whl) that don't exist locally are proxied from CDN.
  * In production, files are copied via copy:pyodide script instead.
  */
 function pyodideServePlugin(): Plugin {
@@ -22,37 +24,68 @@ function pyodideServePlugin(): Plugin {
     name: 'serve-pyodide',
     configureServer(server) {
       const pyodideDir = path.resolve(__dirname, 'node_modules/pyodide')
-      server.middlewares.use('/assets/pyodide', (req: any, res: any, next: any) => {
-        // Strip the /assets/pyodide prefix to get the file path within pyodide package
+      const pyodideVersion = require('./node_modules/pyodide/package.json').version
+      const cdnBase = `https://cdn.jsdelivr.net/pyodide/v${pyodideVersion}/full`
+
+      server.middlewares.use('/assets/pyodide', async (req: any, res: any, next: any) => {
         const filePath = path.join(pyodideDir, req.url || '')
         const resolved = path.resolve(filePath)
+
         // Security: ensure we don't serve files outside pyodide dir
         if (!resolved.startsWith(pyodideDir)) {
           res.statusCode = 403
           res.end('Forbidden')
           return
         }
-        fs.stat(resolved, (err: any, stat: any) => {
-          if (err || !stat.isFile()) {
-            next()
+
+        // Try local file first (core files like pyodide.asm.wasm)
+        try {
+          const stat = fs.statSync(resolved)
+          if (stat.isFile()) {
+            const ext = path.extname(resolved)
+            const mimeTypes: Record<string, string> = {
+              '.wasm': 'application/wasm',
+              '.js': 'application/javascript',
+              '.json': 'application/json',
+              '.tar': 'application/x-tar',
+              '.whl': 'application/zip',
+              '.data': 'application/octet-stream',
+            }
+            res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+            res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+            fs.createReadStream(resolved).pipe(res)
             return
           }
-          // Set correct MIME types for common pyodide files
-          const ext = path.extname(resolved)
-          const mimeTypes: Record<string, string> = {
-            '.wasm': 'application/wasm',
-            '.js': 'application/javascript',
-            '.json': 'application/json',
-            '.tar': 'application/x-tar',
-            '.whl': 'application/zip',
-            '.data': 'application/octet-stream',
+        } catch {
+          // File not found locally, fall through to CDN proxy
+        }
+
+        // Fallback: proxy .whl/.tar package files from CDN
+        const fileName = (req.url || '').replace(/^\//, '')
+        if (fileName && (fileName.endsWith('.whl') || fileName.endsWith('.tar'))) {
+          try {
+            const cdnUrl = `${cdnBase}/${fileName}`
+            const cdnRes = await fetch(cdnUrl)
+            if (cdnRes.ok) {
+              const ext = path.extname(fileName)
+              const mimeTypes: Record<string, string> = {
+                '.whl': 'application/zip',
+                '.tar': 'application/x-tar',
+              }
+              res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
+              res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+              res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+              const body = await cdnRes.arrayBuffer()
+              res.end(Buffer.from(body))
+              return
+            }
+          } catch {
+            // CDN fetch failed, fall through
           }
-          res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
-          // Cross-origin headers needed for SharedArrayBuffer / WASM
-          res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
-          res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
-          fs.createReadStream(resolved).pipe(res)
-        })
+        }
+
+        next()
       })
     },
   }
