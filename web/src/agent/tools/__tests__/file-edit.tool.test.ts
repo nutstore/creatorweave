@@ -64,10 +64,6 @@ describe('file edit tool', () => {
 
   it('requires file to be read before edit', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
-    readFileMock.mockResolvedValueOnce({
-      content: 'const a = 1\n',
-      metadata: { size: 12, contentType: 'text/plain' },
-    })
 
     const result = await editExecutor(
       { path: 'src/a.ts', old_text: '1', new_text: '2' },
@@ -76,7 +72,37 @@ describe('file edit tool', () => {
     const error = unwrapError(result)
     expect(error.code).toBe('read_required')
     expect(error.message).toContain('Read file before editing')
+    expect(readFileMock).not.toHaveBeenCalled()
     expect(writeFileMock).not.toHaveBeenCalled()
+  })
+
+  it('reuses OPFS read source policy when snapshot came from OPFS', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const a = 1\n',
+      metadata: { size: 12, contentType: 'text/plain' },
+      source: 'opfs',
+    })
+    const readFileState = new Map([
+      [
+        'workspace:src/a.ts',
+        {
+          content: 'const a = 1\n',
+          timestamp: Date.now(),
+          isPartialView: false,
+          source: 'opfs',
+        },
+      ],
+    ])
+
+    const result = await editExecutor(
+      { path: 'src/a.ts', old_text: '1', new_text: '2' },
+      makeContext({ readFileState })
+    )
+
+    unwrapOk(result)
+    expect(readFileMock).toHaveBeenCalledWith('src/a.ts', null, 'ws-1', 'prefer_opfs')
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
   })
 
   it('rejects multiple matches when replace_all is false', async () => {
@@ -124,8 +150,8 @@ describe('file edit tool', () => {
 
     expect(data.replaceAll).toBe(true)
     expect(typeof data.diff).toBe('string')
-    expect(data.diff).toContain('-old')
-    expect(data.diff).toContain('+new')
+    expect(data.diff).toContain('-const x = old')
+    expect(data.diff).toContain('+const x = new')
     expect(writeFileMock).toHaveBeenCalledWith(
       'src/a.ts',
       'const x = new\nconst y = new\n',
@@ -199,10 +225,6 @@ describe('file edit tool', () => {
 
   it('rejects edit when snapshot is partial view', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
-    readFileMock.mockResolvedValueOnce({
-      content: 'const x = old\n',
-      metadata: { size: 14, contentType: 'text/plain' },
-    })
     const readFileState = new Map([
       ['workspace:src/a.ts', { content: 'const x = old\n', timestamp: Date.now(), isPartialView: true }],
     ])
@@ -215,6 +237,7 @@ describe('file edit tool', () => {
 
     expect(error.code).toBe('read_required')
     expect(error.message).toContain('Read file before editing')
+    expect(readFileMock).not.toHaveBeenCalled()
     expect(writeFileMock).not.toHaveBeenCalled()
   })
 

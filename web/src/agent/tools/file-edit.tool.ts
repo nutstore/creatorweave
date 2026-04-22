@@ -5,6 +5,7 @@
 import { structuredPatch } from 'diff'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
+import type { ReadPolicy } from '@/opfs/types/opfs-types'
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
@@ -266,11 +267,29 @@ async function executeSingleEdit(
     const readFileState = ensureReadFileState(context)
     const target = await resolveVfsTarget(path, context, 'write')
     const readStateKey = getReadStateKey(target)
+    const snapshot = readFileState.get(readStateKey)
+
+    if (!snapshot || snapshot.isPartialView) {
+      return toolErrorJson(
+        'edit',
+        'read_required',
+        'Read file before editing. Use read(path) first, then retry edit.'
+      )
+    }
 
     let fileContent: string
 
     if (target.kind === 'workspace') {
-      const { content } = await readFile(target.path, context.directoryHandle, context.workspaceId)
+      const readPolicy: ReadPolicy | undefined =
+        snapshot.source === 'opfs'
+          ? 'prefer_opfs'
+          : snapshot.source === 'native'
+            ? 'prefer_native'
+            : undefined
+      const result = readPolicy
+        ? await readFile(target.path, context.directoryHandle, context.workspaceId, readPolicy)
+        : await readFile(target.path, context.directoryHandle, context.workspaceId)
+      const { content } = result
       if (typeof content !== 'string') {
         return toolErrorJson(
           'edit',
@@ -285,15 +304,6 @@ async function executeSingleEdit(
         return toolErrorJson('edit', 'file_not_found', `File not found: ${path}`)
       }
       fileContent = content
-    }
-
-    const snapshot = readFileState.get(readStateKey)
-    if (!snapshot || snapshot.isPartialView) {
-      return toolErrorJson(
-        'edit',
-        'read_required',
-        'Read file before editing. Use read(path) first, then retry edit.'
-      )
     }
 
     const isFullRead = snapshot.offset === undefined && snapshot.limit === undefined
@@ -354,6 +364,7 @@ async function executeSingleEdit(
       offset: undefined,
       limit: undefined,
       isPartialView: false,
+      source: target.kind === 'workspace' ? 'opfs' : 'agent',
     })
 
     const pendingCount = getPendingChanges().length
