@@ -90,7 +90,7 @@ export interface LLMProvider {
   readonly maxContextTokens: number
 
   /** Non-streaming chat completion */
-  chat(request: ChatCompletionRequest): Promise<ChatCompletionResponse>
+  chat(request: ChatCompletionRequest, signal?: AbortSignal): Promise<ChatCompletionResponse>
 
   /** Streaming chat completion */
   chatStream(

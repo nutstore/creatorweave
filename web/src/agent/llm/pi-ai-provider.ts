@@ -43,12 +43,13 @@ export class PiAIProvider implements LLMProvider {
     return this.apiKey
   }
 
-  async chat(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
+  async chat(request: ChatCompletionRequest, signal?: AbortSignal): Promise<ChatCompletionResponse> {
     const context = this.toPiAIContext(request)
     const message = await complete(this.model, context, {
       apiKey: this.apiKey,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
+      signal,
     })
 
     const content = this.textFromContent(message.content)
