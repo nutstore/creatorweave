@@ -42,6 +42,7 @@
     "@tiptap/extension-code": "^3.20.5",
     "@tiptap/extension-document": "^3.20.5",
     "@tiptap/extension-hard-break": "^3.20.5",
+    "@tiptap/extension-history": "^3.20.5",
     "@tiptap/extension-mention": "^3.20.5",
     "@tiptap/extension-paragraph": "^3.20.5",
     "@tiptap/extension-text": "^3.20.5",

@@ -4,6 +4,7 @@ import Document from '@tiptap/extension-document'
 import Paragraph from '@tiptap/extension-paragraph'
 import Text from '@tiptap/extension-text'
 import HardBreak from '@tiptap/extension-hard-break'
+import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { Plus, Trash2, Check } from 'lucide-react'
 import { useT } from '@/i18n'
@@ -256,6 +257,7 @@ export function AgentRichInput({
       Paragraph,
       Text,
       HardBreak,
+      History,
       Mention.configure({
         HTMLAttributes: {
           class:
