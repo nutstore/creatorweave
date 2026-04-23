@@ -38,3 +38,11 @@ export {
   applyTemplate,
   type TemplateType,
 } from '../../export/templates/report-templates'
+
+export {
+  exportConversation,
+  type ConversationExportFormat,
+  type ConversationExportOptions,
+  type ConversationExportResult,
+  type ConversationExportData,
+} from './conversation-export'

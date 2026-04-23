@@ -60,7 +60,7 @@ const BrandDialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-modal w-[90vw] max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl border bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 dark:bg-neutral-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "fixed left-[50%] top-[50%] z-modal w-[90vw] max-w-md translate-x-[-50%] translate-y-[-50%] rounded-xl bg-white shadow-[0_4px_16px_rgba(0,0,0,0.06),0_1px_4px_rgba(0,0,0,0.024)] duration-200 dark:bg-neutral-900 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
         className
       )}
       {...props}
@@ -78,7 +78,7 @@ const BrandDialogHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-14 items-center justify-between border-b border px-5",
+      "flex h-14 items-center justify-between border-b px-5",
       className
     )}
     {...props}
@@ -105,7 +105,7 @@ const BrandDialogFooter = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex min-h-16 items-center justify-end gap-3 border-t border px-5 py-3",
+      "flex min-h-16 items-center justify-end gap-3 border-t px-5 py-3",
       className
     )}
     {...props}

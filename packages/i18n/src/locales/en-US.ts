@@ -1066,6 +1066,27 @@ export const enUS = {
       tokenUsage:
         "Input {promptTokens} + Output {completionTokens} = {totalTokens} tokens",
     },
+
+    // Export conversation
+    export: {
+      title: "Export Conversation",
+      format: "Format",
+      markdownDesc: "Readable, great for sharing",
+      jsonDesc: "Structured data, good for backup",
+      htmlDesc: "Styled page, good for printing",
+      options: "Options",
+      includeToolCalls: "Include tool calls",
+      includeReasoning: "Include reasoning",
+      addTimestamp: "Add timestamp to filename",
+      messages: "messages",
+      user: "user",
+      assistant: "assistant",
+      preparing: "Preparing...",
+      complete: "Export complete!",
+      failed: "Export failed",
+      saved: "Saved",
+      button: "Export",
+    },
   },
 
   conversationStorage: {
@@ -1820,6 +1841,7 @@ export const enUS = {
     deletePartial: "Deleted {success}, failed {failed}",
     clearing: "Clearing...",
     dragToResizeWidth: "Drag to resize width",
+    exportWorkspace: "Export conversation",
 
     // Sync Progress Dialog
     syncProgress: {

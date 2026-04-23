@@ -15,7 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -34,6 +34,7 @@ import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useT } from '@/i18n'
+import { ExportConversationDialog } from '@/components/conversation/ExportConversationDialog'
 
 type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
@@ -148,6 +149,7 @@ export function Sidebar({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [composing, setComposing] = useState(false)
+  const [exportConvId, setExportConvId] = useState<string | null>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const closeMobileSidebar = useCallback(() => {
@@ -489,6 +491,18 @@ export function Sidebar({
                         iconButton
                         variant="ghost"
                         className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExportConvId(conv.id)
+                        }}
+                        title={t('sidebar.exportWorkspace') || 'Export conversation'}
+                      >
+                        <Download className="h-3 w-3" />
+                      </BrandButton>
+                      <BrandButton
+                        iconButton
+                        variant="ghost"
+                        className="h-6 w-6"
                         onClick={async (e) => {
                           e.stopPropagation()
                           const { archiveWorkspace, unarchiveWorkspace } = useConversationContextStore.getState()
@@ -708,6 +722,17 @@ export function Sidebar({
           {/* center dot */}
           <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
         </div>
+      )}
+
+      {/* Export conversation dialog */}
+      {exportConvId && (
+        <ExportConversationDialog
+          open={!!exportConvId}
+          onOpenChange={(open) => {
+            if (!open) setExportConvId(null)
+          }}
+          conversationId={exportConvId}
+        />
       )}
     </>
   )

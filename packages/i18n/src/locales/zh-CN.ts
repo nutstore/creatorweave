@@ -1046,6 +1046,27 @@ export const zhCN = {
       tokenUsage:
         "输入 {promptTokens} + 输出 {completionTokens} = {totalTokens} tokens",
     },
+
+    // 导出会话
+    export: {
+      title: "导出会话记录",
+      format: "导出格式",
+      markdownDesc: "易读格式，适合分享和阅读",
+      jsonDesc: "结构化数据，适合备份和导入",
+      htmlDesc: "带样式页面，适合打印和存档",
+      options: "导出选项",
+      includeToolCalls: "包含工具调用详情",
+      includeReasoning: "包含推理过程",
+      addTimestamp: "文件名添加时间戳",
+      messages: "条消息",
+      user: "条用户",
+      assistant: "条助手",
+      preparing: "准备中...",
+      complete: "导出完成！",
+      failed: "导出失败",
+      saved: "已保存",
+      button: "导出",
+    },
   },
 
   conversationStorage: {
@@ -1778,6 +1799,7 @@ export const zhCN = {
     deletePartial: "已删除 {success} 个，失败 {failed} 个",
     clearing: "清空中...",
     dragToResizeWidth: "拖动调整宽度",
+    exportWorkspace: "导出会话记录",
 
     // Sync Progress Dialog
     syncProgress: {
