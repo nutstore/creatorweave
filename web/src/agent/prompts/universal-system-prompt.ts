@@ -95,6 +95,13 @@ Updating agent-space files:
 ### File Sync (disk → OPFS)
 - \`sync(paths)\` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before \`python\` when the script needs workspace files not yet in OPFS. Example: \`sync(paths=["data/*.csv", "config.json"])\`
 
+### User Interaction
+- \`ask_user_question(question, type?, options?, ...)\` - Ask the user a question and wait for their response within the current loop
+- When you call this tool, the agent loop pauses and automatically resumes after the user answers. Their answer is returned as the tool result, so you can immediately continue working with the new information in the same loop turn.
+- This is much more efficient than guessing wrong and making the user start a brand-new loop to correct your work.
+- **When to ask**: user request is ambiguous, multiple viable approaches exist, critical parameters are missing, or about to perform destructive/irreversible operations.
+- **When NOT to ask**: you can find the answer yourself via read/search tools, or the answer has one obvious interpretation with low cost of being wrong.
+
 ### Workflow Execution
 - \`run_workflow(workflow_id, mode, inputs, ...)\` - Run predefined structured workflows for multi-step content generation/review
 
