@@ -7,6 +7,7 @@ import type { Message, ToolCall } from '../message-types'
 import type { ToolRegistry } from '../tool-registry'
 import { notifyOtherToolCall } from '../tools/loop-guard'
 import type { ToolContext } from '../tools/tool-types'
+import { isToolEnvelopeV2 } from '../tools/tool-envelope'
 import type { AgentCallbacks, AgentLoopConfig } from './types'
 import {
   coerceToolArgs,
@@ -152,9 +153,17 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         }
 
         if (finalIsError) {
-          throw new Error(
-            finalContent.replace(/^Error(?:\s*\[[^\]]+\])?:\s*/i, '') || 'Tool execution failed'
-          )
+          // If the error is already wrapped in a ToolEnvelopeV2 (e.g. from MCP tools),
+          // return the raw envelope JSON as-is so the LLM receives structured error data.
+          // Only throw for non-envelope errors (legacy/internal tools).
+          if (isToolEnvelopeV2(finalDetails.parsed)) {
+            finalContent = rawResult
+            finalIsError = false
+          } else {
+            throw new Error(
+              finalContent.replace(/^Error(?:\s*\[[^\]]+\])?:\s*/i, '') || 'Tool execution failed'
+            )
+          }
         }
 
         let elicitationData: {

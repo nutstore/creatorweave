@@ -307,7 +307,11 @@ describe('mcp-tool-bridge', () => {
       const executor = createMCPToolExecutor('test-server', 'test_tool')
       const result = await executor({}, {} as any)
 
-      expect(result).toBe('Line 1\n\nLine 2')
+      const parsed = JSON.parse(result)
+      expect(parsed.ok).toBe(true)
+      expect(parsed.tool).toBe('test-server:test_tool')
+      expect(parsed.version).toBe(2)
+      expect(parsed.data.text).toBe('Line 1\n\nLine 2')
     })
 
     it('should return single text part without extra newlines', async () => {
@@ -318,7 +322,9 @@ describe('mcp-tool-bridge', () => {
       const executor = createMCPToolExecutor('test-server', 'test_tool')
       const result = await executor({}, {} as any)
 
-      expect(result).toBe('Single result')
+      const parsed = JSON.parse(result)
+      expect(parsed.ok).toBe(true)
+      expect(parsed.data.text).toBe('Single result')
     })
 
     it('should handle error results from MCP', async () => {
@@ -330,8 +336,15 @@ describe('mcp-tool-bridge', () => {
       const executor = createMCPToolExecutor('test-server', 'test_tool')
       const result = await executor({}, {} as any)
 
-      expect(result).toContain('error')
-      expect(result).toContain('MCP tool returned an error')
+      const parsed = JSON.parse(result)
+      expect(parsed.ok).toBe(false)
+      expect(parsed.tool).toBe('test-server:test_tool')
+      expect(parsed.version).toBe(2)
+      expect(parsed.error.code).toBe('mcp_tool_error')
+      expect(parsed.error.message).toBe('Error occurred')
+      expect(parsed.error.retryable).toBe(true)
+      expect(parsed.error.details.serverId).toBe('test-server')
+      expect(parsed.error.details.toolName).toBe('test_tool')
     })
 
     it('should handle execution errors gracefully', async () => {
@@ -341,9 +354,13 @@ describe('mcp-tool-bridge', () => {
       const result = await executor({}, {} as any)
 
       const parsed = JSON.parse(result)
-      expect(parsed.error).toContain('MCP tool execution failed')
-      expect(parsed.serverId).toBe('test-server')
-      expect(parsed.toolName).toBe('test_tool')
+      expect(parsed.ok).toBe(false)
+      expect(parsed.tool).toBe('test-server:test_tool')
+      expect(parsed.error.code).toBe('mcp_execution_failed')
+      expect(parsed.error.message).toContain('Connection failed')
+      expect(parsed.error.retryable).toBe(true)
+      expect(parsed.error.details.serverId).toBe('test-server')
+      expect(parsed.error.details.toolName).toBe('test_tool')
     })
 
     it('should JSON stringify non-object results', async () => {
@@ -352,7 +369,9 @@ describe('mcp-tool-bridge', () => {
       const executor = createMCPToolExecutor('test-server', 'test_tool')
       const result = await executor({}, {} as any)
 
-      expect(result).toBe('plain string result')
+      const parsed = JSON.parse(result)
+      expect(parsed.ok).toBe(true)
+      expect(parsed.data.text).toBe('plain string result')
     })
   })
 

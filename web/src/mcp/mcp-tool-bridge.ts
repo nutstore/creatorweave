@@ -9,6 +9,7 @@
 import type { ToolDefinition, ToolExecutor, ToolContext } from '../agent/tools/tool-types'
 import type { MCPToolDefinition, MCPServerConfig } from './mcp-types'
 import { getMCPManager } from './mcp-manager'
+import { toolOkJson, toolErrorJson } from '../agent/tools/tool-envelope'
 
 //=============================================================================
 // Type Conversions
@@ -121,6 +122,7 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 
     try {
       const result = await manager.executeTool(serverId, toolName, args, onProgress)
+      const fullToolName = `${serverId}:${toolName}`
 
       // SEP-1306: Check for binary elicitation
       if (hasBinaryElicitation(result)) {
@@ -137,7 +139,7 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
           {
             _elicitation: {
               ...elicitationPayload, // Include requestedSchema, uploadEndpoints, etc.
-              toolName: `${serverId}:${toolName}`,
+              toolName: fullToolName,
               args,
               serverId,
             },
@@ -149,7 +151,7 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
 
       // Format the result for the LLM
       if (typeof result === 'string') {
-        return result
+        return toolOkJson(fullToolName, { text: result })
       }
 
       // Handle MCP tool call result format
@@ -160,7 +162,23 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
         }
 
         if (mcpResult.isError) {
-          return JSON.stringify({ error: 'MCP tool returned an error', result })
+          // Extract error details from content if available
+          const errorContent = Array.isArray(mcpResult.content)
+            ? mcpResult.content
+                .filter((item) => item.type === 'text' && item.text)
+                .map((item) => item.text)
+                .join('\n')
+            : undefined
+
+          const errorMessage = errorContent || 'Unknown MCP error'
+          return toolErrorJson(fullToolName, 'mcp_tool_error', errorMessage, {
+            retryable: true,
+            details: {
+              serverId,
+              toolName,
+              ...(errorContent ? {} : { result }),
+            },
+          })
         }
 
         if (Array.isArray(mcpResult.content)) {
@@ -170,23 +188,22 @@ export function createMCPToolExecutor(serverId: string, toolName: string): ToolE
             .map((item) => item.text)
 
           if (textParts.length === 1) {
-            return textParts[0]!
+            return toolOkJson(fullToolName, { text: textParts[0] })
           } else if (textParts.length > 1) {
-            return textParts.join('\n\n')
+            return toolOkJson(fullToolName, { text: textParts.join('\n\n') })
           }
         }
 
-        // Default to JSON stringify
-        return JSON.stringify(result)
+        // Default: wrap the raw result in envelope
+        return toolOkJson(fullToolName, result)
       }
 
-      return JSON.stringify(result)
+      return toolOkJson(fullToolName, result)
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
-      return JSON.stringify({
-        error: `MCP tool execution failed: ${errorMessage}`,
-        serverId,
-        toolName,
+      return toolErrorJson(`${serverId}:${toolName}`, 'mcp_execution_failed', errorMessage, {
+        retryable: true,
+        details: { serverId, toolName },
       })
     }
   }
