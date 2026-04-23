@@ -429,7 +429,7 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
 }
 
 // Default conversation name when title is not available
-const DEFAULT_CONVERSATION_NAME = '对话'
+const DEFAULT_CONVERSATION_NAME = 'New Chat'
 import { StreamingQueue } from '../utils/streaming-queue'
 
 // Enable Immer Map/Set support
