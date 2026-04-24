@@ -874,23 +874,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               console.warn('[WorkspaceStore] Failed to refresh OPFS store:', e)
             }
 
-            // Show toast notification when changes are detected
-            if (!silent && hasChanges && changes) {
-              const changeCount = changes.changes.length
-              const message = changeCount === 1
-                ? '检测到 1 个文件变更，请查看变更待审阅'
-                : `检测到 ${changeCount} 个文件变更，请查看变更待审阅`
 
-              toast(message, {
-                action: {
-                  label: '查看',
-                  onClick: () => {
-                    set({ showPreview: true })
-                  },
-                },
-                duration: 5000,
-              })
-            }
           })()
 
           try {
