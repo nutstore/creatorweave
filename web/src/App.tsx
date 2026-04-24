@@ -182,8 +182,10 @@ function App() {
   const projectStats = useProjectStore((s) => s.projectStats)
   const projectLoading = useProjectStore((s) => s.isLoading)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
-  const activeWorkspaceId = useConversationContextStore((s) => s.activeWorkspaceId)
-  const switchingWorkspaceId = useConversationContextStore((s) => s.switchingWorkspaceId)
+  // NOTE: activeWorkspaceId and switchingWorkspaceId are NOT subscribed here.
+  // They are read via getState() inside syncFromRoute useEffect to prevent
+  // this component from re-rendering on every workspace switch (which caused
+  // the syncFromRoute infinite loop and CPU spikes).
   const activeConversationId = useConversationStore((s) => s.activeConversationId)
   const conversations = useConversationStore((s) => s.conversations)
   const t = useT() // i18n hook
@@ -649,12 +651,22 @@ function App() {
     setCurrentRoute(route)
   }
 
+  // Route → state sync.
+  // Reads store state via getState() inside the effect body to avoid
+  // subscribing to values that this effect itself modifies (which caused
+  // infinite re-trigger loops and CPU spikes).
   useEffect(() => {
     if (!isStorageReady || projectLoading) return
 
     let cancelled = false
 
     const syncFromRoute = async () => {
+      // Snapshot current store state to avoid stale closures
+      const _projects = useProjectStore.getState().projects
+      const _activeProjectId = useProjectStore.getState().activeProjectId
+      const _activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
+      const _switchingWorkspaceId = useConversationContextStore.getState().switchingWorkspaceId
+
       if (currentRoute.kind === 'projectsHome') {
         return
       }
@@ -677,17 +689,17 @@ function App() {
       }
 
       if (currentRoute.kind === 'legacyWorkspace') {
-        if (activeProjectId && activeWorkspaceId) {
+        if (_activeProjectId && _activeWorkspaceId) {
           navigateToRoute(
             {
               kind: 'projectWorkspace',
-              projectId: activeProjectId,
-              workspaceId: activeWorkspaceId,
+              projectId: _activeProjectId,
+              workspaceId: _activeWorkspaceId,
             },
             true
           )
-        } else if (activeProjectId) {
-          navigateToRoute({ kind: 'projectWorkspace', projectId: activeProjectId }, true)
+        } else if (_activeProjectId) {
+          navigateToRoute({ kind: 'projectWorkspace', projectId: _activeProjectId }, true)
         } else {
           navigateToRoute({ kind: 'projectsHome' }, true)
         }
@@ -696,14 +708,14 @@ function App() {
 
       const { projectId, workspaceId } = currentRoute
 
-      const projectExists = projects.some((project) => project.id === projectId)
+      const projectExists = _projects.some((project) => project.id === projectId)
       if (!projectExists) {
         toast.error(t('app.projectNotFound'))
         navigateToRoute({ kind: 'projectsHome' }, true)
         return
       }
 
-      if (activeProjectId !== projectId) {
+      if (_activeProjectId !== projectId) {
         const switched = await setActiveProject(projectId)
         if (!switched) {
           if (!cancelled) {
@@ -716,6 +728,7 @@ function App() {
 
       if (cancelled) return
 
+      // Re-read workspace list after potential project switch
       const scopedWorkspaceIds = useConversationContextStore.getState().workspaces.map((workspace) => workspace.id)
 
       if (!workspaceId) {
@@ -734,7 +747,7 @@ function App() {
         const shouldApplyRouteWorkspace = shouldApplyRouteWorkspaceToConversation({
           routeWorkspaceId: workspaceId,
           activeConversationId: convState.activeConversationId,
-          switchingWorkspaceId,
+          switchingWorkspaceId: useConversationContextStore.getState().switchingWorkspaceId,
         })
         if (shouldApplyRouteWorkspace) {
           await useConversationStore.getState().setActive(workspaceId)
@@ -743,8 +756,9 @@ function App() {
       }
 
       const convState = useConversationStore.getState()
+      const latestSwitchingId = useConversationContextStore.getState().switchingWorkspaceId
       const isTransientActiveConversation =
-        switchingWorkspaceId === workspaceId &&
+        latestSwitchingId === workspaceId &&
         convState.activeConversationId === workspaceId &&
         convState.conversations.some((conversation) => conversation.id === workspaceId)
       if (isTransientActiveConversation) {
@@ -776,14 +790,15 @@ function App() {
     isStorageReady,
     projectLoading,
     currentRoute,
-    projects,
-    activeProjectId,
-    activeWorkspaceId,
-    activeConversationId,
-    switchingWorkspaceId,
+    // NOTE: Only depend on values that this effect does NOT modify.
+    // projects/activeProjectId/activeWorkspaceId/activeConversationId/switchingWorkspaceId
+    // are now read via getState() inside the effect body to prevent infinite re-trigger loops.
     setActiveProject,
   ])
 
+  // URL sync: active conversation → URL path.
+  // This effect ONLY writes to the URL (navigateToRoute), it does NOT modify
+  // store state. Safe to subscribe to activeProjectId/activeConversationId.
   useEffect(() => {
     if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
     if (!activeProjectId || !activeConversationId) return
