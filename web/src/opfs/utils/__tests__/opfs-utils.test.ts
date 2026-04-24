@@ -104,6 +104,26 @@ describe('opfs-utils', () => {
       expect(getFileContentType('file.svg')).toBe('text')
       expect(getFileContentType('file.yml')).toBe('text')
       expect(getFileContentType('file.env')).toBe('text')
+      // Programming languages
+      expect(getFileContentType('file.py')).toBe('text')
+      expect(getFileContentType('file.pyi')).toBe('text')
+      expect(getFileContentType('file.rs')).toBe('text')
+      expect(getFileContentType('file.go')).toBe('text')
+      expect(getFileContentType('file.java')).toBe('text')
+      expect(getFileContentType('file.c')).toBe('text')
+      expect(getFileContentType('file.cpp')).toBe('text')
+      expect(getFileContentType('file.h')).toBe('text')
+      expect(getFileContentType('file.rb')).toBe('text')
+      expect(getFileContentType('file.php')).toBe('text')
+      expect(getFileContentType('file.sh')).toBe('text')
+      expect(getFileContentType('file.sql')).toBe('text')
+      expect(getFileContentType('file.dart')).toBe('text')
+      expect(getFileContentType('file.swift')).toBe('text')
+      expect(getFileContentType('file.kt')).toBe('text')
+      expect(getFileContentType('file.scala')).toBe('text')
+      expect(getFileContentType('file.lua')).toBe('text')
+      expect(getFileContentType('file.vue')).toBe('text')
+      expect(getFileContentType('file.svelte')).toBe('text')
     })
 
     it('should detect binary files', () => {
@@ -114,8 +134,12 @@ describe('opfs-utils', () => {
     })
 
     it('should handle files without extension', () => {
-      expect(getFileContentType('Makefile')).toBe('binary')
-      expect(getFileContentType('Dockerfile')).toBe('binary')
+      expect(getFileContentType('Makefile')).toBe('text')
+      expect(getFileContentType('Dockerfile')).toBe('text')
+      expect(getFileContentType('Gemfile')).toBe('text')
+      expect(getFileContentType('README')).toBe('text')
+      expect(getFileContentType('LICENSE')).toBe('text')
+      expect(getFileContentType('src/Makefile')).toBe('text')
     })
   })
 
