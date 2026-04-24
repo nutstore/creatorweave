@@ -62,16 +62,16 @@ function setupProjectChangeListener(onChange: () => void): () => void {
   return () => channel.removeEventListener('message', handler)
 }
 
-function setupProjectSync(onChange: () => void): void {
-  if (projectSyncInitialized) return
+function setupProjectSync(onChange: () => void): () => void {
+  if (projectSyncInitialized) return () => {}
   projectSyncInitialized = true
 
-  setupProjectChangeListener(() => {
+  const unsubChannel = setupProjectChangeListener(() => {
     console.log('[ProjectStore] Received cross-tab change, refreshing...')
     onChange()
   })
 
-  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  if (typeof window === 'undefined' || typeof document === 'undefined') return () => {}
 
   const refreshOnTabActivation = () => {
     const now = Date.now()
@@ -82,11 +82,20 @@ function setupProjectSync(onChange: () => void): void {
   }
 
   window.addEventListener('focus', refreshOnTabActivation)
-  document.addEventListener('visibilitychange', () => {
+  const handleVisibility = () => {
     if (document.visibilityState === 'visible') {
       refreshOnTabActivation()
     }
-  })
+  }
+  document.addEventListener('visibilitychange', handleVisibility)
+
+  // Return cleanup function so callers can tear down listeners on unmount.
+  return () => {
+    unsubChannel()
+    window.removeEventListener('focus', refreshOnTabActivation)
+    document.removeEventListener('visibilitychange', handleVisibility)
+    projectSyncInitialized = false
+  }
 }
 
 interface ProjectState {
@@ -144,6 +153,8 @@ export const useProjectStore = create<ProjectState>()(
     error: null,
 
     initialize: async () => {
+      // setupProjectSync is idempotent — returns the previous cleanup if already
+      // initialised, so calling initialize() multiple times is safe.
       setupProjectSync(() => {
         void get().refreshProjects()
       })
