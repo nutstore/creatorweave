@@ -1738,6 +1738,8 @@ export const jaJP = {
     deleteWorkspaceFailed: "ワークスペースの削除に失敗しました",
     deleteWorkspace: "ワークスペースを削除",
     renameWorkspace: "ワークスペース名を変更",
+    pinWorkspace: "ワークスペースをピン留め",
+    unpinWorkspace: "ピン留めを解除",
     dragToResizeHeight: "ドラッグして高さを調整",
     centerDot: "センターポイント",
     files: "ファイル",

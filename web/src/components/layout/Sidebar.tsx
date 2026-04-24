@@ -15,7 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -29,6 +29,7 @@ import {
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
+import { useWorkspaceStore } from '@/store/workspace.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
@@ -131,12 +132,27 @@ export function Sidebar({
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [workspaceTab, setWorkspaceTab] = useState<'active' | 'archived'>('active')
 
+  // Pin state from workspace store
+  const pinnedIds = useWorkspaceStore((state) => state.pinnedWorkspaceIds)
+  const togglePin = useWorkspaceStore((state) => state.togglePin)
+
   const displayedConversations = useMemo(
-    () => scopedConversations.filter((conv) => {
-      const status = workspaceStatusMap.get(conv.id) || 'active'
-      return workspaceTab === 'active' ? status !== 'archived' : status === 'archived'
-    }),
-    [scopedConversations, workspaceTab, workspaceStatusMap]
+    () => {
+      const filtered = scopedConversations.filter((conv) => {
+        const status = workspaceStatusMap.get(conv.id) || 'active'
+        return workspaceTab === 'active' ? status !== 'archived' : status === 'archived'
+      })
+      // Sort: pinned first, then by original order (lastActiveAt desc)
+      const pinnedSet = new Set(pinnedIds)
+      return [...filtered].sort((a, b) => {
+        const aPinned = pinnedSet.has(a.id)
+        const bPinned = pinnedSet.has(b.id)
+        if (aPinned && !bPinned) return -1
+        if (!aPinned && bPinned) return 1
+        return 0 // preserve original relative order
+      })
+    },
+    [scopedConversations, workspaceTab, workspaceStatusMap, pinnedIds]
   )
   const archivedCount = useMemo(
     () => scopedConversations.filter((conv) => workspaceStatusMap.get(conv.id) === 'archived').length,
@@ -406,6 +422,8 @@ export function Sidebar({
               const pendingReviewCount = pendingCountByConversationId.get(conv.id) || 0
               const isEditing = editingId === conv.id
               const isArchived = workspaceStatusMap.get(conv.id) === 'archived'
+              const isPinned = pinnedIds.includes(conv.id)
+
               return (
                 <div
                   key={conv.id}
@@ -436,6 +454,11 @@ export function Sidebar({
                     }
                   }}
                 >
+                  {/* Pin indicator icon */}
+                  {isPinned && (
+                    <Pin className="h-3 w-3 shrink-0 text-primary-500" />
+                  )}
+
                   {/* Running status indicator */}
                   {isRunning && (
                     <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
@@ -475,6 +498,21 @@ export function Sidebar({
                   {/* Action buttons - only visible on hover, absolutely positioned so no layout space */}
                   {!isEditing && (
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 rounded-md bg-white/90 px-0.5 py-0.5 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 dark:bg-card/90">
+                      <BrandButton
+                        iconButton
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          togglePin(conv.id)
+                        }}
+                        title={isPinned ? t('sidebar.unpinWorkspace') : t('sidebar.pinWorkspace')}
+                      >
+                        {isPinned
+                          ? <PinOff className="h-3 w-3" />
+                          : <Pin className="h-3 w-3" />
+                        }
+                      </BrandButton>
                       <BrandButton
                         iconButton
                         variant="ghost"

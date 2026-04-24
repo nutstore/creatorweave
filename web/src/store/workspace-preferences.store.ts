@@ -66,6 +66,8 @@ export interface WorkspacePreferences {
   agentMode: 'plan' | 'act'
   /** Persisted mode map keyed by workspace ID */
   agentModeByWorkspace: Record<string, 'plan' | 'act'>
+  /** Pinned workspace IDs — pinned items show at top of sidebar */
+  pinnedWorkspaceIds: string[]
 }
 
 /**
@@ -94,6 +96,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   onboardingCompleted: false,
   agentMode: 'act',
   agentModeByWorkspace: {},
+  pinnedWorkspaceIds: [],
 }
 
 /**
@@ -130,6 +133,9 @@ interface WorkspacePreferencesState extends WorkspacePreferences {
   // Agent mode actions
   setAgentMode: (mode: 'plan' | 'act') => void
   syncAgentModeForWorkspace: (workspaceId: string | null) => void
+
+  // Pinned workspaces actions
+  setPinnedWorkspaceIds: (ids: string[]) => void
 
   // Reset actions
   resetAll: () => void
@@ -266,6 +272,12 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
             : DEFAULT_PREFERENCES.agentMode
         }),
 
+      // Pinned workspaces actions
+      setPinnedWorkspaceIds: (ids) =>
+        set((state) => {
+          state.pinnedWorkspaceIds = ids
+        }),
+
       // Reset actions
       resetAll: () =>
         set((state) => {
@@ -280,7 +292,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 3, // Bump version for per-workspace agentMode map
+      version: 4, // Bump version for pinnedWorkspaceIds
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         panelState: state.panelState,
@@ -289,6 +301,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
         onboardingCompleted: state.onboardingCompleted,
         agentMode: state.agentMode,
         agentModeByWorkspace: state.agentModeByWorkspace,
+        pinnedWorkspaceIds: state.pinnedWorkspaceIds,
       }),
       migrate: (persistedState) => {
         const state = (persistedState || {}) as Partial<WorkspacePreferences>
@@ -296,6 +309,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
           ...DEFAULT_PREFERENCES,
           ...state,
           agentModeByWorkspace: state.agentModeByWorkspace || {},
+          pinnedWorkspaceIds: (state as Record<string, unknown>).pinnedWorkspaceIds as string[] || [],
         }
       },
     }

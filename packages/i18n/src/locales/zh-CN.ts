@@ -1721,6 +1721,8 @@ export const zhCN = {
     workspaceUnarchived: "工作区已恢复",
     archiveFailed: "归档失败",
     unarchiveFailed: "取消归档失败",
+    pinWorkspace: "置顶工作区",
+    unpinWorkspace: "取消置顶",
     dragToResizeHeight: "拖动调整高度",
     centerDot: "中心圆点",
     files: "文件",

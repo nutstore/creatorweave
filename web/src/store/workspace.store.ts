@@ -262,6 +262,12 @@ interface WorkspaceState {
 
   /** Clear unsynced snapshots notification */
   clearUnsyncedSnapshots: () => void
+
+  /** Pinned workspace IDs (persisted via preferences store) */
+  pinnedWorkspaceIds: string[]
+
+  /** Toggle pin status for a workspace */
+  togglePin: (id: string) => void
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -279,6 +285,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         isSyncPreviewEnabled: true,
         switchingWorkspaceId: null,
         unsyncedSnapshots: [],
+        pinnedWorkspaceIds: [],
 
         //=============================================================================
         // Actions
@@ -323,6 +330,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 ...ws,
                 pendingCount: realPendingCounts.get(ws.id) ?? 0,
               }))
+            }
+
+            // Load pinned workspace IDs from preferences
+            try {
+              const { useWorkspacePreferencesStore } = await import('./workspace-preferences.store')
+              const pinnedIds = useWorkspacePreferencesStore.getState().pinnedWorkspaceIds
+              if (pinnedIds.length > 0) {
+                const pinnedSet = new Set(pinnedIds)
+                set({ pinnedWorkspaceIds: pinnedIds })
+                // Sort: pinned first (in pinnedIds order), then remaining by lastActiveAt desc
+                workspaces.sort((a, b) => {
+                  const aPinned = pinnedSet.has(a.id)
+                  const bPinned = pinnedSet.has(b.id)
+                  if (aPinned && !bPinned) return -1
+                  if (!aPinned && bPinned) return 1
+                  return (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)
+                })
+              }
+            } catch {
+              // Ignore preference loading errors, keep default order
             }
 
             // Set first workspace as active if none active
@@ -681,6 +708,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 newActiveId && remaining.length > 0 ? remaining[0]?.pendingCount || 0 : 0,
               isLoading: false,
             })
+
+            // Clean up pinnedWorkspaceIds to remove stale ID
+            const currentPinned = get().pinnedWorkspaceIds
+            if (currentPinned.includes(id)) {
+              const newPinned = currentPinned.filter((pid) => pid !== id)
+              set({ pinnedWorkspaceIds: newPinned })
+              import('./workspace-preferences.store').then(({ useWorkspacePreferencesStore }) => {
+                useWorkspacePreferencesStore.getState().setPinnedWorkspaceIds(newPinned)
+              }).catch(() => {})
+            }
 
             // Also switch active conversation to match new workspace
             if (newActiveId !== null) {
@@ -1093,6 +1130,35 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         clearUnsyncedSnapshots: () => {
           set({ unsyncedSnapshots: [] })
+        },
+
+        togglePin: (id) => {
+          const current = get().pinnedWorkspaceIds
+          const isPinned = current.includes(id)
+          const next = isPinned
+            ? current.filter((pid) => pid !== id)
+            : [...current, id]
+
+          set({ pinnedWorkspaceIds: next })
+
+          // Re-sort workspaces: pinned first, then by lastActiveAt desc
+          const workspaces = [...get().workspaces]
+          const pinnedSet = new Set(next)
+          workspaces.sort((a, b) => {
+            const aPinned = pinnedSet.has(a.id)
+            const bPinned = pinnedSet.has(b.id)
+            if (aPinned && !bPinned) return -1
+            if (!aPinned && bPinned) return 1
+            return (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)
+          })
+          set({ workspaces })
+
+          // Persist (lazy import to avoid circular dependency)
+          import('./workspace-preferences.store').then(({ useWorkspacePreferencesStore }) => {
+            useWorkspacePreferencesStore.getState().setPinnedWorkspaceIds(next)
+          }).catch((err) => {
+            console.error('[WorkspaceStore] Failed to persist pinned workspaces:', err)
+          })
         },
       })
 )
