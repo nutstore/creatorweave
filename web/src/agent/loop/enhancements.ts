@@ -104,6 +104,12 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     enhancedPrompt += scenarioEnhancement
   }
 
+  // ⑥.5: File mention context (when user message contains #path references)
+  const fileMentionMatch = userMessage.match(/#([\w.\-]+\/[\w./\\\-]*)/)
+  if (fileMentionMatch) {
+    enhancedPrompt += '\n\n## User-Referenced Files\nThe user used `#path/to/file` notation to reference specific files in their message. These are file paths in their project. When relevant, read these files before responding to provide accurate, context-aware answers.'
+  }
+
   // ⑦: Skills block (depends on user message)
   if (lastUserMsg) {
     const context: SkillMatchContext = {

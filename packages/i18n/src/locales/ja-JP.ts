@@ -1066,6 +1066,27 @@ export const jaJP = {
       tokenUsage:
         "入力 {promptTokens} + 出力 {completionTokens} = {totalTokens} tokens",
     },
+
+    // 会話エクスポート
+    export: {
+      title: "会話をエクスポート",
+      format: "フォーマット",
+      markdownDesc: "読みやすく、共有に最適",
+      jsonDesc: "構造化データ、バックアップに適している",
+      htmlDesc: "スタイル付きページ、印刷に適している",
+      options: "オプション",
+      includeToolCalls: "ツール呼び出しを含む",
+      includeReasoning: "推論過程を含む",
+      addTimestamp: "ファイル名にタイムスタンプを追加",
+      messages: "件のメッセージ",
+      user: "件のユーザー",
+      assistant: "件のアシスタント",
+      preparing: "準備中...",
+      complete: "エクスポート完了！",
+      failed: "エクスポートに失敗しました",
+      saved: "保存済み",
+      button: "エクスポート",
+    },
   },
 
   conversationStorage: {
@@ -1851,6 +1872,9 @@ export const jaJP = {
       cannotReadChangedImage: "変更バージョンの画像を読み込めません",
       imageWillBeDeleted: "画像は削除されます（変更バージョンに内容なし）",
       currentFileComments: "現在のファイルコメント",
+      filesWithComments: "ファイルにコメントあり",
+      copyCommentsToAI: "AIにコピー",
+      commentsSummary: "{files} ファイルにコメントあり、合計 {comments} 件",
       close: "閉じる",
       // AI review prompt
       reviewPromptIntro:

@@ -6,7 +6,7 @@
  * For HTML files, provides "Inspect Element" to preview in a new tab with element inspector.
  */
 
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useState } from 'react'
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
@@ -24,17 +24,7 @@ import { Columns2, UnfoldVertical, Copy, X, MousePointer2, FileText } from 'luci
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
 const LazyDiffViewer = React.lazy(() => import('./LazyDiffViewer'))
 
-type CommentSide = 'original' | 'modified'
-
-type LineComment = {
-  id: string
-  path: string
-  side: CommentSide
-  startLine: number
-  endLine: number
-  text: string
-  createdAt: number
-}
+import { type CommentSide, type LineComment } from './comment-types'
 
 interface FileDiffViewerProps {
   fileChange: FileChange | null
@@ -50,6 +40,10 @@ interface FileDiffViewerProps {
     beforeBinary?: Uint8Array | null
     afterBinary?: Uint8Array | null
   } | null
+  /** External comment state (managed by parent). Falls back to internal state if not provided. */
+  commentsByPath?: Record<string, LineComment[]>
+  /** Callback to update comment state in parent */
+  onCommentsChange?: (comments: Record<string, LineComment[]>) => void
 }
 
 type FileContentState = {
@@ -105,7 +99,7 @@ function formatTime(timestamp?: number): string {
   }
 }
 
-export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snapshotDiff = null }) => {
+export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snapshotDiff = null, commentsByPath: externalCommentsByPath, onCommentsChange }) => {
   const t = useT()
   const [isSplitView, setIsSplitView] = useState(false)
   const [useFullEditor, setUseFullEditor] = useState(false)
@@ -123,7 +117,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     before: null,
     after: null,
   })
-  const [commentsByPath, setCommentsByPath] = useState<Record<string, LineComment[]>>({})
+  const [internalCommentsByPath, setInternalCommentsByPath] = useState<Record<string, LineComment[]>>({})
+  // Use external state if provided (from SyncPreviewPanel), otherwise use internal state
+  const commentsByPath = externalCommentsByPath ?? internalCommentsByPath
+  const setCommentsByPath = onCommentsChange ?? setInternalCommentsByPath
   const [composer, setComposer] = useState<{
     side: CommentSide
     startLine: number
@@ -136,10 +133,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     snapshotDiff?.beforeKind === 'binary' || snapshotDiff?.afterKind === 'binary'
   )
   const currentFileComments = activePath ? commentsByPath[activePath] ?? [] : []
-  const allComments = useMemo(
-    () => Object.values(commentsByPath).flat().sort((a, b) => a.createdAt - b.createdAt),
-    [commentsByPath]
-  )
+
 
   /**
    * Open HTML file in a new tab with element inspector.
@@ -420,36 +414,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       ...prev,
       [activePath]: (prev[activePath] ?? []).filter((item) => item.id !== id),
     }))
-  }
-
-  const copyCommentsForLLM = async () => {
-    if (allComments.length === 0) return
-
-    const payload = allComments
-      .map((item) => {
-        const sideLabel = item.side === 'modified'
-          ? (isSnapshotMode ? t('sidebar.fileDiffViewer.afterSnapshot') : t('sidebar.fileDiffViewer.changedVersion'))
-          : (isSnapshotMode ? t('sidebar.fileDiffViewer.beforeSnapshot') : t('sidebar.fileDiffViewer.currentFile'))
-        const lineLabel = item.startLine === item.endLine
-          ? `L${item.startLine}`
-          : `L${item.startLine}-L${item.endLine}`
-        return `- ${item.path} [${sideLabel} ${lineLabel}] ${item.text}`
-      })
-      .join('\n')
-
-    const contentToCopy = `${payload}`
-
-    try {
-      await navigator.clipboard.writeText(contentToCopy)
-    } catch {
-      // fallback for limited environments
-      const textArea = document.createElement('textarea')
-      textArea.value = contentToCopy
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-    }
   }
 
   const copySnapshotTemplateForLLM = async () => {
@@ -767,9 +731,9 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               {(fileChange.size / 1024).toFixed(1)}k
             </span>
           ) : null}
-          {allComments.length > 0 && (
+          {currentFileComments.length > 0 && (
             <span className="shrink-0 text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
-              {t('sidebar.fileDiffViewer.commentsCount', { count: allComments.length })}
+              {t('sidebar.fileDiffViewer.commentsCount', { count: currentFileComments.length })}
             </span>
           )}
         </div>
@@ -850,15 +814,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               {t('sidebar.fileDiffViewer.template')}
             </button>
           )}
-          <button
-            type="button"
-            onClick={copyCommentsForLLM}
-            disabled={allComments.length === 0}
-            className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 disabled:opacity-30 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
-          >
-            <Copy className="h-3 w-3" />
-            {t('sidebar.fileDiffViewer.comments')}
-          </button>
+
         </div>
       </div>
 

@@ -1054,6 +1054,27 @@ export const koKR = {
       tokenUsage:
         "입력 {promptTokens} + 출력 {completionTokens} = {totalTokens} tokens",
     },
+
+    // 대화 내보내기
+    export: {
+      title: "대화 내보내기",
+      format: "형식",
+      markdownDesc: "읽기 쉬운 형식, 공유에 적합",
+      jsonDesc: "구조화된 데이터, 백업에 적합",
+      htmlDesc: "스타일이 적용된 페이지, 인쇄에 적합",
+      options: "옵션",
+      includeToolCalls: "도구 호출 포함",
+      includeReasoning: "추론 과정 포함",
+      addTimestamp: "파일명에 타임스탬프 추가",
+      messages: "개 메시지",
+      user: "개 사용자",
+      assistant: "개 어시스턴트",
+      preparing: "준비 중...",
+      complete: "내보내기 완료!",
+      failed: "내보내기 실패",
+      saved: "저장됨",
+      button: "내보내기",
+    },
   },
 
   conversationStorage: {
@@ -1833,6 +1854,9 @@ export const koKR = {
       cannotReadChangedImage: "변경된 버전의 이미지를 읽을 수 없습니다",
       imageWillBeDeleted: "이미지가 삭제됩니다 (변경된 버전에 내용 없음)",
       currentFileComments: "현재 파일 댓글",
+      filesWithComments: "파일에 댓글 있음",
+      copyCommentsToAI: "AI에 복사",
+      commentsSummary: "{files}개 파일에 댓글 있음, 총 {comments}개",
       close: "닫기",
       // AI review prompt
       reviewPromptIntro:

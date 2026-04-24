@@ -8,7 +8,7 @@
  * Part of Phase 3: Sync Preview UI
  */
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { type FileChange, type ConflictInfo, type ConflictDetail, type SyncResult } from '@/opfs/types/opfs-types'
 import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
@@ -20,7 +20,7 @@ import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
-import { ArrowLeft, AlertCircle, Sparkles } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Sparkles, Copy, MessageSquare, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
@@ -28,6 +28,7 @@ import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
+import { type LineComment } from './comment-types'
 
 /**
  * Empty state when no changes detected
@@ -135,6 +136,15 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
   // Selection state for selective sync
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
+
+  // Global comment state (lifted from FileDiffViewer)
+  const [commentsByPath, setCommentsByPath] = useState<Record<string, LineComment[]>>({})
+  const [commentsExpanded, setCommentsExpanded] = useState(false)
+  const allComments = useMemo(
+    () => Object.values(commentsByPath).flat().sort((a, b) => a.createdAt - b.createdAt),
+    [commentsByPath]
+  )
+  const commentedFileCount = Object.keys(commentsByPath).filter(k => commentsByPath[k].length > 0).length
 
   const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
     path: conflict.path,
@@ -381,6 +391,14 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         }
         return next
       })
+      // Clean up comments for synced files
+      setCommentsByPath((prev) => {
+        const next = { ...prev }
+        for (const path of approvedPaths) {
+          delete next[path]
+        }
+        return Object.keys(next).length > 0 ? next : {}
+      })
       onSync?.()
       return true
     } catch (err) {
@@ -538,6 +556,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     setSyncError(null)
     setSelectedItems(new Set())
     setConflictPaths(new Set())
+    setCommentsByPath({})
   }, [clearChanges])
 
   /**
@@ -550,7 +569,59 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       next.delete(path)
       return next
     })
+    // Clean up comments for the removed file
+    setCommentsByPath((prev) => {
+      if (!prev[path]) return prev
+      const next = { ...prev }
+      delete next[path]
+      return next
+    })
   }, [discardPendingPath])
+
+  /** Copy all comments formatted for LLM consumption */
+  const copyCommentsForLLM = useCallback(async () => {
+    if (allComments.length === 0) return
+
+    const payload = allComments
+      .map((item) => {
+        const sideLabel = item.side === 'modified' ? t('sidebar.fileDiffViewer.changedVersion') : t('sidebar.fileDiffViewer.currentFile')
+        const lineLabel = item.startLine === item.endLine
+          ? `L${item.startLine}`
+          : `L${item.startLine}-L${item.endLine}`
+        return `- ${item.path} [${sideLabel} ${lineLabel}] ${item.text}`
+      })
+      .join('\n')
+
+    try {
+      await navigator.clipboard.writeText(payload)
+    } catch {
+      const textArea = document.createElement('textarea')
+      textArea.value = payload
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
+  }, [allComments, t])
+
+  /** Remove a single comment by id */
+  const removeComment = useCallback((id: string) => {
+    setCommentsByPath((prev) => {
+      const next: Record<string, LineComment[]> = {}
+      for (const [path, comments] of Object.entries(prev)) {
+        const filtered = comments.filter((c) => c.id !== id)
+        if (filtered.length > 0) {
+          next[path] = filtered
+        }
+      }
+      return next
+    })
+  }, [])
+
+  /** Clear all comments */
+  const clearAllComments = useCallback(() => {
+    setCommentsByPath({})
+  }, [])
 
   const hasSelection = Boolean(selectedFile)
   const hasPending = Boolean(pendingChanges && pendingChanges.changes.length > 0)
@@ -619,6 +690,68 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         </div>
         </div>
 
+        {/* Global Comments Summary Bar */}
+        {allComments.length > 0 && (
+          <div className="border-b bg-amber-50/80 px-4 py-2 dark:bg-amber-950/20">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-3.5 w-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span className="text-xs text-amber-700 dark:text-amber-300">
+                {t('sidebar.fileDiffViewer.commentsSummary', { files: commentedFileCount, comments: allComments.length })}
+              </span>
+              <div className="flex-1" />
+              <button
+                type="button"
+                onClick={() => setCommentsExpanded((v) => !v)}
+                className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-amber-600 transition-colors hover:bg-amber-100/80 dark:text-amber-400 dark:hover:bg-amber-900/30"
+              >
+                {commentsExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </button>
+              <button
+                type="button"
+                onClick={clearAllComments}
+                className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-amber-600 transition-colors hover:bg-amber-100/80 dark:text-amber-400 dark:hover:bg-amber-900/30"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={copyCommentsForLLM}
+                className="inline-flex h-6 items-center gap-1 rounded bg-amber-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+              >
+                <Copy className="h-3 w-3" />
+                {t('sidebar.fileDiffViewer.copyCommentsToAI')}
+              </button>
+            </div>
+            {commentsExpanded && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {allComments.map((item) => (
+                  <div
+                    key={item.id}
+                    className="inline-flex max-w-full items-center gap-1 rounded border border-amber-200 bg-white px-2 py-1 text-xs dark:border-amber-800 dark:bg-amber-950/40"
+                  >
+                    <span className="shrink-0 font-mono text-[10px] text-amber-600 dark:text-amber-400">
+                      {item.path.split('/').pop()}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-amber-500 dark:text-amber-500">
+                      {item.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}{' '}
+                      {item.startLine === item.endLine ? `L${item.startLine}` : `L${item.startLine}-L${item.endLine}`}
+                    </span>
+                    <span className="max-w-[240px] truncate text-neutral-700 dark:text-neutral-300" title={item.text}>
+                      {item.text}
+                    </span>
+                    <button
+                      className="shrink-0 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+                      onClick={() => removeComment(item.id)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
       {/* Main Content - Split View */}
         {!selectedFile ? (
         // Show compact list (when no file selected)
@@ -652,7 +785,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
           {/* Diff Viewer */}
           <div className="flex-1">
-            <FileDiffViewer fileChange={selectedFile} />
+            <FileDiffViewer fileChange={selectedFile} commentsByPath={commentsByPath} onCommentsChange={setCommentsByPath} />
           </div>
         </div>
         )}

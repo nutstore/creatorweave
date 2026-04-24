@@ -1,10 +1,10 @@
 /**
- * Folder Access Store - 唯一状态源
+ * Folder Access Store - Single source of truth
  *
- * 统一管理文件夹权限状态，解决：
- * 1. 状态分散问题
- * 2. release() 后权限记录未删除问题
- * 3. 释放后重新添加不弹框问题
+ * Unified folder permission state management, solving:
+ * 1. Scattered state
+ * 2. Permission records not deleted after release()
+ * 3. Re-add not showing picker after release
  */
 
 import { create } from 'zustand'
@@ -16,7 +16,7 @@ import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { bindRuntimeDirectoryHandle, unbindRuntimeDirectoryHandle } from '@/native-fs'
 
 /**
- * 初始空记录
+ * Create an empty record
  */
 function createEmptyRecord(projectId: string): FolderAccessRecord {
   return {
@@ -40,26 +40,34 @@ async function notifyWorkspaceNativeDirectoryGranted(handle: FileSystemDirectory
   }
 }
 
+/**
+ * Module-level dedup: prevents concurrent ensureFilePaths from triggering multiple traversals
+ */
+let _filePathPromise: Promise<string[]> | null = null
+
 export const useFolderAccessStore = create<FolderAccessStore>()(
   immer((set, get) => ({
     activeProjectId: null,
     records: {},
+    allFilePaths: [],
 
     // ========================================================================
     // Actions
     // ========================================================================
 
     /**
-     * 设置活动项目并水合
+     * Set active project and hydrate
      */
     setActiveProject: async (projectId: string | null) => {
+      // Clear file path cache on project switch
+      get().clearFilePaths()
       set((state) => {
         state.activeProjectId = projectId
       })
 
       if (!projectId) return
 
-      // 如果还没有记录，创建空记录
+      // Create empty record if none exists yet
       if (!get().records[projectId]) {
         set((state) => {
           state.records[projectId] = createEmptyRecord(projectId)
@@ -70,7 +78,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 水合项目数据（从 IndexedDB 恢复）
+     * Hydrate project data (restore from IndexedDB)
      */
     hydrateProject: async (projectId: string) => {
       set((state) => {
@@ -81,25 +89,25 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       })
 
       try {
-        // 从 IndexedDB 加载记录
+        // Load record from IndexedDB
         const existing = await folderAccessRepo.load(projectId)
 
         if (!existing || !existing.persistedHandle) {
-          // 无记录 -> idle
+          // No record -> idle
           set((state) => {
             state.records[projectId] = createEmptyRecord(projectId)
           })
           return
         }
 
-        // 有持久化句柄 -> 检查权限状态
+        // Has persisted handle -> check permission status
         const handle = existing.persistedHandle
 
         try {
           const permission = await handle.queryPermission({ mode: 'readwrite' })
 
           if (permission === 'granted') {
-            // 权限已授予 -> ready
+            // Permission already granted -> ready
             set((state) => {
               state.records[projectId] = {
                 ...existing,
@@ -112,7 +120,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             await notifyWorkspaceNativeDirectoryGranted(handle)
             console.log('[FolderAccessStore] Permission granted, handle ready:', handle.name)
           } else if (permission === 'prompt') {
-            // 需要用户激活 -> needs_user_activation
+            // Needs user activation -> needs_user_activation
             set((state) => {
               state.records[projectId] = {
                 ...existing,
@@ -123,7 +131,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             })
             console.log('[FolderAccessStore] Permission prompt, needs activation:', handle.name)
           } else {
-            // 权限被拒绝 -> 删除记录，回到 idle
+            // Permission denied -> delete record, back to idle
             console.log('[FolderAccessStore] Permission denied, clearing record')
             await folderAccessRepo.delete(projectId)
             set((state) => {
@@ -131,7 +139,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             })
           }
         } catch (permError) {
-          // 查询权限失败，可能是 handle 已失效
+          // Permission query failed, handle may have expired
           console.error('[FolderAccessStore] Permission query failed:', permError)
           await folderAccessRepo.delete(projectId)
           set((state) => {
@@ -151,7 +159,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 选择新文件夹（弹出选择框）
+     * Pick a new folder (shows folder picker dialog)
      */
     pickDirectory: async (projectId: string) => {
       set((state) => {
@@ -165,12 +173,12 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         const handle = await selectFolderReadWrite()
 
         if (!handle) {
-          // 用户取消 -> 回到之前的状态
+          // User cancelled -> restore previous state
           set((state) => {
             const record = state.records[projectId]
             if (record) {
-              // 修复：如果已经有有效的 handle，保持 ready 状态
-              // 只有在没有持久化句柄时才设为 idle 或 needs_user_activation
+              // Fix: if there's a valid handle, keep ready status
+              // Only set idle/needs_user_activation when no persisted handle exists
               if (record.handle || record.persistedHandle) {
                 record.status = 'ready'
               } else {
@@ -192,7 +200,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           updatedAt: Date.now(),
         }
 
-        // 持久化
+        // Persist
         await folderAccessRepo.save(record)
         bindRuntimeDirectoryHandle(projectId, handle)
         await notifyWorkspaceNativeDirectoryGranted(handle)
@@ -201,9 +209,10 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           state.records[projectId] = record
         })
 
-        toast.success(`已选择文件夹: ${handle.name}`)
+        toast.success(`Folder selected: ${handle.name}`)
 
-        // 通知文件树刷新
+        // Notify file tree to refresh + clear file path cache (lazy reload on next search)
+        get().clearFilePaths()
         get().notifyFileTreeRefresh()
 
         return true
@@ -211,12 +220,12 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         console.error('[FolderAccessStore] Pick directory failed:', error)
 
         if (error instanceof Error && error.message === 'User cancelled') {
-          // 用户取消，不设置错误状态
+          // User cancelled, don't set error state
           set((state) => {
             const record = state.records[projectId]
             if (record) {
-              // 修复：如果已经有有效的 handle，保持 ready 状态
-              // 只有在没有持久化句柄时才设为 idle 或 needs_user_activation
+              // Fix: if there's a valid handle, keep ready status
+              // Only set idle/needs_user_activation when no persisted handle exists
               if (record.handle || record.persistedHandle) {
                 record.status = 'ready'
               } else {
@@ -235,13 +244,13 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           }
         })
 
-        toast.error('选择文件夹失败: ' + (error instanceof Error ? error.message : 'Unknown error'))
+        toast.error('Failed to select folder: ' + (error instanceof Error ? error.message : 'Unknown error'))
         return false
       }
     },
 
     /**
-     * 直接设置文件夹句柄（不弹框，用于外部已获取 handle 的场景）
+     * Set folder handle directly (no dialog, for externally obtained handles)
      */
     setHandle: async (projectId: string, handle: FileSystemDirectoryHandle) => {
       set((state) => {
@@ -263,7 +272,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         updatedAt: Date.now(),
       }
 
-      // 持久化
+      // Persist
       await folderAccessRepo.save(record)
       bindRuntimeDirectoryHandle(projectId, handle)
       await notifyWorkspaceNativeDirectoryGranted(handle)
@@ -274,12 +283,13 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
       console.log('[FolderAccessStore] Handle set directly:', handle.name)
 
-      // 通知文件树刷新
+      // Notify file tree to refresh + clear file path cache
+      get().clearFilePaths()
       get().notifyFileTreeRefresh()
     },
 
     /**
-     * 请求恢复权限（从 needs_user_activation 状态）
+     * Request permission restoration (from needs_user_activation state)
      */
     requestPermission: async (projectId: string) => {
       const record = get().records[projectId]
@@ -308,16 +318,17 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             }
           })
 
-          // 更新持久化
+          // Update persistence
           await folderAccessRepo.save(get().records[projectId])
           bindRuntimeDirectoryHandle(projectId, handle)
           await notifyWorkspaceNativeDirectoryGranted(handle)
 
-          toast.success('文件夹权限已恢复')
+          toast.success('Folder permission restored')
+          get().clearFilePaths()
           get().notifyFileTreeRefresh()
           return true
         } else {
-          toast.error('权限被拒绝')
+          toast.error('Permission denied')
           set((state) => {
             const r = state.records[projectId]
             if (r) r.status = 'needs_user_activation'
@@ -328,12 +339,12 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         console.error('[FolderAccessStore] Request permission failed:', error)
 
         if (error instanceof Error && error.name === 'SecurityError') {
-          // 需要用户交互
+          // Requires user interaction
           set((state) => {
             const r = state.records[projectId]
             if (r) r.status = 'needs_user_activation'
           })
-          toast.info('请重新点击按钮恢复权限')
+          toast.info('Please click the button again to restore permission')
         } else {
           set((state) => {
             const r = state.records[projectId]
@@ -342,15 +353,15 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
               r.error = error instanceof Error ? error.message : 'Unknown error'
             }
           })
-          toast.error('恢复权限失败')
+          toast.error('Failed to restore permission')
         }
         return false
       }
     },
 
     /**
-     * 彻底释放（删除记录）
-     * 关键：必须删除 IndexedDB 记录，这样下次添加才会弹框
+     * Fully release (delete record)
+     * Critical: must delete IndexedDB record so next add shows the picker
      */
     release: async (projectId: string) => {
       set((state) => {
@@ -361,7 +372,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       })
 
       try {
-        // 关键：彻底删除 IndexedDB 记录
+        // Critical: fully delete IndexedDB record
         await folderAccessRepo.delete(projectId)
         unbindRuntimeDirectoryHandle(projectId)
 
@@ -369,7 +380,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           state.records[projectId] = createEmptyRecord(projectId)
         })
 
-        toast.success('文件夹权限已释放')
+        get().clearFilePaths()
+        toast.success('Folder permission released')
         console.log('[FolderAccessStore] Released and deleted record for project:', projectId)
       } catch (error) {
         console.error('[FolderAccessStore] Release failed:', error)
@@ -384,7 +396,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 清除错误状态
+     * Clear error state
      */
     clearError: (projectId: string) => {
       set((state) => {
@@ -401,7 +413,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     // ========================================================================
 
     /**
-     * 获取当前项目记录
+     * Get current project record
      */
     getRecord: (): FolderAccessRecord | null => {
       const { activeProjectId, records } = get()
@@ -410,7 +422,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 获取当前项目状态
+     * Get current project status
      */
     getCurrentStatus: (): FolderAccessStatus | null => {
       const { activeProjectId, records } = get()
@@ -419,7 +431,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 获取当前项目句柄
+     * Get current project handle
      */
     getCurrentHandle: (): FileSystemDirectoryHandle | null => {
       const { activeProjectId, records } = get()
@@ -428,11 +440,46 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     },
 
     /**
-     * 当前项目是否可用
+     * Whether the current project is ready
      */
     isReady: (): boolean => {
       const status = get().getCurrentStatus()
       return status === 'ready'
+    },
+
+    // ========================================================================
+    // Shared file path cache
+    // ========================================================================
+
+    ensureFilePaths: async () => {
+      const existing = get().allFilePaths
+      if (existing.length > 0) return existing
+      // Dedup: concurrent calls share the same traversal Promise
+      if (!_filePathPromise) {
+        _filePathPromise = get().refreshFilePaths().finally(() => {
+          _filePathPromise = null
+        })
+      }
+      return _filePathPromise
+    },
+
+    refreshFilePaths: async () => {
+      const handle = get().getCurrentHandle()
+      if (!handle) return []
+
+      const { traverseDirectory } = await import('../services/traversal.service')
+      const paths: string[] = []
+      for await (const entry of traverseDirectory(handle)) {
+        if (entry.type === 'file') paths.push(entry.path)
+        if (paths.length >= 5000) break
+      }
+      set({ allFilePaths: paths })
+      return paths
+    },
+
+    clearFilePaths: () => {
+      _filePathPromise = null
+      set({ allFilePaths: [] })
     },
 
     // ========================================================================
@@ -454,11 +501,11 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 )
 
 // ============================================================================
-// 便捷 Hook
+// Convenience hook
 // ============================================================================
 
 /**
- * 便捷 Hook：获取当前项目的文件夹状态
+ * Convenience hook: get the current project's folder access state
  */
 export function useCurrentFolderAccess() {
   const store = useFolderAccessStore()

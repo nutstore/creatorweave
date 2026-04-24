@@ -69,7 +69,7 @@ interface OPFSState {
   /** File paths that are approved but not yet synced to disk */
   approvedNotSyncedPaths: Set<string>
 
-  /** Cached file paths for current workspace */
+  /** Cached file paths for current workspace (OPFS cache only) */
   cachedPaths: string[]
 
   /** Whether an operation is in progress */

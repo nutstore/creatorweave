@@ -11,7 +11,7 @@
  *   - ContextUsageBar        — context window usage display
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Send, StopCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
@@ -20,6 +20,7 @@ import { WorkflowQuickActions } from './WorkflowQuickActions'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
+import type { FileMentionItem } from './FileMentionExtension'
 import { useInitialMessage } from './useInitialMessage'
 import { ConversationMessages } from './ConversationMessages'
 import { ConversationEmptyState } from './ConversationEmptyState'
@@ -44,7 +45,7 @@ export function ConversationView({
 
   const logic = useConversationLogic()
   const {
-    input, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef,
+    input, setInput, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     convId, activeMessages, activeDraftAssistant, activeStreamingState,
     activeWorkflowExecution, conversationError, activeContextWindowUsage,
@@ -57,6 +58,120 @@ export function ConversationView({
     runCustomWorkflowDryRun,
     useConversationStore: convStore,
   } = logic
+
+  // ── File search for # file mention ──
+  // isComposing ref is toggled by AgentRichInput via onSetIsComposing callback
+  const isComposingRef = useRef(false)
+  const searchReqIdRef = useRef(0)
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleSearchFiles = useCallback(
+    async (query: string): Promise<FileMentionItem[]> => {
+      // Guard: skip search while IME is composing (pinyin letters should not trigger search)
+      if (isComposingRef.current) return []
+      // Monotonic request ID — lets us discard stale results
+      const reqId = ++searchReqIdRef.current
+
+      try {
+        // --- Remote/Host mode: use fileTree from remote store ---
+        const { useRemoteStore } = await import('@/store/remote.store')
+        const remoteStore = useRemoteStore.getState()
+        const fileTree = remoteStore.fileTree
+
+        if (fileTree) {
+          // Empty query → show project root files as a quick pick
+          if (!query.trim()) {
+            const rootFiles = (fileTree.children ?? [])
+              .filter((c: any) => c.type === 'file')
+              .slice(0, 10)
+            if (reqId !== searchReqIdRef.current) return []
+            return rootFiles.map((c: any) => ({
+              path: c.path,
+              name: c.name,
+              extension: c.extension,
+            }))
+          }
+
+          const { fileDiscoveryService } = await import('@/services/file-discovery.service')
+          const results = await fileDiscoveryService.search(query, [fileTree], { limit: 10 })
+          if (reqId !== searchReqIdRef.current) return []
+          return results
+            .filter((r) => r.type === 'file')
+            .map((r) => ({ path: r.path, name: r.name, extension: r.extension }))
+        }
+
+        // --- Local mode: use shared file path cache from folder-access.store ---
+        const { useFolderAccessStore } = await import('@/store/folder-access.store')
+        let allPaths = await useFolderAccessStore.getState().ensureFilePaths()
+
+        if (reqId !== searchReqIdRef.current) return []
+
+        // Merge OPFS cachedPaths for pending files not yet on disk
+        const { useOPFSStore } = await import('@/store/opfs.store')
+        const opfsCached = useOPFSStore.getState().cachedPaths
+        if (opfsCached.length > 0) {
+          const existing = new Set(allPaths)
+          for (const p of opfsCached) {
+            if (!existing.has(p)) allPaths.push(p)
+          }
+        }
+
+        if (reqId !== searchReqIdRef.current) return []
+
+        // Build FileMentionItem list from paths
+        const toItems = (paths: string[]): FileMentionItem[] =>
+          paths.map((p) => {
+            const name = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p
+            const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : undefined
+            return { path: p, name, extension: ext }
+          })
+
+        // Empty query → show root-level files (paths without '/' separator)
+        if (!query.trim()) {
+          return toItems(allPaths.filter((p) => !p.includes('/')).slice(0, 10))
+        }
+
+        // Simple fuzzy match
+        const q = query.toLowerCase()
+        return toItems(
+          allPaths
+            .filter((p) => p.toLowerCase().includes(q))
+            .slice(0, 10),
+        )
+      } catch (err) {
+        console.warn('[handleSearchFiles] error:', err)
+        return []
+      }
+    },
+    [],
+  )
+
+  /** Debounced wrapper — 200ms delay to avoid hammering search on every keystroke. */
+  const debouncedSearchFiles = useCallback(
+    (query: string): Promise<FileMentionItem[]> => {
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current)
+      }
+      return new Promise<FileMentionItem[]>((resolve) => {
+        searchTimerRef.current = setTimeout(() => {
+          handleSearchFiles(query).then(resolve)
+        }, 200)
+      })
+    },
+    [handleSearchFiles],
+  )
+
+  const setIsComposing = useCallback(
+    (v: boolean) => { isComposingRef.current = v },
+    [],
+  )
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    }
+  }, [])
 
   // ── Initial message handling ──
   useInitialMessage({
@@ -146,14 +261,17 @@ export function ConversationView({
                 disabled={isProcessing || !hasApiKey || disabled}
                 resetToken={inputResetToken}
                 agents={mentionAgents}
+                onSearchFiles={debouncedSearchFiles}
+                onSetIsComposing={setIsComposing}
                 activeAgentId={activeAgentId}
                 allAgents={allAgents}
                 onSetActiveAgent={setActiveAgent}
                 onCreateAgent={createAgent}
                 onDeleteAgent={deleteAgent}
-                onChange={({ text, mentionedAgentIds: ids }) => {
+                onChange={({ text, mentionedAgentIds: ids, selectedFiles: files }) => {
                   setInput(text)
                   setMentionedAgentIds(ids)
+                  if (files) setSelectedFiles(files)
                 }}
                 onSubmit={handleSend}
               />

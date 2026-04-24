@@ -6,7 +6,8 @@ import Text from '@tiptap/extension-text'
 import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
-import { Plus, Trash2, Check } from 'lucide-react'
+import { FileMention, type FileMentionItem } from './FileMentionExtension'
+import { Plus, Trash2, Check, FileIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,8 @@ export interface AgentMentionCandidate {
 export interface AgentRichInputValue {
   text: string
   mentionedAgentIds: string[]
+  /** Selected file paths (displayed as tags above the editor). */
+  selectedFiles: string[]
 }
 
 export interface AgentInfo {
@@ -36,6 +39,10 @@ interface AgentRichInputProps {
   agents: AgentMentionCandidate[]
   onSubmit: () => void
   onChange: (value: AgentRichInputValue) => void
+  /** Async file search callback for # file mention. */
+  onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
+  /** Called when IME composition starts/ends — lets the parent suppress search during composition. */
+  onSetIsComposing?: (composing: boolean) => void
   // Agent selector props
   activeAgentId: string | null
   allAgents: AgentMentionCandidate[]
@@ -53,91 +60,105 @@ interface SuggestionDropdownHandle {
   onKeyDown: (event: KeyboardEvent) => boolean
 }
 
-const MentionSuggestionDropdown = forwardRef<
-  SuggestionDropdownHandle,
-  {
-    items: AgentMentionCandidate[]
-    command: (item: { id: string }) => void
-  }
->(function MentionSuggestionDropdown({ items, command }, ref) {
-  const [selectedIndex, setSelectedIndex] = useState(0)
-  const selectedRef = useRef(0)
+interface SuggestionDropdownProps<T> {
+  items: T[]
+  getItemKey: (item: T) => string
+  onSelect: (item: T) => void
+  renderItem: (item: T, isSelected: boolean) => React.ReactNode
+  width?: string // default 'w-72'
+  selectedColor?: string // default 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200'
+}
 
-  const selectItem = useCallback(
-    (index: number) => {
-      const item = items[index]
-      if (item) command({ id: item.id })
-    },
-    [items, command]
-  )
+const SuggestionDropdown = forwardRef(
+  function SuggestionDropdown<T>(
+    {
+      items,
+      getItemKey,
+      onSelect,
+      renderItem,
+      width = 'w-72',
+      selectedColor = 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200',
+    }: SuggestionDropdownProps<T>,
+    ref: React.Ref<SuggestionDropdownHandle>,
+  ) {
+    const [selectedIndex, setSelectedIndex] = useState(0)
+    const selectedRef = useRef(0)
 
-  useEffect(() => {
-    setSelectedIndex(0)
-    selectedRef.current = 0
-  }, [items])
+    const selectItem = useCallback(
+      (index: number) => {
+        const item = items[index]
+        if (item) onSelect(item)
+      },
+      [items, onSelect],
+    )
 
-  useImperativeHandle(ref, () => ({
-    onKeyDown: (event: KeyboardEvent) => {
-      if (event.key === 'ArrowUp') {
-        setSelectedIndex((idx) => {
-          const next = Math.max(0, idx - 1)
-          selectedRef.current = next
-          return next
-        })
-        return true
-      }
-      if (event.key === 'ArrowDown') {
-        setSelectedIndex((idx) => {
-          const max = Math.max(items.length - 1, 0)
-          const next = idx >= max ? max : idx + 1
-          selectedRef.current = next
-          return next
-        })
-        return true
-      }
-      if (event.key === 'Enter') {
-        if (items.length === 0) return false
-        selectItem(selectedRef.current)
-        return true
-      }
-      return false
-    },
-  }))
+    useEffect(() => {
+      setSelectedIndex(0)
+      selectedRef.current = 0
+    }, [items])
 
-  if (items.length === 0) return null
+    useImperativeHandle(ref, () => ({
+      onKeyDown: (event: KeyboardEvent) => {
+        if (event.key === 'ArrowUp') {
+          setSelectedIndex((idx) => {
+            const next = Math.max(0, idx - 1)
+            selectedRef.current = next
+            return next
+          })
+          return true
+        }
+        if (event.key === 'ArrowDown') {
+          setSelectedIndex((idx) => {
+            const max = Math.max(items.length - 1, 0)
+            const next = idx >= max ? max : idx + 1
+            selectedRef.current = next
+            return next
+          })
+          return true
+        }
+        if (event.key === 'Enter') {
+          if (items.length === 0) return true // prevent accidental submit
+          selectItem(selectedRef.current)
+          return true
+        }
+        return false
+      },
+    }))
 
-  return (
-    <div className="absolute bottom-full left-0 z-20 mb-2 w-72 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
-      <div className="max-h-56 overflow-y-auto py-1">
-        {items.map((candidate, idx) => {
-          const selected = idx === selectedIndex
-          return (
-            <button
-              key={candidate.id}
-              type="button"
-              className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
-                selected
-                  ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200'
-                  : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
-              }`}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                selectItem(idx)
-              }}
-            >
-              <span className="font-medium">@{candidate.id}</span>
-              {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs text-neutral-500 dark:text-neutral-400">
-                  {candidate.name}
-                </span>
-              )}
-            </button>
-          )
-        })}
+    if (items.length === 0) return null
+
+    return (
+      <div
+        className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
+      >
+        <div className="max-h-56 overflow-y-auto py-1">
+          {items.map((item, idx) => {
+            const selected = idx === selectedIndex
+            return (
+              <button
+                key={getItemKey(item)}
+                type="button"
+                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                  selected
+                    ? selectedColor
+                    : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
+                }`}
+                onMouseDown={(e) => {
+                  e.preventDefault()
+                  selectItem(idx)
+                }}
+              >
+                {renderItem(item, selected)}
+              </button>
+            )
+          })}
+        </div>
       </div>
-    </div>
-  )
-})
+    )
+  },
+) as <T>(
+  props: SuggestionDropdownProps<T> & { ref?: React.Ref<SuggestionDropdownHandle> },
+) => React.ReactElement | null
 
 // ---------------------------------------------------------------------------
 // Helpers – extract plain text & mention IDs from editor document
@@ -202,6 +223,8 @@ export function AgentRichInput({
   agents,
   onSubmit,
   onChange,
+  onSearchFiles,
+  onSetIsComposing,
   activeAgentId,
   allAgents,
   onSetActiveAgent,
@@ -221,6 +244,21 @@ export function AgentRichInput({
   const [suggestionCommand, setSuggestionCommand] = useState<((item: { id: string }) => void) | null>(null)
   const suggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
 
+  // File suggestion state – driven by tiptap FileMention/Suggestion
+  const [fileSuggestionItems, setFileSuggestionItems] = useState<FileMentionItem[]>([])
+  const [fileSuggestionCommand, setFileSuggestionCommand] = useState<((item: FileMentionItem) => void) | null>(null)
+  const fileSuggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
+  // Refs for accessing latest state inside the tiptap suggestion callback (avoids stale closures)
+  const fileSuggestionItemsRef = useRef<FileMentionItem[]>([])
+  const fileSuggestionCommandRef = useRef<((item: FileMentionItem) => void) | null>(null)
+  useEffect(() => { fileSuggestionItemsRef.current = fileSuggestionItems }, [fileSuggestionItems])
+  useEffect(() => { fileSuggestionCommandRef.current = fileSuggestionCommand }, [fileSuggestionCommand])
+
+  // Selected files – displayed as tags above the editor, not inline in text
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const selectedFilesRef = useRef<string[]>([])
+  useEffect(() => { selectedFilesRef.current = selectedFiles }, [selectedFiles])
+
   const disabledRef = useRef(disabled)
   const onSubmitRef = useRef(onSubmit)
   const onChangeRef = useRef(onChange)
@@ -234,9 +272,9 @@ export function AgentRichInput({
     (editor: Editor) => {
       const text = getPlainText(editor)
       const mentionedAgentIds = getMentionedAgentIds(editor)
-      onChangeRef.current({ text, mentionedAgentIds })
+      onChangeRef.current({ text, mentionedAgentIds, selectedFiles: selectedFilesRef.current })
     },
-    []
+    [],
   )
 
   // ---- ref sync ----------------------------------------------------------
@@ -284,6 +322,7 @@ export function AgentRichInput({
               },
               onUpdate: (props) => {
                 setSuggestionItems(props.items as AgentMentionCandidate[])
+                setSuggestionCommand(() => props.command)
               },
               onKeyDown: (props) => {
                 if (props.event.key === 'Escape') {
@@ -320,6 +359,112 @@ export function AgentRichInput({
           },
         },
       }),
+      ...(onSearchFiles
+        ? [
+            FileMention.configure({
+              onSearch: onSearchFiles,
+              render: () => {
+                // Track selection index locally so Enter works even when
+                // the React dropdown hasn't rendered yet (async items).
+                let activeIdx = 0
+                // We save the suggestion range + editor so we can delete the
+                // `#query` trigger text when a file is selected, without
+                // inserting an inline fileMention node.
+                let savedRange: { from: number; to: number } | null = null
+                let savedEditor: Editor | null = null
+
+                /** Select a file: delete the `#query` trigger text and add the path to selectedFiles. */
+                const selectFile = (item: FileMentionItem) => {
+                  if (savedRange && savedEditor) {
+                    savedEditor.chain().focus().deleteRange(savedRange).run()
+                  }
+                  setSelectedFiles((prev) => {
+                    const next = prev.includes(item.path) ? prev : [...prev, item.path]
+                    selectedFilesRef.current = next
+                    // Manually emit value since editor onUpdate won't capture selectedFiles change
+                    const text = getPlainText(savedEditor!)
+                    const mentionedAgentIds = getMentionedAgentIds(savedEditor!)
+                    onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
+                    return next
+                  })
+                  // Clear suggestion state
+                  setFileSuggestionItems([])
+                  setFileSuggestionCommand(null)
+                  fileSuggestionItemsRef.current = []
+                  fileSuggestionCommandRef.current = null
+                }
+
+                return {
+                  onStart: async (props) => {
+                    // items() is async → props.items may be an unresolved Promise
+                    const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
+                    setFileSuggestionItems(items as FileMentionItem[])
+                    // Save a wrapped command that selects file without inserting inline node
+                    setFileSuggestionCommand(() => selectFile)
+                    // Sync refs immediately (before next React render) for onKeyDown access
+                    fileSuggestionItemsRef.current = items as FileMentionItem[]
+                    fileSuggestionCommandRef.current = selectFile
+                    activeIdx = 0
+                    savedRange = props.range
+                    savedEditor = props.editor
+                  },
+                  onUpdate: async (props) => {
+                    const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
+                    setFileSuggestionItems(items as FileMentionItem[])
+                    setFileSuggestionCommand(() => selectFile)
+                    fileSuggestionItemsRef.current = items as FileMentionItem[]
+                    fileSuggestionCommandRef.current = selectFile
+                    activeIdx = 0
+                    savedRange = props.range
+                    savedEditor = props.editor
+                  },
+                  onKeyDown: (props) => {
+                    if (props.event.key === 'Escape') {
+                      setFileSuggestionItems([])
+                      setFileSuggestionCommand(null)
+                      fileSuggestionItemsRef.current = []
+                      fileSuggestionCommandRef.current = null
+                      return true
+                    }
+                    // Try delegating to the rendered dropdown first.
+                    const dropdownResult = fileSuggestionDropdownRef.current?.onKeyDown(props.event)
+                    if (dropdownResult) return true
+
+                    // Fallback: if the dropdown ref is not yet mounted but we
+                    // have items, handle navigation / selection ourselves so
+                    // that Enter never accidentally submits the message.
+                    const items = fileSuggestionItemsRef.current
+                    if (items.length === 0) return false
+
+                    if (props.event.key === 'ArrowUp') {
+                      activeIdx = Math.max(0, activeIdx - 1)
+                      return true
+                    }
+                    if (props.event.key === 'ArrowDown') {
+                      activeIdx = Math.min(items.length - 1, activeIdx + 1)
+                      return true
+                    }
+                    if (props.event.key === 'Enter') {
+                      const item = items[activeIdx]
+                      if (item) {
+                        const cmd = fileSuggestionCommandRef.current
+                        if (cmd) cmd(item)
+                      }
+                      return true // always consume Enter to prevent submit
+                    }
+                    return false
+                  },
+                  onExit: () => {
+                    setFileSuggestionItems([])
+                    setFileSuggestionCommand(null)
+                    fileSuggestionItemsRef.current = []
+                    fileSuggestionCommandRef.current = null
+                  },
+                }
+              }
+            }),
+          ]
+        : []),
     ],
     editorProps: {
       attributes: {
@@ -327,7 +472,7 @@ export function AgentRichInput({
         class:
           'min-h-[44px] max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 outline-none',
       },
-      handleKeyDown: (_view, event) => {
+      handleKeyDown: (view, event) => {
         if (disabledRef.current) return false
         if (event.isComposing) return false
 
@@ -335,6 +480,22 @@ export function AgentRichInput({
         // Suggestion handles its own Enter, so this only fires when the
         // suggestion popup is closed.
         if (event.key === 'Enter' && !event.shiftKey) {
+          // Guard: if the file-mention suggestion popup is showing, block submit.
+          // The Suggestion plugin's onKeyDown runs AFTER editorProps.handleKeyDown
+          // in ProseMirror, so it never gets a chance to handle Enter.  We must
+          // intercept here and delegate to the dropdown's own key handler.
+          const fileItems = fileSuggestionItemsRef.current
+          if (fileItems.length > 0) {
+            // Let the dropdown handle Enter (select current item)
+            const handled = fileSuggestionDropdownRef.current?.onKeyDown(event) ?? false
+            if (handled) return true
+            // Fallback: select first item directly
+            const cmd = fileSuggestionCommandRef.current
+            if (cmd) {
+              cmd(fileItems[0])
+              return true
+            }
+          }
           event.preventDefault()
           onSubmitRef.current()
           return true
@@ -360,8 +521,27 @@ export function AgentRichInput({
   useEffect(() => {
     if (!editor) return
     editor.commands.clearContent()
+    setSelectedFiles([])
     emitValue(editor)
   }, [editor, emitValue, resetToken])
+
+  // ---- IME composition tracking -------------------------------------------
+  // Notifies parent (ConversationView) so it can suppress file search
+  // during composition — prevents pinyin letters from triggering searches.
+  useEffect(() => {
+    if (!editor || !onSetIsComposing) return
+    const el = editor.view.dom as HTMLElement
+
+    const start = () => onSetIsComposing(true)
+    const end = () => onSetIsComposing(false)
+
+    el.addEventListener('compositionstart', start)
+    el.addEventListener('compositionend', end)
+    return () => {
+      el.removeEventListener('compositionstart', start)
+      el.removeEventListener('compositionend', end)
+    }
+  }, [editor, onSetIsComposing])
 
   // ---- Agent selector handlers -------------------------------------------
   const handleCreateAgent = useCallback(async () => {
@@ -388,7 +568,7 @@ export function AgentRichInput({
         }
       }
     },
-    [onDeleteAgent]
+    [onDeleteAgent],
   )
 
   const handleSelectAgent = useCallback(
@@ -396,7 +576,7 @@ export function AgentRichInput({
       await onSetActiveAgent(agentId)
       setShowAgentSelector(false)
     },
-    [onSetActiveAgent]
+    [onSetActiveAgent],
   )
 
   // Keyboard navigation for agent selector
@@ -451,13 +631,53 @@ export function AgentRichInput({
 
   const isEmpty = editor ? editor.isEmpty : true
   const showSuggestion = !disabled && suggestionItems.length > 0 && !!suggestionCommand
+  const showFileSuggestion = !disabled && fileSuggestionItems.length > 0 && !!fileSuggestionCommand
 
   return (
     <div className="relative">
       <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 w-full rounded-xl border border-neutral-300 bg-white px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
-        {editor && <EditorContent editor={editor} />}
+        {editor && (
+          <>
+            {selectedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {selectedFiles.map((filePath) => (
+                  <span
+                    key={filePath}
+                    className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/60 dark:text-sky-200"
+                  >
+                    <FileIcon className="h-3 w-3 shrink-0 opacity-60" />
+                    <span className="max-w-[200px] truncate">{filePath}</span>
+                    <button
+                      type="button"
+                      className="ml-0.5 rounded p-0.5 hover:bg-sky-200 dark:hover:bg-sky-800"
+                      onClick={() => {
+                        setSelectedFiles((prev) => {
+                          const next = prev.filter((p) => p !== filePath)
+                          selectedFilesRef.current = next
+                          // Notify parent of selectedFiles change
+                          if (editor) {
+                            const text = getPlainText(editor)
+                            const mentionedAgentIds = getMentionedAgentIds(editor)
+                            onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
+                          }
+                          return next
+                        })
+                      }}
+                      aria-label={`Remove ${filePath}`}
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <EditorContent editor={editor} />
+          </>
+        )}
         {!isFocused && isEmpty && (
-          <div className="pointer-events-none absolute left-5 top-4 pr-16 text-sm text-neutral-400 dark:text-neutral-500">
+          <div
+            className={`pointer-events-none absolute left-5 pr-16 text-sm text-neutral-400 dark:text-neutral-500 ${selectedFiles.length > 0 ? 'top-12' : 'top-4'}`}
+          >
             {placeholder}
           </div>
         )}
@@ -562,10 +782,49 @@ export function AgentRichInput({
 
       {/* Mention suggestions dropdown – rendered by tiptap suggestion plugin */}
       {showSuggestion && suggestionCommand && (
-        <MentionSuggestionDropdown
+        <SuggestionDropdown<AgentMentionCandidate>
           ref={suggestionDropdownRef}
           items={suggestionItems}
-          command={suggestionCommand}
+          getItemKey={(c) => c.id}
+          onSelect={(c) => suggestionCommand?.({ id: c.id })}
+          renderItem={(candidate, _selected) => (
+            <>
+              <span className="font-medium">@{candidate.id}</span>
+              {candidate.name && candidate.name !== candidate.id && (
+                <span className="truncate pl-3 text-xs text-neutral-500 dark:text-neutral-400">
+                  {candidate.name}
+                </span>
+              )}
+            </>
+          )}
+        />
+      )}
+
+      {/* File suggestions dropdown – rendered by tiptap fileMention suggestion plugin */}
+      {showFileSuggestion && fileSuggestionCommand && (
+        <SuggestionDropdown<FileMentionItem>
+          ref={fileSuggestionDropdownRef}
+          items={fileSuggestionItems}
+          getItemKey={(f) => f.path}
+          onSelect={(f) => fileSuggestionCommand?.(f)}
+          width="w-80"
+          selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
+          renderItem={(file, _selected) => (
+            <>
+              <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-medium">{file.name}</div>
+                <div className="truncate text-xs text-neutral-400 dark:text-neutral-500">
+                  {file.path}
+                </div>
+              </div>
+              {file.extension && (
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                  .{file.extension}
+                </span>
+              )}
+            </>
+          )}
         />
       )}
     </div>

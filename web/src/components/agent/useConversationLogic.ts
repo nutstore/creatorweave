@@ -22,6 +22,7 @@ export function useConversationLogic() {
   // ── Local UI state ──
   const [input, setInput] = useState('')
   const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [inputResetToken, setInputResetToken] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -222,10 +223,16 @@ export function useConversationLogic() {
 
   const handleSend = () => {
     const inputTrimmed = input.trim()
-    const textToSend = inputTrimmed ? input : suggestedFollowUp
+    let textToSend = inputTrimmed ? input : suggestedFollowUp
     if (textToSend) {
+      // Prepend selected file paths as `#path` references
+      if (selectedFiles.length > 0) {
+        const filePrefix = selectedFiles.map((p) => `#${p}`).join(' ')
+        textToSend = `${filePrefix} ${textToSend}`
+      }
       sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (mentionedAgentIds[0] ?? null) : null })
       if (!inputTrimmed && convId) clearSuggestedFollowUp(convId)
+      setSelectedFiles([])
     }
   }
 
@@ -253,7 +260,7 @@ export function useConversationLogic() {
 
   return {
     // Local UI state
-    input, setInput, mentionedAgentIds, setMentionedAgentIds, inputResetToken, messagesEndRef,
+    input, setInput, mentionedAgentIds, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef,
     // Agent store
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     // Conversation state

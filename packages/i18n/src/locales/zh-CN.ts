@@ -1850,6 +1850,9 @@ export const zhCN = {
       cannotReadChangedImage: "无法读取变更版本图片",
       imageWillBeDeleted: "图片将被删除（变更版本中无内容）",
       currentFileComments: "当前文件评论",
+      filesWithComments: "个文件有评论",
+      copyCommentsToAI: "复制给 AI",
+      commentsSummary: "{files} 个文件有评论，共 {comments} 条",
       close: "关闭",
       // AI review prompt
       reviewPromptIntro: "请基于下面这个文件快照做审阅并给出修改建议：",

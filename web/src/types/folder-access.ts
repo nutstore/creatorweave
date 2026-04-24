@@ -1,79 +1,93 @@
 /**
- * Folder Access Types - 统一类型定义
+ * Folder Access Types - Unified type definitions
  *
- * 单一权限状态管理：解决状态分散、释放不彻底、重新添加失效问题
+ * Single source of truth for permission state management:
+ * solves scattered state, incomplete release, and re-add failure issues
  */
 
 /**
- * 文件夹访问状态机
+ * Folder access state machine
  */
 export type FolderAccessStatus =
-  | 'idle' // 初始状态，未选择文件夹
-  | 'checking' // 检查权限中
-  | 'ready' // 已选择且权限有效
-  | 'needs_user_activation' // 需要用户交互才能恢复权限
-  | 'requesting' // 用户交互中（选择/请求权限）
-  | 'releasing' // 释放中
-  | 'error' // 错误状态
+  | 'idle' // Initial state, no folder selected
+  | 'checking' // Checking permissions
+  | 'ready' // Folder selected and permission valid
+  | 'needs_user_activation' // Needs user interaction to restore permission
+  | 'requesting' // User interaction in progress (select/request permission)
+  | 'releasing' // Releasing
+  | 'error' // Error state
 
 /**
- * 文件夹访问记录
+ * Folder access record
  */
 export interface FolderAccessRecord {
-  /** 项目 ID */
+  /** Project ID */
   projectId: string
-  /** 文件夹名称 */
+  /** Folder name */
   folderName: string | null
-  /** 目录句柄（内存，当前可用） */
+  /** Directory handle (in-memory, currently available) */
   handle: FileSystemDirectoryHandle | null
-  /** 持久化句柄（可恢复权限） */
+  /** Persisted handle (permission-restorable) */
   persistedHandle: FileSystemDirectoryHandle | null
-  /** 当前状态 */
+  /** Current status */
   status: FolderAccessStatus
-  /** 错误信息 */
+  /** Error message */
   error?: string
-  /** 创建时间 */
+  /** Created at */
   createdAt: number
-  /** 最后更新时间 */
+  /** Last updated at */
   updatedAt: number
 }
 
 /**
- * Store 动作类型
+ * Store action types
  */
 export interface FolderAccessActions {
-  /** 设置活动项目 */
+  /** Set active project */
   setActiveProject: (projectId: string | null) => Promise<void>
-  /** 初始化项目数据（水合） */
+  /** Initialize project data (hydration) */
   hydrateProject: (projectId: string) => Promise<void>
-  /** 选择新文件夹（弹出选择框） */
+  /** Pick a new folder (shows folder picker dialog) */
   pickDirectory: (projectId: string) => Promise<boolean>
-  /** 直接设置文件夹句柄（不弹框，用于外部已获取 handle 的场景） */
+  /** Set folder handle directly (no dialog, for externally obtained handles) */
   setHandle: (projectId: string, handle: FileSystemDirectoryHandle) => Promise<void>
-  /** 请求恢复权限（从 pending 状态） */
+  /** Request permission restoration (from pending state) */
   requestPermission: (projectId: string) => Promise<boolean>
-  /** 彻底释放（删除记录） */
+  /** Fully release (delete record) */
   release: (projectId: string) => Promise<void>
-  /** 清除错误状态 */
+  /** Clear error state */
   clearError: (projectId: string) => void
 }
 
 /**
- * 完整的 Store 类型
+ * Full store type
  */
 export interface FolderAccessStore extends FolderAccessActions {
-  /** 当前活动项目 ID */
+  /** Active project ID */
   activeProjectId: string | null
-  /** 所有项目的权限记录 */
+  /** Permission records for all projects */
   records: Record<string, FolderAccessRecord>
-  /** 获取当前项目的记录 */
+
+  // ---- Shared file path cache ----
+
+  /** All file paths for the current project (flat list, populated by directory traversal, reusable for search etc.) */
+  allFilePaths: string[]
+
+  /** Get the current project's record */
   getRecord: () => FolderAccessRecord | null
-  /** 当前项目状态 */
+  /** Current project status */
   getCurrentStatus: () => FolderAccessStatus | null
-  /** 当前项目的句柄 */
+  /** Current project's directory handle */
   getCurrentHandle: () => FileSystemDirectoryHandle | null
-  /** 当前项目是否可用 */
+  /** Whether the current project is ready */
   isReady: () => boolean
-  /** 通知文件树刷新 */
+  /** Notify file tree to refresh */
   notifyFileTreeRefresh: () => Promise<void>
+
+  /** Ensure file path cache is loaded (traverses directory on first call, returns cache on subsequent calls) */
+  ensureFilePaths: () => Promise<string[]>
+  /** Refresh file path cache (forces re-traversal) */
+  refreshFilePaths: () => Promise<string[]>
+  /** Clear file path cache (called automatically on project switch/release) */
+  clearFilePaths: () => void
 }
