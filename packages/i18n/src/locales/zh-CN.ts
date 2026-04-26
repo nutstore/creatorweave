@@ -2050,6 +2050,9 @@ export const zhCN = {
     placeholder: "请输入你的回答…",
     submitHint: "Ctrl+Enter 提交",
     submit: "提交",
+    customInput: "自定义输入",
+    customInputHint: "自己填写回答",
+    userAnswer: "用户回答",
   },
 } as const;
 

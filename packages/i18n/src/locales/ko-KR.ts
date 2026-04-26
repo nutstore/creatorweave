@@ -2059,6 +2059,9 @@ export const koKR = {
     placeholder: "답변을 입력하세요…",
     submitHint: "Ctrl+Enter로 제출",
     submit: "제출",
+    customInput: "직접 입력",
+    customInputHint: "직접 답변 입력",
+    userAnswer: "사용자 답변",
   },
 } as const;
 

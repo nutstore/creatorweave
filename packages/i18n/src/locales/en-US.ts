@@ -2098,6 +2098,9 @@ export const enUS = {
     placeholder: "Type your answer…",
     submitHint: "Ctrl+Enter to submit",
     submit: "Submit",
+    customInput: "Custom input",
+    customInputHint: "Type your own answer",
+    userAnswer: "Your answer",
   },
 } as const;
 

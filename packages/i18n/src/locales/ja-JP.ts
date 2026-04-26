@@ -2077,6 +2077,9 @@ export const jaJP = {
     placeholder: "回答を入力してください…",
     submitHint: "Ctrl+Enter で送信",
     submit: "送信",
+    customInput: "カスタム入力",
+    customInputHint: "自分で回答を入力",
+    userAnswer: "あなたの回答",
   },
 } as const;
 
