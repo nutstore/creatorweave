@@ -231,12 +231,25 @@ export function useStorageInfo(): UseStorageInfoResult {
       }
 
       const workspacesList = await loadWorkspacesFromSQLite()
+
+      // Always get real pending counts from OPFS ledger (not cached SQLite values)
+      const repo = getWorkspaceRepository()
+      let realPendingCounts: Map<string, number> | undefined
+      try {
+        realPendingCounts = await repo.getRealPendingCounts()
+      } catch {
+        // Fallback to cached values if OPFS ledger is unavailable
+      }
+      const workspacesWithRealPending = realPendingCounts
+        ? workspacesList.map((w) => ({ ...w, pendingCount: realPendingCounts!.get(w.id) ?? w.pendingCount }))
+        : workspacesList
+
       let workspaceInfo: WorkspaceStorageInfo[]
 
       if (includeWorkspaceSizes) {
-        workspaceInfo = await calculateWorkspaceSizes(workspacesList, abortControllerRef.current.signal)
+        workspaceInfo = await calculateWorkspaceSizes(workspacesWithRealPending, abortControllerRef.current.signal)
       } else {
-        workspaceInfo = workspacesList.map((workspace) => ({
+        workspaceInfo = workspacesWithRealPending.map((workspace) => ({
           id: workspace.id,
           name: workspace.name,
           cacheSize: workspace.cacheSize || 0,

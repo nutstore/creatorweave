@@ -15,7 +15,7 @@ import { Clock, HardDrive, Trash2, Check, Info, AlertTriangle } from 'lucide-rea
 import { toast } from 'sonner'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useConversationStore } from '@/store/conversation.store'
-import { useStorageInfo, type CleanupPreview } from '@/hooks/useStorageInfo'
+import { useStorageInfo, type CleanupPreview, type WorkspaceStorageInfo } from '@/hooks/useStorageInfo'
 import { useSQLiteMode } from '@/hooks/useSQLiteMode'
 import type { StorageStatus } from '@/opfs/utils/storage-utils'
 import {
@@ -36,10 +36,17 @@ import {
 import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
 
-export interface ConversationStorageBadgeProps {
-  /** Compact mode (show only counts) */
-  compact?: boolean
-}
+// --- Module-level sub-components (stable references, won't cause DOM remount) ---
+
+/** Reusable tooltip wrapper */
+const ActionTooltip = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>{children}</TooltipTrigger>
+    <TooltipContent side="bottom">{label}</TooltipContent>
+  </Tooltip>
+)
+
+// --- Constants ---
 
 /** Storage status to badge variant mapping */
 const STORAGE_STATUS_VARIANT: Record<StorageStatus, 'success' | 'warning' | 'error' | 'neutral'> = {
@@ -70,6 +77,229 @@ const getStatusDotColor = (hasError: boolean, isInitialized: boolean, isOPFS: bo
   if (hasError) return 'bg-danger'
   if (!isInitialized) return 'bg-amber-500'
   return isOPFS ? 'bg-emerald-500' : ''
+}
+
+// --- Dropdown component (module-level for stable reference) ---
+
+interface ConversationDropdownProps {
+  activeConversationId: string | undefined
+  currentConversationTitle: string
+  conversationsCount: number
+  storageConversations: WorkspaceStorageInfo[]
+  conversationTitles: { id: string; title: string }[]
+  storage: { usageFormatted: string; quotaFormatted: string; usagePercent: number; status: StorageStatus } | null
+  storageLoading: boolean
+  cleanupLoading: boolean
+  onSwitch: (id: string) => void
+  onDeleteClick: (id: string) => void
+  onRefresh: () => void
+  onOpenCleanupDialog: (scope: 'old' | 'all') => void
+}
+
+const ConversationDropdown: React.FC<ConversationDropdownProps> = ({
+  activeConversationId,
+  currentConversationTitle,
+  conversationsCount,
+  storageConversations,
+  conversationTitles,
+  storage,
+  storageLoading,
+  cleanupLoading,
+  onSwitch,
+  onDeleteClick,
+  onRefresh,
+  onOpenCleanupDialog,
+}) => {
+  const t = useT()
+
+  return (
+    <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-white shadow-lg dark:border-border dark:bg-card">
+      {/* Header - Current conversation */}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <span className="text-tertiary text-xs font-medium">{t('workspaceStorage.currentConversation')}</span>
+          {activeConversationId && (
+            <span className="text-xs font-semibold text-primary-600">
+              {currentConversationTitle}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <BrandSelectSeparator />
+
+      {/* Storage overview */}
+      <div className="px-4 py-3">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-secondary">
+          <HardDrive className="h-3.5 w-3.5" />
+          <span>{t('workspaceStorage.storageSpace')} {t('workspaceStorage.browserQuota')}</span>
+          {storageLoading && <span className="text-muted">{t('workspaceStorage.loading')}</span>}
+        </div>
+
+        {storage && (
+          <>
+            {/* Progress bar */}
+            <div className="mb-3">
+              <div className="text-tertiary mb-1.5 flex items-center justify-between text-[10px]">
+                <span>
+                  {storage.usageFormatted} / {storage.quotaFormatted}
+                </span>
+                <span className="font-medium">{storage.usagePercent.toFixed(1)}%</span>
+              </div>
+              <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted dark:bg-muted dark:bg-neutral-700">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-300',
+                    getProgressColor(storage.usagePercent)
+                  )}
+                  style={{ width: `${Math.max(storage.usagePercent, 2)}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Status badge and note */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <BrandBadge
+                  variant={STORAGE_STATUS_VARIANT[storage.status]}
+                  shape="pill"
+                  className="!px-1.5 !py-0.5 !text-[10px]"
+                >
+                  {t(STORAGE_STATUS_LABELS[storage.status])}
+                </BrandBadge>
+                <ActionTooltip label={t('workspaceStorage.calculateSize')}>
+                  <button
+                    type="button"
+                    onClick={onRefresh}
+                    className="text-[10px] text-primary-600 hover:underline"
+                  >
+                    {t('workspaceStorage.refresh')}
+                  </button>
+                </ActionTooltip>
+              </div>
+              {/* Explanatory note */}
+              <div className="flex items-start gap-1.5 text-[9px] leading-tight text-muted">
+                <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
+                <p>{t('workspaceStorage.quotaExplanation')}</p>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!storage && !storageLoading && (
+          <p className="text-[10px] text-muted">{t('workspaceStorage.cannotGetStorage')}</p>
+        )}
+      </div>
+
+      <BrandSelectSeparator />
+
+      {/* Conversation list */}
+      <div className="px-4 py-2">
+        <span className="text-xs font-semibold text-secondary">
+          {t('workspaceStorage.allConversations', { count: conversationsCount })}
+        </span>
+      </div>
+
+      <div className="custom-scrollbar max-h-60 overflow-y-auto">
+        {storageConversations.length === 0 ? (
+          <div className="px-4 py-4 text-center text-xs text-muted">{t('workspaceStorage.noSessions')}</div>
+        ) : (
+          <ul>
+            {storageConversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId
+              const hasPending = conversation.pendingCount > 0
+
+              return (
+                <li
+                  key={conversation.id}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 transition-colors',
+                    isActive ? 'bg-primary-50' : 'hover:bg-muted dark:hover:bg-muted'
+                  )}
+                >
+                  {/* Active indicator */}
+                  {isActive && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
+                  {!isActive && <span className="h-4 w-4 shrink-0" />}
+
+                  {/* Conversation info */}
+                  <button
+                    type="button"
+                    onClick={() => onSwitch(conversation.id)}
+                    className="flex min-w-0 flex-1 flex-col items-start text-left"
+                  >
+                    {/* First row: name + size */}
+                    <div className="flex w-full min-w-0 items-center gap-2">
+                      <span className="truncate text-xs font-medium text-primary">
+                        {conversationTitles.find((c) => c.id === conversation.id)?.title ?? conversation.name}
+                      </span>
+                      <span className="shrink-0 text-[10px] tabular-nums text-muted">
+                        {conversation.cacheSizeFormatted}
+                      </span>
+                    </div>
+
+                    {/* Second row: status */}
+                    <div className="mt-0.5 flex items-center gap-2 text-[10px]">
+                      {hasPending && (
+                        <BrandBadge
+                          variant="warning"
+                          shape="pill"
+                          className="!gap-0.5 !px-1.5 !py-0 !text-[10px]"
+                        >
+                          <Clock className="h-2.5 w-2.5" />
+                          {conversation.pendingCount}
+                        </BrandBadge>
+                      )}
+                      {!hasPending && <span className="text-muted">{t('workspaceStorage.noChanges')}</span>}
+                    </div>
+                  </button>
+
+                  {/* Delete button */}
+                  {!isActive && (
+                    <ActionTooltip label={t('workspaceStorage.deleteConversation')}>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteClick(conversation.id)}
+                        className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </ActionTooltip>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      <BrandSelectSeparator />
+
+      {/* Footer - Cleanup Action */}
+      <div className="px-4 py-2">
+        <ActionTooltip label={t('workspaceStorage.cleanupOldDescription')}>
+          <button
+            type="button"
+            onClick={() => onOpenCleanupDialog('old')}
+            disabled={cleanupLoading}
+            className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-muted dark:hover:bg-muted dark:hover:bg-neutral-800 disabled:opacity-50"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {cleanupLoading ? t('workspaceStorage.loading') : t('workspaceStorage.cleanupFileCache')}
+          </button>
+        </ActionTooltip>
+        <p className="px-1 pt-1.5 text-[9px] leading-tight text-muted">
+          {t('workspaceStorage.cleanupFileCacheHelp')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// --- Main component ---
+
+export interface ConversationStorageBadgeProps {
+  /** Compact mode (show only counts) */
+  compact?: boolean
 }
 
 export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> = () => {
@@ -104,6 +334,17 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     switchWorkspace,
   } = useConversationContextStore()
   const deleteConversation = useConversationStore((state) => state.deleteConversation)
+  // Extract conversation id→title pairs (shallow-equal stable reference, won't re-render on streaming updates)
+  const conversationTitles = useConversationStore(
+    (state) => state.conversations.map((c) => ({ id: c.id, title: c.title })),
+    (a, b) => {
+      if (a.length !== b.length) return false
+      for (let i = 0; i < a.length; i++) {
+        if (a[i].id !== b[i].id || a[i].title !== b[i].title) return false
+      }
+      return true
+    }
+  )
   const {
     storage,
     conversations: storageConversations,
@@ -202,27 +443,16 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     }
   }, [cleanupPreview, cleanupScope, executeCleanup, refresh])
 
-  // Get current conversation info
-  const currentConversation = conversations.find((w) => w.id === activeConversationId)
-
-  const ActionTooltip = ({
-    label,
-    children,
-  }: {
-    label: string
-    children: React.ReactNode
-  }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
-    </Tooltip>
-  )
+  // Get current conversation title from conversation store (single source of truth)
+  const currentConversationTitle = activeConversationId
+    ? (conversationTitles.find((c) => c.id === activeConversationId)?.title ?? conversations.find((w) => w.id === activeConversationId)?.name ?? '')
+    : ''
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="relative" ref={containerRef}>
         <ActionTooltip label={t('workspaceStorage.storageSpace')}>
-          <BrandButton iconButton variant="ghost" onClick={() => setOpen(!open)}>
+          <BrandButton iconButton variant="ghost" onClick={() => { const next = !open; setOpen(next); if (next) refresh(true) }}>
             <HardDrive className="h-5 w-5" />
           </BrandButton>
         </ActionTooltip>
@@ -231,7 +461,22 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
         <span className={cn('absolute right-0 top-0 h-2 w-2 rounded-full', statusDotColor)} />
       )}
 
-      {open && <ConversationDropdown />}
+      {open && (
+        <ConversationDropdown
+          activeConversationId={activeConversationId}
+          currentConversationTitle={currentConversationTitle}
+          conversationsCount={conversations.length}
+          storageConversations={storageConversations}
+          conversationTitles={conversationTitles}
+          storage={storage}
+          storageLoading={storageLoading}
+          cleanupLoading={cleanupLoading}
+          onSwitch={handleSwitch}
+          onDeleteClick={handleDeleteClick}
+          onRefresh={() => refresh(true)}
+          onOpenCleanupDialog={handleOpenCleanupDialog}
+        />
+      )}
 
       {/* Cleanup Confirmation Dialog */}
       <BrandDialog open={cleanupDialogOpen} onOpenChange={setCleanupDialogOpen}>
@@ -352,14 +597,15 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
           </BrandDialogHeader>
           <BrandDialogBody>
             {(() => {
-              const conversation = conversations.find((w) => w.id === conversationToDelete)
-              const hasPending = conversation?.pendingCount ? conversation.pendingCount > 0 : false
+              const workspaceInfo = conversations.find((w) => w.id === conversationToDelete)
+              const hasPending = workspaceInfo?.pendingCount ? workspaceInfo.pendingCount > 0 : false
               const hasData = hasPending
+              const displayName = conversationToDelete ? (conversationTitles.find((c) => c.id === conversationToDelete)?.title ?? workspaceInfo?.name ?? '') : ''
 
               return (
                 <>
                   <p className="text-sm text-secondary">
-                    {t('workspaceStorage.deleteConfirm', { name: conversation?.name ?? '' })}
+                    {t('workspaceStorage.deleteConfirm', { name: displayName })}
                   </p>
 
                   {hasData && (
@@ -369,7 +615,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                         <span className="font-semibold">{t('workspaceStorage.warningUnsaved')}</span>
                       </p>
                       <p className="ml-5 text-[10px] text-amber-700">
-                        {hasPending && t('workspaceStorage.pendingSync', { count: conversation?.pendingCount ?? 0 })}
+                        {hasPending && t('workspaceStorage.pendingSync', { count: workspaceInfo?.pendingCount ?? 0 })}
                       </p>
                     </div>
                   )}
@@ -412,191 +658,4 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
       </div>
     </TooltipProvider>
   )
-
-  function ConversationDropdown() {
-    return (
-      <>
-        {/* Dropdown menu - same z-index pattern as LanguageSwitcher */}
-        <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-white shadow-lg dark:border-border dark:bg-card">
-          {/* Header - Current conversation */}
-          <div className="px-4 py-3">
-            <div className="flex items-center justify-between">
-              <span className="text-tertiary text-xs font-medium">{t('workspaceStorage.currentConversation')}</span>
-              {currentConversation && (
-                <span className="text-xs font-semibold text-primary-600">
-                  {currentConversation.name}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <BrandSelectSeparator />
-
-          {/* Storage overview */}
-          <div className="px-4 py-3">
-            <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-secondary">
-              <HardDrive className="h-3.5 w-3.5" />
-              <span>{t('workspaceStorage.storageSpace')} {t('workspaceStorage.browserQuota')}</span>
-              {storageLoading && <span className="text-muted">{t('workspaceStorage.loading')}</span>}
-            </div>
-
-            {storage && (
-              <>
-                {/* Progress bar using BrandProgress */}
-                <div className="mb-3">
-                  <div className="text-tertiary mb-1.5 flex items-center justify-between text-[10px]">
-                    <span>
-                      {storage.usageFormatted} / {storage.quotaFormatted}
-                    </span>
-                    <span className="font-medium">{storage.usagePercent.toFixed(1)}%</span>
-                  </div>
-                  <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted dark:bg-muted dark:bg-neutral-700">
-                    <div
-                      className={cn(
-                        'h-full rounded-full transition-all duration-300',
-                        getProgressColor(storage.usagePercent)
-                      )}
-                      style={{ width: `${Math.max(storage.usagePercent, 2)}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Status badge and note */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <BrandBadge
-                      variant={STORAGE_STATUS_VARIANT[storage.status]}
-                      shape="pill"
-                      className="!px-1.5 !py-0.5 !text-[10px]"
-                    >
-                      {t(STORAGE_STATUS_LABELS[storage.status])}
-                    </BrandBadge>
-                    <ActionTooltip label={t('workspaceStorage.calculateSize')}>
-                      <button
-                        type="button"
-                        onClick={() => refresh(true)}
-                        className="text-[10px] text-primary-600 hover:underline"
-                      >
-                        {t('workspaceStorage.refresh')}
-                      </button>
-                    </ActionTooltip>
-                  </div>
-                  {/* Explanatory note */}
-                  <div className="flex items-start gap-1.5 text-[9px] leading-tight text-muted">
-                    <Info className="mt-0.5 h-2.5 w-2.5 shrink-0" />
-                    <p>{t('workspaceStorage.quotaExplanation')}</p>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {!storage && !storageLoading && (
-              <p className="text-[10px] text-muted">{t('workspaceStorage.cannotGetStorage')}</p>
-            )}
-          </div>
-
-          <BrandSelectSeparator />
-
-          {/* Conversation list */}
-          <div className="custom-scrollbar max-h-60 overflow-y-auto">
-            <div className="px-4 py-2">
-              <span className="text-xs font-semibold text-secondary">
-                {t('workspaceStorage.allConversations', { count: conversations.length })}
-              </span>
-            </div>
-
-            {storageConversations.length === 0 ? (
-              <div className="px-4 py-4 text-center text-xs text-muted">{t('workspaceStorage.noSessions')}</div>
-            ) : (
-              <ul>
-                {storageConversations.map((conversation) => {
-                  const isActive = conversation.id === activeConversationId
-                  const hasPending = conversation.pendingCount > 0
-
-                  return (
-                    <li
-                      key={conversation.id}
-                      className={cn(
-                        'flex items-center gap-2 px-4 py-2 transition-colors',
-                        isActive ? 'bg-primary-50' : 'hover:bg-muted dark:hover:bg-muted'
-                      )}
-                    >
-                      {/* Active indicator */}
-                      {isActive && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
-                      {!isActive && <span className="h-4 w-4 shrink-0" />}
-
-                      {/* Conversation info */}
-                      <button
-                        type="button"
-                        onClick={() => handleSwitch(conversation.id)}
-                        className="flex min-w-0 flex-1 flex-col items-start text-left"
-                      >
-                        {/* First row: name + size */}
-                        <div className="flex w-full min-w-0 items-center gap-2">
-                          <span className="truncate text-xs font-medium text-primary">
-                            {conversation.name}
-                          </span>
-                          <span className="shrink-0 text-[10px] tabular-nums text-muted">
-                            {conversation.cacheSizeFormatted}
-                          </span>
-                        </div>
-
-                        {/* Second row: status */}
-                        <div className="mt-0.5 flex items-center gap-2 text-[10px]">
-                          {hasPending && (
-                            <BrandBadge
-                              variant="warning"
-                              shape="pill"
-                              className="!gap-0.5 !px-1.5 !py-0 !text-[10px]"
-                            >
-                              <Clock className="h-2.5 w-2.5" />
-                              {conversation.pendingCount}
-                            </BrandBadge>
-                          )}
-                          {!hasPending && <span className="text-muted">{t('workspaceStorage.noChanges')}</span>}
-                        </div>
-                      </button>
-
-                      {/* Delete button */}
-                      {!isActive && (
-                        <ActionTooltip label={t('workspaceStorage.deleteConversation')}>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteClick(conversation.id)}
-                            className="shrink-0 rounded p-1 text-muted transition-colors hover:bg-danger-bg hover:text-danger"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </ActionTooltip>
-                      )}
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </div>
-
-          <BrandSelectSeparator />
-
-          {/* Footer - Cleanup Action */}
-          <div className="px-4 py-2">
-            <ActionTooltip label={t('workspaceStorage.cleanupOldDescription')}>
-              <button
-                type="button"
-                onClick={() => handleOpenCleanupDialog('old')}
-                disabled={cleanupLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-md px-3 py-2 text-xs text-secondary transition-colors hover:bg-muted dark:hover:bg-muted dark:hover:bg-neutral-800 disabled:opacity-50"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                {cleanupLoading ? t('workspaceStorage.loading') : t('workspaceStorage.cleanupFileCache')}
-              </button>
-            </ActionTooltip>
-            <p className="px-1 pt-1.5 text-[9px] leading-tight text-muted">
-              {t('workspaceStorage.cleanupFileCacheHelp')}
-            </p>
-          </div>
-        </div>
-      </>
-    )
-  }
 }
