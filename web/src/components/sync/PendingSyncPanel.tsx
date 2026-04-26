@@ -623,7 +623,26 @@ export function PendingSyncPanel() {
             </button>
           </div>
         }
-        right={selectedCount > 0 ? <span className="text-xs text-secondary">{t('settings.pendingSyncPanel.selectedCount', { count: selectedCount })}</span> : null}
+        right={
+          <div className="flex items-center gap-1">
+            {selectedCount > 0 && (
+              <span className="text-xs text-secondary">{selectedCount}</span>
+            )}
+            <button
+              onClick={handleReview}
+              disabled={isSyncing || isReviewing}
+              className="h-6 w-6 flex items-center justify-center text-tertiary hover:text-primary transition-colors rounded hover:bg-hover/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={isReviewing ? t('settings.pendingSyncPanel.reviewInProgress') : t('settings.pendingSyncPanel.review')}
+              type="button"
+            >
+              {isReviewing ? (
+                <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Sparkles className="w-3 h-3" />
+              )}
+            </button>
+          </div>
+        }
       />
 
       {/* File List */}
@@ -705,8 +724,9 @@ export function PendingSyncPanel() {
       </div>
 
       {/* Footer Actions */}
-      <div className="border-subtle flex items-center justify-between border-t bg-elevated px-3 py-2">
-        <div className="flex items-center gap-2">
+      <div className="border-subtle bg-elevated border-t">
+        {/* Row 1: Select all + Total size */}
+        <div className="flex items-center justify-between px-3 py-1.5">
           <label className="flex items-center gap-2 text-xs text-secondary cursor-pointer">
             <input
               type="checkbox"
@@ -717,28 +737,16 @@ export function PendingSyncPanel() {
             />
             <span>{t('settings.pendingSyncPanel.selectAll')}</span>
           </label>
+          <span className="text-xs text-tertiary">
+            {t('settings.pendingSyncPanel.totalSize', { size: formatFileSize(totalSize) })}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Row 2: Action buttons */}
+        <div className="flex items-center gap-2 px-3 pb-2">
           <BrandButton
             variant="outline"
-            className="h-8 px-3 py-1.5 text-xs"
-            onClick={handleReview}
-            disabled={isSyncing || isReviewing}
-            aria-label={t('settings.pendingSyncPanel.reviewInProgress')}
-          >
-            {isReviewing ? (
-              t('settings.pendingSyncPanel.reviewInProgress')
-            ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5" />
-                {t('settings.pendingSyncPanel.review')}
-              </>
-            )}
-          </BrandButton>
-          <BrandButton
-            variant="outline"
-            className="h-8 px-3 py-1.5 text-xs"
+            className="h-8 flex-1 text-xs"
             onClick={() => setShowClearConfirm(true)}
             disabled={isSyncing || isReviewing}
             aria-label={t('settings.pendingSyncPanel.rejectAll')}
@@ -747,7 +755,7 @@ export function PendingSyncPanel() {
           </BrandButton>
           <BrandButton
             variant="primary"
-            className="h-8 px-4 py-1.5 text-xs"
+            className="h-8 flex-1 text-xs"
             onClick={handleSync}
             disabled={isSyncing || isReviewing || selectedCount === 0}
             aria-label={t('settings.pendingSyncPanel.approveSelected')}
@@ -765,13 +773,6 @@ export function PendingSyncPanel() {
             )}
           </BrandButton>
         </div>
-      </div>
-
-      {/* Total Size Info */}
-      <div className="border-subtle bg-elevated border-t px-3 py-1.5 text-center">
-        <span className="text-xs text-tertiary">
-          {t('settings.pendingSyncPanel.totalSize', { size: formatFileSize(totalSize) })}
-        </span>
       </div>
 
       {/* Clear Confirmation Dialog */}
