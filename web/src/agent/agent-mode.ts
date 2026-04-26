@@ -53,6 +53,7 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   // Meta tools (read-only — no file modifications)
   ['ask_user_question', { name: 'ask_user_question', category: 'read' }],
   // Subagent orchestration tools (read-only orchestration surface)
+  ['search_conversations', { name: 'search_conversations', category: 'read' }],
   ['spawn_subagent', { name: 'spawn_subagent', category: 'read' }],
   ['batch_spawn', { name: 'batch_spawn', category: 'read' }],
   ['send_message_to_subagent', { name: 'send_message_to_subagent', category: 'read' }],

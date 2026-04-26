@@ -83,6 +83,12 @@ import {
   rollbackSnapshotExecutor,
 } from './tools/changeset.tool'
 
+// Cross-workspace conversation search
+import {
+  searchConversationsDefinition,
+  searchConversationsExecutor,
+} from './tools/search-conversations.tool'
+
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
@@ -110,6 +116,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: createSnapshotDefinition, executor: createSnapshotExecutor },
   { definition: rollbackSnapshotDefinition, executor: rollbackSnapshotExecutor },
   { definition: detectConflictsDefinition, executor: detectConflictsExecutor },
+  // Cross-workspace conversation search
+  { definition: searchConversationsDefinition, executor: searchConversationsExecutor },
   // Meta tools
   { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
   { definition: askUserQuestionDefinition, executor: askUserQuestionExecutor },
