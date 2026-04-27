@@ -840,12 +840,25 @@ export function FileTreePanel({
     }
   }, [directoryHandle, loaded, loading, loadRoot, activeWorkspaceId])
 
-  // Reuse the same refresh callback as the toolbar button when workspace changes.
-  // Use a ref to hold the latest loadRoot so the effect only depends on
-  // activeWorkspaceId — avoids re-triggering when loadRoot / handleRefresh
-  // rebuild due to expandedPaths or cachedPaths changes.
+  // Stable ref to latest loadRoot — used by effects below to avoid re-triggering
+  // when loadRoot rebuilds due to expandedPaths / cachedPaths changes.
   const loadRootRef = useRef(loadRoot)
   loadRootRef.current = loadRoot
+
+  // Re-load tree when pendingChanges or cachedPaths change (e.g. after Python execution)
+  // so newly created OPFS files appear in the tree without manual refresh.
+  const prevPendingLenRef = useRef(pendingChanges.length)
+  const prevCachedLenRef = useRef(cachedPaths.length)
+  useEffect(() => {
+    if (!loaded || loading) return
+    const pendingChanged = prevPendingLenRef.current !== pendingChanges.length
+    const cachedChanged = prevCachedLenRef.current !== cachedPaths.length
+    prevPendingLenRef.current = pendingChanges.length
+    prevCachedLenRef.current = cachedPaths.length
+    if (pendingChanged || cachedChanged) {
+      loadRootRef.current(true)
+    }
+  }, [pendingChanges.length, cachedPaths.length, loaded, loading])
 
   const prevWorkspaceIdRef = useRef<string | null>(null)
   useEffect(() => {
