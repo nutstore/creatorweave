@@ -35,6 +35,33 @@ const FILES_DIR = 'files'
 const BASELINE_DIR = '.baseline'
 
 /**
+ * Compare two Uint8Arrays for equality using 4-byte (Uint32) chunks.
+ * Falls back to byte-by-byte for the tail (< 4 bytes remainder).
+ * ~4x faster than byte-by-byte loop on V8 for large arrays.
+ */
+function compareUint8Arrays(a: Uint8Array, b: Uint8Array): boolean {
+  const len = a.byteLength
+  if (b.byteLength !== len) return false
+
+  // Align to 4-byte boundaries via Uint32Array DataView
+  const u32Len = len >>> 2 // floor(len / 4)
+  if (u32Len > 0) {
+    const a32 = new Uint32Array(a.buffer, a.byteOffset, u32Len)
+    const b32 = new Uint32Array(b.buffer, b.byteOffset, u32Len)
+    for (let i = 0; i < u32Len; i++) {
+      if (a32[i] !== b32[i]) return false
+    }
+  }
+
+  // Compare remaining bytes (0-3)
+  const tail = u32Len << 2
+  for (let i = tail; i < len; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+/**
  * Workspace metadata for persistence.
  */
 interface WorkspaceMetadataPersist {
@@ -337,14 +364,33 @@ export class WorkspaceRuntime {
     return new Uint8Array(content)
   }
 
+  /**
+   * Compare two FileContent values for byte-level equality.
+   *
+   * Optimization layers:
+   * 1. String fast-path: skip comparison when string lengths differ.
+   * 2. Same-reference shortcut: identical objects are always equal.
+   * 3. Byte-level: convert both sides to Uint8Array, compare length
+   *    then use TypedArray friendly comparison.
+   */
   private async areFileContentsEqual(left: FileContent, right: FileContent): Promise<boolean> {
+    // Same reference — always equal (covers both being the same string/object)
+    if (left === right) return true
+
+    // String fast-path: different JS string length → different byte content
+    if (typeof left === 'string' && typeof right === 'string') {
+      if (left.length !== right.length) return false
+      // Same length strings — still need full comparison (different chars,
+      // same length is possible). Fall through to byte comparison below.
+    }
+
     const leftBytes = await this.contentToBytes(left)
     const rightBytes = await this.contentToBytes(right)
     if (leftBytes.byteLength !== rightBytes.byteLength) return false
-    for (let i = 0; i < leftBytes.byteLength; i++) {
-      if (leftBytes[i] !== rightBytes[i]) return false
-    }
-    return true
+
+    // Use DataView for efficient multi-byte comparison instead of
+    // byte-by-byte loop. Process 4 bytes at a time via Uint32Array view.
+    return compareUint8Arrays(leftBytes, rightBytes)
   }
 
   /**
@@ -854,6 +900,31 @@ export class WorkspaceRuntime {
         }
       } catch {
         // Best effort detection
+      }
+    }
+
+    // Ghost change dedup: if the content to be written is identical to the
+    // baseline (disk/native version, or current OPFS files/ content in pure
+    // OPFS mode), there is no real change. Skip all write operations and
+    // clean up any prior ghost pending entry + stale baseline snapshot.
+    // Check BEFORE write to avoid redundant I/O and spurious notifications.
+    if (!isNewFile && baselineContent !== null) {
+      const contentsMatch = await this.areFileContentsEqual(baselineContent, content)
+      if (contentsMatch) {
+        if (this.pendingManager.hasPendingPath(normalizedPath)) {
+          await this.pendingManager.removeByPath(normalizedPath)
+          await this.deleteFromBaselineDirIfExists(normalizedPath)
+        }
+        // If files/ contains conflict markers from a prior materialization,
+        // replace them with the clean baseline content so other tabs/readers
+        // no longer see stale conflict markers.
+        if (resolvingConflict) {
+          await this.writeToFilesDir(normalizedPath, content)
+        }
+        console.log(`[WorkspaceRuntime] Skipping no-op write (content matches baseline): ${normalizedPath}`)
+        this.metadata.lastAccessedAt = Date.now()
+        await this.saveMetadata()
+        return
       }
     }
 
