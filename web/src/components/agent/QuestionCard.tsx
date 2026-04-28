@@ -70,7 +70,7 @@ export function QuestionCard({
         <div className="flex items-center gap-2 border-b border-green-200 px-3 py-2 dark:border-green-800">
           <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
           <span className="text-xs font-medium text-green-700 dark:text-green-300">
-            {t('')}
+            {t('questionCard.answered')}
           </span>
         </div>
 
@@ -86,7 +86,7 @@ export function QuestionCard({
           <div className="border-b border-green-200 px-3 py-2 dark:border-green-800">
             <div className="mb-1 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
               <FileText className="h-3 w-3" />
-              <span>{t('')}</span>
+              <span>{t('questionCard.affectedFiles')}</span>
             </div>
             <div className="space-y-0.5">
               {context.affected_files.map((file) => (
@@ -111,7 +111,7 @@ export function QuestionCard({
         {resultAnswer && (
           <div className="px-3 py-2">
             <div className="text-xs font-medium text-green-600 dark:text-green-400">
-              {t('')}
+              {t('questionCard.userAnswer')}
             </div>
             <div className="mt-1 rounded bg-green-100 px-2 py-1.5 text-sm text-green-900 dark:bg-green-900/40 dark:text-green-100">
               {resultAnswer}
@@ -128,7 +128,7 @@ export function QuestionCard({
       <div className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 dark:border-amber-800">
         <MessageCircleQuestion className="h-4 w-4 text-amber-600 dark:text-amber-400" />
         <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
-          {t('')}
+          {t('questionCard.title')}
         </span>
         <Clock className="ml-auto h-3 w-3 text-amber-400 dark:text-amber-500" />
       </div>
@@ -138,7 +138,7 @@ export function QuestionCard({
         <div className="border-b border-amber-200 px-3 py-2 dark:border-amber-800">
           <div className="mb-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
             <FileText className="h-3 w-3" />
-            <span>{t('')}</span>
+            <span>{t('questionCard.affectedFiles')}</span>
           </div>
           <div className="space-y-0.5">
             {context.affected_files.map((file) => (
@@ -223,7 +223,7 @@ function YesNoInput({
           disabled={showCustom}
           className="rounded-md bg-green-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-green-700 dark:hover:bg-green-600"
         >
-          {t('')}
+          {t('questionCard.yes')}
         </button>
         <button
           type="button"
@@ -231,7 +231,7 @@ function YesNoInput({
           disabled={showCustom}
           className="rounded-md bg-neutral-200 px-4 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-300 focus:outline-none focus:ring-2 focus:ring-neutral-400 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600"
         >
-          {t('')}
+          {t('questionCard.no')}
         </button>
         <button
           type="button"
@@ -241,8 +241,8 @@ function YesNoInput({
               ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-400 dark:bg-amber-900/40 dark:text-amber-300 dark:ring-amber-600'
               : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
           }`}
-          title={t('')}
-          aria-label={t('')}
+          title={t('questionCard.customInputHint')}
+          aria-label={t('questionCard.customInputHint')}
         >
           <PencilLine className="h-4 w-4" />
         </button>
@@ -253,13 +253,13 @@ function YesNoInput({
             value={customText}
             onChange={(e) => setCustomText(e.target.value)}
             onKeyDown={handleCustomKeyDown}
-            placeholder={t('')}
+            placeholder={t('questionCard.placeholder')}
             rows={2}
             className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
           <div className="mt-1.5 flex items-center justify-between">
             <span className="text-[10px] text-amber-500 dark:text-amber-400">
-              {t('')}
+              {t('questionCard.submitHint')}
             </span>
             <button
               type="button"
@@ -267,7 +267,7 @@ function YesNoInput({
               onClick={handleCustomSubmit}
               className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
             >
-              {t('')}
+              {t('questionCard.submit')}
             </button>
           </div>
         </div>
@@ -353,7 +353,7 @@ function SingleChoiceInput({
           />
           <PencilLine className="h-3.5 w-3.5 text-amber-500" />
           <span className="text-sm text-amber-700 dark:text-amber-300">
-            {t('')}
+            {t('questionCard.customInput')}
           </span>
         </label>
       </div>
@@ -363,7 +363,7 @@ function SingleChoiceInput({
             value={customText}
             onChange={(e) => setCustomText(e.target.value)}
             onKeyDown={handleCustomKeyDown}
-            placeholder={t('')}
+            placeholder={t('questionCard.placeholder')}
             rows={2}
             className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
@@ -375,7 +375,7 @@ function SingleChoiceInput({
         onClick={handleSubmit}
         className="mt-2 rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
       >
-        {t('')}
+        {t('questionCard.submit')}
       </button>
     </div>
   )
@@ -460,7 +460,7 @@ function MultiChoiceInput({
         }`}
       >
         <PencilLine className="h-3.5 w-3.5" />
-        <span>{t('')}</span>
+        <span>{t('questionCard.customInput')}</span>
       </button>
       {showCustom && (
         <div className="mt-2">
@@ -468,7 +468,7 @@ function MultiChoiceInput({
             value={customText}
             onChange={(e) => setCustomText(e.target.value)}
             onKeyDown={handleCustomKeyDown}
-            placeholder={t('')}
+            placeholder={t('questionCard.placeholder')}
             rows={2}
             className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
           />
@@ -480,7 +480,7 @@ function MultiChoiceInput({
         onClick={handleSubmit}
         className="mt-2 rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
       >
-        {t('')}
+        {t('questionCard.submit')}
       </button>
     </div>
   )
@@ -517,13 +517,13 @@ function FreeTextInput({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder={t('')}
+        placeholder={t('questionCard.placeholder')}
         rows={3}
         className="w-full rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
       />
       <div className="mt-1.5 flex items-center justify-between">
         <span className="text-[10px] text-amber-500 dark:text-amber-400">
-          {t('')}
+          {t('questionCard.submitHint')}
         </span>
         <button
           type="button"
@@ -531,7 +531,7 @@ function FreeTextInput({
           onClick={handleSubmit}
           className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
         >
-          {t('')}
+          {t('questionCard.submit')}
         </button>
       </div>
     </div>
