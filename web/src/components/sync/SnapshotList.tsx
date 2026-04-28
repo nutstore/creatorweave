@@ -17,6 +17,7 @@ import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
 import { getWorkspaceManager } from '@/opfs'
+import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
 
 interface SnapshotListProps {
@@ -70,6 +71,31 @@ function formatContentMeta(kind: 'text' | 'binary' | 'none', size: number, t: (k
   const kb = size / 1024
   const human = kb >= 1 ? `${kb.toFixed(1)}KB` : `${size}B`
   return `${kind === 'binary' ? t('sidebar.snapshotList.contentKindBinary') : t('sidebar.snapshotList.contentKindText')} ${human}`
+}
+
+/**
+ * Collect all file paths from snapshots in a given index range.
+ * Used to determine which paths to pause/resume Vite HMR for during snapshot switching.
+ */
+async function collectSnapshotPaths(
+  workspaceId: string,
+  snapshots: SnapshotRecord[],
+  fromIndex: number,
+  toIndex: number
+): Promise<string[]> {
+  const repo = getFSOverlayRepository()
+  const paths = new Set<string>()
+  const start = Math.min(fromIndex, toIndex)
+  const end = Math.max(fromIndex, toIndex)
+  for (let i = start; i < end; i++) {
+    const snapshot = snapshots[i]
+    if (!snapshot) continue
+    const ops = await repo.listSnapshotOps(workspaceId, snapshot.id)
+    for (const op of ops) {
+      paths.add(op.path)
+    }
+  }
+  return [...paths]
 }
 
 export const SnapshotList: React.FC<SnapshotListProps> = ({
@@ -176,11 +202,24 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
         const workspace = await manager.getWorkspace(latest.workspaceId)
         if (!workspace) throw new Error(t('sidebar.snapshotList.workspaceNotFound', { name: latest.workspaceName || latest.workspaceId }))
         const nativeDir = await workspace.getNativeDirectoryHandle()
-        const result = await workspace.switchToSnapshot(latest.id, nativeDir, setSwitchProgress)
-        if (result.unresolved.length > 0) {
-          setError(t('sidebar.snapshotList.switchFailedWithCount', { count: result.unresolved.length }))
-        } else if (result.compensationAttempted && !result.compensationSucceeded) {
-          setError(t('sidebar.snapshotList.switchFailed'))
+
+        // Collect all paths that will be touched during the switch
+        const currentIndex = rows.findIndex((item) => item.status === 'approved' || item.status === 'committed')
+        const targetIndex = rows.findIndex((item) => item.id === latest.id)
+        const affectedPaths = await collectSnapshotPaths(latest.workspaceId, rows, currentIndex, targetIndex)
+
+        // Pause Vite HMR to prevent mid-switch page reloads
+        await pauseHmr(affectedPaths)
+        try {
+          const result = await workspace.switchToSnapshot(latest.id, nativeDir, setSwitchProgress)
+          if (result.unresolved.length > 0) {
+            setError(t('sidebar.snapshotList.switchFailedWithCount', { count: result.unresolved.length }))
+          } else if (result.compensationAttempted && !result.compensationSucceeded) {
+            setError(t('sidebar.snapshotList.switchFailed'))
+          }
+        } finally {
+          // Resume HMR — re-add paths and trigger full-reload for consistent state
+          await resumeHmr(affectedPaths)
         }
       }
       await useWorkspaceStore.getState().refreshPendingChanges(true)
@@ -204,14 +243,30 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
       const workspace = await manager.getWorkspace(target.workspaceId)
       if (!workspace) throw new Error(t('sidebar.snapshotList.workspaceNotFound', { name: target.workspaceName || target.workspaceId }))
       const nativeDir = await workspace.getNativeDirectoryHandle()
-      const result = await workspace.switchToSnapshot(snapshotId, nativeDir, setSwitchProgress)
-      if (result.unresolved.length > 0) {
-        setError(
-          t('sidebar.snapshotList.switchPartial', { failedSnapshotId: result.failedSnapshotId || '-', count: result.unresolved.length })
-        )
-      } else if (result.compensationAttempted && !result.compensationSucceeded) {
-        setError(t('sidebar.snapshotList.switchFailed'))
+
+      // Collect all paths that will be touched during the switch
+      const repo = getFSOverlayRepository()
+      const allSnapshots = await repo.listSnapshots(target.workspaceId, 500)
+      const currentIndex = allSnapshots.findIndex((item) => item.status === 'approved' || item.status === 'committed')
+      const targetIndex = allSnapshots.findIndex((item) => item.id === snapshotId)
+      const affectedPaths = await collectSnapshotPaths(target.workspaceId, allSnapshots, currentIndex, targetIndex)
+
+      // Pause Vite HMR to prevent mid-switch page reloads
+      await pauseHmr(affectedPaths)
+      try {
+        const result = await workspace.switchToSnapshot(snapshotId, nativeDir, setSwitchProgress)
+        if (result.unresolved.length > 0) {
+          setError(
+            t('sidebar.snapshotList.switchPartial', { failedSnapshotId: result.failedSnapshotId || '-', count: result.unresolved.length })
+          )
+        } else if (result.compensationAttempted && !result.compensationSucceeded) {
+          setError(t('sidebar.snapshotList.switchFailed'))
+        }
+      } finally {
+        // Resume HMR — re-add paths and trigger full-reload for consistent state
+        await resumeHmr(affectedPaths)
       }
+
       await useWorkspaceStore.getState().refreshPendingChanges(true)
       await useWorkspaceStore.getState().refreshWorkspaces()
       await loadSnapshots()
