@@ -1,4 +1,4 @@
-import { diffLines, type Change } from 'diff'
+import { diffLines } from 'diff'
 
 export const CONFLICT_MARKER_START = '<<<<<<< OPFS'
 export const CONFLICT_MARKER_MIDDLE = '======='

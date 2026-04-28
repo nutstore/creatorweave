@@ -40,8 +40,15 @@ export class AgentBackend implements VfsBackend {
     }
   }
 
-  async writeFile(path: string, content: string | ArrayBuffer): Promise<void> {
-    const text = typeof content === 'string' ? content : new TextDecoder().decode(content)
+  async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
+    let text: string
+    if (typeof content === 'string') {
+      text = content
+    } else if (content instanceof Blob) {
+      text = await content.text()
+    } else {
+      text = new TextDecoder().decode(content)
+    }
     // Auto-create agent if it doesn't exist yet
     const exists = await this.agentManager.hasAgent(this.agentId)
     if (!exists) {

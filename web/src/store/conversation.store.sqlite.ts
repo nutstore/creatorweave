@@ -20,6 +20,7 @@ import type {
   ConversationStatus,
   DraftAssistantStep,
 } from '@/agent/message-types'
+import type { AssetMeta } from '@/types/asset'
 import {
   createAssistantMessage,
   createConversation,
@@ -44,6 +45,7 @@ import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
  */
 function commitDraftToMessages(conv: {
   messages: Message[]
+  collectedAssets?: AssetMeta[]
   draftAssistant?: {
     reasoning: string
     content: string

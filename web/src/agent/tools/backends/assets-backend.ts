@@ -96,7 +96,7 @@ export class AssetsBackend implements VfsBackend {
     }
   }
 
-  async writeFile(path: string, content: string | ArrayBuffer): Promise<void> {
+  async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
     const dir = await this.getDir()
     const { dir: parentDir, fileName } = await navigateToParent(dir, path)
     const fileHandle = await parentDir.getFileHandle(fileName, { create: true })

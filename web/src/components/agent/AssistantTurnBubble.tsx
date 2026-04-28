@@ -268,7 +268,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
                       : undefined
                   }
                   subagentEvents={step.subagentEvents}
-                  conversationId={conversationId}
+                  conversationId={conversationId ?? undefined}
                 />
               </div>
             )
@@ -340,7 +340,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
                     : undefined
                 }
                 subagentEvents={step.subagentEvents}
-                conversationId={conversationId}
+                conversationId={conversationId ?? undefined}
               />
             )
           })}
@@ -359,7 +359,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
                 streamingToolArgsByCallId?.[tc.id] ||
                 (currentToolCall?.id === tc.id ? streamingToolArgs || undefined : undefined)
               }
-              conversationId={conversationId}
+              conversationId={conversationId ?? undefined}
             />
           ))}
 
@@ -386,7 +386,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               streamingArgs={
                 streamingToolArgsByCallId?.[currentToolCall.id] || streamingToolArgs || undefined
               }
-              conversationId={conversationId}
+              conversationId={conversationId ?? undefined}
             />
           )}
 

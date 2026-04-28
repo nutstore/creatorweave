@@ -665,7 +665,6 @@ function App() {
       const _projects = useProjectStore.getState().projects
       const _activeProjectId = useProjectStore.getState().activeProjectId
       const _activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
-      const _switchingWorkspaceId = useConversationContextStore.getState().switchingWorkspaceId
 
       if (currentRoute.kind === 'projectsHome') {
         return

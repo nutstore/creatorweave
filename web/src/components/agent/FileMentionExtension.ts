@@ -74,7 +74,6 @@ export const FileMention = Node.create<FileMentionOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const ext = (node.attrs.extension as string) || ''
     return [
       'span',
       mergeAttributes(HTMLAttributes, {

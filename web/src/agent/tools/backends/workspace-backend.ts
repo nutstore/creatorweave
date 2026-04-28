@@ -6,7 +6,6 @@
  */
 
 import { useOPFSStore } from '@/store/opfs.store'
-import { getWorkspaceManager } from '@/opfs'
 import type { VfsBackend, VfsReadResult, VfsReadOptions, VfsDirEntry, VfsListOptions } from '../vfs-backend'
 import { resolveNativeDirectoryHandle } from '../tool-utils'
 import type { ReadPolicy } from '@/opfs/types/opfs-types'
@@ -55,7 +54,7 @@ export class WorkspaceBackend implements VfsBackend {
     }
   }
 
-  async writeFile(path: string, content: string | ArrayBuffer): Promise<void> {
+  async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
     const { writeFile } = useOPFSStore.getState()
     const dirHandle = await this.resolveDirHandle()
     await writeFile(path, content, dirHandle, this.workspaceId)
@@ -67,7 +66,7 @@ export class WorkspaceBackend implements VfsBackend {
     await deleteFile(path, dirHandle, this.workspaceId)
   }
 
-  async listDir(path: string, options?: VfsListOptions): Promise<VfsDirEntry[]> {
+  async listDir(path: string, _options?: VfsListOptions): Promise<VfsDirEntry[]> {
     // ls.tool.ts has its own complex traversal logic using directory handles.
     // This method provides a simpler fallback for basic listing.
     const handle = await this.resolveDirHandle()

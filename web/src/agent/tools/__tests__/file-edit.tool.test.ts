@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
+import type { ReadFileStateEntry } from '../tool-types'
 import { editExecutor } from '../file-edit.tool'
 
 const readFileMock = vi.fn()
@@ -89,7 +90,7 @@ describe('file edit tool', () => {
       metadata: { size: 12, contentType: 'text/plain' },
       source: 'opfs',
     })
-    const readFileState = new Map([
+    const readFileState = new Map<string, ReadFileStateEntry>([
       [
         'workspace:src/a.ts',
         {
@@ -120,7 +121,7 @@ describe('file edit tool', () => {
       metadata: { size: 12, contentType: 'text/plain' },
       source: 'native',
     })
-    const readFileState = new Map([
+    const readFileState = new Map<string, ReadFileStateEntry>([
       [
         'workspace:src/a.ts',
         {

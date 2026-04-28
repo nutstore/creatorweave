@@ -13,7 +13,7 @@ import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import type { ReadPolicy } from '@/opfs/types/opfs-types'
-import { resolveVfsTarget, type AgentTarget, withVfsAgentIdHint } from './vfs-resolver'
+import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandle } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
@@ -270,7 +270,11 @@ async function executeSingleRead(
       }
       readFileState.set(
         readStateKey,
-        buildReadStateEntry(formatted, options, backendResult.source || target.backend.label)
+        buildReadStateEntry(
+          formatted,
+          options,
+          normalizeReadStateSource(backendResult.source, target.backend.label)
+        )
       )
       // Record mtime for future dedup — backend may provide mtime, otherwise use wall clock
       const effectiveMtime = backendResult.mtime ?? Date.now()
@@ -348,7 +352,11 @@ async function executeSingleRead(
             }
             readFileState.set(
               readStateKey,
-              buildReadStateEntry(formatted, options, result.source || 'workspace')
+              buildReadStateEntry(
+                formatted,
+                options,
+                normalizeReadStateSource(result.source, 'workspace')
+              )
             )
             // Record mtime for future dedup
             recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
@@ -436,6 +444,7 @@ async function executeBatchRead(
     success: boolean
     kind?: 'text' | 'binary_base64'
     content?: string
+    source?: string
     error?: {
       code: string
       message: string
@@ -509,7 +518,7 @@ async function executeBatchRead(
       const content = backendResult.content
       const size = backendResult.size
       const contentType = backendResult.mimeType
-      const source = backendResult.source || target.backend.label
+      const source = normalizeReadStateSource(backendResult.source, target.backend.label)
 
       if (maxSize && size > maxSize) {
         results.push({
@@ -633,7 +642,7 @@ async function encodeBinaryContentAsBase64(content: ArrayBuffer | Blob): Promise
 function buildReadStateEntry(
   content: string,
   options: ReadRangeOptions,
-  source: 'workspace' | 'native' | 'opfs' | 'agent' | 'assets' = 'workspace'
+  source: import('./tool-types').ReadFileStateEntry['source'] = 'workspace'
 ) {
   const hasRange = hasRangeOptions(options)
   return {
@@ -644,6 +653,24 @@ function buildReadStateEntry(
     isPartialView: false,
     source,
   }
+}
+
+function normalizeReadStateSource(
+  source: string | undefined,
+  fallback: import('./tool-types').ReadFileStateEntry['source']
+): import('./tool-types').ReadFileStateEntry['source'] {
+  const value = source ?? fallback
+  if (
+    value === 'workspace' ||
+    value === 'native' ||
+    value === 'opfs' ||
+    value === 'agent' ||
+    value === 'assets' ||
+    value === 'native_fallback'
+  ) {
+    return value
+  }
+  return fallback
 }
 
 function validateReadRange(options: ReadRangeOptions): string | null {
@@ -764,7 +791,7 @@ async function executeSingleWrite(
   content: string,
   context: ToolContext
 ): Promise<string> {
-  const { writeFile, getPendingChanges, hasCachedFile } = useOPFSStore.getState()
+  const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
 
   try {
     const target = await resolveVfsTarget(path, context, 'write')
@@ -862,7 +889,7 @@ async function executeSingleWrite(
 }
 
 async function executeBatchWrite(files: FileItem[], context: ToolContext): Promise<string> {
-  const { writeFile, getPendingChanges, hasCachedFile } = useOPFSStore.getState()
+  const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
   const results: Array<{
     path: string
     success: boolean

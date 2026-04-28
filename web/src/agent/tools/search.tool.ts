@@ -194,7 +194,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
   // VFS path support: resolve vfs:// URIs to directory handles via backends
   if (searchPath.startsWith('vfs://')) {
     try {
-      const resolved = await resolveVfsTarget(searchPath, context, 'search', { allowEmptyPath: true })
+      const resolved = await resolveVfsTarget(searchPath, context, 'list', { allowEmptyPath: true })
       vfsSubPath = resolved.path
       const backendHandle = await resolved.backend.getDirectoryHandle?.()
       if (!backendHandle) {

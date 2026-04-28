@@ -46,8 +46,6 @@ describe('build-agent-tools', () => {
   })
 
   it('uses per-call timeout from args.timeout when provided', async () => {
-    let capturedTimeoutMs: number | null | undefined
-
     // We spy on the timeout by checking that a tool with timeout=120000
     // does NOT time out after 30s but DOES complete. We verify this indirectly
     // by recording the timeoutMs passed to executeToolWithTimeout.
@@ -74,7 +72,7 @@ describe('build-agent-tools', () => {
 
     // With per-call timeout of 5000ms, the tool should succeed
     // (global 50ms would kill it, but per-call 5000ms should not)
-    const result = await tools[0].execute('call_1', { code: 'print(1)', timeout: 5000 })
+    await tools[0].execute('call_1', { code: 'print(1)', timeout: 5000 })
     expect(toolRegistry.execute).toHaveBeenCalled()
   })
 

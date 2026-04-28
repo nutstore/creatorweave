@@ -9,7 +9,7 @@ import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
 import { Plus, Trash2, Check, FileIcon, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useT } from '@/i18n'
-import { useAssetStore, type PendingAsset } from '@/store/asset.store'
+import { useAssetStore } from '@/store/asset.store'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -501,7 +501,7 @@ export function AgentRichInput({
         class:
           'min-h-[44px] max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 outline-none',
       },
-      handleKeyDown: (view, event) => {
+      handleKeyDown: (_view, event) => {
         if (disabledRef.current) return false
         if (event.isComposing) return false
 

@@ -463,7 +463,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
 
       {open && (
         <ConversationDropdown
-          activeConversationId={activeConversationId}
+          activeConversationId={activeConversationId ?? undefined}
           currentConversationTitle={currentConversationTitle}
           conversationsCount={conversations.length}
           storageConversations={storageConversations}

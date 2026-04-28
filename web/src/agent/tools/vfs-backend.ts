@@ -53,7 +53,7 @@ export interface VfsSearchOptions {
 
 /** Result of a readFile operation */
 export interface VfsReadResult {
-  content: string | ArrayBuffer
+  content: string | ArrayBuffer | Blob
   size: number
   mimeType: string
   /** Where the content came from (backend-specific) */
@@ -88,7 +88,7 @@ export interface VfsBackend {
    * Write content to a file.
    * Creates parent directories as needed.
    */
-  writeFile(path: string, content: string | ArrayBuffer): Promise<void>
+  writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void>
 
   /**
    * Delete a file.

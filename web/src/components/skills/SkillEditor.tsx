@@ -12,8 +12,8 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
-  X, Eye, EyeOff, Save, FileCode, ChevronDown, Lock,
-  Tag, Hash, FileText, Zap, Clock, User as UserIcon, Layers,
+  X, Eye, Save, FileCode, ChevronDown, Lock,
+  Tag, FileText, Zap, Clock, User as UserIcon, Layers,
 } from 'lucide-react'
 import { BrandDialog, BrandDialogContent, BrandDialogTitle } from '@creatorweave/ui'
 import { Button } from '@/components/ui/button'

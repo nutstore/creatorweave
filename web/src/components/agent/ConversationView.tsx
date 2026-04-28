@@ -45,7 +45,7 @@ export function ConversationView({
 
   const logic = useConversationLogic()
   const {
-    input, setInput, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef,
+    input, setInput, setMentionedAgentIds, setSelectedFiles, inputResetToken, messagesEndRef,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     convId, activeMessages, activeDraftAssistant, activeStreamingState,
     activeWorkflowExecution, conversationError, activeContextWindowUsage,

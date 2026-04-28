@@ -4,7 +4,7 @@
  * Enhanced rendering for spawn_subagent / batch_spawn with subagent progress.
  */
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Bot } from 'lucide-react'
 import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'

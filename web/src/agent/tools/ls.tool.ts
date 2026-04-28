@@ -242,10 +242,6 @@ async function resolveDiscoveryScope(
       }
     }
 
-    if (resolved.kind !== 'agent') {
-      throw new Error(`Unsupported vfs namespace for ls: ${resolved.kind}`)
-    }
-
     // Agent scope: use backend.getDirectoryHandle() to get root, then resolve sub-paths
     if (!resolved.agentId) {
       return {

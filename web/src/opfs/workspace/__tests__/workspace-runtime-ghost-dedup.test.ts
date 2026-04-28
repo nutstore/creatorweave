@@ -1,16 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { WorkspaceRuntime } from '../workspace-runtime'
-import type { PendingChange } from '@/opfs/types/opfs-types'
-
-function createPending(id: string, path: string, type: PendingChange['type']): PendingChange {
-  return {
-    id,
-    path,
-    type,
-    fsMtime: 0,
-    timestamp: Date.now(),
-  }
-}
 
 /**
  * Helper: create a partially-mocked WorkspaceRuntime for writeFile tests.
@@ -48,18 +37,7 @@ function createRuntimeForWriteTest(mocks: Record<string, unknown> = {}) {
   // Apply caller overrides
   Object.assign(runtime, mocks)
 
-  return runtime as unknown as WorkspaceRuntime & {
-    pendingManager: {
-      hasPendingPath: ReturnType<typeof vi.fn>
-      removeByPath: ReturnType<typeof vi.fn>
-      markAsCreated: ReturnType<typeof vi.fn>
-      add: ReturnType<typeof vi.fn>
-    }
-    writeToFilesDir: ReturnType<typeof vi.fn>
-    captureModifyBaseline: ReturnType<typeof vi.fn>
-    deleteFromBaselineDirIfExists: ReturnType<typeof vi.fn>
-    saveMetadata: ReturnType<typeof vi.fn>
-  }
+  return runtime as any
 }
 
 describe('writeFile ghost change dedup', () => {

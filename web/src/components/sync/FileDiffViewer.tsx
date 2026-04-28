@@ -43,7 +43,7 @@ interface FileDiffViewerProps {
   /** External comment state (managed by parent). Falls back to internal state if not provided. */
   commentsByPath?: Record<string, LineComment[]>
   /** Callback to update comment state in parent */
-  onCommentsChange?: (comments: Record<string, LineComment[]>) => void
+  onCommentsChange?: React.Dispatch<React.SetStateAction<Record<string, LineComment[]>>>
 }
 
 type FileContentState = {
@@ -120,7 +120,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const [internalCommentsByPath, setInternalCommentsByPath] = useState<Record<string, LineComment[]>>({})
   // Use external state if provided (from SyncPreviewPanel), otherwise use internal state
   const commentsByPath = externalCommentsByPath ?? internalCommentsByPath
-  const setCommentsByPath = onCommentsChange ?? setInternalCommentsByPath
+  const setCommentsByPath: React.Dispatch<React.SetStateAction<Record<string, LineComment[]>>> =
+    onCommentsChange ?? setInternalCommentsByPath
   const [composer, setComposer] = useState<{
     side: CommentSide
     startLine: number
@@ -412,7 +413,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     if (!activePath) return
     setCommentsByPath((prev) => ({
       ...prev,
-      [activePath]: (prev[activePath] ?? []).filter((item) => item.id !== id),
+      [activePath]: (prev[activePath] ?? []).filter((item: LineComment) => item.id !== id),
     }))
   }
 
