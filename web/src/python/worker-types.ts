@@ -36,6 +36,8 @@ export interface ExecuteRequest {
   timeout?: number
   /** Directory handle to mount at /mnt (File System Access API) */
   mountDir?: FileSystemDirectoryHandle
+  /** Directory handle to mount at /mnt_assets (File System Access API) */
+  assetsDir?: FileSystemDirectoryHandle
   /** Whether to sync changes back to native filesystem after execution */
   syncFs?: boolean
 }

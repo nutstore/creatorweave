@@ -12,5 +12,9 @@ export function getReadStateKey(target: ResolvedVfsTarget): string {
   if (target.kind === 'workspace') {
     return `workspace:${target.path}`
   }
-  return `agent:${target.projectId}:${target.agentId}:${target.path}`
+  if (target.kind === 'agent') {
+    return `agent:${target.projectId}:${target.agentId}:${target.path}`
+  }
+  // assets
+  return `assets:${target.path}`
 }

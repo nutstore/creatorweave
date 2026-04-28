@@ -14,7 +14,7 @@ import { getProjectRepository } from '@/sqlite/repositories/project.repository'
 
 const PROJECTS_ROOT_DIR = 'projects'
 const PROJECT_WORKSPACES_DIR = 'workspaces'
-const WORKSPACE_ATTACHMENTS_DIR = 'attachments'
+const WORKSPACE_ASSETS_DIR = 'assets'
 
 /**
  * Canonical workspace metadata in memory.
@@ -178,7 +178,7 @@ export class WorkspaceManager {
     }
 
     const workspaceDir = await this.getWorkspaceDirForProject(projectId, id, true)
-    await workspaceDir.getDirectoryHandle(WORKSPACE_ATTACHMENTS_DIR, { create: true })
+    await workspaceDir.getDirectoryHandle(WORKSPACE_ASSETS_DIR, { create: true })
 
     const workspace = new WorkspaceRuntime(id, workspaceDir, rootDirectory)
     await workspace.initialize()
@@ -216,7 +216,7 @@ export class WorkspaceManager {
 
     try {
       const workspaceDir = await this.getWorkspaceDirForProject(projectId, workspaceId, false)
-      await workspaceDir.getDirectoryHandle(WORKSPACE_ATTACHMENTS_DIR, { create: true })
+      await workspaceDir.getDirectoryHandle(WORKSPACE_ASSETS_DIR, { create: true })
       const workspace = new WorkspaceRuntime(workspaceId, workspaceDir, rootDirectory)
       await workspace.initialize()
 

@@ -3,6 +3,7 @@
  * Compatible with OpenAI chat completion format.
  */
 
+import type { AssetMeta } from '@/types/asset'
 import { parseThinkTags } from './think-tags'
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
@@ -106,6 +107,8 @@ export interface Message {
   timestamp: number
   /** Token usage for this assistant message (from API response) */
   usage?: MessageUsage
+  /** File assets attached to this message (user uploads or agent-generated) */
+  assets?: AssetMeta[]
 }
 
 export type DraftAssistantStep =
@@ -228,6 +231,8 @@ export interface Conversation {
   compressionConvertCallCount?: number
   /** Runtime marker for last summary convert call (not persisted) */
   compressionLastSummaryConvertCall?: number
+  /** Assets collected during current agent run (not persisted, moved to assistant message on commit) */
+  collectedAssets?: AssetMeta[]
 }
 
 /** Generate a unique message ID */
@@ -236,12 +241,13 @@ export function generateId(): string {
 }
 
 /** Create a user message */
-export function createUserMessage(content: string): Message {
+export function createUserMessage(content: string, assets?: AssetMeta[]): Message {
   return {
     id: generateId(),
     role: 'user',
     content,
     timestamp: Date.now(),
+    assets,
   }
 }
 
@@ -253,7 +259,8 @@ export function createAssistantMessage(
   reasoning?: string | null,
   kind: Message['kind'] = 'normal',
   workflowDryRun?: WorkflowDryRunPayload,
-  workflowRealRun?: WorkflowRealRunPayload
+  workflowRealRun?: WorkflowRealRunPayload,
+  assets?: AssetMeta[]
 ): Message {
   const rawContent = content || ''
   const parsedThink = parseThinkTags(rawContent)
@@ -276,6 +283,7 @@ export function createAssistantMessage(
     toolCalls,
     usage,
     timestamp: Date.now(),
+    assets,
   }
 }
 
@@ -324,5 +332,6 @@ export function createConversation(title?: string): Conversation {
     mountRefCount: 0,
     compressionConvertCallCount: 0,
     compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+    collectedAssets: [],
   }
 }

@@ -6,6 +6,7 @@ import { getWorkspaceManager } from '@/opfs'
 import { resolveNativeDirectoryHandle } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
+import { resolveVfsTarget } from './vfs-resolver'
 
 function looksRegexLikeQuery(query: string): boolean {
   // Guard against common LLM misuse where regex operators are passed while regex=false.
@@ -187,12 +188,31 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     )
   }
 
-  let directoryHandle: FileSystemDirectoryHandle | null = context.directoryHandle
+  let directoryHandle: FileSystemDirectoryHandle | null = null
+  let vfsSubPath = '' // sub-path within the resolved VFS namespace
 
-  // OPFS-only fallback: search in active workspace files snapshot.
-  if (!directoryHandle) {
-    directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  // VFS path support: resolve vfs:// URIs to directory handles via backends
+  if (searchPath.startsWith('vfs://')) {
+    try {
+      const resolved = await resolveVfsTarget(searchPath, context, 'search', { allowEmptyPath: true })
+      vfsSubPath = resolved.path
+      const backendHandle = await resolved.backend.getDirectoryHandle?.()
+      if (!backendHandle) {
+        return toolErrorJson('search', 'no_active_workspace', `VFS backend '${resolved.kind}' does not support directory handles`)
+      }
+      directoryHandle = backendHandle
+    } catch (error) {
+      return toolErrorJson('search', 'path_not_found', `Failed to resolve VFS path: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  } else {
+    // Legacy: workspace path resolution
+    directoryHandle = context.directoryHandle
+    if (!directoryHandle) {
+      directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+    }
+    vfsSubPath = searchPath
   }
+
   if (!directoryHandle) {
     return toolErrorJson('search', 'no_active_workspace', 'No active workspace')
   }
@@ -213,7 +233,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
     const result = await manager.searchInDirectory(directoryHandle, {
       query,
-      path: typeof args.path === 'string' ? args.path : undefined,
+      path: vfsSubPath || undefined,
       glob: typeof args.glob === 'string' ? args.glob : undefined,
       regex: useRegex,
       caseSensitive: args.case_sensitive === true,

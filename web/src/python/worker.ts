@@ -58,6 +58,15 @@ let pyodideReadyPromise = null
 /** @type {any} NativeFS handle for syncing changes back */
 let nativefs = null
 
+/** @type {FileSystemDirectoryHandle | null} Currently mounted directory handle (to detect workspace switches) */
+let mountedDirHandle = null
+
+/** @type {any} NativeFS handle for /mnt_assets syncing */
+let nativefsAssets = null
+
+/** @type {FileSystemDirectoryHandle | null} Currently mounted assets directory handle */
+let mountedAssetsDirHandle = null
+
 /** @type {Promise<void>} Serialize mount/unmount operations to avoid /mnt races */
 let fsOpQueue = Promise.resolve()
 
@@ -169,8 +178,17 @@ async function runExclusiveFSOperation(operation) {
  */
 async function cleanupNativeFS() {
   if (!nativefs) return
-
   nativefs = null
+  mountedDirHandle = null
+}
+
+/**
+ * Cleanup nativefsAssets references
+ */
+async function cleanupAssetsFS() {
+  if (!nativefsAssets) return
+  nativefsAssets = null
+  mountedAssetsDirHandle = null
 }
 
 /**
@@ -230,8 +248,126 @@ function rmrf(path) {
 }
 
 /**
+ * Unmount and remove /mnt_assets directory completely (internal, no mutex).
+ * Caller must hold runExclusiveFSOperation if needed.
+ */
+async function unmountAndRemoveMntAssetsRaw() {
+  if (!pyodide) return
+
+  await cleanupAssetsFS()
+
+  try {
+    pyodide.FS.unmount('/mnt_assets')
+    console.log('[Pyodide Worker] Unmounted /mnt_assets')
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[Pyodide Worker] /mnt_assets unmount skipped/failed:', msg)
+  }
+
+  try {
+    const mntAssetsPath = pyodide.FS.analyzePath('/mnt_assets')
+    if (mntAssetsPath.exists) {
+      rmrf('/mnt_assets')
+      console.log('[Pyodide Worker] Removed /mnt_assets directory')
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[Pyodide Worker] /mnt_assets directory removal failed:', msg)
+  }
+}
+
+/**
+ * Mount assets directory handle to /mnt_assets using mountNativeFS.
+ * Remounts only when the handle changes; uses syncfs(true) for same-handle refresh.
+ * @param {FileSystemDirectoryHandle} dirHandle - Assets directory to mount
+ */
+async function ensureAssetsMounted(dirHandle) {
+  return runExclusiveFSOperation(async () => {
+    if (!pyodide) {
+      throw new Error('Pyodide not initialized. Call initPyodide() first.')
+    }
+
+    // Check if the same handle is already mounted
+    const sameHandle = mountedAssetsDirHandle && mountedAssetsDirHandle.isSameEntry
+      ? await mountedAssetsDirHandle.isSameEntry(dirHandle)
+      : false
+
+    if (nativefsAssets && sameHandle) {
+      try {
+        await new Promise((resolve, reject) => {
+          pyodide.FS.syncfs(true, (err) => {
+            if (err) reject(err)
+            else resolve(undefined)
+          })
+        })
+        console.log('[Pyodide Worker] /mnt_assets refreshed via syncfs')
+        return
+      } catch {
+        console.warn('[Pyodide Worker] /mnt_assets syncfs failed, falling back to remount')
+      }
+    }
+
+    console.log('[Pyodide Worker] Mounting assets directory:', dirHandle.name)
+
+    // Clean up stale mount
+    await unmountAndRemoveMntAssetsRaw()
+
+    // Create /mnt_assets mount point
+    if (!pyodide.FS.analyzePath('/mnt_assets').exists) {
+      pyodide.FS.mkdir('/mnt_assets')
+    }
+
+    try {
+      nativefsAssets = await pyodide.mountNativeFS('/mnt_assets', dirHandle)
+      mountedAssetsDirHandle = dirHandle
+      console.log(`[Pyodide Worker] Assets directory "${dirHandle.name}" mounted at /mnt_assets`)
+    } catch (mountError) {
+      const mountMsg = mountError instanceof Error ? mountError.message : String(mountError)
+      if (mountMsg.includes('already a file system mount point')) {
+        console.warn('[Pyodide Worker] Detected stale /mnt_assets mount point, retrying')
+        await unmountAndRemoveMntAssetsRaw()
+        if (!pyodide.FS.analyzePath('/mnt_assets').exists) {
+          pyodide.FS.mkdir('/mnt_assets')
+        }
+        nativefsAssets = await pyodide.mountNativeFS('/mnt_assets', dirHandle)
+        mountedAssetsDirHandle = dirHandle
+        console.log(`[Pyodide Worker] Assets directory "${dirHandle.name}" mounted at /mnt_assets (retry)`)
+      } else {
+        console.error('[Pyodide Worker] /mnt_assets mount failed:', mountMsg)
+        throw mountError
+      }
+    }
+  })
+}
+
+/**
+ * Populate /mnt from OPFS using FS.syncfs(true).
+ * This refreshes the PROXYFS cache to reflect external OPFS changes
+ * (e.g. files written by agent tools on the main thread)
+ * without the overhead of a full unmount + remount cycle.
+ */
+async function syncFromOPFS() {
+  return runExclusiveFSOperation(async () => {
+    if (!pyodide || !nativefs) return
+    try {
+      await new Promise((resolve, reject) => {
+        pyodide.FS.syncfs(true, (err) => {
+          if (err) reject(err)
+          else resolve(undefined)
+        })
+      })
+      console.log('[Pyodide Worker] syncfs(true) populated from OPFS')
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error)
+      console.warn('[Pyodide Worker] syncfs(true) failed:', msg)
+      throw error
+    }
+  })
+}
+
+/**
  * Mount directory handle to /mnt using mountNativeFS.
- * Always remounts to refresh PROSFS cache and reflect OPFS external changes.
+ * Only mounts on first call; subsequent calls use syncfs(true) to refresh.
  * @param {FileSystemDirectoryHandle} dirHandle - Directory to mount
  */
 async function ensureMounted(dirHandle) {
@@ -241,9 +377,29 @@ async function ensureMounted(dirHandle) {
       throw new Error('Pyodide not initialized. Call initPyodide() first.')
     }
 
-    console.log('[Pyodide Worker] Remounting directory:', dirHandle.name)
+    // Check if the same directory handle is already mounted
+    const sameHandle = mountedDirHandle && mountedDirHandle.isSameEntry
+      ? await mountedDirHandle.isSameEntry(dirHandle)
+      : false
 
-    // Always clean old mount first so external OPFS changes become visible
+    // If already mounted with the same handle, just sync from OPFS to refresh cache
+    if (nativefs && sameHandle) {
+      try {
+        await syncFromOPFS()
+        return
+      } catch {
+        // syncfs failed, fall through to full remount
+        console.warn('[Pyodide Worker] syncfs failed, falling back to remount')
+      }
+    }
+
+    if (nativefs && !sameHandle) {
+      console.log('[Pyodide Worker] Different workspace detected, switching mount')
+    }
+
+    console.log('[Pyodide Worker] Mounting directory:', dirHandle.name)
+
+    // Clean up any stale mount
     await unmountAndRemoveMnt()
 
     // Create /mnt directory for mount point
@@ -254,6 +410,7 @@ async function ensureMounted(dirHandle) {
     // Mount using mountNativeFS
     try {
       nativefs = await pyodide.mountNativeFS('/mnt', dirHandle)
+      mountedDirHandle = dirHandle
       console.log(`[Pyodide Worker] Directory "${dirHandle.name}" mounted at /mnt`)
     } catch (mountError) {
       const mountMsg = mountError instanceof Error ? mountError.message : String(mountError)
@@ -264,10 +421,11 @@ async function ensureMounted(dirHandle) {
           pyodide.FS.mkdir('/mnt')
         }
         nativefs = await pyodide.mountNativeFS('/mnt', dirHandle)
+        mountedDirHandle = dirHandle
         console.log(`[Pyodide Worker] Directory "${dirHandle.name}" mounted at /mnt (retry)`)
         return
       }
-      console.error('[Pyodide Worker] Mount failed:', mountError)
+      console.error('[Pyodide Worker] Mount failed:', mountMsg)
       throw mountError
     }
   })
@@ -299,8 +457,25 @@ function captureOutput() {
   }
 }
 
-self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
-  const { id, type } = e.data
+self.onmessage = (/** @type {MessageEvent<any>} */ e) => {
+  // Queue all messages for serial execution to prevent concurrent access
+  // to shared pyodide instance and /mnt filesystem
+  const previous = messageQueue
+  messageQueue = previous.then(() => handleMessage(e.data))
+}
+
+/**
+ * Serial message queue - ensures only one message is processed at a time.
+ * This prevents concurrent pyodide.runPythonAsync calls which would corrupt
+ * shared state (global Python scope, /mnt filesystem, stdout/stderr buffers).
+ */
+let messageQueue = Promise.resolve()
+
+/**
+ * Handle a single message (called serially via messageQueue)
+ */
+async function handleMessage(/** @type {any} */ data) {
+  const { id, type } = data
 
   // Handle 'mount' type - mount a directory to /mnt
   if (type === 'mount') {
@@ -308,7 +483,7 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
       if (!pyodide) {
         pyodide = await initPyodide()
       }
-      await ensureMounted(e.data.dirHandle)
+      await ensureMounted(data.dirHandle)
       sendResponse(id, true, { success: true })
     } catch (error) {
       sendError(id, error instanceof Error ? error.message : String(error))
@@ -336,7 +511,8 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
   if (type === 'unmount') {
     try {
       await unmountDir()
-      console.log('[Pyodide Worker] Filesystem unmounted and /mnt removed')
+      await runExclusiveFSOperation(() => unmountAndRemoveMntAssetsRaw())
+      console.log('[Pyodide Worker] Filesystem unmounted and /mnt, /mnt_assets removed')
       sendResponse(id, true, { success: true })
     } catch (error) {
       sendError(id, error instanceof Error ? error.message : String(error))
@@ -345,7 +521,7 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
   }
 
   // Handle 'execute' type - run Python code
-  const { code, files = [], timeout = DEFAULT_TIMEOUT, mountDir, syncFs = true } = e.data
+  const { code, files = [], timeout = DEFAULT_TIMEOUT, mountDir, assetsDir, syncFs = true } = data
 
   const startTime = performance.now()
   /** @type {number | undefined} */
@@ -374,6 +550,11 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
           pyodide.FS.writeFile(filePath, data)
         }
       }
+    }
+
+    // Handle assetsDir if provided — mount at /mnt_assets
+    if (assetsDir) {
+      await ensureAssetsMounted(assetsDir)
     }
 
     // Auto-load packages based on imports in the user code (includes matplotlib if needed)
@@ -416,6 +597,12 @@ self.onmessage = async (/** @type {MessageEvent<any>} */ e) => {
     if (syncFs && nativefs) {
       await nativefs.syncfs()
       console.log('[Pyodide Worker] Synced changes back to native filesystem')
+    }
+
+    // Sync assets changes back if assets were mounted
+    if (syncFs && nativefsAssets) {
+      await nativefsAssets.syncfs()
+      console.log('[Pyodide Worker] Synced assets changes back to native filesystem')
     }
 
     // Collect matplotlib images

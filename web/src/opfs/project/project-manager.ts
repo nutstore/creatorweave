@@ -9,7 +9,7 @@
  * ├── agents/{agentId}/
  * └── workspaces/{workspaceId}/
  *     ├── files/
- *     ├── attachments/
+ *     ├── assets/
  *     └── workspace.json
  */
 
@@ -19,7 +19,6 @@ import { getDefaultAgentTemplate } from '../agent/agent-templates'
 const PROJECTS_DIR = 'projects'
 const AGENTS_DIR = 'agents'
 const WORKSPACES_DIR = 'workspaces'
-const ATTACHMENTS_DIR = 'attachments'
 
 /**
  * 项目信息
@@ -169,23 +168,6 @@ export class ProjectManager {
     try {
       const projectDir = await this.projectsDir.getDirectoryHandle(id)
       return projectDir.getDirectoryHandle(WORKSPACES_DIR)
-    } catch {
-      return null
-    }
-  }
-
-  /**
-   * 获取工作区级别的 attachments 目录
-   */
-  async getWorkspaceAttachmentsDir(
-    projectId: string,
-    workspaceId: string
-  ): Promise<FileSystemDirectoryHandle | null> {
-    try {
-      const projectDir = await this.projectsDir.getDirectoryHandle(projectId)
-      const workspacesDir = await projectDir.getDirectoryHandle(WORKSPACES_DIR)
-      const workspaceDir = await workspacesDir.getDirectoryHandle(workspaceId)
-      return workspaceDir.getDirectoryHandle(ATTACHMENTS_DIR, { create: true })
     } catch {
       return null
     }

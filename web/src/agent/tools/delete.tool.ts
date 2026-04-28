@@ -19,7 +19,7 @@ export const deleteDefinition: ToolDefinition = {
       'Soft delete file(s). Marks files as pending deletion in OPFS workspace. ' +
       'Use path for single file, or paths for batch. ' +
       'IMPORTANT: Files are not removed from real disk until sync is executed. ' +
-      'Supports vfs://workspace/... and vfs://agents/{id}/... paths.',
+      'Supports vfs://workspace/..., vfs://agents/{id}/..., and vfs://assets/... paths.',
     parameters: {
       type: 'object',
       properties: {
@@ -101,21 +101,18 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
     })
   }
 
-  const { deleteFile, getPendingChanges } = useOPFSStore.getState()
   const deleted: string[] = []
   const failed: Array<{ path: string; error: string }> = []
 
   for (const target of targets) {
     try {
       const resolved = await resolveVfsTarget(target, context, 'delete')
-      if (resolved.kind === 'workspace') {
-        await deleteFile(resolved.path, context.directoryHandle, context.workspaceId)
-      } else {
-        if (isProtectedAgentCoreFile(resolved.path)) {
-          throw new Error(`Protected agent file cannot be deleted: ${resolved.path}`)
-        }
-        await resolved.agentManager.deletePath(resolved.agentId, resolved.path)
+
+      if (resolved.kind === 'agent' && isProtectedAgentCoreFile(resolved.path)) {
+        throw new Error(`Protected agent file cannot be deleted: ${resolved.path}`)
       }
+
+      await resolved.backend.deleteFile(resolved.path)
 
       const session = useRemoteStore.getState().session
       if (session) {
@@ -131,7 +128,7 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
     }
   }
 
-  const pendingChanges = getPendingChanges()
+  const pendingChanges = useOPFSStore.getState().getPendingChanges()
 
   return JSON.stringify({
     success: failed.length === 0,

@@ -68,12 +68,22 @@ function commitDraftToMessages(conv: {
 
   if (!hasContent) return false
 
+  // Collect assets accumulated during this agent run
+  const collectedAssets = conv.collectedAssets?.length ? conv.collectedAssets : undefined
+  console.log('[commitDraftToMessages] conv.collectedAssets:', conv.collectedAssets?.length, '→ passing:', collectedAssets?.length)
+  // Clear the accumulator after collecting
+  conv.collectedAssets = []
+
   conv.messages.push(
     createAssistantMessage(
       draft.content || null,
       completedToolCalls.length > 0 ? completedToolCalls : undefined,
       undefined,
-      draft.reasoning || null
+      draft.reasoning || null,
+      undefined,
+      undefined,
+      undefined,
+      collectedAssets
     )
   )
   for (const tc of completedToolCalls) {
@@ -504,6 +514,7 @@ async function loadConversations(): Promise<Conversation[]> {
     mountRefCount: 0,
     compressionConvertCallCount: 0,
     compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+    collectedAssets: [],
     // Runtime state - read from workspace-preferences (workspace-level isolation)
     agentMode: getCurrentWorkspaceAgentMode(),
   }))
@@ -717,6 +728,9 @@ interface ConversationState {
   setConversationError: (id: string, error: string | null) => void
   resetConversationState: (id: string) => void
 
+  // Asset accumulation (not persisted — moved to assistant message on commit)
+  collectAssets: (conversationId: string, assets: import('@/types/asset').AssetMeta[]) => void
+
   // Follow-up suggestion actions
   setSuggestedFollowUp: (conversationId: string, suggestion: string) => void
   clearSuggestedFollowUp: (conversationId: string) => void
@@ -866,6 +880,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             compressionConvertCallCount: conv.compressionConvertCallCount ?? 0,
             compressionLastSummaryConvertCall:
               conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
+            collectedAssets: [],
           }))
           state.activeConversationId = activeId
           state.loaded = true
@@ -1334,6 +1349,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           c.isReasoningStreaming = false
           c.contextWindowUsage = null
           c.workflowExecution = null
+          c.collectedAssets = []
           c.draftAssistant = {
             reasoning: '',
             content: '',
@@ -2011,11 +2027,23 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           committed = true
           const targetMessages = finalMessages || latestMessages
 
+          // Collect any assets accumulated during this agent run before overwriting messages
+          const currentConv = get().conversations.find((c) => c.id === conversationId)
+          const collectedAssets = currentConv?.collectedAssets?.length ? [...currentConv.collectedAssets] : undefined
+
           set((inner) => {
             const c = inner.conversations.find((x) => x.id === conversationId)
             if (!c) return
             if (status === 'idle') {
               c.messages = targetMessages
+              // Attach collected assets to the last assistant message
+              if (collectedAssets && collectedAssets.length > 0) {
+                const lastAssistantMsg = [...c.messages].reverse().find((m) => m.role === 'assistant')
+                if (lastAssistantMsg) {
+                  lastAssistantMsg.assets = collectedAssets
+                }
+              }
+              c.collectedAssets = []
             }
             c.status = status
             c.error = error || null
@@ -2940,6 +2968,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     // Follow-up suggestion actions
+    collectAssets: (conversationId: string, assets: import('@/types/asset').AssetMeta[]) => {
+      set((state) => {
+        const conv = state.conversations.find((c) => c.id === conversationId)
+        if (conv) {
+          if (!conv.collectedAssets) {
+            conv.collectedAssets = []
+          }
+          conv.collectedAssets.push(...assets)
+        }
+      })
+    },
+
     setSuggestedFollowUp: (conversationId: string, suggestion: string) => {
       set((state) => ({
         suggestedFollowUps: new Map(state.suggestedFollowUps).set(conversationId, suggestion),

@@ -33,6 +33,7 @@ import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.reposit
 const WORKSPACE_METADATA_FILE = 'workspace.json'
 const FILES_DIR = 'files'
 const BASELINE_DIR = '.baseline'
+const ASSETS_DIR = 'assets'
 
 /**
  * Compare two Uint8Arrays for equality using 4-byte (Uint32) chunks.
@@ -1939,6 +1940,14 @@ export class WorkspaceRuntime {
    */
   async getFilesDir(): Promise<FileSystemDirectoryHandle> {
     return await this.workspaceDir.getDirectoryHandle(FILES_DIR, { create: true })
+  }
+
+  /**
+   * Get the assets/ directory handle (user uploads & agent-generated files)
+   * This is the mount point for /mnt_assets in Pyodide Python execution
+   */
+  async getAssetsDir(): Promise<FileSystemDirectoryHandle> {
+    return await this.workspaceDir.getDirectoryHandle(ASSETS_DIR, { create: true })
   }
 
   /**

@@ -5,6 +5,9 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { pythonExecutor as runtimePythonExecutor } from '@/python'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
+import { useConversationStore } from '@/store/conversation.store'
+import type { AssetMeta, FileSnapshot } from '@/types/asset'
+import { inferMimeType } from '@/types/asset'
 
 //=============================================================================
 // Tool Definition
@@ -20,10 +23,17 @@ LANGUAGE: python
 - Runs via Pyodide (WebAssembly Python runtime)
 - Built-in packages (auto-loaded): pandas, numpy, matplotlib, openpyxl, pillow, scipy, sklearn
 - For matplotlib: set matplotlib.use('Agg') BEFORE creating figures
-- Files accessible at /mnt/ path (workspace OPFS directory)
-- **IMPORTANT**: The default working directory is /home/pyodide, but /mnt is the OPFS mount. ALWAYS use /mnt/ prefix when reading or writing files, otherwise the file will be lost outside OPFS. Example: \`open('/mnt/output.csv', 'w')\` NOT \`open('output.csv', 'w')\`
-- /mnt/ reads from OPFS, NOT directly from disk. If you see errors like "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
-- Project skill resources (.skills/ directory) are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
+
+Two mounted directories:
+- \`/mnt/\` — workspace project files. Read/write project source files here. ALWAYS use /mnt/ prefix. Example: \`open('/mnt/output.csv', 'w')\`
+- \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here. Example: \`pd.read_csv('/mnt_assets/data.csv')\`
+
+Important:
+- The default working directory is /home/pyodide, which is NOT synced. Files written there will be lost.
+- /mnt/ reads from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
+- For user-uploaded files (CSV, images, etc.), read from /mnt_assets/.
+- For output files you want the user to see (charts, reports), write to /mnt_assets/.
+- Project skill scripts in .skills/ directory are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
   Example: if .skills/word-processor/scripts/convert.py exists, use \`exec(open('/mnt/.skills/word-processor/scripts/convert.py').read())\` or \`import sys; sys.path.insert(0, '/mnt/.skills/word-processor/scripts')\`
 - For packages NOT in the built-in list, use micropip to install from PyPI before importing:
   Example: \`import micropip; await micropip.install('requests'); import requests\`
@@ -76,11 +86,18 @@ async function executePython(
     // Mount OPFS files/ directory to /mnt so Python writes sync to OPFS directly
     const filesDirHandle = await active.conversation.getFilesDir()
 
+    // Mount OPFS assets/ directory to /mnt_assets for asset file I/O
+    const assetsDirHandle = await active.conversation.getAssetsDir()
+
+    // Take assets snapshot BEFORE execution
+    const beforeAssets = await snapshotAssetsDir(assetsDirHandle)
+
     // Execute Python code
     const result = await runtimePythonExecutor.execute({
       code,
       timeout,
       mountDir: filesDirHandle,
+      assetsDir: assetsDirHandle,
     })
 
     // Register OPFS delta into overlay ledger for pending/review/sync.
@@ -90,6 +107,10 @@ async function executePython(
       await active.conversation.registerDetectedChanges(detected.changes, directoryHandle)
     }
     await useConversationContextStore.getState().refreshPendingChanges(true)
+
+    // Take assets snapshot AFTER execution and diff
+    const afterAssets = await snapshotAssetsDir(assetsDirHandle)
+    const newAssets = diffAssets(beforeAssets, afterAssets)
 
     // Format result as string
     let output = ''
@@ -108,6 +129,18 @@ async function executePython(
     if (detected.changes.length > 0) {
       output += `\n[conversation] detected ${detected.changes.length} file change(s)`
     }
+    if (newAssets.length > 0) {
+      output += `\n[assets] generated ${newAssets.length} file(s): ${newAssets.map(a => a.name).join(', ')}`
+
+      // Accumulate assets into the conversation store's collectedAssets
+      // These will be attached to the final assistant message when the draft is committed
+      const activeConvId = useConversationStore.getState().activeConversationId
+      if (activeConvId) {
+        useConversationStore.getState().collectAssets(activeConvId, newAssets)
+      } else {
+        console.warn('[execute.tool] No activeConversationId! Assets will be lost.')
+      }
+    }
 
     return output.trim() || 'Execution completed'
   } catch (error) {
@@ -116,4 +149,58 @@ async function executePython(
     }
     return JSON.stringify({ error: String(error) })
   }
+}
+
+//=============================================================================
+// Assets Snapshot Helpers
+//=============================================================================
+
+/**
+ * Scan the assets directory and build a snapshot map of filename → { size, lastModified }.
+ * Does NOT read file contents — only fetches lightweight File metadata.
+ */
+async function snapshotAssetsDir(
+  dirHandle: FileSystemDirectoryHandle
+): Promise<FileSnapshot> {
+  const snapshot: FileSnapshot = new Map()
+  for await (const entry of dirHandle.values()) {
+    if (entry.kind === 'file') {
+      const file = await (entry as FileSystemFileHandle).getFile()
+      snapshot.set(entry.name, {
+        size: file.size,
+        lastModified: file.lastModified,
+      })
+    }
+  }
+  return snapshot
+}
+
+/**
+ * Diff two snapshots and return AssetMeta[] for new or modified files.
+ * Reads size from the after snapshot; generates a fresh id and timestamp.
+ */
+function diffAssets(
+  before: FileSnapshot,
+  after: FileSnapshot,
+): AssetMeta[] {
+  const assets: AssetMeta[] = []
+  for (const [name, afterEntry] of after) {
+    const beforeEntry = before.get(name)
+    const isNew = !beforeEntry
+    const isModified =
+      beforeEntry !== undefined &&
+      (beforeEntry.size !== afterEntry.size || beforeEntry.lastModified !== afterEntry.lastModified)
+
+    if (isNew || isModified) {
+      assets.push({
+        id: crypto.randomUUID(),
+        name,
+        size: afterEntry.size,
+        mimeType: inferMimeType(name),
+        direction: 'generated',
+        createdAt: Date.now(),
+      })
+    }
+  }
+  return assets
 }

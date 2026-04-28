@@ -5,12 +5,10 @@
 import { structuredPatch } from 'diff'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import type { ReadPolicy } from '@/opfs/types/opfs-types'
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
-import { resolveNativeDirectoryHandle } from './tool-utils'
 
 // ── Fuzzy matching helpers ──────────────────────────────────────────
 
@@ -264,7 +262,7 @@ async function executeSingleEdit(
   const isNoopEdit = oldText === newText
 
   try {
-    const { readFile, writeFile, getPendingChanges } = useOPFSStore.getState()
+    const { getPendingChanges } = useOPFSStore.getState()
     const readFileState = ensureReadFileState(context)
     const target = await resolveVfsTarget(path, context, 'write')
     const readStateKey = getReadStateKey(target)
@@ -279,36 +277,23 @@ async function executeSingleEdit(
     }
 
     let fileContent: string
-    const workspaceDirectoryHandle =
-      target.kind === 'workspace'
-        ? await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
-        : null
 
-    if (target.kind === 'workspace') {
-      const readPolicy: ReadPolicy | undefined =
-        snapshot.source === 'opfs'
-          ? 'prefer_opfs'
-          : snapshot.source === 'native'
-            ? 'prefer_native'
-            : undefined
-      const result = readPolicy
-        ? await readFile(target.path, workspaceDirectoryHandle, context.workspaceId, readPolicy)
-        : await readFile(target.path, workspaceDirectoryHandle, context.workspaceId)
-      const { content } = result
-      if (typeof content !== 'string') {
+    // Read current content via backend (unified for all target kinds)
+    try {
+      const backendResult = await target.backend.readFile(target.path)
+      if (typeof backendResult.content !== 'string') {
         return toolErrorJson(
           'edit',
           'binary_not_supported',
           `Cannot edit binary file: ${path}. Use write to replace the entire file.`
         )
       }
-      fileContent = content
-    } else {
-      const content = await target.agentManager.readPath(target.agentId, target.path)
-      if (content == null) {
+      fileContent = backendResult.content
+    } catch (error) {
+      if (error instanceof Error && error.message?.includes('not found')) {
         return toolErrorJson('edit', 'file_not_found', `File not found: ${path}`)
       }
-      fileContent = content
+      throw error
     }
 
     const isFullRead = snapshot.offset === undefined && snapshot.limit === undefined
@@ -357,10 +342,8 @@ async function executeSingleEdit(
         ? fileContent.split(actualOldText).join(actualNewText)
         : fileContent.replace(actualOldText, actualNewText)
 
-    if (target.kind === 'workspace') {
-      await writeFile(target.path, updatedFile, workspaceDirectoryHandle, context.workspaceId)
-    } else {
-      await target.agentManager.writePath(target.agentId, target.path, updatedFile)
+    if (!isNoopEdit) {
+      await target.backend.writeFile(target.path, updatedFile)
     }
 
     readFileState.set(readStateKey, {
@@ -369,11 +352,11 @@ async function executeSingleEdit(
       offset: undefined,
       limit: undefined,
       isPartialView: false,
-      source: target.kind === 'workspace' ? 'opfs' : 'agent',
+      source: target.backend.label === 'workspace' ? 'opfs' : target.backend.label,
     })
 
     const pendingCount = getPendingChanges().length
-    const status = target.kind === 'workspace' ? 'pending' : 'saved'
+    const status = target.backend.label === 'workspace' ? 'pending' : 'saved'
 
     const patchResult = structuredPatch(path, path, fileContent, updatedFile, '', '', {
       context: 3,
@@ -397,7 +380,7 @@ async function executeSingleEdit(
       status,
       pendingCount,
       message:
-        target.kind === 'workspace'
+        target.backend.label === 'workspace'
           ? isNoopEdit
             ? `File "${path}" already matched requested content. ${pendingCount} change(s) pending review.`
             : `File "${path}" edited. ${pendingCount} change(s) pending review.`

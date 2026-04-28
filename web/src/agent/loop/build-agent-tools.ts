@@ -90,12 +90,20 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
 
         let rawResult = ''
         try {
+          // Resolve effective timeout: respect per-call timeout for tools that declare one
+          // (e.g. python tool accepts a `timeout` parameter). Use the larger of the per-call
+          // value or the global default so we never accidentally reduce a legitimate timeout.
+          let effectiveTimeoutMs: number | null = input.toolExecutionTimeout
+          if (input.toolTimeoutExemptions.has(toolDef.function.name)) {
+            effectiveTimeoutMs = null
+          } else if (typeof args.timeout === 'number' && args.timeout > 0) {
+            effectiveTimeoutMs = Math.min(args.timeout, 300_000) // cap at 5 min for safety
+          }
+
           rawResult = await executeToolWithTimeout({
             toolName: toolDef.function.name,
             args,
-            timeoutMs: input.toolTimeoutExemptions.has(toolDef.function.name)
-              ? null
-              : input.toolExecutionTimeout,
+            timeoutMs: effectiveTimeoutMs,
             runAbortSignal: input.getAbortSignal(),
             externalAbortSignal: toolContextWithUsage.abortSignal,
             execute: (abortSignal) =>

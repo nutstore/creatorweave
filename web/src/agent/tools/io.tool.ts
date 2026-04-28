@@ -242,54 +242,12 @@ async function executeSingleRead(
       ...extra,
     })
 
-    if (target.kind === 'agent') {
-      const content = await target.agentManager.readPath(target.agentId, target.path)
-      if (content == null) {
-        return toolErrorJson('read', 'file_not_found', `File not found: ${path}`)
-      }
-      const size = new TextEncoder().encode(content).length
-      if (maxSize && size > maxSize) {
-        return toolErrorJson(
-          'read',
-          'too_large',
-          `File size ${size} exceeds requested max_size ${maxSize}.`,
-          { details: { path, fileSize: size, maxSize } }
-        )
-      }
-      const totalLines = content.split('\n').length
-      const rendered = applyTextRange(content, options)
-      // Safety limit: cap the actual payload returned to the model.
-      // For range reads, validate the sliced content instead of full file text.
-      const sizeLimitCheck = checkContentSizeLimit(rendered, size, totalLines)
-      if (!sizeLimitCheck.ok) {
-        return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
-          details: { totalLines: sizeLimitCheck.totalLines },
-          hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
-        })
-      }
-      readFileState.set(readStateKey, buildReadStateEntry(rendered, options, 'agent'))
-      // Agent reads don't have real filesystem mtime — use wall clock as approximation
-      recordReadMtime(context, loopCheckResult!.dedupKey, Date.now(), size)
-      return toolOkJson(
-        'read',
-        {
-          path,
-          kind: 'text',
-          content: rendered,
-          metadata: { size, contentType: 'text' },
-          range: {
-            start_line: options.startLine,
-            line_count: options.lineCount,
-          },
-        },
-        buildMeta({ source: 'agent' })
-      )
-    }
-
-    const result = readPolicy
-      ? await readFile(target.path, context.directoryHandle, context.workspaceId, readPolicy)
-      : await readFile(target.path, context.directoryHandle, context.workspaceId)
-    const { content, metadata } = result
+    // ── Unified backend read ──
+    const backendResult = await target.backend.readFile(target.path, {
+      readPolicy: readPolicy as any,
+    })
+    const content = backendResult.content
+    const metadata = { size: backendResult.size, contentType: backendResult.mimeType, mtime: backendResult.mtime }
     if (maxSize && metadata.size > maxSize) {
       return toolErrorJson(
         'read',
@@ -312,10 +270,11 @@ async function executeSingleRead(
       }
       readFileState.set(
         readStateKey,
-        buildReadStateEntry(formatted, options, result.source || 'workspace')
+        buildReadStateEntry(formatted, options, backendResult.source || target.backend.label)
       )
-      // Record mtime for future dedup — OPFS returns metadata.mtime
-      recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
+      // Record mtime for future dedup — backend may provide mtime, otherwise use wall clock
+      const effectiveMtime = backendResult.mtime ?? Date.now()
+      recordReadMtime(context, loopCheckResult!.dedupKey, effectiveMtime, metadata.size)
       return toolOkJson(
         'read',
         {
@@ -328,7 +287,7 @@ async function executeSingleRead(
             line_count: options.lineCount,
           },
         },
-        buildMeta({ source: result.source || 'workspace' })
+        buildMeta({ source: backendResult.source || target.backend.label })
       )
     }
 
@@ -349,7 +308,7 @@ async function executeSingleRead(
         content: base64,
         metadata: { size: metadata.size, contentType: metadata.contentType },
       },
-      buildMeta({ source: result.source || 'workspace' })
+      buildMeta({ source: backendResult.source || target.backend.label })
     )
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
@@ -491,95 +450,76 @@ async function executeBatchRead(
     try {
       const target = await resolveVfsTarget(filePath, context, 'read')
 
-      if (target.kind === 'agent') {
-        const agentContent = await target.agentManager.readPath(target.agentId, target.path)
-        if (agentContent == null) {
-          throw new Error(`File not found: ${filePath}`)
-        }
-        const size = new TextEncoder().encode(agentContent).length
-
-        if (maxSize && size > maxSize) {
-          results.push({
-            path: filePath,
-            success: false,
-            error: {
-              code: 'too_large',
-              message: `file size ${size} exceeds requested max_size ${maxSize}`,
-            },
-            metadata: { size, contentType: 'text' },
-          })
-          errorCount++
-          continue
-        }
-
-        const totalLines = agentContent.split('\n').length
-        const rendered = applyTextRange(agentContent, {
-          startLine: read.start_line,
-          lineCount: read.line_count,
-        })
-        // Safety limit: cap the actual payload returned to the model.
-        const sizeLimitCheck = checkContentSizeLimit(rendered, size, totalLines)
-        if (!sizeLimitCheck.ok) {
-          results.push({
-            path: filePath,
-            success: false,
-            error: {
-              code: 'content_too_large',
-              message:
-                sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
-            },
-            metadata: { size, contentType: 'text' },
-          })
-          errorCount++
-          continue
-        }
-
-        results.push({
-          path: filePath,
-          success: true,
-          kind: 'text',
-          content: rendered,
-          metadata: { size, contentType: 'text' },
-          source: 'agent',
-        })
-        readFileState.set(getReadStateKey(target), {
-          ...buildReadStateEntry(rendered, {
-            startLine: read.start_line,
-            lineCount: read.line_count,
-          }, 'agent'),
-        })
-        successCount++
-        continue
-      }
-
-      let readResult: Awaited<ReturnType<ReturnType<typeof useOPFSStore.getState>['readFile']>>
+      // ── Unified backend read ──
+      let backendResult: import('./vfs-backend').VfsReadResult
       try {
-        readResult = readPolicy
-          ? await readFile(target.path, context.directoryHandle, context.workspaceId, readPolicy)
-          : await readFile(target.path, context.directoryHandle, context.workspaceId)
+        backendResult = await target.backend.readFile(target.path, {
+          readPolicy: readPolicy as any,
+        })
       } catch (error) {
-        if (!isOPFSWorkspaceMiss(error)) {
-          throw error
+        if (!isOPFSWorkspaceMiss(error) || target.backend.label !== 'workspace') {
+          results.push({
+            path: filePath,
+            success: false,
+            error: {
+              code: error instanceof Error && error.message.includes('not found') ? 'file_not_found' : 'internal_error',
+              message: formatToolErrorMessage(error),
+            },
+          })
+          errorCount++
+          continue
         }
+        // OPFS workspace miss — try native fallback
         const fallbackHandle = await getNativeFallbackHandle()
         if (!fallbackHandle) {
-          throw error
+          results.push({
+            path: filePath,
+            success: false,
+            error: { code: 'file_not_found', message: `File not found: ${filePath}` },
+          })
+          errorCount++
+          continue
         }
-        readResult = readPolicy
-          ? await readFile(target.path, fallbackHandle, context.workspaceId, readPolicy)
-          : await readFile(target.path, fallbackHandle, context.workspaceId)
+        try {
+          backendResult = {
+            content: '',
+            size: 0,
+            mimeType: 'text/plain',
+            source: 'native_fallback',
+          }
+          const fallbackResult = readPolicy
+            ? await readFile(target.path, fallbackHandle, context.workspaceId, readPolicy)
+            : await readFile(target.path, fallbackHandle, context.workspaceId)
+          backendResult.content = fallbackResult.content
+          backendResult.size = fallbackResult.metadata.size
+          backendResult.mimeType = fallbackResult.metadata.contentType
+          backendResult.mtime = fallbackResult.metadata.mtime
+          backendResult.source = 'native_fallback'
+        } catch {
+          results.push({
+            path: filePath,
+            success: false,
+            error: { code: 'file_not_found', message: `File not found: ${filePath}` },
+          })
+          errorCount++
+          continue
+        }
       }
-      const { content, metadata } = readResult
 
-      if (maxSize && metadata.size > maxSize) {
+      const content = backendResult.content
+      const size = backendResult.size
+      const contentType = backendResult.mimeType
+      const source = backendResult.source || target.backend.label
+
+      if (maxSize && size > maxSize) {
         results.push({
           path: filePath,
           success: false,
           error: {
             code: 'too_large',
-            message: `file size ${metadata.size} exceeds requested max_size ${maxSize}`,
+            message: `file size ${size} exceeds requested max_size ${maxSize}`,
           },
-          metadata: { size: metadata.size, contentType: metadata.contentType },
+          metadata: { size, contentType },
         })
         errorCount++
         continue
@@ -599,7 +539,7 @@ async function executeBatchRead(
               code: 'range_not_supported_for_binary',
               message: 'start_line/line_count are not supported for binary files',
             },
-            metadata: { size: metadata.size, contentType: metadata.contentType },
+            metadata: { size, contentType },
           })
           errorCount++
           continue
@@ -610,8 +550,8 @@ async function executeBatchRead(
           success: true,
           kind: 'binary_base64',
           content: base64,
-          metadata: { size: metadata.size, contentType: metadata.contentType },
-          source: readResult.source || 'workspace',
+          metadata: { size, contentType },
+          source,
         })
         successCount++
         continue
@@ -623,7 +563,7 @@ async function executeBatchRead(
         lineCount: read.line_count,
       })
       // Safety limit: cap the actual payload returned to the model.
-      const sizeLimitCheck = checkContentSizeLimit(rendered, metadata.size, totalLines)
+      const sizeLimitCheck = checkContentSizeLimit(rendered, size, totalLines)
       if (!sizeLimitCheck.ok) {
         results.push({
           path: filePath,
@@ -632,7 +572,7 @@ async function executeBatchRead(
             code: 'content_too_large',
             message: sizeLimitCheck.error + ' ' + buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
           },
-          metadata: { size: metadata.size, contentType: metadata.contentType },
+          metadata: { size, contentType },
         })
         errorCount++
         continue
@@ -643,14 +583,14 @@ async function executeBatchRead(
         success: true,
         kind: 'text',
         content: rendered,
-        metadata: { size: metadata.size, contentType: metadata.contentType },
-        source: readResult.source || 'workspace',
+        metadata: { size, contentType },
+        source,
       })
       readFileState.set(getReadStateKey(target), {
           ...buildReadStateEntry(rendered, {
             startLine: read.start_line,
             lineCount: read.line_count,
-          }, readResult.source || 'workspace'),
+          }, source),
       })
       successCount++
     } catch (error) {
@@ -693,7 +633,7 @@ async function encodeBinaryContentAsBase64(content: ArrayBuffer | Blob): Promise
 function buildReadStateEntry(
   content: string,
   options: ReadRangeOptions,
-  source: 'workspace' | 'native' | 'opfs' | 'agent' = 'workspace'
+  source: 'workspace' | 'native' | 'opfs' | 'agent' | 'assets' = 'workspace'
 ) {
   const hasRange = hasRangeOptions(options)
   return {
@@ -832,7 +772,7 @@ async function executeSingleWrite(
 
     // Staleness check: warn if file was modified externally since last read
     let stalenessWarning: string | null = null
-    if (target.kind === 'workspace') {
+    if (target.backend.label === 'workspace') {
       try {
         const nativeHandle = await resolveNativeDirectoryHandle(
           context.directoryHandle,
@@ -863,26 +803,28 @@ async function executeSingleWrite(
       ...extra,
     })
 
-    if (target.kind === 'workspace') {
-      const wasCachedBeforeWrite = hasCachedFile(target.path)
-      const writeDirectoryHandle = await resolveNativeDirectoryHandle(
-        context.directoryHandle,
-        context.workspaceId
-      )
-      await writeFile(target.path, content, writeDirectoryHandle, context.workspaceId)
+    // ── Pre-write: determine isNew for non-workspace backends ──
+    const source = target.backend.label
+    if (source !== 'workspace') {
+      isNew = !(await target.backend.exists?.(target.path) ?? true)
+    }
+
+    // ── Unified backend write ──
+    await target.backend.writeFile(target.path, content)
+
+    // Post-write metadata: workspace needs pending tracking
+    if (source === 'workspace') {
       const pendingChanges = getPendingChanges()
       pendingCount = pendingChanges.length
       const pendingType = getPendingWriteTypeForPath(pendingChanges, target.path)
+      const wasCachedBeforeWrite = hasCachedFile(target.path)
       isNew = pendingType ? pendingType === 'create' : !wasCachedBeforeWrite
       status = 'pending'
       message = isNew
         ? `File "${path}" created. ${pendingCount} change(s) pending review.`
         : `File "${path}" updated. ${pendingCount} change(s) pending review.`
     } else {
-      await ensureAgentExistsForWrite(target)
-      const existing = await target.agentManager.readPath(target.agentId, target.path)
-      isNew = existing == null
-      await target.agentManager.writePath(target.agentId, target.path, content)
+      // Agent / Assets backends: isNew was already determined before write (L811-812)
       pendingCount = getPendingChanges().length
       status = 'saved'
       message = isNew ? `File "${path}" created.` : `File "${path}" updated.`
@@ -929,7 +871,7 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
   let created = 0
   let updated = 0
   let hasWorkspaceWrites = false
-  const ensuredAgentIds = new Set<string>()
+
   const writeDirectoryHandle = await resolveNativeDirectoryHandle(
     context.directoryHandle,
     context.workspaceId
@@ -940,8 +882,8 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
       const target = await resolveVfsTarget(file.path, context, 'write')
       const resolvedPath = getResolvedPathForLoopGuard(target)
 
-      // Staleness check (best-effort)
-      if (target.kind === 'workspace') {
+      // Staleness check (best-effort, workspace only)
+      if (target.backend.label === 'workspace') {
         try {
           const fileHandle = await writeDirectoryHandle
             ?.getFileHandle(target.path.split('/').pop()!, { create: false })
@@ -966,17 +908,20 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
 
       let isNew = false
 
-      if (target.kind === 'workspace') {
+      // Pre-write: determine isNew for non-workspace backends
+      if (target.backend.label !== 'workspace') {
+        isNew = !(await target.backend.exists?.(target.path) ?? true)
+      }
+
+      // ── Unified backend write ──
+      await target.backend.writeFile(target.path, file.content)
+
+      // Post-write: workspace needs pending tracking
+      if (target.backend.label === 'workspace') {
         const wasCachedBeforeWrite = hasCachedFile(target.path)
-        await writeFile(target.path, file.content, writeDirectoryHandle, context.workspaceId)
         const pendingType = getPendingWriteTypeForPath(getPendingChanges(), target.path)
         isNew = pendingType ? pendingType === 'create' : !wasCachedBeforeWrite
         hasWorkspaceWrites = true
-      } else {
-        await ensureAgentExistsForWrite(target, ensuredAgentIds)
-        const existing = await target.agentManager.readPath(target.agentId, target.path)
-        isNew = existing == null
-        await target.agentManager.writePath(target.agentId, target.path, file.content)
       }
 
       // Refresh timestamp after successful write
@@ -1018,26 +963,15 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
   })
 }
 
-async function ensureAgentExistsForWrite(target: AgentTarget, cache?: Set<string>): Promise<void> {
-  const cacheKey = `${target.projectId}:${target.agentId}`
-  if (cache?.has(cacheKey)) return
-
-  const exists = await target.agentManager.hasAgent(target.agentId)
-  if (!exists) {
-    await target.agentManager.createAgent(target.agentId)
-  }
-
-  cache?.add(cacheKey)
-}
-
 /**
  * Extract a stable resolved path string for loop guard tracking.
  * For workspace targets: uses the resolved absolute path.
  * For agent targets: constructs a synthetic path for tracking.
  */
 function getResolvedPathForLoopGuard(target: Awaited<ReturnType<typeof resolveVfsTarget>>): string {
-  if (target.kind === 'workspace') {
+  if (target.backend.label === 'workspace') {
     return target.path
   }
-  return `vfs://agents/${target.agentId}/${target.path}`
+  // For agent targets, construct a synthetic path
+  return `vfs://agents/${(target as any).agentId}/${target.path}`
 }

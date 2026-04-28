@@ -1,12 +1,17 @@
 import { ProjectManager, type AgentManager } from '@/opfs'
 import { useAgentsStore } from '@/store/agents.store'
 import type { ToolContext } from './tool-types'
+import type { VfsBackend } from './vfs-backend'
+import { WorkspaceBackend } from './backends/workspace-backend'
+import { AgentBackend } from './backends/agent-backend'
+import { AssetsBackend } from './backends/assets-backend'
 
 export type VfsAction = 'read' | 'write' | 'delete' | 'list'
 
 export interface WorkspaceTarget {
   kind: 'workspace'
   path: string
+  backend: VfsBackend
 }
 
 export interface AgentTarget {
@@ -15,12 +20,19 @@ export interface AgentTarget {
   agentId: string
   projectId: string
   agentManager: AgentManager
+  backend: VfsBackend
 }
 
-export type ResolvedVfsTarget = WorkspaceTarget | AgentTarget
+export interface AssetsTarget {
+  kind: 'assets'
+  path: string
+  backend: VfsBackend
+}
+
+export type ResolvedVfsTarget = WorkspaceTarget | AgentTarget | AssetsTarget
 
 interface ParsedPath {
-  namespace: 'workspace' | 'agents'
+  namespace: 'workspace' | 'agents' | 'assets'
   path: string
   agentId?: string
 }
@@ -113,6 +125,13 @@ function parseVfsPath(
     }
   }
 
+  if (namespace === 'assets' || namespace === 'asset') {
+    return {
+      namespace: 'assets',
+      path: normalizeRelativePath(parts.slice(1).join('/'), { allowEmpty: allowEmptyPath }),
+    }
+  }
+
   throw new Error(`Unsupported vfs namespace: ${namespace || '(empty)'}`)
 }
 
@@ -169,13 +188,24 @@ export async function resolveVfsTarget(
     ...options,
     allowAgentsNamespaceRoot: action === 'list' && (options?.allowEmptyPath ?? false),
   })
+
+  if (parsed.namespace === 'assets') {
+    return {
+      kind: 'assets',
+      path: parsed.path,
+      backend: new AssetsBackend(context.workspaceId),
+    }
+  }
+
   if (parsed.namespace === 'workspace') {
     return {
       kind: 'workspace',
       path: parsed.path,
+      backend: new WorkspaceBackend(context.workspaceId, context.directoryHandle),
     }
   }
 
+  // agents namespace
   const projectId = resolveProjectId(context)
   if (!projectId) {
     throw new Error('No active project for agent namespace path')
@@ -194,12 +224,14 @@ export async function resolveVfsTarget(
     }
   }
 
+  const agentManager = project.agentManager
   return {
     kind: 'agent',
     path: parsed.path,
     agentId: parsed.agentId!,
     projectId,
-    agentManager: project.agentManager,
+    agentManager,
+    backend: new AgentBackend(agentManager, parsed.agentId!),
   }
 }
 

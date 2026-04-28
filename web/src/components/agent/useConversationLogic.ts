@@ -14,6 +14,8 @@ import { useAgentsStore } from '@/store/agents.store'
 import { useT } from '@/i18n'
 import { createUserMessage } from '@/agent/message-types'
 import type { Message } from '@/agent/message-types'
+import { useAssetStore } from '@/store/asset.store'
+import { writePendingAssetsToOPFS } from '@/services/asset.service'
 import { useActiveConversation } from './useActiveConversation'
 
 export function useConversationLogic() {
@@ -192,7 +194,7 @@ export function useConversationLogic() {
         })()
 
   // ── Handlers ──
-  const sendMessage = async (text: string, options?: { agentOverrideId?: string | null }) => {
+  const sendMessage = async (text: string, options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }) => {
     if (!text.trim()) return
     if (!hasApiKey) {
       toast.error(t('conversation.toast.noApiKey'))
@@ -208,7 +210,7 @@ export function useConversationLogic() {
 
     if (isConversationRunning(targetConvId)) return
 
-    const userMsg = createUserMessage(text)
+    const userMsg = createUserMessage(text, options?.assets)
     const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)
     updateMessages(targetConvId, conv ? [...conv.messages, userMsg] : [userMsg])
     setInput('')
@@ -221,7 +223,7 @@ export function useConversationLogic() {
     )
   }
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const inputTrimmed = input.trim()
     let textToSend = inputTrimmed ? input : suggestedFollowUp
     if (textToSend) {
@@ -230,7 +232,23 @@ export function useConversationLogic() {
         const filePrefix = selectedFiles.map((p) => `#${p}`).join(' ')
         textToSend = `${filePrefix} ${textToSend}`
       }
-      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (mentionedAgentIds[0] ?? null) : null })
+
+      // Upload pending assets to OPFS and get AssetMeta[]
+      const { pendingAssets, clearAll } = useAssetStore.getState()
+      let assets = undefined
+      if (pendingAssets.length > 0) {
+        try {
+          assets = await writePendingAssetsToOPFS(
+            pendingAssets.map((a) => ({ name: a.name, file: a.file })),
+          )
+        } catch (err) {
+          toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
+          return // Don't send — user can retry
+        }
+        clearAll()
+      }
+
+      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (mentionedAgentIds[0] ?? null) : null, assets })
       if (!inputTrimmed && convId) clearSuggestedFollowUp(convId)
       setSelectedFiles([])
     }

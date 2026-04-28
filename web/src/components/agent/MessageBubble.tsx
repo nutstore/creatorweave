@@ -13,6 +13,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { CopyButton } from './CopyButton'
 import { RegenerateButton } from './RegenerateButton'
+import { AssetList } from './AssetCard'
 import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
@@ -163,6 +164,13 @@ export function MessageBubble({
             </div>
           )}
 
+          {/* User uploaded assets */}
+          {message.assets && message.assets.length > 0 && (
+            <div className="mt-1">
+              <AssetList assets={message.assets} compact />
+            </div>
+          )}
+
           {/* Timestamp + Copy + Delete buttons */}
           <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-400">
             <span>
@@ -247,6 +255,11 @@ export function MessageBubble({
               <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
             )}
           </div>
+        )}
+
+        {/* Agent generated assets */}
+        {message.assets && message.assets.length > 0 && (
+          <AssetList assets={message.assets} />
         )}
 
         {/* Tool calls */}

@@ -112,7 +112,7 @@ function createDirectoryToolDefinition(name: string, description: string): ToolD
 
 export const lsDefinition: ToolDefinition = createDirectoryToolDefinition(
   'ls',
-  'List directory contents. With pattern: search files matching glob. Without pattern: list tree structure. Supports workspace relative paths and vfs://workspace/... or vfs://agents/{id}/... in path.'
+  'List directory contents. With pattern: search files matching glob. Without pattern: list tree structure. Supports workspace relative paths and vfs://workspace/..., vfs://agents/{id}/..., or vfs://assets/... in path.'
 )
 
 function formatSize(bytes: number): string {
@@ -202,6 +202,14 @@ type DiscoveryScope =
         options?: { allowMissing?: boolean }
       ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
     }
+  | {
+      kind: 'assets'
+      subPath: string
+      resolveHandle: (
+        path: string,
+        options?: { allowMissing?: boolean }
+      ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
+    }
 
 async function resolveDiscoveryScope(
   rawPath: unknown,
@@ -222,6 +230,23 @@ async function resolveDiscoveryScope(
       }
     }
 
+    if (resolved.kind === 'assets') {
+      const assetsHandle = await resolved.backend.getDirectoryHandle?.()
+      if (!assetsHandle) {
+        throw new Error('Assets directory not available.')
+      }
+      return {
+        kind: 'assets',
+        subPath: resolved.path,
+        resolveHandle: (path, options) => resolveDirectoryHandle(assetsHandle, path, options),
+      }
+    }
+
+    if (resolved.kind !== 'agent') {
+      throw new Error(`Unsupported vfs namespace for ls: ${resolved.kind}`)
+    }
+
+    // Agent scope: use backend.getDirectoryHandle() to get root, then resolve sub-paths
     if (!resolved.agentId) {
       return {
         kind: 'agents-root',
@@ -234,10 +259,15 @@ async function resolveDiscoveryScope(
       }
     }
 
+    // Single agent: get root handle from backend, then resolve sub-paths
+    const agentRootHandle = await resolved.backend.getDirectoryHandle?.()
+    if (!agentRootHandle) {
+      throw new Error('Agent directory not available.')
+    }
     return {
       kind: 'agent',
       subPath: resolved.path,
-      resolveHandle: (path, options) => resolved.agentManager.getDirectoryHandle(resolved.agentId, path, options),
+      resolveHandle: (path, options) => resolveDirectoryHandle(agentRootHandle, path, options),
     }
   }
 

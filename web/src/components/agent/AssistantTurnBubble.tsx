@@ -18,6 +18,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
@@ -499,6 +500,7 @@ const AssistantStep = memo(function AssistantStep({
   const t = useT()
   const hasReasoning = !!message.reasoning
   const hasContent = !!message.content
+  const hasAssets = !!(message.assets && message.assets.length > 0)
   const visibleToolCalls =
     message.toolCalls?.filter((tc) => !suppressExecutingToolCallIds?.has(tc.id)) || []
   const hasToolCalls = visibleToolCalls.length > 0
@@ -511,7 +513,7 @@ const AssistantStep = memo(function AssistantStep({
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
       {/* Unified container for reasoning, content, and tool calls */}
-      {(hasReasoning || hasContent || hasToolCalls) && (
+      {(hasReasoning || hasContent || hasToolCalls || hasAssets) && (
         <div className="space-y-2">
           {/* Reasoning section */}
           {hasReasoning && <ReasoningSection reasoning={message.reasoning!} />}
@@ -568,6 +570,11 @@ const AssistantStep = memo(function AssistantStep({
                 <ToolCallDisplay key={tc.id} toolCall={tc} result={toolResults.get(tc.id)} conversationId={conversationId} />
               ))}
             </div>
+          )}
+
+          {/* Assets section (generated charts, images, etc.) */}
+          {message.assets && message.assets.length > 0 && (
+            <AssetCompactList assets={message.assets} />
           )}
         </div>
       )}

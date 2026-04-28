@@ -2,6 +2,13 @@ import type { AgentMessage as PiAgentMessage } from '@mariozechner/pi-agent-core
 import type { Api, Message as PiMessage, Model } from '@mariozechner/pi-ai'
 import { createAssistantMessage, createToolMessage, type Message, type ToolCall } from '../message-types'
 
+/** Format file size for display in asset metadata */
+function formatAssetSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function parseToolArgs(args: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(args) as unknown
@@ -64,10 +71,19 @@ export function internalToPiMessages(
       ]
     }
     if (msg.role === 'user') {
+      // Inject asset metadata into user message so the LLM knows about uploaded files
+      let userContent = msg.content || ''
+      if (msg.assets && msg.assets.length > 0) {
+        const assetLines = msg.assets.map((a) => {
+          const dir = a.direction === 'upload' ? 'Uploaded' : 'Generated'
+          return `- ${dir}: ${a.name} (${a.mimeType}, ${formatAssetSize(a.size)})`
+        })
+        userContent += `\n\n[Attached files]\n${assetLines.join('\n')}\nUse read vfs://assets/<filename> to read file contents.`
+      }
       return [
         {
           role: 'user',
-          content: msg.content || '',
+          content: userContent,
           timestamp: msg.timestamp || Date.now(),
         },
       ]

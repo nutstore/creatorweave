@@ -7,8 +7,9 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
-import { Plus, Trash2, Check, FileIcon } from 'lucide-react'
+import { Plus, Trash2, Check, FileIcon, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useT } from '@/i18n'
+import { useAssetStore, type PendingAsset } from '@/store/asset.store'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -215,6 +216,20 @@ function getMentionedAgentIds(editor: Editor): string[] {
 // Main component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+// ---------------------------------------------------------------------------
+// AgentRichInput
+// ---------------------------------------------------------------------------
+
 export function AgentRichInput({
   ariaLabel,
   placeholder,
@@ -238,6 +253,20 @@ export function AgentRichInput({
   const [isCreatingAgent, setIsCreatingAgent] = useState(false)
   const [newAgentInput, setNewAgentInput] = useState('')
   const [agentSelection, setAgentSelection] = useState(0)
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  // Asset upload state
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { pendingAssets, addFiles, removeAsset } = useAssetStore()
+
+  // Handle files from file picker or drag-drop
+  const handleFiles = useCallback(
+    (fileList: FileList | File[]) => {
+      const files = Array.from(fileList)
+      if (files.length > 0) addFiles(files)
+    },
+    [addFiles],
+  )
 
   // Suggestion state – driven by tiptap Mention/Suggestion
   const [suggestionItems, setSuggestionItems] = useState<AgentMentionCandidate[]>([])
@@ -522,6 +551,8 @@ export function AgentRichInput({
     if (!editor) return
     editor.commands.clearContent()
     setSelectedFiles([])
+    // Clear pending asset uploads when input resets (message sent)
+    useAssetStore.getState().clearAll()
     emitValue(editor)
   }, [editor, emitValue, resetToken])
 
@@ -633,8 +664,63 @@ export function AgentRichInput({
   const showSuggestion = !disabled && suggestionItems.length > 0 && !!suggestionCommand
   const showFileSuggestion = !disabled && fileSuggestionItems.length > 0 && !!fileSuggestionCommand
 
+  // Drag-drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!disabled) setIsDragOver(true)
+  }, [disabled])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+      if (disabled) return
+      if (e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files)
+      }
+    },
+    [disabled, handleFiles],
+  )
+
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag overlay */}
+      {isDragOver && (
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-400 bg-primary-50/80 dark:bg-primary-900/30">
+          <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-300">
+            <Paperclip className="h-8 w-8" />
+            <span className="text-sm font-medium">Drop files here</span>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            handleFiles(e.target.files)
+            // Reset so the same file can be selected again
+            e.target.value = ''
+          }
+        }}
+      />
       <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 w-full rounded-xl border border-neutral-300 bg-white px-5 py-4 pr-14 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
@@ -672,6 +758,46 @@ export function AgentRichInput({
               </div>
             )}
             <EditorContent editor={editor} />
+
+            {/* Pending asset uploads preview */}
+            {pendingAssets.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {pendingAssets.map((asset) => (
+                  <div
+                    key={asset.id}
+                    className="group relative flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-800"
+                  >
+                    {asset.previewUrl ? (
+                      <img
+                        src={asset.previewUrl}
+                        alt={asset.name}
+                        className="h-8 w-8 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">
+                        <ImageIcon className="h-4 w-4 text-neutral-400" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                        {asset.name}
+                      </div>
+                      <div className="text-[10px] text-neutral-400">
+                        {formatFileSize(asset.size)}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-200 dark:hover:bg-neutral-600"
+                      onClick={() => removeAsset(asset.id)}
+                      aria-label={`Remove ${asset.name}`}
+                    >
+                      <X className="h-3.5 w-3.5 text-neutral-500" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
         {!isFocused && isEmpty && (
@@ -681,6 +807,17 @@ export function AgentRichInput({
             {placeholder}
           </div>
         )}
+
+        {/* Upload attachment button */}
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={disabled}
+          className="absolute bottom-3 left-3 rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          title="Attach files"
+        >
+          <Paperclip className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Agent selector dropdown - expands downward */}
