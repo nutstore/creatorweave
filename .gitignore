@@ -85,3 +85,7 @@ docs/design/design-system.md
 docs/design/p0-performance-and-testing.md
 docs/technical-debt-plan.md
 .worktrees
+
+# Browser extension (WXT)
+browser-extension/.output/
+browser-extension/.wxt/

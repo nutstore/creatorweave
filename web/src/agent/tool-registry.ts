@@ -89,6 +89,15 @@ import {
   searchConversationsExecutor,
 } from './tools/search-conversations.tool'
 
+// Web bridge tools (conditional — requires Browser Extension)
+import {
+  isWebBridgeAvailable,
+  webSearchDefinition,
+  webSearchExecutor,
+  webFetchDefinition,
+  webFetchExecutor,
+} from './tools/web-bridge.tool'
+
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
@@ -294,6 +303,32 @@ export class ToolRegistry {
   }
 
   //=============================================================================
+  // Web Bridge Tools (Browser Extension)
+  //=============================================================================
+
+  /**
+   * Register web_search and web_fetch tools if the Browser Extension bridge
+   * (window.__agentWeb) is detected. Safe to call multiple times.
+   */
+  registerWebBridgeTools(): boolean {
+    if (!isWebBridgeAvailable()) return false
+    if (this.has('web_search')) return true // Already registered
+
+    this.register(webSearchDefinition, webSearchExecutor)
+    this.register(webFetchDefinition, webFetchExecutor)
+    console.log('[ToolRegistry] ✅ Web bridge tools registered (Browser Extension detected)')
+    return true
+  }
+
+  /**
+   * Unregister web bridge tools (e.g. when extension is disconnected).
+   */
+  unregisterWebBridgeTools(): void {
+    this.unregister('web_search')
+    this.unregister('web_fetch')
+  }
+
+  //=============================================================================
   // Skill Tools
   //=============================================================================
 
@@ -338,6 +373,13 @@ export function getToolRegistry(): ToolRegistry {
     instance = new ToolRegistry()
     instance.registerBuiltins()
     instance.registerSkillTools()
+    // Conditionally register web bridge tools (Browser Extension)
+    instance.registerWebBridgeTools()
+  } else {
+    // Try to register web bridge tools on every access (extension may have been
+    // installed after page load). registerWebBridgeTools() is idempotent — it
+    // checks both availability and existing registration.
+    instance.registerWebBridgeTools()
   }
   return instance
 }

@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B8A6"/>
+      <stop offset="100%" stop-color="#0D7377"/>
+    </linearGradient>
+    <linearGradient id="weave1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="weave2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+
+  <g fill="#ffffff" opacity="0.12">
+    <circle cx="128" cy="128" r="4"/><circle cx="192" cy="128" r="4"/><circle cx="256" cy="128" r="4"/><circle cx="320" cy="128" r="4"/><circle cx="384" cy="128" r="4"/>
+    <circle cx="128" cy="192" r="4"/><circle cx="192" cy="192" r="4"/><circle cx="256" cy="192" r="4"/><circle cx="320" cy="192" r="4"/><circle cx="384" cy="192" r="4"/>
+    <circle cx="128" cy="256" r="4"/><circle cx="192" cy="256" r="4"/><circle cx="256" cy="256" r="4"/><circle cx="320" cy="256" r="4"/><circle cx="384" cy="256" r="4"/>
+    <circle cx="128" cy="320" r="4"/><circle cx="192" cy="320" r="4"/><circle cx="256" cy="320" r="4"/><circle cx="320" cy="320" r="4"/><circle cx="384" cy="320" r="4"/>
+    <circle cx="128" cy="384" r="4"/><circle cx="192" cy="384" r="4"/><circle cx="256" cy="384" r="4"/><circle cx="320" cy="384" r="4"/><circle cx="384" cy="384" r="4"/>
+  </g>
+
+  <g stroke="url(#weave1)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.9">
+    <path d="M 100 100 C 180 180, 220 220, 256 256"/>
+    <path d="M 160 100 C 220 170, 240 230, 256 256"/>
+    <path d="M 256 256 C 292 292, 332 332, 412 412"/>
+    <path d="M 256 256 C 272 272, 292 332, 352 412"/>
+  </g>
+
+  <g stroke="url(#weave2)" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M 100 412 C 180 332, 220 292, 256 256"/>
+    <path d="M 160 412 C 220 342, 240 282, 256 256"/>
+    <path d="M 256 256 C 292 220, 332 180, 412 100"/>
+    <path d="M 256 256 C 272 240, 292 180, 352 100"/>
+  </g>
+
+  <circle cx="256" cy="256" r="28" fill="url(#glow)" opacity="0.95"/>
+  <circle cx="256" cy="256" r="16" fill="#ffffff" opacity="0.9"/>
+
+  <g fill="#ffffff" opacity="0.5">
+    <circle cx="170" cy="170" r="6"/>
+    <circle cx="342" cy="170" r="6"/>
+    <circle cx="170" cy="342" r="6"/>
+    <circle cx="342" cy="342" r="6"/>
+  </g>
+</svg>

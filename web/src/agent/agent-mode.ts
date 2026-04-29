@@ -54,6 +54,9 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['ask_user_question', { name: 'ask_user_question', category: 'read' }],
   // Subagent orchestration tools (read-only orchestration surface)
   ['search_conversations', { name: 'search_conversations', category: 'read' }],
+  // Web bridge tools (read-only — fetch external info, requires Browser Extension)
+  ['web_search', { name: 'web_search', category: 'read' }],
+  ['web_fetch', { name: 'web_fetch', category: 'read' }],
   ['spawn_subagent', { name: 'spawn_subagent', category: 'read' }],
   ['batch_spawn', { name: 'batch_spawn', category: 'read' }],
   ['send_message_to_subagent', { name: 'send_message_to_subagent', category: 'read' }],
