@@ -46,6 +46,7 @@ export function ConversationView({
   const logic = useConversationLogic()
   const {
     input, setInput, setMentionedAgentIds, setSelectedFiles, inputResetToken, messagesEndRef,
+    draftTextToRestore, onDraftRestored,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     convId, activeMessages, activeDraftAssistant, activeStreamingState,
     activeWorkflowExecution, conversationError, activeContextWindowUsage,
@@ -253,6 +254,7 @@ export function ConversationView({
           <div className="mx-auto flex max-w-3xl flex-col">
             <div className="relative">
               <AgentRichInput
+                key={convId ?? 'new'}
                 placeholder={
                   suggestedFollowUp ||
                   (hasApiKey ? t('conversation.input.placeholder') : t('conversation.input.placeholderNoKey'))
@@ -260,6 +262,8 @@ export function ConversationView({
                 ariaLabel={t('conversation.input.ariaLabel')}
                 disabled={isProcessing || !hasApiKey || disabled}
                 resetToken={inputResetToken}
+                initialText={draftTextToRestore ?? undefined}
+                onDraftRestored={onDraftRestored}
                 agents={mentionAgents}
                 onSearchFiles={debouncedSearchFiles}
                 onSetIsComposing={setIsComposing}

@@ -16,6 +16,7 @@ import { createUserMessage } from '@/agent/message-types'
 import type { Message } from '@/agent/message-types'
 import { useAssetStore } from '@/store/asset.store'
 import { writePendingAssetsToOPFS } from '@/services/asset.service'
+import { useInputDraftStore } from '@/store/input-draft.store'
 import { useActiveConversation } from './useActiveConversation'
 
 export function useConversationLogic() {
@@ -27,6 +28,22 @@ export function useConversationLogic() {
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [inputResetToken, setInputResetToken] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // ── Draft persistence (save/restore across workspace switches) ──
+  const prevConvIdRef = useRef<string | null>(null)
+  // Sync latest values to refs inline (no useEffect delay — safe for render-time reads)
+  const inputRef = useRef(input)
+  const mentionedAgentIdsRef = useRef(mentionedAgentIds)
+  const selectedFilesRef = useRef(selectedFiles)
+  inputRef.current = input
+  mentionedAgentIdsRef.current = mentionedAgentIds
+  selectedFilesRef.current = selectedFiles
+
+  // The draft text to inject into the editor when switching back to a workspace.
+  // This is separate from `input` because Tiptap manages its own content.
+  const [draftTextToRestore, setDraftTextToRestore] = useState<string | null>(null)
+  // Track which convId the draft belongs to, so we can clear it after restore
+  const draftConvIdRef = useRef<string | null>(null)
 
   // ── Agent store ──
   const { directoryHandle } = useAgentStore()
@@ -108,6 +125,52 @@ export function useConversationLogic() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convId])
+
+  // ── Draft save/restore on workspace switch ──
+  useEffect(() => {
+    const prevId = prevConvIdRef.current
+    prevConvIdRef.current = convId
+
+    // Save draft for the previous workspace (if there was one and it changed)
+    if (prevId && prevId !== convId) {
+      useInputDraftStore.getState().saveDraft(prevId, {
+        text: inputRef.current,
+        mentionedAgentIds: mentionedAgentIdsRef.current,
+        selectedFiles: selectedFilesRef.current,
+      })
+    }
+
+    // Restore draft for the new workspace (if one exists)
+    // Uses peekDraft (non-destructive) to survive React StrictMode double-mount
+    if (convId) {
+      const draft = useInputDraftStore.getState().peekDraft(convId)
+      if (draft) {
+        setMentionedAgentIds(draft.mentionedAgentIds)
+        setSelectedFiles(draft.selectedFiles)
+        setDraftTextToRestore(draft.text)
+        draftConvIdRef.current = convId
+      } else {
+        setDraftTextToRestore(null)
+        draftConvIdRef.current = null
+      }
+    } else {
+      setDraftTextToRestore(null)
+      draftConvIdRef.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // setMentionedAgentIds / setSelectedFiles are useState setters (stable refs).
+    // Values are read via refs to avoid stale closures without re-triggering.
+  }, [convId])
+
+  // Stable callback to clear draft after the editor has consumed it
+  const onDraftRestored = useCallback(() => {
+    const id = draftConvIdRef.current
+    if (id) {
+      useInputDraftStore.getState().clearDraft(id)
+      draftConvIdRef.current = null
+    }
+    setDraftTextToRestore(null)
+  }, [])
 
   // ── Initialize agents for mentions ──
   useEffect(() => {
@@ -216,6 +279,10 @@ export function useConversationLogic() {
     setInput('')
     setMentionedAgentIds([])
     setInputResetToken((v) => v + 1)
+    // Clear any draft for this conversation (message sent) and reset restore state
+    useInputDraftStore.getState().clearDraft(targetConvId)
+    setDraftTextToRestore(null)
+    draftConvIdRef.current = null
 
     await runAgent(
       targetConvId, providerType, modelName, maxTokens, directoryHandle,
@@ -279,6 +346,7 @@ export function useConversationLogic() {
   return {
     // Local UI state
     input, setInput, mentionedAgentIds, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef,
+    draftTextToRestore, onDraftRestored,
     // Agent store
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     // Conversation state

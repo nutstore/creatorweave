@@ -37,6 +37,10 @@ interface AgentRichInputProps {
   placeholder: string
   disabled?: boolean
   resetToken?: number
+  /** Initial text to populate the editor with (e.g. restored draft). */
+  initialText?: string
+  /** Called after initialText has been successfully injected into the editor. */
+  onDraftRestored?: () => void
   agents: AgentMentionCandidate[]
   onSubmit: () => void
   onChange: (value: AgentRichInputValue) => void
@@ -235,6 +239,8 @@ export function AgentRichInput({
   placeholder,
   disabled = false,
   resetToken = 0,
+  initialText,
+  onDraftRestored,
   agents,
   onSubmit,
   onChange,
@@ -547,6 +553,7 @@ export function AgentRichInput({
     editor.setEditable(!disabled)
   }, [disabled, editor])
 
+  // ── Clear editor on resetToken change (message sent) ──
   useEffect(() => {
     if (!editor) return
     editor.commands.clearContent()
@@ -555,6 +562,21 @@ export function AgentRichInput({
     useAssetStore.getState().clearAll()
     emitValue(editor)
   }, [editor, emitValue, resetToken])
+
+  // ── Restore initial text (draft) into editor ──
+  // When key={convId} changes, a new editor is created. This effect injects
+  // the draft text on first render. After injection, onDraftRestored clears
+  // the draft so it won't be re-injected if the user manually clears the editor.
+  useEffect(() => {
+    if (!editor || !initialText) return
+    // Only inject when editor is empty — prevents re-injection if user manually
+    // clears the editor and the effect re-runs (e.g. initialText changes).
+    if (editor.isEmpty) {
+      editor.commands.setContent(initialText)
+      emitValue(editor)
+      onDraftRestored?.()
+    }
+  }, [editor, initialText, emitValue, onDraftRestored])
 
   // ---- IME composition tracking -------------------------------------------
   // Notifies parent (ConversationView) so it can suppress file search
