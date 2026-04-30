@@ -389,6 +389,8 @@ export const zhCN = {
       selectProviderFirst: "请先创建并选择一个服务商",
       modelNameRequired: "模型名称不能为空",
       modelAdded: "模型已添加",
+      apiKeyRequired: "请先保存 API Key",
+      modelsRefreshed: "已从 API 刷新模型列表",
     },
 
     // 模型管理
@@ -411,6 +413,7 @@ export const zhCN = {
     modelSelection: {
       useCustomModelName: "手动输入",
       customModelHint: "开启后可输入任意模型名称，适用于新发布的模型",
+      refreshModels: "从 API 刷新模型列表",
     },
 
     // 自定义 Base URL

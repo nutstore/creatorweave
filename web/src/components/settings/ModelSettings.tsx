@@ -28,6 +28,7 @@ import {
   Plus,
   Trash2,
   X,
+  RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
@@ -45,6 +46,7 @@ import type {
   ModelInfo,
   ProviderCategory,
 } from '@/agent/providers/types'
+import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { useT } from '@/i18n'
 import { getInvalidModelAutoEnableDecision } from './model-auto-enable'
 import { BrandInput } from '@creatorweave/ui'
@@ -254,6 +256,21 @@ export function ModelSettings({ open }: ModelSettingsProps) {
   const currentProviderMeta = PROVIDER_META[providerType]
   const activeCustomProvider =
     customProviders.find((provider) => provider.id === activeCustomProviderId) || customProviders[0]
+
+  const providerKey = useMemo(() => {
+    if (providerType !== 'custom') return providerType
+    return activeCustomProvider ? `custom:${activeCustomProvider.id}` : 'custom'
+  }, [providerType, activeCustomProvider])
+
+  // Dynamic model fetching
+  const {
+    models: dynamicModels,
+    source: modelsSource,
+    loading: modelsLoading,
+    error: modelsError,
+    refresh: refreshModels,
+  } = useDynamicModels(providerType, providerKey)
+
   const availableModels = useMemo<ModelInfo[]>(() => {
     if (providerType === 'custom') {
       return (activeCustomProvider?.models || []).map((id) => ({
@@ -263,13 +280,9 @@ export function ModelSettings({ open }: ModelSettingsProps) {
         contextWindow: 128000,
       }))
     }
-    return getModelsForProvider(providerType)
-  }, [providerType, activeCustomProvider])
+    return dynamicModels.length > 0 ? dynamicModels : getModelsForProvider(providerType)
+  }, [providerType, activeCustomProvider, dynamicModels])
 
-  const providerKey = useMemo(() => {
-    if (providerType !== 'custom') return providerType
-    return activeCustomProvider ? `custom:${activeCustomProvider.id}` : 'custom'
-  }, [providerType, activeCustomProvider])
   const selectedModel = useMemo(
     () => availableModels.find((m) => m.id === modelName),
     [availableModels, modelName]
@@ -443,6 +456,26 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     },
     [setModelName]
   )
+
+  const modelsSourceRef = useRef(modelsSource)
+  modelsSourceRef.current = modelsSource
+
+  const handleRefreshModels = useCallback(async () => {
+    const key = await loadApiKey(providerKey)
+    if (!key && providerType !== 'custom') {
+      toast.error(t('settings.toast.apiKeyRequired'))
+      return
+    }
+    const baseUrl =
+      providerType === 'custom'
+        ? activeCustomProvider?.baseUrl || customBaseUrl
+        : LLM_PROVIDER_CONFIGS[providerType]?.baseURL || ''
+    await refreshModels(key || undefined, baseUrl)
+    // Read from ref to get the latest source after async refresh completes
+    if (modelsSourceRef.current === 'dynamic') {
+      toast.success(t('settings.toast.modelsRefreshed'))
+    }
+  }, [providerKey, providerType, activeCustomProvider, customBaseUrl, refreshModels, t])
 
   // Convert temperature (0-1) to slider value (0-100)
   const temperatureValue = Math.round(temperature * 100)
@@ -621,20 +654,49 @@ export function ModelSettings({ open }: ModelSettingsProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium text-primary">{t('settings.modelName')}</label>
-            <label className="flex items-center gap-2 text-xs text-secondary">
-              <input
-                type="checkbox"
-                checked={useCustomModelName}
-                onChange={(e) => {
-                  setUseCustomModelName(e.target.checked)
-                  if (e.target.checked) {
-                    setCustomModelInput(modelName)
-                  }
-                }}
-                className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
-              />
-              {t('settings.modelSelection.useCustomModelName')}
-            </label>
+            <div className="flex items-center gap-2">
+              {/* Model source indicator */}
+              {providerType !== 'custom' && (
+                <>
+                  <span
+                    className={`text-[10px] font-medium ${
+                      modelsSource === 'dynamic'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-tertiary dark:text-muted'
+                    }`}
+                  >
+                    {modelsSource === 'dynamic'
+                      ? `${availableModels.length} models (API)`
+                      : `${availableModels.length} models (default)`}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRefreshModels}
+                    disabled={modelsLoading}
+                    className="text-tertiary hover:text-primary disabled:opacity-50"
+                    title={t('settings.modelSelection.refreshModels')}
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`}
+                    />
+                  </button>
+                </>
+              )}
+              <label className="flex items-center gap-2 text-xs text-secondary">
+                <input
+                  type="checkbox"
+                  checked={useCustomModelName}
+                  onChange={(e) => {
+                    setUseCustomModelName(e.target.checked)
+                    if (e.target.checked) {
+                      setCustomModelInput(modelName)
+                    }
+                  }}
+                  className="h-3.5 w-3.5 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
+                />
+                {t('settings.modelSelection.useCustomModelName')}
+              </label>
+            </div>
           </div>
 
           {useCustomModelName ? (

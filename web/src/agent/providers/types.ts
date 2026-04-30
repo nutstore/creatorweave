@@ -432,7 +432,7 @@ export function getProvidersByCategory(): Record<
   return grouped
 }
 
-/** Get available models for a provider */
+/** Get static model list for a provider (from hardcoded PROVIDER_META) */
 export function getModelsForProvider(providerType: LLMProviderType): ModelInfo[] {
   return PROVIDER_META[providerType]?.models ?? []
 }

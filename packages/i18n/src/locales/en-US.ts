@@ -403,6 +403,8 @@ export const enUS = {
       selectProviderFirst: "Please create and select a provider first",
       modelNameRequired: "Model name cannot be empty",
       modelAdded: "Model added",
+      apiKeyRequired: "Please save an API key first",
+      modelsRefreshed: "Models refreshed from API",
     },
 
     // Model Management
@@ -426,6 +428,7 @@ export const enUS = {
       useCustomModelName: "Manual input",
       customModelHint:
         "Enable to enter any model name, suitable for newly released models",
+      refreshModels: "Refresh models from API",
     },
 
     // Custom Base URL

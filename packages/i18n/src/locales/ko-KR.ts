@@ -394,6 +394,8 @@ export const koKR = {
       selectProviderFirst: "먼저 서비스를 생성하고 선택하세요",
       modelNameRequired: "모델 이름은 비워둘 수 없습니다",
       modelAdded: "모델이 추가되었습니다",
+      apiKeyRequired: "먼저 API Key를 저장하세요",
+      modelsRefreshed: "API에서 모델 목록을 새로고침했습니다",
     },
 
     // 모델 관리
@@ -416,7 +418,8 @@ export const koKR = {
     modelSelection: {
       useCustomModelName: "수동 입력",
       customModelHint:
-        "활성화하면任意の 모델 이름을 입력할 수 있으며, 새로 출시된 모델에 적합합니다",
+        "활성화하면 모든 모델 이름을 입력할 수 있으며, 새로 출시된 모델에 적합합니다",
+      refreshModels: "API에서 모델 목록 새로고침",
     },
 
     // 커스텀 Base URL

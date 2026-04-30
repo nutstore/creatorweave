@@ -402,6 +402,8 @@ export const jaJP = {
       selectProviderFirst: "まずプロバイダーを作成して選択してください",
       modelNameRequired: "モデル名は空にできません",
       modelAdded: "モデルが追加されました",
+      apiKeyRequired: "先にAPI Keyを保存してください",
+      modelsRefreshed: "APIからモデルリストを更新しました",
     },
 
     // モデル管理
@@ -425,6 +427,7 @@ export const jaJP = {
       useCustomModelName: "手動入力",
       customModelHint:
         "有効にすると任意のモデル名を入力でき、新しくリリースされたモデルに最適です",
+      refreshModels: "APIからモデルリストを更新",
     },
 
     // カスタム Base URL
