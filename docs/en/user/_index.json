@@ -24,6 +24,18 @@
       "title": "Sync and Remote Control",
       "file": "sync.md",
       "order": 4
+    },
+    {
+      "slug": "assets",
+      "title": "Assets",
+      "file": "assets.md",
+      "order": 5
+    },
+    {
+      "slug": "project-skills",
+      "title": "Project Skills",
+      "file": "project-skills.md",
+      "order": 6
     }
   ]
 }
