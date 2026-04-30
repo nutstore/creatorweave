@@ -1,0 +1,49 @@
+name: Feature request
+description: Suggest an improvement or new capability for CreatorWeave
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please focus on the user problem and avoid including private data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem description
+      description: What user problem or workflow gap should this solve?
+      placeholder: Describe the current limitation and who it affects.
+    validations:
+      required: true
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: What change would you like to see?
+      placeholder: Describe the desired behavior, UI, API, or workflow.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative designs have you considered?
+    validations:
+      required: false
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add screenshots, links, examples, or related issues if useful. Remove secrets and private data before posting.
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checks
+      options:
+        - label: I searched existing issues and did not find a duplicate feature request.
+          required: true
+        - label: This request does not include secrets, credentials, or private data.
+          required: true
