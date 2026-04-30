@@ -1804,6 +1804,7 @@ export const koKR = {
     renameWorkspace: "워크스페이스 이름 변경",
     pinWorkspace: "워크스페이스 고정",
     unpinWorkspace: "고정 해제",
+    moreActions: "더 보기",
     dragToResizeHeight: "드래그하여 높이 조정",
     centerDot: "중앙 점",
     files: "파일",

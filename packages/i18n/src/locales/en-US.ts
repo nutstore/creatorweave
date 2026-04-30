@@ -1841,6 +1841,7 @@ export const enUS = {
     unarchiveFailed: "Failed to unarchive workspace",
     pinWorkspace: "Pin Workspace",
     unpinWorkspace: "Unpin Workspace",
+    moreActions: "More Actions",
     dragToResizeHeight: "Drag to resize height",
     centerDot: "Center",
     files: "Files",

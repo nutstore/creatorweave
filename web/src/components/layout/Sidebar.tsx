@@ -25,6 +25,11 @@ import {
   BrandDialogFooter,
   BrandDialogHeader,
   BrandDialogTitle,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
@@ -425,166 +430,142 @@ export function Sidebar({
               const isPinned = pinnedIds.includes(conv.id)
 
               return (
-                <div
-                  key={conv.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isActive}
-                  aria-label={t('sidebar.workspaceLabel', { name: conv.title })}
-                  className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
-                    isActive
-                      ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                      : 'hover:bg-hover text-secondary'
-                  }`}
-                  onClick={() => {
-                    if (isEditing) return
-                    setActive(conv.id)
-                    closeMobileSidebar()
-                  }}
-                  onDoubleClick={(e) => {
-                    e.stopPropagation()
-                    startRename(conv.id, conv.title)
-                  }}
-                  onKeyDown={(e) => {
-                    if (isEditing) return
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      setActive(conv.id)
-                      closeMobileSidebar()
-                    }
-                  }}
-                >
-                  {/* Pin indicator icon */}
-                  {isPinned && (
-                    <Pin className="h-3 w-3 shrink-0 text-primary-500" />
-                  )}
-
-                  {/* Running status indicator */}
-                  {isRunning && (
-                    <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
-                  )}
-                  {isEditing ? (
-                    <input
-                      ref={renameInputRef}
-                      type="text"
-                      value={editingTitle}
-                      onChange={(e) => setEditingTitle(e.target.value)}
-                      onCompositionStart={() => setComposing(true)}
-                      onCompositionEnd={() => setComposing(false)}
-                      onKeyDown={(e) => {
+                <ContextMenu key={conv.id}>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={isActive}
+                      aria-label={t('sidebar.workspaceLabel', { name: conv.title })}
+                      className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
+                        isActive
+                          ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          : 'hover:bg-hover text-secondary'
+                      }`}
+                      onClick={() => {
+                        if (isEditing) return
+                        setActive(conv.id)
+                        closeMobileSidebar()
+                      }}
+                      onDoubleClick={(e) => {
                         e.stopPropagation()
-                        if (e.key === 'Enter' && !composing) {
-                          confirmRename()
-                        } else if (e.key === 'Escape') {
-                          cancelRename()
+                        startRename(conv.id, conv.title)
+                      }}
+                      onKeyDown={(e) => {
+                        if (isEditing) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setActive(conv.id)
+                          closeMobileSidebar()
                         }
                       }}
-                      onBlur={confirmRename}
-                      onClick={(e) => e.stopPropagation()}
-                      className="min-w-0 flex-1 rounded border border-primary-300 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
-                      maxLength={100}
-                    />
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate" title={conv.title}>{conv.title}</span>
-                  )}
-                  {pendingReviewCount > 0 && !isEditing && (
-                    <span
-                      className="shrink-0 rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning"
-                      title={t('sidebar.pendingReviewCount', { count: pendingReviewCount })}
                     >
-                      {pendingReviewCount}
-                    </span>
-                  )}
-                  {/* Action buttons - only visible on hover, absolutely positioned so no layout space */}
-                  {!isEditing && (
-                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 rounded-md bg-white/90 px-0.5 py-0.5 opacity-0 shadow-sm backdrop-blur-sm transition-opacity group-hover:opacity-100 dark:bg-card/90">
-                      <BrandButton
-                        iconButton
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          togglePin(conv.id)
-                        }}
-                        title={isPinned ? t('sidebar.unpinWorkspace') : t('sidebar.pinWorkspace')}
-                      >
-                        {isPinned
-                          ? <PinOff className="h-3 w-3" />
-                          : <Pin className="h-3 w-3" />
-                        }
-                      </BrandButton>
-                      <BrandButton
-                        iconButton
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          startRename(conv.id, conv.title)
-                        }}
-                        title={t('sidebar.renameWorkspace')}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </BrandButton>
-                      <BrandButton
-                        iconButton
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setExportConvId(conv.id)
-                        }}
-                        title={t('sidebar.exportWorkspace') || 'Export conversation'}
-                      >
-                        <Download className="h-3 w-3" />
-                      </BrandButton>
-                      <BrandButton
-                        iconButton
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          const { archiveWorkspace, unarchiveWorkspace } = useConversationContextStore.getState()
-                          try {
-                            if (isArchived) {
-                              await unarchiveWorkspace(conv.id)
-                              toast.success(t('sidebar.workspaceUnarchived'))
-                            } else {
-                              await archiveWorkspace(conv.id)
-                              toast.success(t('sidebar.workspaceArchived'))
+                      {/* Pin indicator icon */}
+                      {isPinned && (
+                        <Pin className="h-3 w-3 shrink-0 text-primary-500" />
+                      )}
+
+                      {/* Running status indicator */}
+                      {isRunning && (
+                        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
+                      )}
+                      {isEditing ? (
+                        <input
+                          ref={renameInputRef}
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onCompositionStart={() => setComposing(true)}
+                          onCompositionEnd={() => setComposing(false)}
+                          onKeyDown={(e) => {
+                            e.stopPropagation()
+                            if (e.key === 'Enter' && !composing) {
+                              confirmRename()
+                            } else if (e.key === 'Escape') {
+                              cancelRename()
                             }
-                          } catch (error) {
-                            console.error('[Sidebar] Failed to toggle archive:', error)
-                            toast.error(isArchived ? t('sidebar.unarchiveFailed') : t('sidebar.archiveFailed'))
-                          }
-                        }}
-                        title={isArchived ? t('sidebar.unarchiveWorkspace') : t('sidebar.archiveWorkspace')}
-                      >
-                        {isArchived
-                          ? <ArchiveRestore className="h-3 w-3" />
-                          : <Archive className="h-3 w-3" />
-                        }
-                      </BrandButton>
-                      <BrandButton
-                        iconButton
-                        variant="ghost"
-                        className="h-6 w-6"
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          try {
-                            await deleteConversation(conv.id)
-                            toast.success(t('sidebar.workspaceDeleted'))
-                          } catch (error) {
-                            console.error('[Sidebar] Failed to delete conversation:', error)
-                            toast.error(t('sidebar.deleteWorkspaceFailed'))
-                          }
-                        }}
-                        title={t('sidebar.deleteWorkspace')}
-                      >
-                        <Trash2 className="h-3 w-3 text-danger" />
-                      </BrandButton>
+                          }}
+                          onBlur={confirmRename}
+                          onClick={(e) => e.stopPropagation()}
+                          className="min-w-0 flex-1 rounded border border-primary-300 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
+                          maxLength={100}
+                        />
+                      ) : (
+                        <span className="min-w-0 flex-1 truncate" title={conv.title}>{conv.title}</span>
+                      )}
+                      {pendingReviewCount > 0 && !isEditing && (
+                        <span
+                          className="shrink-0 rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning"
+                          title={t('sidebar.pendingReviewCount', { count: pendingReviewCount })}
+                        >
+                          {pendingReviewCount}
+                        </span>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem
+                      onClick={() => togglePin(conv.id)}
+                    >
+                      {isPinned
+                        ? <PinOff className="mr-2 h-3.5 w-3.5" />
+                        : <Pin className="mr-2 h-3.5 w-3.5" />
+                      }
+                      {isPinned ? t('sidebar.unpinWorkspace') : t('sidebar.pinWorkspace')}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => startRename(conv.id, conv.title)}
+                    >
+                      <Pencil className="mr-2 h-3.5 w-3.5" />
+                      {t('sidebar.renameWorkspace')}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => setExportConvId(conv.id)}
+                    >
+                      <Download className="mr-2 h-3.5 w-3.5" />
+                      {t('sidebar.exportWorkspace') || 'Export'}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onClick={async () => {
+                        const { archiveWorkspace, unarchiveWorkspace } = useConversationContextStore.getState()
+                        try {
+                          if (isArchived) {
+                            await unarchiveWorkspace(conv.id)
+                            toast.success(t('sidebar.workspaceUnarchived'))
+                          } else {
+                            await archiveWorkspace(conv.id)
+                            toast.success(t('sidebar.workspaceArchived'))
+                          }
+                        } catch (error) {
+                          console.error('[Sidebar] Failed to toggle archive:', error)
+                          toast.error(isArchived ? t('sidebar.unarchiveFailed') : t('sidebar.archiveFailed'))
+                        }
+                      }}
+                    >
+                      {isArchived
+                        ? <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
+                        : <Archive className="mr-2 h-3.5 w-3.5" />
+                      }
+                      {isArchived ? t('sidebar.unarchiveWorkspace') : t('sidebar.archiveWorkspace')}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      className="text-danger focus:text-danger"
+                      onClick={async () => {
+                        try {
+                          await deleteConversation(conv.id)
+                          toast.success(t('sidebar.workspaceDeleted'))
+                        } catch (error) {
+                          console.error('[Sidebar] Failed to delete conversation:', error)
+                          toast.error(t('sidebar.deleteWorkspaceFailed'))
+                        }
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-3.5 w-3.5" />
+                      {t('sidebar.deleteWorkspace')}
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               )
             })}
           </div>

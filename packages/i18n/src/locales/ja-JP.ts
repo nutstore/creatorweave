@@ -1822,6 +1822,7 @@ export const jaJP = {
     renameWorkspace: "ワークスペース名を変更",
     pinWorkspace: "ワークスペースをピン留め",
     unpinWorkspace: "ピン留めを解除",
+    moreActions: "その他の操作",
     dragToResizeHeight: "ドラッグして高さを調整",
     centerDot: "センターポイント",
     files: "ファイル",

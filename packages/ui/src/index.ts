@@ -44,6 +44,25 @@ export {
   DropdownMenuRadioGroup,
 } from './components/ui/dropdown-menu'
 
+// ContextMenu - exported for sidebar workspace context menu
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuLabel,
+  ContextMenuShortcut,
+  ContextMenuGroup,
+  ContextMenuPortal,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuCheckboxItem,
+  ContextMenuRadioItem,
+  ContextMenuRadioGroup,
+} from './components/ui/context-menu'
+
 // Tooltip - exported for app toolbar actions
 export {
   Tooltip,
