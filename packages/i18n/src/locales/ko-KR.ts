@@ -1340,6 +1340,8 @@ export const koKR = {
   htmlPreview: {
     preview: "미리보기",
     loading: "로딩 중...",
+    source: "소스",
+    close: "닫기",
   },
 
   // 파일 미리보기
@@ -1353,6 +1355,8 @@ export const koKR = {
     copyContent: "내용 복사",
     close: "닫기",
     binaryFile: "바이너리 파일",
+    preview: "미리보기",
+    source: "소스",
   },
 
   // 최근 파일

@@ -1327,6 +1327,8 @@ export const zhCN = {
   htmlPreview: {
     preview: "预览",
     loading: "加载中...",
+    source: "源码",
+    close: "关闭",
   },
 
   // 文件预览
@@ -1340,6 +1342,8 @@ export const zhCN = {
     copyContent: "复制内容",
     close: "关闭",
     binaryFile: "二进制文件",
+    preview: "预览",
+    source: "源码",
   },
 
   // Phase 4: 工作区功能

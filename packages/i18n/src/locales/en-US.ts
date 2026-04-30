@@ -1354,6 +1354,8 @@ export const enUS = {
   htmlPreview: {
     preview: "Preview",
     loading: "Loading...",
+    source: "Source",
+    close: "Close",
   },
 
   // File Preview
@@ -1367,6 +1369,8 @@ export const enUS = {
     copyContent: "Copy content",
     close: "Close",
     binaryFile: "Binary file",
+    preview: "Preview",
+    source: "Source",
   },
 
   // Phase 4: Workspace Features

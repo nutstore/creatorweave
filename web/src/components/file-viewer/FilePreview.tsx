@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { X, FileText, Copy, Check } from 'lucide-react'
+import { X, FileText, Copy, Check, Eye, Code } from 'lucide-react'
 import { Editor } from '@monaco-editor/react'
 import { formatBytes } from '@/lib/utils'
 import { useT } from '@/i18n'
@@ -72,10 +72,14 @@ const TEXT_EXTS = new Set([
   'lock', 'gitignore', 'editorconfig', 'dockerfile', 'makefile',
 ])
 
-function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' {
+/** HTML extensions for rendered preview */
+const HTML_EXTS = new Set(['html', 'htm'])
+
+function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   if (IMAGE_EXTS.has(ext)) return 'image'
   if (DOCX_EXTS.has(ext)) return 'docx'
+  if (HTML_EXTS.has(ext)) return 'html'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
   // Unknown extension - try text
@@ -95,11 +99,34 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
   const docxContainerRef = useRef<HTMLDivElement>(null)
+  // HTML preview: toggle between rendered preview and source code
+  const [previewMode, setPreviewMode] = useState<'preview' | 'source'>('source')
   const [isDark, setIsDark] = useState(
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   )
 
   const fileType = useMemo(() => (filePath ? getFileType(filePath) : 'text'), [filePath])
+
+  // Create blob URL for HTML preview
+  const htmlBlobUrl = useMemo(() => {
+    if (fileType !== 'html' || !content) return null
+    const blob = new Blob([content], { type: 'text/html' })
+    return URL.createObjectURL(blob)
+  }, [fileType, content])
+
+  // Clean up HTML blob URL
+  useEffect(() => {
+    return () => {
+      if (htmlBlobUrl) {
+        URL.revokeObjectURL(htmlBlobUrl)
+      }
+    }
+  }, [htmlBlobUrl])
+
+  // Reset preview mode when file changes
+  useEffect(() => {
+    setPreviewMode('preview')
+  }, [filePath])
 
   // Track dark mode changes
   useEffect(() => {
@@ -315,6 +342,35 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-500">{formatBytes(fileSize)}</span>
         </div>
         <div className="flex items-center gap-1">
+          {/* HTML preview/source toggle */}
+          {fileType === 'html' && content && !loading && !error && (
+            <div className="flex items-center rounded border border-neutral-200 dark:border-neutral-600">
+              <button
+                type="button"
+                onClick={() => setPreviewMode('preview')}
+                className={`rounded-l px-1.5 py-0.5 text-[10px] ${
+                  previewMode === 'preview'
+                    ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
+                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                }`}
+                title={t('filePreview.preview')}
+              >
+                <Eye className="h-3 w-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode('source')}
+                className={`rounded-r px-1.5 py-0.5 text-[10px] ${
+                  previewMode === 'source'
+                    ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
+                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                }`}
+                title={t('filePreview.source')}
+              >
+                <Code className="h-3 w-3" />
+              </button>
+            </div>
+          )}
           {content && (
             <button
               type="button"
@@ -370,8 +426,18 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           </div>
         )}
 
-        {/* Monaco Editor for text files */}
-        {content && fileType === 'text' && !loading && !error && (
+        {/* HTML rendered preview */}
+        {fileType === 'html' && previewMode === 'preview' && htmlBlobUrl && !loading && !error && (
+          <iframe
+            src={htmlBlobUrl}
+            title="HTML Preview"
+            className="h-full w-full border-0 bg-white"
+            sandbox="allow-scripts allow-same-origin"
+          />
+        )}
+
+        {/* Monaco Editor for text files and HTML source view */}
+        {content && ((fileType === 'text') || (fileType === 'html' && previewMode === 'source')) && !loading && !error && (
           <Editor
             height="100%"
             language={language}

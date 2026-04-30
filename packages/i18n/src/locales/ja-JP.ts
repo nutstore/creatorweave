@@ -1353,6 +1353,8 @@ export const jaJP = {
   htmlPreview: {
     preview: "プレビュー",
     loading: "読み込み中...",
+    source: "ソース",
+    close: "閉じる",
   },
 
   // ファイルプレビュー
@@ -1367,6 +1369,8 @@ export const jaJP = {
     copyContent: "コンテンツをコピー",
     close: "閉じる",
     binaryFile: "バイナリファイル",
+    preview: "プレビュー",
+    source: "ソース",
   },
 
   // 最近使ったファイル

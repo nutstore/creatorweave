@@ -4,15 +4,22 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { FileText, Image, Download, X } from 'lucide-react'
+import { FileText, Image, Download, X, Eye } from 'lucide-react'
 import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { ImageLightbox } from '@/components/ui/image-lightbox'
+import { HTMLLightbox } from '@/components/ui/html-lightbox'
+import { useT } from '@/i18n'
 
 /** Check if a MIME type is an image */
 function isImageMime(mime: string): boolean {
   return mime.startsWith('image/')
+}
+
+/** Check if a MIME type is previewable HTML */
+function isHtmlMime(mime: string): boolean {
+  return mime === 'text/html'
 }
 
 /** Format file size for display */
@@ -75,11 +82,15 @@ interface AssetCardProps {
 }
 
 export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) {
+  const t = useT()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
+  const isHtml = isHtmlMime(mime)
 
   const imageUrlRef = useRef<string | null>(null)
 
@@ -97,6 +108,19 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
       setLoading(false)
     }
   }, [asset.name, loading])
+
+  const handlePreviewHtml = useCallback(async () => {
+    if (htmlUrl) {
+      setHtmlLightboxOpen(true)
+      return
+    }
+    const blob = await readAssetBlob(asset.name)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      setHtmlUrl(url)
+      setHtmlLightboxOpen(true)
+    }
+  }, [asset.name, htmlUrl])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -167,6 +191,15 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
         />
       )}
 
+      {/* HTML preview lightbox */}
+      {htmlLightboxOpen && htmlUrl && (
+        <HTMLLightbox
+          src={htmlUrl}
+          title={asset.name}
+          onClose={() => setHtmlLightboxOpen(false)}
+        />
+      )}
+
       {/* File info row */}
       <div className="flex items-center gap-2 px-3 py-2">
         <AssetIcon mimeType={mime} />
@@ -179,6 +212,17 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
             {asset.direction === 'upload' ? ' • uploaded' : ' • generated'}
           </div>
         </div>
+        {/* Preview button for HTML files */}
+        {isHtml && (
+          <button
+            type="button"
+            onClick={handlePreviewHtml}
+            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+            title={t('filePreview.preview')}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        )}
         <button
           type="button"
           onClick={handleDownload}
@@ -247,10 +291,14 @@ export function AssetCompactList({ assets }: { assets: AssetMeta[] }) {
 
 /** Single row in the compact list */
 function AssetCompactRow({ asset }: { asset: AssetMeta }) {
+  const t = useT()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
+  const isHtml = isHtmlMime(mime)
 
   // Load thumbnail for images
   useEffect(() => {
@@ -267,6 +315,19 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
   const handleDownload = useCallback(() => {
     downloadAsset(asset)
   }, [asset])
+
+  const handlePreviewHtml = useCallback(async () => {
+    if (htmlUrl) {
+      setHtmlLightboxOpen(true)
+      return
+    }
+    const blob = await readAssetBlob(asset.name)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      setHtmlUrl(url)
+      setHtmlLightboxOpen(true)
+    }
+  }, [asset.name, htmlUrl])
 
   return (
     <>
@@ -303,6 +364,18 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
         >
           <Download className="h-3.5 w-3.5" />
         </button>
+
+        {/* Preview button for HTML files */}
+        {isHtml && (
+          <button
+            type="button"
+            onClick={handlePreviewHtml}
+            className="flex-shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-600 dark:hover:text-neutral-300"
+            title={t('filePreview.preview')}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Lightbox for image preview */}
@@ -311,6 +384,15 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
           src={imageUrl}
           title={asset.name}
           onClose={() => setLightboxOpen(false)}
+        />
+      )}
+
+      {/* HTML preview lightbox */}
+      {htmlLightboxOpen && htmlUrl && (
+        <HTMLLightbox
+          src={htmlUrl}
+          title={asset.name}
+          onClose={() => setHtmlLightboxOpen(false)}
         />
       )}
     </>
