@@ -30,6 +30,7 @@ export function useConversationLogic() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isUserAtBottomRef = useRef(true)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
 
   // ── Draft persistence (save/restore across workspace switches) ──
   const prevConvIdRef = useRef<string | null>(null)
@@ -207,8 +208,9 @@ export function useConversationLogic() {
     if (!el) return
     const handleScroll = () => {
       const threshold = 80 // px from bottom
-      isUserAtBottomRef.current =
-        el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
+      isUserAtBottomRef.current = atBottom
+      setShowScrollToBottom(!atBottom)
     }
     el.addEventListener('scroll', handleScroll, { passive: true })
     return () => el.removeEventListener('scroll', handleScroll)
@@ -222,6 +224,12 @@ export function useConversationLogic() {
     lastRenderedMessageCountRef.current = activeMessagesLength
     messagesEndRef.current?.scrollIntoView({ behavior })
   }, [activeMessagesLength, status])
+
+  // Scroll-to-bottom handler (for the floating button)
+  const scrollToBottom = useCallback(() => {
+    isUserAtBottomRef.current = true
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   // ── Tool results map ──
   const buildToolResultsMap = useCallback((messages: Message[]) => {
@@ -366,6 +374,7 @@ export function useConversationLogic() {
   return {
     // Local UI state
     input, setInput, mentionedAgentIds, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef, scrollContainerRef,
+    showScrollToBottom, scrollToBottom,
     draftTextToRestore, onDraftRestored,
     // Agent store
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,

@@ -1073,6 +1073,7 @@ export const jaJP = {
       stop: "停止",
       send: "送信",
       deleteTurn: "このターンを削除",
+      scrollToBottom: "下にスクロール",
     },
     toast: {
       noApiKey: "まず設定で API Key を設定してください",

@@ -1050,6 +1050,7 @@ export const zhCN = {
       stop: "停止",
       send: "发送",
       deleteTurn: "删除此轮对话",
+      scrollToBottom: "滚动到底部",
     },
     // 提示
     toast: {

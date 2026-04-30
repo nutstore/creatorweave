@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Send, StopCircle } from 'lucide-react'
+import { Send, StopCircle, ChevronDown } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput } from './AgentRichInput'
@@ -46,6 +46,7 @@ export function ConversationView({
   const logic = useConversationLogic()
   const {
     input, setInput, setMentionedAgentIds, setSelectedFiles, inputResetToken, messagesEndRef, scrollContainerRef,
+    showScrollToBottom, scrollToBottom,
     draftTextToRestore, onDraftRestored,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     convId, activeMessages, activeDraftAssistant, activeStreamingState,
@@ -213,7 +214,8 @@ export function ConversationView({
     >
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
         {/* Messages area */}
-        <div ref={scrollContainerRef} className="custom-scrollbar min-h-0 flex-1 overflow-y-auto">
+        <div className="relative min-h-0 flex-1">
+          <div ref={scrollContainerRef} className="custom-scrollbar absolute inset-0 overflow-y-auto">
           {activeMessages.length === 0 && !isProcessing ? (
             <ConversationEmptyState />
           ) : (
@@ -239,6 +241,19 @@ export function ConversationView({
             />
           )}
         </div>
+
+        {/* Scroll-to-bottom floating button */}
+        {showScrollToBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="absolute bottom-3 right-4 rounded-full bg-neutral-800/70 p-2 text-white shadow-lg backdrop-blur-sm transition-opacity hover:bg-neutral-700/80 dark:bg-neutral-200/70 dark:text-neutral-900 dark:hover:bg-neutral-200/90"
+            title={t('conversation.buttons.scrollToBottom')}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        )}
+      </div>
 
         {conversationError && (
           <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">

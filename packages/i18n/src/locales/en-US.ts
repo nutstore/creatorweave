@@ -1070,6 +1070,7 @@ export const enUS = {
       stop: "Stop",
       send: "Send",
       deleteTurn: "Delete this turn",
+      scrollToBottom: "Scroll to bottom",
     },
     // Toast
     toast: {

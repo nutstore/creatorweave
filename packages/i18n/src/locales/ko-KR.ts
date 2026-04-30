@@ -1061,6 +1061,7 @@ export const koKR = {
       stop: "중지",
       send: "전송",
       deleteTurn: "이 턴 삭제",
+      scrollToBottom: "하단으로 스크롤",
     },
     toast: {
       noApiKey: "먼저 설정에서 API Key를 구성하세요",
