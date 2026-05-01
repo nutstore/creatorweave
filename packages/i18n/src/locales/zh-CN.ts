@@ -55,6 +55,7 @@ export const zhCN = {
     deleteFailed: "删除失败，请稍后重试",
     // Database refresh dialog
     databaseConnectionLost: "数据库连接已断开",
+    databaseConnectionLostDescription: "刷新页面以重新连接本地数据库。",
     whatHappened: "发生了什么？",
     databaseHandleInvalidExplanation:
       "浏览器标签页休眠后，数据库文件句柄失效。这是浏览器的正常行为。",
@@ -64,6 +65,7 @@ export const zhCN = {
     dataStoredInOPFS: "数据存储在浏览器的 OPFS 中，只是暂时无法访问。",
     willAutoRecoverAfterRefresh: "刷新页面后将自动恢复数据库连接。",
     refreshPage: "刷新页面",
+    refreshPageParenthetical: "（刷新页面）",
     cannotCloseDialog: "此对话框无法关闭 - 请点击上方按钮刷新页面",
     databaseInitFailed: "数据库初始化失败",
     databaseResetExplanation:

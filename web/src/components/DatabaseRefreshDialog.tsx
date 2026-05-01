@@ -59,7 +59,7 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
         {/* Header */}
         <div className="px-6 py-4 text-center">
           <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{t('app.databaseConnectionLost')}</h3>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Database Connection Lost</p>
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">{t('app.databaseConnectionLostDescription')}</p>
         </div>
 
         {/* Content */}
@@ -91,7 +91,7 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
             className="w-full rounded-lg bg-primary-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
           >
             {t('app.refreshPage')}
-            <span className="ml-2 text-sm opacity-80">(Refresh Page)</span>
+            <span className="ml-2 text-sm opacity-80">{t('app.refreshPageParenthetical')}</span>
           </button>
           <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
             {t('app.cannotCloseDialog')}

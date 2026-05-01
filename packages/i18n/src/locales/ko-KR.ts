@@ -59,6 +59,7 @@ export const koKR = {
     deleteFailed: "삭제에 실패했습니다. 나중에 다시 시도해 주세요",
     // Database refresh dialog
     databaseConnectionLost: "데이터베이스 연결이 끊어졌습니다",
+    databaseConnectionLostDescription: "페이지를 새로고침하여 로컬 데이터베이스에 다시 연결하세요.",
     whatHappened: "무슨 일이 발생했나요?",
     databaseHandleInvalidExplanation:
       "브라우저 탭이 최대 절전 모드 후 데이터베이스 파일 핸들이 무효가 됩니다. 이는 정상적인 브라우저 동작입니다.",
@@ -70,6 +71,7 @@ export const koKR = {
     willAutoRecoverAfterRefresh:
       "페이지를 새로고침하면 데이터베이스 연결이 자동으로 복원됩니다.",
     refreshPage: "페이지 새로고침",
+    refreshPageParenthetical: "(페이지 새로고침)",
     cannotCloseDialog:
       "이 대화상자는 닫을 수 없습니다 - 위 버튼을 클릭하여 페이지를 새로고침해 주세요",
     databaseInitFailed: "데이터베이스 초기화 실패",
