@@ -60,6 +60,7 @@ export const jaJP = {
     deleteFailed: "削除に失敗しました。しばらくしてから再試行してください",
     // Database refresh dialog
     databaseConnectionLost: "データベース接続が切断されました",
+    databaseConnectionLostDescription: "ページを更新してローカルデータベースに再接続してください。",
     whatHappened: "何が発生しましたか？",
     databaseHandleInvalidExplanation:
       "ブラウザタブが休止状態になると、データベースファイルハンドルが無効になります。これは通常のブラウザ動作です。",
@@ -71,6 +72,7 @@ export const jaJP = {
     willAutoRecoverAfterRefresh:
       "ページを更新すると、データベース接続は自動的に回復します。",
     refreshPage: "ページを更新",
+    refreshPageParenthetical: "（ページを更新）",
     cannotCloseDialog:
       "このダイアログは閉じられません - 上のボタンをクリックしてページを更新してください",
     databaseInitFailed: "データベースの初期化に失敗しました",

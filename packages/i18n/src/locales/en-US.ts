@@ -57,6 +57,7 @@ export const enUS = {
     deleteFailed: "Failed to delete, please try again later",
     // Database refresh dialog
     databaseConnectionLost: "Database connection lost",
+    databaseConnectionLostDescription: "Refresh the page to reconnect to the local database.",
     whatHappened: "What happened?",
     databaseHandleInvalidExplanation:
       "After browser tab hibernation, the database file handle becomes invalid. This is normal browser behavior.",
@@ -68,6 +69,7 @@ export const enUS = {
     willAutoRecoverAfterRefresh:
       "Database connection will automatically recover after page refresh.",
     refreshPage: "Refresh Page",
+    refreshPageParenthetical: "(Refresh Page)",
     cannotCloseDialog:
       "This dialog cannot be closed - please click the button above to refresh the page",
     // Storage loading screen
