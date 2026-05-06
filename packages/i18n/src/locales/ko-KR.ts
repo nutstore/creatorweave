@@ -1805,6 +1805,7 @@ export const koKR = {
     createFirstWorkspace: "첫 번째 워크스페이스 만들기",
     deleteWorkspaceFailed: "워크스페이스 삭제 실패",
     deleteWorkspace: "워크스페이스 삭제",
+    confirmDeleteWorkspace: '"{name}" 워크스페이스를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.',
     renameWorkspace: "워크스페이스 이름 변경",
     pinWorkspace: "워크스페이스 고정",
     unpinWorkspace: "고정 해제",

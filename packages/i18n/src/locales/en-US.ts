@@ -1845,6 +1845,7 @@ export const enUS = {
     createFirstWorkspace: "Create First Workspace",
     deleteWorkspaceFailed: "Failed to delete workspace",
     deleteWorkspace: "Delete Workspace",
+    confirmDeleteWorkspace: 'Are you sure you want to delete workspace "{name}"? This cannot be undone.',
     renameWorkspace: "Rename Workspace",
     archiveWorkspace: "Archive Workspace",
     unarchiveWorkspace: "Unarchive Workspace",

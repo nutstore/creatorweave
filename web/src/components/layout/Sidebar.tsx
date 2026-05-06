@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -171,6 +172,9 @@ export function Sidebar({
   const [editingTitle, setEditingTitle] = useState('')
   const [composing, setComposing] = useState(false)
   const [exportConvId, setExportConvId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [confirmDeletePos, setConfirmDeletePos] = useState<{ x: number; y: number } | null>(null)
+  const deleteConfirmRef = useRef<HTMLDivElement>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
   const closeMobileSidebar = useCallback(() => {
@@ -230,6 +234,32 @@ export function Sidebar({
       setCollapsed(false)
     }
   }, [isMobile, collapsed])
+
+  // Close delete confirmation when clicking outside
+  useEffect(() => {
+    if (!confirmDeleteId) return
+
+    const handleClick = (e: MouseEvent) => {
+      if (deleteConfirmRef.current && !deleteConfirmRef.current.contains(e.target as Node)) {
+        setConfirmDeleteId(null)
+        setConfirmDeletePos(null)
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setConfirmDeleteId(null)
+        setConfirmDeletePos(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [confirmDeleteId])
 
   // Refresh pending changes when switching to pending tab
   const refreshPending = useCallback(async () => {
@@ -469,6 +499,24 @@ export function Sidebar({
                       {isRunning && (
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
                       )}
+
+                      {/* Delete button - visible on hover */}
+                      <button
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded border border-danger/30 bg-danger/10 p-0.5 opacity-0 text-danger transition-all hover:border-danger/50 hover:bg-danger/20 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-1"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          setConfirmDeleteId(conv.id)
+                          // Get button position for portal
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          setConfirmDeletePos({ x: rect.left, y: rect.top })
+                        }}
+                        title={t('sidebar.deleteWorkspace')}
+                        aria-label={t('sidebar.deleteWorkspace')}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+
                       {isEditing ? (
                         <input
                           ref={renameInputRef}
@@ -752,6 +800,51 @@ export function Sidebar({
           }}
           conversationId={exportConvId}
         />
+      )}
+
+      {/* Delete confirmation portal - rendered at body level */}
+      {confirmDeleteId && confirmDeletePos && createPortal(
+        <div
+          ref={deleteConfirmRef}
+          className="fixed z-[9999] rounded-lg border border-danger/30 bg-card p-3 shadow-xl"
+          style={{
+            left: Math.max(8, confirmDeletePos.x - 80),
+            top: Math.max(8, confirmDeletePos.y - 60),
+          }}
+        >
+          <p className="mb-2 text-xs text-secondary">
+            {t('sidebar.confirmDeleteWorkspace', { name: displayedConversations.find(c => c.id === confirmDeleteId)?.title || '' })}
+          </p>
+          <div className="flex gap-2">
+            <button
+              className="rounded border border-danger/30 bg-danger/10 px-3 py-1 text-xs text-danger hover:bg-danger/20"
+              onClick={() => {
+                if (confirmDeleteId) {
+                  deleteConversation(confirmDeleteId)
+                    .then(() => toast.success(t('sidebar.workspaceDeleted')))
+                    .catch((error) => {
+                      console.error('[Sidebar] Failed to delete conversation:', error)
+                      toast.error(t('sidebar.deleteWorkspaceFailed'))
+                    })
+                }
+                setConfirmDeleteId(null)
+                setConfirmDeletePos(null)
+              }}
+            >
+              {t('common.delete')}
+            </button>
+            <button
+              className="rounded border border-neutral-200 bg-white px-3 py-1 text-xs text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+              onClick={() => {
+                setConfirmDeleteId(null)
+                setConfirmDeletePos(null)
+              }}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </>
   )

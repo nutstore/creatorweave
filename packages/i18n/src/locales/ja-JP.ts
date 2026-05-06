@@ -1823,6 +1823,7 @@ export const jaJP = {
     createFirstWorkspace: "最初のワークスペースを作成",
     deleteWorkspaceFailed: "ワークスペースの削除に失敗しました",
     deleteWorkspace: "ワークスペースを削除",
+    confirmDeleteWorkspace: 'ワークスペース"{name}"を削除してもよろしいですか？この操作は取り消せません。',
     renameWorkspace: "ワークスペース名を変更",
     pinWorkspace: "ワークスペースをピン留め",
     unpinWorkspace: "ピン留めを解除",
