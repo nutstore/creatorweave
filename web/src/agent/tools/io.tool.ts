@@ -18,7 +18,7 @@ import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import {
   checkReadLoop,
@@ -325,14 +325,13 @@ async function executeSingleRead(
           throw error
         }
         const readStateKey = getReadStateKey(target)
-        const nativeHandle = await resolveNativeDirectoryHandle(
-          context.directoryHandle,
-          context.workspaceId
+        const { handle: nativeHandle, nativePath } = await resolveNativeDirectoryHandleForPath(
+          target.path, context.directoryHandle, context.workspaceId
         )
         if (nativeHandle) {
           const result = readPolicy
-            ? await readFile(target.path, nativeHandle, context.workspaceId, readPolicy)
-            : await readFile(target.path, nativeHandle, context.workspaceId)
+            ? await readFile(nativePath, nativeHandle, context.workspaceId, readPolicy)
+            : await readFile(nativePath, nativeHandle, context.workspaceId)
           const { content, metadata } = result
           if (maxSize && metadata.size > maxSize) {
             return toolErrorJson(
@@ -430,17 +429,23 @@ async function executeBatchRead(
   const { readFile } = useOPFSStore.getState()
   const readFileState = ensureReadFileState(context)
   let nativeFallbackHandle: FileSystemDirectoryHandle | null | undefined
-  const getNativeFallbackHandle = async (): Promise<FileSystemDirectoryHandle | null> => {
-    if (nativeFallbackHandle !== undefined) return nativeFallbackHandle
+  let nativeFallbackPath: string | undefined
+  const getNativeFallbackHandleForPath = async (path: string): Promise<{ handle: FileSystemDirectoryHandle | null; nativePath: string }> => {
+    if (nativeFallbackHandle !== undefined && nativeFallbackPath !== undefined) {
+      return { handle: nativeFallbackHandle, nativePath: path }
+    }
     try {
-      nativeFallbackHandle = await resolveNativeDirectoryHandle(
-        context.directoryHandle,
-        context.workspaceId
+      const resolved = await resolveNativeDirectoryHandleForPath(
+        path, context.directoryHandle, context.workspaceId
       )
+      nativeFallbackHandle = resolved.handle
+      nativeFallbackPath = resolved.nativePath
+      return resolved
     } catch {
       nativeFallbackHandle = null
+      nativeFallbackPath = path
+      return { handle: null, nativePath: path }
     }
-    return nativeFallbackHandle
   }
   const results: Array<{
     path: string
@@ -482,7 +487,7 @@ async function executeBatchRead(
           continue
         }
         // OPFS workspace miss — try native fallback
-        const fallbackHandle = await getNativeFallbackHandle()
+        const { handle: fallbackHandle, nativePath: fallbackNativePath } = await getNativeFallbackHandleForPath(target.path)
         if (!fallbackHandle) {
           results.push({
             path: filePath,
@@ -500,8 +505,8 @@ async function executeBatchRead(
             source: 'native_fallback',
           }
           const fallbackResult = readPolicy
-            ? await readFile(target.path, fallbackHandle, context.workspaceId, readPolicy)
-            : await readFile(target.path, fallbackHandle, context.workspaceId)
+            ? await readFile(fallbackNativePath, fallbackHandle, context.workspaceId, readPolicy)
+            : await readFile(fallbackNativePath, fallbackHandle, context.workspaceId)
           backendResult.content = fallbackResult.content
           backendResult.size = fallbackResult.metadata.size
           backendResult.mimeType = fallbackResult.metadata.contentType
@@ -804,13 +809,12 @@ async function executeSingleWrite(
     let stalenessWarning: string | null = null
     if (target.backend.label === 'workspace') {
       try {
-        const nativeHandle = await resolveNativeDirectoryHandle(
-          context.directoryHandle,
-          context.workspaceId
+        const { handle: nativeHandle, nativePath } = await resolveNativeDirectoryHandleForPath(
+          target.path, context.directoryHandle, context.workspaceId
         )
         if (nativeHandle) {
           const fileHandle = await nativeHandle
-            .getFileHandle(target.path.split('/').pop()!, { create: false })
+            .getFileHandle(nativePath.split('/').pop()!, { create: false })
             .catch(() => null)
           if (fileHandle) {
             // getFile() returns a File object with lastModified
@@ -907,11 +911,6 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
   let updated = 0
   let hasWorkspaceWrites = false
 
-  const writeDirectoryHandle = await resolveNativeDirectoryHandle(
-    context.directoryHandle,
-    context.workspaceId
-  )
-
   for (const file of files) {
     try {
       const target = await resolveVfsTarget(file.path, context, 'write')
@@ -920,8 +919,11 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
       // Staleness check (best-effort, workspace only)
       if (target.backend.label === 'workspace') {
         try {
-          const fileHandle = await writeDirectoryHandle
-            ?.getFileHandle(target.path.split('/').pop()!, { create: false })
+          const { handle: writeHandle, nativePath: writeNativePath } = await resolveNativeDirectoryHandleForPath(
+            target.path, context.directoryHandle, context.workspaceId
+          )
+          const fileHandle = await writeHandle
+            ?.getFileHandle(writeNativePath.split('/').pop()!, { create: false })
             .catch(() => null)
           if (fileHandle) {
             // getFile() returns a File object with lastModified

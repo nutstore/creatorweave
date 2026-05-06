@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback } from 'react'
-import { readFileFromNativeFS, readFileFromOPFS, isImageFile } from '@/opfs'
+import { readFileFromNativeFSMultiRoot, readFileFromOPFS, isImageFile } from '@/opfs'
 import { type ConflictDetail } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { useT } from '@/i18n'
@@ -186,7 +186,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
       const [opfsContent, nativeContent] = await Promise.all([
         readFileFromOPFS(conflict.opfsVersion.workspaceId, conflict.path),
         conflict.nativeVersion.exists && nativeDir
-          ? readFileFromNativeFS(nativeDir, conflict.path)
+          ? readFileFromNativeFSMultiRoot(nativeDir, conflict.path)
           : Promise.resolve(null),
       ])
 

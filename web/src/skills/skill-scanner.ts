@@ -275,7 +275,8 @@ export async function syncResourcesToOPFS(
  */
 export async function syncProjectSkillsToActiveWorkspace(
   rootHandle: FileSystemDirectoryHandle,
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  rootName?: string
 ): Promise<void> {
   let targetFilesDir: FileSystemDirectoryHandle | null = null
 
@@ -306,6 +307,11 @@ export async function syncProjectSkillsToActiveWorkspace(
     if (!active) return
     targetFilesDir = await active.workspace.getFilesDir()
     console.log(`[SkillScanner] Syncing .skills to active workspace: ${active.workspaceId}`)
+  }
+
+  // In multi-root mode, sync to files/{rootName}/ instead of files/ directly
+  if (rootName) {
+    targetFilesDir = await targetFilesDir.getDirectoryHandle(rootName, { create: true })
   }
 
   await syncSkillsDirToOPFS(targetFilesDir, rootHandle)

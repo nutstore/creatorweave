@@ -6,7 +6,7 @@
  * Handles user permission requests, handle storage, and lifecycle management.
  *
  * Multi-root support: handles are keyed by `${projectId}:${rootName}`.
- * Legacy single-root callers use projectId directly (mapped to default root).
+ * Single-root callers use projectId directly (mapped to default root).
  */
 
 /**
@@ -405,7 +405,7 @@ export function bindRuntimeDirectoryHandle(
     const compoundKey = buildHandleKey(projectId, rootName)
     runtimeHandles.set(compoundKey, handle)
   } else {
-    // Legacy API: bindRuntimeDirectoryHandle(projectId, handle)
+    // Single-arg form: bindRuntimeDirectoryHandle(projectId, handle)
     // Maps to default root using projectId as rootName
     const handle = rootNameOrHandle
     const compoundKey = buildHandleKey(projectId, projectId)
@@ -415,18 +415,17 @@ export function bindRuntimeDirectoryHandle(
 
 /**
  * Get in-memory directory handle for a project root.
- * Multi-root version: takes (projectId, rootName).
- * Legacy version: takes single id (projectId), returns default root handle.
+ * Multi-root: takes (projectId, rootName).
+ * Single-arg: takes just projectId, returns default root handle.
  */
 export function getRuntimeDirectoryHandle(
   projectId: string,
   rootName?: string
 ): FileSystemDirectoryHandle | null {
   if (rootName !== undefined) {
-    // New multi-root API
     return runtimeHandles.get(buildHandleKey(projectId, rootName)) ?? null
   }
-  // Legacy API: return handle keyed by projectId (backward compat)
+  // Fallback: return handle keyed by projectId (default root)
   return runtimeHandles.get(buildHandleKey(projectId, projectId)) ?? null
 }
 
@@ -457,7 +456,7 @@ export function unbindRuntimeDirectoryHandle(
   if (rootName !== undefined) {
     runtimeHandles.delete(buildHandleKey(projectId, rootName))
   } else {
-    // Legacy: remove by projectId
+    // Single-arg: remove by projectId (default root)
     runtimeHandles.delete(buildHandleKey(projectId, projectId))
   }
 }

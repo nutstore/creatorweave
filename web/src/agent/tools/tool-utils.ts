@@ -42,3 +42,57 @@ export async function resolveNativeDirectoryHandle(
   if (!activeWorkspaceId) return null
   return await resolveWorkspaceDirectoryHandle(activeWorkspaceId)
 }
+
+/**
+ * Multi-root: resolve the correct native directory handle for a given path.
+ *
+ * Uses WorkspaceRuntime.resolvePath() to route the path to the correct root,
+ * then returns that root's DirectoryHandle.
+ *
+ * Falls back to resolveNativeDirectoryHandle() when no workspace is available.
+ */
+export async function resolveNativeDirectoryHandleForPath(
+  path: string,
+  directoryHandle: FileSystemDirectoryHandle | null | undefined,
+  workspaceId?: string | null
+): Promise<{ handle: FileSystemDirectoryHandle | null; nativePath: string }> {
+  // Always try resolvePath first — handles multi-root routing by stripping root prefix
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const manager = await getWorkspaceManager()
+    const workspace = workspaceId
+      ? await manager.getWorkspace(workspaceId)
+      : null
+
+    if (workspace) {
+      const nativeHandle = await workspace.getNativeDirectoryHandleForPath(path)
+      if (nativeHandle) {
+        const resolved = await workspace.resolvePath(path)
+        return { handle: nativeHandle, nativePath: resolved.relativePath || path }
+      }
+    }
+
+    // Fallback: try active conversation's workspace
+    const active = await getActiveConversation()
+    if (active) {
+      const activeWorkspace = active.conversation.workspaceId
+        ? await manager.getWorkspace(active.conversation.workspaceId)
+        : null
+      if (activeWorkspace) {
+        const nativeHandle = await activeWorkspace.getNativeDirectoryHandleForPath(path)
+        if (nativeHandle) {
+          const resolved = await activeWorkspace.resolvePath(path)
+          return { handle: nativeHandle, nativePath: resolved.relativePath || path }
+        }
+      }
+    }
+  } catch {
+    // Fall through to fallback
+  }
+
+  // Final fallback: use provided directoryHandle or resolve from store
+  if (directoryHandle) {
+    return { handle: directoryHandle, nativePath: path }
+  }
+  return { handle: await resolveNativeDirectoryHandle(null, workspaceId), nativePath: path }
+}

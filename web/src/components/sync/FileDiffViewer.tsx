@@ -15,7 +15,7 @@ import {
   isImageFile,
   fileExistsInNativeFS,
   readFileFromOPFS,
-  readFileFromNativeFS,
+  readFileFromNativeFSMultiRoot,
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFS,
 } from '@/opfs'
@@ -259,7 +259,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           try {
             if (fileChange.type !== 'add') {
               if (nativeDir) {
-                nativeContent = await readFileFromNativeFS(nativeDir, filePath)
+                nativeContent = await readFileFromNativeFSMultiRoot(nativeDir, filePath)
               } else if (showNativePanel) {
                 nativeContent = t('sidebar.fileDiffViewer.cannotReadNativeContent')
               }

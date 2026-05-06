@@ -23,7 +23,7 @@ export type FolderAccessStatus =
 export interface FolderAccessRecord {
   /** Project ID */
   projectId: string
-  /** Root name (handle.name or projectId for legacy single-root) */
+  /** Root name (handle.name or projectId for default root) */
   rootName?: string
   /** Folder name */
   folderName: string | null

@@ -67,6 +67,7 @@ export {
 export {
   readFileFromOPFS,
   readFileFromNativeFS,
+  readFileFromNativeFSMultiRoot,
   readFileFromOPFSWithMeta,
   fileExistsInOPFS,
   fileExistsInNativeFS,

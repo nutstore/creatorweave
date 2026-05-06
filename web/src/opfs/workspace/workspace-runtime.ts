@@ -39,7 +39,7 @@ const ASSETS_DIR = 'assets'
  * Result of resolving a workspace-relative path to a specific root.
  *
  * Multi-root workspace paths follow the pattern: `{rootName}/{relativePath}`
- * If no root prefix matches a known root, the default root is used (backward compat).
+ * If no root prefix matches a known root, the first root is used.
  */
 interface ResolvedRoot {
   /** Root name (matches project_roots.name) */
@@ -113,7 +113,7 @@ export class WorkspaceRuntime {
    * Multi-root mapping for this workspace's project.
    * Populated lazily on first access via resolvePath().
    * Key = rootName, value = { readOnly, isDefault }.
-   * When null/empty, falls back to single-root behavior.
+   * When null, no project_roots entries exist yet.
    */
   private _rootMap: Map<string, { readOnly: boolean; isDefault: boolean }> | null = null
   private _rootMapProjectId: string | null = null
@@ -632,13 +632,22 @@ export class WorkspaceRuntime {
     const preferNative = readPolicy === 'prefer_native'
 
     // Multi-root: resolve the correct native handle for this path
-    // If directoryHandle is provided, use it (legacy path / explicit override).
-    // Otherwise, try to resolve the per-root handle based on path prefix.
-    const nativeHandle = directoryHandle ?? await this.getNativeDirectoryHandleForPath(normalizedPath)
+    // If directoryHandle is provided, use it (explicit override).
+    // Otherwise, resolve the per-root handle based on path prefix.
+    let nativeHandle: FileSystemDirectoryHandle | null
+    let nativePath = normalizedPath
+    if (directoryHandle) {
+      nativeHandle = directoryHandle
+    } else {
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      // Resolve the path relative to the root (strip root prefix for native FS access)
+      const resolved = await this.resolvePath(normalizedPath)
+      nativePath = resolved.relativePath || normalizedPath
+    }
 
     if (nativeHandle && preferNative) {
       try {
-        const native = await this.readFromNativeFS(normalizedPath, nativeHandle)
+        const native = await this.readFromNativeFS(nativePath, nativeHandle)
         return { ...native, source: 'native' }
       } catch {
         // Fallback to OPFS branch below.
@@ -683,13 +692,13 @@ export class WorkspaceRuntime {
       if (!preferOpfs) {
         // Check if disk has been modified since OPFS recorded baseline
         try {
-          const diskMeta = await this.getFileMetadata(nativeHandle, normalizedPath)
+          const diskMeta = await this.getFileMetadata(nativeHandle, nativePath)
           const pendingChanges = await this.pendingManager.getAll()
           const pending = pendingChanges.find(
             (p) => this.normalizeWorkspacePath(p.path) === normalizedPath
           )
           if (pending && pending.fsMtime && diskMeta.mtime > pending.fsMtime) {
-            const diskContent = await this.readFromNativeFS(normalizedPath, nativeHandle)
+            const diskContent = await this.readFromNativeFS(nativePath, nativeHandle)
             const baseline = await this.readFromBaselineDir(normalizedPath)
             if (baseline) {
               const diskMatchesBaseline = await this.areFileContentsEqual(baseline.content, diskContent.content)
@@ -747,7 +756,7 @@ export class WorkspaceRuntime {
       // For non-pending files, always prefer native disk view so external
       // filesystem changes are visible to tools immediately.
       try {
-        const native = await this.readFromNativeFS(normalizedPath, nativeHandle)
+        const native = await this.readFromNativeFS(nativePath, nativeHandle)
         return { ...native, source: 'native' }
       } catch {
         // Disk read failed (e.g. file only exists in OPFS, not yet synced).
@@ -775,7 +784,7 @@ export class WorkspaceRuntime {
     // prefer_opfs can still fall back to native when OPFS body is missing.
     if (nativeHandle) {
       try {
-        const native = await this.readFromNativeFS(normalizedPath, nativeHandle)
+        const native = await this.readFromNativeFS(nativePath, nativeHandle)
         return { ...native, source: 'native' }
       } catch {
         // Fall through to not-found error below.
@@ -870,7 +879,15 @@ export class WorkspaceRuntime {
     const normalizedPath = this.normalizeWorkspacePath(path)
 
     // Multi-root: resolve the correct native handle for this path
-    const nativeHandle = directoryHandle ?? await this.getNativeDirectoryHandleForPath(normalizedPath)
+    let nativeHandle: FileSystemDirectoryHandle | null
+    let nativePath = normalizedPath
+    if (directoryHandle) {
+      nativeHandle = directoryHandle
+    } else {
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      const resolved = await this.resolvePath(normalizedPath)
+      nativePath = resolved.relativePath || normalizedPath
+    }
 
     // Get baseline mtime for conflict detection
     // Also track if this is a new file (not in files/ index and not in native FS)
@@ -881,7 +898,7 @@ export class WorkspaceRuntime {
       if (nativeHandle) {
         // Always use native mtime as conflict baseline when directory handle is available.
         // OPFS cache mtime can diverge from native disk mtime after prior approvals/syncs.
-        const fromNative = await this.readFromNativeFS(normalizedPath, nativeHandle)
+        const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
         baselineFsMtime = fromNative.metadata.mtime
         baselineContent = fromNative.content
       } else {
@@ -1003,7 +1020,15 @@ export class WorkspaceRuntime {
     const normalizedPath = this.normalizeWorkspacePath(path)
 
     // Multi-root: resolve the correct native handle for this path
-    const nativeHandle = directoryHandle ?? await this.getNativeDirectoryHandleForPath(normalizedPath)
+    let nativeHandle: FileSystemDirectoryHandle | null
+    let nativePath = normalizedPath
+    if (directoryHandle) {
+      nativeHandle = directoryHandle
+    } else {
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      const resolved = await this.resolvePath(normalizedPath)
+      nativePath = resolved.relativePath || normalizedPath
+    }
 
     const pendingEntry = this.pendingManager
       .getAll()
@@ -1014,7 +1039,7 @@ export class WorkspaceRuntime {
     let baselineContent: FileContent | null = null
     try {
       if (nativeHandle) {
-        const oldData = await this.readFromNativeFS(normalizedPath, nativeHandle)
+        const oldData = await this.readFromNativeFS(nativePath, nativeHandle)
         baselineFsMtime = oldData.metadata.mtime || 0
         baselineContent = oldData.content
       } else if (this.hasFileInIndex(normalizedPath)) {
@@ -1153,7 +1178,7 @@ export class WorkspaceRuntime {
 
   /**
    * Sync pending changes to real filesystem
-   * @param directoryHandle Real filesystem directory handle (legacy single-root)
+   * @param directoryHandle Fallback handle when no root handles available
    * @param onlyPaths Optional list of paths to sync (if not provided, sync all)
    * @param forceOverwrite If true, skip conflict check and overwrite disk files
    * @returns Sync result
@@ -1165,20 +1190,19 @@ export class WorkspaceRuntime {
   ): Promise<SyncResult> {
     if (!this.initialized) await this.initialize()
 
-    // Check if we have multi-root setup
     const allHandles = await this.getAllNativeDirectoryHandles()
 
-    if (allHandles.size <= 1) {
-      // Single-root: use legacy path (backward compat)
+    // No handles → fallback to passed directoryHandle
+    if (allHandles.size === 0) {
       return this.syncToDiskSingleRoot(directoryHandle, onlyPaths, forceOverwrite)
     }
 
-    // Multi-root: group pending paths by root and sync each group separately
     return this.syncToDiskMultiRoot(allHandles, onlyPaths, forceOverwrite)
   }
 
   /**
-   * Legacy single-root sync (backward compat for single-root and tests)
+   * Sync pending changes for a single directory handle.
+   * Used internally by syncToDiskMultiRoot per-root, and as fallback when no root handles exist.
    */
   private async syncToDiskSingleRoot(
     directoryHandle: FileSystemDirectoryHandle,
@@ -1274,35 +1298,35 @@ export class WorkspaceRuntime {
   ): Promise<SyncResult['conflicts']> {
     if (!this.initialized) await this.initialize()
 
-    // Multi-root: if we have multiple handles, aggregate conflicts from each root
     const allHandles = await this.getAllNativeDirectoryHandles()
-    if (allHandles.size > 1) {
-      const allConflicts: SyncResult['conflicts'] = []
-      const pathsToCheck = onlyPaths ?? (await this.getPendingPaths())
 
-      // Group paths by root
-      const pathsByRoot = new Map<string, string[]>()
-      for (const rawPath of pathsToCheck) {
-        const resolved = await this.resolvePath(rawPath)
-        const rootPaths = pathsByRoot.get(resolved.rootName) ?? []
-        rootPaths.push(rawPath)
-        pathsByRoot.set(resolved.rootName, rootPaths)
-      }
-
-      for (const [rootName, rootPaths] of pathsByRoot) {
-        const handle = allHandles.get(rootName) ?? directoryHandle
-        const conflicts = await this.pendingManager.detectConflicts(handle, rootPaths)
-        allConflicts.push(...conflicts)
-      }
-
-      await this.materializeTextConflictMarkers(directoryHandle, allConflicts)
-      return allConflicts
+    // No handles → fallback to passed directoryHandle
+    if (allHandles.size === 0) {
+      const conflicts = await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
+      await this.materializeTextConflictMarkers(directoryHandle, conflicts)
+      return conflicts
     }
 
-    // Single-root: legacy path
-    const conflicts = await this.pendingManager.detectConflicts(directoryHandle, onlyPaths)
-    await this.materializeTextConflictMarkers(directoryHandle, conflicts)
-    return conflicts
+    // Group paths by root and detect conflicts per root
+    const allConflicts: SyncResult['conflicts'] = []
+    const pathsToCheck = onlyPaths ?? (await this.getPendingPaths())
+
+    const pathsByRoot = new Map<string, string[]>()
+    for (const rawPath of pathsToCheck) {
+      const resolved = await this.resolvePath(rawPath)
+      const rootPaths = pathsByRoot.get(resolved.rootName) ?? []
+      rootPaths.push(rawPath)
+      pathsByRoot.set(resolved.rootName, rootPaths)
+    }
+
+    for (const [rootName, rootPaths] of pathsByRoot) {
+      const handle = allHandles.get(rootName) ?? directoryHandle
+      const conflicts = await this.pendingManager.detectConflicts(handle, rootPaths)
+      allConflicts.push(...conflicts)
+    }
+
+    await this.materializeTextConflictMarkers(directoryHandle, allConflicts)
+    return allConflicts
   }
 
   private async materializeTextConflictMarkers(
@@ -2108,33 +2132,20 @@ export class WorkspaceRuntime {
 
   /**
    * Get native directory handle for file preparation
-   * @returns Native FS directory handle or null if not set
-   *
-   * Legacy single-root: returns the default root handle.
-   * For multi-root scenarios, use getNativeDirectoryHandleForPath() instead.
+   * @returns First root's Native FS directory handle, or null if not set
    */
   async getNativeDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
     if (!this.metadata.rootDirectory) return null
 
     try {
-      try {
-        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-        const activeProject = await getProjectRepository().findActiveProject()
-        if (activeProject?.id) {
-          // Multi-root: try first root handle, then legacy projectId key
-          const rootMap = await this.ensureRootMap(activeProject.id)
-          if (rootMap && rootMap.size > 0) {
-            // Try the first root handle
-            const firstRootName = rootMap.keys().next().value!
-            const handle = getRuntimeDirectoryHandle(activeProject.id, firstRootName)
-            if (handle) return handle
-          }
-          // Legacy fallback: single handle keyed by projectId
-          const projectHandle = getRuntimeDirectoryHandle(activeProject.id)
-          if (projectHandle) return projectHandle
+      const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+      const activeProject = await getProjectRepository().findActiveProject()
+      if (activeProject?.id) {
+        const rootMap = await this.ensureRootMap(activeProject.id)
+        if (rootMap && rootMap.size > 0) {
+          const firstRootName = rootMap.keys().next().value!
+          return getRuntimeDirectoryHandle(activeProject.id, firstRootName)
         }
-      } catch {
-        // Ignore fallback lookup errors and continue to null return.
       }
 
       return null
@@ -2148,7 +2159,7 @@ export class WorkspaceRuntime {
    *
    * Resolution logic:
    * 1. If path starts with a known rootName prefix → use that root's handle
-   * 2. Otherwise → use the default root's handle (backward compat)
+   * 2. Otherwise → use the first root's handle
    */
   async getNativeDirectoryHandleForPath(path: string): Promise<FileSystemDirectoryHandle | null> {
     try {
@@ -2269,14 +2280,14 @@ export class WorkspaceRuntime {
       }
     }
 
-    // No project → single-root fallback
+    // No project → fallback
     if (!projectId) {
       return { rootName: '_default', relativePath: normalized, readOnly: false }
     }
 
     const rootMap = await this.ensureRootMap(projectId)
 
-    // No root map → single-root fallback using default handle
+    // No root map → fallback
     if (!rootMap || rootMap.size === 0) {
       return { rootName: projectId, relativePath: normalized, readOnly: false }
     }
@@ -2294,19 +2305,14 @@ export class WorkspaceRuntime {
       }
     }
 
-    // No root prefix match → route by root count
-    if (rootMap.size === 1) {
-      // Single root: direct route
-      const [rootName, rootInfo] = rootMap.entries().next().value!
-      return { rootName, relativePath: normalized, readOnly: rootInfo.readOnly }
-    }
-
-    // Multi root: route to first root + warn
+    // No root prefix match → route to first root
     const firstEntry = rootMap.entries().next().value!
-    console.warn(
-      `[resolvePath] Path "${normalized}" has no root prefix. ` +
-      `Defaulting to "${firstEntry[0]}". Consider using "${firstEntry[0]}/${normalized}" for clarity.`
-    )
+    if (rootMap.size > 1) {
+      console.warn(
+        `[resolvePath] Path "${normalized}" has no root prefix. ` +
+        `Defaulting to "${firstEntry[0]}". Consider using "${firstEntry[0]}/${normalized}" for clarity.`
+      )
+    }
     return { rootName: firstEntry[0], relativePath: normalized, readOnly: firstEntry[1].readOnly }
   }
 
@@ -2398,7 +2404,7 @@ export class WorkspaceRuntime {
           nativeDir = handle
           nativePath = resolved.relativePath || normalizedPath
         } else {
-          // Single-root: use the default handle
+          // No path prefix match: use the first root handle
           nativeDir = allHandles.values().next().value
             ?? (await this.getNativeDirectoryHandle())!
           if (!nativeDir) {
@@ -2816,15 +2822,14 @@ export class WorkspaceRuntime {
   ): Promise<{ synced: number; failed: number }> {
     if (!this.initialized) await this.initialize()
 
-    // Multi-root: check if we need per-path routing
     const allHandles = await this.getAllNativeDirectoryHandles()
 
-    if (allHandles.size <= 1) {
-      // Single-root: legacy path
+    // No handles → fallback to passed directoryHandle
+    if (allHandles.size === 0) {
       return this.syncToNativeSingleRoot(directoryHandle, changes)
     }
 
-    // Multi-root: group changes by root and sync each group
+    // Group changes by root and sync each group
     let synced = 0
     let failed = 0
 
@@ -2852,7 +2857,8 @@ export class WorkspaceRuntime {
   }
 
   /**
-   * Single-root syncToNative implementation
+   * syncToNative for a single directory handle.
+   * Used internally by syncToNative per-root, and as fallback.
    */
   private async syncToNativeSingleRoot(
     directoryHandle: FileSystemDirectoryHandle,

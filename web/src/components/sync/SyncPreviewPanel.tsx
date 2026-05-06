@@ -10,7 +10,7 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { type FileChange, type ConflictInfo, type ConflictDetail, type SyncResult } from '@/opfs/types/opfs-types'
-import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
+import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
@@ -267,7 +267,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         let beforeText = ''
         let afterText = ''
         if (change.type !== 'add' && nativeDir) {
-          const content = await readFileFromNativeFS(nativeDir, change.path)
+          const content = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
           beforeText = content ?? ''
         }
         if (change.type !== 'delete') {

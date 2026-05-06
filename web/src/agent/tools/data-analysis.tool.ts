@@ -9,7 +9,7 @@
  */
 
 import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import {
   parseCSV,
   parseJSON,
@@ -56,7 +56,7 @@ export const analyzeDataExecutor: ToolExecutor = async (
   const path = args.path as string
   const fileType = args.file_type as 'csv' | 'json'
 
-  const directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  const { handle: directoryHandle, nativePath } = await resolveNativeDirectoryHandleForPath(path, context.directoryHandle, context.workspaceId)
   if (!directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
   }
@@ -65,7 +65,7 @@ export const analyzeDataExecutor: ToolExecutor = async (
     // Read file content
     let fileContent: string
     try {
-      const fileHandle = await getFileHandle(directoryHandle, path)
+      const fileHandle = await getFileHandle(directoryHandle, nativePath)
       const file = await fileHandle.getFile()
       fileContent = await file.text()
     } catch (error) {
@@ -216,13 +216,12 @@ export const generateChartExecutor: ToolExecutor = async (
     y_axis: string
     limit?: number
   }
-  const filePath = path
   const fileType = file_type
   const chartType = chart_type
   const xAxis = x_axis
   const yAxis = y_axis
 
-  const directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  const { handle: directoryHandle, nativePath } = await resolveNativeDirectoryHandleForPath(path, context.directoryHandle, context.workspaceId)
   if (!directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
   }
@@ -231,7 +230,7 @@ export const generateChartExecutor: ToolExecutor = async (
     // Read file content
     let fileContent: string
     try {
-      const fileHandle = await getFileHandle(directoryHandle, filePath)
+      const fileHandle = await getFileHandle(directoryHandle, nativePath)
       const file = await fileHandle.getFile()
       fileContent = await file.text()
     } catch (error) {
@@ -388,11 +387,10 @@ export const filterDataExecutor: ToolExecutor = async (
     filters: Array<{ column: string; operator: string; value: unknown }>
     export_format?: 'json' | 'csv'
   }
-  const filePath = path
   const fileType = file_type
   const exportFormat = (export_format ?? 'json') as 'json' | 'csv'
 
-  const directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  const { handle: directoryHandle, nativePath } = await resolveNativeDirectoryHandleForPath(path, context.directoryHandle, context.workspaceId)
   if (!directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
   }
@@ -401,7 +399,7 @@ export const filterDataExecutor: ToolExecutor = async (
     // Read file content
     let fileContent: string
     try {
-      const fileHandle = await getFileHandle(directoryHandle, filePath)
+      const fileHandle = await getFileHandle(directoryHandle, nativePath)
       const file = await fileHandle.getFile()
       fileContent = await file.text()
     } catch (error) {
@@ -504,11 +502,10 @@ export const aggregateDataExecutor: ToolExecutor = async (
     group_by: string
     aggregations: Record<string, 'count' | 'sum' | 'avg' | 'min' | 'max'>
   }
-  const filePath = path
   const fileType = file_type
   const groupBy = group_by
 
-  const directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  const { handle: directoryHandle, nativePath } = await resolveNativeDirectoryHandleForPath(path, context.directoryHandle, context.workspaceId)
   if (!directoryHandle) {
     return JSON.stringify({ error: 'No directory selected. Please select a folder first.' })
   }
@@ -517,7 +514,7 @@ export const aggregateDataExecutor: ToolExecutor = async (
     // Read file content
     let fileContent: string
     try {
-      const fileHandle = await getFileHandle(directoryHandle, filePath)
+      const fileHandle = await getFileHandle(directoryHandle, nativePath)
       const file = await fileHandle.getFile()
       fileContent = await file.text()
     } catch (error) {

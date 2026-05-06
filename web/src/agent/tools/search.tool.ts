@@ -3,7 +3,7 @@ import { getSearchWorkerManager } from '@/workers/search-worker-manager'
 import type { PendingFileOverlay } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
 import { getWorkspaceManager } from '@/opfs'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
 import { resolveVfsTarget } from './vfs-resolver'
@@ -206,9 +206,13 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     }
   } else {
     // Legacy: workspace path resolution
-    directoryHandle = context.directoryHandle
-    if (!directoryHandle) {
-      directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+    if (context.directoryHandle) {
+      directoryHandle = context.directoryHandle
+    } else {
+      const { handle } = await resolveNativeDirectoryHandleForPath(
+        searchPath, context.directoryHandle, context.workspaceId
+      )
+      directoryHandle = handle
     }
     vfsSubPath = searchPath
   }

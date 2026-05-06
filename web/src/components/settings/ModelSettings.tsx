@@ -267,7 +267,6 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     models: dynamicModels,
     source: modelsSource,
     loading: modelsLoading,
-    error: modelsError,
     refresh: refreshModels,
   } = useDynamicModels(providerType, providerKey)
 

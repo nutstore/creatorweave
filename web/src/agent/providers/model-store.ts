@@ -62,14 +62,6 @@ function writeToDisk(cacheKey: string, data: CachedModels): void {
   }
 }
 
-function removeFromDisk(cacheKey: string): void {
-  try {
-    localStorage.removeItem(getStorageKey(cacheKey))
-  } catch {
-    // ignore
-  }
-}
-
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**

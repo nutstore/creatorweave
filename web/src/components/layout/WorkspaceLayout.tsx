@@ -37,6 +37,7 @@ import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
 import { scanProjectSkills, syncResourcesToOPFS, syncProjectSkillsToActiveWorkspace } from '@/skills/skill-scanner'
+import type { Skill, SkillResource } from '@/skills/skill-types'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useSkillsStore } from '@/store/skills.store'
 import { createUserMessage } from '@/agent/message-types'
@@ -57,6 +58,7 @@ import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
 import { getWorkspaceManager } from '@/opfs'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -104,6 +106,7 @@ export function WorkspaceLayout({
     loadFromDB,
   } = useConversationStore()
   const { directoryHandle } = useAgentStore()
+  const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
   const { role } = useRemoteStore()
@@ -120,7 +123,6 @@ export function WorkspaceLayout({
   const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
   const [toolsPanelOpen, setToolsPanelOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
-  const [skillsSyncing, setSkillsSyncing] = useState(false)
   const skillsLoaded = useSkillsStore((s) => s.loaded) // Reactive state
   const loadSkills = useSkillsStore((s) => s.loadSkills)
 
@@ -249,12 +251,20 @@ export function WorkspaceLayout({
     }
   }, [skillsLoaded, loadSkills])
 
-  // Scan project skills when directoryHandle changes
+  // Scan project skills when roots change
   // Must wait for skillsLoaded to be true, otherwise cannot properly filter loaded skills
   useEffect(() => {
     const manager = getSkillManager()
 
-    if (!directoryHandle) {
+    // Collect handles from all roots
+    const handlesToScan: Array<{ handle: FileSystemDirectoryHandle; rootName: string }> = []
+    for (const root of roots) {
+      if (root.handle) {
+        handlesToScan.push({ handle: root.handle, rootName: root.name })
+      }
+    }
+
+    if (handlesToScan.length === 0) {
       manager.clearProjectSkills()
       void loadSkills()
       return
@@ -267,16 +277,30 @@ export function WorkspaceLayout({
         manager.clearProjectSkills()
         await loadSkills()
 
-        console.log('[WorkspaceLayout] Scanning project skills...')
-        const result = await scanProjectSkills(directoryHandle)
-        console.log('[WorkspaceLayout] Scan result:', result.skills.length, 'skills found')
-        if (result.errors.length > 0) {
-          console.warn('[WorkspaceLayout] Scan errors:', result.errors)
+        console.log(`[WorkspaceLayout] Scanning project skills across ${handlesToScan.length} root(s)...`)
+
+        let allSkills: Skill[] = []
+        let allResources: SkillResource[] = []
+        let allErrors: string[] = []
+
+        for (const { handle, rootName } of handlesToScan) {
+          const result = await scanProjectSkills(handle)
+          // Prefix skill IDs with root name for disambiguation
+          for (const skill of result.skills) {
+            skill.id = `project:${rootName}:${skill.id.replace('project:', '')}`
+          }
+          allSkills = allSkills.concat(result.skills)
+          allResources = allResources.concat(result.resources)
+          allErrors = allErrors.concat(result.errors)
         }
 
-        if (result.skills.length > 0) {
-          // Keep project skills runtime-scoped (do not persist in SQLite).
-          manager.setProjectSkills(result.skills, result.resources, activeProjectId)
+        console.log(`[WorkspaceLayout] Scan result: ${allSkills.length} skills found`)
+        if (allErrors.length > 0) {
+          console.warn('[WorkspaceLayout] Scan errors:', allErrors)
+        }
+
+        if (allSkills.length > 0) {
+          manager.setProjectSkills(allSkills, allResources, activeProjectId)
           await loadSkills()
         } else {
           manager.clearProjectSkills()
@@ -287,13 +311,14 @@ export function WorkspaceLayout({
         }
 
         // Sync skill resources to OPFS so Pyodide can access them at /mnt/.skills/
-        await syncResourcesToOPFS(result)
-        // Also sync .skills/ directory directly from disk (covers all workspaces).
-        // Wait for workspace creation/switch completion to avoid writing into stale workspace.
+        await syncResourcesToOPFS({ skills: allSkills, resources: allResources, errors: allErrors })
+        // Also sync .skills/ directories from all roots directly to OPFS
         if (activeConversationId) {
           const ready = await waitForWorkspaceReady(activeConversationId)
           if (ready) {
-            await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+            for (const { handle, rootName } of handlesToScan) {
+              await syncProjectSkillsToActiveWorkspace(handle, activeConversationId, rootName)
+            }
           } else {
             console.warn(
               `[WorkspaceLayout] Workspace not ready for skill sync after timeout: ${activeConversationId}`
@@ -306,36 +331,7 @@ export function WorkspaceLayout({
     }
 
     void scanForSkills()
-  }, [directoryHandle, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady])
-
-  // Sync .skills/ to OPFS when workspace changes (new workspace created or switched)
-  useEffect(() => {
-    if (!directoryHandle || !activeConversationId) return
-
-    let cancelled = false
-    setSkillsSyncing(true)
-    ;(async () => {
-      const ready = await waitForWorkspaceReady(activeConversationId)
-      if (!ready) {
-        console.warn(
-          `[WorkspaceLayout] Workspace not ready for direct skill sync after timeout: ${activeConversationId}`
-        )
-        return
-      }
-      if (cancelled) return
-      await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
-    })()
-      .catch((err) => {
-        console.warn('[WorkspaceLayout] Failed to sync skills to workspace:', err)
-      })
-      .finally(() => {
-        if (!cancelled) setSkillsSyncing(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [directoryHandle, activeConversationId, waitForWorkspaceReady])
+  }, [roots, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -608,7 +604,6 @@ export function WorkspaceLayout({
               <ConversationView
                 initialMessage={pendingMessage}
                 onInitialMessageConsumed={handleInitialMessageConsumed}
-                disabled={skillsSyncing}
               />
             ) : (
               <div className="relative h-full min-h-0 w-full overflow-hidden">

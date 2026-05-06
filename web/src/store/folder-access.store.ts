@@ -499,7 +499,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       // Multi-root: traverse all root handles and prefix paths with rootName
       const allHandles = getRuntimeHandlesForProject(projectId)
       if (allHandles.size === 0) {
-        // Legacy single-root fallback
+        // Fallback: no root handles in memory, try current handle
         const handle = get().getCurrentHandle()
         if (!handle) return []
         const { traverseDirectory } = await import('../services/traversal.service')
@@ -576,7 +576,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       const roots: RootInfo[] = await Promise.all(
         dbRoots.map(async (dbRoot) => {
           const runtimeHandle = runtimeHandles.get(dbRoot.name)
-          const handle = runtimeHandle ?? null
+          let handle = runtimeHandle ?? null
 
           // Try to restore persisted handle
           let persistedHandle: FileSystemDirectoryHandle | null = null
@@ -590,7 +590,15 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
               const record = await folderAccessRepo.findByProjectAndRoot(projectId, dbRoot.name)
               if (record?.persistedHandle) {
                 persistedHandle = record.persistedHandle
-                status = 'needs_user_activation'
+                // Auto-check if browser still has cached permission
+                const permission = await persistedHandle.queryPermission({ mode: 'readwrite' })
+                if (permission === 'granted') {
+                  handle = persistedHandle
+                  status = 'ready'
+                  bindRuntimeDirectoryHandle(projectId, dbRoot.name, handle)
+                } else {
+                  status = 'needs_user_activation'
+                }
               } else {
                 status = 'idle'
               }
@@ -613,6 +621,18 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       )
 
       set({ roots })
+
+      // Sync first ready handle to agent.store for backward compat
+      const firstReady = roots.find((r) => r.status === 'ready' && r.handle)
+      if (firstReady?.handle) {
+        try {
+          const { useAgentStore } = await import('./agent.store')
+          useAgentStore.setState({
+            directoryHandle: firstReady.handle,
+            directoryName: firstReady.name,
+          })
+        } catch { /* ignore */ }
+      }
     },
 
     addRoot: async () => {
@@ -661,7 +681,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       // Reload roots
       await get().loadRoots()
 
-      // Sync to agent.store for backward compat
+      // Sync first root to agent.store (used by some tools as default handle)
       try {
         const { useAgentStore } = await import('./agent.store')
         useAgentStore.setState({

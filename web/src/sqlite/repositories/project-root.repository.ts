@@ -157,16 +157,7 @@ export class ProjectRootRepository {
    */
   async deleteRoot(id: string): Promise<void> {
     const db = getSQLiteDB()
-
     await db.execute('DELETE FROM project_roots WHERE id = ?', [id])
-
-    // If we deleted the default root, promote the first remaining root
-    if (root.isDefault) {
-      const remaining = siblings.filter((r) => r.id !== id)
-      if (remaining.length > 0) {
-        await this.setDefaultRoot(root.projectId, remaining[0].id)
-      }
-    }
   }
 
   /**

@@ -3,6 +3,9 @@
  *
  * Thin wrapper around useOPFSStore / WorkspaceRuntime.
  * Tools call backend.readFile() instead of directly calling opfsStore.readFile().
+ *
+ * Multi-root: passes null as directoryHandle to WorkspaceRuntime methods,
+ * allowing the runtime to resolve the correct root via resolvePath() internally.
  */
 
 import { useOPFSStore } from '@/store/opfs.store'
@@ -37,12 +40,12 @@ export class WorkspaceBackend implements VfsBackend {
 
   async readFile(path: string, options?: VfsReadOptions): Promise<VfsReadResult> {
     const { readFile } = useOPFSStore.getState()
-    const dirHandle = await this.resolveDirHandle()
+    // Pass null to let WorkspaceRuntime resolve the correct root via resolvePath()
     const readPolicy = options?.readPolicy as ReadPolicy | undefined
 
     const result = readPolicy
-      ? await readFile(path, dirHandle, this.workspaceId, readPolicy)
-      : await readFile(path, dirHandle, this.workspaceId)
+      ? await readFile(path, null, this.workspaceId, readPolicy)
+      : await readFile(path, null, this.workspaceId)
 
     const { content, metadata, source } = result
     return {
@@ -56,19 +59,19 @@ export class WorkspaceBackend implements VfsBackend {
 
   async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
     const { writeFile } = useOPFSStore.getState()
-    const dirHandle = await this.resolveDirHandle()
-    await writeFile(path, content, dirHandle, this.workspaceId)
+    // Pass null to let WorkspaceRuntime resolve the correct root
+    await writeFile(path, content, null, this.workspaceId)
   }
 
   async deleteFile(path: string): Promise<void> {
     const { deleteFile } = useOPFSStore.getState()
-    const dirHandle = await this.resolveDirHandle()
-    await deleteFile(path, dirHandle, this.workspaceId)
+    // Pass null to let WorkspaceRuntime resolve the correct root
+    await deleteFile(path, null, this.workspaceId)
   }
 
   async listDir(path: string, _options?: VfsListOptions): Promise<VfsDirEntry[]> {
-    // ls.tool.ts has its own complex traversal logic using directory handles.
-    // This method provides a simpler fallback for basic listing.
+    // ls.tool.ts has its own complex traversal logic.
+    // This fallback resolves a single handle for basic listing.
     const handle = await this.resolveDirHandle()
     if (!handle) return []
 
@@ -97,14 +100,18 @@ export class WorkspaceBackend implements VfsBackend {
   async exists(path: string): Promise<boolean> {
     try {
       const { readFile } = useOPFSStore.getState()
-      const dirHandle = await this.resolveDirHandle()
-      await readFile(path, dirHandle, this.workspaceId)
+      // Pass null to let WorkspaceRuntime resolve the correct root
+      await readFile(path, null, this.workspaceId)
       return true
     } catch {
       return false
     }
   }
 
+  /**
+   * Resolve a directory handle for callers that need a single handle (listDir, getDirectoryHandle).
+   * Not used by readFile/writeFile/deleteFile which go through WorkspaceRuntime's multi-root routing.
+   */
   private async resolveDirHandle(): Promise<FileSystemDirectoryHandle | null> {
     if (this.directoryHandle) return this.directoryHandle
     return resolveNativeDirectoryHandle(this.directoryHandle, this.workspaceId)

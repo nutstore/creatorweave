@@ -56,6 +56,8 @@ interface TreeNode {
 interface FileTreePanelBaseProps {
   directoryHandle: FileSystemDirectoryHandle | null
   rootName?: string | null
+  /** Prefix for OPFS path matching in multi-root mode (e.g., "my-app"). Pending/cached paths in OPFS store use "{prefix}/path" format. */
+  pathPrefix?: string | null
   selectedPath?: string | null
   showHeader?: boolean
 }
@@ -454,6 +456,7 @@ function TreeBranch({
 export function FileTreePanel({
   directoryHandle,
   rootName,
+  pathPrefix,
   onFileSelect,
   onDirectorySelect,
   onInspect,
@@ -473,33 +476,64 @@ export function FileTreePanel({
   const approvedNotSyncedPaths = useOPFSStore((state) => state.approvedNotSyncedPaths)
   const cachedPaths = useOPFSStore((state) => state.cachedPaths)
 
-  // Build a map of file paths to pending change types for O(1) lookup
+  // Prefix for OPFS path matching: in multi-root mode, OPFS paths include the root name
+  const prefix = pathPrefix ? `${pathPrefix}/` : ''
+
+  // Filter approved-not-synced paths to only those belonging to this root
+  const rootApprovedNotSyncedPaths = useMemo(() => {
+    if (!prefix) return approvedNotSyncedPaths
+    const result = new Set<string>()
+    for (const p of approvedNotSyncedPaths) {
+      if (p.startsWith(prefix)) {
+        result.add(p.slice(prefix.length))
+      }
+    }
+    return result
+  }, [approvedNotSyncedPaths, prefix])
+
+  // Filter pending changes to only those belonging to this root, stripping the prefix
+  const rootPendingChanges = useMemo(() => {
+    if (!prefix) return pendingChanges
+    return pendingChanges
+      .filter((c) => c.path.startsWith(prefix))
+      .map((c) => ({ ...c, path: c.path.slice(prefix.length) }))
+  }, [pendingChanges, prefix])
+
+  // Filter cached paths to only those belonging to this root, stripping the prefix
+  const rootCachedPaths = useMemo(() => {
+    if (!prefix) return cachedPaths
+    return cachedPaths
+      .filter((p) => p.startsWith(prefix))
+      .map((p) => p.slice(prefix.length))
+  }, [cachedPaths, prefix])
+
+  // Build a map of local file paths to pending change types for O(1) lookup
   const pendingMap = useMemo(() => {
     const map = new Map<string, PendingChange['type']>()
-    for (const change of pendingChanges) {
+    for (const change of rootPendingChanges) {
       map.set(change.path, change.type)
     }
     return map
-  }, [pendingChanges])
+  }, [rootPendingChanges])
 
   /** Get pending create changes that belong to a specific parent directory */
   const getPendingCreatesForPath = useCallback(
     (parentPath: string): PendingChange[] => {
-      return pendingChanges.filter((change) => {
+      return rootPendingChanges.filter((change) => {
         if (change.type !== 'create') return false
         // Check if the file's parent matches the parentPath
         const parentOfFile = change.path.split('/').slice(0, -1).join('/')
         return parentOfFile === parentPath
       })
     },
-    [pendingChanges]
+    [rootPendingChanges]
   )
 
   /** Get pending create subdirectory names that don't exist on disk */
   const getPendingCreateSubdirs = useCallback(
     (parentPath: string, diskSubdirs: Set<string>): string[] => {
       const subdirs = new Set<string>()
-      for (const change of pendingChanges) {
+      for (const change of rootPendingChanges) {
         if (change.type !== 'create') continue
         // Check if the path is under parentPath
         const expectedPrefix = parentPath ? `${parentPath}/` : ''
@@ -518,7 +552,7 @@ export function FileTreePanel({
       }
       return Array.from(subdirs)
     },
-    [pendingChanges]
+    [rootPendingChanges]
   )
 
   /** Check if a file/directory name should be hidden */
@@ -690,13 +724,13 @@ export function FileTreePanel({
       // Add subdirectories inferred from cached OPFS files.
       // Needed when changes are approved (no longer pending) but not yet synced to disk.
       const namesAfterPendingSubdirs = new Set(children.map((c) => c.name))
-      addCachedSubdirsAtLevel(children, cachedPaths, parentPath, namesAfterPendingSubdirs)
+      addCachedSubdirsAtLevel(children, rootCachedPaths, parentPath, namesAfterPendingSubdirs)
 
       // Add cached files from OPFS that are not already in children
       // and not pending creates (already handled above)
       // This works for both OPFS-only mode (dirHandle=null) and disk+OPFS mode
       const existingNames = new Set(children.map((c) => c.name))
-      addCachedFilesAtLevel(children, cachedPaths, parentPath, existingNames, pendingCreates)
+      addCachedFilesAtLevel(children, rootCachedPaths, parentPath, existingNames, pendingCreates)
 
       return children
     },
@@ -705,7 +739,7 @@ export function FileTreePanel({
       mode,
       getPendingCreatesForPath,
       getPendingCreateSubdirs,
-      cachedPaths,
+      rootCachedPaths,
       addCachedFilesAtLevel,
       addCachedSubdirsAtLevel,
     ]
@@ -917,7 +951,7 @@ export function FileTreePanel({
               expandedPaths={expandedPaths}
               selectedPath={selectedPath || null}
               pendingMap={pendingMap}
-              approvedNotSyncedPaths={approvedNotSyncedPaths}
+              approvedNotSyncedPaths={rootApprovedNotSyncedPaths}
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
               onInspect={onInspect}

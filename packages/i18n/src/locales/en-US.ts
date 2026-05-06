@@ -468,19 +468,6 @@ export const enUS = {
     notConfigured: "Not configured",
   },
 
-  workspaceSettings: {
-    title: "Workspace Settings",
-    close: "Close",
-    done: "Done",
-    tabs: {
-      layout: "Layout",
-      display: "Display",
-      shortcuts: "Shortcuts",
-      data: "Data",
-      ariaLabel: "Settings options",
-    },
-  },
-
   projectRoots: {
     tabLabel: "Folders",
     title: "Project Folders",

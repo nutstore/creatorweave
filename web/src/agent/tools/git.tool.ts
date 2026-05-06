@@ -248,7 +248,7 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
       mode,
       snapshotId,
       path,
-      directoryHandle: context.directoryHandle,
+      directoryHandle: null,
       contextLines: unified,
     })
 
@@ -541,7 +541,7 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
       staged: staged || false,
       worktree: !staged,
       snapshotId,
-      directoryHandle: context.directoryHandle,
+      directoryHandle: null,
     })
 
     // 刷新状态

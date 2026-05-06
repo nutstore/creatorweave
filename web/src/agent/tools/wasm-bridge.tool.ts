@@ -10,7 +10,7 @@ import type { PluginMetadata, PluginInstance, FileEntry, Plugin } from '@/types/
 import { getPluginLoader } from '@/services/plugin-loader.service'
 import { PluginExecutorService } from '@/services/plugin-executor.service'
 import { traverseDirectory } from '@/services/traversal.service'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 
 /**
  * Convert a WASM plugin's metadata into an OpenAI-compatible ToolDefinition.
@@ -60,7 +60,7 @@ export function createPluginBridgeExecutor(pluginId: string): ToolExecutor {
       return JSON.stringify({ error: `Plugin not ready (state: ${instance.state})` })
     }
 
-    const dirHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+    const { handle: dirHandle } = await resolveNativeDirectoryHandleForPath('', context.directoryHandle, context.workspaceId)
     if (!dirHandle) {
       return JSON.stringify({ error: 'No project folder selected, cannot execute plugin' })
     }

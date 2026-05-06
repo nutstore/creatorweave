@@ -118,6 +118,40 @@ export async function readFileFromNativeFS(
 }
 
 /**
+ * Multi-root aware: read file from native FS by resolving the correct root handle.
+ * Uses WorkspaceRuntime.resolvePath() to strip root prefix and route to the right handle.
+ * Falls back to the provided directoryHandle when no workspace is available.
+ */
+export async function readFileFromNativeFSMultiRoot(
+  directoryHandle: FileSystemDirectoryHandle | null,
+  path: string
+): Promise<string | null> {
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+    const { getRuntimeDirectoryHandle } = await import('@/native-fs')
+    const manager = await getWorkspaceManager()
+    const activeProject = await getProjectRepository().findActiveProject()
+    if (activeProject?.id) {
+      const workspace = await manager.getWorkspace(activeProject.id)
+      if (workspace) {
+        const resolved = await workspace.resolvePath(path)
+        const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
+        if (rootHandle) {
+          return await readFileFromNativeFS(rootHandle, resolved.relativePath)
+        }
+      }
+    }
+  } catch {
+    // Fall through to directoryHandle fallback
+  }
+  if (directoryHandle) {
+    return await readFileFromNativeFS(directoryHandle, path)
+  }
+  return null
+}
+
+/**
  * Read file content from OPFS with metadata
  * This version includes size and modification time
  */

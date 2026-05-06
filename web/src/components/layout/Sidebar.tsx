@@ -33,7 +33,6 @@ import {
   ContextMenuTrigger,
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
-import { useAgentStore } from '@/store/agent.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
@@ -109,8 +108,6 @@ export function Sidebar({
     isConversationRunning,
     updateTitle,
   } = useConversationStore()
-
-  const { directoryHandle, directoryName } = useAgentStore()
 
   // Multi-root: get all roots from folder-access store
   const roots = useFolderAccessStore((state) => state.roots)
@@ -703,31 +700,22 @@ export function Sidebar({
             {/* Tab content */}
             <div className="flex-1 overflow-hidden" data-tour="file-tree">
               {resourceTab === 'files' && (
-                roots.length > 0 ? (
-                  <div className="custom-scrollbar flex h-full flex-col overflow-y-auto">
-                    {roots.map((root) => (
-                      <div key={root.id} className="flex-shrink-0">
-                        <FileTreePanel
-                          directoryHandle={root.handle}
-                          rootName={root.name}
-                          onFileSelect={(path, handle) => {
-                            handleFileSelect(`${root.name}/${path}`, handle)
-                          }}
-                          selectedPath={selectedFilePath?.startsWith(`${root.name}/`) ? selectedFilePath.slice(root.name.length + 1) : null}
-                          onInspect={onInspect ? (path, handle) => onInspect(`${root.name}/${path}`, handle) : undefined}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <FileTreePanel
-                    directoryHandle={directoryHandle}
-                    rootName={directoryName}
-                    onFileSelect={handleFileSelect}
-                    selectedPath={selectedFilePath}
-                    onInspect={onInspect}
-                  />
-                )
+                <div className="custom-scrollbar flex h-full flex-col overflow-y-auto">
+                  {roots.map((root) => (
+                    <div key={root.id} className="flex-shrink-0">
+                      <FileTreePanel
+                        directoryHandle={root.handle}
+                        rootName={root.name}
+                        pathPrefix={root.name}
+                        onFileSelect={(path, handle) => {
+                          handleFileSelect(`${root.name}/${path}`, handle)
+                        }}
+                        selectedPath={selectedFilePath?.startsWith(`${root.name}/`) ? selectedFilePath.slice(root.name.length + 1) : null}
+                        onInspect={onInspect ? (path, handle) => onInspect(`${root.name}/${path}`, handle) : undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
               )}
 
               {resourceTab === 'plugins' && (

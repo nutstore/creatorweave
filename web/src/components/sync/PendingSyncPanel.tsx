@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
-import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
+import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
@@ -288,7 +288,7 @@ export function PendingSyncPanel() {
         let beforeText = ''
         let afterText = ''
         if (change.type !== 'add' && nativeDir) {
-          const text = await readFileFromNativeFS(nativeDir, change.path)
+          const text = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
           beforeText = text ?? ''
         }
         if (change.type !== 'delete') {

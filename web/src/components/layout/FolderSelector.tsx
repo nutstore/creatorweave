@@ -84,7 +84,7 @@ export function FolderSelector() {
     async (root: RootInfo) => {
       if (!activeProjectId || !root.persistedHandle) return
       try {
-        const permission = await root.persistedHandle.requestPermission()
+        const permission = await root.persistedHandle.requestPermission({ mode: 'readwrite' })
         if (permission) {
           bindRuntimeDirectoryHandle(activeProjectId, root.name, root.persistedHandle)
           await loadRoots()
