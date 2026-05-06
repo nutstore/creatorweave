@@ -187,6 +187,21 @@ async function expandGlob(
   const results: string[] = []
   const parts = pattern.split('/')
 
+  async function collectAllFiles(
+    dirHandle: FileSystemDirectoryHandle,
+    currentPath: string
+  ): Promise<void> {
+    for await (const [name, entry] of dirHandle.entries()) {
+      const entryPath = currentPath ? `${currentPath}/${name}` : name
+      if (entry.kind === 'file') {
+        results.push(entryPath)
+      } else if (entry.kind === 'directory') {
+        const subDir = await dirHandle.getDirectoryHandle(name)
+        await collectAllFiles(subDir, entryPath)
+      }
+    }
+  }
+
   async function match(
     dirHandle: FileSystemDirectoryHandle,
     partIndex: number,
@@ -198,6 +213,11 @@ async function expandGlob(
     const isLast = partIndex === parts.length - 1
 
     if (part === '**') {
+      if (isLast) {
+        // Pattern ending with /** should include all descendant files.
+        await collectAllFiles(dirHandle, currentPath)
+        return
+      }
       // Recursive match - match zero or more directories
       // Try matching rest of pattern in current dir
       await match(dirHandle, partIndex + 1, currentPath)
