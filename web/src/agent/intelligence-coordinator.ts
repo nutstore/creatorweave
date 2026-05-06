@@ -1,11 +1,10 @@
 /**
- * Intelligence Coordinator - Integrates Phase 2 intelligent enhancements.
+ * Intelligence Coordinator - Integrates intelligent prompt enhancements.
  *
  * This module coordinates:
  * 1. Agent Configuration (SOUL, IDENTITY, etc.)
  * 2. Tool Recommendation System
- * 3. Project Fingerprint Identification
- * 4. Context Memory System
+ * 3. Context Memory System
  *
  * And injects relevant enhancements into the system prompt.
  */
@@ -14,12 +13,6 @@ import {
   getRecommendationEngine,
   getToolRecommendationsForPrompt,
 } from './tools/tool-recommendation'
-import {
-  getFingerprintScanner,
-  formatFingerprintForPrompt,
-  getProjectTypeDescription,
-  type ProjectFingerprint,
-} from './project-fingerprint'
 import {
   getContextMemoryManager,
   getMemoryBlockForPrompt,
@@ -40,8 +33,6 @@ export type { AgentInfo } from '@/opfs'
 export interface IntelligenceEnhancement {
   /** Enhanced system prompt */
   systemPrompt: string
-  /** Detected project fingerprint */
-  fingerprint: ProjectFingerprint | null
   /** Recommended tools */
   recommendedTools: string[]
   /** Memory context used */
@@ -54,8 +45,6 @@ export interface IntelligenceEnhancement {
 export interface CoordinatorOptions {
   /** Explicit project id for this run (preferred over any global active pointer) */
   projectId?: string | null
-  /** Directory handle for fingerprinting */
-  directoryHandle?: FileSystemDirectoryHandle | null
   /** Current user message for intent analysis */
   userMessage?: string
   /** Recent conversation history */
@@ -73,10 +62,6 @@ export interface CoordinatorOptions {
 //=============================================================================
 
 export class IntelligenceCoordinator {
-  private fingerprintCache: Map<string, ProjectFingerprint | null> = new Map()
-  private lastScanTime: number = 0
-  private readonly SCAN_COOLDOWN = 10000 // 10 seconds between scans
-
   /**
    * Enhance system prompt with intelligent context
    */
@@ -93,20 +78,7 @@ export class IntelligenceCoordinator {
       options.currentAgentId?.trim() || extractFirstMentionedAgentId(options.userMessage || undefined)
     agentInfo = await this.loadAgentForRun(routedAgentId, options.projectId)
 
-    // 1. Project Fingerprint (cached)
-    let fingerprint: ProjectFingerprint | null = null
-    if (options.directoryHandle) {
-      fingerprint = await this.getProjectFingerprint(options.directoryHandle)
-      if (fingerprint) {
-        const fpBlock = formatFingerprintForPrompt(fingerprint)
-        if (fpBlock) {
-          enhancements.push(fpBlock)
-        }
-        recommendedTools.push(...fingerprint.recommendedTools)
-      }
-    }
-
-    // 2. Tool Recommendations (based on user message)
+    // 1. Tool Recommendations (based on user message)
     if (options.userMessage) {
       const toolRecs = getRecommendationEngine().recommend(options.userMessage, 3)
       if (toolRecs.length > 0) {
@@ -118,11 +90,10 @@ export class IntelligenceCoordinator {
       }
     }
 
-    // 3. Context Memory (previous conversations)
+    // 2. Context Memory (previous conversations)
     const memoryContext: MemoryContext = {
       activeFile: options.activeFile,
       recentMessages: options.recentMessages || [],
-      projectType: fingerprint?.type,
       sessionId: options.sessionId,
     }
 
@@ -152,7 +123,6 @@ export class IntelligenceCoordinator {
 
     return {
       systemPrompt: enhancedPrompt,
-      fingerprint,
       recommendedTools: [...new Set(recommendedTools)],
       memoryContext,
       agentInfo,
@@ -219,57 +189,11 @@ export class IntelligenceCoordinator {
   }
 
   /**
-   * Get project fingerprint with caching
-   */
-  private async getProjectFingerprint(
-    directoryHandle: FileSystemDirectoryHandle
-  ): Promise<ProjectFingerprint | null> {
-    const key = directoryHandle.name
-    const now = Date.now()
-
-    // Check cache
-    if (this.fingerprintCache.has(key)) {
-      const cached = this.fingerprintCache.get(key)!
-      // Only use cache if recent
-      if (now - this.lastScanTime < this.SCAN_COOLDOWN) {
-        return cached
-      }
-    }
-
-    // Scan project
-    const scanner = getFingerprintScanner()
-    const fingerprint = await scanner.scan(directoryHandle)
-
-    // Update cache
-    this.fingerprintCache.set(key, fingerprint)
-    this.lastScanTime = now
-
-    return fingerprint
-  }
-
-  /**
    * Process user message for learning
    */
   async processUserMessage(message: string, context: MemoryContext): Promise<void> {
     const memoryManager = getContextMemoryManager()
     await memoryManager.processMessage(message, context)
-  }
-
-  /**
-   * Get quick project type detection
-   */
-  async quickDetectProjectType(
-    directoryHandle: FileSystemDirectoryHandle
-  ): Promise<{ type: string; description: string } | null> {
-    const scanner = getFingerprintScanner()
-    const type = await scanner.quickScan(directoryHandle)
-
-    if (type === 'unknown') return null
-
-    return {
-      type,
-      description: getProjectTypeDescription(type),
-    }
   }
 
   /**
@@ -284,13 +208,6 @@ export class IntelligenceCoordinator {
    */
   getAllTools() {
     return getRecommendationEngine().getAllTools()
-  }
-
-  /**
-   * Clear fingerprint cache
-   */
-  clearCache(): void {
-    this.fingerprintCache.clear()
   }
 
   /**
@@ -327,33 +244,3 @@ export function getIntelligenceCoordinator(): IntelligenceCoordinator {
 // Integration Helpers
 //=============================================================================
 
-/**
- * Hook for agent-loop to enhance system prompt
- */
-export async function enhancePromptForAgentLoop(
-  basePrompt: string,
-  projectId: string | null | undefined,
-  directoryHandle: FileSystemDirectoryHandle | null | undefined,
-  userMessage: string,
-  sessionId?: string,
-  currentAgentId?: string | null
-): Promise<string> {
-  const coordinator = getIntelligenceCoordinator()
-
-  const result = await coordinator.enhanceSystemPrompt(basePrompt, {
-    projectId,
-    directoryHandle,
-    userMessage,
-    sessionId,
-    currentAgentId,
-  })
-
-  // Process message for learning
-  await coordinator.processUserMessage(userMessage, {
-    projectType: result.fingerprint?.type,
-    sessionId,
-    recentMessages: [userMessage],
-  })
-
-  return result.systemPrompt
-}

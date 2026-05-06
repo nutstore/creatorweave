@@ -218,33 +218,3 @@ export function InlineToolSuggestion({ userMessage, onSelectExample }: InlineToo
 // Project Type Badge Component
 //=============================================================================
 
-interface ProjectTypeBadgeProps {
-  directoryHandle: FileSystemDirectoryHandle | null | undefined
-}
-
-export function ProjectTypeBadge({ directoryHandle }: ProjectTypeBadgeProps) {
-  const [projectInfo, setProjectInfo] = useState<{
-    type: string
-    description: string
-  } | null>(null)
-
-  useEffect(() => {
-    if (!directoryHandle) {
-      setProjectInfo(null)
-      return
-    }
-
-    const coordinator = getIntelligenceCoordinator()
-    coordinator.quickDetectProjectType(directoryHandle).then((info) => {
-      setProjectInfo(info)
-    })
-  }, [directoryHandle])
-
-  if (!projectInfo) return null
-
-  return (
-    <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-      <span>{projectInfo.description}</span>
-    </div>
-  )
-}

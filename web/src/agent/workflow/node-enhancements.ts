@@ -55,7 +55,6 @@ export async function buildEnhancedWorkflowNodePrompt(
     const coordinator = getIntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt(enhanced, {
       projectId: options.projectId ?? null,
-      directoryHandle: options.directoryHandle || undefined,
       userMessage,
       currentAgentId: options.currentAgentId ?? null,
       sessionId: options.sessionId,

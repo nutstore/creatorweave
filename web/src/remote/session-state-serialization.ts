@@ -6,7 +6,6 @@
  */
 
 import type { Conversation, Message, MessageRole } from '@/agent/message-types'
-import type { ProjectFingerprint } from '@/agent/project-fingerprint'
 import type { MemoryEntry } from '@/agent/context-memory'
 
 //=============================================================================
@@ -103,9 +102,6 @@ export interface FileHandleMetadata {
 }
 
 export interface AgentState {
-  /** Project fingerprint */
-  fingerprint: ProjectFingerprint | null
-
   /** Memory entries */
   memories: MemoryEntry[]
 
@@ -379,7 +375,6 @@ export class SessionStateManager {
         activeFile: null,
       },
       agent: {
-        fingerprint: null,
         memories: [],
         preferences: {
           model: 'glm-4.7',
@@ -413,7 +408,6 @@ export class SessionStateManager {
    */
   async createFromCurrentState(
     conversations: Conversation[],
-    fingerprint: ProjectFingerprint | null,
     memories: MemoryEntry[],
     files: FileSystemState,
     ui: UIState
@@ -437,7 +431,6 @@ export class SessionStateManager {
       conversations: serializedConversations,
       files,
       agent: {
-        fingerprint,
         memories: this.options.includeMemories ? memories.slice(-100) : [],
         preferences: {
           model: 'glm-4.7',

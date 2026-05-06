@@ -62,29 +62,9 @@ const SUGGESTION_ICONS: Record<string, React.ElementType> = {
 export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestionsProps) {
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
-  const [projectType, setProjectType] = useState<string | null>(null)
 
   const { directoryHandle } = useAgentStore()
   const dropZoneRef = useRef<HTMLDivElement>(null)
-
-  // Load project type on mount
-  useEffect(() => {
-    const loadProjectType = async () => {
-      if (!directoryHandle) return
-
-      try {
-        const coordinator = getIntelligenceCoordinator()
-        const detected = await coordinator.quickDetectProjectType(directoryHandle)
-        if (detected) {
-          setProjectType(detected.type)
-        }
-      } catch (error) {
-        console.warn('[SmartSuggestions] Failed to detect project type:', error)
-      }
-    }
-
-    loadProjectType()
-  }, [directoryHandle])
 
   // Generate suggestions based on context
   const generateSuggestions = useCallback(async () => {
@@ -118,50 +98,17 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
       if (items.length >= 3) break
     }
 
-    // 2. Add workflow suggestions based on project type
-    if (projectType) {
-      const workflowIcon = Lightbulb
-
-      switch (projectType) {
-        case 'typescript':
-        case 'react':
-          items.push({
-            id: 'workflow-ts-analysis',
-            type: 'workflow',
-            title: 'Analyze TypeScript Code',
-            description: 'Find types, functions, and dependencies',
-            icon: workflowIcon,
-            action: () => {
-              onExecutePrompt?.('Analyze the TypeScript code structure in this project')
-            },
-          })
-          break
-        case 'python':
-          items.push({
-            id: 'workflow-python-analysis',
-            type: 'workflow',
-            title: 'Analyze Python Code',
-            description: 'Find classes, functions, and imports',
-            icon: workflowIcon,
-            action: () => {
-              onExecutePrompt?.('Analyze the Python code structure in this project')
-            },
-          })
-          break
-        case 'data':
-          items.push({
-            id: 'workflow-data-analysis',
-            type: 'workflow',
-            title: 'Data Analysis',
-            description: 'Analyze CSV/JSON data files',
-            icon: workflowIcon,
-            action: () => {
-              onExecutePrompt?.('Find and analyze data files (CSV, JSON)')
-            },
-          })
-          break
-      }
-    }
+    // 2. Add a general code-analysis workflow suggestion
+    items.push({
+      id: 'workflow-code-analysis',
+      type: 'workflow',
+      title: 'Analyze Project Code',
+      description: 'Inspect structure, functions, types, and dependencies',
+      icon: Lightbulb,
+      action: () => {
+        onExecutePrompt?.('Analyze the code structure in this project')
+      },
+    })
 
     // 3. Add file upload suggestion if no directory
     if (!directoryHandle) {
@@ -179,7 +126,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
     }
 
     setSuggestions(items.slice(0, 6))
-  }, [directoryHandle, projectType, onExecutePrompt])
+  }, [directoryHandle, onExecutePrompt])
 
   // Generate suggestions on mount and when directory changes
   useEffect(() => {

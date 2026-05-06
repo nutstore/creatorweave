@@ -191,7 +191,6 @@ export function QuickActionsPanel({
   const [activeTab, setActiveTab] = useState<'actions' | 'smart' | 'upload'>(
     controlledTab || 'actions'
   )
-  const [projectType, setProjectType] = useState<string | null>(null)
   const [smartSuggestions, setSmartSuggestions] = useState<
     Array<{
       id: string
@@ -218,19 +217,13 @@ export function QuickActionsPanel({
     }
   })
 
-  // Load project type and smart suggestions
+  // Load smart suggestions
   useEffect(() => {
     const loadSmartData = async () => {
       if (!directoryHandle) return
 
       try {
         const coordinator = getIntelligenceCoordinator()
-
-        // Detect project type
-        const detected = await coordinator.quickDetectProjectType(directoryHandle)
-        if (detected) {
-          setProjectType(detected.type)
-        }
 
         // Get tool recommendations
         const allTools = coordinator.getAllTools()
@@ -474,16 +467,6 @@ export function QuickActionsPanel({
           {/* Smart Tab */}
           {activeTab === 'smart' && (
             <div className="p-4">
-              {/* Project Type Badge */}
-              {projectType && (
-                <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary-50 px-3 py-2 dark:bg-primary-950/20">
-                  <Sparkles className="h-4 w-4 text-primary-600" />
-                  <span className="text-primary-900 dark:text-primary-200 text-sm font-medium">
-                    {projectType.charAt(0).toUpperCase() + projectType.slice(1)} Project Detected
-                  </span>
-                </div>
-              )}
-
               {/* Smart Suggestions */}
               <div className="mb-2">
                 <div className="mb-3 flex items-center justify-between">
@@ -555,26 +538,25 @@ export function QuickActionsPanel({
                 </div>
               </div>
 
-              {/* Project-Specific Suggestions */}
-              {projectType === 'typescript' && (
-                <div className="mt-6">
-                  <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary">
-                    TypeScript Actions
-                  </h3>
-                  <div className="space-y-2">
-                    <button
-                      onClick={() => {
-                        const prompt =
-                          'Analyze the TypeScript code structure, find all types, interfaces, and their relationships'
-                        if (onStartConversation) onStartConversation(prompt)
-                        onClose()
-                      }}
-                      className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted dark:hover:bg-muted"
-                    >
-                      <Code className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-secondary dark:text-muted">Analyze Types & Interfaces</span>
-                    </button>
-                    <button
+              {/* TypeScript Actions */}
+              <div className="mt-6">
+                <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary">
+                  TypeScript Actions
+                </h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      const prompt =
+                        'Analyze the TypeScript code structure, find all types, interfaces, and their relationships'
+                      if (onStartConversation) onStartConversation(prompt)
+                      onClose()
+                    }}
+                    className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted dark:hover:bg-muted"
+                  >
+                    <Code className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm text-secondary dark:text-muted">Analyze Types & Interfaces</span>
+                  </button>
+                  <button
                       onClick={() => {
                         const prompt = 'Find all React components and their props'
                         if (onStartConversation) onStartConversation(prompt)
@@ -587,7 +569,6 @@ export function QuickActionsPanel({
                     </button>
                   </div>
                 </div>
-              )}
             </div>
           )}
 

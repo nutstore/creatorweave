@@ -56,7 +56,6 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     const coordinator = getIntelligenceCoordinator()
     const intelligenceResult = await coordinator.enhanceSystemPrompt(enhancedPrompt, {
       projectId: input.toolContext.projectId ?? null,
-      directoryHandle: input.toolContext.directoryHandle || undefined,
       userMessage,
       sessionId: input.sessionId,
       currentAgentId: input.toolContext.currentAgentId ?? null,
@@ -186,21 +185,8 @@ export async function triggerPrefetchForMessages(
     }
   }
 
-  // Get project type from intelligence coordinator
-  let projectType = 'typescript'
-  try {
-    const coordinator = getIntelligenceCoordinator()
-    if (toolContext.directoryHandle) {
-      const detected = await coordinator.quickDetectProjectType(toolContext.directoryHandle)
-      if (detected) {
-        projectType = detected.type
-      }
-    }
-  } catch {
-    // Use default type
-  }
-
   // Trigger prefetch in background (don't await)
+  const projectType = 'typescript'
   triggerPrefetch({
     directoryHandle: toolContext.directoryHandle,
     recentMessages,

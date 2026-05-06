@@ -4,8 +4,6 @@ import { IntelligenceCoordinator } from '../intelligence-coordinator'
 const {
   recommendMock,
   getToolRecommendationsForPromptMock,
-  scanMock,
-  formatFingerprintForPromptMock,
   getMemoryBlockForPromptMock,
   processMessageMock,
   getProjectMock,
@@ -14,8 +12,6 @@ const {
   return {
     recommendMock: vi.fn(() => []),
     getToolRecommendationsForPromptMock: vi.fn(() => ''),
-    scanMock: vi.fn(async () => null),
-    formatFingerprintForPromptMock: vi.fn(() => ''),
     getMemoryBlockForPromptMock: vi.fn(async () => ''),
     processMessageMock: vi.fn(async () => {}),
     getProjectMock: vi.fn(),
@@ -29,15 +25,6 @@ vi.mock('../tools/tool-recommendation', () => ({
     getAllTools: vi.fn(() => ({})),
   }),
   getToolRecommendationsForPrompt: getToolRecommendationsForPromptMock,
-}))
-
-vi.mock('../project-fingerprint', () => ({
-  getFingerprintScanner: () => ({
-    scan: scanMock,
-    quickScan: vi.fn(async () => 'unknown'),
-  }),
-  formatFingerprintForPrompt: formatFingerprintForPromptMock,
-  getProjectTypeDescription: vi.fn(() => ''),
 }))
 
 vi.mock('../context-memory', () => ({

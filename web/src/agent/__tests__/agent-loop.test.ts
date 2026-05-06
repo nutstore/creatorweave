@@ -20,7 +20,6 @@ vi.mock('@/skills/skill-manager', () => ({
 vi.mock('../intelligence-coordinator', () => ({
   getIntelligenceCoordinator: vi.fn(() => ({
     enhanceSystemPrompt: vi.fn((prompt: string) => Promise.resolve({ systemPrompt: prompt })),
-    quickDetectProjectType: vi.fn(() => Promise.resolve({ type: 'typescript' })),
   })),
 }))
 
