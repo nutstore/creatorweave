@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 5;
+PRAGMA user_version = 6;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -43,6 +43,25 @@ CREATE TRIGGER IF NOT EXISTS active_project_singleton
     BEGIN
         SELECT RAISE(ABORT, 'Only one active project allowed with singleton_id=0');
     END;
+
+
+-- ============================================================================
+-- Project Roots Table (multi-root: one project can have N local folders)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS project_roots (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    name TEXT NOT NULL,                      -- handle.name or "_opfs" for browser-only
+    is_default INTEGER NOT NULL DEFAULT 0,   -- exactly one default per project
+    read_only INTEGER NOT NULL DEFAULT 0,    -- 1 = agent can only read
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+    UNIQUE(project_id, name),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_roots_project_id ON project_roots(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_roots_project_default ON project_roots(project_id, is_default);
 
 
 -- ============================================================================

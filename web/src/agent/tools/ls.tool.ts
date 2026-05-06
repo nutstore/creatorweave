@@ -274,6 +274,32 @@ async function resolveDiscoveryScope(
     throw new Error(`${mode === 'list' ? 'List' : 'Glob search'} failed: path cannot include ".."`)
   }
 
+  // Multi-root: check if first segment matches a root name
+  // If so, resolve within that root's OPFS subtree
+  try {
+    const { getRuntimeHandlesForProject } = await import('@/native-fs')
+    const { useFolderAccessStore } = await import('@/store/folder-access.store')
+    const projectId = useFolderAccessStore.getState().activeProjectId
+    if (projectId) {
+      const allHandles = getRuntimeHandlesForProject(projectId)
+      if (allHandles.size > 0 && subPath) {
+        const segments = subPath.split('/')
+        const maybeRoot = segments[0]
+        if (allHandles.has(maybeRoot)) {
+          // Path starts with a root name → route to that root
+          const rootHandle = allHandles.get(maybeRoot)!
+          const rootSubPath = segments.slice(1).join('/')
+          return {
+            kind: 'workspace' as const,
+            subPath: rootSubPath,
+            resolveHandle: (path: string, options?: { allowMissing?: boolean }) =>
+              resolveDirectoryHandle(rootHandle, path, options),
+          }
+        }
+      }
+    }
+  } catch { /* ignore, fall through to single-handle logic */ }
+
   const rootHandle = await resolveDirectoryHandleWithConversationFallback(
     toolContext.directoryHandle,
     toolContext.workspaceId
@@ -295,6 +321,26 @@ async function resolveDiscoveryScope(
 async function executeListMode(args: Record<string, unknown>, context: unknown): Promise<string> {
   const toolContext = context as ToolContext
   const abortSignal = toolContext.abortSignal
+
+  // Multi-root: when no path and multiple roots exist, list root names
+  if (!args.path) {
+    try {
+      const { getRuntimeHandlesForProject } = await import('@/native-fs')
+      const { useFolderAccessStore } = await import('@/store/folder-access.store')
+      const projectId = useFolderAccessStore.getState().activeProjectId
+      if (projectId) {
+        const allHandles = getRuntimeHandlesForProject(projectId)
+        if (allHandles.size > 0) {
+          const roots = useFolderAccessStore.getState().roots
+          if (roots.length > 0) {
+            return roots.map((r: { name: string; readOnly: boolean }) =>
+              `${r.name}/${r.readOnly ? ' (read-only)' : ''}`
+            ).join('\n')
+          }
+        }
+      }
+    } catch { /* fall through to normal list */ }
+  }
 
   let scope: DiscoveryScope
   try {

@@ -143,6 +143,7 @@ class FolderAccessRepository {
       // 只保存可序列化的数据，不保存 handle
       const persistedRecord = {
         projectId: record.projectId,
+        rootName: record.rootName,
         folderName: record.folderName,
         persistedHandle: record.persistedHandle, // FileSystemDirectoryHandle 可被结构化克隆
         status: record.status,
@@ -184,6 +185,7 @@ class FolderAccessRepository {
         // 恢复完整记录
         const record: FolderAccessRecord = {
           projectId: result.projectId,
+          rootName: result.rootName,
           folderName: result.folderName,
           handle: null, // 内存句柄需要重新获取权限
           persistedHandle: result.persistedHandle,
@@ -266,6 +268,81 @@ class FolderAccessRepository {
       request.onerror = () => {
         reject(request.error)
       }
+    })
+  }
+
+  /**
+   * 按 projectId + rootName 查找记录（多 root 支持）
+   */
+  async findByProjectAndRoot(
+    projectId: string,
+    rootName: string
+  ): Promise<FolderAccessRecord | null> {
+    const db = await this.ensureDB()
+
+    // Scan all records for this project and match rootName
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const request = store.getAll()
+
+      request.onsuccess = () => {
+        const results = request.result as FolderAccessRecord[]
+        const match = results.find(
+          (r) => r.projectId === projectId && r.rootName === rootName
+        )
+        resolve(match ?? null)
+      }
+
+      request.onerror = () => {
+        reject(request.error)
+      }
+    })
+  }
+
+  /**
+   * 按 projectId + rootName 删除记录（多 root 支持）
+   */
+  async deleteByProjectAndRoot(projectId: string, rootName: string): Promise<void> {
+    const record = await this.findByProjectAndRoot(projectId, rootName)
+    if (!record) return
+
+    // Multi-root: update keyPath to include rootName for unique identification
+    // Use a compound approach: store as projectId:rootName
+    const db = await this.ensureDB()
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite')
+      const store = tx.objectStore(STORE_NAME)
+
+      // Find and delete matching records
+      const getAll = store.getAll()
+      getAll.onsuccess = () => {
+        const results = getAll.result as FolderAccessRecord[]
+        const toDelete = results.filter(
+          (r) => r.projectId === projectId && r.rootName === rootName
+        )
+
+        if (toDelete.length === 0) {
+          resolve()
+          return
+        }
+
+        // Delete each matching record (use projectId as key, store handles rootName internally)
+        let deleted = 0
+        for (const record of toDelete) {
+          const delRequest = store.delete(record.projectId)
+          delRequest.onsuccess = () => {
+            deleted++
+            if (deleted === toDelete.length) {
+              resolve()
+            }
+          }
+          delRequest.onerror = () => reject(delRequest.error)
+        }
+      }
+
+      getAll.onerror = () => reject(getAll.error)
     })
   }
 }

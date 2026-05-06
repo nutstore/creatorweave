@@ -57,6 +57,9 @@ export type {
 export { ProjectRepository, getProjectRepository } from './repositories/project.repository'
 export type { Project } from './repositories/project.repository'
 
+export { ProjectRootRepository, getProjectRootRepository } from './repositories/project-root.repository'
+export type { ProjectRoot } from './repositories/project-root.repository'
+
 export { ApiKeyRepository, getApiKeyRepository } from './repositories/api-key.repository'
 
 export { PluginRepository, getPluginRepository } from './repositories/plugin.repository'

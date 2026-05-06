@@ -36,6 +36,7 @@ import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
@@ -110,6 +111,9 @@ export function Sidebar({
   } = useConversationStore()
 
   const { directoryHandle, directoryName } = useAgentStore()
+
+  // Multi-root: get all roots from folder-access store
+  const roots = useFolderAccessStore((state) => state.roots)
   const workspaceStats = useConversationContextStore((state) => state.workspaces)
   const workspaceIds = workspaceStats.map((w) => w.id)
   const currentPendingCount = useConversationContextStore((state) => state.currentPendingCount)
@@ -699,13 +703,31 @@ export function Sidebar({
             {/* Tab content */}
             <div className="flex-1 overflow-hidden" data-tour="file-tree">
               {resourceTab === 'files' && (
-                <FileTreePanel
-                  directoryHandle={directoryHandle}
-                  rootName={directoryName}
-                  onFileSelect={handleFileSelect}
-                  selectedPath={selectedFilePath}
-                  onInspect={onInspect}
-                />
+                roots.length > 0 ? (
+                  <div className="custom-scrollbar flex h-full flex-col overflow-y-auto">
+                    {roots.map((root) => (
+                      <div key={root.id} className="flex-shrink-0">
+                        <FileTreePanel
+                          directoryHandle={root.handle}
+                          rootName={root.name}
+                          onFileSelect={(path, handle) => {
+                            handleFileSelect(`${root.name}/${path}`, handle)
+                          }}
+                          selectedPath={selectedFilePath?.startsWith(`${root.name}/`) ? selectedFilePath.slice(root.name.length + 1) : null}
+                          onInspect={onInspect ? (path, handle) => onInspect(`${root.name}/${path}`, handle) : undefined}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <FileTreePanel
+                    directoryHandle={directoryHandle}
+                    rootName={directoryName}
+                    onFileSelect={handleFileSelect}
+                    selectedPath={selectedFilePath}
+                    onInspect={onInspect}
+                  />
+                )
               )}
 
               {resourceTab === 'plugins' && (

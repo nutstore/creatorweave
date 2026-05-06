@@ -282,14 +282,21 @@ export async function syncProjectSkillsToActiveWorkspace(
   if (workspaceId) {
     const { getWorkspaceManager } = await import('@/opfs/workspace')
     const manager = await getWorkspaceManager()
-    const workspace = await manager.getWorkspace(workspaceId)
+    let workspace = await manager.getWorkspace(workspaceId)
+    // New conversation workspace creation is async; wait briefly before giving up.
+    if (!workspace) {
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        workspace = await manager.getWorkspace(workspaceId)
+        if (workspace) break
+      }
+    }
     if (workspace) {
       targetFilesDir = await workspace.getFilesDir()
       console.log(`[SkillScanner] Syncing .skills to explicit workspace: ${workspaceId}`)
     } else {
-      console.warn(
-        `[SkillScanner] Explicit workspace not found: ${workspaceId}, falling back to active workspace`
-      )
+      console.warn(`[SkillScanner] Explicit workspace not found after wait: ${workspaceId}, skipping sync`)
+      return
     }
   }
 

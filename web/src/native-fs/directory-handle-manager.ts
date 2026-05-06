@@ -5,15 +5,20 @@
  * Manages native filesystem directory handles for dual-storage sync.
  * Handles user permission requests, handle storage, and lifecycle management.
  *
- * Phase 4: Native Filesystem Sync - Story 4.1
+ * Multi-root support: handles are keyed by `${projectId}:${rootName}`.
+ * Legacy single-root callers use projectId directly (mapped to default root).
  */
 
 /**
  * Directory handle storage structure
  */
 export interface StoredHandle {
-  /** Workspace ID */
-  workspaceId: string
+  /** Composite key: `${projectId}:${rootName}` */
+  compoundKey: string
+  /** Project ID */
+  projectId: string
+  /** Root name (handle.name or "_opfs") */
+  rootName: string
   /** Serialized directory handle reference */
   handleRef: string
   /** Storage timestamp */
@@ -35,11 +40,31 @@ export interface DirectoryPickerOptions {
 }
 
 /**
+ * Build compound key for multi-root handle storage
+ */
+export function buildHandleKey(projectId: string, rootName: string): string {
+  return `${projectId}:${rootName}`
+}
+
+/**
+ * Parse compound key back into projectId and rootName
+ */
+export function parseHandleKey(key: string): { projectId: string; rootName: string } {
+  const idx = key.indexOf(':')
+  if (idx === -1) {
+    // Legacy format: just projectId
+    return { projectId: key, rootName: key }
+  }
+  return { projectId: key.substring(0, idx), rootName: key.substring(idx + 1) }
+}
+
+/**
  * Directory handle manager class
  */
 export class DirectoryHandleManager {
   private static readonly DB_NAME = 'AppDirectoryHandles'
   private static readonly STORE_NAME = 'directoryHandles'
+  private static readonly DB_VERSION = 2 // v2: compoundKey-based storage
   private _db: IDBDatabase | null = null
 
   private get db(): IDBDatabase {
@@ -56,20 +81,41 @@ export class DirectoryHandleManager {
     if (this._db) return
 
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(DirectoryHandleManager.DB_NAME, 1)
+      const request = indexedDB.open(DirectoryHandleManager.DB_NAME, DirectoryHandleManager.DB_VERSION)
 
       request.onerror = () => {
         reject(new Error('Failed to open IndexedDB'))
       }
 
+      request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+        const db = request.result
+        const oldVersion = event.oldVersion
+
+        if (oldVersion < 2) {
+          // v1 → v2 migration: old store uses keyPath 'workspaceId', new uses 'compoundKey'
+          // Delete old store and recreate with new schema.
+          // Stored handles are just references; real handles live in the runtime map,
+          // so data loss from this migration is benign.
+          if (db.objectStoreNames.contains(DirectoryHandleManager.STORE_NAME)) {
+            db.deleteObjectStore(DirectoryHandleManager.STORE_NAME)
+          }
+        }
+
+        // Create new v2 store
+        if (!db.objectStoreNames.contains(DirectoryHandleManager.STORE_NAME)) {
+          const store = db.createObjectStore(DirectoryHandleManager.STORE_NAME, {
+            keyPath: 'compoundKey',
+          })
+          store.createIndex('projectId', 'projectId', { unique: false })
+        }
+      }
+
       request.onsuccess = () => {
         this._db = request.result
 
-        // Create object store if not exists
+        // Verify object store exists (safety net for version upgrade edge cases)
         if (!this._db.objectStoreNames.contains(DirectoryHandleManager.STORE_NAME)) {
-          this._db.createObjectStore(DirectoryHandleManager.STORE_NAME, {
-            keyPath: 'workspaceId',
-          })
+          console.warn('[DirectoryHandleManager] Store missing after open, will be created on next upgrade')
         }
 
         resolve()
@@ -116,13 +162,16 @@ export class DirectoryHandleManager {
   }
 
   /**
-   * Store directory handle for a workspace
+   * Store directory handle for a project root
    */
   async storeHandle(
-    workspaceId: string,
+    projectId: string,
+    rootName: string,
     _handle: FileSystemDirectoryHandle
   ): Promise<void> {
     await this.initialize()
+
+    const compoundKey = buildHandleKey(projectId, rootName)
 
     return new Promise<void>((resolve, reject) => {
       const transaction = this.db.transaction(
@@ -145,7 +194,9 @@ export class DirectoryHandleManager {
 
       // Store handle reference
       const request = store.put({
-        workspaceId,
+        compoundKey,
+        projectId,
+        rootName,
         handleRef,
         timestamp: Date.now(),
         status: 'active',
@@ -158,10 +209,12 @@ export class DirectoryHandleManager {
   }
 
   /**
-   * Get stored directory handle for a workspace
+   * Get stored handle info for a project root
    */
-  async getHandle(workspaceId: string): Promise<StoredHandle | null> {
+  async getHandle(projectId: string, rootName: string): Promise<StoredHandle | null> {
     await this.initialize()
+
+    const compoundKey = buildHandleKey(projectId, rootName)
 
     return new Promise<StoredHandle | null>((resolve, reject) => {
       const transaction = this.db.transaction(
@@ -175,7 +228,7 @@ export class DirectoryHandleManager {
         reject(new Error('Failed to read directory handle'))
       }
 
-      const request = store.get(workspaceId)
+      const request = store.get(compoundKey)
 
       request.onsuccess = () => {
         const result = request.result as StoredHandle | undefined
@@ -189,10 +242,43 @@ export class DirectoryHandleManager {
   }
 
   /**
-   * Release directory handle for a workspace
+   * Get all handles for a project
    */
-  async releaseHandle(workspaceId: string): Promise<void> {
+  async getHandlesByProject(projectId: string): Promise<StoredHandle[]> {
     await this.initialize()
+
+    return new Promise<StoredHandle[]>((resolve, reject) => {
+      const transaction = this.db.transaction(
+        [DirectoryHandleManager.STORE_NAME],
+        'readonly'
+      )
+
+      const store = transaction.objectStore(DirectoryHandleManager.STORE_NAME)
+      const index = store.index('projectId')
+
+      transaction.onerror = () => {
+        reject(new Error('Failed to read directory handles'))
+      }
+
+      const request = index.getAll(projectId)
+
+      request.onsuccess = () => {
+        resolve(request.result || [])
+      }
+
+      request.onerror = () => {
+        reject(new Error('Failed to get handles from IndexedDB'))
+      }
+    })
+  }
+
+  /**
+   * Release directory handle for a project root
+   */
+  async releaseHandle(projectId: string, rootName: string): Promise<void> {
+    await this.initialize()
+
+    const compoundKey = buildHandleKey(projectId, rootName)
 
     return new Promise<void>((resolve, reject) => {
       const transaction = this.db.transaction(
@@ -210,7 +296,7 @@ export class DirectoryHandleManager {
         resolve()
       }
 
-      const request = store.delete(workspaceId)
+      const request = store.delete(compoundKey)
 
       request.onerror = () => {
         reject(new Error('Failed to delete handle from IndexedDB'))
@@ -219,10 +305,10 @@ export class DirectoryHandleManager {
   }
 
   /**
-   * Check if workspace has valid handle
+   * Check if project root has valid handle
    */
-  async hasValidHandle(workspaceId: string): Promise<boolean> {
-    const stored = await this.getHandle(workspaceId)
+  async hasValidHandle(projectId: string, rootName: string): Promise<boolean> {
+    const stored = await this.getHandle(projectId, rootName)
     return stored !== null && stored.status === 'active'
   }
 
@@ -269,6 +355,8 @@ export class DirectoryHandleManager {
 
 // Singleton instance
 let defaultManager: DirectoryHandleManager | null = null
+
+// Runtime handles keyed by compound key: `${projectId}:${rootName}`
 const runtimeHandles = new Map<string, FileSystemDirectoryHandle>()
 
 /**
@@ -282,68 +370,117 @@ export function getDirectoryHandleManager(): DirectoryHandleManager {
 }
 
 /**
- * Request directory handle with user prompt
+ * Request directory handle with user prompt and store for a project root
  */
 export async function requestDirectoryAccess(
-  scopeId: string,
+  projectId: string,
+  rootName: string,
   options?: DirectoryPickerOptions
 ): Promise<FileSystemDirectoryHandle | null> {
   const manager = getDirectoryHandleManager()
   const handle = await manager.requestHandle(options)
 
   if (handle) {
-    await manager.storeHandle(scopeId, handle)
-    runtimeHandles.set(scopeId, handle)
+    await manager.storeHandle(projectId, rootName, handle)
+    const compoundKey = buildHandleKey(projectId, rootName)
+    runtimeHandles.set(compoundKey, handle)
   }
 
   return handle
 }
 
 /**
- * Bind an in-memory handle alias to an already granted directory handle.
- * Application invariant:
- * - Use project ID as the runtime-handle scope.
- * - Do not bind per-workspace aliases.
+ * Bind an in-memory handle for a project root.
+ * Multi-root version: takes (projectId, rootName, handle).
  */
 export function bindRuntimeDirectoryHandle(
-  id: string,
-  handle: FileSystemDirectoryHandle
+  projectId: string,
+  rootNameOrHandle: string | FileSystemDirectoryHandle,
+  maybeHandle?: FileSystemDirectoryHandle
 ): void {
-  runtimeHandles.set(id, handle)
+  if (typeof rootNameOrHandle === 'string') {
+    // New multi-root API: bindRuntimeDirectoryHandle(projectId, rootName, handle)
+    const rootName = rootNameOrHandle
+    const handle = maybeHandle!
+    const compoundKey = buildHandleKey(projectId, rootName)
+    runtimeHandles.set(compoundKey, handle)
+  } else {
+    // Legacy API: bindRuntimeDirectoryHandle(projectId, handle)
+    // Maps to default root using projectId as rootName
+    const handle = rootNameOrHandle
+    const compoundKey = buildHandleKey(projectId, projectId)
+    runtimeHandles.set(compoundKey, handle)
+  }
 }
 
 /**
- * Get currently available in-memory directory handle by ID.
- * In app flows this ID should be the active project ID.
+ * Get in-memory directory handle for a project root.
+ * Multi-root version: takes (projectId, rootName).
+ * Legacy version: takes single id (projectId), returns default root handle.
  */
 export function getRuntimeDirectoryHandle(
-  id: string
+  projectId: string,
+  rootName?: string
 ): FileSystemDirectoryHandle | null {
-  return runtimeHandles.get(id) ?? null
+  if (rootName !== undefined) {
+    // New multi-root API
+    return runtimeHandles.get(buildHandleKey(projectId, rootName)) ?? null
+  }
+  // Legacy API: return handle keyed by projectId (backward compat)
+  return runtimeHandles.get(buildHandleKey(projectId, projectId)) ?? null
 }
 
 /**
- * Remove an in-memory directory handle binding by ID.
+ * Get all runtime handles for a project.
  */
-export function unbindRuntimeDirectoryHandle(id: string): void {
-  runtimeHandles.delete(id)
+export function getRuntimeHandlesForProject(
+  projectId: string
+): Map<string, FileSystemDirectoryHandle> {
+  const result = new Map<string, FileSystemDirectoryHandle>()
+  for (const [key, handle] of runtimeHandles.entries()) {
+    const parsed = parseHandleKey(key)
+    if (parsed.projectId === projectId) {
+      result.set(parsed.rootName, handle)
+    }
+  }
+  return result
 }
 
 /**
- * Get stored directory handle reference
+ * Remove an in-memory directory handle binding.
+ * Multi-root version: takes (projectId, rootName).
+ */
+export function unbindRuntimeDirectoryHandle(
+  projectId: string,
+  rootName?: string
+): void {
+  if (rootName !== undefined) {
+    runtimeHandles.delete(buildHandleKey(projectId, rootName))
+  } else {
+    // Legacy: remove by projectId
+    runtimeHandles.delete(buildHandleKey(projectId, projectId))
+  }
+}
+
+/**
+ * Get stored directory handle reference for a project root
  */
 export async function getStoredDirectoryHandle(
-  workspaceId: string
+  projectId: string,
+  rootName: string
 ): Promise<StoredHandle | null> {
   const manager = getDirectoryHandleManager()
-  return manager.getHandle(workspaceId)
+  return manager.getHandle(projectId, rootName)
 }
 
 /**
- * Release directory handle
+ * Release directory handle for a project root
  */
-export async function releaseDirectoryHandle(workspaceId: string): Promise<void> {
+export async function releaseDirectoryHandle(
+  projectId: string,
+  rootName: string
+): Promise<void> {
   const manager = getDirectoryHandleManager()
-  await manager.releaseHandle(workspaceId)
-  runtimeHandles.delete(workspaceId)
+  await manager.releaseHandle(projectId, rootName)
+  runtimeHandles.delete(buildHandleKey(projectId, rootName))
 }

@@ -503,6 +503,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
             const manager = await getWorkspaceManager()
             const refreshForWorkspace = async () => {
+              // Multi-root: try default root handle first, then any handle
               const projectHandle = getRuntimeDirectoryHandle(activeProjectId)
               if (projectHandle) {
                 await get().onNativeDirectoryGranted(projectHandle)
@@ -992,15 +993,15 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           try {
             // Request directory access from user
-            const handle = await requestDirectoryAccess(activeProjectId, {
+            // Multi-root: rootName = handle.name (set after picker returns)
+            const handle = await requestDirectoryAccess(activeProjectId, activeProjectId, {
               mode: 'readwrite',
               startIn: '/',
             })
 
             if (handle) {
-              // Native directory handle is project-scoped.
-              // All workspaces in this project share the same handle.
-              bindRuntimeDirectoryHandle(activeProjectId, handle)
+              // Multi-root: bind with handle.name as the root name
+              bindRuntimeDirectoryHandle(activeProjectId, handle.name, handle)
               await get().onNativeDirectoryGranted(handle)
               set({ isLoading: false })
             } else {
@@ -1057,7 +1058,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           if (!activeProjectId) return
 
           try {
-            await releaseDirectoryHandle(activeProjectId)
+            // Multi-root: release all handles for this project
+            const { getRuntimeHandlesForProject } = await import('@/native-fs')
+            const handles = getRuntimeHandlesForProject(activeProjectId)
+            for (const [rootName] of handles) {
+              await releaseDirectoryHandle(activeProjectId, rootName)
+            }
             set({ hasDirectoryHandle: false })
           } catch (e) {
             console.error('Failed to release directory handle:', e)
@@ -1104,6 +1110,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const workspace = await manager.getWorkspace(activeWorkspaceId)
             if (!workspace) return
 
+            // Multi-root aware: get default handle (or first available)
             const nativeDir = await workspace.getNativeDirectoryHandle()
             if (!nativeDir) {
               toast.error('没有可用的本地目录')
@@ -1122,6 +1129,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const paths = snapshotOps.map((op: { path: string }) => op.path)
 
               if (paths.length > 0) {
+                // syncToDisk now internally routes to correct root handles
                 const result = await workspace.syncToDisk(nativeDir, paths)
                 if (result.failed === 0) {
                   await workspace.markSnapshotAsSynced(snapshot.snapshotId)

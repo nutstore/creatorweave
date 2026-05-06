@@ -479,6 +479,38 @@ export const enUS = {
       data: "Data",
       ariaLabel: "Settings options",
     },
+  },
+
+  projectRoots: {
+    tabLabel: "Folders",
+    title: "Project Folders",
+    description: "Add, remove, or manage project folders",
+    addFolder: "Add Folder",
+    empty: "No folders added yet",
+    emptyHint: "Add a folder to start working with project files",
+    default: "Default",
+    readOnly: "Read-only",
+    restorePermission: "Restore permission",
+    permissionDenied: "Permission denied",
+    permissionFailed: "Failed to restore permission",
+    enableWrite: "Enable write access",
+    makeReadOnly: "Make read-only",
+    setAsDefault: "Set as default",
+    removeRoot: "Remove folder",
+    confirmRemove: 'Are you sure you want to remove "{name}" from this project?',
+  },
+
+  workspaceSettings: {
+    title: "Workspace Settings",
+    close: "Close",
+    done: "Done",
+    tabs: {
+      layout: "Layout",
+      display: "Display",
+      shortcuts: "Shortcuts",
+      data: "Data",
+      ariaLabel: "Settings options",
+    },
     layout: {
       title: "Layout Settings",
       description: "Adjust panel sizes and ratios in your workspace",

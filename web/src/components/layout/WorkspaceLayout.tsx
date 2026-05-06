@@ -56,6 +56,7 @@ import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
+import { getWorkspaceManager } from '@/opfs'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -80,6 +81,17 @@ export function WorkspaceLayout({
   onCreateProject,
   onManageProjects,
 }: WorkspaceLayoutProps) {
+  const waitForWorkspaceReady = useCallback(async (workspaceId: string, timeoutMs = 30000) => {
+    const manager = await getWorkspaceManager()
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      const workspace = await manager.getWorkspace(workspaceId)
+      if (workspace) return true
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return false
+  }, [])
+
   const {
     activeConversationId,
     conversations,
@@ -276,27 +288,54 @@ export function WorkspaceLayout({
 
         // Sync skill resources to OPFS so Pyodide can access them at /mnt/.skills/
         await syncResourcesToOPFS(result)
-        // Also sync .skills/ directory directly from disk (covers all workspaces)
-        await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+        // Also sync .skills/ directory directly from disk (covers all workspaces).
+        // Wait for workspace creation/switch completion to avoid writing into stale workspace.
+        if (activeConversationId) {
+          const ready = await waitForWorkspaceReady(activeConversationId)
+          if (ready) {
+            await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+          } else {
+            console.warn(
+              `[WorkspaceLayout] Workspace not ready for skill sync after timeout: ${activeConversationId}`
+            )
+          }
+        }
       } catch (error) {
         console.error('Failed to scan project skills:', error)
       }
     }
 
     void scanForSkills()
-  }, [directoryHandle, skillsLoaded, loadSkills, activeProjectId])
+  }, [directoryHandle, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady])
 
   // Sync .skills/ to OPFS when workspace changes (new workspace created or switched)
   useEffect(() => {
     if (!directoryHandle || !activeConversationId) return
 
+    let cancelled = false
     setSkillsSyncing(true)
-    syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+    ;(async () => {
+      const ready = await waitForWorkspaceReady(activeConversationId)
+      if (!ready) {
+        console.warn(
+          `[WorkspaceLayout] Workspace not ready for direct skill sync after timeout: ${activeConversationId}`
+        )
+        return
+      }
+      if (cancelled) return
+      await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+    })()
       .catch((err) => {
         console.warn('[WorkspaceLayout] Failed to sync skills to workspace:', err)
       })
-      .finally(() => setSkillsSyncing(false))
-  }, [directoryHandle, activeConversationId])
+      .finally(() => {
+        if (!cancelled) setSkillsSyncing(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [directoryHandle, activeConversationId, waitForWorkspaceReady])
 
   // Global keyboard shortcuts
   useEffect(() => {

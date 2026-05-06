@@ -28,6 +28,8 @@ Two mounted directories:
 - \`/mnt/\` — workspace project files. Read/write project source files here. ALWAYS use /mnt/ prefix. Example: \`open('/mnt/output.csv', 'w')\`
 - \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here. Example: \`pd.read_csv('/mnt_assets/data.csv')\`
 
+Multi-root projects: When the project has multiple roots, files are accessible under \`/mnt/{rootName}/path/to/file\`. The default root files are at the top level of /mnt/ (no prefix needed).
+
 Important:
 - The default working directory is /home/pyodide, which is NOT synced. Files written there will be lost.
 - /mnt/ reads from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.

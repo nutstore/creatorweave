@@ -50,14 +50,6 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     return toolErrorJson('sync', 'invalid_args', 'paths must be a non-empty array of file paths or glob patterns')
   }
 
-  const nativeHandle = await resolveNativeDirectoryHandle(
-    context.directoryHandle,
-    context.workspaceId
-  )
-  if (!nativeHandle) {
-    return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
-  }
-
   // Resolve workspace runtime and files/ dir
   const runtime = await getWorkspaceRuntime(context.workspaceId)
   if (!runtime) {
@@ -65,11 +57,46 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   }
   const filesDir = await runtime.getFilesDir()
 
-  // Expand globs and collect actual file paths
-  const resolvedPaths = await resolvePaths(nativeHandle, paths as string[])
-  if (resolvedPaths.length === 0) {
-    // If none are found on native FS, check whether paths already exist in OPFS.
-    // In that case syncing is unnecessary and returning no_files is misleading.
+  // Collect all native handles: multi-root aware
+  // If context.directoryHandle exists, use it as the primary (legacy path)
+  // Otherwise, try to get all native handles from the runtime (multi-root path)
+  let nativeHandleMap: Map<string, FileSystemDirectoryHandle>
+
+  if (context.directoryHandle) {
+    // Legacy single-root: use context handle as default
+    nativeHandleMap = new Map([['', context.directoryHandle]])
+  } else {
+    // Multi-root: resolve all handles from runtime
+    nativeHandleMap = await runtime.getAllNativeDirectoryHandles()
+    // Fallback to single handle resolution
+    if (nativeHandleMap.size === 0) {
+      const fallbackHandle = await resolveNativeDirectoryHandle(
+        null,
+        context.workspaceId
+      )
+      if (!fallbackHandle) {
+        return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
+      }
+      nativeHandleMap = new Map([['', fallbackHandle]])
+    }
+  }
+
+  if (nativeHandleMap.size === 0) {
+    return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
+  }
+
+  // Expand globs across all roots and collect file paths grouped by root
+  const allResolvedPaths = new Map<string, string[]>() // rootName → filePaths
+  let totalResolved = 0
+
+  for (const [rootName, nativeHandle] of nativeHandleMap) {
+    const resolvedPaths = await resolvePaths(nativeHandle, paths as string[])
+    allResolvedPaths.set(rootName, resolvedPaths)
+    totalResolved += resolvedPaths.length
+  }
+
+  if (totalResolved === 0) {
+    // Check whether paths already exist in OPFS
     const alreadyInOPFS = await resolvePaths(filesDir, paths as string[])
     if (alreadyInOPFS.length > 0) {
       return toolOkJson('sync', {
@@ -89,35 +116,47 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     )
   }
 
-  // Sync files
+  // Sync files from each root
   let synced = 0
   let skipped = 0
   let totalBytes = 0
   const errors: string[] = []
 
-  for (const filePath of resolvedPaths) {
-    if (synced >= MAX_FILES) {
-      errors.push(`Reached max file limit (${MAX_FILES}), stopping`)
-      break
-    }
-    if (totalBytes >= MAX_TOTAL_SIZE) {
-      errors.push(`Reached total size limit (${MAX_TOTAL_SIZE / 1024 / 1024}MB), stopping`)
-      break
+  for (const [rootName, nativeHandle] of nativeHandleMap) {
+    const resolvedPaths = allResolvedPaths.get(rootName) ?? []
+
+    // For multi-root, prepend rootName to OPFS path so resolvePath() can route correctly
+    const opfsPathPrefix = rootName ? `${rootName}/` : ''
+
+    for (const filePath of resolvedPaths) {
+      if (synced >= MAX_FILES) {
+        errors.push(`Reached max file limit (${MAX_FILES}), stopping`)
+        break
+      }
+      if (totalBytes >= MAX_TOTAL_SIZE) {
+        errors.push(`Reached total size limit (${MAX_TOTAL_SIZE / 1024 / 1024}MB), stopping`)
+        break
+      }
+
+      try {
+        // Source: native handle (root's directory)
+        // Destination: OPFS files/ with root prefix for correct routing
+        const opfsPath = `${opfsPathPrefix}${filePath}`
+        const size = await syncSingleFile(nativeHandle, filesDir, filePath, opfsPath)
+        if (size >= 0) {
+          synced++
+          totalBytes += size
+        } else {
+          skipped++
+        }
+      } catch (e) {
+        errors.push(
+          `${filePath}: ${e instanceof Error ? e.message : String(e)}`
+        )
+      }
     }
 
-    try {
-      const size = await syncSingleFile(nativeHandle, filesDir, filePath)
-      if (size >= 0) {
-        synced++
-        totalBytes += size
-      } else {
-        skipped++
-      }
-    } catch (e) {
-      errors.push(
-        `${filePath}: ${e instanceof Error ? e.message : String(e)}`
-      )
-    }
+    if (synced >= MAX_FILES || totalBytes >= MAX_TOTAL_SIZE) break
   }
 
   // Rebuild filesIndex so workspace-runtime sees the newly synced files
@@ -314,43 +353,48 @@ function globToRegex(glob: string): RegExp {
 async function syncSingleFile(
   nativeHandle: FileSystemDirectoryHandle,
   opfsFilesDir: FileSystemDirectoryHandle,
-  filePath: string
+  filePath: string,
+  opfsDestPath?: string
 ): Promise<number> {
-  const parts = filePath.split('/')
+  // opfsDestPath: optional destination path in OPFS (for multi-root prefix routing)
+  // If not provided, uses filePath (legacy single-root behavior)
+  const destPath = opfsDestPath ?? filePath
+  const destParts = destPath.split('/')
+  const sourceParts = filePath.split('/')
 
   // Check if file already exists in OPFS — never overwrite existing files
   // because OPFS version may contain agent edits (pending changes).
   try {
     let checkDir = opfsFilesDir
-    for (let i = 0; i < parts.length - 1; i++) {
-      checkDir = await checkDir.getDirectoryHandle(parts[i])
+    for (let i = 0; i < destParts.length - 1; i++) {
+      checkDir = await checkDir.getDirectoryHandle(destParts[i])
     }
-    await checkDir.getFileHandle(parts[parts.length - 1])
+    await checkDir.getFileHandle(destParts[destParts.length - 1])
     // File exists in OPFS — skip to avoid clobbering agent edits
     return -1
   } catch {
     // File not in OPFS, proceed with sync
   }
 
-  // Read from native FS
+  // Read from native FS (using source path relative to root's handle)
   let dirHandle = nativeHandle
-  for (let i = 0; i < parts.length - 1; i++) {
-    dirHandle = await dirHandle.getDirectoryHandle(parts[i])
+  for (let i = 0; i < sourceParts.length - 1; i++) {
+    dirHandle = await dirHandle.getDirectoryHandle(sourceParts[i])
   }
-  const fileHandle = await dirHandle.getFileHandle(parts[parts.length - 1])
+  const fileHandle = await dirHandle.getFileHandle(sourceParts[sourceParts.length - 1])
   const file = await fileHandle.getFile()
 
   if (file.size > MAX_FILE_SIZE) {
     throw new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
   }
 
-  // Write to OPFS files/ dir
+  // Write to OPFS files/ dir (using destination path)
   let opfsDir = opfsFilesDir
-  for (let i = 0; i < parts.length - 1; i++) {
-    opfsDir = await opfsDir.getDirectoryHandle(parts[i], { create: true })
+  for (let i = 0; i < destParts.length - 1; i++) {
+    opfsDir = await opfsDir.getDirectoryHandle(destParts[i], { create: true })
   }
 
-  const opfsFileHandle = await opfsDir.getFileHandle(parts[parts.length - 1], { create: true })
+  const opfsFileHandle = await opfsDir.getFileHandle(destParts[destParts.length - 1], { create: true })
   const writable = await opfsFileHandle.createWritable()
   await writable.write(file)
   await writable.close()

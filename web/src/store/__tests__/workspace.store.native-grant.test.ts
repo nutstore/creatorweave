@@ -29,6 +29,7 @@ vi.mock('@/native-fs', () => ({
   releaseDirectoryHandle: vi.fn(),
   bindRuntimeDirectoryHandle: bindRuntimeDirectoryHandleMock,
   getRuntimeDirectoryHandle: getRuntimeDirectoryHandleMock,
+  getRuntimeHandlesForProject: vi.fn(() => new Map()),
 }))
 
 vi.mock('@/sqlite/repositories/workspace.repository', () => ({
@@ -190,7 +191,7 @@ describe('workspace.store native directory grant feedback', () => {
   })
 
   it('requestDirectoryAccess binds runtime handle only by project id', async () => {
-    const handle = {} as FileSystemDirectoryHandle
+    const handle = { name: 'my-project' } as FileSystemDirectoryHandle
     requestDirectoryAccessMock.mockResolvedValue(handle)
     rebindMock.mockResolvedValue({
       checked: 0,
@@ -203,10 +204,12 @@ describe('workspace.store native directory grant feedback', () => {
 
     expect(requestDirectoryAccessMock).toHaveBeenCalledWith(
       'project-1',
+      'project-1',
       expect.objectContaining({ mode: 'readwrite' })
     )
-    expect(bindRuntimeDirectoryHandleMock).toHaveBeenCalledWith('project-1', handle)
-    expect(bindRuntimeDirectoryHandleMock).not.toHaveBeenCalledWith('ws-1', handle)
+    // Multi-root: bindRuntimeDirectoryHandle is called with (projectId, rootName, handle)
+    expect(bindRuntimeDirectoryHandleMock).toHaveBeenCalledWith('project-1', 'my-project', handle)
+    expect(bindRuntimeDirectoryHandleMock).not.toHaveBeenCalledWith('ws-1', expect.anything(), handle)
   })
 
   it('refreshWorkspaces clears stale pendingChanges and preview state', async () => {
