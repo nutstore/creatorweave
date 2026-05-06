@@ -344,22 +344,26 @@ async function ensureAssetsMounted(dirHandle) {
  * (e.g. files written by agent tools on the main thread)
  * without the overhead of a full unmount + remount cycle.
  */
+async function syncFromOPFSRaw() {
+  if (!pyodide || !nativefs) return
+  try {
+    await new Promise((resolve, reject) => {
+      pyodide.FS.syncfs(true, (err) => {
+        if (err) reject(err)
+        else resolve(undefined)
+      })
+    })
+    console.log('[Pyodide Worker] syncfs(true) populated from OPFS')
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[Pyodide Worker] syncfs(true) failed:', msg)
+    throw error
+  }
+}
+
 async function syncFromOPFS() {
   return runExclusiveFSOperation(async () => {
-    if (!pyodide || !nativefs) return
-    try {
-      await new Promise((resolve, reject) => {
-        pyodide.FS.syncfs(true, (err) => {
-          if (err) reject(err)
-          else resolve(undefined)
-        })
-      })
-      console.log('[Pyodide Worker] syncfs(true) populated from OPFS')
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error)
-      console.warn('[Pyodide Worker] syncfs(true) failed:', msg)
-      throw error
-    }
+    await syncFromOPFSRaw()
   })
 }
 
@@ -383,7 +387,9 @@ async function ensureMounted(dirHandle) {
     // If already mounted with the same handle, just sync from OPFS to refresh cache
     if (nativefs && sameHandle) {
       try {
-        await syncFromOPFS()
+        // IMPORTANT: already inside runExclusiveFSOperation in ensureMounted.
+        // Calling the locked wrapper here causes lock re-entry deadlock.
+        await syncFromOPFSRaw()
         return
       } catch {
         // syncfs failed, fall through to full remount
