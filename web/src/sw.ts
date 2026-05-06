@@ -22,6 +22,9 @@ const DYNAMIC_CACHE = 'dynamic-v2'
 const STATIC_RESOURCES = ['/manifest.json']
 
 const API_PATTERNS = [/\/api\//, /\/mcp\//]
+const PYODIDE_WHEEL_PATTERN = /^\/assets\/pyodide\/.+\.(?:whl|tar)$/i
+const PYODIDE_VERSION = '0.29.3'
+const PYODIDE_CDN_BASE = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
 
 const IMMUTABLE_ASSET_PATTERN =
   /^\/assets\/.+-[A-Za-z0-9_-]{6,}\.(?:js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|wasm)$/i
@@ -84,6 +87,11 @@ self.addEventListener('fetch', (event) => {
 
   if (isNavigationRequest(request)) {
     event.respondWith(networkFirstWithCacheFallback(request))
+    return
+  }
+
+  if (isPyodideWheel(url.pathname)) {
+    event.respondWith(pyodideWheelCacheWithCdnFallback(request, url))
     return
   }
 
@@ -155,6 +163,33 @@ async function networkFirstWithCacheFallback(request: Request): Promise<Response
   }
 }
 
+async function pyodideWheelCacheWithCdnFallback(request: Request, url: URL): Promise<Response> {
+  const cache = await caches.open(DYNAMIC_CACHE)
+  const cached = await cache.match(request)
+  if (cached) return cached
+
+  // Local build does not include full wheel set; fetch wheels from CDN when absent.
+  const fileName = url.pathname.split('/').pop()
+  if (!fileName) {
+    return new Response('Bad Request', { status: 400 })
+  }
+  const cdnUrl = `${PYODIDE_CDN_BASE}${fileName}`
+
+  try {
+    const cdnResponse = await fetch(cdnUrl, { mode: 'cors' })
+    if (cdnResponse.ok) {
+      // Cache under the original local URL key so future local requests hit cache directly.
+      await cache.put(request, cdnResponse.clone())
+    }
+    return cdnResponse
+  } catch {
+    return new Response(JSON.stringify({ error: 'Offline', cached: false }), {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+}
+
 function isStaticResource(pathname: string): boolean {
   const staticExtensions = [
     '.js',
@@ -175,6 +210,10 @@ function isStaticResource(pathname: string): boolean {
 
 function isImmutableAsset(pathname: string): boolean {
   return IMMUTABLE_ASSET_PATTERN.test(pathname)
+}
+
+function isPyodideWheel(pathname: string): boolean {
+  return PYODIDE_WHEEL_PATTERN.test(pathname)
 }
 
 function isNavigationRequest(request: Request): boolean {
