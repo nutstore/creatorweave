@@ -1021,7 +1021,7 @@ function getResolvedPathForLoopGuard(target: Awaited<ReturnType<typeof resolveVf
  * This mirrors the snapshot-diff logic in execute.tool.ts but works
  * for direct vfs://assets/ writes where we already know the file details.
  */
-function collectAssetsFromWrite(
+export function collectAssetsFromWrite(
   assetPath: string,
   size: number,
   isNew: boolean,

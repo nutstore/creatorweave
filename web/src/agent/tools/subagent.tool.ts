@@ -1,5 +1,8 @@
 import { toolErrorJson, toolOkJson } from './tool-envelope'
+import { collectAssetsFromWrite } from './io.tool'
+import { resolveVfsTarget } from './vfs-resolver'
 import { SubagentError } from './tool-types'
+import type { ToolContext } from './tool-types'
 import {
   validateAgentId,
   validateDescription,
@@ -17,6 +20,45 @@ const TOOL_NAME_STOP = 'stop_subagent'
 const TOOL_NAME_RESUME = 'resume_subagent'
 const TOOL_NAME_GET_STATUS = 'get_subagent_status'
 const TOOL_NAME_LIST = 'list_subagents'
+
+/** Character threshold above which subagent output is offloaded to an asset file. */
+const SUBAGENT_OUTPUT_OFFLOAD_THRESHOLD = 8000
+/** Characters from the start of the content to include in the summary. */
+const SUBAGENT_SUMMARY_PREVIEW = 2000
+
+/**
+ * If content exceeds the offload threshold, write the full output to an asset
+ * file and return a summary + file path. Otherwise return content unchanged.
+ */
+async function offloadLargeContent(
+  content: string,
+  agentId: string,
+  context: ToolContext,
+): Promise<{ content: string; assetPath?: string }> {
+  if (content.length <= SUBAGENT_OUTPUT_OFFLOAD_THRESHOLD) {
+    return { content }
+  }
+
+  const shortId = agentId.replace(/^subagent_/, '')
+  const fileName = `subagent-output-${shortId}.md`
+  const vfsPath = `vfs://assets/${fileName}`
+
+  try {
+    const target = await resolveVfsTarget(vfsPath, context, 'write')
+    await target.backend.writeFile(target.path, content)
+    collectAssetsFromWrite(fileName, content.length, true)
+
+    const preview = content.slice(0, SUBAGENT_SUMMARY_PREVIEW)
+    const summary =
+      preview +
+      `\n\n... [Subagent output truncated. Full result (${content.length.toLocaleString()} chars) saved to: \`${vfsPath}\` — use \`read\` to view the complete output.]`
+
+    return { content: summary, assetPath: vfsPath }
+  } catch (error) {
+    console.warn('[SubagentTool] Failed to offload content to asset file:', error)
+    return { content }
+  }
+}
 
 function runtimeMissing(tool: string): string {
   return toolErrorJson(
@@ -251,7 +293,12 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
       mode: args.mode === 'plan' || args.mode === 'act' ? args.mode : undefined,
       timeout_ms,
     })
-    return toolOkJson(TOOL_NAME_SPAWN, result)
+    const offloaded = await offloadLargeContent(result.content, result.agentId, context)
+    return toolOkJson(TOOL_NAME_SPAWN, {
+      ...result,
+      content: offloaded.content,
+      ...(offloaded.assetPath ? { assetPath: offloaded.assetPath } : {}),
+    })
   } catch (error) {
     return formatError(TOOL_NAME_SPAWN, error)
   }
@@ -276,7 +323,17 @@ export const batchSpawnExecutor: ToolExecutor = async (args, context) => {
       tasks,
       max_concurrency,
     })
-    return toolOkJson(TOOL_NAME_BATCH_SPAWN, result)
+    const offloadedCompleted = await Promise.all(
+      result.completed.map(async (item) => {
+        const offloaded = await offloadLargeContent(item.content, item.agentId, context)
+        return {
+          ...item,
+          content: offloaded.content,
+          ...(offloaded.assetPath ? { assetPath: offloaded.assetPath } : {}),
+        }
+      }),
+    )
+    return toolOkJson(TOOL_NAME_BATCH_SPAWN, { ...result, completed: offloadedCompleted })
   } catch (error) {
     return formatError(TOOL_NAME_BATCH_SPAWN, error)
   }
