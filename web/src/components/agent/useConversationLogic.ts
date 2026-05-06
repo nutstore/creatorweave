@@ -297,7 +297,10 @@ export function useConversationLogic() {
       setActive(targetConvId)
     }
 
-    if (isConversationRunning(targetConvId)) return
+    if (isConversationRunning(targetConvId)) {
+      toast.error(t('conversation.toast.stopBeforeSend'))
+      return
+    }
 
     const userMsg = createUserMessage(text, options?.assets)
     const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)

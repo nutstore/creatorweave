@@ -13,6 +13,7 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { enableMapSet } from 'immer'
 import { toast } from 'sonner'
+import { t as translateStatic } from '@creatorweave/i18n'
 import type {
   Conversation,
   Message,
@@ -37,7 +38,14 @@ import {
   emitError,
 } from '@/streaming-bus'
 import { useConversationContextStore } from './conversation-context.store'
+import { useI18nStore } from '@/i18n/store'
 import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
+
+function i18nText(key: string, fallback: string): string {
+  const locale = useI18nStore.getState().locale
+  const translated = translateStatic(locale, key)
+  return translated === key ? fallback : translated
+}
 
 /**
  * Commit completed draft assistant content + tool calls into conversation messages.
@@ -1312,15 +1320,25 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     regenerateUserMessage: (conversationId, userMessageId) => {
       const state = get()
       if (state.isConversationRunning(conversationId)) {
-        toast.error('请先停止当前运行，再重新生成')
+        toast.error(i18nText('conversation.toast.stopBeforeRegenerate', '请先停止当前运行，再重新生成'))
         return
       }
 
       const conv = state.conversations.find((c) => c.id === conversationId)
-      if (!conv) return
+      if (!conv) {
+        toast.error(i18nText('conversation.toast.conversationMissingForRegenerate', '会话不存在，无法重新生成'))
+        return
+      }
 
       const userMsgIndex = conv.messages.findIndex((m) => m.id === userMessageId)
-      if (userMsgIndex < 0 || conv.messages[userMsgIndex].role !== 'user') return
+      if (userMsgIndex < 0) {
+        toast.error(i18nText('conversation.toast.targetMessageMissing', '目标消息不存在，可能已被删除'))
+        return
+      }
+      if (conv.messages[userMsgIndex].role !== 'user') {
+        toast.error(i18nText('conversation.toast.onlyUserMessageRegenerate', '只能重新生成用户消息'))
+        return
+      }
 
       // 找到该用户消息所属轮次中，需要清理的所有后续消息（直到下一个 user）
       const idsToDelete = new Set<string>()
@@ -1361,25 +1379,38 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       // 获取设置并执行
       const settingsState = useSettingsStore.getState()
       const provider = settingsState.providerType
-      const model = settingsState.modelName
+      const effectiveConfig = settingsState.getEffectiveProviderConfig()
+      const model = effectiveConfig?.modelName || settingsState.modelName
 
       if (provider && model) {
         get().runAgent(conversationId, provider, model, 8192, null)
+      } else {
+        toast.error(i18nText('conversation.toast.modelNotConfigured', '模型未配置，请先在设置中选择服务商和模型'))
       }
     },
 
     editAndResendUserMessage: (conversationId, userMessageId, newContent) => {
       const state = get()
       if (state.isConversationRunning(conversationId)) {
-        toast.error('请先停止当前运行，再编辑发送')
+        toast.error(i18nText('conversation.toast.stopBeforeEditResend', '请先停止当前运行，再编辑发送'))
         return
       }
 
       const conv = state.conversations.find((c) => c.id === conversationId)
-      if (!conv) return
+      if (!conv) {
+        toast.error(i18nText('conversation.toast.conversationMissingForEditResend', '会话不存在，无法编辑重发'))
+        return
+      }
 
       const userMsgIndex = conv.messages.findIndex((m) => m.id === userMessageId)
-      if (userMsgIndex < 0 || conv.messages[userMsgIndex].role !== 'user') return
+      if (userMsgIndex < 0) {
+        toast.error(i18nText('conversation.toast.targetMessageMissing', '目标消息不存在，可能已被删除'))
+        return
+      }
+      if (conv.messages[userMsgIndex].role !== 'user') {
+        toast.error(i18nText('conversation.toast.onlyUserMessageEditResend', '只能编辑并重发用户消息'))
+        return
+      }
 
       // 找到该用户消息所属轮次中，需要清理的所有后续消息（直到下一个 user）
       const idsToDelete = new Set<string>()
@@ -1428,10 +1459,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       // 获取设置并执行
       const settingsState = useSettingsStore.getState()
       const provider = settingsState.providerType
-      const model = settingsState.modelName
+      const effectiveConfig = settingsState.getEffectiveProviderConfig()
+      const model = effectiveConfig?.modelName || settingsState.modelName
 
       if (provider && model) {
         get().runAgent(conversationId, provider, model, 8192, null)
+      } else {
+        toast.error(i18nText('conversation.toast.modelNotConfigured', '模型未配置，请先在设置中选择服务商和模型'))
       }
     },
 

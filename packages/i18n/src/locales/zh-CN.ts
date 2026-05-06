@@ -1056,6 +1056,15 @@ export const zhCN = {
     toast: {
       noApiKey: "请先在设置中配置 API Key",
       deletedTurn: "已删除完整对话轮次",
+      stopBeforeSend: "当前会话正在运行，请先停止后再发送",
+      stopBeforeRegenerate: "请先停止当前运行，再重新生成",
+      conversationMissingForRegenerate: "会话不存在，无法重新生成",
+      targetMessageMissing: "目标消息不存在，可能已被删除",
+      onlyUserMessageRegenerate: "只能重新生成用户消息",
+      modelNotConfigured: "模型未配置，请先在设置中选择服务商和模型",
+      stopBeforeEditResend: "请先停止当前运行，再编辑发送",
+      conversationMissingForEditResend: "会话不存在，无法编辑重发",
+      onlyUserMessageEditResend: "只能编辑并重发用户消息",
     },
     // 错误
     error: {

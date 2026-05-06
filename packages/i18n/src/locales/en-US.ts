@@ -1076,6 +1076,15 @@ export const enUS = {
     toast: {
       noApiKey: "Please configure API Key in settings first",
       deletedTurn: "Deleted complete conversation turn",
+      stopBeforeSend: "This conversation is running. Stop it before sending a new message.",
+      stopBeforeRegenerate: "Please stop the current run before regenerating.",
+      conversationMissingForRegenerate: "Conversation not found. Cannot regenerate.",
+      targetMessageMissing: "Target message not found. It may have been deleted.",
+      onlyUserMessageRegenerate: "Only user messages can be regenerated.",
+      modelNotConfigured: "Model is not configured. Please select provider and model in settings first.",
+      stopBeforeEditResend: "Please stop the current run before edit-and-resend.",
+      conversationMissingForEditResend: "Conversation not found. Cannot edit and resend.",
+      onlyUserMessageEditResend: "Only user messages can be edited and resent.",
     },
     // Error
     error: {
