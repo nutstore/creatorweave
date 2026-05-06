@@ -459,7 +459,23 @@ self.onmessage = (/** @type {MessageEvent<any>} */ e) => {
   // Queue all messages for serial execution to prevent concurrent access
   // to shared pyodide instance and /mnt filesystem
   const previous = messageQueue
-  messageQueue = previous.then(() => handleMessage(e.data))
+  messageQueue = previous
+    .catch((error) => {
+      // Keep queue alive after any unexpected prior failure.
+      console.error('[Pyodide Worker] Recovered from prior queue failure:', error)
+    })
+    .then(() => handleMessage(e.data))
+    .catch((error) => {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error('[Pyodide Worker] Unhandled message failure:', errorMessage)
+      try {
+        const requestId =
+          e.data && typeof e.data === 'object' && 'id' in e.data ? String(e.data.id) : 'unknown'
+        sendError(requestId, errorMessage)
+      } catch {
+        // Ignore secondary failures while reporting fatal worker errors.
+      }
+    })
 }
 
 /**

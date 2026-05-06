@@ -86,6 +86,15 @@ export class PythonExecutor {
         pending.reject(new Error(`Worker error: ${error.message}`))
       }
       this.pendingRequests.clear()
+
+      // Worker may be in a bad state after an unhandled runtime failure.
+      // Force recreation on next execute() instead of keeping a poisoned worker instance.
+      try {
+        this.worker?.terminate()
+      } catch {
+        // ignore termination cleanup errors
+      }
+      this.worker = null
     }
 
     logger('Pyodide worker initialized')
