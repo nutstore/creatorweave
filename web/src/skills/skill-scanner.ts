@@ -274,13 +274,34 @@ export async function syncResourcesToOPFS(
  * Called from WorkspaceLayout to ensure all workspaces have skill files available.
  */
 export async function syncProjectSkillsToActiveWorkspace(
-  rootHandle: FileSystemDirectoryHandle
+  rootHandle: FileSystemDirectoryHandle,
+  workspaceId?: string | null
 ): Promise<void> {
-  const { getActiveWorkspace } = await import('@/store/workspace.store')
-  const active = await getActiveWorkspace()
-  if (!active) return
+  let targetFilesDir: FileSystemDirectoryHandle | null = null
 
-  await syncSkillsDirToOPFS(await active.workspace.getFilesDir(), rootHandle)
+  if (workspaceId) {
+    const { getWorkspaceManager } = await import('@/opfs/workspace')
+    const manager = await getWorkspaceManager()
+    const workspace = await manager.getWorkspace(workspaceId)
+    if (workspace) {
+      targetFilesDir = await workspace.getFilesDir()
+      console.log(`[SkillScanner] Syncing .skills to explicit workspace: ${workspaceId}`)
+    } else {
+      console.warn(
+        `[SkillScanner] Explicit workspace not found: ${workspaceId}, falling back to active workspace`
+      )
+    }
+  }
+
+  if (!targetFilesDir) {
+    const { getActiveWorkspace } = await import('@/store/workspace.store')
+    const active = await getActiveWorkspace()
+    if (!active) return
+    targetFilesDir = await active.workspace.getFilesDir()
+    console.log(`[SkillScanner] Syncing .skills to active workspace: ${active.workspaceId}`)
+  }
+
+  await syncSkillsDirToOPFS(targetFilesDir, rootHandle)
 }
 
 /**

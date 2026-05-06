@@ -277,7 +277,7 @@ export function WorkspaceLayout({
         // Sync skill resources to OPFS so Pyodide can access them at /mnt/.skills/
         await syncResourcesToOPFS(result)
         // Also sync .skills/ directory directly from disk (covers all workspaces)
-        await syncProjectSkillsToActiveWorkspace(directoryHandle)
+        await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
       } catch (error) {
         console.error('Failed to scan project skills:', error)
       }
@@ -291,7 +291,7 @@ export function WorkspaceLayout({
     if (!directoryHandle || !activeConversationId) return
 
     setSkillsSyncing(true)
-    syncProjectSkillsToActiveWorkspace(directoryHandle)
+    syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
       .catch((err) => {
         console.warn('[WorkspaceLayout] Failed to sync skills to workspace:', err)
       })
