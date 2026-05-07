@@ -17,7 +17,7 @@ export const sidebar = {
     createFirstWorkspace: "Create First Workspace",
     deleteWorkspaceFailed: "Failed to delete workspace",
     deleteWorkspace: "Delete Workspace",
-    confirmDeleteWorkspace: 'Delete workspace "{name}"?',
+    confirmDeleteWorkspace: 'Delete this workspace?',
     renameWorkspace: "Rename Workspace",
     archiveWorkspace: "Archive Workspace",
     unarchiveWorkspace: "Unarchive Workspace",
