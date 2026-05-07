@@ -58,39 +58,59 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   const filesDir = await runtime.getFilesDir()
 
   // Collect all native handles: multi-root aware
-  // If context.directoryHandle exists, use it as the primary (legacy path)
-  // Otherwise, try to get all native handles from the runtime (multi-root path)
   let nativeHandleMap: Map<string, FileSystemDirectoryHandle>
 
-  if (context.directoryHandle) {
-    // Legacy single-root: use context handle as default
-    nativeHandleMap = new Map([['', context.directoryHandle]])
-  } else {
-    // Multi-root: resolve all handles from runtime
-    nativeHandleMap = await runtime.getAllNativeDirectoryHandles()
-    // Fallback to single handle resolution
-    if (nativeHandleMap.size === 0) {
-      const fallbackHandle = await resolveNativeDirectoryHandle(
-        null,
-        context.workspaceId
-      )
-      if (!fallbackHandle) {
-        return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
-      }
-      nativeHandleMap = new Map([['', fallbackHandle]])
+  // Always try to get all handles from runtime (multi-root)
+  nativeHandleMap = await runtime.getAllNativeDirectoryHandles()
+  if (nativeHandleMap.size === 0) {
+    // Fallback: use context handle or resolve single handle
+    const fallbackHandle = context.directoryHandle
+      ?? await resolveNativeDirectoryHandle(null, context.workspaceId)
+    if (!fallbackHandle) {
+      return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
     }
+    nativeHandleMap = new Map([['', fallbackHandle]])
   }
 
   if (nativeHandleMap.size === 0) {
     return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
   }
 
-  // Expand globs across all roots and collect file paths grouped by root
+  // Build a rootName → rootHandle map and resolve paths per root
+  // For multi-root, paths may have root prefix (e.g. "creatorweave/src/App.tsx")
+  // We need to strip the root prefix before globbing within the root's handle
+  const resolvedByRoot = new Map<string, { handle: FileSystemDirectoryHandle; patterns: string[] }>()
+
+  for (const rawPath of paths as string[]) {
+    const normalized = rawPath.replace(/^(\.\/)+/, '')
+    // Try to resolve root prefix using runtime.resolvePath
+    try {
+      const resolved = await runtime.resolvePath(normalized)
+      const rootName = resolved.rootName
+      const relativePattern = resolved.relativePath || '**'
+      if (!resolvedByRoot.has(rootName)) {
+        const handle = nativeHandleMap.get(rootName) ?? null
+        if (!handle) continue // root handle not available, skip
+        resolvedByRoot.set(rootName, { handle, patterns: [] })
+      }
+      resolvedByRoot.get(rootName)!.patterns.push(relativePattern)
+    } catch {
+      // resolvePath failed — try against all roots with the original pattern
+      for (const [rootName, handle] of nativeHandleMap) {
+        if (!resolvedByRoot.has(rootName)) {
+          resolvedByRoot.set(rootName, { handle, patterns: [] })
+        }
+        resolvedByRoot.get(rootName)!.patterns.push(normalized)
+      }
+    }
+  }
+
+  // Expand globs per root with resolved patterns
   const allResolvedPaths = new Map<string, string[]>() // rootName → filePaths
   let totalResolved = 0
 
-  for (const [rootName, nativeHandle] of nativeHandleMap) {
-    const resolvedPaths = await resolvePaths(nativeHandle, paths as string[])
+  for (const [rootName, { handle, patterns }] of resolvedByRoot) {
+    const resolvedPaths = await resolvePaths(handle, patterns)
     allResolvedPaths.set(rootName, resolvedPaths)
     totalResolved += resolvedPaths.length
   }
