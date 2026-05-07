@@ -394,12 +394,8 @@ export function WorkspaceLayout({
         return
       }
 
-      // ? with Shift to show keyboard shortcuts
-      if (e.key === '?' && e.shiftKey) {
-        e.preventDefault()
-        setShowShortcutsHelp(true)
-        return
-      }
+      // NOTE: removed Shift+? shortcut — too hidden and conflicts with '?' typing.
+      // Shortcuts help is accessible via Command Palette (⌘K → "Keyboard Shortcuts")
 
       // ESC to close panels
       if (e.key === 'Escape') {

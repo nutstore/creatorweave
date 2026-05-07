@@ -28,6 +28,20 @@ import { AgentDropdown } from './AgentDropdown'
 import { ThinkingDropdown } from './ThinkingDropdown'
 import { ContextUsageBar } from './ContextUsageBar'
 
+/** Lightweight keyboard shortcut hint shown near the input area */
+function ShortcutHint() {
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+  const mod = isMac ? '⌘' : 'Ctrl+'
+  return (
+    <span className="hidden text-[11px] leading-none text-neutral-400 dark:text-neutral-500 sm:inline-flex sm:items-center sm:gap-1">
+      <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-0.5 font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">
+        {mod}K
+      </kbd>
+      {typeof navigator !== 'undefined' && /zh/i.test(navigator.language) ? '命令面板' : 'Commands'}
+    </span>
+  )
+}
+
 interface ConversationViewProps {
   initialMessage?: string | null
   onInitialMessageConsumed?: () => void
@@ -344,7 +358,8 @@ export function ConversationView({
               />
               <AgentModeSwitchCompact mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
             </div>
-            <div className="self-start sm:self-auto">
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <ShortcutHint />
               <ContextUsageBar contextWindowUsage={activeContextWindowUsage} isProcessing={isProcessing} />
             </div>
           </div>
