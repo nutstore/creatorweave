@@ -269,16 +269,28 @@ export const settings = {
     // 模型管理
     modelManagement: {
       title: "自定义服务商",
+      myProviders: "我的服务商",
       selectProvider: "选择服务商",
       noCustomProviders: "尚未添加自定义服务商",
+      emptyHint: "点击\"新增服务商\"接入 OpenAI 兼容的 API",
       providerName: "服务商名称",
-      defaultModel: "默认模型，如 gpt-4o-mini",
+      providerNamePlaceholder: "如：Ollama 本地、我的中转站",
+      defaultModel: "默认模型",
+      defaultModelPlaceholder: "如 gpt-4o, deepseek-chat",
       save: "保存",
-      add: "添加",
+      add: "新增服务商",
+      cancel: "取消",
+      create: "创建",
+      newProvider: "新增服务商",
+      editProvider: "编辑服务商",
       deleteProvider: "删除服务商",
+      confirmDeleteTitle: "删除服务商",
+      confirmDeleteMessage: "确定要删除「{name}」吗？相关的 API Key 也会被一并删除，此操作无法撤销。",
+      confirmDelete: "确认删除",
       modelList: "模型列表",
-      newModelName: "新增模型名称",
+      newModelName: "输入模型名称",
       addModel: "添加模型",
+      addModelShort: "添加",
       removeModel: "移除模型 {name}",
     },
 
@@ -322,4 +334,20 @@ export const settings = {
     // 外部链接
     getApiKey: "获取 API Key",
     notConfigured: "未配置",
+
+    // 默认模型选择
+    defaultModel: {
+      title: "默认模型",
+      description: "选择对话使用的服务商和模型",
+      selectModel: "选择模型",
+      noProviders: "请先在下方配置服务商 API Key",
+      manualInput: "手动输入",
+      manualPlaceholder: "输入模型名称，如 glm-5.1",
+    },
+
+    // 服务商管理
+    providerManager: {
+      title: "服务商管理",
+      defaultModels: "(默认)",
+    },
 } as const

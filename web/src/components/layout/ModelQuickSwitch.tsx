@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronDown, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import type { LLMProviderType } from '@/agent/providers/types'
+import { isCustomProviderType } from '@/agent/providers/types'
 import { Popover, PopoverContent, PopoverTrigger, BrandButton } from '@creatorweave/ui'
 import { useT } from '@/i18n'
 
@@ -12,16 +13,10 @@ interface AvailableProvider {
   providerKey: string
 }
 
-function getCustomProviderIdFromKey(providerKey: string): string | undefined {
-  if (!providerKey.startsWith('custom:')) return undefined
-  return providerKey.slice('custom:'.length)
-}
-
 export function ModelQuickSwitch() {
   const t = useT()
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
-  const activeCustomProviderId = useSettingsStore((s) => s.activeCustomProviderId)
   const getAvailableProviders = useSettingsStore((s) => s.getAvailableProviders)
   const switchProviderAndModel = useSettingsStore((s) => s.switchProviderAndModel)
 
@@ -49,9 +44,9 @@ export function ModelQuickSwitch() {
   }, [getAvailableProviders, open])
 
   const currentLabel = useMemo(() => {
-    if (providerType === 'custom') {
+    if (isCustomProviderType(providerType)) {
       const currentCustom = providers.find(
-        (p) => p.providerType === 'custom' && getCustomProviderIdFromKey(p.providerKey) === activeCustomProviderId
+        (p) => p.providerType === providerType
       )
       if (currentCustom) {
         const model = currentCustom.models.find((m) => m.id === modelName)
@@ -66,13 +61,10 @@ export function ModelQuickSwitch() {
       return `${current.displayName} / ${model?.name || modelName}`
     }
     return t('topbar.modelSwitcher.unavailable')
-  }, [providerType, activeCustomProviderId, providers, modelName, t])
+  }, [providerType, providers, modelName, t])
 
   const handleSelect = (provider: AvailableProvider, nextModelName: string) => {
-    const customProviderId = provider.providerType === 'custom'
-      ? getCustomProviderIdFromKey(provider.providerKey)
-      : undefined
-    switchProviderAndModel(provider.providerType, nextModelName, customProviderId)
+    switchProviderAndModel(provider.providerType, nextModelName)
     setOpen(false)
   }
 
@@ -97,9 +89,7 @@ export function ModelQuickSwitch() {
         </div>
         <div className="max-h-[360px] space-y-2 overflow-auto">
           {providers.map((provider) => {
-            const isCurrentProvider = provider.providerType === 'custom'
-              ? provider.providerKey === `custom:${activeCustomProviderId}`
-              : provider.providerType === providerType
+            const isCurrentProvider = provider.providerType === providerType
 
             return (
               <div key={provider.providerKey} className="rounded-lg border border-border/60 p-2">

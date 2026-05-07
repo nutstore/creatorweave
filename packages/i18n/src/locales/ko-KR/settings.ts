@@ -275,16 +275,28 @@ export const settings = {
     // 모델 관리
     modelManagement: {
       title: "커스텀 서비스",
+      myProviders: "내 서비스",
       selectProvider: "서비스 선택",
       noCustomProviders: "아직 커스텀 서비스가 추가되지 않았습니다",
+      emptyHint: "\"서비스 추가\"를 클릭하여 OpenAI 호환 API에 연결",
       providerName: "서비스 이름",
-      defaultModel: "기본 모델, 예: gpt-4o-mini",
+      providerNamePlaceholder: "예: Ollama 로컬, 내 릴레이",
+      defaultModel: "기본 모델",
+      defaultModelPlaceholder: "예: gpt-4o, deepseek-chat",
       save: "저장",
-      add: "추가",
+      add: "서비스 추가",
+      cancel: "취소",
+      create: "만들기",
+      newProvider: "새 서비스",
+      editProvider: "서비스 편집",
       deleteProvider: "서비스 삭제",
+      confirmDeleteTitle: "서비스 삭제",
+      confirmDeleteMessage: "\"{name}\"을(를) 삭제하시겠습니까? 관련 API Key도 함께 삭제됩니다. 이 작업은 취소할 수 없습니다.",
+      confirmDelete: "삭제 확인",
       modelList: "모델 목록",
-      newModelName: "새 모델 이름",
+      newModelName: "모델 이름 입력",
       addModel: "모델 추가",
+      addModelShort: "추가",
       removeModel: "모델 {name} 제거",
     },
 
@@ -330,4 +342,20 @@ export const settings = {
     // 외부 링크
     getApiKey: "API Key 받기",
     notConfigured: "설정되지 않음",
+
+    // 기본 모델 선택
+    defaultModel: {
+      title: "기본 모델",
+      description: "대화에 사용할 프로바이더와 모델을 선택하세요",
+      selectModel: "모델 선택",
+      noProviders: "먼저 프로바이더 API Key를 설정해주세요",
+      manualInput: "수동 입력",
+      manualPlaceholder: "모델 이름 입력, 예: gpt-4o",
+    },
+
+    // 프로바이더 관리
+    providerManager: {
+      title: "프로바이더 관리",
+      defaultModels: "(기본)",
+    },
 } as const

@@ -1,7 +1,7 @@
 import { getModel } from '@mariozechner/pi-ai'
 import type { Api, KnownProvider, Model } from '@mariozechner/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
-import { getModelsForProvider } from '@/agent/providers/types'
+import { getModelsForProvider, isCustomProviderType } from '@/agent/providers/types'
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
@@ -88,7 +88,7 @@ function createOpenAICompatibleFallback(
   baseUrl: string
 ): Model<Api> {
   const fallbackApi: Api =
-    providerType === 'minimax' || providerType === 'minimax-cn'
+    providerType === 'minimax' || providerType === 'minimax-cn' || isCustomProviderType(providerType)
       ? CW_OPENAI_FETCH_API
       : 'openai-completions'
   const contextWindow = lookupContextWindow(providerType, modelName)

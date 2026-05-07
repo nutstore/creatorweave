@@ -36,7 +36,8 @@ export interface ProviderMeta {
   models: ModelInfo[]
 }
 
-export type LLMProviderType =
+/** Built-in provider types */
+export type BuiltinLLMProviderType =
   // International
   | 'openai'
   | 'anthropic'
@@ -50,8 +51,9 @@ export type LLMProviderType =
   | 'minimax'
   | 'minimax-cn'
   | 'qwen'
-  // Custom
-  | 'custom'
+
+/** Provider type: built-in or dynamically registered custom provider (e.g. "custom-abc123") */
+export type LLMProviderType = BuiltinLLMProviderType | string
 
 export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfig, 'apiKey'>> = {
   // International providers
@@ -88,7 +90,7 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
   },
   'glm-coding': {
     baseURL: 'https://open.bigmodel.cn/api/coding/paas/v4/',
-    modelName: 'glm-4.7-flash',
+    modelName: 'glm-5.1',
     headers: {},
   },
   kimi: {
@@ -111,12 +113,50 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
     modelName: 'qwen-turbo',
     headers: {},
   },
-  // Custom
-  custom: {
-    baseURL: '',
-    modelName: '',
-    headers: {},
-  },
+}
+
+// ── Dynamic Custom Provider Registry ──
+// Custom providers are registered at runtime; each has its own providerType (e.g. "custom-abc123").
+
+const DYNAMIC_PROVIDER_CONFIGS = new Map<string, Omit<LLMProviderConfig, 'apiKey'>>()
+const DYNAMIC_PROVIDER_METAS = new Map<string, ProviderMeta>()
+
+/** Register (or update) a custom provider */
+export function registerDynamicProvider(
+  id: string,
+  config: Omit<LLMProviderConfig, 'apiKey'>,
+  meta: ProviderMeta,
+) {
+  DYNAMIC_PROVIDER_CONFIGS.set(id, config)
+  DYNAMIC_PROVIDER_METAS.set(id, meta)
+}
+
+/** Remove a custom provider */
+export function unregisterDynamicProvider(id: string) {
+  DYNAMIC_PROVIDER_CONFIGS.delete(id)
+  DYNAMIC_PROVIDER_METAS.delete(id)
+}
+
+/** Check if a providerType is a dynamically registered custom provider */
+export function isCustomProviderType(type: string): boolean {
+  return DYNAMIC_PROVIDER_CONFIGS.has(type)
+}
+
+/** Get all dynamic provider IDs */
+export function getDynamicProviderIds(): string[] {
+  return Array.from(DYNAMIC_PROVIDER_CONFIGS.keys())
+}
+
+/** Get config for any provider (built-in or dynamic) */
+export function getProviderConfig(type: LLMProviderType): Omit<LLMProviderConfig, 'apiKey'> | null {
+  if (DYNAMIC_PROVIDER_CONFIGS.has(type)) return DYNAMIC_PROVIDER_CONFIGS.get(type)!
+  return (LLM_PROVIDER_CONFIGS as Record<string, Omit<LLMProviderConfig, 'apiKey'>>)[type] ?? null
+}
+
+/** Get meta for any provider (built-in or dynamic) */
+export function getProviderMeta(type: LLMProviderType): ProviderMeta | null {
+  if (DYNAMIC_PROVIDER_METAS.has(type)) return DYNAMIC_PROVIDER_METAS.get(type)!
+  return (PROVIDER_META as Record<string, ProviderMeta>)[type] ?? null
 }
 
 /** Provider metadata registry for UI display and grouping */
@@ -409,11 +449,6 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
       },
     ],
   },
-  custom: {
-    category: 'custom',
-    displayName: '自定义 (OpenAI 兼容)',
-    models: [],
-  },
 }
 
 /** Get providers grouped by category */
@@ -429,12 +464,19 @@ export function getProvidersByCategory(): Record<
   for (const [type, meta] of Object.entries(PROVIDER_META)) {
     grouped[meta.category].push({ type: type as LLMProviderType, meta })
   }
+  // Add dynamic custom providers
+  for (const [id, meta] of DYNAMIC_PROVIDER_METAS.entries()) {
+    grouped.custom.push({ type: id, meta })
+  }
   return grouped
 }
 
-/** Get static model list for a provider (from hardcoded PROVIDER_META) */
+/** Get static model list for a provider (from PROVIDER_META or dynamic registry) */
 export function getModelsForProvider(providerType: LLMProviderType): ModelInfo[] {
-  return PROVIDER_META[providerType]?.models ?? []
+  if (DYNAMIC_PROVIDER_METAS.has(providerType)) {
+    return DYNAMIC_PROVIDER_METAS.get(providerType)!.models
+  }
+  return (PROVIDER_META as Record<string, ProviderMeta>)[providerType]?.models ?? []
 }
 
 export interface ProviderOptions {

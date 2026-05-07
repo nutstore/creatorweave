@@ -467,7 +467,7 @@ import { ContextManager } from '@/agent/context-manager'
 import { getToolRegistry } from '@/agent/tool-registry'
 import { getOrCreateSubagentRuntime } from '@/agent/subagent/runtime'
 import { getApiKeyRepository } from '@/sqlite'
-import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
+import { LLM_PROVIDER_CONFIGS, isCustomProviderType, type LLMProviderType } from '@/agent/providers/types'
 import { generateFollowUp } from '@/agent/follow-up-generator'
 import {
   WORKFLOW_DRY_RUN_MODEL_PREFIX,
@@ -806,6 +806,10 @@ interface ConversationState {
   // Follow-up suggestions (not persisted) - per conversation
   suggestedFollowUps: Map<string, string>
 
+  // Track run IDs that were cancelled by user (not persisted)
+  // Used to suppress follow-up generation for cancelled runs
+  cancelledRunIds: Set<string>
+
   // Track mounted view ref counts per conversation (not persisted)
   // Used to prevent StrictMode mount/unmount churn from cancelling active runs
   mountedConversations: Map<string, number>
@@ -910,6 +914,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     agentLoops: new Map(),
     streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
+    cancelledRunIds: new Set(),
     mountedConversations: new Map(),
     pendingWorkflowDryRuns: new Map(),
     pendingWorkflowRealRuns: new Map(),
@@ -1079,6 +1084,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.activeConversationId = activeId
           state.loaded = true
           state.suggestedFollowUps.clear()
+          state.cancelledRunIds.clear()
         })
 
         // Load messages for the active conversation (it's about to be displayed)
@@ -1489,6 +1495,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.workflowAbortControllers.delete(id)
         }
         state.suggestedFollowUps.delete(id)
+        // Clean up any cancelled run IDs for this conversation's active run
+        const convToDelete = state.conversations.find((c) => c.id === id)
+        if (convToDelete?.activeRunId) {
+          state.cancelledRunIds.delete(convToDelete.activeRunId)
+        }
         state.streamingQueues.delete(id)
         state.mountedConversations.delete(id)
         state.pendingWorkflowDryRuns.delete(id)
@@ -1762,7 +1773,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const settingsState = useSettingsStore.getState()
         const effectiveConfig = settingsState.getEffectiveProviderConfig()
         const providerConfig =
-          providerType === 'custom'
+          isCustomProviderType(providerType)
             ? effectiveConfig
             : {
                 apiKeyProviderKey: providerType,
@@ -2351,6 +2362,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.activeRunId = null
             inner.agentLoops.delete(conversationId)
             inner.streamingQueues.delete(conversationId)
+            if (status === 'idle') {
+              inner.cancelledRunIds.delete(runId)
+            }
           })
 
           if (status === 'idle') {
@@ -2376,17 +2390,22 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               )
             }
 
-            try {
-              const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
-              if (apiKey) {
-                const suggestion = await generateFollowUp(targetMessages, providerType, apiKey)
-                if (suggestion) {
-                  get().setSuggestedFollowUp(conversationId, suggestion)
+            // Only generate follow-up on successful (non-cancelled, non-error) completion
+            const runWasCancelled = get().cancelledRunIds.has(runId)
+            if (!runWasCancelled) {
+              try {
+                const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
+                if (apiKey) {
+                  const suggestion = await generateFollowUp(targetMessages, providerType, apiKey)
+                  if (suggestion) {
+                    get().setSuggestedFollowUp(conversationId, suggestion)
+                  }
                 }
+              } catch (err) {
+                console.error('[conversation.store] Failed to generate follow-up:', err)
               }
-            } catch (err) {
-              console.error('[conversation.store] Failed to generate follow-up:', err)
             }
+            // Clean up cancelled run ID tracking (moved inside set() above)
           }
         }
 
@@ -3011,6 +3030,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     cancelAgent: (conversationId: string) => {
+      // Track the run being cancelled to suppress follow-up generation
+      const convBeingCancelled = get().conversations.find((c) => c.id === conversationId)
+      const runIdBeingCancelled = convBeingCancelled?.activeRunId
+
       // Clear any pending ask_user_question entries to unblock executor promises
       import('@/store/pending-question.store')
         .then(({ clearPendingQuestions }) => {
@@ -3065,6 +3088,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.status = 'idle'
             c.error = null
             c.activeRunId = null
+            // Mark this run as cancelled so finalizeRun skips follow-up generation
+            if (runIdBeingCancelled) {
+              state.cancelledRunIds.add(runIdBeingCancelled)
+            }
           }
         })
         if (committedPartial) {

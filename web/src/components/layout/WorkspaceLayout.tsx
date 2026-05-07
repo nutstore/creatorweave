@@ -108,7 +108,7 @@ export function WorkspaceLayout({
   const { directoryHandle } = useAgentStore()
   const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
-  const { providerType, modelName, maxTokens, hasApiKey, activeCustomProviderId } = useSettingsStore()
+  const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   const { role } = useRemoteStore()
@@ -211,7 +211,6 @@ export function WorkspaceLayout({
     activeConversationId,
     providerType,
     modelName,
-    activeCustomProviderId,
     saveModelOverrideForWorkspace,
   ])
 

@@ -282,16 +282,28 @@ export const settings = {
     // モデル管理
     modelManagement: {
       title: "カスタムプロバイダー",
+      myProviders: "マイプロバイダー",
       selectProvider: "プロバイダーを選択",
       noCustomProviders: "カスタムプロバイダーがまだ追加されていません",
+      emptyHint: "「プロバイダーを追加」をクリックして OpenAI 互換 API に接続",
       providerName: "プロバイダー名",
-      defaultModel: "デフォルトモデル、例: gpt-4o-mini",
+      providerNamePlaceholder: "例：Ollama ローカル、マイリレー",
+      defaultModel: "デフォルトモデル",
+      defaultModelPlaceholder: "例：gpt-4o, deepseek-chat",
       save: "保存",
-      add: "追加",
+      add: "プロバイダーを追加",
+      cancel: "キャンセル",
+      create: "作成",
+      newProvider: "新規プロバイダー",
+      editProvider: "プロバイダーを編集",
       deleteProvider: "プロバイダーを削除",
+      confirmDeleteTitle: "プロバイダーを削除",
+      confirmDeleteMessage: "「{name}」を削除しますか？関連する API Key も削除されます。この操作は取り消せません。",
+      confirmDelete: "削除を確認",
       modelList: "モデルリスト",
-      newModelName: "新しいモデル名",
+      newModelName: "モデル名を入力",
       addModel: "モデルを追加",
+      addModelShort: "追加",
       removeModel: "モデル {name} を削除",
     },
 
@@ -337,4 +349,20 @@ export const settings = {
     // 外部リンク
     getApiKey: "API Key を取得",
     notConfigured: "未設定",
+
+    // デフォルトモデル選択
+    defaultModel: {
+      title: "デフォルトモデル",
+      description: "会話で使用するプロバイダとモデルを選択",
+      selectModel: "モデルを選択",
+      noProviders: "先にプロバイダの API Key を設定してください",
+      manualInput: "手動入力",
+      manualPlaceholder: "モデル名を入力、例: gpt-4o",
+    },
+
+    // プロバイダ管理
+    providerManager: {
+      title: "プロバイダ管理",
+      defaultModels: "(デフォルト)",
+    },
 } as const

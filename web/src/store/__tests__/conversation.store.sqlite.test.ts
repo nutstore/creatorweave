@@ -211,6 +211,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
       agentLoops: new Map(),
       streamingQueues: new Map(),
       suggestedFollowUps: new Map(),
+      cancelledRunIds: new Set(),
       mountedConversations: new Map(),
     } as any)
     delete (globalThis as any).__conversationStoreTestHook

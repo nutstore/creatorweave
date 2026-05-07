@@ -278,16 +278,28 @@ export const settings = {
     // Model Management
     modelManagement: {
       title: "Custom Provider",
+      myProviders: "My Providers",
       selectProvider: "Select Provider",
       noCustomProviders: "No custom providers added yet",
+      emptyHint: "Click \"Add Provider\" to connect an OpenAI-compatible API",
       providerName: "Provider Name",
-      defaultModel: "Default model, e.g. gpt-4o-mini",
+      providerNamePlaceholder: "e.g. Ollama Local, My Relay",
+      defaultModel: "Default Model",
+      defaultModelPlaceholder: "e.g. gpt-4o, deepseek-chat",
       save: "Save",
-      add: "Add",
+      add: "Add Provider",
+      cancel: "Cancel",
+      create: "Create",
+      newProvider: "New Provider",
+      editProvider: "Edit Provider",
       deleteProvider: "Delete Provider",
+      confirmDeleteTitle: "Delete Provider",
+      confirmDeleteMessage: "Are you sure you want to delete \"{name}\"? The associated API Key will also be removed. This action cannot be undone.",
+      confirmDelete: "Confirm Delete",
       modelList: "Model List",
-      newModelName: "New model name",
+      newModelName: "Enter model name",
       addModel: "Add Model",
+      addModelShort: "Add",
       removeModel: "Remove model {name}",
     },
 
@@ -334,4 +346,20 @@ export const settings = {
     // External Links
     getApiKey: "Get API Key",
     notConfigured: "Not configured",
+
+    // Default Model Selection
+    defaultModel: {
+      title: "Default Model",
+      description: "Select provider and model for conversations",
+      selectModel: "Select Model",
+      noProviders: "Please configure an API Key below first",
+      manualInput: "Manual Input",
+      manualPlaceholder: "Enter model name, e.g. gpt-4o",
+    },
+
+    // Provider Management
+    providerManager: {
+      title: "Provider Management",
+      defaultModels: "(default)",
+    },
 } as const
