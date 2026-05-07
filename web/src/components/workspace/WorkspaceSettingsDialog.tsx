@@ -10,7 +10,18 @@
  */
 
 import { useState, useCallback } from 'react'
-import { RotateCcw, Trash2, Keyboard, Monitor, X, AlertTriangle, Info } from 'lucide-react'
+import {
+  RotateCcw,
+  Trash2,
+  Keyboard,
+  Monitor,
+  X,
+  AlertTriangle,
+  Info,
+  LayoutDashboard,
+  Palette,
+  Database,
+} from 'lucide-react'
 import {
   BrandDialog,
   BrandButton,
@@ -89,35 +100,33 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
   }
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'layout', label: t('workspaceSettings.tabs.layout'), icon: <Monitor className="h-4 w-4" /> },
-    { id: 'display', label: t('workspaceSettings.tabs.display'), icon: <Monitor className="h-4 w-4" /> },
+    { id: 'layout', label: t('workspaceSettings.tabs.layout'), icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: 'display', label: t('workspaceSettings.tabs.display'), icon: <Palette className="h-4 w-4" /> },
     { id: 'shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
-    { id: 'data', label: t('workspaceSettings.tabs.data'), icon: <Trash2 className="h-4 w-4" /> },
+    { id: 'data', label: t('workspaceSettings.tabs.data'), icon: <Database className="h-4 w-4" /> },
   ]
 
   return (
     <>
       <BrandDialog open={open} onOpenChange={onOpenChange}>
-        <BrandDialogContent className="max-w-4xl dark:border-border dark:bg-card overflow-hidden">
-          {/* Brand accent bar */}
-          <div className="h-1 w-full bg-gradient-to-r from-primary-400 via-primary-500 to-primary-600 dark:from-primary-500 dark:via-primary-600 dark:to-primary-700" />
-          <BrandDialogHeader className="pb-2">
-            <BrandDialogTitle className="text-xl">{t('workspaceSettings.title')}</BrandDialogTitle>
+        <BrandDialogContent className="max-w-3xl dark:border-border dark:bg-card overflow-hidden">
+          <BrandDialogHeader className="border-b border-subtle px-6 py-4 pb-3">
+            <BrandDialogTitle className="text-base font-semibold">{t('workspaceSettings.title')}</BrandDialogTitle>
             <BrandDialogClose asChild>
-              <button className="absolute right-4 top-6 rounded-sm opacity-70 ring-offset-background transition-all duration-200 hover:opacity-100 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+              <button className="absolute right-4 top-4 rounded-lg opacity-70 ring-offset-background transition-all duration-200 hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
                 <X className="h-4 w-4" />
                 <span className="sr-only">{t('workspaceSettings.close')}</span>
               </button>
             </BrandDialogClose>
           </BrandDialogHeader>
 
-          <div className="flex h-[60vh] flex-col sm:flex-row">
+          <div className="flex min-h-[560px] max-h-[720px] flex-col sm:flex-row">
             {/* Sidebar tabs */}
-            <div className="border-subtle flex border-r sm:w-48 sm:flex-col">
+            <div className="flex border-r border-subtle bg-neutral-50 sm:w-[180px] sm:flex-col dark:bg-muted">
               <nav
                 role="tablist"
                 aria-label={t('workspaceSettings.tabs.ariaLabel')}
-                className="flex space-x-1 p-2 sm:space-x-0 sm:space-y-1 sm:flex-col"
+                className="flex space-x-1 p-2 sm:space-x-0 sm:space-y-0.5 sm:flex-col"
                 onKeyDown={(e) => {
                   const tabIds = tabs.map((t) => t.id)
                   const currentIndex = tabIds.indexOf(activeTab)
@@ -145,13 +154,13 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                     aria-controls={`tabpanel-${tab.id}`}
                     tabIndex={activeTab === tab.id ? 0 : -1}
                     onClick={() => handleTabChange(tab.id)}
-                    className={`group relative flex w-full items-center gap-2 rounded-md px-3 py-3 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
+                    className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                       activeTab === tab.id
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 border-l-2 border-primary-600 dark:border-primary-500 pl-2.5'
-                        : 'text-secondary hover:bg-muted dark:text-muted dark:hover:bg-muted border-l-2 border-transparent hover:border-primary-200 dark:hover:border-primary-700'
+                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                        : 'text-secondary hover:text-foreground dark:text-muted dark:hover:text-foreground'
                     }`}
                   >
-                    <span className={`transition-colors ${activeTab === tab.id ? 'text-primary-600 dark:text-primary-400' : 'text-secondary dark:text-muted group-hover:text-primary-600 dark:group-hover:text-primary-400'}`}>
+                    <span className={`transition-colors duration-150 ${activeTab === tab.id ? 'text-primary-600 dark:text-primary-400' : 'text-secondary dark:text-muted group-hover:text-primary-600 dark:group-hover:text-primary-400'}`}>
                       {tab.icon}
                     </span>
                     <span className="truncate">{tab.label}</span>
@@ -161,7 +170,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
             </div>
 
             {/* Tab content */}
-            <div className={`flex-1 overflow-y-auto p-4 sm:p-6 transition-opacity duration-150 ${isTabTransitioning ? 'opacity-50' : 'opacity-100'}`} role="tabpanel" aria-label="Settings content">
+            <div className={`flex-1 overflow-y-auto p-5 sm:p-6 transition-opacity duration-150 ${isTabTransitioning ? 'opacity-50' : 'opacity-100'}`} role="tabpanel" aria-label="Settings content">
               {/* Layout Tab */}
               {activeTab === 'layout' && (
                 <div id="tabpanel-layout" role="tabpanel" aria-labelledby="tab-layout" className="space-y-6">
@@ -443,8 +452,14 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
           </div>
 
           {/* Footer */}
-          <div className="border-subtle flex justify-end border-t px-6 py-4">
-            <BrandButton variant="default" onClick={() => onOpenChange(false)}>
+          <div className="border-subtle flex items-center justify-between border-t px-6 py-3">
+            <p className="text-xs text-tertiary dark:text-muted">
+              <kbd className="border-subtle rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] dark:bg-muted">⌘</kbd>
+              {' '}
+              <kbd className="border-subtle rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] dark:bg-muted">,</kbd>
+              {' '}打开设置
+            </p>
+            <BrandButton variant="primary" onClick={() => onOpenChange(false)}>
               {t('workspaceSettings.done')}
             </BrandButton>
           </div>
