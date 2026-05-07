@@ -205,16 +205,12 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('search', 'path_not_found', `Failed to resolve VFS path: ${error instanceof Error ? error.message : String(error)}`)
     }
   } else {
-    // Legacy: workspace path resolution
-    if (context.directoryHandle) {
-      directoryHandle = context.directoryHandle
-    } else {
-      const { handle } = await resolveNativeDirectoryHandleForPath(
-        searchPath, context.directoryHandle, context.workspaceId
-      )
-      directoryHandle = handle
-    }
-    vfsSubPath = searchPath
+    // Multi-root aware path resolution: always resolve to handle path prefix stripping
+    const { handle, nativePath } = await resolveNativeDirectoryHandleForPath(
+      searchPath, context.directoryHandle, context.workspaceId
+    )
+    directoryHandle = handle
+    vfsSubPath = nativePath
   }
 
   if (!directoryHandle) {
