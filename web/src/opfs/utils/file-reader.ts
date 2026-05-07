@@ -236,6 +236,38 @@ export async function fileExistsInNativeFS(
   }
 }
 
+/**
+ * Multi-root aware: check if file exists in native FS by resolving the correct root handle.
+ */
+export async function fileExistsInNativeFSMultiRoot(
+  directoryHandle: FileSystemDirectoryHandle | null,
+  path: string
+): Promise<boolean> {
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+    const { getRuntimeDirectoryHandle } = await import('@/native-fs')
+    const manager = await getWorkspaceManager()
+    const activeProject = await getProjectRepository().findActiveProject()
+    if (activeProject?.id) {
+      const workspace = await manager.getWorkspace(activeProject.id)
+      if (workspace) {
+        const resolved = await workspace.resolvePath(path)
+        const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
+        if (rootHandle) {
+          return await fileExistsInNativeFS(rootHandle, resolved.relativePath)
+        }
+      }
+    }
+  } catch {
+    // Fall through to directoryHandle fallback
+  }
+  if (directoryHandle) {
+    return await fileExistsInNativeFS(directoryHandle, path)
+  }
+  return false
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -351,6 +383,38 @@ export async function readBinaryFileFromNativeFS(
     console.error(`[FileReader] Failed to read binary from native FS: ${path}`, error)
     return null
   }
+}
+
+/**
+ * Multi-root aware: read binary file from native FS by resolving the correct root handle.
+ */
+export async function readBinaryFileFromNativeFSMultiRoot(
+  directoryHandle: FileSystemDirectoryHandle | null,
+  path: string
+): Promise<string | null> {
+  try {
+    const { getWorkspaceManager } = await import('@/opfs')
+    const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+    const { getRuntimeDirectoryHandle } = await import('@/native-fs')
+    const manager = await getWorkspaceManager()
+    const activeProject = await getProjectRepository().findActiveProject()
+    if (activeProject?.id) {
+      const workspace = await manager.getWorkspace(activeProject.id)
+      if (workspace) {
+        const resolved = await workspace.resolvePath(path)
+        const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
+        if (rootHandle) {
+          return await readBinaryFileFromNativeFS(rootHandle, resolved.relativePath)
+        }
+      }
+    }
+  } catch {
+    // Fall through to directoryHandle fallback
+  }
+  if (directoryHandle) {
+    return await readBinaryFileFromNativeFS(directoryHandle, path)
+  }
+  return null
 }
 
 /**

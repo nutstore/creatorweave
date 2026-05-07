@@ -25,7 +25,6 @@ export function useConversationLogic() {
   // ── Local UI state ──
   const [input, setInput] = useState('')
   const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([])
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
   const [inputResetToken, setInputResetToken] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -37,10 +36,8 @@ export function useConversationLogic() {
   // Sync latest values to refs inline (no useEffect delay — safe for render-time reads)
   const inputRef = useRef(input)
   const mentionedAgentIdsRef = useRef(mentionedAgentIds)
-  const selectedFilesRef = useRef(selectedFiles)
   inputRef.current = input
   mentionedAgentIdsRef.current = mentionedAgentIds
-  selectedFilesRef.current = selectedFiles
 
   // The draft text to inject into the editor when switching back to a workspace.
   // This is separate from `input` because Tiptap manages its own content.
@@ -139,7 +136,7 @@ export function useConversationLogic() {
       useInputDraftStore.getState().saveDraft(prevId, {
         text: inputRef.current,
         mentionedAgentIds: mentionedAgentIdsRef.current,
-        selectedFiles: selectedFilesRef.current,
+        selectedFiles: [],
       })
     }
 
@@ -149,7 +146,6 @@ export function useConversationLogic() {
       const draft = useInputDraftStore.getState().peekDraft(convId)
       if (draft) {
         setMentionedAgentIds(draft.mentionedAgentIds)
-        setSelectedFiles(draft.selectedFiles)
         setDraftTextToRestore(draft.text)
         draftConvIdRef.current = convId
       } else {
@@ -325,12 +321,6 @@ export function useConversationLogic() {
     const inputTrimmed = input.trim()
     let textToSend = inputTrimmed ? input : suggestedFollowUp
     if (textToSend) {
-      // Prepend selected file paths as `#path` references
-      if (selectedFiles.length > 0) {
-        const filePrefix = selectedFiles.map((p) => `#${p}`).join(' ')
-        textToSend = `${filePrefix} ${textToSend}`
-      }
-
       // Upload pending assets to OPFS and get AssetMeta[]
       const { pendingAssets, clearAll } = useAssetStore.getState()
       let assets = undefined
@@ -348,7 +338,6 @@ export function useConversationLogic() {
 
       sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (mentionedAgentIds[0] ?? null) : null, assets })
       if (!inputTrimmed && convId) clearSuggestedFollowUp(convId)
-      setSelectedFiles([])
     }
   }
 
@@ -376,7 +365,7 @@ export function useConversationLogic() {
 
   return {
     // Local UI state
-    input, setInput, mentionedAgentIds, setMentionedAgentIds, selectedFiles, setSelectedFiles, inputResetToken, messagesEndRef, scrollContainerRef,
+    input, setInput, mentionedAgentIds, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
     showScrollToBottom, scrollToBottom,
     draftTextToRestore, onDraftRestored,
     // Agent store

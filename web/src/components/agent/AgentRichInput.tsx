@@ -7,7 +7,7 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
-import { Plus, Trash2, Check, FileIcon, Paperclip, X, ImageIcon } from 'lucide-react'
+import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
 
@@ -23,8 +23,6 @@ export interface AgentMentionCandidate {
 export interface AgentRichInputValue {
   text: string
   mentionedAgentIds: string[]
-  /** Selected file paths (displayed as tags above the editor). */
-  selectedFiles: string[]
 }
 
 export interface AgentInfo {
@@ -289,11 +287,6 @@ export function AgentRichInput({
   useEffect(() => { fileSuggestionItemsRef.current = fileSuggestionItems }, [fileSuggestionItems])
   useEffect(() => { fileSuggestionCommandRef.current = fileSuggestionCommand }, [fileSuggestionCommand])
 
-  // Selected files – displayed as tags above the editor, not inline in text
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
-  const selectedFilesRef = useRef<string[]>([])
-  useEffect(() => { selectedFilesRef.current = selectedFiles }, [selectedFiles])
-
   const disabledRef = useRef(disabled)
   const onSubmitRef = useRef(onSubmit)
   const onChangeRef = useRef(onChange)
@@ -307,7 +300,7 @@ export function AgentRichInput({
     (editor: Editor) => {
       const text = getPlainText(editor)
       const mentionedAgentIds = getMentionedAgentIds(editor)
-      onChangeRef.current({ text, mentionedAgentIds, selectedFiles: selectedFilesRef.current })
+      onChangeRef.current({ text, mentionedAgentIds })
     },
     [],
   )
@@ -408,20 +401,16 @@ export function AgentRichInput({
                 let savedRange: { from: number; to: number } | null = null
                 let savedEditor: Editor | null = null
 
-                /** Select a file: delete the `#query` trigger text and add the path to selectedFiles. */
+                /** Select a file/dir: replace the `#query` trigger with inline `#path` text. */
                 const selectFile = (item: FileMentionItem) => {
                   if (savedRange && savedEditor) {
-                    savedEditor.chain().focus().deleteRange(savedRange).run()
+                    // Insert inline `#path` text in place of the `#query` trigger
+                    const suffix = item.isDirectory ? '/' : ''
+                    savedEditor.chain().focus()
+                      .deleteRange(savedRange)
+                      .insertContent(`#${item.path}${suffix} `)
+                      .run()
                   }
-                  setSelectedFiles((prev) => {
-                    const next = prev.includes(item.path) ? prev : [...prev, item.path]
-                    selectedFilesRef.current = next
-                    // Manually emit value since editor onUpdate won't capture selectedFiles change
-                    const text = getPlainText(savedEditor!)
-                    const mentionedAgentIds = getMentionedAgentIds(savedEditor!)
-                    onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
-                    return next
-                  })
                   // Clear suggestion state
                   setFileSuggestionItems([])
                   setFileSuggestionCommand(null)
@@ -557,7 +546,6 @@ export function AgentRichInput({
   useEffect(() => {
     if (!editor) return
     editor.commands.clearContent()
-    setSelectedFiles([])
     // Clear pending asset uploads when input resets (message sent)
     useAssetStore.getState().clearAll()
     emitValue(editor)
@@ -746,39 +734,6 @@ export function AgentRichInput({
       <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-14 py-4 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
-            {selectedFiles.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {selectedFiles.map((filePath) => (
-                  <span
-                    key={filePath}
-                    className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/60 dark:text-sky-200"
-                  >
-                    <FileIcon className="h-3 w-3 shrink-0 opacity-60" />
-                    <span className="max-w-[200px] truncate">{filePath}</span>
-                    <button
-                      type="button"
-                      className="ml-0.5 rounded p-0.5 hover:bg-sky-200 dark:hover:bg-sky-800"
-                      onClick={() => {
-                        setSelectedFiles((prev) => {
-                          const next = prev.filter((p) => p !== filePath)
-                          selectedFilesRef.current = next
-                          // Notify parent of selectedFiles change
-                          if (editor) {
-                            const text = getPlainText(editor)
-                            const mentionedAgentIds = getMentionedAgentIds(editor)
-                            onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
-                          }
-                          return next
-                        })
-                      }}
-                      aria-label={`Remove ${filePath}`}
-                    >
-                      <Trash2 className="h-2.5 w-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
             <EditorContent editor={editor} />
 
             {/* Pending asset uploads preview */}
@@ -824,7 +779,7 @@ export function AgentRichInput({
         )}
         {!isFocused && isEmpty && (
           <div
-            className={`pointer-events-none absolute left-11 pr-16 text-sm text-neutral-400 dark:text-neutral-500 ${selectedFiles.length > 0 ? 'top-12' : 'top-4'}`}
+            className="pointer-events-none absolute left-11 top-4 pr-16 text-sm text-neutral-400 dark:text-neutral-500"
           >
             {placeholder}
           </div>
@@ -970,14 +925,18 @@ export function AgentRichInput({
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file, _selected) => (
             <>
-              <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+              {file.isDirectory ? (
+                <FolderIcon className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+              ) : (
+                <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+              )}
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{file.name}</div>
                 <div className="truncate text-xs text-neutral-400 dark:text-neutral-500">
-                  {file.path}
+                  {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
-              {file.extension && (
+              {!file.isDirectory && file.extension && (
                 <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
                   .{file.extension}
                 </span>

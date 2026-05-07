@@ -1207,7 +1207,8 @@ export class WorkspaceRuntime {
   private async syncToDiskSingleRoot(
     directoryHandle: FileSystemDirectoryHandle,
     onlyPaths?: string[],
-    forceOverwrite?: boolean
+    forceOverwrite?: boolean,
+    pathTransform?: (path: string) => string
   ): Promise<SyncResult> {
     const cacheInterface = {
       readCached: async (path: string) => {
@@ -1229,7 +1230,7 @@ export class WorkspaceRuntime {
       },
     }
 
-    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite)
+    const result = await this.pendingManager.sync(directoryHandle, cacheInterface, onlyPaths, forceOverwrite, pathTransform)
     await this.cleanupStaleBaselines()
     this.metadata.lastAccessedAt = Date.now()
     await this.saveMetadata()
@@ -1270,7 +1271,15 @@ export class WorkspaceRuntime {
         continue
       }
 
-      const result = await this.syncToDiskSingleRoot(handle, rootPaths, forceOverwrite)
+      // Build pathTransform to strip root prefix for native FS operations
+      const stripPrefix = (rootName + '/').toLowerCase()
+      const pathTransform = (path: string) => {
+        const lower = path.toLowerCase()
+        if (lower.startsWith(stripPrefix)) return path.slice(stripPrefix.length)
+        return path
+      }
+
+      const result = await this.syncToDiskSingleRoot(handle, rootPaths, forceOverwrite, pathTransform)
       aggregated.success += result.success
       aggregated.failed += result.failed
       aggregated.skipped += result.skipped
@@ -1321,7 +1330,14 @@ export class WorkspaceRuntime {
 
     for (const [rootName, rootPaths] of pathsByRoot) {
       const handle = allHandles.get(rootName) ?? directoryHandle
-      const conflicts = await this.pendingManager.detectConflicts(handle, rootPaths)
+      // Build pathTransform to strip root prefix for native FS operations
+      const stripPrefix = (rootName + '/').toLowerCase()
+      const pathTransform = (path: string) => {
+        const lower = path.toLowerCase()
+        if (lower.startsWith(stripPrefix)) return path.slice(stripPrefix.length)
+        return path
+      }
+      const conflicts = await this.pendingManager.detectConflicts(handle, rootPaths, pathTransform)
       allConflicts.push(...conflicts)
     }
 
@@ -1344,7 +1360,12 @@ export class WorkspaceRuntime {
           continue
         }
 
-        const fromNative = await this.readFromNativeFS(path, directoryHandle)
+        // Resolve to correct root handle and strip prefix for native FS read
+        const resolved = await this.resolvePath(path)
+        const nativeHandle = await this.getNativeDirectoryHandleForPath(path) ?? directoryHandle
+        const nativePath = resolved.relativePath || path
+
+        const fromNative = await this.readFromNativeFS(nativePath, nativeHandle)
         if (fromNative.metadata.contentType !== 'text' || typeof fromNative.content !== 'string') {
           continue
         }
@@ -1575,7 +1596,31 @@ export class WorkspaceRuntime {
     // Detect conflicts but don't block - let the agent handle them
     let conflicts: ConflictInfo[] = []
     if (directoryHandle) {
-      conflicts = await this.pendingManager.detectConflicts(directoryHandle, paths)
+      const allHandles = await this.getAllNativeDirectoryHandles()
+      if (allHandles.size > 0) {
+        // Multi-root: check conflicts per root with path stripping
+        const pathsByRoot = new Map<string, { paths: string[]; transform: (p: string) => string }>()
+        for (const rawPath of paths) {
+          const resolved = await this.resolvePath(rawPath)
+          let entry = pathsByRoot.get(resolved.rootName)
+          if (!entry) {
+            const stripPrefix = (resolved.rootName + '/').toLowerCase()
+            entry = { paths: [], transform: (p: string) => {
+              const lower = p.toLowerCase()
+              return lower.startsWith(stripPrefix) ? p.slice(stripPrefix.length) : p
+            }}
+            pathsByRoot.set(resolved.rootName, entry)
+          }
+          entry.paths.push(rawPath)
+        }
+        for (const [rootName, { paths: rootPaths, transform }] of pathsByRoot) {
+          const handle = allHandles.get(rootName) ?? directoryHandle
+          const rootConflicts = await this.pendingManager.detectConflicts(handle, rootPaths, transform)
+          conflicts.push(...rootConflicts)
+        }
+      } else {
+        conflicts = await this.pendingManager.detectConflicts(directoryHandle, paths)
+      }
     }
 
     const repo = getFSOverlayRepository()

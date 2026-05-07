@@ -128,7 +128,8 @@ export class WorkspacePendingManager {
 
   async detectConflicts(
     directoryHandle: FileSystemDirectoryHandle,
-    onlyPaths?: string[]
+    onlyPaths?: string[],
+    pathTransform?: (path: string) => string
   ): Promise<SyncResult['conflicts']> {
     const conflicts: SyncResult['conflicts'] = []
     const normalizeComparePath = (p: string): string => {
@@ -150,7 +151,8 @@ export class WorkspacePendingManager {
       if (change.type !== 'delete') {
         const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path)
         if (hasMarkers) {
-          const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, change.path)
+          const nativePath = pathTransform ? pathTransform(change.path) : change.path
+          const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, nativePath)
           conflicts.push({
             path: change.path,
             workspaceId: this.workspaceId,
@@ -162,7 +164,7 @@ export class WorkspacePendingManager {
         }
       }
 
-      const check = await this.checkNativeConflict(directoryHandle, change)
+      const check = await this.checkNativeConflict(directoryHandle, change, pathTransform)
       if (!check.isConflict) continue
 
       conflicts.push({
@@ -276,7 +278,8 @@ export class WorkspacePendingManager {
     directoryHandle: FileSystemDirectoryHandle,
     cacheManager: CacheManager,
     onlyPaths?: string[],
-    forceOverwrite?: boolean
+    forceOverwrite?: boolean,
+    pathTransform?: (path: string) => string
   ): Promise<SyncResult> {
     const result: SyncResult = {
       success: 0,
@@ -306,11 +309,12 @@ export class WorkspacePendingManager {
       }
 
       try {
+        const nativePath = pathTransform ? pathTransform(change.path) : change.path
         if (change.type !== 'delete') {
           const hasMarkers = await this.hasUnresolvedConflictMarkers(change.path, cacheManager)
           if (hasMarkers) {
             result.failed++
-            const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, change.path)
+            const currentFsMtime = await this.safeReadNativeMtime(directoryHandle, nativePath)
             const message = `检测到未解决冲突标记：${change.path}，请先处理 <<<<<<< / ======= / >>>>>>> 标记后再审批。`
             await repo.keepOpPending(change.id, message)
             await repo.recordSyncItem(batchId, change.id, change.path, 'failed', message)
@@ -328,7 +332,7 @@ export class WorkspacePendingManager {
         // Skip conflict check if forceOverwrite is true
         const conflictCheck = forceOverwrite
           ? { isConflict: false, currentFsMtime: 0 }
-          : await this.checkNativeConflict(directoryHandle, change)
+          : await this.checkNativeConflict(directoryHandle, change, pathTransform)
         if (conflictCheck.isConflict) {
           result.failed++
           const message =
@@ -347,7 +351,7 @@ export class WorkspacePendingManager {
         }
 
         if (change.type === 'delete') {
-          await this.deleteFile(directoryHandle, change.path)
+          await this.deleteFile(directoryHandle, nativePath)
           result.success++
           await repo.markOpSynced(change.id)
           await repo.recordSyncItem(batchId, change.id, change.path, 'success')
@@ -356,7 +360,7 @@ export class WorkspacePendingManager {
           // Read from OPFS cache and write to filesystem
           const content = await this.readCacheContent(change.path, cacheManager)
           if (content) {
-            await this.writeFile(directoryHandle, change.path, content)
+            await this.writeFile(directoryHandle, nativePath, content)
             result.success++
             await repo.markOpSynced(change.id)
             await repo.recordSyncItem(batchId, change.id, change.path, 'success')
@@ -576,9 +580,11 @@ export class WorkspacePendingManager {
 
   private async checkNativeConflict(
     directoryHandle: FileSystemDirectoryHandle,
-    change: PendingChange
+    change: PendingChange,
+    pathTransform?: (path: string) => string
   ): Promise<SyncConflictCheck> {
-    const currentFsMtime = await this.readNativeMtime(directoryHandle, change.path)
+    const nativePath = pathTransform ? pathTransform(change.path) : change.path
+    const currentFsMtime = await this.readNativeMtime(directoryHandle, nativePath)
     const baselineFsMtime = change.fsMtime || 0
 
     if (change.type === 'create') {
@@ -596,7 +602,7 @@ export class WorkspacePendingManager {
 
     if (change.type === 'modify') {
       if (baselineFsMtime > 0 && currentFsMtime !== baselineFsMtime) {
-        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path)
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath)
         if (alignedWithBaseline) {
           return { isConflict: false, currentFsMtime: currentFsMtime ?? 0 }
         }
@@ -615,7 +621,7 @@ export class WorkspacePendingManager {
         currentFsMtime !== null &&
         currentFsMtime !== baselineFsMtime
       ) {
-        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path)
+        const alignedWithBaseline = await this.isNativeAlignedWithBaseline(directoryHandle, change.path, nativePath)
         if (alignedWithBaseline) {
           return { isConflict: false, currentFsMtime }
         }
@@ -638,12 +644,13 @@ export class WorkspacePendingManager {
    */
   private async isNativeAlignedWithBaseline(
     directoryHandle: FileSystemDirectoryHandle,
-    path: string
+    baselinePath: string,
+    nativePath?: string
   ): Promise<boolean> {
     try {
-      const baselineBytes = await this.readBaselineBytes(path)
+      const baselineBytes = await this.readBaselineBytes(baselinePath)
       if (!baselineBytes) return false
-      const nativeBytes = await this.readNativeBytes(directoryHandle, path)
+      const nativeBytes = await this.readNativeBytes(directoryHandle, nativePath ?? baselinePath)
       if (!nativeBytes) return false
       return this.bytesEqual(baselineBytes, nativeBytes)
     } catch {

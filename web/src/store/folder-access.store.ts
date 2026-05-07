@@ -505,7 +505,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         const { traverseDirectory } = await import('../services/traversal.service')
         const paths: string[] = []
         for await (const entry of traverseDirectory(handle)) {
-          if (entry.type === 'file') paths.push(entry.path)
+          paths.push(entry.path)
           if (paths.length >= 5000) break
         }
         set({ allFilePaths: paths })
@@ -517,10 +517,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       for (const [rootName, handle] of allHandles) {
         if (paths.length >= 5000) break
         for await (const entry of traverseDirectory(handle)) {
-          if (entry.type === 'file') {
-            // Prefix with rootName for multi-root routing
-            paths.push(`${rootName}/${entry.path}`)
-          }
+          // Prefix with rootName for multi-root routing
+          paths.push(`${rootName}/${entry.path}`)
           if (paths.length >= 5000) break
         }
       }

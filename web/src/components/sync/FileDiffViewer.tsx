@@ -13,15 +13,46 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creat
 import { useT } from '@/i18n'
 import {
   isImageFile,
-  fileExistsInNativeFS,
   readFileFromOPFS,
-  readFileFromNativeFSMultiRoot,
   readBinaryFileFromOPFS,
-  readBinaryFileFromNativeFS,
+  readBinaryFileFromNativeFSMultiRoot,
 } from '@/opfs'
 import { Columns2, UnfoldVertical, Copy, X, MousePointer2, FileText } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
+
+/**
+ * Read native file content using conversation's resolvePath to get correct root handle.
+ */
+async function readNativeFileViaConversation(
+  conversation: import('@/opfs').WorkspaceRuntime,
+  filePath: string
+): Promise<string | null> {
+  try {
+    const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+    const { getRuntimeDirectoryHandle } = await import('@/native-fs')
+    const activeProject = await getProjectRepository().findActiveProject()
+    if (!activeProject?.id) return null
+
+    const resolved = await conversation.resolvePath(filePath)
+    const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
+    if (!rootHandle) return null
+
+    // Navigate using the relative path (root prefix stripped)
+    const parts = resolved.relativePath.split('/').filter(Boolean)
+    if (parts.length === 0) return null
+
+    let current: FileSystemDirectoryHandle = rootHandle
+    for (let i = 0; i < parts.length - 1; i++) {
+      current = await current.getDirectoryHandle(parts[i])
+    }
+    const fileHandle = await current.getFileHandle(parts[parts.length - 1])
+    const file = await fileHandle.getFile()
+    return await file.text()
+  } catch {
+    return null
+  }
+}
 const LazyDiffViewer = React.lazy(() => import('./LazyDiffViewer'))
 
 import { type CommentSide, type LineComment } from './comment-types'
@@ -198,14 +229,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         const filePath = fileChange.path
         const isImage = isImageFile(filePath)
         let showNativePanel = fileChange.type !== 'add'
-        let nativeDir: FileSystemDirectoryHandle | null = null
 
         if (fileChange.type !== 'add') {
-          nativeDir = await conversation.getNativeDirectoryHandle()
-          if (nativeDir) {
-            const exists = await fileExistsInNativeFS(nativeDir, filePath)
-            showNativePanel = exists
-          }
+          const nativeContent = await readNativeFileViaConversation(conversation, filePath)
+          showNativePanel = nativeContent !== null
         }
 
         if (isImage) {
@@ -225,8 +252,9 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           }
 
           try {
-            if (fileChange.type !== 'add' && nativeDir) {
-              const nativeBase64 = await readBinaryFileFromNativeFS(nativeDir, filePath)
+            if (fileChange.type !== 'add') {
+              const nativeDir = await conversation.getNativeDirectoryHandle()
+              const nativeBase64 = await readBinaryFileFromNativeFSMultiRoot(nativeDir, filePath)
               if (nativeBase64) {
                 nativeImageUrl = `data:${mimeType};base64,${nativeBase64}`
               }
@@ -258,9 +286,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           let nativeContent: string | null = null
           try {
             if (fileChange.type !== 'add') {
-              if (nativeDir) {
-                nativeContent = await readFileFromNativeFSMultiRoot(nativeDir, filePath)
-              } else if (showNativePanel) {
+              nativeContent = await readNativeFileViaConversation(conversation, filePath)
+              if (!nativeContent && showNativePanel) {
                 nativeContent = t('sidebar.fileDiffViewer.cannotReadNativeContent')
               }
             }

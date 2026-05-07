@@ -45,7 +45,7 @@ export function ConversationView({
 
   const logic = useConversationLogic()
   const {
-    input, setInput, setMentionedAgentIds, setSelectedFiles, inputResetToken, messagesEndRef, scrollContainerRef,
+    input, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
     showScrollToBottom, scrollToBottom,
     draftTextToRestore, onDraftRestored,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
@@ -81,16 +81,16 @@ export function ConversationView({
         const fileTree = remoteStore.fileTree
 
         if (fileTree) {
-          // Empty query → show project root files as a quick pick
+          // Empty query → show project root entries as a quick pick
           if (!query.trim()) {
-            const rootFiles = (fileTree.children ?? [])
-              .filter((c: any) => c.type === 'file')
+            const rootEntries = (fileTree.children ?? [])
               .slice(0, 10)
             if (reqId !== searchReqIdRef.current) return []
-            return rootFiles.map((c: any) => ({
+            return rootEntries.map((c: any) => ({
               path: c.path,
               name: c.name,
               extension: c.extension,
+              isDirectory: c.type === 'directory',
             }))
           }
 
@@ -98,8 +98,7 @@ export function ConversationView({
           const results = await fileDiscoveryService.search(query, [fileTree], { limit: 10 })
           if (reqId !== searchReqIdRef.current) return []
           return results
-            .filter((r) => r.type === 'file')
-            .map((r) => ({ path: r.path, name: r.name, extension: r.extension }))
+            .map((r) => ({ path: r.path, name: r.name, extension: r.extension, isDirectory: r.type === 'directory' }))
         }
 
         // --- Local mode: use shared file path cache from folder-access.store ---
@@ -125,10 +124,12 @@ export function ConversationView({
           paths.map((p) => {
             const name = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p
             const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : undefined
-            return { path: p, name, extension: ext }
+            // A path with no extension or ending with a segment that has no dot is likely a directory
+            const isDirectory = !name.includes('.')
+            return { path: p, name, extension: ext, isDirectory }
           })
 
-        // Empty query → show root-level files (paths without '/' separator)
+        // Empty query → show root-level entries (paths without '/' separator)
         if (!query.trim()) {
           return toItems(allPaths.filter((p) => !p.includes('/')).slice(0, 10))
         }
@@ -287,10 +288,9 @@ export function ConversationView({
                 onSetActiveAgent={setActiveAgent}
                 onCreateAgent={createAgent}
                 onDeleteAgent={deleteAgent}
-                onChange={({ text, mentionedAgentIds: ids, selectedFiles: files }) => {
+                onChange={({ text, mentionedAgentIds: ids }) => {
                   setInput(text)
                   setMentionedAgentIds(ids)
-                  if (files) setSelectedFiles(files)
                 }}
                 onSubmit={handleSend}
               />
