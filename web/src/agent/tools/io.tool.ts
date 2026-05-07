@@ -848,7 +848,7 @@ async function executeSingleWrite(
 
     // Collect asset metadata for assets backend (so UI shows AssetCard)
     if (source === 'assets') {
-      collectAssetsFromWrite(target.path, content.length, isNew)
+      collectAssetsFromWrite(target.path, content.length, isNew, context.workspaceId)
     }
 
     // Post-write metadata: workspace needs pending tracking
@@ -955,7 +955,7 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
 
       // Collect asset metadata for assets backend
       if (target.backend.label === 'assets') {
-        collectAssetsFromWrite(target.path, file.content.length, isNew)
+        collectAssetsFromWrite(target.path, file.content.length, isNew, context.workspaceId)
       }
 
       // Post-write: workspace needs pending tracking
@@ -1027,6 +1027,7 @@ export function collectAssetsFromWrite(
   assetPath: string,
   size: number,
   isNew: boolean,
+  contextWorkspaceId?: string | null,
 ): void {
   // Only collect for new files to avoid duplicate entries on edits
   if (!isNew) return
@@ -1041,8 +1042,10 @@ export function collectAssetsFromWrite(
     createdAt: Date.now(),
   }
 
-  const activeConvId = useConversationStore.getState().activeConversationId
-  if (activeConvId) {
-    useConversationStore.getState().collectAssets(activeConvId, [asset])
+  // Prefer the workspace ID from the tool context (correct for parallel/subagent scenarios)
+  // Fall back to the global activeConversationId for backwards compatibility
+  const targetId = contextWorkspaceId || useConversationStore.getState().activeConversationId
+  if (targetId) {
+    useConversationStore.getState().collectAssets(targetId, [asset])
   }
 }

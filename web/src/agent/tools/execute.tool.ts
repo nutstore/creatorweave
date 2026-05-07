@@ -136,11 +136,11 @@ async function executePython(
 
       // Accumulate assets into the conversation store's collectedAssets
       // These will be attached to the final assistant message when the draft is committed
-      const activeConvId = useConversationStore.getState().activeConversationId
-      if (activeConvId) {
-        useConversationStore.getState().collectAssets(activeConvId, newAssets)
+      const targetConvId = context.workspaceId || useConversationStore.getState().activeConversationId
+      if (targetConvId) {
+        useConversationStore.getState().collectAssets(targetConvId, newAssets)
       } else {
-        console.warn('[execute.tool] No activeConversationId! Assets will be lost.')
+        console.warn('[execute.tool] No conversationId! Assets will be lost.')
       }
     }
 

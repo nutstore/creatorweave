@@ -10,6 +10,7 @@ import { inferMimeType } from '@/types/asset'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { ImageLightbox } from '@/components/ui/image-lightbox'
 import { HTMLLightbox } from '@/components/ui/html-lightbox'
+import { MarkdownLightbox } from '@/components/ui/markdown-lightbox'
 import { useT } from '@/i18n'
 
 /** Check if a MIME type is an image */
@@ -20,6 +21,11 @@ function isImageMime(mime: string): boolean {
 /** Check if a MIME type is previewable HTML */
 function isHtmlMime(mime: string): boolean {
   return mime === 'text/html'
+}
+
+/** Check if a MIME type is previewable Markdown */
+function isMarkdownMime(mime: string): boolean {
+  return mime === 'text/markdown'
 }
 
 /** Format file size for display */
@@ -85,12 +91,15 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
   const t = useT()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
+  const [mdUrl, setMdUrl] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
+  const [mdLightboxOpen, setMdLightboxOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
   const isHtml = isHtmlMime(mime)
+  const isMarkdown = isMarkdownMime(mime)
 
   const imageUrlRef = useRef<string | null>(null)
 
@@ -121,6 +130,19 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
       setHtmlLightboxOpen(true)
     }
   }, [asset.name, htmlUrl])
+
+  const handlePreviewMarkdown = useCallback(async () => {
+    if (mdUrl) {
+      setMdLightboxOpen(true)
+      return
+    }
+    const blob = await readAssetBlob(asset.name)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      setMdUrl(url)
+      setMdLightboxOpen(true)
+    }
+  }, [asset.name, mdUrl])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -200,6 +222,15 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
         />
       )}
 
+      {/* Markdown preview lightbox */}
+      {mdLightboxOpen && mdUrl && (
+        <MarkdownLightbox
+          src={mdUrl}
+          title={asset.name}
+          onClose={() => setMdLightboxOpen(false)}
+        />
+      )}
+
       {/* File info row */}
       <div className="flex items-center gap-2 px-3 py-2">
         <AssetIcon mimeType={mime} />
@@ -217,6 +248,17 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
           <button
             type="button"
             onClick={handlePreviewHtml}
+            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+            title={t('filePreview.preview')}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+        )}
+        {/* Preview button for Markdown files */}
+        {isMarkdown && (
+          <button
+            type="button"
+            onClick={handlePreviewMarkdown}
             className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
             title={t('filePreview.preview')}
           >
@@ -294,11 +336,14 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
   const t = useT()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [htmlUrl, setHtmlUrl] = useState<string | null>(null)
+  const [mdUrl, setMdUrl] = useState<string | null>(null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
+  const [mdLightboxOpen, setMdLightboxOpen] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
   const isHtml = isHtmlMime(mime)
+  const isMarkdown = isMarkdownMime(mime)
 
   // Load thumbnail for images
   useEffect(() => {
@@ -328,6 +373,19 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
       setHtmlLightboxOpen(true)
     }
   }, [asset.name, htmlUrl])
+
+  const handlePreviewMarkdown = useCallback(async () => {
+    if (mdUrl) {
+      setMdLightboxOpen(true)
+      return
+    }
+    const blob = await readAssetBlob(asset.name)
+    if (blob) {
+      const url = URL.createObjectURL(blob)
+      setMdUrl(url)
+      setMdLightboxOpen(true)
+    }
+  }, [asset.name, mdUrl])
 
   return (
     <>
@@ -376,6 +434,18 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
             <Eye className="h-3.5 w-3.5" />
           </button>
         )}
+
+        {/* Preview button for Markdown files */}
+        {isMarkdown && (
+          <button
+            type="button"
+            onClick={handlePreviewMarkdown}
+            className="flex-shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-600 dark:hover:text-neutral-300"
+            title={t('filePreview.preview')}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Lightbox for image preview */}
@@ -393,6 +463,15 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
           src={htmlUrl}
           title={asset.name}
           onClose={() => setHtmlLightboxOpen(false)}
+        />
+      )}
+
+      {/* Markdown preview lightbox */}
+      {mdLightboxOpen && mdUrl && (
+        <MarkdownLightbox
+          src={mdUrl}
+          title={asset.name}
+          onClose={() => setMdLightboxOpen(false)}
         />
       )}
     </>

@@ -46,7 +46,7 @@ async function offloadLargeContent(
   try {
     const target = await resolveVfsTarget(vfsPath, context, 'write')
     await target.backend.writeFile(target.path, content)
-    collectAssetsFromWrite(fileName, content.length, true)
+    collectAssetsFromWrite(fileName, content.length, true, context.workspaceId)
 
     const preview = content.slice(0, SUBAGENT_SUMMARY_PREVIEW)
     const summary =
