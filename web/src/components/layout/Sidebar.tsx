@@ -178,6 +178,9 @@ export function Sidebar({
   const deleteConfirmRef = useRef<HTMLDivElement>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
+  // Track the target rename ID to prevent click interference
+  const pendingRenameIdRef = useRef<string | null>(null)
+
   const closeMobileSidebar = useCallback(() => {
     if (isMobile) {
       onRequestClose?.()
@@ -186,9 +189,9 @@ export function Sidebar({
 
   // Rename handlers
   const startRename = useCallback((convId: string, currentTitle: string) => {
+    pendingRenameIdRef.current = convId
     setEditingId(convId)
     setEditingTitle(currentTitle)
-    // Focus the input after React renders it
     requestAnimationFrame(() => {
       renameInputRef.current?.focus()
       renameInputRef.current?.select()
@@ -198,7 +201,6 @@ export function Sidebar({
   const confirmRename = useCallback(() => {
     if (editingId && editingTitle.trim()) {
       const trimmedTitle = editingTitle.trim()
-      // Find current conversation to check if title actually changed
       const conv = scopedConversations.find((c) => c.id === editingId)
       if (conv && conv.title !== trimmedTitle) {
         updateTitle(editingId, trimmedTitle)
@@ -206,12 +208,22 @@ export function Sidebar({
     }
     setEditingId(null)
     setEditingTitle('')
+    pendingRenameIdRef.current = null
   }, [editingId, editingTitle, updateTitle, scopedConversations])
+
+  const handleRenameBlur = useCallback(() => {
+    setTimeout(() => {
+      if (document.activeElement !== renameInputRef.current) {
+        confirmRename()
+      }
+    }, 150)
+  }, [confirmRename])
 
   const cancelRename = useCallback(() => {
     setEditingId(null)
     setEditingTitle('')
     setComposing(false)
+    pendingRenameIdRef.current = null
   }, [])
 
   // Drag sidebar width (horizontal)
@@ -474,7 +486,8 @@ export function Sidebar({
                           : 'hover:bg-hover text-secondary'
                       }`}
                       onClick={() => {
-                        if (isEditing) return
+                        // Check both state and ref to handle rapid state changes
+                        if (isEditing || pendingRenameIdRef.current === conv.id) return
                         setActive(conv.id)
                         closeMobileSidebar()
                       }}
@@ -501,22 +514,38 @@ export function Sidebar({
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
                       )}
 
-                      {/* Delete button - visible on hover */}
-                      <button
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded border border-danger/30 bg-danger/10 p-0.5 opacity-0 text-danger transition-all hover:border-danger/50 hover:bg-danger/20 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          setConfirmDeleteId(conv.id)
-                          // Get button position for portal
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setConfirmDeletePos({ x: rect.left, y: rect.top })
-                        }}
-                        title={t('sidebar.deleteWorkspace')}
-                        aria-label={t('sidebar.deleteWorkspace')}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {/* Action buttons - visible on hover */}
+                      {!isEditing && (
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md border border-neutral-200 bg-neutral-100 p-0.5 opacity-0 shadow-sm group-hover:opacity-100 focus-within:opacity-100 transition-opacity dark:border-neutral-600 dark:bg-neutral-700">
+                          <button
+                            className="rounded p-0.5 text-secondary transition-colors hover:bg-neutral-200 hover:text-primary dark:hover:bg-neutral-600 dark:hover:text-primary-300"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              startRename(conv.id, conv.title)
+                            }}
+                            title={t('sidebar.renameWorkspace')}
+                            aria-label={t('sidebar.renameWorkspace')}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <div className="mx-0.5 h-3 w-px bg-neutral-300 dark:bg-neutral-500" />
+                          <button
+                            className="rounded p-0.5 text-secondary transition-colors hover:bg-danger/10 hover:text-danger dark:hover:bg-danger/20"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              setConfirmDeleteId(conv.id)
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setConfirmDeletePos({ x: rect.left, y: rect.top })
+                            }}
+                            title={t('sidebar.deleteWorkspace')}
+                            aria-label={t('sidebar.deleteWorkspace')}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
 
                       {isEditing ? (
                         <input
@@ -534,7 +563,7 @@ export function Sidebar({
                               cancelRename()
                             }
                           }}
-                          onBlur={confirmRename}
+                          onBlur={handleRenameBlur}
                           onClick={(e) => e.stopPropagation()}
                           className="min-w-0 flex-1 rounded border border-primary-300 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
                           maxLength={100}
@@ -561,12 +590,6 @@ export function Sidebar({
                         : <Pin className="mr-2 h-3.5 w-3.5" />
                       }
                       {isPinned ? t('sidebar.unpinWorkspace') : t('sidebar.pinWorkspace')}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onClick={() => startRename(conv.id, conv.title)}
-                    >
-                      <Pencil className="mr-2 h-3.5 w-3.5" />
-                      {t('sidebar.renameWorkspace')}
                     </ContextMenuItem>
                     <ContextMenuItem
                       onClick={() => setExportConvId(conv.id)}
