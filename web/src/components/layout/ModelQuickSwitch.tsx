@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Check, ChevronDown, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
-import { useWorkspaceStore } from '@/store/workspace.store'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { Popover, PopoverContent, PopoverTrigger, BrandButton } from '@creatorweave/ui'
 import { useT } from '@/i18n'
