@@ -11,10 +11,24 @@ export const settings = {
     temperature: "Temperature",
     maxTokens: "最大输出 Tokens",
 
-    // Sync tabs
+    // Tabs
+    general: "通用",
+    mcp: "MCP 服务",
     sync: "跨设备同步",
     offline: "离线任务",
     experimental: "实验性功能",
+
+    // General tab
+    generalDescription: "语言、主题等基础设置",
+    language: "语言",
+    languageDescription: "选择界面显示语言",
+    theme: "主题",
+    themeDescription: "切换亮色/暗色/跟随系统主题",
+    themeLight: "亮色",
+    themeDark: "暗色",
+    themeSystem: "跟随系统",
+    docs: "帮助文档",
+    docsDescription: "查看使用文档和帮助信息",
 
     // Experimental features
     experimentalWarning: "这些功能处于实验阶段",

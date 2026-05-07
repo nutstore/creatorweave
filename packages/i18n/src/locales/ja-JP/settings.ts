@@ -11,10 +11,24 @@ export const settings = {
     temperature: "Temperature",
     maxTokens: "最大出力トークン数",
 
-    // Sync tabs
+    // Tabs
+    general: "一般",
+    mcp: "MCP サービス",
     sync: "クロスデバイス同期",
     offline: "オフラインタスク",
     experimental: "実験的機能",
+
+    // General tab
+    generalDescription: "言語、テーマなどの基本設定",
+    language: "言語",
+    languageDescription: "インターフェースの表示言語を選択",
+    theme: "テーマ",
+    themeDescription: "ライト/ダーク/システム設定の切り替え",
+    themeLight: "ライト",
+    themeDark: "ダーク",
+    themeSystem: "システム",
+    docs: "ドキュメント",
+    docsDescription: "使用方法やヘルプを表示",
 
     // Experimental features
     experimentalWarning: "これらの機能は実験段階です",

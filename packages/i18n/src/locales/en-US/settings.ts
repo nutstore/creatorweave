@@ -10,10 +10,24 @@ export const settings = {
     temperature: "Temperature",
     maxTokens: "Max Tokens",
 
-    // Sync tabs
+    // Tabs
+    general: "General",
+    mcp: "MCP Services",
     sync: "Cross-device Sync",
     offline: "Offline Tasks",
     experimental: "Experimental",
+
+    // General tab
+    generalDescription: "Language, theme and basic settings",
+    language: "Language",
+    languageDescription: "Choose the interface language",
+    theme: "Theme",
+    themeDescription: "Switch between light/dark/system theme",
+    themeLight: "Light",
+    themeDark: "Dark",
+    themeSystem: "System",
+    docs: "Documentation",
+    docsDescription: "View usage docs and help",
 
     // Experimental features
     experimentalWarning: "These features are experimental",

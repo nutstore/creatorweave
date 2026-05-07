@@ -11,10 +11,24 @@ export const settings = {
     temperature: "Temperature",
     maxTokens: "최대 출력 토큰 수",
 
-    // Sync tabs
+    // Tabs
+    general: "일반",
+    mcp: "MCP 서비스",
     sync: "크로스 디바이스 동기화",
     offline: "오프라인 작업",
     experimental: "실험적 기능",
+
+    // General tab
+    generalDescription: "언어, 테마 등 기본 설정",
+    language: "언어",
+    languageDescription: "인터페이스 표시 언어 선택",
+    theme: "테마",
+    themeDescription: "라이트/다크/시스템 테마 전환",
+    themeLight: "라이트",
+    themeDark: "다크",
+    themeSystem: "시스템",
+    docs: "문서",
+    docsDescription: "사용 문서 및 도움말 보기",
 
     // Experimental features
     experimentalWarning: "이 기능들은 실험 단계입니다",
