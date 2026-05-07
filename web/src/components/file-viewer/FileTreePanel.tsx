@@ -231,6 +231,7 @@ function TreeNodeRow({
   selected,
   pendingType,
   approvedNotSynced,
+  rootName,
   onClick,
   onInspect,
 }: {
@@ -240,6 +241,7 @@ function TreeNodeRow({
   selected: boolean
   pendingType: PendingChange['type'] | null
   approvedNotSynced: boolean
+  rootName?: string | null
   onClick: () => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
@@ -264,11 +266,11 @@ function TreeNodeRow({
     setContextMenuOpen(false)
   }
 
-  /** Copy path to clipboard */
+  /** Copy path to clipboard (with rootName prefix for multi-root mode) */
   const handleCopyPath = async () => {
     try {
-      await navigator.clipboard.writeText(node.path)
-
+      const fullPath = rootName ? `${rootName}/${node.path}` : node.path
+      await navigator.clipboard.writeText(fullPath)
     } catch (error) {
       console.error('[FileTree] Failed to copy path:', error)
     }
@@ -357,15 +359,13 @@ function TreeNodeRow({
             className="z-dropdown fixed min-w-[6rem] overflow-hidden rounded border bg-popover py-0.5 shadow-md"
             style={{ left: contextMenuPos.x + 20, top: contextMenuPos.y }}
           >
-            {!isDir && (
-              <button
-                className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
-                onClick={handleCopyPath}
-              >
-                <Copy className="h-3 w-3" />
-                <span>{t('fileTree.copyPath')}</span>
-              </button>
-            )}
+            <button
+              className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
+              onClick={handleCopyPath}
+            >
+              <Copy className="h-3 w-3" />
+              <span>{t('fileTree.copyPath')}</span>
+            </button>
             {!isDir && onInspect && node.path.endsWith('.html') && (
               <button
                 className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
@@ -396,6 +396,7 @@ function TreeBranch({
   onNodeClick,
   onInspect,
   approvedNotSyncedPaths,
+  rootName,
 }: {
   nodes: TreeNode[]
   depth: number
@@ -403,6 +404,7 @@ function TreeBranch({
   selectedPath: string | null
   pendingMap: Map<string, PendingChange['type']>
   approvedNotSyncedPaths: Set<string>
+  rootName?: string | null
   onToggle: (node: TreeNode) => void
   onNodeClick: (node: TreeNode) => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
@@ -430,6 +432,7 @@ function TreeBranch({
               selected={selected}
               pendingType={pendingType}
               approvedNotSynced={approvedNotSynced}
+              rootName={rootName}
               onClick={() => onNodeClick(node)}
               onInspect={onInspect ? (path, handle) => onInspect(path, handle) : undefined}
             />
@@ -441,6 +444,7 @@ function TreeBranch({
                 selectedPath={selectedPath}
                 pendingMap={pendingMap}
                 approvedNotSyncedPaths={approvedNotSyncedPaths}
+                rootName={rootName}
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
                 onInspect={onInspect}
@@ -952,6 +956,7 @@ export function FileTreePanel({
               selectedPath={selectedPath || null}
               pendingMap={pendingMap}
               approvedNotSyncedPaths={rootApprovedNotSyncedPaths}
+              rootName={rootName}
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
               onInspect={onInspect}
