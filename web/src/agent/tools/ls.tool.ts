@@ -14,7 +14,6 @@ import micromatch from 'micromatch'
 import { resolveVfsTarget } from './vfs-resolver'
 import { resolveNativeDirectoryHandle, resolveWorkspaceDirectoryHandle } from './tool-utils'
 import {
-  DOT_GLOB_WHITELIST,
   getStaticGlobPrefix,
   normalizeSubPath,
   parseBoundedInt,
@@ -180,6 +179,9 @@ type DiscoveryScope =
   | {
       kind: 'workspace'
       subPath: string
+      /** When path was routed to a specific multi-root (e.g. path="lxy"), this holds that root name
+       *  so OPFS merge can resolve into files/{rootName}/ instead of the workspace-level files/ root. */
+      rootName?: string
       resolveHandle: (
         path: string,
         options?: { allowMissing?: boolean }
@@ -292,6 +294,7 @@ async function resolveDiscoveryScope(
           return {
             kind: 'workspace' as const,
             subPath: rootSubPath,
+            rootName: maybeRoot,
             resolveHandle: (path: string, options?: { allowMissing?: boolean }) =>
               resolveDirectoryHandle(rootHandle, path, options),
           }
@@ -440,7 +443,12 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     if (!isTruncated && !timedOut && scope.kind === 'workspace') {
       const opfsHandle = await getOPFSFilesHandle(toolContext.workspaceId)
       if (opfsHandle) {
-        const resolved = await resolveDirectoryHandle(opfsHandle, scope.subPath, { allowMissing: true })
+        // In multi-root: rootName is set when path was routed to a specific root.
+        // We must resolve into files/{rootName}/ subdirectory first, then apply subPath.
+        const opfsSubPath = scope.rootName
+          ? (scope.subPath ? `${scope.rootName}/${scope.subPath}` : scope.rootName)
+          : scope.subPath
+        const resolved = await resolveDirectoryHandle(opfsHandle, opfsSubPath, { allowMissing: true })
         if (resolved.exists) {
           await scanTree(resolved.handle)
         }
@@ -592,10 +600,11 @@ async function executeGlobMode(
               continue
             }
 
+            const dotOpts: micromatch.Options = { dot: true }
             const matched =
-              micromatch.isMatch(namespacedPath, pattern) ||
-              micromatch.isMatch(fullPath, pattern) ||
-              micromatch.isMatch(localPath, pattern)
+              micromatch.isMatch(namespacedPath, pattern, dotOpts) ||
+              micromatch.isMatch(fullPath, pattern, dotOpts) ||
+              micromatch.isMatch(localPath, pattern, dotOpts)
             if (matched) {
               matches.push(namespacedPath)
               if (maxResults !== undefined && matches.length >= maxResults) {
@@ -646,7 +655,12 @@ async function executeGlobMode(
       // 2. OPFS (pending changes, .skills/, etc.)
       const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
       if (opfsFilesHandle) {
-        const opfsResult = await resolveDirectoryHandle(opfsFilesHandle, effectiveRoot, { allowMissing: true })
+        // In multi-root: rootName is set when path was routed to a specific root.
+        // We must resolve into files/{rootName}/ subdirectory first.
+        const opfsEffectiveRoot = scope.rootName
+          ? (effectiveRoot ? `${scope.rootName}/${effectiveRoot}` : scope.rootName)
+          : effectiveRoot
+        const opfsResult = await resolveDirectoryHandle(opfsFilesHandle, opfsEffectiveRoot, { allowMissing: true })
         if (opfsResult.exists) {
           searchHandles.push({ handle: opfsResult.handle, source: 'opfs' })
         }
@@ -662,9 +676,11 @@ async function executeGlobMode(
       return `No files matching pattern "${pattern}"`
     }
 
-    // Enable dot matching when the search root contains a whitelisted dot-directory
-    const globDot = effectiveRoot.split('/').some((seg) => DOT_GLOB_WHITELIST.has(seg))
-    const micromatchOpts = globDot ? { dot: true } : undefined
+    // Always enable dot matching for glob: micromatch's `**` skips dot-prefixed
+    // segments by default, but `shouldSkipDirectory` already filters unwanted
+    // dot-dirs (.git, node_modules, etc.), so whitelisted ones like .skills
+    // should always be reachable via `**`.
+    const micromatchOpts: micromatch.Options = { dot: true }
 
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs
