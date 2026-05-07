@@ -1,0 +1,53 @@
+// 应用初始化
+export const app = {
+    initializing: "正在初始化...",
+    preparing: "正在准备...",
+    loadProgress: "加载进度",
+    firstLoadHint: "首次加载可能需要几秒钟时间",
+    productName: "CreatorWeave",
+    initComplete: "初始化完成",
+    initFailed: "初始化失败",
+    sessionStorageOnly: "数据仅在当前会话保存，刷新后将丢失",
+    localStorageMode: "使用本地存储模式",
+    migrationInProgress: "正在迁移数据",
+    migrationComplete: "数据迁移完成",
+    conversationsMigrated: "{count} 个对话",
+    // App toast messages
+    resetDatabaseFailed: "重置数据库失败，请手动刷新页面",
+    localDataCleared: "已清空本地数据，可以重新开始了",
+    clearFailedCloseOtherTabs:
+      "清空失败：请先关闭该应用的其他标签页/窗口后重试",
+    clearLocalDataFailed: "清空本地数据失败",
+    storageInitError: "存储初始化错误",
+    projectNotFound: "项目不存在或已删除",
+    switchProjectFailed: "切换项目失败，请稍后重试",
+    noWorkspaceInProject: "当前项目还没有工作区",
+    projectCreated: "项目「{name}」已创建",
+    projectCreatedButSwitchFailed: "项目已创建，但切换失败，请手动重试",
+    createProjectFailed: "创建项目失败，请稍后重试",
+    projectRenamed: "项目已重命名",
+    renameFailed: "重命名失败，请稍后重试",
+    projectArchived: "项目已归档",
+    projectUnarchived: "项目已取消归档",
+    archiveFailed: "归档失败，请稍后重试",
+    unarchiveFailed: "取消归档失败，请稍后重试",
+    projectDeleted: "项目已删除",
+    deleteFailed: "删除失败，请稍后重试",
+    // Database refresh dialog
+    databaseConnectionLost: "数据库连接已断开",
+    whatHappened: "发生了什么？",
+    databaseHandleInvalidExplanation:
+      "浏览器标签页休眠后，数据库文件句柄失效。这是浏览器的正常行为。",
+    ifJustClearedData:
+      '如果刚执行过"清空数据"，请先关闭同源的其他标签页/窗口，再刷新当前页面。',
+    yourDataIsSafe: "您的对话数据是安全的！",
+    dataStoredInOPFS: "数据存储在浏览器的 OPFS 中，只是暂时无法访问。",
+    willAutoRecoverAfterRefresh: "刷新页面后将自动恢复数据库连接。",
+    refreshPage: "刷新页面",
+    cannotCloseDialog: "此对话框无法关闭 - 请点击上方按钮刷新页面",
+    databaseInitFailed: "数据库初始化失败",
+    databaseResetExplanation:
+      "这可能由于数据库损坏或迁移失败导致。重置数据库将清除所有数据并重新创建。",
+    resetDatabase: "重置数据库",
+    reloadPage: "重新加载页面",
+} as const

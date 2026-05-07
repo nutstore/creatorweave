@@ -1,0 +1,70 @@
+// 移动端专属
+export const mobile = {
+    menu: "Menu",
+    back: "Back",
+    home: "Home",
+    profile: "Profile",
+    // Settings page
+    settings: {
+      connectionStatus: "Connection Status",
+      status: "Status",
+      statusConnected: "Connected",
+      statusConnecting: "Connecting...",
+      statusDisconnected: "Disconnected",
+      directory: "Directory",
+      encryption: "Encryption",
+      encryptionReady: "End-to-end encryption enabled",
+      encryptionExchanging: "Exchanging keys...",
+      encryptionError: "Encryption error",
+      encryptionNone: "No encryption",
+      sessionId: "Session ID",
+      sessionManagement: "Session Management",
+      clearLocalData: "Clear local session data",
+      clearDataConfirm: "Are you sure you want to clear local session data?",
+      about: "About",
+      disconnect: "Disconnect",
+    },
+    // Session input page
+    sessionInput: {
+      title: "Join Remote Session",
+      subtitle: "Enter the session ID displayed on PC",
+      placeholder: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      inputLabel: "Session ID input",
+      joinSession: "Join Session",
+      connecting: "Connecting...",
+      reconnecting: "Reconnecting...",
+      cancel: "Cancel",
+      errorRequired: "Please enter session ID",
+      errorInvalidFormat:
+        "Invalid session ID format, should be UUID (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)",
+      formatHint: "Session ID format: UUID (8-4-4-4-12)",
+      qrHint: "Or scan QR code with iOS camera to join automatically",
+    },
+} as const
+
+// Offline Queue
+export const offlineQueue = {
+    justNow: "Just now",
+    minutesAgo: "{count} min ago",
+    hoursAgo: "{count} hr ago",
+    retry: "Retry",
+    delete: "Delete",
+    syncing: "Syncing",
+    pending: "Pending",
+    failed: "Failed",
+    completed: "Completed",
+    clearCompleted: "Clear completed",
+    online: "Online",
+    offline: "Offline",
+    syncingCount: "Syncing {count}",
+    pendingCount: "Pending {count}",
+    failedCount: "Failed {count}",
+    connectedToNetwork: "Connected to network",
+    offlineMode: "Offline mode",
+    tasksWillSyncAutomatically: "Tasks will sync automatically",
+    tasksWillSyncWhenReconnected: "Tasks will sync when connection is restored",
+    syncAll: "Sync All",
+    noOfflineTasks: "No offline tasks",
+    tasksSavedAutomatically:
+      "Tasks are automatically saved to queue when network is interrupted",
+} as const
