@@ -278,21 +278,9 @@ async function buildMultiRootBlock(
 
     const rootNames = roots.map((r) => `\`${r.name}\``).join(', ')
     const defaultRoot = roots.find((r) => r.isDefault)
-    const defaultLine = defaultRoot ? `Default root: \`${defaultRoot.name}\`` : ''
 
     return [
-      '## Current Project Roots',
-      '',
-      `This project has **${roots.length} roots**: ${rootNames}`,
-      defaultLine,
-      '',
-      'When calling tools, **always prefix file paths with the correct root name**:',
-      `- \`read("frontend/src/App.tsx")\` — read a file in the "frontend" root`,
-      `- \`search("FileTree", { path: "frontend/src" })\` — search within a specific root`,
-      `- \`sync({ paths: ["frontend/src/**/*.tsx"] })\` — sync files from a specific root`,
-      `- \`ls()\` — list all root directories`,
-      '',
-      'Do NOT use bare paths like \`src/App.tsx\` when multiple roots exist — always include the root prefix.',
+      `## Active Roots: ${rootNames}${defaultRoot ? ` (default: \`${defaultRoot.name}\`)` : ''}`,
     ].join('\n')
   } catch {
     return null

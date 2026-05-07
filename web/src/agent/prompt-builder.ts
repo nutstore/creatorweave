@@ -5,6 +5,7 @@
  */
 
 import type { AgentInfo } from '@/opfs'
+import { DEFAULT_AGENT_TEMPLATE } from '@/opfs/agent/agent-templates'
 
 export interface PromptOptions {
   /** 是否包含今日日记 */
@@ -36,13 +37,13 @@ export function buildAgentPrompt(agent: AgentInfo, options: PromptOptions = {}):
     sections.push(`# 工作流程\n\n${agent.agents.trim()}`)
   }
 
-  // 4. USER - 用户信息
-  if (agent.user.trim()) {
+  // 4. USER - 用户信息 (skip default unfilled template)
+  if (agent.user.trim() && agent.user.trim() !== DEFAULT_AGENT_TEMPLATE.USER.trim()) {
     sections.push(`# 用户\n\n${agent.user.trim()}`)
   }
 
-  // 5. MEMORY - 长期记忆
-  if (agent.memory.trim()) {
+  // 5. MEMORY - 长期记忆 (skip default unfilled template)
+  if (agent.memory.trim() && agent.memory.trim() !== DEFAULT_AGENT_TEMPLATE.MEMORY.trim()) {
     sections.push(`# 长期记忆\n\n${agent.memory.trim()}`)
   }
 

@@ -58,19 +58,18 @@ You can help users with a wide variety of tasks:
 9. **Delegate when exploration is needed** - If a task requires extensive searching, reading, or iterative investigation (debugging, code review, multi-file analysis), spawn a subagent to do the exploration. The main agent should focus on reasoning and decision-making, not raw exploration.
 10. **Prefer skills over ad-hoc code** - When a matching skill exists, use its scripts and workflows first. Only fall back to your own approach if the skill cannot handle the task.
 
-## Multi-Root Project Paths (CRITICAL)
+## Multi-Root Project Paths
 
-This workspace may contain **multiple project roots** (e.g., separate git repos or directories). When multiple roots exist:
-- A **root list** will be injected below listing all root names (e.g., \`rootA\`, \`rootB\`).
-- File paths in this workspace follow the pattern: \`{rootName}/relative/path/to/file\`
-- **ALWAYS prefix paths with the correct root name** when calling tools like \`ls\`, \`read\`, \`edit\`, \`write\`, \`search\`, \`sync\`.
-- Example: if roots are \`frontend\` and \`backend\`, a file in frontend is \`frontend/src/App.tsx\`, NOT just \`src/App.tsx\`.
-- Use \`ls()\` (no arguments) to see the root names, then \`ls("{rootName}/")\` to explore a specific root.
-- When only one root exists, paths work as usual without any prefix.
+This workspace may contain multiple project roots. If a root list is injected below:
+- File paths follow the pattern: \`{rootName}/relative/path/to/file\`
+- **Always prefix paths with the root name** in all tools (\`ls\`, \`read\`, \`edit\`, \`write\`, \`search\`, \`sync\`).
+- In Python, files under \`/mnt/\` also follow this pattern: \`/mnt/{rootName}/relative/path\`.
+- Use \`ls()\` to list root names. When only one root exists, no prefix is needed.
 
 ## Available Tools
 
 ### File Discovery
+- \`ls()\` - List root directories (in multi-root: shows all root names)
 - \`ls(pattern)\` - Find files by pattern (e.g., "**/*.csv", "src/**/*.tsx")
 - \`ls(path)\` - Show directory structure
 
@@ -115,7 +114,7 @@ Updating agent-space files:
 - Project skill scripts in \`.skills/\` are auto-synced to \`/mnt/.skills/{skill-dir}/\` and can be used directly in Python. When a skill provides Python scripts, use read_skill_resource to read and understand them first, then prefer using them over writing ad-hoc code.
 
 ### File Sync (disk → OPFS)
-- \`sync(paths)\` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before \`python\` when the script needs workspace files not yet in OPFS. Example: \`sync(paths=["data/*.csv", "config.json"])\`
+- \`sync(paths)\` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before \`python\` when the script needs workspace files not yet in OPFS. Example: \`sync(paths=["data/*.csv", "config.json"])\`. In multi-root: \`sync(paths=["rootName/data/*.csv"])\`.
 
 ### Assets
 - Users can upload files during conversations. These are stored at \`vfs://assets/\`.
@@ -176,89 +175,34 @@ export interface ScenarioEnhancement {
 }
 
 export const SCENARIO_ENHANCEMENTS: ScenarioEnhancement[] = [
-  // Developer scenarios
   {
     keywords: [
-      'code',
-      'function',
-      'class',
-      'bug',
-      'debug',
-      'refactor',
-      'api',
-      'implement',
-      'typescript',
-      'javascript',
-      'python',
-      'rust',
-      'go',
+      'code', 'function', 'class', 'bug', 'debug', 'refactor', 'api',
+      'implement', 'typescript', 'javascript', 'python', 'rust', 'go',
     ],
     intent: 'development',
-    enhancement: `\n## Developer Mode
-The user is working on code. Focus on:
-- Understanding code structure and dependencies
-- Identifying bugs and suggesting fixes
-- Explaining technical concepts clearly
-- Helping with refactoring and code quality
-- Following the project's existing patterns and conventions`,
+    enhancement: `\n## Developer Mode\nFocus on: code structure, bug fixes, refactoring, following project conventions.`,
   },
-  // Data analysis scenarios
   {
     keywords: [
-      'data',
-      'csv',
-      'excel',
-      'spreadsheet',
-      'chart',
-      'graph',
-      'analyze',
-      'statistics',
-      'pandas',
-      'visualization',
-      'plot',
+      'data', 'csv', 'excel', 'spreadsheet', 'chart', 'graph',
+      'analyze', 'statistics', 'pandas', 'visualization', 'plot',
     ],
     intent: 'analysis',
-    enhancement: `\n## Data Analysis Mode
-The user is working with data. Focus on:
-- Understanding data structure and contents
-- Generating insights and summaries
-- Creating visualizations when helpful
-- Using pandas/python for data manipulation
-- Explaining findings in business terms`,
+    enhancement: `\n## Data Analysis Mode\nFocus on: data structure, insights, visualizations, pandas/python manipulation.`,
   },
-  // Document/Research scenarios
   {
     keywords: [
-      'document',
-      'read',
-      'summarize',
-      'explain',
-      'research',
-      'paper',
-      'article',
-      'markdown',
-      'pdf',
+      'document', 'read', 'summarize', 'explain', 'research',
+      'paper', 'article', 'markdown', 'pdf',
     ],
     intent: 'research',
-    enhancement: `\n## Research Mode
-The user is studying or researching. Focus on:
-- Extracting key information from documents
-- Summarizing complex content clearly
-- Explaining concepts in accessible language
-- Connecting related ideas
-- Helping with knowledge organization`,
+    enhancement: `\n## Research Mode\nFocus on: extracting key info, summarizing, explaining concepts clearly.`,
   },
-  // Writing scenarios
   {
     keywords: ['write', 'draft', 'edit', 'format', 'document', 'report', 'content'],
     intent: 'writing',
-    enhancement: `\n## Writing Mode
-The user is creating content. Focus on:
-- Clear, well-structured prose
-- Proper formatting and organization
-- Tone and style consistency
-- Grammar and correctness
-- Meeting the user's communication goals`,
+    enhancement: `\n## Writing Mode\nFocus on: clear prose, formatting, tone consistency, grammar.`,
   },
 ]
 
@@ -274,64 +218,15 @@ export interface ToolDiscovery {
 export const TOOL_DISCOVERIES: ToolDiscovery[] = [
   {
     trigger: ['what can you do', 'help', 'capabilities', 'features', 'how to use'],
-    message: `## What I Can Help With
-
-I can assist you with various tasks using your local files:
-
-**📁 File Operations**
-- Search for files by name or pattern
-- Read and understand file contents
-- Create, edit, and organize files
-
-**💻 Development**
-- Analyze and explain code
-- Help debug issues
-- Suggest refactoring improvements
-- Write new code following project patterns
-
-**📊 Data Analysis**
-- Process CSV/Excel files
-- Generate charts and visualizations
-- Calculate statistics and insights
-- Transform and clean data
-
-**📚 Research & Learning**
-- Read and summarize documentation
-- Explain technical concepts
-- Extract information from multiple files
-- Help organize knowledge
-
-**✍️ Writing**
-- Draft and edit documents
-- Format content consistently
-- Improve clarity and flow
-
-Just describe what you want to do, and I'll help you accomplish it!`,
+    message: `Refer to the "Available Tools" section above for my full capabilities. Key areas: file operations (read/write/edit/search), Python data analysis (pandas, matplotlib), code development, and document processing. Just describe what you need.`,
   },
   {
     trigger: ['python', 'pandas', 'data', 'csv', 'excel', 'chart', 'graph'],
-    message: `## Data Analysis Capabilities
-
-I can execute Python code directly in your browser with these packages:
-- **pandas** - Data manipulation and analysis
-- **numpy** - Numerical computing
-- **matplotlib** - Charts and visualizations
-- **openpyxl** - Excel file handling
-
-Workflow: I'll find your data files → analyze them → generate insights/visualizations`,
+    message: `Python is available with pandas, numpy, matplotlib, openpyxl. Use \`sync\` to bring files into OPFS first, then \`python\` to analyze. Write output to \`/mnt_assets/\`.`,
   },
   {
     trigger: ['code', 'debug', 'refactor', 'implement', 'function'],
-    message: `## Code Assistance Capabilities
-
-I can help with:
-- Reading and understanding codebases
-- Identifying and fixing bugs
-- Refactoring for better quality
-- Writing new code following your project's patterns
-- Explaining how code works
-
-Just point me to the files or describe what you need!`,
+    message: `I can read, analyze, and modify code. Use \`search\` to locate relevant files, \`read\` to understand them, then \`edit\` or \`write\` to make changes.`,
   },
 ]
 
