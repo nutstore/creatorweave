@@ -68,7 +68,8 @@ export async function resolveNativeDirectoryHandleForPath(
       const nativeHandle = await workspace.getNativeDirectoryHandleForPath(path)
       if (nativeHandle) {
         const resolved = await workspace.resolvePath(path)
-        return { handle: nativeHandle, nativePath: resolved.relativePath || path }
+        // relativePath may be empty when path matches a root name exactly (e.g. "creatorweave")
+        return { handle: nativeHandle, nativePath: resolved.relativePath }
       }
     }
 
@@ -82,7 +83,7 @@ export async function resolveNativeDirectoryHandleForPath(
         const nativeHandle = await activeWorkspace.getNativeDirectoryHandleForPath(path)
         if (nativeHandle) {
           const resolved = await activeWorkspace.resolvePath(path)
-          return { handle: nativeHandle, nativePath: resolved.relativePath || path }
+          return { handle: nativeHandle, nativePath: resolved.relativePath }
         }
       }
     }
