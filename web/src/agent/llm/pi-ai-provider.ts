@@ -182,12 +182,27 @@ export class PiAIProvider implements LLMProvider {
     const streamId = this.createId()
     const seenToolDelta = new Set<number>()
 
-    const eventStream = stream(this.model, context, {
+    const streamOptions: Record<string, unknown> = {
       apiKey: this.apiKey,
       signal,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
-    })
+    }
+
+    // When disableThinking is true, inject onPayload callback to suppress reasoning
+    if (request.disableThinking) {
+      streamOptions.onPayload = (payload: Record<string, unknown>) => {
+        // GLM (智谱): thinking.type = "disabled"
+        // Qwen (通义): enable_thinking = false
+        // DeepSeek: no official param
+        // OpenAI o-series: reasoning_effort = "none"
+        payload.thinking = { type: 'disabled' }
+        payload.enable_thinking = false
+        payload.reasoning_effort = 'none'
+      }
+    }
+
+    const eventStream = stream(this.model, context, streamOptions as Parameters<typeof stream>[2])
 
     for await (const event of eventStream) {
       switch (event.type) {

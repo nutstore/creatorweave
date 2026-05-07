@@ -237,7 +237,11 @@ export function PendingSyncPanel() {
     conflicts: [...a.conflicts, ...b.conflicts],
   }), [])
 
-  const generateSummaryWithLLM = useCallback(async (paths: string[], signal?: AbortSignal): Promise<string | null> => {
+  const generateSummaryWithLLM = useCallback(async (
+    paths: string[],
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string | null> => {
     try {
       const activeConversation = await getActiveConversation()
       signal?.throwIfAborted()
@@ -317,14 +321,23 @@ export function PendingSyncPanel() {
       signal?.throwIfAborted()
       const prompt = buildSnapshotSummaryPrompt(selectedChanges.length, changesText, diffSections)
 
-      const response = await provider.chat({
+      // Use streaming to show text incrementally
+      let content = ''
+      for await (const chunk of provider.chatStream({
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 220,
-      }, signal)
+        disableThinking: true,
+      }, signal)) {
+        const delta = chunk.choices[0]?.delta?.content
+        if (delta) {
+          content += delta
+          onChunk(content.slice(0, 3000))
+        }
+      }
       signal?.throwIfAborted()
-      const content = response.choices[0]?.message?.content?.trim()
-      if (!content) return null
-      return content.slice(0, 3000)
+      const trimmed = content.trim()
+      if (!trimmed) return null
+      return trimmed.slice(0, 3000)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return null
       return null
@@ -826,7 +839,12 @@ export function PendingSyncPanel() {
           const controller = new AbortController()
           summaryAbortRef.current = controller
           setGeneratingSummary(true)
-          const aiSummary = await generateSummaryWithLLM(pendingApprovePaths, controller.signal)
+          setSnapshotSummary('')
+          const aiSummary = await generateSummaryWithLLM(
+            pendingApprovePaths,
+            (chunk) => setSnapshotSummary(chunk),
+            controller.signal,
+          )
           // Only update state if this controller is still the active one
           // (prevents a cancelled first call from resetting spinner during a second call)
           if (summaryAbortRef.current !== controller) return

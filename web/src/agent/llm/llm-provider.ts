@@ -14,6 +14,8 @@ export interface ChatCompletionRequest {
   temperature?: number
   maxTokens?: number
   stream?: boolean
+  /** If true, instruct the provider to disable thinking/reasoning (saves latency and tokens) */
+  disableThinking?: boolean
 }
 
 /** Message format sent to LLM API */

@@ -220,7 +220,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [pendingChanges])
 
-  const generateSummaryWithLLM = useCallback(async (changes: FileChange[]): Promise<string | null> => {
+  const generateSummaryWithLLM = useCallback(async (
+    changes: FileChange[],
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string | null> => {
     try {
       const activeConversation = await getActiveConversation()
       if (!activeConversation) return null
@@ -295,13 +299,22 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
       const prompt = buildSnapshotSummaryPrompt(changes.length, changesText, diffSections)
 
-      const response = await provider.chat({
+      // Use streaming to show text incrementally
+      let content = ''
+      for await (const chunk of provider.chatStream({
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 220,
-      })
-      const content = response.choices[0]?.message?.content?.trim()
-      if (!content) return null
-      return content.slice(0, 3000)
+        disableThinking: true,
+      }, signal)) {
+        const delta = chunk.choices[0]?.delta?.content
+        if (delta) {
+          content += delta
+          onChunk(content.slice(0, 3000))
+        }
+      }
+      const trimmed = content.trim()
+      if (!trimmed) return null
+      return trimmed.slice(0, 3000)
     } catch {
       return null
     }
@@ -802,7 +815,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         onSummaryChange={setSnapshotSummary}
         onGenerateSummary={async () => {
           setGeneratingSummary(true)
-          const aiSummary = await generateSummaryWithLLM(pendingApproveFiles)
+          setSnapshotSummary('')
+          const aiSummary = await generateSummaryWithLLM(
+            pendingApproveFiles,
+            (chunk) => setSnapshotSummary(chunk),
+          )
           if (aiSummary && aiSummary.trim().length > 0) {
             setSnapshotSummary(aiSummary.trim())
             setSummaryError(null)
