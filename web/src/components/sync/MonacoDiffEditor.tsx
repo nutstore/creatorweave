@@ -2,6 +2,7 @@ import { DiffEditor, loader } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '@/i18n'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 
 let loaderConfigured = false
 
@@ -71,6 +72,7 @@ export default function MonacoDiffEditor({
   renderSideBySide = false,
 }: MonacoDiffEditorProps) {
   const t = useT()
+  const display = useWorkspacePreferencesStore((s) => s.display)
   ensureMonacoLoaderConfigured()
 
   const language = useMemo(() => languageFromPath(path), [path])
@@ -297,12 +299,13 @@ export default function MonacoDiffEditor({
           automaticLayout: true,
           renderSideBySide: renderSideBySide,
           scrollBeyondLastLine: false,
-          minimap: { enabled: false },
-          wordWrap: 'on',
-          diffWordWrap: 'on',
+          minimap: { enabled: display.showMiniMap },
+          wordWrap: display.wordWrap ? 'on' : 'off',
+          diffWordWrap: display.wordWrap ? 'on' : 'off',
           renderOverviewRuler: false,
           glyphMargin: true,
           lineDecorationsWidth: 8,
+          fontSize: display.fontSize === 'small' ? 11 : display.fontSize === 'large' ? 14 : 12,
         }}
       />
     </div>

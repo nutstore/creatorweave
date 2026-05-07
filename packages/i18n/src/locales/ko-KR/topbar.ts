@@ -8,6 +8,10 @@ export const topbar = {
     skillsManagement: "스킬 관리",
     projectLabel: "프로젝트: {name}",
     workspaceLabel: "워크스페이스: {name}",
+    modelSwitcher: {
+      title: "빠른 모델 전환",
+      unavailable: "모델을 사용할 수 없음",
+    },
     tooltips: {
       backToProjects: "프로젝트 목록으로 돌아가기",
       menu: "메뉴",

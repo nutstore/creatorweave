@@ -108,7 +108,9 @@ export function WorkspaceLayout({
   const { directoryHandle } = useAgentStore()
   const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
-  const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
+  const { providerType, modelName, maxTokens, hasApiKey, activeCustomProviderId } = useSettingsStore()
+  const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
+  const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   const { role } = useRemoteStore()
   const showPreview = useConversationContextStore((state) => state.showPreview)
   const projectWorkspaceIds = useConversationContextStore((state) => state.workspaces.map((w) => w.id))
@@ -131,6 +133,7 @@ export function WorkspaceLayout({
     panelState,
     setSidebarCollapsed,
     setActiveResourceTab,
+    panelSizes,
   } = useWorkspacePreferencesStore()
 
   // Phase 4: Dialog states
@@ -194,6 +197,23 @@ export function WorkspaceLayout({
   useEffect(() => {
     if (!loaded) loadFromDB()
   }, [loaded, loadFromDB])
+
+  // Sync workspace-specific model selection when switching workspace
+  useEffect(() => {
+    syncModelForWorkspace(activeConversationId ?? null)
+  }, [activeConversationId, syncModelForWorkspace])
+
+  // Persist current model selection for active workspace
+  useEffect(() => {
+    if (!activeConversationId) return
+    saveModelOverrideForWorkspace(activeConversationId)
+  }, [
+    activeConversationId,
+    providerType,
+    modelName,
+    activeCustomProviderId,
+    saveModelOverrideForWorkspace,
+  ])
 
   // Phase 4: Enhanced command palette commands
   const commands: Command[] = buildEnhancedCommands({
@@ -632,7 +652,7 @@ export function WorkspaceLayout({
           <Drawer
             open={!!selectedFilePath}
             onClose={handleCloseFilePreview}
-            width={isMobile ? '100vw' : '50vw'}
+            width={isMobile ? '100vw' : `${panelSizes.previewRatio}vw`}
           >
             <FilePreview
               filePath={selectedFilePath}

@@ -8,6 +8,10 @@ export const topbar = {
     skillsManagement: "技能管理",
     projectLabel: "项目：{name}",
     workspaceLabel: "工作区：{name}",
+    modelSwitcher: {
+      title: "快速切换模型",
+      unavailable: "模型不可用",
+    },
     tooltips: {
       backToProjects: "返回项目列表",
       menu: "菜单",

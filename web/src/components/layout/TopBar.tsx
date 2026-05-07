@@ -27,6 +27,7 @@ import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { ConversationStorageBadge } from '@/components/conversation'
 import { FolderSelector } from './FolderSelector'
+import { ModelQuickSwitch } from './ModelQuickSwitch'
 import { useT } from '@/i18n'
 import {
   BrandButton,
@@ -224,6 +225,10 @@ export function TopBar({
                 </button>
               </ActionTooltip>
             )}
+
+            <div className="shrink-0">
+              <ModelQuickSwitch />
+            </div>
 
             {/* Remote */}
             <div className="shrink-0">

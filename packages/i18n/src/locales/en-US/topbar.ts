@@ -7,6 +7,10 @@ export const topbar = {
     skillsManagement: "Skills",
     projectLabel: "Project: {name}",
     workspaceLabel: "Workspace: {name}",
+    modelSwitcher: {
+      title: "Quick Model Switch",
+      unavailable: "Model unavailable",
+    },
     tooltips: {
       backToProjects: "Back to Project List",
       menu: "Menu",

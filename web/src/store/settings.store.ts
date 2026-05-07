@@ -32,6 +32,13 @@ interface EffectiveProviderConfig {
   modelName: string
 }
 
+/** Per-workspace model override */
+export interface WorkspaceModelOverride {
+  providerType: LLMProviderType
+  modelName: string
+  activeCustomProviderId?: string
+}
+
 interface SettingsState {
   // LLM settings
   providerType: LLMProviderType
@@ -51,6 +58,9 @@ interface SettingsState {
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
   hasApiKey: boolean
+
+  // Per-workspace model overrides
+  modelOverridesByWorkspace: Record<string, WorkspaceModelOverride>
 
   // Actions
   setProviderType: (type: LLMProviderType) => void
@@ -85,6 +95,31 @@ interface SettingsState {
    * Call this after saving/deleting an API key
    */
   invalidateApiKeyCache: (provider?: string) => void
+
+  /**
+   * Save current model selection to a specific workspace
+   */
+  saveModelOverrideForWorkspace: (workspaceId: string) => void
+
+  /**
+   * Restore model selection from a workspace override (or fallback to defaults)
+   */
+  syncModelForWorkspace: (workspaceId: string | null) => void
+
+  /**
+   * Switch provider and model atomically (used by quick-switcher)
+   */
+  switchProviderAndModel: (providerType: LLMProviderType, modelName: string, customProviderId?: string) => void
+
+  /**
+   * Get all providers that have a saved API key
+   */
+  getAvailableProviders: () => Promise<Array<{
+    providerType: LLMProviderType
+    displayName: string
+    models: Array<{ id: string; name: string }>
+    providerKey: string
+  }>>
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -102,6 +137,7 @@ export const useSettingsStore = create<SettingsState>()(
       thinkingLevel: 'medium' as ThinkingLevel,
       enableBatchSpawn: false,
       hasApiKey: false,
+      modelOverridesByWorkspace: {},
 
       setProviderType: (providerType) => {
         set({ providerType })
@@ -338,6 +374,104 @@ export const useSettingsStore = create<SettingsState>()(
         apiKeyCache.delete(currentProvider)
         apiKeyCachePromise.delete(currentProvider)
       },
+
+      saveModelOverrideForWorkspace: (workspaceId) => {
+        const state = get()
+        set({
+          modelOverridesByWorkspace: {
+            ...state.modelOverridesByWorkspace,
+            [workspaceId]: {
+              providerType: state.providerType,
+              modelName: state.modelName,
+              activeCustomProviderId: state.activeCustomProviderId || undefined,
+            },
+          },
+        })
+      },
+
+      syncModelForWorkspace: (workspaceId) => {
+        if (!workspaceId) return
+        const state = get()
+        const override = state.modelOverridesByWorkspace[workspaceId]
+        if (override) {
+          set({
+            providerType: override.providerType,
+            modelName: override.modelName,
+            activeCustomProviderId: override.activeCustomProviderId || '',
+          })
+          // Also update customBaseUrl if custom provider
+          if (override.providerType === 'custom' && override.activeCustomProviderId) {
+            const customProvider = state.customProviders.find(
+              (p) => p.id === override.activeCustomProviderId
+            )
+            if (customProvider) {
+              set({ customBaseUrl: customProvider.baseUrl })
+            }
+          }
+        }
+      },
+
+      switchProviderAndModel: (newProviderType, newModelName, customProviderId) => {
+        if (newProviderType === 'custom' && customProviderId) {
+          const state = get()
+          const provider = state.customProviders.find((p) => p.id === customProviderId)
+          if (provider) {
+            set({
+              providerType: 'custom',
+              modelName: newModelName,
+              activeCustomProviderId: customProviderId,
+              customBaseUrl: provider.baseUrl,
+            })
+          }
+        } else {
+          set({
+            providerType: newProviderType,
+            modelName: newModelName,
+          })
+        }
+      },
+
+      getAvailableProviders: async () => {
+        const { loadApiKey } = await import('@/security/api-key-store')
+        const { PROVIDER_META, getModelsForProvider } = await import('@/agent/providers/types')
+        const state = get()
+        const results: Array<{
+          providerType: LLMProviderType
+          displayName: string
+          models: Array<{ id: string; name: string }>
+          providerKey: string
+        }> = []
+
+        // Check built-in providers
+        for (const [type, meta] of Object.entries(PROVIDER_META)) {
+          if (type === 'custom') continue // handled separately
+          const providerType = type as LLMProviderType
+          const key = await loadApiKey(providerType)
+          if (key) {
+            results.push({
+              providerType,
+              displayName: meta.displayName,
+              models: getModelsForProvider(providerType).map((m) => ({ id: m.id, name: m.name })),
+              providerKey: providerType,
+            })
+          }
+        }
+
+        // Check custom providers
+        for (const cp of state.customProviders) {
+          const key = await loadApiKey(`custom:${cp.id}`)
+          if (key) {
+            results.push({
+              providerType: 'custom',
+              displayName: cp.name,
+              models: cp.models.map((m) => ({ id: m, name: m })),
+              providerKey: `custom:${cp.id}`,
+            })
+          }
+        }
+
+        return results
+      },
     }),
     {
       name: 'bfosa-settings',
@@ -354,6 +488,7 @@ export const useSettingsStore = create<SettingsState>()(
         enableThinking: state.enableThinking,
         thinkingLevel: state.thinkingLevel,
         enableBatchSpawn: state.enableBatchSpawn,
+        modelOverridesByWorkspace: state.modelOverridesByWorkspace,
       }),
     }
   )

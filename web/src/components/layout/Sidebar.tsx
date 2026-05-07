@@ -42,39 +42,12 @@ import { SnapshotList } from '@/components/sync/SnapshotList'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useT } from '@/i18n'
 import { ExportConversationDialog } from '@/components/conversation/ExportConversationDialog'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 
 type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
-const STORAGE_KEY_RATIO = 'sidebar-conversation-ratio'
-
-const DEFAULT_CONVERSATION_RATIO = 50 // percentage
 const MIN_CONVERSATION_RATIO = 20 // minimum percentage
 const MAX_CONVERSATION_RATIO = 80 // maximum percentage
-
-// Load saved conversation ratio from localStorage
-function loadConversationRatio(): number {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_RATIO)
-    if (saved) {
-      const ratio = Number(saved)
-      if (ratio >= MIN_CONVERSATION_RATIO && ratio <= MAX_CONVERSATION_RATIO) {
-        return ratio
-      }
-    }
-  } catch {
-    // Ignore storage errors
-  }
-  return DEFAULT_CONVERSATION_RATIO
-}
-
-// Save conversation ratio to localStorage
-function saveConversationRatio(ratio: number): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_RATIO, String(ratio))
-  } catch {
-    // Ignore storage errors
-  }
-}
 
 interface SidebarProps {
   /** Called when user clicks a file in the tree */
@@ -133,9 +106,17 @@ export function Sidebar({
     return map
   }, [workspaceStats])
 
-  // Sidebar state
-  const [collapsed, setCollapsed] = useState(false)
-  const [width, setWidth] = useState(320)
+  // Sidebar state — read layout preferences from store
+  const {
+    panelSizes,
+    panelState: storePanelState,
+    setSidebarWidth,
+    setConversationRatio,
+    setSidebarCollapsed,
+  } = useWorkspacePreferencesStore()
+
+  const [collapsed, setCollapsed] = useState(storePanelState.sidebarCollapsed)
+  const width = panelSizes.sidebarWidth
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [workspaceTab, setWorkspaceTab] = useState<'active' | 'archived'>('active')
 
@@ -166,7 +147,7 @@ export function Sidebar({
     [scopedConversations, workspaceStatusMap]
   )
   const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
-  const [conversationRatio, _setConversationRatio] = useState(loadConversationRatio)
+  const conversationRatio = panelSizes.conversationRatio
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
   const [clearingConversations, setClearingConversations] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -237,11 +218,6 @@ export function Sidebar({
   } | null>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
 
-  // Save ratio when it changes
-  useEffect(() => {
-    saveConversationRatio(conversationRatio)
-  }, [conversationRatio])
-
   useEffect(() => {
     if (isMobile && collapsed) {
       setCollapsed(false)
@@ -292,13 +268,14 @@ export function Sidebar({
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
-      dragRef.current = { startX: e.clientX, startWidth: width }
+      const startWidth = width
+      dragRef.current = { startX: e.clientX, startWidth }
 
       const handleMove = (me: MouseEvent) => {
         if (!dragRef.current) return
         const delta = me.clientX - dragRef.current.startX
         const newWidth = Math.max(200, Math.min(400, dragRef.current.startWidth + delta))
-        setWidth(newWidth)
+        setSidebarWidth(newWidth)
       }
 
       const handleUp = () => {
@@ -310,7 +287,7 @@ export function Sidebar({
       document.addEventListener('mousemove', handleMove)
       document.addEventListener('mouseup', handleUp)
     },
-    [width]
+    [width, setSidebarWidth]
   )
 
   // Vertical drag (conversation/resource split)
@@ -334,7 +311,7 @@ export function Sidebar({
 
         // Constrain to min/max values
         newRatio = Math.max(MIN_CONVERSATION_RATIO, Math.min(MAX_CONVERSATION_RATIO, newRatio))
-        _setConversationRatio(newRatio)
+        setConversationRatio(newRatio)
       }
 
       const handleUp = () => {
@@ -346,17 +323,26 @@ export function Sidebar({
       document.addEventListener('mousemove', handleMove)
       document.addEventListener('mouseup', handleUp)
     },
-    [conversationRatio]
+    [conversationRatio, setConversationRatio]
   )
 
-  // Collapsed state
+  // Collapsed state — sync local state with store
+  useEffect(() => {
+    setCollapsed(storePanelState.sidebarCollapsed)
+  }, [storePanelState.sidebarCollapsed])
+
+  const handleSetCollapsed = useCallback((value: boolean) => {
+    setCollapsed(value)
+    setSidebarCollapsed(value)
+  }, [setSidebarCollapsed])
+
   if (collapsed) {
     return (
       <div className="border-subtle flex shrink-0 flex-col border-r bg-white dark:bg-card">
         <BrandButton
           iconButton
           variant="ghost"
-          onClick={() => setCollapsed(false)}
+          onClick={() => handleSetCollapsed(false)}
           title={t('sidebar.expandSidebar')}
         >
           <PanelLeft className="h-4 w-4" />
@@ -396,7 +382,7 @@ export function Sidebar({
                   onRequestClose?.()
                   return
                 }
-                setCollapsed(true)
+                handleSetCollapsed(true)
               }}
               title={isMobile ? t('sidebar.closeSidebar') : t('sidebar.collapseSidebar')}
             >
