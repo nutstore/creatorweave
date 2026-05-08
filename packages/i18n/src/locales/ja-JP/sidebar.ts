@@ -155,7 +155,7 @@ export const sidebar = {
       imageWillBeDeleted: "画像は削除されます（変更バージョンに内容なし）",
       currentFileComments: "現在のファイルコメント",
       filesWithComments: "ファイルにコメントあり",
-      copyCommentsToAI: "AIにコピー",
+      copyCommentsToAI: "AIに送信",
       commentsSummary: "{files} ファイルにコメントあり、合計 {comments} 件",
       close: "閉じる",
       // AI review prompt

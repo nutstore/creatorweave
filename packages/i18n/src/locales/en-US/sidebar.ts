@@ -166,7 +166,7 @@ export const sidebar = {
         "Image will be deleted (no content in changed version)",
       currentFileComments: "Current file comments",
       filesWithComments: "files with comments",
-      copyCommentsToAI: "Copy to AI",
+      copyCommentsToAI: "Send to AI",
       commentsSummary: "{files} files with comments, {comments} total",
       close: "Close",
       // AI review prompt

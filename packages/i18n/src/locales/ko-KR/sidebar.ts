@@ -155,7 +155,7 @@ export const sidebar = {
       imageWillBeDeleted: "이미지가 삭제됩니다 (변경된 버전에 내용 없음)",
       currentFileComments: "현재 파일 댓글",
       filesWithComments: "파일에 댓글 있음",
-      copyCommentsToAI: "AI에 복사",
+      copyCommentsToAI: "AI에 보내기",
       commentsSummary: "{files}개 파일에 댓글 있음, 총 {comments}개",
       close: "닫기",
       // AI review prompt
