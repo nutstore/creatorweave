@@ -231,6 +231,10 @@ export interface Conversation {
   compressionConvertCallCount?: number
   /** Runtime marker for last summary convert call (not persisted) */
   compressionLastSummaryConvertCall?: number
+  /** Persisted compressed context summary injected into future model inputs */
+  compressedContextSummary?: string | null
+  /** Persisted cutoff timestamp for rebuilding compressed context */
+  compressedContextCutoffTimestamp?: number | null
   /** Assets collected during current agent run (not persisted, moved to assistant message on commit) */
   collectedAssets?: AssetMeta[]
 }
@@ -332,6 +336,8 @@ export function createConversation(title?: string): Conversation {
     mountRefCount: 0,
     compressionConvertCallCount: 0,
     compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+    compressedContextSummary: null,
+    compressedContextCutoffTimestamp: null,
     collectedAssets: [],
   }
 }

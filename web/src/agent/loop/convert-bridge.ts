@@ -35,7 +35,7 @@ export interface ConvertAgentMessagesToLlmInput {
     droppedContent: string,
     maxSummaryTokens: number
   ) => Promise<{ summary: string | null; mode: CompressionSummaryMode }>
-  onSummaryInjected?: (summary: string) => void
+  onSummaryInjected?: (summary: string, cutoffTimestamp: number) => void
 }
 
 export interface ConvertAgentMessagesToLlmResult {
@@ -146,6 +146,9 @@ export async function convertAgentMessagesToLlm(
         if (postTrimTokens > targetTokens) {
           trimmed = input.contextManager.trimMessagesToTarget(trimmed, targetTokens)
         }
+        if (typeof cutoffTimestamp === 'number') {
+          input.onSummaryInjected?.(summary, cutoffTimestamp)
+        }
       }
       const postCompressionTokens = input.provider.estimateTokens(trimmed)
       const postCompressionUsagePercent = Math.max(
@@ -173,9 +176,6 @@ export async function convertAgentMessagesToLlm(
         latencyMs,
       }
 
-      if (summary) {
-        input.onSummaryInjected?.(summary)
-      }
     } else {
       input.callbacks?.onContextCompressionComplete?.({
         mode: 'skip',

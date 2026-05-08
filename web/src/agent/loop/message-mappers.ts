@@ -45,27 +45,12 @@ export function internalToPiMessages(
   const modelMessages = lastSummaryIndex >= 0 ? messages.slice(lastSummaryIndex) : messages
   return modelMessages.flatMap((msg): PiMessage[] => {
     if (msg.kind === 'context_summary') {
+      // Map context_summary as a user message (system-context block) so the
+      // model treats it as memory/context rather than its own prior response.
       return [
         {
-          role: 'assistant',
-          content: [
-            {
-              type: 'text',
-              text: `${compressedMemoryPrefix}\n${msg.content || ''}`,
-            },
-          ],
-          api: model.api,
-          provider: model.provider,
-          model: model.id,
-          usage: {
-            input: 0,
-            output: 0,
-            cacheRead: 0,
-            cacheWrite: 0,
-            totalTokens: 0,
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-          },
-          stopReason: 'stop',
+          role: 'user',
+          content: `${compressedMemoryPrefix}\n${msg.content || ''}`,
           timestamp: msg.timestamp || Date.now(),
         },
       ]

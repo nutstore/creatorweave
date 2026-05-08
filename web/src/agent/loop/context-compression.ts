@@ -68,14 +68,13 @@ export function injectSummaryMessage(
   summary: string,
   compressedMemoryPrefix: string
 ): ChatMessage[] {
+  // Inject as a user message so internalToPiMessages() can correctly map it
+  // (system-role ChatMessages are silently dropped by internalToPiMessages).
   const summaryMessage: ChatMessage = {
-    role: 'assistant',
+    role: 'user',
     content: `${compressedMemoryPrefix}\n${summary}`,
   }
 
-  if (messages[0]?.role === 'system' && messages[1]) {
-    return [messages[0], summaryMessage, ...messages.slice(1)]
-  }
   return [summaryMessage, ...messages]
 }
 
@@ -111,6 +110,10 @@ export function applyCompressionBaseline(
     return messages
   }
 
+  // Use createAssistantMessage with kind='context_summary' so that
+  // internalToPiMessages() can recognise and correctly map it to a system-context
+  // message for the LLM.  The kind flag also allows the store layer to strip
+  // it from persisted conversation history.
   const summaryMessage = createAssistantMessage(
     `${compressedMemoryPrefix}\n${baseline.summary}`,
     undefined,
@@ -118,7 +121,6 @@ export function applyCompressionBaseline(
     null,
     'context_summary'
   )
-  // Ensure summary stays before retained prompt boundary for stable ordering.
   summaryMessage.timestamp = Math.max(0, baseline.cutoffTimestamp - 1)
   return [summaryMessage, ...retained]
 }

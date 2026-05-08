@@ -1,4 +1,5 @@
 import type { AgentMode } from '../agent-mode'
+import type { CompressionBaselineState } from './context-compression'
 import type { ContextManager } from '../context-manager'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 import type { Message, ToolCall } from '../message-types'
@@ -135,4 +136,10 @@ export interface AgentLoopConfig {
     convertCallCount: number
     lastSummaryConvertCall: number
   }) => void
+  /**
+   * Restored compression baseline from a previous run's persisted state.
+   * When provided, `convertAgentMessagesToLlm` will prepend the summary
+   * and filter out messages older than the cutoff timestamp.
+   */
+  initialCompressionBaseline?: CompressionBaselineState | null
 }

@@ -1614,9 +1614,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
-        // Compression summary messages are now injected into the agent
-        // loop's allMessages directly via onMessagesUpdated, so they appear
-        // at the correct chronological position — no longer appended here.
+        // Compression summaries are injected into the agent loop as
+        // system-context messages and mirrored into the runtime message state.
         let committed = false
 
         // Acquire run lock immediately to prevent concurrent duplicate starts.
@@ -2274,6 +2273,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           initialConvertCallCount: conv.compressionConvertCallCount ?? 0,
           initialLastSummaryConvertCall:
             conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
+          initialCompressionBaseline:
+            conv.compressedContextSummary && conv.compressedContextCutoffTimestamp
+              ? { summary: conv.compressedContextSummary, cutoffTimestamp: conv.compressedContextCutoffTimestamp }
+              : null,
           onCompressionStateUpdate: (compressionState) => {
             if (!isCurrentRun()) return
             set((state) => {
@@ -2851,11 +2854,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isCurrentRun()) return
-            latestMessages = msgs
+            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c || c.activeRunId !== runId) return
-              c.messages = msgs
+              c.messages = msgs.filter((msg) => msg.kind !== 'context_summary')
+              c.compressedContextSummary =
+                msgs.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
+              c.compressedContextCutoffTimestamp =
+                msgs.find((msg) => msg.kind === 'context_summary')?.timestamp ||
+                c.compressedContextCutoffTimestamp ||
+                null
               c.updatedAt = Date.now()
             })
             // Persist immediately — this callback fires at block boundaries
@@ -2869,7 +2878,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               runId,
               messagesCount: msgs.length,
             })
-            latestMessages = msgs
+            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
