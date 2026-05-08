@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { LLMProviderType, ModelInfo } from '@/agent/providers/types'
-import { getModelsForProvider, isCustomProviderType } from '@/agent/providers/types'
+import { getModelsForProvider } from '@/agent/providers/types'
 import { fetchModelsForProvider } from '@/agent/providers/model-fetcher'
 import {
   getCachedModels,
@@ -59,15 +59,6 @@ export function useDynamicModels(
 
   const doFetch = useCallback(
     async (apiKey?: string, baseUrl?: string) => {
-      if (isCustomProviderType(providerType)) {
-        if (mountedRef.current) {
-          setModels([])
-          setSource('static')
-          setDynamicCount(0)
-        }
-        return
-      }
-
       if (mountedRef.current) setLoading(true)
       if (mountedRef.current) setError(null)
 

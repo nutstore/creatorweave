@@ -11,7 +11,7 @@
  */
 
 import type { LLMProviderType, ModelInfo, ModelCapability } from './types'
-import { LLM_PROVIDER_CONFIGS, PROVIDER_META } from './types'
+import { LLM_PROVIDER_CONFIGS, PROVIDER_META, isCustomProviderType } from './types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -151,10 +151,11 @@ export async function fetchModelsForProvider(
   options?: { apiKey?: string; baseUrl?: string }
 ): Promise<FetchModelsResult> {
   const now = Date.now()
-  const staticModels = PROVIDER_META[providerType]?.models ?? []
+  const isCustom = isCustomProviderType(providerType)
+  const staticModels = isCustom ? [] : (PROVIDER_META[providerType]?.models ?? [])
 
   // Static-only providers always return static list
-  if (STATIC_ONLY_PROVIDERS.includes(providerType)) {
+  if (!isCustom && STATIC_ONLY_PROVIDERS.includes(providerType)) {
     return {
       models: staticModels,
       source: 'static',
@@ -181,7 +182,7 @@ export async function fetchModelsForProvider(
 
     if (providerType === 'google') {
       models = await fetchGoogleModels(apiKey)
-    } else if (OPENAI_COMPATIBLE_PROVIDERS.includes(providerType)) {
+    } else if (isCustom || OPENAI_COMPATIBLE_PROVIDERS.includes(providerType)) {
       models = await fetchOpenAICompatibleModels(baseUrl, apiKey)
     } else {
       // Unknown provider → static fallback

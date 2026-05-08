@@ -15,7 +15,6 @@ import {
   Check,
   ExternalLink,
   Plus,
-  Trash2,
   X,
   RefreshCw,
   ChevronDown,
@@ -23,13 +22,12 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
-import type { CustomProviderConfig, CustomApiMode } from '@/store/settings.store'
+import type { CustomProviderConfig } from '@/store/settings.store'
 import { saveApiKey, loadApiKey, deleteApiKey } from '@/security/api-key-store'
 import {
   getProvidersByCategory,
   getModelsForProvider,
   getProviderConfig,
-  getProviderMeta,
   isCustomProviderType,
 } from '@/agent/providers/types'
 import type {
@@ -38,6 +36,7 @@ import type {
   ProviderCategory,
 } from '@/agent/providers/types'
 import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
+import { getCachedModels } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton } from '@creatorweave/ui'
 
@@ -46,8 +45,6 @@ import { BrandInput, BrandButton } from '@creatorweave/ui'
 // =============================================================================
 
 const CATEGORY_ORDER: ProviderCategory[] = ['international', 'chinese', 'custom']
-
-const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
 
 // =============================================================================
 // ProviderCard - 单个服务商卡片
@@ -75,13 +72,11 @@ function ProviderCard({
   const t = useT()
   const {
     customProviders,
-    createCustomProvider,
     updateCustomProvider,
     removeCustomProvider,
     addCustomProviderModel,
     removeCustomProviderModel,
     setCustomProviderApiMode,
-    setHasApiKey,
     invalidateApiKeyCache,
   } = useSettingsStore()
 
@@ -193,10 +188,28 @@ function ProviderCard({
       ? customProvider?.baseUrl || ''
       : config?.baseURL || ''
     await refreshModels(key || undefined, url)
-    if (modelsSource === 'dynamic') {
+
+    // For custom providers, sync fetched models to customProvider.models
+    if (isCustom && customProvider) {
+      const cached = getCachedModels(providerType, providerKey)
+      if (cached && cached.length > 0) {
+        let added = 0
+        for (const model of cached) {
+          if (!customProvider.models.includes(model.id)) {
+            addCustomProviderModel(customProvider.id, model.id)
+            added++
+          }
+        }
+        if (added > 0) {
+          toast.success(t('settings.toast.modelsRefreshed'))
+        } else {
+          toast.success(t('settings.toast.modelsRefreshed'))
+        }
+      }
+    } else if (modelsSource === 'dynamic') {
       toast.success(t('settings.toast.modelsRefreshed'))
     }
-  }, [providerKey, isCustom, customProvider, config, refreshModels, modelsSource, t])
+  }, [providerKey, isCustom, customProvider, config, refreshModels, modelsSource, t, providerType, addCustomProviderModel])
 
   const handleAddModel = useCallback(() => {
     if (!customProvider) return
@@ -482,9 +495,31 @@ function ProviderCard({
           {/* Custom Provider Model Tags */}
           {isCustom && customProvider && (
             <div className="space-y-2">
-              <label className="text-[12px] font-medium text-primary">
-                {t('settings.modelManagement.modelList')}
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[12px] font-medium text-primary">
+                  {t('settings.modelManagement.modelList')}
+                </label>
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[10px] font-medium ${
+                      modelsSource === 'dynamic'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-tertiary'
+                    }`}
+                  >
+                    {customProvider.models.length} {modelsSource === 'dynamic' ? '(API)' : t('settings.providerManager.defaultModels')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRefreshModels}
+                    disabled={modelsLoading}
+                    className="text-tertiary hover:text-primary disabled:opacity-50"
+                    title={t('settings.modelSelection.refreshModels')}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {customProvider.models.map((model) => (
                   <span
