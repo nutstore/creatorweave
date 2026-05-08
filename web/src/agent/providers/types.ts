@@ -10,6 +10,8 @@ export interface LLMProviderConfig {
   baseURL: string
   modelName: string
   headers?: Record<string, string>
+  /** API mode for custom providers: 'chat-completions' or 'responses' */
+  apiMode?: 'chat-completions' | 'responses'
 }
 
 /** Provider category for grouping in UI */

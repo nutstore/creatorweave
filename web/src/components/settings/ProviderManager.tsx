@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
-import type { CustomProviderConfig } from '@/store/settings.store'
+import type { CustomProviderConfig, CustomApiMode } from '@/store/settings.store'
 import { saveApiKey, loadApiKey, deleteApiKey } from '@/security/api-key-store'
 import {
   getProvidersByCategory,
@@ -80,6 +80,7 @@ function ProviderCard({
     removeCustomProvider,
     addCustomProviderModel,
     removeCustomProviderModel,
+    setCustomProviderApiMode,
     setHasApiKey,
     invalidateApiKeyCache,
   } = useSettingsStore()
@@ -283,6 +284,18 @@ function ProviderCard({
             </p>
           </div>
 
+          {/* API Mode indicator for custom providers (non-edit mode) */}
+          {isCustom && customProvider && !isEditing && (
+            <div>
+              <p className="text-[11px] font-medium text-secondary">{t('settings.apiMode.label')}</p>
+              <p className="mt-0.5 text-[11px] text-tertiary">
+                {(customProvider.apiMode || 'chat-completions') === 'chat-completions'
+                  ? 'Chat Completions (/chat/completions)'
+                  : 'Responses API (/responses)'}
+              </p>
+            </div>
+          )}
+
           {/* Custom Provider Edit (only for custom) */}
           {isCustom && customProvider && (
             <div>
@@ -303,6 +316,44 @@ function ProviderCard({
                       onChange={(e) => setEditBaseUrl(e.target.value)}
                       className="h-9 font-mono text-[12px]"
                     />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-[11px] font-medium text-secondary">{t('settings.apiMode.label')}</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className={`flex-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                          (customProvider.apiMode || 'chat-completions') === 'chat-completions'
+                            ? 'text-white'
+                            : 'text-tertiary border border-border hover:bg-muted'
+                        }`}
+                        style={
+                          (customProvider.apiMode || 'chat-completions') === 'chat-completions'
+                            ? { background: 'var(--brand, #0d9488)' }
+                            : undefined
+                        }
+                        onClick={() => setCustomProviderApiMode(customProvider.id, 'chat-completions')}
+                      >
+                        Chat Completions
+                      </button>
+                      <button
+                        type="button"
+                        className={`flex-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                          customProvider.apiMode === 'responses'
+                            ? 'text-white'
+                            : 'text-tertiary border border-border hover:bg-muted'
+                        }`}
+                        style={
+                          customProvider.apiMode === 'responses'
+                            ? { background: 'var(--brand, #0d9488)' }
+                            : undefined
+                        }
+                        onClick={() => setCustomProviderApiMode(customProvider.id, 'responses')}
+                      >
+                        Responses API
+                      </button>
+                    </div>
+                    <p className="mt-1 text-[10px] text-tertiary">{t('settings.apiMode.hint')}</p>
                   </div>
                   <div>
                     <label className="mb-1 block text-[11px] font-medium text-secondary">{t('settings.modelManagement.defaultModel')}</label>

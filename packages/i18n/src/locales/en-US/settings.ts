@@ -318,6 +318,12 @@ export const settings = {
       hint: "Supports OpenAI-compatible API endpoints",
     },
 
+    // API Mode
+    apiMode: {
+      label: "API Mode",
+      hint: "Choose the API endpoint format. Chat Completions uses /chat/completions, Responses API uses /responses (OpenAI's newer API)",
+    },
+
     // Advanced Parameters
     advancedParameters: "Advanced Parameters",
     temperatureOptions: {

@@ -19,6 +19,8 @@ export interface PiAIProviderConfig {
   providerType: LLMProviderType
   baseUrl: string
   model: string
+  /** API mode for custom providers: 'chat-completions' or 'responses' */
+  apiMode?: 'chat-completions' | 'responses'
 }
 
 export class PiAIProvider implements LLMProvider {
@@ -31,7 +33,7 @@ export class PiAIProvider implements LLMProvider {
   constructor(config: PiAIProviderConfig) {
     ensurePiAICustomProvidersRegistered()
     this.apiKey = config.apiKey
-    this.model = resolvePiAIModel(config.providerType, config.model, config.baseUrl)
+    this.model = resolvePiAIModel(config.providerType, config.model, config.baseUrl, config.apiMode)
     this.maxContextTokens = this.model.contextWindow || MAX_CONTEXT_TOKENS
   }
 

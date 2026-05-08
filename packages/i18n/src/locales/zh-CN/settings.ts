@@ -308,6 +308,12 @@ export const settings = {
       hint: "支持 OpenAI 兼容的 API 端点",
     },
 
+    // API Mode
+    apiMode: {
+      label: "API 模式",
+      hint: "选择请求的 API 端点格式。Chat Completions 使用 /chat/completions，Responses API 使用 /responses（OpenAI 新版 API）",
+    },
+
     // 高级参数
     advancedParameters: "高级参数",
     temperatureOptions: {

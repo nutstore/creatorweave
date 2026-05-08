@@ -22,6 +22,8 @@ export interface RealRunOptions {
   providerType: LLMProviderType
   baseUrl: string
   model: string
+  /** API mode for custom providers: 'chat-completions' or 'responses' */
+  apiMode?: 'chat-completions' | 'responses'
   abortSignal?: AbortSignal
   onNodeStart?: (nodeId: string, kind: WorkflowNodeKind) => void
   onNodeComplete?: (nodeId: string, output: string) => void
@@ -296,7 +298,7 @@ export async function runRealWorkflow(options: RealRunOptions): Promise<RealRunR
   }
 
   ensurePiAICustomProvidersRegistered()
-  const piModel = resolvePiAIModel(options.providerType, options.model, options.baseUrl)
+  const piModel = resolvePiAIModel(options.providerType, options.model, options.baseUrl, options.apiMode)
 
   const outputStore = new NodeOutputStore()
   const initialInputs = new Map<string, string>(Object.entries(options.initialInputs || {}))

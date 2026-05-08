@@ -315,6 +315,12 @@ export const settings = {
       hint: "OpenAI 호환 API 엔드포인트를 지원합니다",
     },
 
+    // API Mode
+    apiMode: {
+      label: "API 모드",
+      hint: "API 엔드포인트 형식을 선택하세요. Chat Completions은 /chat/completions, Responses API는 /responses (OpenAI 최신 API)",
+    },
+
     // 고급 매개변수
     advancedParameters: "고급 매개변수",
     temperatureOptions: {

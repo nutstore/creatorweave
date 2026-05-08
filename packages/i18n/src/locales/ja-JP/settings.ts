@@ -322,6 +322,12 @@ export const settings = {
       hint: "OpenAI 互換の API エンドポイントに対応",
     },
 
+    // API Mode
+    apiMode: {
+      label: "API モード",
+      hint: "API エンドポイント形式を選択。Chat Completions は /chat/completions、Responses API は /responses（OpenAI 新API）",
+    },
+
     // 高度なパラメータ
     advancedParameters: "高度なパラメータ",
     temperatureOptions: {

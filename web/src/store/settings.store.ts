@@ -24,11 +24,16 @@ import type { ThinkingLevel } from '@mariozechner/pi-ai'
 const apiKeyCache = new Map<string, boolean>()
 const apiKeyCachePromise: Map<string, Promise<boolean>> = new Map()
 
+/** API mode for custom providers: chat completions vs OpenAI responses API */
+export type CustomApiMode = 'chat-completions' | 'responses'
+
 export interface CustomProviderConfig {
   id: string
   name: string
   baseUrl: string
   models: string[]
+  /** Which API endpoint format to use. Defaults to 'chat-completions' */
+  apiMode: CustomApiMode
   createdAt: number
   updatedAt: number
 }
@@ -84,6 +89,7 @@ interface SettingsState {
   removeCustomProvider: (providerId: string) => void
   addCustomProviderModel: (providerId: string, model: string) => boolean
   removeCustomProviderModel: (providerId: string, model: string) => void
+  setCustomProviderApiMode: (providerId: string, apiMode: import('@/store/settings.store').CustomApiMode) => void
   setTemperature: (temp: number) => void
   setMaxTokens: (tokens: number) => void
   setMaxIterations: (iterations: number) => void
@@ -140,7 +146,7 @@ interface SettingsState {
 function registerCustomAsDynamic(cp: CustomProviderConfig) {
   registerDynamicProvider(
     cp.id,
-    { baseURL: cp.baseUrl, modelName: cp.models[0] || '', headers: {} },
+    { baseURL: cp.baseUrl, modelName: cp.models[0] || '', headers: {}, apiMode: cp.apiMode || 'chat-completions' },
     {
       category: 'custom',
       displayName: cp.name,
@@ -206,6 +212,7 @@ export const useSettingsStore = create<SettingsState>()(
           name: trimmedName,
           baseUrl: trimmedBaseUrl,
           models: [trimmedModel],
+          apiMode: 'chat-completions',
           createdAt: now,
           updatedAt: now,
         }
@@ -351,6 +358,22 @@ export const useSettingsStore = create<SettingsState>()(
 
         if (get().providerType === providerId && get().modelName === model) {
           set({ modelName: nextModels[0] })
+        }
+      },
+
+      setCustomProviderApiMode: (providerId, apiMode) => {
+        set((state) => ({
+          customProviders: state.customProviders.map((provider) =>
+            provider.id === providerId
+              ? { ...provider, apiMode, updatedAt: Date.now() }
+              : provider
+          ),
+        }))
+
+        // Re-register in dynamic registry
+        const updated = get().customProviders.find((p) => p.id === providerId)
+        if (updated) {
+          registerCustomAsDynamic(updated)
         }
       },
 

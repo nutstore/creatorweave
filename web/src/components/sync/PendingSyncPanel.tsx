@@ -13,6 +13,7 @@ import { useConversationContextStore, getActiveConversation } from '@/store/conv
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
+import { isCustomProviderType } from '@/agent/providers/types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import {
   BrandButton,
@@ -263,6 +264,9 @@ export function PendingSyncPanel() {
         providerType,
         baseUrl: effectiveConfig.baseUrl,
         model: effectiveConfig.modelName,
+        apiMode: isCustomProviderType(providerType)
+          ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
+          : undefined,
       })
 
       const selectedChanges = (pendingChanges?.changes || []).filter((c) => paths.includes(c.path))
