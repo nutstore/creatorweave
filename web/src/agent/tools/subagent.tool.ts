@@ -9,7 +9,6 @@ import {
   validateMessage,
   validateName,
   validatePrompt,
-  validateTimeoutMs,
 } from './subagent-validation'
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 
@@ -105,10 +104,6 @@ export const spawnSubagentDefinition: ToolDefinition = {
           type: 'string',
           enum: ['plan', 'act'],
           description: 'Optional execution mode for the subagent.',
-        },
-        timeout_ms: {
-          type: 'number',
-          description: 'Optional execution timeout in milliseconds. 0 or omitted = no timeout. Max 3600000.',
         },
       },
       required: ['description', 'prompt'],
@@ -223,10 +218,6 @@ export const resumeSubagentDefinition: ToolDefinition = {
           type: 'string',
           description: 'Prompt to continue the task.',
         },
-        timeout_ms: {
-          type: 'number',
-          description: 'Optional execution timeout in milliseconds. 0 or omitted = no timeout. Max 3600000.',
-        },
       },
       required: ['agentId', 'prompt'],
     },
@@ -284,14 +275,12 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
     const description = validateDescription(args.description)
     const prompt = validatePrompt(args.prompt)
     const name = validateName(args.name)
-    const timeout_ms = validateTimeoutMs(args.timeout_ms)
 
     const result = await runtime.spawn({
       description,
       prompt,
       name,
       mode: args.mode === 'plan' || args.mode === 'act' ? args.mode : undefined,
-      timeout_ms,
     })
     const offloaded = await offloadLargeContent(result.content, result.agentId, context)
     return toolOkJson(TOOL_NAME_SPAWN, {
@@ -391,12 +380,10 @@ export const resumeSubagentExecutor: ToolExecutor = async (args, context) => {
   try {
     const agentId = validateAgentId(args.agentId)
     const prompt = validatePrompt(args.prompt)
-    const timeout_ms = validateTimeoutMs(args.timeout_ms)
 
     const result = await runtime.resume({
       agentId,
       prompt,
-      timeout_ms,
     })
     return toolOkJson(TOOL_NAME_RESUME, result)
   } catch (error) {
