@@ -30,7 +30,8 @@ function parseStructuredError(error: unknown): Record<string, unknown> | null {
  * which reads from OPFS cache for files with pending modifications.
  */
 async function collectPendingOverlays(
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  projectId?: string | null
 ): Promise<Record<string, PendingFileOverlay>> {
   try {
     const pendingChanges = useOPFSStore.getState().getPendingChanges()
@@ -58,7 +59,7 @@ async function collectPendingOverlays(
 
       // For modify/create, read the cached content from OPFS
       try {
-        const result = await workspace.readFile(change.path, null)
+        const result = await workspace.readFile(change.path, null, { projectId })
         if (typeof result.content === 'string') {
           overlays[change.path] = { content: result.content }
         }
@@ -79,7 +80,7 @@ async function collectPendingOverlays(
  * Get all root handles for the current project (multi-root aware).
  */
 async function getAllRootHandles(
-  context: { workspaceId?: string | null; directoryHandle?: FileSystemDirectoryHandle | null }
+  context: { workspaceId?: string | null; directoryHandle?: FileSystemDirectoryHandle | null; projectId?: string | null }
 ): Promise<Map<string, FileSystemDirectoryHandle>> {
   try {
     const manager = await getWorkspaceManager()
@@ -87,7 +88,7 @@ async function getAllRootHandles(
     if (workspaceId) {
       const workspace = await manager.getWorkspace(workspaceId)
       if (workspace) {
-        const handles = await workspace.getAllNativeDirectoryHandles()
+        const handles = await workspace.getAllNativeDirectoryHandles(context.projectId)
         if (handles.size > 0) return handles
       }
     }
@@ -308,7 +309,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     }
 
     // Collect pending overlays from OPFS to ensure search consistency with read tool
-    const pendingOverlays = await collectPendingOverlays(context.workspaceId)
+    const pendingOverlays = await collectPendingOverlays(context.workspaceId, context.projectId)
 
     // Build search options (shared across all roots)
     const buildSearchOptions = (subPath?: string) => ({

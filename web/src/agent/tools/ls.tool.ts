@@ -280,8 +280,7 @@ async function resolveDiscoveryScope(
   // If so, resolve within that root's OPFS subtree
   try {
     const { getRuntimeHandlesForProject } = await import('@/native-fs')
-    const { useFolderAccessStore } = await import('@/store/folder-access.store')
-    const projectId = useFolderAccessStore.getState().activeProjectId
+    const projectId = toolContext.projectId
     if (projectId) {
       const allHandles = getRuntimeHandlesForProject(projectId)
       if (allHandles.size > 0 && subPath) {
@@ -330,7 +329,7 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     try {
       const { getRuntimeHandlesForProject } = await import('@/native-fs')
       const { useFolderAccessStore } = await import('@/store/folder-access.store')
-      const projectId = useFolderAccessStore.getState().activeProjectId
+      const projectId = toolContext.projectId ?? useFolderAccessStore.getState().activeProjectId
       if (projectId) {
         const allHandles = getRuntimeHandlesForProject(projectId)
         if (allHandles.size > 0) {

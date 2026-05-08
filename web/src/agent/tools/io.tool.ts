@@ -268,8 +268,8 @@ async function executeSingleRead(
         )
         if (nativeHandle) {
           const result = readPolicy
-            ? await readFile(nativePath, nativeHandle, context.workspaceId, readPolicy)
-            : await readFile(nativePath, nativeHandle, context.workspaceId)
+            ? await readFile(nativePath, nativeHandle, context.workspaceId, readPolicy, context.projectId)
+            : await readFile(nativePath, nativeHandle, context.workspaceId, undefined, context.projectId)
           const { content, metadata } = result
           if (maxSize && metadata.size > maxSize) {
             return toolErrorJson(

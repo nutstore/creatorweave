@@ -201,7 +201,7 @@ export async function resolveVfsTarget(
     return {
       kind: 'workspace',
       path: parsed.path,
-      backend: new WorkspaceBackend(context.workspaceId, context.directoryHandle),
+      backend: new WorkspaceBackend(context.workspaceId, context.directoryHandle, resolveProjectId(context)),
     }
   }
 

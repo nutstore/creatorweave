@@ -623,13 +623,14 @@ export class WorkspaceRuntime {
   async readFile(
     path: string,
     directoryHandle?: FileSystemDirectoryHandle | null,
-    options: { policy?: ReadPolicy } = {}
+    options: { policy?: ReadPolicy; projectId?: string | null } = {}
   ): Promise<{ content: FileContent; metadata: FileMetadata; source: 'native' | 'opfs' }> {
     if (!this.initialized) await this.initialize()
     const normalizedPath = this.normalizeWorkspacePath(path)
     const readPolicy = options.policy ?? 'auto'
     const preferOpfs = readPolicy === 'prefer_opfs'
     const preferNative = readPolicy === 'prefer_native'
+    const projectId = options.projectId
 
     // Multi-root: resolve the correct native handle for this path
     // If directoryHandle is provided, use it (explicit override).
@@ -639,9 +640,9 @@ export class WorkspaceRuntime {
     if (directoryHandle) {
       nativeHandle = directoryHandle
     } else {
-      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       // Resolve the path relative to the root (strip root prefix for native FS access)
-      const resolved = await this.resolvePath(normalizedPath)
+      const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
     }
 
@@ -873,7 +874,8 @@ export class WorkspaceRuntime {
   async writeFile(
     path: string,
     content: FileContent,
-    directoryHandle?: FileSystemDirectoryHandle | null
+    directoryHandle?: FileSystemDirectoryHandle | null,
+    projectId?: string | null
   ): Promise<void> {
     if (!this.initialized) await this.initialize()
     const normalizedPath = this.normalizeWorkspacePath(path)
@@ -884,8 +886,8 @@ export class WorkspaceRuntime {
     if (directoryHandle) {
       nativeHandle = directoryHandle
     } else {
-      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
-      const resolved = await this.resolvePath(normalizedPath)
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
+      const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
     }
 
@@ -1014,7 +1016,7 @@ export class WorkspaceRuntime {
    * @param path File path
    * @param directoryHandle Real filesystem directory handle (for mtime baseline)
    */
-  async deleteFile(path: string, directoryHandle?: FileSystemDirectoryHandle | null): Promise<void> {
+  async deleteFile(path: string, directoryHandle?: FileSystemDirectoryHandle | null, projectId?: string | null): Promise<void> {
     if (!this.initialized) await this.initialize()
 
     const normalizedPath = this.normalizeWorkspacePath(path)
@@ -1025,8 +1027,8 @@ export class WorkspaceRuntime {
     if (directoryHandle) {
       nativeHandle = directoryHandle
     } else {
-      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath)
-      const resolved = await this.resolvePath(normalizedPath)
+      nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
+      const resolved = await this.resolvePath(normalizedPath, projectId)
       nativePath = resolved.relativePath || normalizedPath
     }
 
@@ -2206,14 +2208,18 @@ export class WorkspaceRuntime {
    * 1. If path starts with a known rootName prefix → use that root's handle
    * 2. Otherwise → use the first root's handle
    */
-  async getNativeDirectoryHandleForPath(path: string): Promise<FileSystemDirectoryHandle | null> {
+  async getNativeDirectoryHandleForPath(path: string, projectId?: string | null): Promise<FileSystemDirectoryHandle | null> {
     try {
-      const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-      const activeProject = await getProjectRepository().findActiveProject()
-      if (!activeProject?.id) return null
+      let resolvedProjectId = projectId
+      if (!resolvedProjectId) {
+        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+        const activeProject = await getProjectRepository().findActiveProject()
+        resolvedProjectId = activeProject?.id
+      }
+      if (!resolvedProjectId) return null
 
-      const resolved = await this.resolvePath(path, activeProject.id)
-      return getRuntimeDirectoryHandle(activeProject.id, resolved.rootName) ?? null
+      const resolved = await this.resolvePath(path, resolvedProjectId)
+      return getRuntimeDirectoryHandle(resolvedProjectId, resolved.rootName) ?? null
     } catch {
       return null
     }
@@ -2223,13 +2229,17 @@ export class WorkspaceRuntime {
    * Get all native directory handles for the project (multi-root).
    * Returns a Map of rootName → handle for all roots with active handles.
    */
-  async getAllNativeDirectoryHandles(): Promise<Map<string, FileSystemDirectoryHandle>> {
+  async getAllNativeDirectoryHandles(projectId?: string | null): Promise<Map<string, FileSystemDirectoryHandle>> {
     try {
-      const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-      const activeProject = await getProjectRepository().findActiveProject()
-      if (!activeProject?.id) return new Map()
+      let resolvedProjectId = projectId
+      if (!resolvedProjectId) {
+        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+        const activeProject = await getProjectRepository().findActiveProject()
+        resolvedProjectId = activeProject?.id
+      }
+      if (!resolvedProjectId) return new Map()
 
-      return getRuntimeHandlesForProject(activeProject.id)
+      return getRuntimeHandlesForProject(resolvedProjectId)
     } catch {
       return new Map()
     }
@@ -2304,7 +2314,7 @@ export class WorkspaceRuntime {
    */
   async resolvePath(
     path: string,
-    projectId?: string
+    projectId?: string | null
   ): Promise<ResolvedRoot> {
     // Normalize path
     let normalized = path.replace(/\\/g, '/')

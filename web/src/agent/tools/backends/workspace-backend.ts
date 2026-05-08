@@ -36,16 +36,17 @@ export class WorkspaceBackend implements VfsBackend {
   constructor(
     private workspaceId?: string | null,
     private directoryHandle?: FileSystemDirectoryHandle | null,
+    private projectId?: string | null,
   ) {}
 
   async readFile(path: string, options?: VfsReadOptions): Promise<VfsReadResult> {
     const { readFile } = useOPFSStore.getState()
-    // Pass null to let WorkspaceRuntime resolve the correct root via resolvePath()
+    // Pass null as directoryHandle to let WorkspaceRuntime resolve the correct root via resolvePath()
     const readPolicy = options?.readPolicy as ReadPolicy | undefined
 
     const result = readPolicy
-      ? await readFile(path, null, this.workspaceId, readPolicy)
-      : await readFile(path, null, this.workspaceId)
+      ? await readFile(path, null, this.workspaceId, readPolicy, this.projectId)
+      : await readFile(path, null, this.workspaceId, undefined, this.projectId)
 
     const { content, metadata, source } = result
     return {
@@ -60,13 +61,13 @@ export class WorkspaceBackend implements VfsBackend {
   async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
     const { writeFile } = useOPFSStore.getState()
     // Pass null to let WorkspaceRuntime resolve the correct root
-    await writeFile(path, content, null, this.workspaceId)
+    await writeFile(path, content, null, this.workspaceId, this.projectId)
   }
 
   async deleteFile(path: string): Promise<void> {
     const { deleteFile } = useOPFSStore.getState()
     // Pass null to let WorkspaceRuntime resolve the correct root
-    await deleteFile(path, null, this.workspaceId)
+    await deleteFile(path, null, this.workspaceId, this.projectId)
   }
 
   async listDir(path: string, _options?: VfsListOptions): Promise<VfsDirEntry[]> {

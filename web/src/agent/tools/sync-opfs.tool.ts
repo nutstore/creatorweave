@@ -50,6 +50,8 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     return toolErrorJson('sync', 'invalid_args', 'paths must be a non-empty array of file paths or glob patterns')
   }
 
+  const projectId = context.projectId ?? null
+
   // Resolve workspace runtime and files/ dir
   const runtime = await getWorkspaceRuntime(context.workspaceId)
   if (!runtime) {
@@ -61,7 +63,7 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   let nativeHandleMap: Map<string, FileSystemDirectoryHandle>
 
   // Always try to get all handles from runtime (multi-root)
-  nativeHandleMap = await runtime.getAllNativeDirectoryHandles()
+  nativeHandleMap = await runtime.getAllNativeDirectoryHandles(projectId)
   if (nativeHandleMap.size === 0) {
     // Fallback: use context handle or resolve single handle
     const fallbackHandle = context.directoryHandle
@@ -85,7 +87,7 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     const normalized = rawPath.replace(/^(\.\/)+/, '')
     // Try to resolve root prefix using runtime.resolvePath
     try {
-      const resolved = await runtime.resolvePath(normalized)
+      const resolved = await runtime.resolvePath(normalized, projectId)
       const rootName = resolved.rootName
       const relativePattern = resolved.relativePath || '**'
       if (!resolvedByRoot.has(rootName)) {
