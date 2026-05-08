@@ -332,6 +332,9 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
   const t = useT()
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Multi-line selection: track anchor line per side (like Monaco's Shift+Click)
+  const anchorRef = useRef<Record<'original' | 'modified', number | null>>({ original: null, modified: null })
+
   // Context expansion state: hunkIndex -> { above: number, below: number }
   const [expandedContext, setExpandedContext] = useState<Record<number, { above: number; below: number }>>({})
 
@@ -478,6 +481,29 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
     )
   }
 
+  /** Handle line number click with Shift+Click multi-line selection support */
+  const handleLineClick = useCallback((
+    side: 'original' | 'modified',
+    lineNo: number,
+    event: React.MouseEvent,
+  ) => {
+    if (!onLineSelectForComment) return
+    const isShift = event.shiftKey
+
+    if (isShift && anchorRef.current[side] !== null) {
+      // Shift+Click: extend selection from anchor to current line
+      const anchorLine = anchorRef.current[side]!
+      const startLine = Math.min(anchorLine, lineNo)
+      const endLine = Math.max(anchorLine, lineNo)
+      onLineSelectForComment({ side, startLine, endLine })
+    } else {
+      // Normal click: set new anchor, single line selection
+      anchorRef.current = { original: null, modified: null }
+      anchorRef.current[side] = lineNo
+      onLineSelectForComment({ side, startLine: lineNo, endLine: lineNo })
+    }
+  }, [onLineSelectForComment])
+
   /** Build the className for a line number cell, with comment/selection indicators */
   function lineNoClassName(
     side: 'original' | 'modified',
@@ -522,8 +548,8 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
       for (let lineNo = startLineNo; lineNo <= range.aboveEnd; lineNo++) {
         const idx = lineNo - 1
         if (idx < 0 || idx >= oldLines.length) continue
-        const commented = isLineCommented('original', lineNo, comments)
-        const selected = isLineSelected('original', lineNo, selectedTarget)
+        const commented = isLineCommented('original', lineNo, comments) || isLineCommented('modified', lineNo, comments)
+        const selected = isLineSelected('original', lineNo, selectedTarget) || isLineSelected('modified', lineNo, selectedTarget)
         lines.push(
           <div
             key={`ctx-above-${hunkIndex}-${lineNo}`}
@@ -533,13 +559,13 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
           >
             <span
               className={lineNoClassName('original', lineNo, 'text-neutral-300 dark:text-neutral-600')}
-              onClick={() => onLineSelectForComment?.({ side: 'original', startLine: lineNo, endLine: lineNo })}
+              onClick={(e) => handleLineClick('original', lineNo, e)}
             >
               {lineNo}
             </span>
             <span
               className={lineNoClassName('modified', lineNo, 'text-neutral-300 dark:text-neutral-600')}
-              onClick={() => onLineSelectForComment?.({ side: 'modified', startLine: lineNo, endLine: lineNo })}
+              onClick={(e) => handleLineClick('modified', lineNo, e)}
             >
               {lineNo}
             </span>
@@ -557,8 +583,8 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
       for (let lineNo = range.belowStart; lineNo <= endLineNo; lineNo++) {
         const idx = lineNo - 1
         if (idx < 0 || idx >= oldLines.length) continue
-        const commented = isLineCommented('original', lineNo, comments)
-        const selected = isLineSelected('original', lineNo, selectedTarget)
+        const commented = isLineCommented('original', lineNo, comments) || isLineCommented('modified', lineNo, comments)
+        const selected = isLineSelected('original', lineNo, selectedTarget) || isLineSelected('modified', lineNo, selectedTarget)
         lines.push(
           <div
             key={`ctx-below-${hunkIndex}-${lineNo}`}
@@ -568,13 +594,13 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
           >
             <span
               className={lineNoClassName('original', lineNo, 'text-neutral-300 dark:text-neutral-600')}
-              onClick={() => onLineSelectForComment?.({ side: 'original', startLine: lineNo, endLine: lineNo })}
+              onClick={(e) => handleLineClick('original', lineNo, e)}
             >
               {lineNo}
             </span>
             <span
               className={lineNoClassName('modified', lineNo, 'text-neutral-300 dark:text-neutral-600')}
-              onClick={() => onLineSelectForComment?.({ side: 'modified', startLine: lineNo, endLine: lineNo })}
+              onClick={(e) => handleLineClick('modified', lineNo, e)}
             >
               {lineNo}
             </span>
@@ -636,7 +662,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
               >
                 <span
                   className={lineNoClassName('original', lineNo, 'text-red-300 dark:text-red-500/50')}
-                  onClick={() => onLineSelectForComment?.({ side: 'original', startLine: lineNo, endLine: lineNo })}
+                  onClick={(e) => handleLineClick('original', lineNo, e)}
                 >
                   {line.oldLineNo ?? ''}
                 </span>
@@ -669,7 +695,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
                 <span className="w-12 shrink-0 select-none text-right pr-3 font-mono text-[13px] leading-[20px] text-emerald-300 dark:text-emerald-500/50" />
                 <span
                   className={lineNoClassName('modified', lineNo, 'text-emerald-300 dark:text-emerald-500/50')}
-                  onClick={() => onLineSelectForComment?.({ side: 'modified', startLine: lineNo, endLine: lineNo })}
+                  onClick={(e) => handleLineClick('modified', lineNo, e)}
                 >
                   {line.newLineNo ?? ''}
                 </span>

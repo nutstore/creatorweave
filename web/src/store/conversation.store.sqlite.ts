@@ -2342,12 +2342,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (status === 'idle') {
               c.messages = targetMessages
               // Attach collected assets to the last assistant message
+              // NOTE: Must mutate via Immer draft (c.messages[i]) directly.
+              // Using spread/reverse/find detaches the object from Immer's proxy,
+              // resulting in "Cannot assign to read only property" error.
               if (collectedAssets && collectedAssets.length > 0) {
-                const lastAssistantMsg = [...c.messages]
-                  .reverse()
-                  .find((m) => m.role === 'assistant')
-                if (lastAssistantMsg) {
-                  lastAssistantMsg.assets = collectedAssets
+                for (let i = c.messages.length - 1; i >= 0; i--) {
+                  if (c.messages[i].role === 'assistant') {
+                    c.messages[i] = {
+                      ...c.messages[i],
+                      assets: collectedAssets,
+                    }
+                    break
+                  }
                 }
               }
               c.collectedAssets = []
