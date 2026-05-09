@@ -47,6 +47,7 @@ import {
   KeyboardShortcutsHelp,
   RecentFilesPanel,
   WorkspaceSettingsDialog,
+  GoToFileDialog,
   buildEnhancedCommands,
   type Command,
 } from '@/components/workspace'
@@ -142,6 +143,9 @@ export function WorkspaceLayout({
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
   const [showRecentFiles, setShowRecentFiles] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
+  const [showGoToFile, setShowGoToFile] = useState(false)
+  /** Target file path (with rootName prefix) to reveal in file tree */
+  const [revealTargetPath, setRevealTargetPath] = useState<string | null>(null)
   const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
   const openWebContainerPanel = useWebContainerStore((s) => s.openPanel)
   const closeWebContainerPanel = useWebContainerStore((s) => s.closePanel)
@@ -229,11 +233,7 @@ export function WorkspaceLayout({
     },
     // Files
     onOpenFile: () => {
-      setSidebarCollapsed(false)
-      setActiveResourceTab('files')
-      if (isMobile) {
-        setIsSidebarOpen(true)
-      }
+      setShowGoToFile(true)
     },
     onShowRecentFiles: () => setShowRecentFiles(true),
 
@@ -363,9 +363,23 @@ export function WorkspaceLayout({
       }
 
       // Cmd/Ctrl + P to toggle project switcher
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault()
         setProjectSwitcherOpen((prev) => !prev)
+        return
+      }
+
+      // Cmd/Ctrl + Shift + P to open Go To File dialog
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault()
+        setShowGoToFile(true)
+        return
+      }
+
+      // Cmd/Ctrl + G to open Go To File dialog (alternative shortcut)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault()
+        setShowGoToFile(true)
         return
       }
 
@@ -401,6 +415,8 @@ export function WorkspaceLayout({
       if (e.key === 'Escape') {
         if (showCommandPalette) {
           setShowCommandPalette(false)
+        } else if (showGoToFile) {
+          setShowGoToFile(false)
         } else if (showShortcutsHelp) {
           setShowShortcutsHelp(false)
         } else if (showWorkspaceSettings) {
@@ -422,6 +438,7 @@ export function WorkspaceLayout({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [
     showCommandPalette,
+    showGoToFile,
     showShortcutsHelp,
     showWorkspaceSettings,
     showRecentFiles,
@@ -562,6 +579,45 @@ export function WorkspaceLayout({
     setSelectedFileHandle(null)
   }, [])
 
+  // Handle "go to file" selection from GoToFileDialog
+  const handleGoToFileSelect = useCallback(
+    (fullPath: string) => {
+      // Determine which root this file belongs to
+      // fullPath format: "rootName/relative/path/to/file.ts" or just "path/to/file.ts"
+      let relativePath: string | null = null
+
+      for (const root of roots) {
+        if (fullPath.startsWith(`${root.name}/`)) {
+          relativePath = fullPath.slice(root.name.length + 1)
+          break
+        }
+      }
+
+      // If no root matched, skip — the path doesn't belong to any known root
+      if (relativePath === null) {
+        console.warn('[WorkspaceLayout] GoToFile: path does not match any root:', fullPath)
+        return
+      }
+
+      // Ensure sidebar is open and files tab is active
+      setSidebarCollapsed(false)
+      setActiveResourceTab('files')
+
+      // Set reveal target for the file tree (relative path without root prefix)
+      setRevealTargetPath(relativePath)
+
+      // Also set the selected file path for preview
+      setSelectedFilePath(fullPath)
+      setSelectedFileHandle(null) // Will be resolved by the tree reveal
+    },
+    [roots, setSidebarCollapsed, setActiveResourceTab]
+  )
+
+  // Handle reveal complete callback from FileTreePanel
+  const handleRevealComplete = useCallback(() => {
+    setRevealTargetPath(null)
+  }, [])
+
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
       {/* Header */}
@@ -597,6 +653,8 @@ export function WorkspaceLayout({
             onFileSelect={handleSidebarFileSelect}
             onInspect={handleElementInspect}
             selectedFilePath={selectedFilePath}
+            revealTargetPath={revealTargetPath}
+            onRevealComplete={handleRevealComplete}
           />
         )}
         {isMobile && isSidebarOpen && (
@@ -607,6 +665,8 @@ export function WorkspaceLayout({
               onFileSelect={handleSidebarFileSelect}
               onInspect={handleElementInspect}
               selectedFilePath={selectedFilePath}
+              revealTargetPath={revealTargetPath}
+              onRevealComplete={handleRevealComplete}
             />
           </div>
         )}
@@ -692,6 +752,13 @@ export function WorkspaceLayout({
         commands={commands}
       />
 
+      {/* Go To File Dialog */}
+      <GoToFileDialog
+        open={showGoToFile}
+        onClose={() => setShowGoToFile(false)}
+        onSelectFile={handleGoToFileSelect}
+      />
+
       {/* Phase 4: Keyboard Shortcuts Help */}
       <KeyboardShortcutsHelp
         open={showShortcutsHelp}
@@ -714,8 +781,8 @@ export function WorkspaceLayout({
             <RecentFilesPanel
               onFileSelect={(path) => {
                 setShowRecentFiles(false)
-                // Find and select file
-                const file = document.querySelector(`[data-file-path="${path}"]`) as HTMLElement
+                // Find and select file — CSS.escape prevents injection via path
+                const file = document.querySelector(`[data-file-path="${CSS.escape(path)}"]`) as HTMLElement
                 file?.click()
               }}
             />

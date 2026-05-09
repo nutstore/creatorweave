@@ -93,8 +93,8 @@ export interface FolderAccessStore extends FolderAccessActions {
 
   // ---- Shared file path cache ----
 
-  /** All file paths for the current project (flat list, populated by directory traversal, reusable for search etc.) */
-  allFilePaths: string[]
+  /** File path cache per project (keyed by projectId, flat path list for search etc.) */
+  allFilePaths: Record<string, string[]>
 
   /** Get the current project's record */
   getRecord: () => FolderAccessRecord | null

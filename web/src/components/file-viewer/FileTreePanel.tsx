@@ -60,6 +60,15 @@ interface FileTreePanelBaseProps {
   pathPrefix?: string | null
   selectedPath?: string | null
   showHeader?: boolean
+  /**
+   * When set, the tree will programmatically expand all ancestor directories
+   * to make this file visible, select it, and scroll it into view.
+   * The value is a relative path within this root (no rootName prefix).
+   * Set to null to clear.
+   */
+  revealTarget?: string | null
+  /** Called when revealTarget has been processed (tree expanded & file selected) */
+  onRevealComplete?: () => void
 }
 
 type FileTreePanelProps =
@@ -302,6 +311,7 @@ function TreeNodeRow({
     <>
       <div
         ref={rowRef}
+        data-tree-path={node.path}
         className={`group flex cursor-pointer items-center gap-2 rounded-md h-7 pr-3 text-xs transition-colors ${
           selected
             ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
@@ -467,6 +477,8 @@ export function FileTreePanel({
   selectedPath,
   mode = 'all',
   showHeader = true,
+  revealTarget,
+  onRevealComplete,
 }: FileTreePanelProps) {
   const t = useT()
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
@@ -850,8 +862,123 @@ export function FileTreePanel({
     [onFileSelect, onDirectorySelect, handleToggle]
   )
 
+  /**
+   * Generation counter to cancel in-flight revealPath operations when
+   * the tree is reset (project switch, directoryHandle change, etc.)
+   */
+  const revealGenRef = useRef(0)
+
+  /**
+   * Programmatically expand the tree to reveal a target file path.
+   * Works by iteratively finding each directory segment, loading its children
+   * if needed, and expanding it. Finally selects the target file.
+   */
+  const revealPath = useCallback(
+    async (targetPath: string): Promise<void> => {
+      if (!targetPath) return
+
+      // Wait for initial load to complete
+      if (!loaded || loading) return
+
+      const gen = revealGenRef.current
+      const segments = targetPath.split('/')
+      const newExpanded = new Set(expandedPaths)
+      let currentNodes = rootNodes
+      let mutated = false
+
+      // Walk through each directory segment (all except the last = file)
+      for (let i = 0; i < segments.length - 1; i++) {
+        // Check if tree was reset during async operation
+        if (revealGenRef.current !== gen) return
+
+        const dirPath = segments.slice(0, i + 1).join('/')
+
+        // Find the directory node at current level
+        let found = currentNodes.find((n) => n.path === dirPath)
+
+        if (!found) {
+          console.warn(`[FileTree] revealPath: directory "${dirPath}" not found in tree`)
+          break
+        }
+
+        if (found.kind !== 'directory') {
+          console.warn(`[FileTree] revealPath: "${dirPath}" is not a directory`)
+          break
+        }
+
+        // Load children if not yet loaded
+        if (!found.loaded) {
+          try {
+            const children = await loadChildren(
+              found.handle as FileSystemDirectoryHandle | null,
+              found.path
+            )
+            // Check cancellation after async
+            if (revealGenRef.current !== gen) return
+            found.children = children
+            found.loaded = true
+            mutated = true
+          } catch (error) {
+            console.error(`[FileTree] revealPath: failed to load "${found.path}":`, error)
+            return
+          }
+        }
+
+        // Expand this directory
+        if (!newExpanded.has(found.path)) {
+          newExpanded.add(found.path)
+        }
+
+        // Move into children for next iteration
+        currentNodes = found.children || []
+      }
+
+      // Final cancellation check before applying state
+      if (revealGenRef.current !== gen) return
+
+      // Apply expanded paths
+      setExpandedPaths(newExpanded)
+      if (mutated) {
+        setRootNodes((prev) => [...prev])
+      }
+
+      // Find the target file node to select it (trigger onFileSelect)
+      const targetFileName = segments[segments.length - 1]
+      const targetNode = currentNodes.find(
+        (n) => n.name === targetFileName && n.kind === 'file'
+      )
+      if (targetNode) {
+        onFileSelect?.(targetNode.path, targetNode.handle as FileSystemFileHandle)
+      }
+
+      // Scroll into view after React renders
+      requestAnimationFrame(() => {
+        if (revealGenRef.current !== gen) return
+        const selectedEl = document.querySelector(
+          `[data-tree-path="${CSS.escape(targetPath)}"]`
+        )
+        if (selectedEl) {
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
+      })
+    },
+    [loaded, loading, expandedPaths, rootNodes, loadChildren, onFileSelect]
+  )
+
+  // React to revealTarget prop changes
+  useEffect(() => {
+    if (!revealTarget || !loaded) return
+    let cancelled = false
+    revealPath(revealTarget).then(() => {
+      if (!cancelled) onRevealComplete?.()
+    })
+    return () => { cancelled = true }
+  }, [revealTarget, loaded, revealPath, onRevealComplete])
+
   // Reset states when directoryHandle changes or workspace is cleared
   useEffect(() => {
+    // Bump generation to cancel any in-flight revealPath
+    revealGenRef.current++
     // Always reset tree state when directoryHandle changes.
     // Also reset when there is no activeWorkspaceId (project switched /
     // workspace cleared) so stale OPFS data doesn't leak into the tree.

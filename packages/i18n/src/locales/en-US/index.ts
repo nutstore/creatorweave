@@ -27,6 +27,7 @@ import { projectHome } from './projectHome'
 import { fileTree } from './fileTree'
 import { agent } from './agent'
 import { sidebar } from './sidebar'
+import { goToFile } from './goToFile'
 
 export const enUS = {
   common,
@@ -72,6 +73,7 @@ export const enUS = {
   fileTree,
   agent,
   sidebar,
+  goToFile,
   workflow,
   questionCard,
 } as const

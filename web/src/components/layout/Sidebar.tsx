@@ -60,6 +60,10 @@ interface SidebarProps {
   isMobile?: boolean
   /** Request parent to close mobile sidebar */
   onRequestClose?: () => void
+  /** Target file path to reveal in tree (relative path without root prefix) */
+  revealTargetPath?: string | null
+  /** Called when reveal has been processed */
+  onRevealComplete?: () => void
 }
 
 export function Sidebar({
@@ -68,6 +72,8 @@ export function Sidebar({
   selectedFilePath,
   isMobile = false,
   onRequestClose,
+  revealTargetPath,
+  onRevealComplete,
 }: SidebarProps) {
   const t = useT()
 
@@ -710,7 +716,22 @@ export function Sidebar({
             <div className="flex-1 overflow-hidden" data-tour="file-tree">
               {resourceTab === 'files' && (
                 <div className="custom-scrollbar flex h-full flex-col overflow-y-auto">
-                  {roots.map((root) => (
+                  {roots.map((root) => {
+                    // Determine if this root should receive the revealTarget
+                    // revealTargetPath is relative (no root prefix)
+                    // In multi-root, we need to check which root matches the selectedFilePath
+                    const rootRevealTarget = (() => {
+                      if (!revealTargetPath) return null
+                      // If selectedFilePath starts with this root name, use the relative path
+                      if (selectedFilePath?.startsWith(`${root.name}/`)) {
+                        return revealTargetPath
+                      }
+                      // Single root case: if there's only one root, always use it
+                      if (roots.length === 1) return revealTargetPath
+                      return null
+                    })()
+
+                    return (
                     <div key={root.id} className="flex-shrink-0">
                       <FileTreePanel
                         directoryHandle={root.handle}
@@ -721,9 +742,12 @@ export function Sidebar({
                         }}
                         selectedPath={selectedFilePath?.startsWith(`${root.name}/`) ? selectedFilePath.slice(root.name.length + 1) : null}
                         onInspect={onInspect ? (path, handle) => onInspect(`${root.name}/${path}`, handle) : undefined}
+                        revealTarget={rootRevealTarget}
+                        onRevealComplete={onRevealComplete}
                       />
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
 

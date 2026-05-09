@@ -56,15 +56,47 @@ async function notifyWorkspaceNativeDirectoryGranted(handle: FileSystemDirectory
 }
 
 /**
- * Module-level dedup: prevents concurrent ensureFilePaths from triggering multiple traversals
+ * Module-level dedup: prevents concurrent ensureFilePaths for the same project
  */
-let _filePathPromise: Promise<string[]> | null = null
+const _filePathPromises: Map<string, Promise<string[]>> = new Map()
+
+/**
+ * LRU eviction for allFilePaths cache.
+ * Keeps at most MAX_CACHED_PROJECTS entries. Evicts the least-recently-written
+ * project when the limit is exceeded.
+ */
+const MAX_CACHED_PROJECTS = 10
+/** Insertion-order of project IDs (most recent at the end) */
+const _cacheOrder: string[] = []
+
+function evictLRU(
+  state: { allFilePaths: Record<string, string[]> },
+  justWrittenId: string
+): void {
+  // Move just-written ID to the end (most recently used)
+  const idx = _cacheOrder.indexOf(justWrittenId)
+  if (idx >= 0) _cacheOrder.splice(idx, 1)
+  _cacheOrder.push(justWrittenId)
+
+  // Evict oldest entries that exceed the limit
+  while (_cacheOrder.length > MAX_CACHED_PROJECTS) {
+    const oldest = _cacheOrder.shift()!
+    // Don't evict the project we just wrote — break instead of infinite loop
+    if (oldest === justWrittenId) {
+      _cacheOrder.push(oldest)
+      break
+    }
+    if (state.allFilePaths[oldest]) {
+      delete state.allFilePaths[oldest]
+    }
+  }
+}
 
 export const useFolderAccessStore = create<FolderAccessStore>()(
   immer((set, get) => ({
     activeProjectId: null,
     records: {},
-    allFilePaths: [],
+    allFilePaths: {},
 
     // ========================================================================
     // Actions
@@ -74,8 +106,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
      * Set active project and hydrate
      */
     setActiveProject: async (projectId: string | null) => {
-      // Clear file path cache on project switch
-      get().clearFilePaths()
       set((state) => {
         state.activeProjectId = projectId
       })
@@ -480,15 +510,18 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     // ========================================================================
 
     ensureFilePaths: async () => {
-      const existing = get().allFilePaths
-      if (existing.length > 0) return existing
+      const projectId = get().activeProjectId
+      if (!projectId) return []
+      // Return cache if already exists for this project
+      const existing = get().allFilePaths[projectId]
+      if (existing && existing.length > 0) return existing
       // Dedup: concurrent calls share the same traversal Promise
-      if (!_filePathPromise) {
-        _filePathPromise = get().refreshFilePaths().finally(() => {
-          _filePathPromise = null
-        })
-      }
-      return _filePathPromise
+      if (_filePathPromises.has(projectId)) return _filePathPromises.get(projectId)!
+      const promise = get().refreshFilePaths().finally(() => {
+        _filePathPromises.delete(projectId)
+      })
+      _filePathPromises.set(projectId, promise)
+      return promise
     },
 
     refreshFilePaths: async () => {
@@ -508,7 +541,10 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           paths.push(entry.path)
           if (paths.length >= 5000) break
         }
-        set({ allFilePaths: paths })
+        set((state) => {
+          state.allFilePaths[projectId] = paths
+          evictLRU(state, projectId)
+        })
         return paths
       }
 
@@ -522,16 +558,33 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
           if (paths.length >= 5000) break
         }
       }
-      set({ allFilePaths: paths })
+      set((state) => {
+        state.allFilePaths[projectId] = paths
+        evictLRU(state, projectId)
+      })
       return paths
     },
 
     clearFilePaths: () => {
-      _filePathPromise = null
-      set({ allFilePaths: [] })
-      // Reload multi-root state in case handles changed
       const projectId = get().activeProjectId
       if (projectId) {
+        _filePathPromises.delete(projectId)
+        // Remove from LRU order tracking
+        const idx = _cacheOrder.indexOf(projectId)
+        if (idx >= 0) _cacheOrder.splice(idx, 1)
+        set((state) => {
+          delete state.allFilePaths[projectId]
+        })
+      } else {
+        _filePathPromises.clear()
+        _cacheOrder.length = 0
+        set((state) => {
+          state.allFilePaths = {}
+        })
+      }
+      // Reload multi-root state in case handles changed
+      const pid = get().activeProjectId
+      if (pid) {
         get().loadRoots()
       }
     },
