@@ -297,6 +297,8 @@ export function ConversationView({
               onCancel={handleCancel}
               messagesEndRef={messagesEndRef}
               conversationId={convId}
+              mentionAgents={mentionAgents}
+              onSearchFiles={debouncedSearchFiles}
             />
           )}
         </div>

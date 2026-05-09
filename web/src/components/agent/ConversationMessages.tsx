@@ -10,6 +10,7 @@ import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
 import { groupMessagesIntoTurns } from './group-messages'
 import { useWorkflowProgressAnchor } from './useWorkflowProgressAnchor'
 import type { DraftAssistantStep, Message, ToolCall, WorkflowExecutionState } from '@/agent/message-types'
+import type { FileMentionItem } from './FileMentionExtension'
 
 type ConversationMessagesProps = {
   activeMessages: Message[]
@@ -40,6 +41,10 @@ type ConversationMessagesProps = {
   messagesEndRef: React.RefObject<HTMLDivElement>
   /** Conversation ID for bridging ask_user_question UI back to executor */
   conversationId?: string | null
+  /** Agent candidates for @ mention in edit mode */
+  mentionAgents: { id: string; name?: string }[]
+  /** Async file search callback for # file mention in edit mode */
+  onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
 }
 
 /** Build runtime props for an AssistantTurnBubble. Returns undefined values when not active. */
@@ -81,6 +86,8 @@ export function ConversationMessages({
   onCancel,
   messagesEndRef,
   conversationId,
+  mentionAgents,
+  onSearchFiles,
 }: ConversationMessagesProps) {
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
@@ -124,6 +131,8 @@ export function ConversationMessages({
               onCancel={onCancel}
               disableDeleteActions={isProcessing}
               isProcessing={isProcessing}
+              mentionAgents={mentionAgents}
+              onSearchFiles={onSearchFiles}
             />
           ) : (
             <Fragment key={turn.messages[0].id}>

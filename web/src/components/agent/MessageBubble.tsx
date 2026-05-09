@@ -5,7 +5,7 @@
  * Streaming is just a transient state prop, not a different component.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { User, Bot, Trash2, Pencil } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
@@ -14,6 +14,7 @@ import { ToolCallDisplay } from './ToolCallDisplay'
 import { CopyButton } from './CopyButton'
 import { RegenerateButton } from './RegenerateButton'
 import { AssetList } from './AssetCard'
+import { InlineMessageEditor } from './InlineMessageEditor'
 import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
@@ -56,6 +57,10 @@ interface MessageBubbleProps {
   isProcessing?: boolean
   /** Edit and resend callback */
   onEditAndResend?: (userMessageId: string, newContent: string) => void
+  /** Agent candidates for @ mention in edit mode */
+  mentionAgents?: { id: string; name?: string }[]
+  /** Async file search callback for # file mention in edit mode */
+  onSearchFiles?: (query: string) => Promise<import('./FileMentionExtension').FileMentionItem[]>
 }
 
 export function MessageBubble({
@@ -70,6 +75,8 @@ export function MessageBubble({
   onCancel,
   isProcessing = false,
   onEditAndResend,
+  mentionAgents = [],
+  onSearchFiles,
 }: MessageBubbleProps) {
   const t = useT()
   const isUser = message.role === 'user'
@@ -78,45 +85,21 @@ export function MessageBubble({
 
   // Edit state for user messages
   const [isEditing, setIsEditing] = useState(false)
-  const [editText, setEditText] = useState('')
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus()
-      // Auto-resize textarea to fit content
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px'
-    }
-  }, [isEditing])
 
   const handleStartEdit = () => {
-    setEditText(message.content || '')
     setIsEditing(true)
   }
 
   const handleCancelEdit = () => {
     setIsEditing(false)
-    setEditText('')
   }
 
-  const handleSubmitEdit = () => {
-    const trimmed = editText.trim()
+  const handleSubmitEdit = (newContent: string) => {
+    const trimmed = newContent.trim()
     if (trimmed && trimmed !== message.content && onEditAndResend) {
       onEditAndResend(message.id, trimmed)
     }
     setIsEditing(false)
-    setEditText('')
-  }
-
-  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmitEdit()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
-      handleCancelEdit()
-    }
   }
 
   // User message rendering
@@ -129,35 +112,17 @@ export function MessageBubble({
         </div>
 
         {/* Content */}
-        <div className="min-w-0 max-w-[90%] flex flex-col items-end">
+        <div className={`min-w-0 flex flex-col ${isEditing ? 'flex-1' : 'max-w-[90%] items-end'}`}>
           {isEditing ? (
-            <div className="space-y-2 w-full">
-              <textarea
-                ref={textareaRef}
-                value={editText}
-                onChange={(e) => setEditText(e.target.value)}
-                onKeyDown={handleEditKeyDown}
-                className="w-full resize-none rounded-lg border border-primary-300 bg-white px-3 py-2 text-sm text-neutral-800 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-700 dark:bg-neutral-900 dark:text-neutral-100"
-                rows={1}
-              />
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="rounded px-2.5 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmitEdit}
-                  disabled={!editText.trim() || editText.trim() === message.content}
-                  className="rounded bg-primary-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-40"
-                >
-                  {t('conversation.buttons.send')}
-                </button>
-              </div>
-            </div>
+            <InlineMessageEditor
+              initialContent={message.content || ''}
+              agents={mentionAgents}
+              onSearchFiles={onSearchFiles}
+              onSubmit={handleSubmitEdit}
+              onCancel={handleCancelEdit}
+              cancelLabel={t('common.cancel')}
+              submitLabel={t('conversation.buttons.send')}
+            />
           ) : (
             <div className="w-fit max-w-full rounded-lg bg-primary-600 px-4 py-2 text-sm text-white">
               <div className="whitespace-pre-wrap break-words overflow-x-auto">{message.content}</div>
