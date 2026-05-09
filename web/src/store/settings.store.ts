@@ -77,6 +77,9 @@ interface SettingsState {
   // Last used model per provider (for restoring on switch-back)
   lastUsedModelByProvider: Partial<Record<LLMProviderType, string>>
 
+  // Pinned (user-selected) models per provider — subset of full model list
+  pinnedModelsByProvider: Record<string, string[]>
+
   // Actions
   setProviderType: (type: LLMProviderType) => void
   setModelName: (name: string) => void
@@ -140,6 +143,11 @@ interface SettingsState {
    * Restore dynamic providers from persisted customProviders on app load
    */
   _restoreDynamicProviders: () => void
+
+  // Pinned models actions
+  pinModel: (providerType: LLMProviderType, modelId: string) => void
+  unpinModel: (providerType: LLMProviderType, modelId: string) => void
+  setPinnedModels: (providerType: LLMProviderType, modelIds: string[]) => void
 }
 
 /** Helper: register a CustomProviderConfig into the dynamic provider registry */
@@ -176,6 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
       hasApiKey: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
+      pinnedModelsByProvider: {},
 
       _restoreDynamicProviders: () => {
         const { customProviders } = get()
@@ -516,10 +525,21 @@ export const useSettingsStore = create<SettingsState>()(
           const providerType = type as LLMProviderType
           const key = await loadApiKey(providerType)
           if (key) {
+            // Use pinned models if available, otherwise fallback to all models
+            const pinned = state.pinnedModelsByProvider[providerType]
+            const allModels = getModelsForProvider(providerType)
+            const models = pinned
+              ? pinned
+                  .map((id) => {
+                    const found = allModels.find((m) => m.id === id)
+                    return found ? { id: found.id, name: found.name } : { id, name: id }
+                  })
+              : allModels.map((m) => ({ id: m.id, name: m.name }))
+
             results.push({
               providerType,
               displayName: meta.displayName,
-              models: getModelsForProvider(providerType).map((m) => ({ id: m.id, name: m.name })),
+              models,
               providerKey: providerType,
             })
           }
@@ -529,16 +549,56 @@ export const useSettingsStore = create<SettingsState>()(
         for (const cp of state.customProviders) {
           const key = await loadApiKey(cp.id)
           if (key) {
+            // Use pinned models if available, otherwise fallback to custom provider models
+            const pinned = state.pinnedModelsByProvider[cp.id]
+            const models = pinned
+              ? pinned.map((id) => ({ id, name: id }))
+              : cp.models.map((m) => ({ id: m, name: m }))
+
             results.push({
               providerType: cp.id,
               displayName: cp.name,
-              models: cp.models.map((m) => ({ id: m, name: m })),
+              models,
               providerKey: cp.id,
             })
           }
         }
 
         return results
+      },
+
+      pinModel: (providerType, modelId) => {
+        const state = get()
+        const current = state.pinnedModelsByProvider[providerType] || []
+        if (current.includes(modelId)) return
+        set({
+          pinnedModelsByProvider: {
+            ...state.pinnedModelsByProvider,
+            [providerType]: [...current, modelId],
+          },
+        })
+      },
+
+      unpinModel: (providerType, modelId) => {
+        const state = get()
+        const current = state.pinnedModelsByProvider[providerType] || []
+        if (!current.includes(modelId)) return
+        set({
+          pinnedModelsByProvider: {
+            ...state.pinnedModelsByProvider,
+            [providerType]: current.filter((id) => id !== modelId),
+          },
+        })
+      },
+
+      setPinnedModels: (providerType, modelIds) => {
+        const state = get()
+        set({
+          pinnedModelsByProvider: {
+            ...state.pinnedModelsByProvider,
+            [providerType]: modelIds,
+          },
+        })
       },
     }),
     {
@@ -557,6 +617,7 @@ export const useSettingsStore = create<SettingsState>()(
         enableBatchSpawn: state.enableBatchSpawn,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
+        pinnedModelsByProvider: state.pinnedModelsByProvider,
       }),
       // On rehydration, restore dynamic providers
       onRehydrateStorage: () => (state) => {

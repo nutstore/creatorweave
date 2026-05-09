@@ -10,6 +10,7 @@ export const topbar = {
     modelSwitcher: {
       title: "Quick Model Switch",
       unavailable: "Model unavailable",
+      noPinnedModels: "No models pinned yet. Add models in Settings.",
     },
     tooltips: {
       backToProjects: "Back to Project List",

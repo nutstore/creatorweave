@@ -356,4 +356,18 @@ export const settings = {
       title: "服务商管理",
       defaultModels: "(默认)",
     },
+
+    // 常用模型（用户精选）
+    pinnedModels: {
+      title: "常用模型",
+      count: "已选 {count} 个",
+      empty: "暂未添加常用模型，点击下方按钮添加",
+      addFromApi: "从模型库添加",
+      addManual: "手动输入",
+      dialogTitle: "添加常用模型",
+      searchPlaceholder: "搜索模型...",
+      noApiModels: "暂无可用模型，请先点击刷新按钮获取模型列表",
+      noMatch: "没有匹配的模型",
+      dialogHint: "共 {count} 个模型可选，点击即可添加",
+    },
 } as const

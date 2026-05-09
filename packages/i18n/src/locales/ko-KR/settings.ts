@@ -364,4 +364,18 @@ export const settings = {
       title: "프로바이더 관리",
       defaultModels: "(기본)",
     },
+
+    // 자주 사용하는 모델 (사용자 선택)
+    pinnedModels: {
+      title: "내 모델",
+      count: "{count}개 선택됨",
+      empty: "아직 추가된 모델이 없습니다. 아래 버튼을 클릭하여 추가하세요",
+      addFromApi: "모델 라이브러리에서 추가",
+      addManual: "수동 입력",
+      dialogTitle: "모델 추가",
+      searchPlaceholder: "모델 검색...",
+      noApiModels: "사용 가능한 모델이 없습니다. 새로고침 버튼으로 모델 목록을 먼저 가져오세요",
+      noMatch: "일치하는 모델이 없습니다",
+      dialogHint: "{count}개의 모델을 선택할 수 있습니다. 클릭하여 추가",
+    },
 } as const

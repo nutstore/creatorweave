@@ -368,4 +368,18 @@ export const settings = {
       title: "Provider Management",
       defaultModels: "(default)",
     },
+
+    // Pinned Models (user-selected subset)
+    pinnedModels: {
+      title: "My Models",
+      count: "{count} selected",
+      empty: "No models added yet. Click below to add.",
+      addFromApi: "Add from model library",
+      addManual: "Manual input",
+      dialogTitle: "Add Models",
+      searchPlaceholder: "Search models...",
+      noApiModels: "No models available. Click refresh to fetch the model list first.",
+      noMatch: "No matching models",
+      dialogHint: "{count} models available. Click to add.",
+    },
 } as const

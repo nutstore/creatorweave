@@ -19,6 +19,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
+  Search,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
@@ -38,7 +39,7 @@ import type {
 import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { getCachedModels } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
-import { BrandInput, BrandButton } from '@creatorweave/ui'
+import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
 
 // =============================================================================
 // Constants
@@ -78,6 +79,9 @@ function ProviderCard({
     removeCustomProviderModel,
     setCustomProviderApiMode,
     invalidateApiKeyCache,
+    pinnedModelsByProvider,
+    pinModel,
+    unpinModel,
   } = useSettingsStore()
 
   const providerKey = providerType
@@ -108,6 +112,10 @@ function ProviderCard({
   const [editName, setEditName] = useState('')
   const [editBaseUrl, setEditBaseUrl] = useState('')
   const [editDefaultModel, setEditDefaultModel] = useState('')
+
+  // Add model dialog state
+  const [showAddModelDialog, setShowAddModelDialog] = useState(false)
+  const [addModelSearch, setAddModelSearch] = useState('')
 
   // Merge model lists: dynamic + static + custom provider models
   const allModels = useMemo<ModelInfo[]>(() => {
@@ -142,6 +150,27 @@ function ProviderCard({
 
     return result
   }, [isCustom, customProvider, providerType, dynamicModels])
+
+  // Pinned models for this provider (resolved to ModelInfo for display)
+  const pinnedModels = useMemo(() => {
+    const pinnedIds = pinnedModelsByProvider[providerType] || []
+    return pinnedIds
+      .map((id) => {
+        const found = allModels.find((m) => m.id === id)
+        return found || { id, name: id, capabilities: [] as const, contextWindow: 0 }
+      })
+  }, [pinnedModelsByProvider, providerType, allModels])
+
+  // Filtered models for the "add model" dialog (all - pinned)
+  const filteredModels = useMemo(() => {
+    const pinnedIds = new Set(pinnedModelsByProvider[providerType] || [])
+    const remaining = allModels.filter((m) => !pinnedIds.has(m.id))
+    if (!addModelSearch.trim()) return remaining
+    const q = addModelSearch.toLowerCase()
+    return remaining.filter((m) =>
+      m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q)
+    )
+  }, [allModels, pinnedModelsByProvider, providerType, addModelSearch])
 
   // Load API Key (always check on mount; reload when expanded for freshness)
   useEffect(() => {
@@ -471,42 +500,35 @@ function ProviderCard({
             </div>
           </div>
 
-          {/* Model List */}
-          {!isCustom && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[12px] font-medium text-primary">
-                  {t('settings.modelManagement.modelList')}
-                </label>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-[10px] font-medium ${
-                      modelsSource === 'dynamic'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-tertiary'
-                    }`}
-                  >
-                    {allModels.length} {modelsSource === 'dynamic' ? '(API)' : t('settings.providerManager.defaultModels')}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRefreshModels}
-                    disabled={modelsLoading}
-                    className="text-tertiary hover:text-primary disabled:opacity-50"
-                    title={t('settings.modelSelection.refreshModels')}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
+          {/* My Models (pinned) — works for both built-in and custom providers */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-primary">
+                {t('settings.pinnedModels.title')}
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-medium text-tertiary">
+                  {t('settings.pinnedModels.count', { count: pinnedModels.length })}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRefreshModels}
+                  disabled={modelsLoading}
+                  className="text-tertiary hover:text-primary disabled:opacity-50"
+                  title={t('settings.modelSelection.refreshModels')}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
+                </button>
               </div>
+            </div>
 
-              {/* Model tags */}
-              <div className="flex flex-wrap gap-1.5">
-                {allModels.map((model) => (
+            {/* Pinned model tags */}
+            {pinnedModels.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {pinnedModels.map((model) => (
                   <span
                     key={model.id}
-                    className="inline-flex items-center gap-1 rounded-full border border-[var(--brand-border,rgba(13,148,136,0.12))] bg-[var(--brand-bg,rgba(13,148,136,0.05))] px-2 py-[3px] text-[11px] text-[var(--brand-light,#14b8a6)]/80"
-                    title={model.capabilities?.join(', ')}
+                    className="group inline-flex items-center gap-1 rounded-full border border-[var(--brand-border,rgba(13,148,136,0.12))] bg-[var(--brand-bg,rgba(13,148,136,0.05))] px-2 py-[3px] text-[11px] text-[var(--brand-light,#14b8a6)]/80 transition-colors cursor-default"
                   >
                     {model.name}
                     <span className="text-[9px] text-tertiary">
@@ -516,133 +538,203 @@ function ProviderCard({
                           ? `${(model.contextWindow / 1000).toFixed(0)}K`
                           : ''}
                     </span>
+                    <button
+                      type="button"
+                      className="invisible text-tertiary hover:text-[#ef4444] group-hover:visible"
+                      onClick={() => unpinModel(providerType, model.id)}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
                   </span>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-[11px] text-tertiary/60">
+                {t('settings.pinnedModels.empty')}
+              </p>
+            )}
 
-          {/* Custom Provider Model Tags */}
-          {isCustom && customProvider && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[12px] font-medium text-primary">
-                  {t('settings.modelManagement.modelList')}
-                </label>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-[10px] font-medium ${
-                      modelsSource === 'dynamic'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-tertiary'
-                    }`}
-                  >
-                    {customProvider.models.length} {modelsSource === 'dynamic' ? '(API)' : t('settings.providerManager.defaultModels')}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={handleRefreshModels}
-                    disabled={modelsLoading}
-                    className="text-tertiary hover:text-primary disabled:opacity-50"
-                    title={t('settings.modelSelection.refreshModels')}
-                  >
-                    <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {customProvider.models.map((model) => (
-                  <span
-                    key={model}
-                    className="group inline-flex items-center gap-1 rounded-full border border-[var(--brand-border,rgba(13,148,136,0.12))] bg-[var(--brand-bg,rgba(13,148,136,0.05))] px-2 py-[3px] text-[11px] text-[var(--brand-light,#14b8a6)]/80 transition-colors cursor-default"
-                  >
-                    {model}
-                    {customProvider.models.length > 1 && (
-                      <button
-                        type="button"
-                        className="invisible text-tertiary hover:text-[#ef4444] group-hover:visible"
-                        onClick={() => removeCustomProviderModel(customProvider.id, model)}
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </span>
-                ))}
+            {/* Add model button + manual input */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {hasKey && (
                 <button
                   type="button"
                   className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border,#2a2a2a)] px-2 py-[3px] text-[11px] text-tertiary transition-colors hover:border-[var(--brand-border,rgba(13,148,136,0.25))] hover:bg-[var(--brand-bg,rgba(13,148,136,0.06))] hover:text-[var(--brand-light,#14b8a6)]"
                   onClick={() => {
-                    setAddingModel(!addingModel)
-                    setNewModelDraft('')
+                    setShowAddModelDialog(true)
+                    setAddModelSearch('')
                   }}
                 >
                   <Plus className="h-3 w-3" />
-                  {t('settings.modelManagement.addModelShort')}
+                  {t('settings.pinnedModels.addFromApi')}
+                </button>
+              )}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border,#2a2a2a)] px-2 py-[3px] text-[11px] text-tertiary transition-colors hover:border-[var(--brand-border,rgba(13,148,136,0.25))] hover:bg-[var(--brand-bg,rgba(13,148,136,0.06))] hover:text-[var(--brand-light,#14b8a6)]"
+                onClick={() => {
+                  setAddingModel(!addingModel)
+                  setNewModelDraft('')
+                }}
+              >
+                <Plus className="h-3 w-3" />
+                {t('settings.pinnedModels.addManual')}
+              </button>
+            </div>
+
+            {/* Manual model input */}
+            {addingModel && (
+              <div className="flex gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <BrandInput
+                  value={newModelDraft}
+                  onChange={(e) => setNewModelDraft(e.target.value)}
+                  placeholder={t('settings.modelManagement.newModelName')}
+                  className="h-8 flex-1 text-[12px]"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newModelDraft.trim()) {
+                      pinModel(providerType, newModelDraft.trim())
+                      if (isCustom && customProvider) {
+                        addCustomProviderModel(customProvider.id, newModelDraft.trim())
+                      }
+                      setNewModelDraft('')
+                      setAddingModel(false)
+                    }
+                    if (e.key === 'Escape') setAddingModel(false)
+                  }}
+                />
+                <BrandButton variant="outline" className="h-8 px-2 text-[11px]" onClick={() => setAddingModel(false)}>
+                  {t('settings.modelManagement.cancel')}
+                </BrandButton>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-md px-2.5 h-8 text-[11px] font-medium text-white"
+                  style={{ background: 'var(--brand, #0d9488)' }}
+                  onClick={() => {
+                    const trimmed = newModelDraft.trim()
+                    if (!trimmed) return
+                    pinModel(providerType, trimmed)
+                    if (isCustom && customProvider) {
+                      addCustomProviderModel(customProvider.id, trimmed)
+                    }
+                    setNewModelDraft('')
+                    setAddingModel(false)
+                  }}
+                >
+                  {t('settings.modelManagement.addModel')}
                 </button>
               </div>
+            )}
+          </div>
 
-              {addingModel && (
-                <div className="flex gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <BrandInput
-                    value={newModelDraft}
-                    onChange={(e) => setNewModelDraft(e.target.value)}
-                    placeholder={t('settings.modelManagement.newModelName')}
-                    className="h-8 flex-1 text-[12px]"
+          {/* Add Model from API Dialog */}
+          <BrandDialog open={showAddModelDialog} onOpenChange={setShowAddModelDialog}>
+            <BrandDialogContent className="!max-w-[420px] !w-[420px] !max-h-[70vh] !flex !flex-col !p-0">
+              <BrandDialogHeader className="!h-auto !py-3 !px-4">
+                <BrandDialogTitle className="!text-[13px]">
+                  {t('settings.pinnedModels.dialogTitle')}
+                </BrandDialogTitle>
+                <BrandDialogClose className="text-tertiary hover:text-primary">
+                  <X className="h-4 w-4" />
+                </BrandDialogClose>
+              </BrandDialogHeader>
+
+              {/* Search */}
+              <div className="px-4 py-2 border-b border-border">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-tertiary" />
+                  <input
+                    type="text"
+                    value={addModelSearch}
+                    onChange={(e) => setAddModelSearch(e.target.value)}
+                    placeholder={t('settings.pinnedModels.searchPlaceholder')}
+                    className="flex w-full rounded-md border border-border bg-transparent py-1.5 pl-8 pr-3 text-[12px] focus-visible:outline-none focus-visible:border-[var(--brand-border,rgba(13,148,136,0.25))]"
                     autoFocus
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && newModelDraft.trim()) handleAddModel()
-                      if (e.key === 'Escape') setAddingModel(false)
-                    }}
                   />
-                  <BrandButton variant="outline" className="h-8 px-2 text-[11px]" onClick={() => setAddingModel(false)}>
-                    {t('settings.modelManagement.cancel')}
-                  </BrandButton>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 rounded-md px-2.5 h-8 text-[11px] font-medium text-white"
-                    style={{ background: 'var(--brand, #0d9488)' }}
-                    onClick={handleAddModel}
-                  >
-                    {t('settings.modelManagement.addModel')}
-                  </button>
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+
+              {/* Model list */}
+              <div className="flex-1 overflow-auto px-2 py-2">
+                {filteredModels.length === 0 ? (
+                  <div className="px-3 py-6 text-center text-[12px] text-tertiary">
+                    {allModels.length === 0
+                      ? t('settings.pinnedModels.noApiModels')
+                      : t('settings.pinnedModels.noMatch')}
+                  </div>
+                ) : (
+                  <div className="space-y-0.5">
+                    {filteredModels.map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left hover:bg-muted transition-colors"
+                        onClick={() => {
+                          pinModel(providerType, model.id)
+                          setAddModelSearch('')
+                        }}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[12px] text-primary">
+                            {model.name}
+                          </div>
+                          <div className="truncate text-[10px] text-tertiary font-mono">
+                            {model.id}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          {model.contextWindow > 0 && (
+                            <span className="text-[9px] text-tertiary">
+                              {model.contextWindow >= 1000000
+                                ? `${(model.contextWindow / 1000000).toFixed(0)}M`
+                                : model.contextWindow >= 1000
+                                  ? `${(model.contextWindow / 1000).toFixed(0)}K`
+                                  : ''}
+                            </span>
+                          )}
+                          <Plus className="h-3.5 w-3.5 text-tertiary" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer hint */}
+              <BrandDialogFooter className="!min-h-0 !py-2 !px-4">
+                <p className="text-[10px] text-tertiary">
+                  {t('settings.pinnedModels.dialogHint', { count: filteredModels.length })}
+                </p>
+              </BrandDialogFooter>
+            </BrandDialogContent>
+          </BrandDialog>
 
           {/* Delete Confirm Dialog */}
-          {deletingProviderId && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingProviderId(null)}>
-              <div
-                className="w-[340px] max-w-[90vw] rounded-lg border border p-5"
-                style={{ background: 'var(--surface2, #1c1c1c)', borderColor: 'var(--border, #2a2a2a)' }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <h3 className="text-[14px] font-semibold text-primary">{t('settings.modelManagement.confirmDeleteTitle')}</h3>
+          <BrandDialog open={!!deletingProviderId} onOpenChange={(open) => { if (!open) setDeletingProviderId(null) }}>
+            <BrandDialogContent className="!max-w-[340px] !w-[340px] !p-0">
+              <BrandDialogBody className="!pt-5">
+                <BrandDialogTitle className="!text-[14px]">
+                  {t('settings.modelManagement.confirmDeleteTitle')}
+                </BrandDialogTitle>
                 <p className="mt-2 text-[13px] leading-relaxed text-secondary">
                   {t('settings.modelManagement.confirmDeleteMessage', {
                     name: customProviders.find((p) => p.id === deletingProviderId)?.name || '',
                   })}
                 </p>
-                <div className="mt-4 flex justify-end gap-2">
-                  <BrandButton variant="outline" className="h-8 text-[12px]" onClick={() => setDeletingProviderId(null)}>
-                    {t('settings.modelManagement.cancel')}
-                  </BrandButton>
-                  <button
-                    type="button"
-                    className="inline-flex h-8 items-center justify-center rounded-md px-3.5 text-[12px] font-medium text-white"
-                    style={{ background: '#ef4444' }}
-                    onClick={() => {
-                      removeCustomProvider(deletingProviderId)
-                      setDeletingProviderId(null)
-                    }}
-                  >
-                    {t('settings.modelManagement.confirmDelete')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+              </BrandDialogBody>
+              <BrandDialogFooter>
+                <BrandButton variant="outline" className="h-8 text-[12px]" onClick={() => setDeletingProviderId(null)}>
+                  {t('settings.modelManagement.cancel')}
+                </BrandButton>
+                <BrandButton variant="danger" onClick={() => {
+                  removeCustomProvider(deletingProviderId!)
+                  setDeletingProviderId(null)
+                }}>
+                  {t('settings.modelManagement.confirmDelete')}
+                </BrandButton>
+              </BrandDialogFooter>
+            </BrandDialogContent>
+          </BrandDialog>
         </div>
       )}
     </div>

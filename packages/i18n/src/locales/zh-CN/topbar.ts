@@ -11,6 +11,7 @@ export const topbar = {
     modelSwitcher: {
       title: "快速切换模型",
       unavailable: "模型不可用",
+      noPinnedModels: "暂无常用模型，请在设置中添加",
     },
     tooltips: {
       backToProjects: "返回项目列表",

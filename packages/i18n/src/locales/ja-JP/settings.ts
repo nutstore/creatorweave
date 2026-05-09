@@ -371,4 +371,18 @@ export const settings = {
       title: "プロバイダ管理",
       defaultModels: "(デフォルト)",
     },
+
+    // よく使うモデル（ユーザー選択）
+    pinnedModels: {
+      title: "マイモデル",
+      count: "{count} 選択済み",
+      empty: "まだモデルが追加されていません。下のボタンから追加してください",
+      addFromApi: "モデルライブラリから追加",
+      addManual: "手動入力",
+      dialogTitle: "モデルを追加",
+      searchPlaceholder: "モデルを検索...",
+      noApiModels: "利用可能なモデルがありません。更新ボタンでモデルリストを取得してください",
+      noMatch: "一致するモデルがありません",
+      dialogHint: "{count} 個のモデルが選択可能です。クリックで追加",
+    },
 } as const
