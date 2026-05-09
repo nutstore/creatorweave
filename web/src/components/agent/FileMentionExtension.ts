@@ -80,26 +80,9 @@ export const FileMention = Node.create<FileMentionOptions>({
       mergeAttributes(HTMLAttributes, {
         'data-file-mention': '',
         'data-path': node.attrs.path ?? '',
-        class:
-          'inline-flex items-center rounded px-1.5 py-0.5 bg-sky-100 text-sky-800 text-sm font-medium dark:bg-sky-900/60 dark:text-sky-200',
+        class: 'text-sky-600 dark:text-sky-400',
       }),
-      ['span', { class: 'mr-1 opacity-60' }, [
-        'svg',
-        {
-          xmlns: 'http://www.w3.org/2000/svg',
-          width: '14',
-          height: '14',
-          viewBox: '0 0 24 24',
-          fill: 'none',
-          stroke: 'currentColor',
-          'stroke-width': '2',
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-        },
-        ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
-        ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }],
-      ]],
-      ['span', {}, node.attrs.name || node.attrs.path],
+      `#${node.attrs.path || node.attrs.name}`,
     ]
   },
 

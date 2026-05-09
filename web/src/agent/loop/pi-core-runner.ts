@@ -16,6 +16,60 @@ import { applyPiAssistantUpdate } from './pi-events'
 import { processPiLoopEvents } from './process-loop-events'
 import type { AgentCallbacks, AgentLoopConfig, CompressionSummaryMode } from './types'
 
+function normalizeResponsesInputPayload(payload: Record<string, unknown>): void {
+  if (!Array.isArray(payload.input)) return
+
+  const normalizeContentItem = (item: unknown): unknown => {
+    if (!item || typeof item !== 'object') return item
+    const src = item as Record<string, unknown>
+
+    if (src.type === 'input_text') {
+      return { type: 'input_text', text: typeof src.text === 'string' ? src.text : '' }
+    }
+    if (src.type === 'output_text') {
+      return { type: 'output_text', text: typeof src.text === 'string' ? src.text : '' }
+    }
+    if (src.type === 'function_call') {
+      return {
+        type: 'function_call',
+        call_id: src.call_id,
+        name: src.name,
+        arguments: src.arguments,
+      }
+    }
+    return item
+  }
+
+  payload.input = payload.input.map((entry) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const msg = entry as Record<string, unknown>
+
+    if (msg.type === 'message' && (msg.role === 'user' || msg.role === 'assistant')) {
+      const normalizedContent = Array.isArray(msg.content)
+        ? msg.content.map(normalizeContentItem)
+        : msg.role === 'user'
+          ? [{ type: 'input_text', text: '' }]
+          : [{ type: 'output_text', text: '' }]
+      return {
+        role: msg.role,
+        content: normalizedContent,
+      }
+    }
+
+    if (msg.role === 'user' || msg.role === 'assistant') {
+      const normalizedContent = Array.isArray(msg.content)
+        ? msg.content.map(normalizeContentItem)
+        : msg.content
+      return {
+        ...msg,
+        content: normalizedContent,
+      }
+    }
+
+    return entry
+  })
+}
+
 export interface ExecutePiCoreLoopInput {
   signal?: AbortSignal
   initialMessages: Message[]
@@ -106,7 +160,34 @@ export async function executePiCoreLoop(
     tools: agentTools,
   }
 
-  const streamFn = piAiStreamSimple as unknown as StreamFn
+  const streamFn = ((
+    streamModel: unknown,
+    streamContext: unknown,
+    streamOptions?: Record<string, unknown>
+  ) => {
+    const prevOnPayload =
+      streamOptions && typeof streamOptions.onPayload === 'function'
+        ? (streamOptions.onPayload as (payload: Record<string, unknown>) => void)
+        : undefined
+
+    const mergedOptions: Record<string, unknown> = {
+      ...(streamOptions || {}),
+      onPayload: (payload: Record<string, unknown>) => {
+        normalizeResponsesInputPayload(payload)
+        // Responses API may omit tool_choice on some paths; default to "auto" when tools exist.
+        if (Array.isArray(payload.tools) && payload.tools.length > 0 && payload.tool_choice == null) {
+          payload.tool_choice = 'auto'
+        }
+        prevOnPayload?.(payload)
+      },
+    }
+
+    return piAiStreamSimple(
+      streamModel as Parameters<typeof piAiStreamSimple>[0],
+      streamContext as Parameters<typeof piAiStreamSimple>[1],
+      mergedOptions as Parameters<typeof piAiStreamSimple>[2]
+    )
+  }) as unknown as StreamFn
 
   const settingsState = useSettingsStore.getState()
   const reasoning = settingsState.enableThinking ? settingsState.thinkingLevel : undefined

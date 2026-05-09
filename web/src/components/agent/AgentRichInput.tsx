@@ -188,6 +188,12 @@ function getPlainText(editor: Editor): string {
         lineBuf += ' '
       }
       lineBuf += `@${id}`
+    } else if (node.type.name === 'fileMention') {
+      const path = node.attrs.path ?? ''
+      if (path && lineBuf.length > 0 && !/[\s\n]$/.test(lineBuf)) {
+        lineBuf += ' '
+      }
+      lineBuf += `#${path}`
     } else if (node.type.name === 'hardBreak') {
       lineBuf += '\n'
     } else if (node.type.isBlock && lineBuf) {

@@ -182,29 +182,44 @@ export const editDefinition: ToolDefinition = {
   type: 'function',
   function: {
     name: 'edit',
-    description:
-      'Apply text replacement to one file. ' +
-      'Use path + old_text + new_text for exact replacement. ' +
-      'Optional replace_all replaces every occurrence. ' +
-      'Supports vfs://workspace/... and vfs://agents/{id}/....',
+    description: [
+      'Apply text replacement to one file.',
+      '',
+      'WHEN TO USE: When modifying part of an existing file — changing a function, fixing a bug, updating a value, renaming a variable, adjusting a config, etc.',
+      'DO NOT use write() for targeted changes to existing files. Always prefer edit() for modifications.',
+      '',
+      'PREREQUISITE: You MUST call read() on the file first. The edit will fail if the file has not been read.',
+      '',
+      'WORKFLOW:',
+      '1. Call read(path) to load file contents',
+      '2. Identify the exact text to change from the read output',
+      '3. Call edit(path, old_text=<exact snippet from file>, new_text=<replacement>)',
+      '',
+      'TIPS:',
+      '- Copy old_text EXACTLY from the read() output — whitespace and line breaks must match',
+      '- old_text must be unique in the file unless replace_all=true',
+      '- For multi-line changes, include enough surrounding context to make old_text unique',
+      '- new_text can be an empty string to delete text',
+      '- Supports vfs://workspace/... and vfs://agents/{id}/... paths',
+    ].join('\n'),
     parameters: {
       type: 'object',
       properties: {
         path: {
           type: 'string',
-          description: 'File path to edit',
+          description: 'File path to edit (e.g., "src/config.ts", "README.md", or "vfs://agents/default/SOUL.md")',
         },
         old_text: {
           type: 'string',
-          description: 'Exact text to find',
+          description: 'Exact text to find in the file. Must match exactly including whitespace and indentation. Copy directly from read() output.',
         },
         new_text: {
           type: 'string',
-          description: 'Replacement text',
+          description: 'Replacement text. Can be empty string to delete the matched text.',
         },
         replace_all: {
           type: 'boolean',
-          description: 'Replace all occurrences. Default: false',
+          description: 'Set true to replace ALL occurrences of old_text in the file. Default: false (only first occurrence).',
           default: false,
         },
       },

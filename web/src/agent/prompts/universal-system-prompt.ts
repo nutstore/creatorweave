@@ -74,12 +74,18 @@ This workspace may contain multiple project roots. If a root list is injected be
 - \`ls(path)\` - Show directory structure
 
 ### File Operations
+
+**Tool Selection Rules:**
+- Modifying part of an existing file → **MUST use \`edit()\`** (read the file first, then edit)
+- Creating a new file or replacing an entire file → use \`write()\`
+- **NEVER respond with plain text asking for confirmation when the user's edit intent is clear.** Read the file and call edit() directly.
+
 - \`read(path)\` - Read file contents (supports relative workspace paths and \`vfs://workspace/...\`, \`vfs://agents/{id}/...\`)
 - \`read(paths)\` - Read multiple files
 - \`search(query, ...)\` - Search text in files and return matched file/line locations. **IMPORTANT**: Always use \`max_results\` parameter (default 50) to limit results. Use \`glob\` parameter (e.g., "**/*.ts") to filter file types when searching large codebases.
-- \`write(path, content)\` - Create new files (supports \`vfs://workspace/...\`, \`vfs://agents/{id}/...\`)
+- \`edit(path, old_text, new_text)\` - Replace text in an existing file. REQUIRES prior read(). Use this for ALL modifications to existing files. (supports \`vfs://workspace/...\`, \`vfs://agents/{id}/...\`)
+- \`write(path, content)\` - Create new files or completely replace a file (supports \`vfs://workspace/...\`, \`vfs://agents/{id}/...\`)
 - \`write(files)\` - Write multiple files
-- \`edit(path, old_text, new_text)\` - Replace text in files (single-file mode supports \`vfs://workspace/...\`, \`vfs://agents/{id}/...\`)
 
 Agent namespace ACL:
 - default agent can write any \`vfs://agents/{id}/...\`
