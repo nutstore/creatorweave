@@ -175,8 +175,38 @@ function ProviderCard({
     setHasKey(true)
     setSaved(true)
     invalidateApiKeyCache(providerKey)
+
+    // Auto-refresh model list after saving API key so users don't need a manual refresh click.
+    const url = isCustom
+      ? customProvider?.baseUrl || ''
+      : config?.baseURL || ''
+    await refreshModels(trimmedKey, url)
+
+    // For custom providers, sync fetched dynamic models into persisted customProvider.models.
+    if (isCustom && customProvider) {
+      const cached = getCachedModels(providerType, providerKey)
+      if (cached && cached.length > 0) {
+        for (const model of cached) {
+          if (!customProvider.models.includes(model.id)) {
+            addCustomProviderModel(customProvider.id, model.id)
+          }
+        }
+      }
+    }
+
     setTimeout(() => setSaved(false), 2000)
-  }, [apiKey, providerKey, invalidateApiKeyCache, t])
+  }, [
+    apiKey,
+    providerKey,
+    invalidateApiKeyCache,
+    isCustom,
+    customProvider,
+    config,
+    refreshModels,
+    providerType,
+    addCustomProviderModel,
+    t,
+  ])
 
   const handleRefreshModels = useCallback(async () => {
     const key = await loadApiKey(providerKey)
