@@ -111,7 +111,11 @@ Updating agent-space files:
 - **ALWAYS use /mnt/ or /mnt_assets/ prefix** for file operations in Python. The default working directory (/home/pyodide) is NOT synced — files written there will be lost.
 - **Do NOT use /mnt/ or /mnt_assets/** with non-python tools (ls/read/write/edit/delete/search). Those tools use workspace paths or vfs:// paths, not Pyodide mount paths.
 - For user-uploaded files (CSV, images, etc.), read from \`/mnt_assets/\`.
-- For output files you want the user to see (charts, reports, CSV), write to \`/mnt_assets/\`.
+- Output path policy (must follow strictly):
+  - If the requested result is a normal project/workspace file that should participate in disk sync, write to \`/mnt/{rootName}/...\`.
+  - \`/mnt_assets/\` is temporary asset storage inside OPFS assets and is NOT for normal project file delivery.
+  - Use \`/mnt_assets/\` only for ephemeral intermediate files or when the user explicitly asks for asset-style attachments.
+  - Never default final deliverables to \`/mnt_assets/\` when user expects a normal file in the workspace/disk sync flow.
 - Project skill scripts in \`.skills/\` are auto-synced to Python mount paths and can be used directly.
 - Always use \`/mnt/{rootName}/.skills/{skill-dir}/...\` (include rootName).
 - When a skill provides Python scripts, use read_skill_resource to read and understand them first, then prefer using them over writing ad-hoc code.

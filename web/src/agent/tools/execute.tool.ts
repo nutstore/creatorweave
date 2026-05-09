@@ -34,7 +34,11 @@ Important:
 - The default working directory is /home/pyodide, which is NOT synced. Files written there will be lost.
 - /mnt/ reads from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
 - For user-uploaded files (CSV, images, etc.), read from /mnt_assets/.
-- For output files you want the user to see (charts, reports), write to /mnt_assets/.
+- Output path policy (must follow strictly):
+  - If the final result is a normal workspace/project file, write it to /mnt/{rootName}/...
+  - /mnt_assets/ is temporary asset storage in OPFS assets and is NOT the default location for normal project deliverables.
+  - Use /mnt_assets/ only for temporary intermediate files or when the user explicitly asks for asset-style attachments.
+  - Do not default final deliverables to /mnt_assets/ when the expected outcome is a regular workspace file.
 - Project skill scripts in .skills/ directory are auto-synced and can be imported directly.
   Example (root "lxy"): \`exec(open('/mnt/lxy/.skills/word-processor/scripts/convert.py').read())\`
   For imports, add the matching scripts directory to \`sys.path\` first.
