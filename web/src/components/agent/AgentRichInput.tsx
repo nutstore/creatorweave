@@ -141,7 +141,7 @@ const SuggestionDropdown = forwardRef(
               <button
                 key={getItemKey(item)}
                 type="button"
-                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   selected
                     ? selectedColor
                     : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
@@ -286,6 +286,8 @@ export function AgentRichInput({
   const fileSuggestionCommandRef = useRef<((item: FileMentionItem) => void) | null>(null)
   useEffect(() => { fileSuggestionItemsRef.current = fileSuggestionItems }, [fileSuggestionItems])
   useEffect(() => { fileSuggestionCommandRef.current = fileSuggestionCommand }, [fileSuggestionCommand])
+  const fileSuggestionRangeRef = useRef<{ from: number; to: number } | null>(null)
+  const fileSuggestionEditorRef = useRef<Editor | null>(null)
 
   const disabledRef = useRef(disabled)
   const onSubmitRef = useRef(onSubmit)
@@ -395,20 +397,25 @@ export function AgentRichInput({
                 // Track selection index locally so Enter works even when
                 // the React dropdown hasn't rendered yet (async items).
                 let activeIdx = 0
-                // We save the suggestion range + editor so we can delete the
-                // `#query` trigger text when a file is selected, without
-                // inserting an inline fileMention node.
-                let savedRange: { from: number; to: number } | null = null
-                let savedEditor: Editor | null = null
-
-                /** Select a file/dir: replace the `#query` trigger with inline `#path` text. */
+                /** Select a file/dir: replace the `#query` trigger with a fileMention node. */
                 const selectFile = (item: FileMentionItem) => {
-                  if (savedRange && savedEditor) {
-                    // Insert inline `#path` text in place of the `#query` trigger
-                    const suffix = item.isDirectory ? '/' : ''
-                    savedEditor.chain().focus()
-                      .deleteRange(savedRange)
-                      .insertContent(`#${item.path}${suffix} `)
+                  const range = fileSuggestionRangeRef.current
+                  const editorInstance = fileSuggestionEditorRef.current
+                  if (range && editorInstance) {
+                    editorInstance
+                      .chain()
+                      .focus()
+                      .insertContentAt(range, [
+                        {
+                          type: 'fileMention',
+                          attrs: {
+                            path: item.path,
+                            name: item.name,
+                            extension: item.extension ?? '',
+                          },
+                        },
+                        { type: 'text', text: ' ' },
+                      ])
                       .run()
                   }
                   // Clear suggestion state
@@ -416,6 +423,8 @@ export function AgentRichInput({
                   setFileSuggestionCommand(null)
                   fileSuggestionItemsRef.current = []
                   fileSuggestionCommandRef.current = null
+                  fileSuggestionRangeRef.current = null
+                  fileSuggestionEditorRef.current = null
                 }
 
                 return {
@@ -429,8 +438,8 @@ export function AgentRichInput({
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
                     fileSuggestionCommandRef.current = selectFile
                     activeIdx = 0
-                    savedRange = props.range
-                    savedEditor = props.editor
+                    fileSuggestionRangeRef.current = props.range
+                    fileSuggestionEditorRef.current = props.editor
                   },
                   onUpdate: async (props) => {
                     const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
@@ -439,8 +448,8 @@ export function AgentRichInput({
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
                     fileSuggestionCommandRef.current = selectFile
                     activeIdx = 0
-                    savedRange = props.range
-                    savedEditor = props.editor
+                    fileSuggestionRangeRef.current = props.range
+                    fileSuggestionEditorRef.current = props.editor
                   },
                   onKeyDown: (props) => {
                     if (props.event.key === 'Escape') {
@@ -921,23 +930,25 @@ export function AgentRichInput({
           items={fileSuggestionItems}
           getItemKey={(f) => f.path}
           onSelect={(f) => fileSuggestionCommand?.(f)}
-          width="w-80"
+          width="w-[26rem]"
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file, _selected) => (
             <>
-              {file.isDirectory ? (
-                <FolderIcon className="h-3.5 w-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
-              ) : (
-                <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
-              )}
+              <span className="mt-0.5 shrink-0 text-neutral-400 dark:text-neutral-500">
+                {file.isDirectory ? (
+                  <FolderIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <FileIcon className="h-3.5 w-3.5" />
+                )}
+              </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{file.name}</div>
-                <div className="truncate text-xs text-neutral-400 dark:text-neutral-500">
+                <div className="truncate font-medium leading-5">{file.name}</div>
+                <div className="truncate text-[11px] leading-4 text-neutral-400 dark:text-neutral-500">
                   {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}

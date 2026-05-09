@@ -85,8 +85,46 @@ export function ConversationView({
     async (query: string): Promise<FileMentionItem[]> => {
       // Guard: skip search while IME is composing (pinyin letters should not trigger search)
       if (isComposingRef.current) return []
+      const normalizedQuery = query.trim().toLowerCase()
       // Monotonic request ID — lets us discard stale results
       const reqId = ++searchReqIdRef.current
+
+      const scoreItem = (path: string, name: string, isDirectory: boolean, q: string) => {
+        const lowerPath = path.toLowerCase()
+        const lowerName = name.toLowerCase()
+        const firstSegment = lowerPath.split(/[\\/]/)[0] ?? ''
+        const qLower = q.toLowerCase()
+        const depth = lowerPath.split(/[\\/]/).length
+        if (!qLower) {
+          return [isDirectory ? 0 : 1, depth, lowerPath.length]
+        }
+        if (lowerName === qLower) return [0, depth, lowerPath.length]
+        if (firstSegment === qLower) return [0.2, depth, lowerPath.length]
+        if (lowerName.startsWith(qLower)) return [1, depth, lowerPath.length]
+        if (firstSegment.startsWith(qLower)) return [1.2, depth, lowerPath.length]
+        if (lowerPath.endsWith(`/${qLower}`) || lowerPath.endsWith(qLower)) return [2, depth, lowerPath.length]
+        if (lowerName.includes(qLower)) return [3, depth, lowerPath.length]
+        if (lowerPath.includes(qLower)) return [4, depth, lowerPath.length]
+        return [100, depth, lowerPath.length]
+      }
+
+      const compareItems = (a: FileMentionItem, b: FileMentionItem, q: string) => {
+        const sa = scoreItem(a.path, a.name, !!a.isDirectory, q)
+        const sb = scoreItem(b.path, b.name, !!b.isDirectory, q)
+        if (sa[0] !== sb[0]) return sa[0] - sb[0]
+        if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+        if (sa[1] !== sb[1]) return sa[1] - sb[1]
+        if (sa[2] !== sb[2]) return sa[2] - sb[2]
+        return a.path.localeCompare(b.path)
+      }
+
+      const toItems = (paths: string[]): FileMentionItem[] =>
+        paths.map((p) => {
+          const name = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p
+          const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : undefined
+          const isDirectory = !name.includes('.')
+          return { path: p, name, extension: ext, isDirectory }
+        })
 
       try {
         // --- Remote/Host mode: use fileTree from remote store ---
@@ -95,24 +133,26 @@ export function ConversationView({
         const fileTree = remoteStore.fileTree
 
         if (fileTree) {
-          // Empty query → show project root entries as a quick pick
-          if (!query.trim()) {
-            const rootEntries = (fileTree.children ?? [])
-              .slice(0, 10)
+          if (!normalizedQuery) {
+            const rootEntries = (fileTree.children ?? []).slice(0, 12)
             if (reqId !== searchReqIdRef.current) return []
-            return rootEntries.map((c: any) => ({
-              path: c.path,
-              name: c.name,
-              extension: c.extension,
-              isDirectory: c.type === 'directory',
-            }))
+            return rootEntries
+              .map((c: any) => ({
+                path: c.path,
+                name: c.name,
+                extension: c.extension,
+                isDirectory: c.type === 'directory',
+              }))
+              .sort((a, b) => compareItems(a, b, normalizedQuery))
           }
 
           const { fileDiscoveryService } = await import('@/services/file-discovery.service')
-          const results = await fileDiscoveryService.search(query, [fileTree], { limit: 10 })
+          const results = await fileDiscoveryService.search(query, [fileTree], { limit: 30 })
           if (reqId !== searchReqIdRef.current) return []
           return results
             .map((r) => ({ path: r.path, name: r.name, extension: r.extension, isDirectory: r.type === 'directory' }))
+            .sort((a, b) => compareItems(a, b, normalizedQuery))
+            .slice(0, 10)
         }
 
         // --- Local mode: use shared file path cache from folder-access.store ---
@@ -126,35 +166,39 @@ export function ConversationView({
         const opfsCached = useOPFSStore.getState().cachedPaths
         if (opfsCached.length > 0) {
           const existing = new Set(allPaths)
+          const mergedPaths = [...allPaths]
           for (const p of opfsCached) {
-            if (!existing.has(p)) allPaths.push(p)
+            if (!existing.has(p)) mergedPaths.push(p)
           }
+          allPaths = mergedPaths
         }
 
         if (reqId !== searchReqIdRef.current) return []
 
-        // Build FileMentionItem list from paths
-        const toItems = (paths: string[]): FileMentionItem[] =>
-          paths.map((p) => {
-            const name = p.includes('/') ? p.slice(p.lastIndexOf('/') + 1) : p
-            const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1) : undefined
-            // A path with no extension or ending with a segment that has no dot is likely a directory
-            const isDirectory = !name.includes('.')
-            return { path: p, name, extension: ext, isDirectory }
-          })
-
-        // Empty query → show root-level entries (paths without '/' separator)
-        if (!query.trim()) {
-          return toItems(allPaths.filter((p) => !p.includes('/')).slice(0, 10))
+        if (!normalizedQuery) {
+          return toItems(allPaths)
+            .sort((a, b) => compareItems(a, b, normalizedQuery))
+            .slice(0, 10)
         }
 
-        // Simple fuzzy match
-        const q = query.toLowerCase()
-        return toItems(
-          allPaths
-            .filter((p) => p.toLowerCase().includes(q))
-            .slice(0, 10),
-        )
+        const rootMatches = toItems(allPaths)
+          .filter((item) => item.path.toLowerCase().split(/[\\/]/)[0] === normalizedQuery)
+          .sort((a, b) => compareItems(a, b, normalizedQuery))
+          .slice(0, 3)
+
+        if (rootMatches.length > 0) {
+          const rest = toItems(allPaths)
+            .filter((item) => !rootMatches.some((m) => m.path === item.path))
+            .filter((item) => item.path.toLowerCase().includes(normalizedQuery) || item.name.toLowerCase().includes(normalizedQuery))
+            .sort((a, b) => compareItems(a, b, normalizedQuery))
+            .slice(0, 7)
+          return [...rootMatches, ...rest].slice(0, 10)
+        }
+
+        return toItems(allPaths)
+          .filter((item) => item.path.toLowerCase().includes(normalizedQuery) || item.name.toLowerCase().includes(normalizedQuery))
+          .sort((a, b) => compareItems(a, b, normalizedQuery))
+          .slice(0, 10)
       } catch (err) {
         console.warn('[handleSearchFiles] error:', err)
         return []
