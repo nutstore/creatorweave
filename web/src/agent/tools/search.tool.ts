@@ -7,7 +7,7 @@ import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
 import { resolveVfsTarget } from './vfs-resolver'
-import { rejectPythonMountPath } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool } from './path-guards'
 
 function looksRegexLikeQuery(query: string): boolean {
   // Guard against common LLM misuse where regex operators are passed while regex=false.
@@ -255,9 +255,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
   }
 
   // Loop guard: check consecutive search counter before searching
-  const searchPath = typeof args.path === 'string' ? args.path : ''
-  const blockedPath = rejectPythonMountPath('search', searchPath)
-  if (blockedPath) return blockedPath
+  const rawSearchPath = typeof args.path === 'string' ? args.path : ''
+  const rewrittenSearchPath = rewritePythonMountPathForNonPythonTool(rawSearchPath)
+  const searchPath = rewrittenSearchPath?.rewritten ? rewrittenSearchPath.rewrittenPath : rawSearchPath
   const searchGlob = typeof args.glob === 'string' ? args.glob : undefined
   const loopCheck = checkSearchLoop(context, query, searchPath, searchGlob, 0, userMaxResults)
   if (loopCheck.isBlocked) {

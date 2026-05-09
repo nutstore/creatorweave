@@ -22,7 +22,7 @@ import {
   resolveDirectoryHandle,
   shouldSkipDirectory,
 } from './file-discovery.helpers'
-import { rejectPythonMountPath } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool } from './path-guards'
 
 const DIRECTORY_TOOL_PARAMETERS: ToolDefinition['function']['parameters'] = {
   type: 'object',
@@ -147,15 +147,17 @@ async function getOPFSFilesHandle(workspaceId?: string | null): Promise<FileSyst
 }
 
 export const lsExecutor: ToolExecutor = async (args, context) => {
-  const blockedPath = rejectPythonMountPath('ls', args.path)
-  if (blockedPath) return blockedPath
-  const pattern = typeof args.pattern === 'string' ? args.pattern.trim() : ''
+  const rewrittenPath = rewritePythonMountPathForNonPythonTool(args.path)
+  const effectiveArgs = rewrittenPath?.rewritten
+    ? { ...args, path: rewrittenPath.rewrittenPath }
+    : args
+  const pattern = typeof effectiveArgs.pattern === 'string' ? effectiveArgs.pattern.trim() : ''
 
   // Smart mode detection: glob mode if pattern provided, list mode otherwise
   if (pattern) {
-    return executeGlobMode(args, context, pattern)
+    return executeGlobMode(effectiveArgs, context, pattern)
   }
-  return executeListMode(args, context)
+  return executeListMode(effectiveArgs, context)
 }
 
 async function resolveDirectoryHandleWithConversationFallback(

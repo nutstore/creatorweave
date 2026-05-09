@@ -10,6 +10,43 @@ function isPythonMountPath(input: string): boolean {
   )
 }
 
+export interface NonPythonPathRewrite {
+  rewrittenPath: string
+  rewritten: boolean
+}
+
+export function rewritePythonMountPathForNonPythonTool(path: unknown): NonPythonPathRewrite | null {
+  if (typeof path !== 'string') return null
+  const normalized = path.trim().replace(/\\/g, '/')
+  if (!isPythonMountPath(normalized)) return null
+
+  // /mnt/{rootName}/... -> {rootName}/...
+  if (normalized.startsWith('/mnt/')) {
+    return {
+      rewrittenPath: normalized.slice('/mnt/'.length),
+      rewritten: true,
+    }
+  }
+
+  // /mnt_assets/... -> vfs://assets/...
+  if (normalized === '/mnt_assets') {
+    return { rewrittenPath: 'vfs://assets/', rewritten: true }
+  }
+  if (normalized.startsWith('/mnt_assets/')) {
+    return {
+      rewrittenPath: `vfs://assets/${normalized.slice('/mnt_assets/'.length)}`,
+      rewritten: true,
+    }
+  }
+
+  // /mnt -> workspace root (empty relative path)
+  if (normalized === '/mnt') {
+    return { rewrittenPath: '', rewritten: true }
+  }
+
+  return null
+}
+
 export function rejectPythonMountPath(toolName: string, path: unknown): string | null {
   if (typeof path !== 'string') return null
   if (!isPythonMountPath(path)) return null

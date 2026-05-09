@@ -10,7 +10,7 @@ import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
-import { rejectPythonMountPath } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool } from './path-guards'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -82,14 +82,14 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   if (requestedTargets.length === 0) {
     return JSON.stringify({ error: 'Either path or paths must be provided' })
   }
-  for (const target of requestedTargets) {
-    const blockedPath = rejectPythonMountPath('delete', target)
-    if (blockedPath) return blockedPath
-  }
+  const rewrittenTargets = requestedTargets.map((target) => {
+    const rewritten = rewritePythonMountPathForNonPythonTool(target)
+    return rewritten?.rewritten ? rewritten.rewrittenPath : target
+  })
 
   let targets: string[]
   try {
-    targets = dedupePaths(requestedTargets)
+    targets = dedupePaths(rewrittenTargets)
   } catch (error) {
     return JSON.stringify({
       error: `Invalid path: ${error instanceof Error ? error.message : String(error)}`,

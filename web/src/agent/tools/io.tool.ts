@@ -18,7 +18,7 @@ import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
-import { rejectPythonMountPath } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool } from './path-guards'
 import {
   checkReadLoop,
   recordReadMtime,
@@ -120,8 +120,8 @@ export const readExecutor: ToolExecutor = async (args, context) => {
   if (!path) {
     return toolErrorJson('read', 'invalid_arguments', 'path is required')
   }
-  const blockedReadPath = rejectPythonMountPath('read', path)
-  if (blockedReadPath) return blockedReadPath
+  const rewrittenReadPath = rewritePythonMountPathForNonPythonTool(path)
+  const effectiveReadPath = rewrittenReadPath?.rewritten ? rewrittenReadPath.rewrittenPath : path
 
   const rangeOptions: ReadRangeOptions = {
     startLine: args.start_line as number | undefined,
@@ -133,7 +133,7 @@ export const readExecutor: ToolExecutor = async (args, context) => {
     return toolErrorJson('read', 'invalid_arguments', validationError)
   }
 
-  return executeSingleRead(path, context, rangeOptions, maxSize, readPolicy)
+  return executeSingleRead(effectiveReadPath, context, rangeOptions, maxSize, readPolicy)
 }
 
 function isOPFSWorkspaceMiss(error: unknown): boolean {
@@ -521,9 +521,9 @@ export const writeExecutor: ToolExecutor = async (args, context) => {
       'Either (path + content) or files must be provided'
     )
   }
-  const blockedWritePath = rejectPythonMountPath('write', path)
-  if (blockedWritePath) return blockedWritePath
-  return executeSingleWrite(path, content, context)
+  const rewrittenWritePath = rewritePythonMountPathForNonPythonTool(path)
+  const effectiveWritePath = rewrittenWritePath?.rewritten ? rewrittenWritePath.rewrittenPath : path
+  return executeSingleWrite(effectiveWritePath, content, context)
 }
 
 async function executeSingleWrite(
@@ -633,10 +633,13 @@ async function executeSingleWrite(
 }
 
 async function executeBatchWrite(files: FileItem[], context: ToolContext): Promise<string> {
-  for (const file of files) {
-    const blockedWritePath = rejectPythonMountPath('write', file.path)
-    if (blockedWritePath) return blockedWritePath
-  }
+  const normalizedFiles = files.map((file) => {
+    const rewritten = rewritePythonMountPathForNonPythonTool(file.path)
+    return {
+      ...file,
+      path: rewritten?.rewritten ? rewritten.rewrittenPath : file.path,
+    }
+  })
   const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
   const results: Array<{
     path: string
@@ -647,7 +650,7 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
   let updated = 0
   let hasWorkspaceWrites = false
 
-  for (const file of files) {
+  for (const file of normalizedFiles) {
     try {
       const target = await resolveVfsTarget(file.path, context, 'write')
       const resolvedPath = getResolvedPathForLoopGuard(target)
@@ -730,14 +733,14 @@ async function executeBatchWrite(files: FileItem[], context: ToolContext): Promi
   }
 
   return toolOkJson('write', {
-    total: files.length,
+    total: normalizedFiles.length,
     created,
     updated,
-    failed: files.length - created - updated,
+    failed: normalizedFiles.length - created - updated,
     results,
     status: hasWorkspaceWrites ? 'pending' : 'saved',
     pendingCount: pendingChanges.length,
-    message: `${files.length} files processed. ${pendingChanges.length} change(s) pending review.`,
+    message: `${normalizedFiles.length} files processed. ${pendingChanges.length} change(s) pending review.`,
   })
 }
 
