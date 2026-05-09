@@ -18,6 +18,7 @@ import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
+import { rejectPythonMountPath } from './path-guards'
 import {
   checkReadLoop,
   recordReadMtime,
@@ -119,6 +120,8 @@ export const readExecutor: ToolExecutor = async (args, context) => {
   if (!path) {
     return toolErrorJson('read', 'invalid_arguments', 'path is required')
   }
+  const blockedReadPath = rejectPythonMountPath('read', path)
+  if (blockedReadPath) return blockedReadPath
 
   const rangeOptions: ReadRangeOptions = {
     startLine: args.start_line as number | undefined,
@@ -518,6 +521,8 @@ export const writeExecutor: ToolExecutor = async (args, context) => {
       'Either (path + content) or files must be provided'
     )
   }
+  const blockedWritePath = rejectPythonMountPath('write', path)
+  if (blockedWritePath) return blockedWritePath
   return executeSingleWrite(path, content, context)
 }
 
@@ -628,6 +633,10 @@ async function executeSingleWrite(
 }
 
 async function executeBatchWrite(files: FileItem[], context: ToolContext): Promise<string> {
+  for (const file of files) {
+    const blockedWritePath = rejectPythonMountPath('write', file.path)
+    if (blockedWritePath) return blockedWritePath
+  }
   const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
   const results: Array<{
     path: string

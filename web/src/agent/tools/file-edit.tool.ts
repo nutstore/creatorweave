@@ -9,6 +9,7 @@ import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
+import { rejectPythonMountPath } from './path-guards'
 
 // ── Fuzzy matching helpers ──────────────────────────────────────────
 
@@ -236,6 +237,8 @@ export const editExecutor: ToolExecutor = async (args, context) => {
   if (!path || oldText === undefined || newText === undefined) {
     return toolErrorJson('edit', 'invalid_arguments', 'edit requires path + old_text + new_text')
   }
+  const blockedPath = rejectPythonMountPath('edit', path)
+  if (blockedPath) return blockedPath
 
   return executeSingleEdit(context, { path, oldText, newText, replaceAll })
 }

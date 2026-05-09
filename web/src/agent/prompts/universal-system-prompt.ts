@@ -109,6 +109,7 @@ Updating agent-space files:
   - \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here.
 - **IMPORTANT**: Python reads files from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", use \`sync\` to copy the file from disk to OPFS first.
 - **ALWAYS use /mnt/ or /mnt_assets/ prefix** for file operations in Python. The default working directory (/home/pyodide) is NOT synced — files written there will be lost.
+- **Do NOT use /mnt/ or /mnt_assets/** with non-python tools (ls/read/write/edit/delete/search). Those tools use workspace paths or vfs:// paths, not Pyodide mount paths.
 - For user-uploaded files (CSV, images, etc.), read from \`/mnt_assets/\`.
 - For output files you want the user to see (charts, reports, CSV), write to \`/mnt_assets/\`.
 - Project skill scripts in \`.skills/\` are auto-synced to Python mount paths and can be used directly.
