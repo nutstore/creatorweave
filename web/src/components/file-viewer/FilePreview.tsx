@@ -8,6 +8,7 @@ import { X, FileText, Copy, Check, Eye, Code } from 'lucide-react'
 import { Editor } from '@monaco-editor/react'
 import { formatBytes } from '@/lib/utils'
 import { useT } from '@/i18n'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 
 interface FilePreviewProps {
   filePath: string | null
@@ -90,6 +91,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps) {
   const t = useT()
+  const wordWrap = useWorkspacePreferencesStore((state) => state.display.wordWrap)
   const [content, setContent] = useState<string | null>(null)
   const [fileSize, setFileSize] = useState<number>(0)
   const [loading, setLoading] = useState(false)
@@ -448,7 +450,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               minimap: { enabled: false },
               lineNumbers: 'on',
               scrollBeyondLastLine: false,
-              wordWrap: 'on',
+              wordWrap: wordWrap ? 'on' : 'off',
               automaticLayout: true,
               fontSize: 12,
               padding: { top: 8, bottom: 8 },

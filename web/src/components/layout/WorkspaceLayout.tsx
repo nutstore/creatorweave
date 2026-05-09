@@ -17,7 +17,7 @@
  * 5. pendingMessage is cleared via onInitialMessageConsumed callback
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useProjectStore } from '@/store/project.store'
@@ -27,6 +27,7 @@ import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.stor
 import { useRemoteStore, registerRemoteCallbacks } from '@/store/remote.store'
 import { useMobile } from '@/components/mobile/useMobile'
 import { useUnloadGuard } from '@/hooks/useUnloadGuard'
+import { useShortcut } from '@/hooks/useKeyboardShortcuts'
 import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { ConversationView } from '@/components/agent/ConversationView'
@@ -117,6 +118,8 @@ export function WorkspaceLayout({
     panelState,
     setSidebarCollapsed,
     setActiveResourceTab,
+    display,
+    setWordWrap,
   } = useWorkspacePreferencesStore()
 
   // Phase 4: Dialog states
@@ -180,6 +183,18 @@ export function WorkspaceLayout({
   useEffect(() => {
     if (!loaded) loadFromDB()
   }, [loaded, loadFromDB])
+
+  const toggleWordWrapShortcut = useMemo(
+    () => ({
+      key: 'z',
+      altKey: true,
+      description: 'Toggle word wrap',
+      handler: () => setWordWrap(!display.wordWrap),
+    }),
+    [display.wordWrap, setWordWrap]
+  )
+
+  useShortcut(toggleWordWrapShortcut)
 
   // Phase 4: Enhanced command palette commands
   const commands: Command[] = buildEnhancedCommands({
