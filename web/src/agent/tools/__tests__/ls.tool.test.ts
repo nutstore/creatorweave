@@ -20,7 +20,23 @@ vi.mock('@/store/folder-access.store', () => ({
 }))
 
 vi.mock('../vfs-resolver', () => ({
-  resolveVfsTarget: (...args: unknown[]) => resolveVfsTargetMock(...args),
+  resolveVfsTarget: async (...args: unknown[]) => {
+    const target = await resolveVfsTargetMock(...args)
+    if (!target || target.backend) return target
+    if (target.kind === 'agent') {
+      return {
+        ...target,
+        backend: {
+          label: 'agent',
+          getDirectoryHandle: async () =>
+            target.agentManager.getDirectoryHandle?.(target.agentId, target.path, { allowMissing: false }),
+          listAgents: target.agentManager.listAgents,
+        },
+      }
+    }
+    return target
+  },
+  withVfsAgentIdHint: (message: string) => message,
 }))
 
 vi.mock('@/opfs', () => ({
@@ -108,10 +124,7 @@ describe('ls tool', () => {
   })
 
   it('supports glob scans on vfs agents namespace', async () => {
-    const getDirectoryHandle = vi.fn(async () => ({
-      handle: createEmptyDirectoryHandle('agent-root'),
-      exists: false,
-    }))
+    const getDirectoryHandle = vi.fn(async () => createEmptyDirectoryHandle('agent-root'))
     resolveVfsTargetMock.mockResolvedValueOnce({
       kind: 'agent',
       path: '',
@@ -128,7 +141,7 @@ describe('ls tool', () => {
     )
 
     expect(result).toContain('No files matching pattern')
-    expect(getDirectoryHandle).toHaveBeenCalledWith('default', 'src', { allowMissing: true })
+    expect(getDirectoryHandle).toHaveBeenCalledWith('default', '', { allowMissing: false })
   })
 
   it('lists agents for vfs://agents in list mode', async () => {

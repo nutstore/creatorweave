@@ -26,6 +26,13 @@ vi.mock('@/services/fsAccess.service', () => ({
 vi.mock('@/native-fs', () => ({
   bindRuntimeDirectoryHandle: mockNativeFS.bindRuntimeDirectoryHandle,
   unbindRuntimeDirectoryHandle: mockNativeFS.unbindRuntimeDirectoryHandle,
+  getRuntimeHandlesForProject: vi.fn(() => new Map()),
+}))
+
+vi.mock('@/sqlite', () => ({
+  getProjectRootRepository: () => ({
+    findByProject: vi.fn(async () => []),
+  }),
 }))
 
 vi.mock('sonner', () => ({
@@ -87,7 +94,7 @@ describe('folder-access.store runtime handle binding', () => {
     const record = useFolderAccessStore.getState().records[projectId]
     expect(record.status).toBe('ready')
     expect(record.handle).toBe(handle)
-    expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, handle)
+    expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, 'demo', handle)
     expect(mockWorkspaceStore.onNativeDirectoryGranted).toHaveBeenCalledWith(handle)
   })
 
@@ -120,7 +127,7 @@ describe('folder-access.store runtime handle binding', () => {
     expect(granted).toBe(true)
     expect(record.status).toBe('ready')
     expect(record.handle).toBe(handle)
-    expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, handle)
+    expect(mockNativeFS.bindRuntimeDirectoryHandle).toHaveBeenCalledWith(projectId, 'repo', handle)
     expect(mockWorkspaceStore.onNativeDirectoryGranted).toHaveBeenCalledWith(handle)
   })
 })

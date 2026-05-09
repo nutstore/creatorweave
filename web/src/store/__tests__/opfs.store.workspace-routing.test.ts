@@ -66,7 +66,10 @@ describe('useOPFSStore workspace routing', () => {
 
     const result = await useOPFSStore.getState().readFile('a.txt', null, 'ws-a')
 
-    expect(workspaceA.readFile).toHaveBeenCalledWith('a.txt', null)
+    expect(workspaceA.readFile).toHaveBeenCalledWith('a.txt', null, {
+      policy: undefined,
+      projectId: undefined,
+    })
     expect(workspaceB.readFile).not.toHaveBeenCalled()
     expect(result.content).toBe('from-a')
   })
@@ -93,7 +96,7 @@ describe('useOPFSStore workspace routing', () => {
 
     await useOPFSStore.getState().writeFile('a.txt', 'next', null, 'ws-a')
 
-    expect(workspaceA.writeFile).toHaveBeenCalledWith('a.txt', 'next', null)
+    expect(workspaceA.writeFile).toHaveBeenCalledWith('a.txt', 'next', null, undefined)
     expect(workspaceB.writeFile).not.toHaveBeenCalled()
 
     const state = useOPFSStore.getState()

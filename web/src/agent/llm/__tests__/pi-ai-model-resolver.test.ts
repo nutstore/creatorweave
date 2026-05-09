@@ -29,7 +29,7 @@ describe('resolvePiAIModel', () => {
 
   it('should resolve latest GLM models', () => {
     const model = resolvePiAIModel('glm-coding', 'glm-5', 'https://open.bigmodel.cn/api/coding/paas/v4/')
-    expect(model.provider).toBe('zai')
+    expect(model.provider).toBe('glm-coding')
     expect(model.id).toBe('glm-5')
   })
 

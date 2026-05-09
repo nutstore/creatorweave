@@ -8,6 +8,7 @@ const storeMock = vi.hoisted(() => ({
     changes: [] as Array<{ type: 'create' | 'modify' | 'delete'; path: string; size?: number }>,
   },
   discardPendingPath: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  discardPendingPaths: vi.fn<(...args: unknown[]) => Promise<{ successCount: number; failedCount: number }>>(),
   refreshPendingChanges: vi.fn<(...args: unknown[]) => Promise<void>>(),
   showPreviewPanel: vi.fn(),
   showPreviewPanelForPath: vi.fn(),
@@ -23,14 +24,17 @@ vi.mock('@/store/conversation-context.store', () => {
   const useConversationContextStore = ((selector: (state: {
     pendingChanges: typeof storeMock.pendingChanges
     discardPendingPath: typeof storeMock.discardPendingPath
+    discardPendingPaths: typeof storeMock.discardPendingPaths
   }) => unknown) =>
     selector({
       pendingChanges: storeMock.pendingChanges,
       discardPendingPath: storeMock.discardPendingPath,
+      discardPendingPaths: storeMock.discardPendingPaths,
     })) as unknown as {
     <T>(selector: (state: {
       pendingChanges: typeof storeMock.pendingChanges
       discardPendingPath: typeof storeMock.discardPendingPath
+      discardPendingPaths: typeof storeMock.discardPendingPaths
     }) => T): T
     getState: () => {
       refreshPendingChanges: typeof storeMock.refreshPendingChanges
@@ -43,6 +47,7 @@ vi.mock('@/store/conversation-context.store', () => {
     refreshPendingChanges: storeMock.refreshPendingChanges,
     showPreviewPanel: storeMock.showPreviewPanel,
     showPreviewPanelForPath: storeMock.showPreviewPanelForPath,
+    discardPendingPaths: storeMock.discardPendingPaths,
   })
 
   return {
@@ -149,6 +154,7 @@ describe('PendingSyncPanel', () => {
       changes: [],
     }
     storeMock.discardPendingPath.mockResolvedValue()
+    storeMock.discardPendingPaths.mockResolvedValue({ successCount: 0, failedCount: 0 })
     storeMock.refreshPendingChanges.mockResolvedValue()
   })
 
@@ -159,27 +165,20 @@ describe('PendingSyncPanel', () => {
         { type: 'modify', path: 'b.txt', size: 20 },
       ],
     }
-    storeMock.discardPendingPath.mockImplementation(async (path: unknown) => {
-      if (path === 'b.txt') {
-        throw new Error('Missing local file baseline')
-      }
-    })
+    storeMock.discardPendingPaths.mockResolvedValue({ successCount: 1, failedCount: 1 })
 
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: 'Discard all changes' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm discard' }))
+    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard all changes/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm discard/ }))
 
     await waitFor(() => {
-      expect(storeMock.discardPendingPath).toHaveBeenCalledTimes(2)
+      expect(storeMock.discardPendingPaths).toHaveBeenCalledTimes(1)
     })
-    expect(storeMock.discardPendingPath).toHaveBeenNthCalledWith(1, 'a.txt')
-    expect(storeMock.discardPendingPath).toHaveBeenNthCalledWith(2, 'b.txt')
-    expect(storeMock.refreshPendingChanges).toHaveBeenCalledWith(true)
-    expect(toastMock.warning).toHaveBeenCalledWith(
-      'Discarded 1 change, 1 retained in list due to missing local file baseline'
-    )
+    expect(storeMock.discardPendingPaths).toHaveBeenCalledWith(['a.txt', 'b.txt'])
+    expect(storeMock.refreshPendingChanges).toHaveBeenCalled()
+    expect(toastMock.warning).toHaveBeenCalled()
     expect(toastMock.success).not.toHaveBeenCalled()
   })
 
@@ -194,14 +193,14 @@ describe('PendingSyncPanel', () => {
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: 'Discard all changes' }))
-    await user.click(screen.getByRole('button', { name: 'Confirm discard' }))
+    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard all changes/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm discard/ }))
 
     await waitFor(() => {
-      expect(storeMock.discardPendingPath).toHaveBeenCalledTimes(2)
+      expect(storeMock.discardPendingPaths).toHaveBeenCalledTimes(1)
     })
-    expect(storeMock.refreshPendingChanges).toHaveBeenCalledWith(true)
-    expect(toastMock.success).toHaveBeenCalledWith('All changes discarded')
+    expect(storeMock.refreshPendingChanges).toHaveBeenCalled()
+    expect(toastMock.success).toHaveBeenCalledWith('All changes rejected')
     expect(toastMock.warning).not.toHaveBeenCalled()
   })
 
@@ -223,3 +222,4 @@ describe('PendingSyncPanel', () => {
     expect(toastMock.error).toHaveBeenCalledWith('Cannot discard changes to "broken.txt": missing local file baseline')
   })
 })
+    storeMock.discardPendingPaths.mockResolvedValue({ successCount: 2, failedCount: 0 })

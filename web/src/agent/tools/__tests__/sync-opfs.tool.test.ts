@@ -104,6 +104,7 @@ describe('sync tool', () => {
     getWorkspaceManagerMock.mockResolvedValue({
       getWorkspace: vi.fn(async () => ({
         getFilesDir: async () => opfsRoot,
+        getAllNativeDirectoryHandles: vi.fn(async () => new Map<string, FileSystemDirectoryHandle>()),
       })),
     })
 
@@ -129,6 +130,7 @@ describe('sync tool', () => {
     getWorkspaceManagerMock.mockResolvedValue({
       getWorkspace: vi.fn(async () => ({
         getFilesDir: async () => opfsRoot,
+        getAllNativeDirectoryHandles: vi.fn(async () => new Map<string, FileSystemDirectoryHandle>()),
       })),
     })
 

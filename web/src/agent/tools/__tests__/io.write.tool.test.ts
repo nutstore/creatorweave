@@ -35,7 +35,31 @@ vi.mock('@/store/remote.store', () => ({
 }))
 
 vi.mock('../vfs-resolver', () => ({
-  resolveVfsTarget: (...args: unknown[]) => resolveVfsTargetMock(...args),
+  resolveVfsTarget: async (...args: unknown[]) => {
+    const target = await resolveVfsTargetMock(...args)
+    if (!target || target.backend) return target
+    if (target.kind === 'workspace') {
+      return {
+        ...target,
+        backend: {
+          label: 'workspace',
+          writeFile: async (path: string, content: string) => writeFileMock(path, content, null, undefined, 'project-1'),
+        },
+      }
+    }
+    if (target.kind === 'agent') {
+      return {
+        ...target,
+        backend: {
+          label: 'agent',
+          exists: async (path: string) => Boolean(await target.agentManager.readPath(target.agentId, path)),
+          writeFile: async (path: string, content: string) => target.agentManager.writePath(target.agentId, path, content),
+        },
+      }
+    }
+    return target
+  },
+  withVfsAgentIdHint: (message: string) => message,
 }))
 
 function makeContext(overrides?: Partial<ToolContext>): ToolContext {
@@ -189,7 +213,7 @@ describe('io write tool', () => {
     )
 
     unwrapOk(result)
-    expect(createAgentMock).toHaveBeenCalledTimes(1)
+    expect(createAgentMock).toHaveBeenCalledTimes(0)
     expect(writePathMock).toHaveBeenCalledWith('novel-editor', 'SOUL.md', 'soul')
   })
 
@@ -230,8 +254,7 @@ describe('io write tool', () => {
 
     const data = unwrapOk(result)
     expect(data.failed).toBe(0)
-    expect(createAgentMock).toHaveBeenCalledTimes(1)
-    expect(createAgentMock).toHaveBeenCalledWith('novel-editor')
+    expect(createAgentMock).toHaveBeenCalledTimes(0)
     expect(writePathMock).toHaveBeenCalledTimes(3)
   })
 })

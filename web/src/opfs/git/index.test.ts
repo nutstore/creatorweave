@@ -52,14 +52,17 @@ vi.mock('@/opfs', () => ({
 
 vi.mock('@/opfs/utils/file-reader', () => ({
   readFileFromNativeFS: vi.fn(),
+  readFileFromNativeFSMultiRoot: vi.fn(),
 }))
 
 import { formatGitDiff, gitDiff, gitRestore, gitStatus } from './index'
 import { gitLog } from './index'
 import { formatGitShow, gitShow } from './index'
 import { readFileFromNativeFS } from '@/opfs/utils/file-reader'
+import { readFileFromNativeFSMultiRoot } from '@/opfs/utils/file-reader'
 
 const readFileFromNativeFSMock = vi.mocked(readFileFromNativeFS)
+const readFileFromNativeFSMultiRootMock = vi.mocked(readFileFromNativeFSMultiRoot)
 
 describe('opfs/git gitDiff', () => {
   beforeEach(() => {
@@ -79,6 +82,7 @@ describe('opfs/git gitDiff', () => {
     workspaceWriteFileMock.mockReset()
     workspaceDeleteFileMock.mockReset()
     readFileFromNativeFSMock.mockReset()
+    readFileFromNativeFSMultiRootMock.mockReset()
     getWorkspaceMock.mockReset()
   })
 
@@ -231,7 +235,7 @@ describe('opfs/git gitDiff', () => {
       },
     ])
     getSnapshotFileContentMock.mockResolvedValue(null)
-    readFileFromNativeFSMock.mockResolvedValue('line1\nold line\nline3\n')
+    readFileFromNativeFSMultiRootMock.mockResolvedValue('line1\nold line\nline3\n')
     getWorkspaceMock.mockResolvedValue({
       readCachedFile: vi.fn(async () => 'line1\nnew line\nline3\n'),
       readBaselineFile: vi.fn(async () => null),

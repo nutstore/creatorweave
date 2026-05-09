@@ -5,8 +5,8 @@ import type { ConditionConfig } from '../workflow/types'
 describe('buildNodeSystemPrompt', () => {
   it('builds system prompt for plan node', () => {
     const prompt = buildNodeSystemPrompt('plan', 'plot_planner', undefined)
-    expect(prompt).toContain('剧情规划师')
-    expect(prompt).toContain('大纲')
+    expect(prompt).toContain('Plot Planner')
+    expect(prompt).toContain('outline')
   })
 
   it('builds system prompt for condition node in rule mode', () => {
@@ -43,6 +43,6 @@ describe('buildNodeSystemPrompt', () => {
   it('uses custom task instruction when provided', () => {
     const prompt = buildNodeSystemPrompt('plan', 'planner', '创建一个关于AI的故事大纲')
     expect(prompt).toContain('创建一个关于AI的故事大纲')
-    expect(prompt).not.toContain('大纲应条理清晰')
+    expect(prompt).not.toContain('The outline should be clear and well-structured')
   })
 })
