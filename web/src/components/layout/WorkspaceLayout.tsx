@@ -304,12 +304,27 @@ export function WorkspaceLayout({
 
         for (const { handle, rootName } of handlesToScan) {
           const result = await scanProjectSkills(handle)
-          // Prefix skill IDs with root name for disambiguation
+          // Prefix skill IDs with root name for disambiguation, and keep
+          // resources in sync with remapped skill IDs.
+          const skillIdMap = new Map<string, string>()
           for (const skill of result.skills) {
-            skill.id = `project:${rootName}:${skill.id.replace('project:', '')}`
+            const oldId = skill.id
+            const newId = `project:${rootName}:${oldId.replace('project:', '')}`
+            skill.id = newId
+            skillIdMap.set(oldId, newId)
           }
+
+          const remappedResources = result.resources.map((resource) => {
+            const mappedSkillId = skillIdMap.get(resource.skillId) ?? resource.skillId
+            return {
+              ...resource,
+              skillId: mappedSkillId,
+              id: `${mappedSkillId}:${resource.resourcePath}`,
+            }
+          })
+
           allSkills = allSkills.concat(result.skills)
-          allResources = allResources.concat(result.resources)
+          allResources = allResources.concat(remappedResources)
           allErrors = allErrors.concat(result.errors)
         }
 

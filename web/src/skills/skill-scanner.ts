@@ -376,7 +376,7 @@ async function syncResourcesToFilesDir(
   filesDir: FileSystemDirectoryHandle
 ): Promise<void> {
   for (const resource of resources) {
-    const skillDir = resource.skillId.replace(/^project:/, '')
+    const skillDir = resolveSkillDirFromSkillId(resource.skillId)
     const opfsPath = `${skillDir}/${resource.resourcePath}`
 
     try {
@@ -399,4 +399,21 @@ async function syncResourcesToFilesDir(
     }
   }
   console.log(`[SkillScanner] OPFS sync complete: ${resources.length} resources`)
+}
+
+function resolveSkillDirFromSkillId(skillId: string): string {
+  const withoutPrefix = skillId.replace(/^project:/, '')
+  const markerIndex = withoutPrefix.indexOf(':.skills/')
+  if (markerIndex > 0) {
+    const rootName = withoutPrefix.slice(0, markerIndex)
+    const suffix = withoutPrefix.slice(markerIndex + 1) // keep ".skills/..."
+    return `${rootName}/${suffix}`
+  }
+  const claudeMarkerIndex = withoutPrefix.indexOf(':.claude/skills/')
+  if (claudeMarkerIndex > 0) {
+    const rootName = withoutPrefix.slice(0, claudeMarkerIndex)
+    const suffix = withoutPrefix.slice(claudeMarkerIndex + 1) // keep ".claude/skills/..."
+    return `${rootName}/${suffix}`
+  }
+  return withoutPrefix
 }

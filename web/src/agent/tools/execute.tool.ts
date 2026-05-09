@@ -28,15 +28,16 @@ Two mounted directories:
 - \`/mnt/\` — workspace project files. Read/write project source files here. ALWAYS use /mnt/ prefix. Example: \`open('/mnt/output.csv', 'w')\`
 - \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here. Example: \`pd.read_csv('/mnt_assets/data.csv')\`
 
-Multi-root projects: When the project has multiple roots, files are accessible under \`/mnt/{rootName}/path/to/file\`. The default root files are at the top level of /mnt/ (no prefix needed).
+Workspace files are accessible under \`/mnt/{rootName}/path/to/file\` (always include rootName).
 
 Important:
 - The default working directory is /home/pyodide, which is NOT synced. Files written there will be lost.
 - /mnt/ reads from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
 - For user-uploaded files (CSV, images, etc.), read from /mnt_assets/.
 - For output files you want the user to see (charts, reports), write to /mnt_assets/.
-- Project skill scripts in .skills/ directory are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
-  Example: if .skills/word-processor/scripts/convert.py exists, use \`exec(open('/mnt/.skills/word-processor/scripts/convert.py').read())\` or \`import sys; sys.path.insert(0, '/mnt/.skills/word-processor/scripts')\`
+- Project skill scripts in .skills/ directory are auto-synced and can be imported directly.
+  Example (root "lxy"): \`exec(open('/mnt/lxy/.skills/word-processor/scripts/convert.py').read())\`
+  For imports, add the matching scripts directory to \`sys.path\` first.
 - For packages NOT in the built-in list, use micropip to install from PyPI before importing:
   Example: \`import micropip; await micropip.install('requests'); import requests\`
   Note: Only pure-Pinux packages work with micropip. C-extension packages must be pre-built in Pyodide.

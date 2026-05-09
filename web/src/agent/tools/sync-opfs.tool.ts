@@ -49,6 +49,20 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   if (!Array.isArray(paths) || paths.length === 0) {
     return toolErrorJson('sync', 'invalid_args', 'paths must be a non-empty array of file paths or glob patterns')
   }
+  const vfsPaths = paths
+    .map((p) => String(p ?? '').trim())
+    .filter((p) => p.toLowerCase().startsWith('vfs://'))
+  if (vfsPaths.length > 0) {
+    return toolErrorJson(
+      'sync',
+      'invalid_args',
+      'sync only accepts workspace-relative native filesystem paths; vfs:// paths are already in OPFS and must not be synced',
+      {
+        hint: 'Use vfs:// paths directly with read/ls, and use /mnt_assets/... in python for assets.',
+        details: { rejected_paths: vfsPaths },
+      }
+    )
+  }
 
   const projectId = context.projectId ?? null
 
