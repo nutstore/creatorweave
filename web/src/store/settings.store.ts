@@ -222,9 +222,6 @@ export const useSettingsStore = create<SettingsState>()(
 
         set((state) => ({
           customProviders: [provider, ...state.customProviders],
-          providerType: id,
-          customBaseUrl: trimmedBaseUrl,
-          modelName: trimmedModel,
         }))
         return true
       },
