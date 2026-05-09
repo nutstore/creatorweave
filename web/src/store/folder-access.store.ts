@@ -103,14 +103,27 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     // ========================================================================
 
     /**
-     * Set active project and hydrate
+     * Set active project and hydrate.
+     * For same-project switches, avoid full hydrate but still reload roots to
+     * keep runtime handle/roots view consistent.
      */
     setActiveProject: async (projectId: string | null) => {
+      const prevId = get().activeProjectId
       set((state) => {
         state.activeProjectId = projectId
       })
 
       if (!projectId) return
+
+      // Same-project fast path:
+      // Skip full hydrate, but still reload roots so UI/runtime bindings stay fresh.
+      if (prevId === projectId) {
+        const record = get().records[projectId]
+        if (record && (record.status === 'ready' || record.status === 'needs_user_activation')) {
+          await get().loadRoots()
+          return
+        }
+      }
 
       // Create empty record if none exists yet
       if (!get().records[projectId]) {

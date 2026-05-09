@@ -830,30 +830,14 @@ function App() {
   }, [isStorageReady, currentRoute.kind, activeProjectId, activeConversationId])
 
   const handleOpenProject = async (projectId: string) => {
-    const ok = await setActiveProject(projectId)
-    if (ok) {
-      const targetWorkspaceId = useConversationContextStore.getState().workspaces[0]?.id
-      if (targetWorkspaceId) {
-        await useConversationStore.getState().setActive(targetWorkspaceId)
-        navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: targetWorkspaceId })
-      } else {
-        navigateToRoute({ kind: 'projectWorkspace', projectId })
-      }
-    } else {
-      toast.error(t('app.switchProjectFailed'))
-    }
+    navigateToRoute({ kind: 'projectWorkspace', projectId })
   }
 
   const handleCreateProject = async (name: string) => {
     const project = await createProject(name)
     if (project) {
-      const switched = await setActiveProject(project.id)
-      if (switched) {
-        navigateToRoute({ kind: 'projectWorkspace', projectId: project.id })
-        toast.success(t('app.projectCreated', { name: project.name }))
-      } else {
-        toast.error(t('app.projectCreatedButSwitchFailed'))
-      }
+      navigateToRoute({ kind: 'projectWorkspace', projectId: project.id })
+      toast.success(t('app.projectCreated', { name: project.name }))
     } else {
       toast.error(t('app.createProjectFailed'))
     }

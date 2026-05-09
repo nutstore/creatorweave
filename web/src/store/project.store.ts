@@ -305,33 +305,9 @@ export const useProjectStore = create<ProjectState>()(
     refreshProjects: async () => {
       try {
         const repo = getProjectRepository()
-        const [projects, stats, persistedActiveProject] = await Promise.all([
-          repo.findAllProjects(),
-          repo.findProjectStats(),
-          repo.findActiveProject(),
-        ])
+        const [projects, stats] = await Promise.all([repo.findAllProjects(), repo.findProjectStats()])
         const projectStats = Object.fromEntries(stats.map((entry) => [entry.projectId, entry]))
-        const projectIds = new Set(projects.map((project) => project.id))
-
-        let activeProjectId = get().activeProjectId
-        if (persistedActiveProject?.id && projectIds.has(persistedActiveProject.id)) {
-          activeProjectId = persistedActiveProject.id
-        } else if (!projectIds.has(activeProjectId)) {
-          activeProjectId = projects[0]?.id || ''
-        }
-
-        const persistedActiveId = persistedActiveProject?.id || ''
-        if (activeProjectId && activeProjectId !== persistedActiveId) {
-          await repo.setActiveProject(activeProjectId)
-        } else if (!activeProjectId && persistedActiveId) {
-          await repo.clearActiveProject()
-        }
-
-        set({ projects, projectStats, activeProjectId })
-
-        // Keep folder-access/agent scoped state aligned to project store active project.
-        const { useAgentStore } = await import('./agent.store')
-        await useAgentStore.getState().setActiveProject(activeProjectId)
+        set({ projects, projectStats })
       } catch (e) {
         console.error('[ProjectStore] Failed to refresh projects:', e)
       }

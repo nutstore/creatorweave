@@ -17,7 +17,7 @@
  * 5. pendingMessage is cleared via onInitialMessageConsumed callback
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useConversationStore } from '@/store/conversation.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useProjectStore } from '@/store/project.store'
@@ -109,6 +109,15 @@ export function WorkspaceLayout({
   const { directoryHandle } = useAgentStore()
   const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
+
+  // Stable key derived from active project + roots + manual scan trigger.
+  // Prevents redundant scans on reference-only updates while still scanning
+  // on project switch and explicit manual refresh.
+  const prevScanKeyRef = useRef<string>('')
+  const rootsKey = roots
+    .map((r) => `${r.name}:${r.status}:${r.handle ? 'y' : 'n'}`)
+    .join('|')
+  const skillsScanVersion = useSkillsStore((s) => s.skillsScanVersion)
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
@@ -290,6 +299,13 @@ export function WorkspaceLayout({
     }
     if (!skillsLoaded) return
 
+    const scanKey = `${activeProjectId ?? 'null'}::${rootsKey}::${skillsScanVersion}`
+    // Skip scan when project+roots+manual-trigger key is unchanged
+    if (prevScanKeyRef.current === scanKey) {
+      return
+    }
+    prevScanKeyRef.current = scanKey
+
     const scanForSkills = async () => {
       try {
         // Prevent stale cross-project visibility while switching projects.
@@ -365,7 +381,7 @@ export function WorkspaceLayout({
     }
 
     void scanForSkills()
-  }, [roots, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady])
+  }, [roots, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady, rootsKey, skillsScanVersion])
 
   // Global keyboard shortcuts
   useEffect(() => {

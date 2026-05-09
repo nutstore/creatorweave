@@ -30,6 +30,8 @@ interface SkillsState {
   loading: boolean
   /** Error state - prevents retry loop on persistent errors */
   error: string | null
+  /** Manual trigger token for forcing project skill re-scan */
+  skillsScanVersion: number
 
   // Actions
   loadSkills: () => Promise<void>
@@ -41,6 +43,7 @@ interface SkillsState {
   getEnabledSkills: () => Promise<Skill[]>
   getSkillsByCategory: (category: SkillCategory) => Promise<Skill[]>
   clearError: () => void
+  bumpSkillsScanVersion: () => void
 }
 
 type SkillsStateWithImmer = SkillsState & {
@@ -54,6 +57,7 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
     loaded: false,
     loading: false,
     error: null,
+    skillsScanVersion: 0,
 
     loadSkills: async () => {
       const state = get()
@@ -189,6 +193,12 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
 
     clearError: () => {
       set({ error: null })
+    },
+
+    bumpSkillsScanVersion: () => {
+      set((state) => {
+        state.skillsScanVersion += 1
+      })
     },
   }))
 )

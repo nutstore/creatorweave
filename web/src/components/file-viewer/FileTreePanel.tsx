@@ -26,6 +26,7 @@ import { BrandButton, BrandBadge } from '@creatorweave/ui'
 import { formatBytes } from '@/lib/utils'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useSkillsStore } from '@/store/skills.store'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useT } from '@/i18n'
 import type { PendingChange } from '@/opfs/types/opfs-types'
@@ -486,6 +487,7 @@ export function FileTreePanel({
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId)
+  const bumpSkillsScanVersion = useSkillsStore((s) => s.bumpSkillsScanVersion)
 
   // Get pending changes and cached files from OPFS store
   const pendingChanges = useOPFSStore((state) => state.pendingChanges)
@@ -806,7 +808,8 @@ export function FileTreePanel({
 
   const handleRefresh = useCallback(() => {
     void loadRoot(true)
-  }, [loadRoot])
+    bumpSkillsScanVersion()
+  }, [loadRoot, bumpSkillsScanVersion])
 
   /** Toggle directory expand/collapse */
   const handleToggle = useCallback(
@@ -894,7 +897,7 @@ export function FileTreePanel({
         const dirPath = segments.slice(0, i + 1).join('/')
 
         // Find the directory node at current level
-        let found = currentNodes.find((n) => n.path === dirPath)
+        const found = currentNodes.find((n) => n.path === dirPath)
 
         if (!found) {
           console.warn(`[FileTree] revealPath: directory "${dirPath}" not found in tree`)
