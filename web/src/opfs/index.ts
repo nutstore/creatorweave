@@ -67,11 +67,14 @@ export {
 export {
   readFileFromOPFS,
   readFileFromNativeFS,
+  readFileFromNativeFSMultiRoot,
   readFileFromOPFSWithMeta,
   fileExistsInOPFS,
   fileExistsInNativeFS,
+  fileExistsInNativeFSMultiRoot,
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFS,
+  readBinaryFileFromNativeFSMultiRoot,
 } from './utils/file-reader'
 
 // Workspace runtime (workspace-first API)

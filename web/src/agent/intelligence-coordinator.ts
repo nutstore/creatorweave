@@ -102,6 +102,16 @@ export class IntelligenceCoordinator {
       enhancements.push(memoryBlock)
     }
 
+    // 3. Multi-root project context (inject root names so agent uses correct paths)
+    try {
+      const rootBlock = await buildMultiRootBlock(options.projectId)
+      if (rootBlock) {
+        enhancements.push(rootBlock)
+      }
+    } catch {
+      // Non-critical
+    }
+
     // Combine all enhancements
     let enhancedPrompt = basePrompt
 
@@ -243,4 +253,37 @@ export function getIntelligenceCoordinator(): IntelligenceCoordinator {
 //=============================================================================
 // Integration Helpers
 //=============================================================================
+
+/**
+ * Build multi-root context block for the system prompt.
+ * When the project has multiple roots, injects the root names so the agent
+ * knows to prefix paths correctly (e.g., "frontend/src/App.tsx").
+ */
+async function buildMultiRootBlock(
+  projectId?: string | null
+): Promise<string | null> {
+  try {
+    if (!projectId) {
+      const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
+      const activeProject = await getProjectRepository().findActiveProject()
+      projectId = activeProject?.id ?? undefined
+    }
+    if (!projectId) return null
+
+    const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+    const repo = getProjectRootRepository()
+    const roots = await repo.findByProject(projectId)
+
+    if (roots.length <= 1) return null // Single-root or no roots — no special instructions needed
+
+    const rootNames = roots.map((r) => `\`${r.name}\``).join(', ')
+    const defaultRoot = roots.find((r) => r.isDefault)
+
+    return [
+      `## Active Roots: ${rootNames}${defaultRoot ? ` (default: \`${defaultRoot.name}\`)` : ''}`,
+    ].join('\n')
+  } catch {
+    return null
+  }
+}
 

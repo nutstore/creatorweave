@@ -62,15 +62,14 @@ describe('buildNodeSystemPrompt', () => {
 
     for (const kind of kinds) {
       const prompt = buildNodeSystemPrompt(kind, 'plot_planner')
-      // plot_planner maps to Chinese label 剧情规划师
-      expect(prompt).toContain('剧情规划师')
+      expect(prompt).toContain('Plot Planner')
       expect(prompt.length).toBeGreaterThan(10)
     }
   })
 
-  it('uses Chinese role label for known roles', () => {
+  it('uses role label for known roles', () => {
     const prompt = buildNodeSystemPrompt('plan', 'plot_planner')
-    expect(prompt).toContain('剧情规划师')
+    expect(prompt).toContain('Plot Planner')
   })
 
   it('falls back to raw agentRole for unknown roles', () => {
@@ -84,7 +83,7 @@ describe('buildNodeSystemPrompt', () => {
       'chapter_writer',
       '请将同一语义内容组织成一个段落，每段至少 3 句。'
     )
-    expect(prompt).toContain('章节写手')
+    expect(prompt).toContain('Chapter Writer')
     expect(prompt).toContain('每段至少 3 句')
     expect(prompt).not.toContain('请根据以下大纲创作内容')
   })
@@ -97,7 +96,7 @@ describe('buildNodeSystemPrompt', () => {
 describe('buildNodeUserMessage', () => {
   it('returns default message for empty inputs', () => {
     const msg = buildNodeUserMessage(new Map())
-    expect(msg).toContain('请开始工作')
+    expect(msg).toContain('Please begin work')
   })
 
   it('includes all input keys and content', () => {

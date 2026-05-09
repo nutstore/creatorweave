@@ -59,15 +59,6 @@ export function useDynamicModels(
 
   const doFetch = useCallback(
     async (apiKey?: string, baseUrl?: string) => {
-      if (providerType === 'custom') {
-        if (mountedRef.current) {
-          setModels([])
-          setSource('static')
-          setDynamicCount(0)
-        }
-        return
-      }
-
       if (mountedRef.current) setLoading(true)
       if (mountedRef.current) setError(null)
 

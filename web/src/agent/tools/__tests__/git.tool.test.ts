@@ -99,7 +99,6 @@ describe('git.tool envelope + validation', () => {
       'ws_1',
       expect.objectContaining({
         mode: 'working',
-        directoryHandle,
       })
     )
   })

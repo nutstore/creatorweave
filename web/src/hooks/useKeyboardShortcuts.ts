@@ -228,9 +228,4 @@ export const DEFAULT_SHORTCUTS: Omit<KeyboardShortcut, 'handler' | 'disabled' | 
     metaKey: true,
     description: 'Switch to Changes tab',
   },
-  {
-    key: '?',
-    shiftKey: true,
-    description: 'Show keyboard shortcuts',
-  },
 ]

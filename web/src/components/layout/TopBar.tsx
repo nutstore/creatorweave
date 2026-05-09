@@ -1,15 +1,10 @@
 /**
  * TopBar - minimal top bar for the conversation area.
  *
- * Left: Logo + product name
- * Right: Folder button, conversation badge, Settings gear, Remote status
+ * Left: Logo + project name
+ * Right: Folder, status badges, action buttons, Settings gear
  *
- * Phase 3 Integration:
- * - Added conversation badge to show OPFS conversation storage status
- * Phase 4 Integration:
- * - Added i18n support
- * Phase 5 Integration:
- * - Replaced inline folder button with FolderSelector component
+ * Refactored: Language, Theme, MCP, Docs moved into SettingsDialog.
  */
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
@@ -18,25 +13,22 @@ import {
   SlidersHorizontal,
   Wrench,
   KeyRound,
-  Server,
   List,
   MoreHorizontal,
   Keyboard,
   Menu,
   ArrowLeft,
   Terminal,
-  BookOpen,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
-import { MCPSettingsDialog } from '@/components/mcp'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { ConversationStorageBadge } from '@/components/conversation'
-import { LanguageSwitcher } from '@/components/ui/LanguageSwitcher'
 import { FolderSelector } from './FolderSelector'
-import { useLocale, useT } from '@/i18n'
+import { ModelQuickSwitch } from './ModelQuickSwitch'
+import { useT } from '@/i18n'
 import {
   BrandButton,
   Tooltip,
@@ -44,7 +36,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@creatorweave/ui'
-import { ThemeToggle } from '@/components/workspace'
 
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
@@ -92,14 +83,11 @@ export function TopBar({
   onProjectSwitcherOpenChange,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [mcpSettingsOpen, setMcpSettingsOpen] = useState(false)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
-  const [locale] = useLocale()
   const conversationName = activeConversationName ?? activeWorkspaceName
-  const docsUrl = locale === 'zh-CN' ? '/#/docs/zh' : '/#/docs/en'
 
   const ActionTooltip = ({
     label,
@@ -238,6 +226,10 @@ export function TopBar({
               </ActionTooltip>
             )}
 
+            <div className="shrink-0">
+              <ModelQuickSwitch />
+            </div>
+
             {/* Remote */}
             <div className="shrink-0">
               <RemoteBadgeErrorBoundary>
@@ -250,19 +242,9 @@ export function TopBar({
               <ConversationStorageBadge compact />
             </div>
 
-            {/* Language Switcher */}
-            <div className="shrink-0">
-              <LanguageSwitcher />
-            </div>
-
-            {/* Theme Toggle */}
-            <div className="shrink-0">
-              <ThemeToggle />
-            </div>
-
             <div className="h-5 w-px bg-muted" />
 
-            {/* Workspace Settings (Phase 4) */}
+            {/* Workspace Settings */}
             <ActionTooltip label={t('topbar.tooltips.workspaceSettings')}>
               <BrandButton iconButton className="shrink-0" onClick={onWorkspaceSettingsOpen}>
                 <SlidersHorizontal className="h-[14px] w-[14px]" />
@@ -283,7 +265,7 @@ export function TopBar({
               </BrandButton>
             </ActionTooltip>
 
-            {/* Quick Actions / Command Palette (Phase 4) */}
+            {/* Quick Actions / Command Palette */}
             <ActionTooltip label={t('topbar.tooltips.commandPalette')}>
               <BrandButton iconButton onClick={onCommandPaletteOpen}>
                 <Keyboard className="h-[14px] w-[14px]" />
@@ -294,20 +276,6 @@ export function TopBar({
             <ActionTooltip label={t('topbar.tooltips.skillsManager')}>
               <BrandButton iconButton className="shrink-0" onClick={onSkillsManagerOpen} data-tour="skills">
                 <Wrench className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
-
-            {/* MCP Settings */}
-            <ActionTooltip label={t('topbar.tooltips.mcpSettings')}>
-              <BrandButton iconButton onClick={() => setMcpSettingsOpen(true)}>
-                <Server className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
-
-            {/* Documentation */}
-            <ActionTooltip label={t('topbar.tooltips.docs')}>
-              <BrandButton iconButton onClick={() => window.open(docsUrl, '_blank')}>
-                <BookOpen className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
 
@@ -384,28 +352,6 @@ export function TopBar({
               <Terminal className="h-3.5 w-3.5" />
               {t('topbar.mobile.webContainer')}
             </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                setMcpSettingsOpen(true)
-                closeMobileMorePanel()
-              }}
-            >
-              <Server className="h-3.5 w-3.5" />
-              {t('topbar.mobile.mcpSettings')}
-            </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                window.open(docsUrl, '_blank')
-                closeMobileMorePanel()
-              }}
-            >
-              <BookOpen className="h-3.5 w-3.5" />
-              {t('topbar.mobile.docs')}
-            </BrandButton>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5">
@@ -419,21 +365,12 @@ export function TopBar({
               <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.storage')}</div>
               <ConversationStorageBadge compact />
             </div>
-            <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.language')}</div>
-              <LanguageSwitcher />
-            </div>
-            <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.theme')}</div>
-              <ThemeToggle />
-            </div>
           </div>
         </div>
       )}
       </TooltipProvider>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <MCPSettingsDialog open={mcpSettingsOpen} onOpenChange={setMcpSettingsOpen} />
     </>
   )
 }

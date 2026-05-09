@@ -2,7 +2,7 @@
  * Native File System Access Module
  *
  * Provides directory handle management for native filesystem sync.
- * Part of Phase 4: Native Filesystem Sync - Story 4.1
+ * Supports multi-root projects with per-root handle management.
  *
  * @module native-fs
  */
@@ -19,7 +19,10 @@ import {
   releaseDirectoryHandle,
   bindRuntimeDirectoryHandle,
   getRuntimeDirectoryHandle,
+  getRuntimeHandlesForProject,
   unbindRuntimeDirectoryHandle,
+  buildHandleKey,
+  parseHandleKey,
 } from './directory-handle-manager'
 
 // Re-export types and functions
@@ -32,7 +35,10 @@ export {
   releaseDirectoryHandle,
   bindRuntimeDirectoryHandle,
   getRuntimeDirectoryHandle,
+  getRuntimeHandlesForProject,
   unbindRuntimeDirectoryHandle,
+  buildHandleKey,
+  parseHandleKey,
 }
 
 /**
@@ -45,21 +51,21 @@ export function createNativeFSManager(workspaceId: string) {
      * Request directory access from user
      */
     async requestHandle(options?: DirectoryPickerOptions) {
-      return await requestDirectoryAccess(workspaceId, options)
+      return await requestDirectoryAccess(workspaceId, workspaceId, options)
     },
 
     /**
      * Get stored directory handle
      */
     async getHandle(): Promise<StoredHandle | null> {
-      return await getStoredDirectoryHandle(workspaceId)
+      return await getStoredDirectoryHandle(workspaceId, workspaceId)
     },
 
     /**
      * Release directory handle
      */
     async releaseHandle(): Promise<void> {
-      await releaseDirectoryHandle(workspaceId)
+      await releaseDirectoryHandle(workspaceId, workspaceId)
     },
 
     /**
@@ -67,7 +73,7 @@ export function createNativeFSManager(workspaceId: string) {
      */
     async hasValidHandle(): Promise<boolean> {
       const manager = getDirectoryHandleManager()
-      return await manager.hasValidHandle(workspaceId)
+      return await manager.hasValidHandle(workspaceId, workspaceId)
     },
   }
 }

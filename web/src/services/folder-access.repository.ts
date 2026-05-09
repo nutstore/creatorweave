@@ -2,13 +2,19 @@
  * Folder Access Repository - IndexedDB 持久化封装
  *
  * 负责文件夹句柄的存储、读取、删除
+ * 每条记录以 `${projectId}/${rootName}` 为复合键，支持多 root。
  */
 
 import type { FolderAccessRecord } from '@/types/folder-access'
 
 const DB_NAME = 'bfosa-folder-access'
 const STORE_NAME = 'folderAccess'
-const DB_VERSION = 1
+const DB_VERSION = 2
+
+/** Build a compound storage key from projectId and rootName */
+function compoundKey(projectId: string, rootName?: string): string {
+  return rootName ? `${projectId}/${rootName}` : projectId
+}
 
 /**
  * IndexedDB 操作封装
@@ -28,22 +34,42 @@ class FolderAccessRepository {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
 
       request.onerror = () => {
-        console.error('[FolderAccessRepo] Failed to open IndexedDB:', request.error)
+        console.error('[FolderAccessRepo] Failed to open database:', request.error)
         reject(request.error)
       }
 
-      request.onsuccess = () => {
+      request.onsuccess = async () => {
         this.db = request.result
-        console.log('[FolderAccessRepo] IndexedDB opened:', DB_NAME)
         // 迁移旧数据库（如果需要）
         this.migrateFromLegacy().then(resolve).catch(reject)
       }
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
-        console.log('[FolderAccessRepo] Creating object store:', STORE_NAME)
+        const oldVersion = event.oldVersion
+
         if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME, { keyPath: 'projectId' })
+          // Fresh install: create with compound key
+          db.createObjectStore(STORE_NAME, { keyPath: '_compoundKey' })
+        } else if (oldVersion < 2) {
+          // Upgrade from v1 (keyPath=projectId) to v2 (compound key)
+          // We need to migrate existing data
+          const tx = (event.target as IDBOpenDBRequest).transaction!
+          const oldStore = tx.objectStore(STORE_NAME)
+
+          const getAll = oldStore.getAll()
+          getAll.onsuccess = () => {
+            const records = getAll.result as any[]
+            // Delete old store and recreate with new keyPath
+            db.deleteObjectStore(STORE_NAME)
+            const newStore = db.createObjectStore(STORE_NAME, { keyPath: '_compoundKey' })
+
+            // Re-add records with compound key
+            for (const record of records) {
+              record._compoundKey = compoundKey(record.projectId, record.rootName)
+              newStore.put(record)
+            }
+          }
         }
       }
     })
@@ -140,9 +166,10 @@ class FolderAccessRepository {
       const tx = db.transaction(STORE_NAME, 'readwrite')
       const store = tx.objectStore(STORE_NAME)
 
-      // 只保存可序列化的数据，不保存 handle
       const persistedRecord = {
+        _compoundKey: compoundKey(record.projectId, record.rootName),
         projectId: record.projectId,
+        rootName: record.rootName,
         folderName: record.folderName,
         persistedHandle: record.persistedHandle, // FileSystemDirectoryHandle 可被结构化克隆
         status: record.status,
@@ -153,7 +180,12 @@ class FolderAccessRepository {
 
       const request = store.put(persistedRecord)
       request.onsuccess = () => {
-        console.log('[FolderAccessRepo] Saved record for project:', record.projectId)
+        console.log(
+          '[FolderAccessRepo] Saved record for project:',
+          record.projectId,
+          'root:',
+          record.rootName
+        )
         resolve()
       }
       request.onerror = () => {
@@ -164,65 +196,64 @@ class FolderAccessRepository {
   }
 
   /**
-   * 加载记录
+   * 加载记录（单 root 兼容：不传 rootName 返回该项目的第一条记录）
    */
-  async load(projectId: string): Promise<FolderAccessRecord | null> {
+  async load(projectId: string, rootName?: string): Promise<FolderAccessRecord | null> {
     const db = await this.ensureDB()
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const store = tx.objectStore(STORE_NAME)
-      const request = store.get(projectId)
 
-      request.onsuccess = () => {
-        const result = request.result
-        if (!result) {
-          resolve(null)
-          return
+      if (rootName) {
+        // Direct lookup by compound key
+        const request = store.get(compoundKey(projectId, rootName))
+        request.onsuccess = () => {
+          resolve(request.result ? this.toRecord(request.result) : null)
         }
-
-        // 恢复完整记录
-        const record: FolderAccessRecord = {
-          projectId: result.projectId,
-          folderName: result.folderName,
-          handle: null, // 内存句柄需要重新获取权限
-          persistedHandle: result.persistedHandle,
-          status: result.status,
-          error: result.error,
-          createdAt: result.createdAt,
-          updatedAt: result.updatedAt,
+        request.onerror = () => reject(request.error)
+      } else {
+        // Find first record for this project
+        const request = store.getAll()
+        request.onsuccess = () => {
+          const results = request.result as any[]
+          const match = results.find((r) => r.projectId === projectId)
+          resolve(match ? this.toRecord(match) : null)
         }
-
-        console.log('[FolderAccessRepo] Loaded record for project:', projectId, record.folderName)
-        resolve(record)
-      }
-
-      request.onerror = () => {
-        console.error('[FolderAccessRepo] Failed to load record:', request.error)
-        reject(request.error)
+        request.onerror = () => reject(request.error)
       }
     })
   }
 
   /**
-   * 删除记录（彻底释放）
+   * 删除记录
    */
-  async delete(projectId: string): Promise<void> {
+  async delete(projectId: string, rootName?: string): Promise<void> {
     const db = await this.ensureDB()
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readwrite')
       const store = tx.objectStore(STORE_NAME)
-      const request = store.delete(projectId)
 
-      request.onsuccess = () => {
-        console.log('[FolderAccessRepo] Deleted record for project:', projectId)
-        resolve()
-      }
-
-      request.onerror = () => {
-        console.error('[FolderAccessRepo] Failed to delete record:', request.error)
-        reject(request.error)
+      if (rootName) {
+        const request = store.delete(compoundKey(projectId, rootName))
+        request.onsuccess = () => resolve()
+        request.onerror = () => reject(request.error)
+      } else {
+        // Delete all records for this project
+        const getAll = store.getAll()
+        getAll.onsuccess = () => {
+          const results = getAll.result as any[]
+          const toDelete = results.filter((r) => r.projectId === projectId)
+          let deleted = 0
+          if (toDelete.length === 0) { resolve(); return }
+          for (const record of toDelete) {
+            const del = store.delete(record._compoundKey)
+            del.onsuccess = () => { deleted++; if (deleted === toDelete.length) resolve() }
+            del.onerror = () => reject(del.error)
+          }
+        }
+        getAll.onerror = () => reject(getAll.error)
       }
     })
   }
@@ -230,22 +261,9 @@ class FolderAccessRepository {
   /**
    * 检查记录是否存在
    */
-  async exists(projectId: string): Promise<boolean> {
-    const db = await this.ensureDB()
-
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly')
-      const store = tx.objectStore(STORE_NAME)
-      const request = store.get(projectId)
-
-      request.onsuccess = () => {
-        resolve(!!request.result)
-      }
-
-      request.onerror = () => {
-        reject(request.error)
-      }
-    })
+  async exists(projectId: string, rootName?: string): Promise<boolean> {
+    const record = await this.load(projectId, rootName)
+    return record !== null
   }
 
   /**
@@ -257,16 +275,52 @@ class FolderAccessRepository {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const store = tx.objectStore(STORE_NAME)
-      const request = store.getAllKeys()
+      const request = store.getAll()
 
       request.onsuccess = () => {
-        resolve(request.result as string[])
+        const results = request.result as any[]
+        const ids = [...new Set(results.map((r) => r.projectId as string))]
+        resolve(ids)
       }
 
       request.onerror = () => {
         reject(request.error)
       }
     })
+  }
+
+  /**
+   * 按 projectId + rootName 查找记录（多 root 支持）
+   */
+  async findByProjectAndRoot(
+    projectId: string,
+    rootName: string
+  ): Promise<FolderAccessRecord | null> {
+    return this.load(projectId, rootName)
+  }
+
+  /**
+   * 按 projectId + rootName 删除记录（多 root 支持）
+   */
+  async deleteByProjectAndRoot(projectId: string, rootName: string): Promise<void> {
+    return this.delete(projectId, rootName)
+  }
+
+  /**
+   * Convert raw IDB record to FolderAccessRecord (strip internal _compoundKey)
+   */
+  private toRecord(raw: any): FolderAccessRecord {
+    return {
+      projectId: raw.projectId,
+      rootName: raw.rootName,
+      folderName: raw.folderName,
+      handle: null,
+      persistedHandle: raw.persistedHandle,
+      status: raw.status,
+      error: raw.error,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+    }
   }
 }
 

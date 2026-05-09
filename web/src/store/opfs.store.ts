@@ -88,7 +88,8 @@ interface OPFSState {
     path: string,
     directoryHandle?: FileSystemDirectoryHandle | null,
     workspaceId?: string | null,
-    readPolicy?: ReadPolicy
+    readPolicy?: ReadPolicy,
+    projectId?: string | null
   ) => Promise<FileReadResult>
 
   /** Write file to current workspace (cache + pending) */
@@ -96,14 +97,16 @@ interface OPFSState {
     path: string,
     content: FileContent,
     directoryHandle?: FileSystemDirectoryHandle | null,
-    workspaceId?: string | null
+    workspaceId?: string | null,
+    projectId?: string | null
   ) => Promise<void>
 
   /** Delete file from current workspace */
   deleteFile: (
     path: string,
     directoryHandle?: FileSystemDirectoryHandle | null,
-    workspaceId?: string | null
+    workspaceId?: string | null,
+    projectId?: string | null
   ) => Promise<void>
 
   /** Get pending changes for current workspace */
@@ -209,12 +212,12 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    readFile: async (path, directoryHandle, workspaceId, readPolicy) => {
+    readFile: async (path, directoryHandle, workspaceId, readPolicy, projectId) => {
       set({ isLoading: true, error: null })
 
       try {
         const { workspace } = await getWorkspaceForOperation(workspaceId)
-        const result = await workspace.readFile(path, directoryHandle, { policy: readPolicy })
+        const result = await workspace.readFile(path, directoryHandle, { policy: readPolicy, projectId })
 
         set({ isLoading: false })
 
@@ -226,12 +229,12 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    writeFile: async (path, content, directoryHandle, workspaceId) => {
+    writeFile: async (path, content, directoryHandle, workspaceId, projectId) => {
       set({ isLoading: true, error: null })
 
       try {
         const { workspace, workspaceId: targetWorkspaceId } = await getWorkspaceForOperation(workspaceId)
-        await workspace.writeFile(path, content, directoryHandle)
+        await workspace.writeFile(path, content, directoryHandle, projectId)
 
         // Update state
         const { useWorkspaceStore } = await import('./workspace.store')
@@ -265,12 +268,12 @@ export const useOPFSStore = create<OPFSState>()(
       }
     },
 
-    deleteFile: async (path, directoryHandle, workspaceId) => {
+    deleteFile: async (path, directoryHandle, workspaceId, projectId) => {
       set({ isLoading: true, error: null })
 
       try {
         const { workspace, workspaceId: targetWorkspaceId } = await getWorkspaceForOperation(workspaceId)
-        await workspace.deleteFile(path, directoryHandle)
+        await workspace.deleteFile(path, directoryHandle, projectId)
 
         // Update state
         const { useWorkspaceStore } = await import('./workspace.store')

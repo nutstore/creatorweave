@@ -56,8 +56,19 @@ interface TreeNode {
 interface FileTreePanelBaseProps {
   directoryHandle: FileSystemDirectoryHandle | null
   rootName?: string | null
+  /** Prefix for OPFS path matching in multi-root mode (e.g., "my-app"). Pending/cached paths in OPFS store use "{prefix}/path" format. */
+  pathPrefix?: string | null
   selectedPath?: string | null
   showHeader?: boolean
+  /**
+   * When set, the tree will programmatically expand all ancestor directories
+   * to make this file visible, select it, and scroll it into view.
+   * The value is a relative path within this root (no rootName prefix).
+   * Set to null to clear.
+   */
+  revealTarget?: string | null
+  /** Called when revealTarget has been processed (tree expanded & file selected) */
+  onRevealComplete?: () => void
 }
 
 type FileTreePanelProps =
@@ -229,6 +240,7 @@ function TreeNodeRow({
   selected,
   pendingType,
   approvedNotSynced,
+  rootName,
   onClick,
   onInspect,
 }: {
@@ -238,6 +250,7 @@ function TreeNodeRow({
   selected: boolean
   pendingType: PendingChange['type'] | null
   approvedNotSynced: boolean
+  rootName?: string | null
   onClick: () => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
 }) {
@@ -262,11 +275,11 @@ function TreeNodeRow({
     setContextMenuOpen(false)
   }
 
-  /** Copy path to clipboard */
+  /** Copy path to clipboard (with rootName prefix for multi-root mode) */
   const handleCopyPath = async () => {
     try {
-      await navigator.clipboard.writeText(node.path)
-
+      const fullPath = rootName ? `${rootName}/${node.path}` : node.path
+      await navigator.clipboard.writeText(fullPath)
     } catch (error) {
       console.error('[FileTree] Failed to copy path:', error)
     }
@@ -298,6 +311,7 @@ function TreeNodeRow({
     <>
       <div
         ref={rowRef}
+        data-tree-path={node.path}
         className={`group flex cursor-pointer items-center gap-2 rounded-md h-7 pr-3 text-xs transition-colors ${
           selected
             ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
@@ -355,15 +369,13 @@ function TreeNodeRow({
             className="z-dropdown fixed min-w-[6rem] overflow-hidden rounded border bg-popover py-0.5 shadow-md"
             style={{ left: contextMenuPos.x + 20, top: contextMenuPos.y }}
           >
-            {!isDir && (
-              <button
-                className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
-                onClick={handleCopyPath}
-              >
-                <Copy className="h-3 w-3" />
-                <span>{t('fileTree.copyPath')}</span>
-              </button>
-            )}
+            <button
+              className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
+              onClick={handleCopyPath}
+            >
+              <Copy className="h-3 w-3" />
+              <span>{t('fileTree.copyPath')}</span>
+            </button>
             {!isDir && onInspect && node.path.endsWith('.html') && (
               <button
                 className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none hover:bg-accent"
@@ -394,6 +406,7 @@ function TreeBranch({
   onNodeClick,
   onInspect,
   approvedNotSyncedPaths,
+  rootName,
 }: {
   nodes: TreeNode[]
   depth: number
@@ -401,6 +414,7 @@ function TreeBranch({
   selectedPath: string | null
   pendingMap: Map<string, PendingChange['type']>
   approvedNotSyncedPaths: Set<string>
+  rootName?: string | null
   onToggle: (node: TreeNode) => void
   onNodeClick: (node: TreeNode) => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
@@ -428,6 +442,7 @@ function TreeBranch({
               selected={selected}
               pendingType={pendingType}
               approvedNotSynced={approvedNotSynced}
+              rootName={rootName}
               onClick={() => onNodeClick(node)}
               onInspect={onInspect ? (path, handle) => onInspect(path, handle) : undefined}
             />
@@ -439,6 +454,7 @@ function TreeBranch({
                 selectedPath={selectedPath}
                 pendingMap={pendingMap}
                 approvedNotSyncedPaths={approvedNotSyncedPaths}
+                rootName={rootName}
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
                 onInspect={onInspect}
@@ -454,12 +470,15 @@ function TreeBranch({
 export function FileTreePanel({
   directoryHandle,
   rootName,
+  pathPrefix,
   onFileSelect,
   onDirectorySelect,
   onInspect,
   selectedPath,
   mode = 'all',
   showHeader = true,
+  revealTarget,
+  onRevealComplete,
 }: FileTreePanelProps) {
   const t = useT()
   const [rootNodes, setRootNodes] = useState<TreeNode[]>([])
@@ -473,33 +492,64 @@ export function FileTreePanel({
   const approvedNotSyncedPaths = useOPFSStore((state) => state.approvedNotSyncedPaths)
   const cachedPaths = useOPFSStore((state) => state.cachedPaths)
 
-  // Build a map of file paths to pending change types for O(1) lookup
+  // Prefix for OPFS path matching: in multi-root mode, OPFS paths include the root name
+  const prefix = pathPrefix ? `${pathPrefix}/` : ''
+
+  // Filter approved-not-synced paths to only those belonging to this root
+  const rootApprovedNotSyncedPaths = useMemo(() => {
+    if (!prefix) return approvedNotSyncedPaths
+    const result = new Set<string>()
+    for (const p of approvedNotSyncedPaths) {
+      if (p.startsWith(prefix)) {
+        result.add(p.slice(prefix.length))
+      }
+    }
+    return result
+  }, [approvedNotSyncedPaths, prefix])
+
+  // Filter pending changes to only those belonging to this root, stripping the prefix
+  const rootPendingChanges = useMemo(() => {
+    if (!prefix) return pendingChanges
+    return pendingChanges
+      .filter((c) => c.path.startsWith(prefix))
+      .map((c) => ({ ...c, path: c.path.slice(prefix.length) }))
+  }, [pendingChanges, prefix])
+
+  // Filter cached paths to only those belonging to this root, stripping the prefix
+  const rootCachedPaths = useMemo(() => {
+    if (!prefix) return cachedPaths
+    return cachedPaths
+      .filter((p) => p.startsWith(prefix))
+      .map((p) => p.slice(prefix.length))
+  }, [cachedPaths, prefix])
+
+  // Build a map of local file paths to pending change types for O(1) lookup
   const pendingMap = useMemo(() => {
     const map = new Map<string, PendingChange['type']>()
-    for (const change of pendingChanges) {
+    for (const change of rootPendingChanges) {
       map.set(change.path, change.type)
     }
     return map
-  }, [pendingChanges])
+  }, [rootPendingChanges])
 
   /** Get pending create changes that belong to a specific parent directory */
   const getPendingCreatesForPath = useCallback(
     (parentPath: string): PendingChange[] => {
-      return pendingChanges.filter((change) => {
+      return rootPendingChanges.filter((change) => {
         if (change.type !== 'create') return false
         // Check if the file's parent matches the parentPath
         const parentOfFile = change.path.split('/').slice(0, -1).join('/')
         return parentOfFile === parentPath
       })
     },
-    [pendingChanges]
+    [rootPendingChanges]
   )
 
   /** Get pending create subdirectory names that don't exist on disk */
   const getPendingCreateSubdirs = useCallback(
     (parentPath: string, diskSubdirs: Set<string>): string[] => {
       const subdirs = new Set<string>()
-      for (const change of pendingChanges) {
+      for (const change of rootPendingChanges) {
         if (change.type !== 'create') continue
         // Check if the path is under parentPath
         const expectedPrefix = parentPath ? `${parentPath}/` : ''
@@ -518,7 +568,7 @@ export function FileTreePanel({
       }
       return Array.from(subdirs)
     },
-    [pendingChanges]
+    [rootPendingChanges]
   )
 
   /** Check if a file/directory name should be hidden */
@@ -690,13 +740,13 @@ export function FileTreePanel({
       // Add subdirectories inferred from cached OPFS files.
       // Needed when changes are approved (no longer pending) but not yet synced to disk.
       const namesAfterPendingSubdirs = new Set(children.map((c) => c.name))
-      addCachedSubdirsAtLevel(children, cachedPaths, parentPath, namesAfterPendingSubdirs)
+      addCachedSubdirsAtLevel(children, rootCachedPaths, parentPath, namesAfterPendingSubdirs)
 
       // Add cached files from OPFS that are not already in children
       // and not pending creates (already handled above)
       // This works for both OPFS-only mode (dirHandle=null) and disk+OPFS mode
       const existingNames = new Set(children.map((c) => c.name))
-      addCachedFilesAtLevel(children, cachedPaths, parentPath, existingNames, pendingCreates)
+      addCachedFilesAtLevel(children, rootCachedPaths, parentPath, existingNames, pendingCreates)
 
       return children
     },
@@ -705,7 +755,7 @@ export function FileTreePanel({
       mode,
       getPendingCreatesForPath,
       getPendingCreateSubdirs,
-      cachedPaths,
+      rootCachedPaths,
       addCachedFilesAtLevel,
       addCachedSubdirsAtLevel,
     ]
@@ -812,8 +862,123 @@ export function FileTreePanel({
     [onFileSelect, onDirectorySelect, handleToggle]
   )
 
+  /**
+   * Generation counter to cancel in-flight revealPath operations when
+   * the tree is reset (project switch, directoryHandle change, etc.)
+   */
+  const revealGenRef = useRef(0)
+
+  /**
+   * Programmatically expand the tree to reveal a target file path.
+   * Works by iteratively finding each directory segment, loading its children
+   * if needed, and expanding it. Finally selects the target file.
+   */
+  const revealPath = useCallback(
+    async (targetPath: string): Promise<void> => {
+      if (!targetPath) return
+
+      // Wait for initial load to complete
+      if (!loaded || loading) return
+
+      const gen = revealGenRef.current
+      const segments = targetPath.split('/')
+      const newExpanded = new Set(expandedPaths)
+      let currentNodes = rootNodes
+      let mutated = false
+
+      // Walk through each directory segment (all except the last = file)
+      for (let i = 0; i < segments.length - 1; i++) {
+        // Check if tree was reset during async operation
+        if (revealGenRef.current !== gen) return
+
+        const dirPath = segments.slice(0, i + 1).join('/')
+
+        // Find the directory node at current level
+        let found = currentNodes.find((n) => n.path === dirPath)
+
+        if (!found) {
+          console.warn(`[FileTree] revealPath: directory "${dirPath}" not found in tree`)
+          break
+        }
+
+        if (found.kind !== 'directory') {
+          console.warn(`[FileTree] revealPath: "${dirPath}" is not a directory`)
+          break
+        }
+
+        // Load children if not yet loaded
+        if (!found.loaded) {
+          try {
+            const children = await loadChildren(
+              found.handle as FileSystemDirectoryHandle | null,
+              found.path
+            )
+            // Check cancellation after async
+            if (revealGenRef.current !== gen) return
+            found.children = children
+            found.loaded = true
+            mutated = true
+          } catch (error) {
+            console.error(`[FileTree] revealPath: failed to load "${found.path}":`, error)
+            return
+          }
+        }
+
+        // Expand this directory
+        if (!newExpanded.has(found.path)) {
+          newExpanded.add(found.path)
+        }
+
+        // Move into children for next iteration
+        currentNodes = found.children || []
+      }
+
+      // Final cancellation check before applying state
+      if (revealGenRef.current !== gen) return
+
+      // Apply expanded paths
+      setExpandedPaths(newExpanded)
+      if (mutated) {
+        setRootNodes((prev) => [...prev])
+      }
+
+      // Find the target file node to select it (trigger onFileSelect)
+      const targetFileName = segments[segments.length - 1]
+      const targetNode = currentNodes.find(
+        (n) => n.name === targetFileName && n.kind === 'file'
+      )
+      if (targetNode) {
+        onFileSelect?.(targetNode.path, targetNode.handle as FileSystemFileHandle)
+      }
+
+      // Scroll into view after React renders
+      requestAnimationFrame(() => {
+        if (revealGenRef.current !== gen) return
+        const selectedEl = document.querySelector(
+          `[data-tree-path="${CSS.escape(targetPath)}"]`
+        )
+        if (selectedEl) {
+          selectedEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+        }
+      })
+    },
+    [loaded, loading, expandedPaths, rootNodes, loadChildren, onFileSelect]
+  )
+
+  // React to revealTarget prop changes
+  useEffect(() => {
+    if (!revealTarget || !loaded) return
+    let cancelled = false
+    revealPath(revealTarget).then(() => {
+      if (!cancelled) onRevealComplete?.()
+    })
+    return () => { cancelled = true }
+  }, [revealTarget, loaded, revealPath, onRevealComplete])
+
   // Reset states when directoryHandle changes or workspace is cleared
   useEffect(() => {
+    // Bump generation to cancel any in-flight revealPath
+    revealGenRef.current++
     // Always reset tree state when directoryHandle changes.
     // Also reset when there is no activeWorkspaceId (project switched /
     // workspace cleared) so stale OPFS data doesn't leak into the tree.
@@ -917,7 +1082,8 @@ export function FileTreePanel({
               expandedPaths={expandedPaths}
               selectedPath={selectedPath || null}
               pendingMap={pendingMap}
-              approvedNotSyncedPaths={approvedNotSyncedPaths}
+              approvedNotSyncedPaths={rootApprovedNotSyncedPaths}
+              rootName={rootName}
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
               onInspect={onInspect}

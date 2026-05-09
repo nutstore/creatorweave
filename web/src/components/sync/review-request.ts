@@ -3,7 +3,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getActiveConversation } from '@/store/conversation-context.store'
-import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
+import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import type { FileChange } from '@/opfs/types/opfs-types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 
@@ -69,7 +69,7 @@ async function buildReviewMessage(changes: FileChange[]): Promise<string> {
     let beforeText = ''
     let afterText = ''
     if (change.type !== 'add' && nativeDir) {
-      const text = await readFileFromNativeFS(nativeDir, change.path)
+      const text = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
       beforeText = text ?? ''
     }
     if (change.type !== 'delete') {

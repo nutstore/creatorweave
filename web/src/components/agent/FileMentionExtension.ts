@@ -10,6 +10,7 @@ export interface FileMentionItem {
   path: string
   name: string
   extension?: string
+  isDirectory?: boolean
 }
 
 export interface FileMentionOptions {

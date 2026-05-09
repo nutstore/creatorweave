@@ -8,11 +8,12 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
-import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
+import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
+import { isCustomProviderType } from '@/agent/providers/types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import {
   BrandButton,
@@ -237,7 +238,11 @@ export function PendingSyncPanel() {
     conflicts: [...a.conflicts, ...b.conflicts],
   }), [])
 
-  const generateSummaryWithLLM = useCallback(async (paths: string[], signal?: AbortSignal): Promise<string | null> => {
+  const generateSummaryWithLLM = useCallback(async (
+    paths: string[],
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string | null> => {
     try {
       const activeConversation = await getActiveConversation()
       signal?.throwIfAborted()
@@ -259,6 +264,9 @@ export function PendingSyncPanel() {
         providerType,
         baseUrl: effectiveConfig.baseUrl,
         model: effectiveConfig.modelName,
+        apiMode: isCustomProviderType(providerType)
+          ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
+          : undefined,
       })
 
       const selectedChanges = (pendingChanges?.changes || []).filter((c) => paths.includes(c.path))
@@ -288,7 +296,7 @@ export function PendingSyncPanel() {
         let beforeText = ''
         let afterText = ''
         if (change.type !== 'add' && nativeDir) {
-          const text = await readFileFromNativeFS(nativeDir, change.path)
+          const text = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
           beforeText = text ?? ''
         }
         if (change.type !== 'delete') {
@@ -317,14 +325,23 @@ export function PendingSyncPanel() {
       signal?.throwIfAborted()
       const prompt = buildSnapshotSummaryPrompt(selectedChanges.length, changesText, diffSections)
 
-      const response = await provider.chat({
+      // Use streaming to show text incrementally
+      let content = ''
+      for await (const chunk of provider.chatStream({
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 220,
-      }, signal)
+        disableThinking: true,
+      }, signal)) {
+        const delta = chunk.choices[0]?.delta?.content
+        if (delta) {
+          content += delta
+          onChunk(content.slice(0, 3000))
+        }
+      }
       signal?.throwIfAborted()
-      const content = response.choices[0]?.message?.content?.trim()
-      if (!content) return null
-      return content.slice(0, 3000)
+      const trimmed = content.trim()
+      if (!trimmed) return null
+      return trimmed.slice(0, 3000)
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return null
       return null
@@ -826,7 +843,12 @@ export function PendingSyncPanel() {
           const controller = new AbortController()
           summaryAbortRef.current = controller
           setGeneratingSummary(true)
-          const aiSummary = await generateSummaryWithLLM(pendingApprovePaths, controller.signal)
+          setSnapshotSummary('')
+          const aiSummary = await generateSummaryWithLLM(
+            pendingApprovePaths,
+            (chunk) => setSnapshotSummary(chunk),
+            controller.signal,
+          )
           // Only update state if this controller is still the active one
           // (prevents a cancelled first call from resetting spinner during a second call)
           if (summaryAbortRef.current !== controller) return

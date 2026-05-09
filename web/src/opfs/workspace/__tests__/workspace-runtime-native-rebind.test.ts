@@ -96,10 +96,9 @@ describe('WorkspaceRuntime native bind rebase', () => {
     expect(result).toEqual({
       checked: 0,
       rebased: 0,
-      skipped: 0,
+      skipped: 3,
       conflicts: 0,
     })
-    expect(repoMock.listActivePendingOps).not.toHaveBeenCalled()
+    expect(repoMock.listActivePendingOps).toHaveBeenCalledWith('w1')
   })
 })
-

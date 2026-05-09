@@ -209,12 +209,14 @@ describe('io read tool', () => {
       1,
       'src/components/agent/ConversationView.tsx',
       null,
+      undefined,
       undefined
     )
     expect(readFileMock).toHaveBeenNthCalledWith(
       2,
       'src/components/agent/ConversationView.tsx',
       nativeHandle,
+      undefined,
       undefined
     )
   })
@@ -235,7 +237,7 @@ describe('io read tool', () => {
     expect(data.results[0]?.path).toBe('a.txt')
     expect(data.results[0]?.content).toBe('line1\nline2')
     expect(readFileMock).toHaveBeenCalledOnce()
-    expect(readFileMock).toHaveBeenCalledWith('a.txt', null, undefined)
+    expect(readFileMock).toHaveBeenCalledWith('a.txt', null, undefined, undefined)
   })
 
   it('validates max_size must be greater than 0', async () => {

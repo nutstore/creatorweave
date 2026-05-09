@@ -1,384 +1,283 @@
 /**
- * FolderSelector - Folder selector component
+ * FolderSelector - Multi-root folder management component
  *
  * Features:
- * - Select folder (direct click when no folder selected)
- * - Switch folder (dropdown when folder selected)
- * - Restore folder handle permission
- * - Release folder handle
- * - Copy folder path
+ * - No roots: show "Open Folder" button → pickDirectory
+ * - Has roots: show root chips + [+] add button
+ * - Each chip: root name, lock icon if read-only
+ * - Chip dropdown: restore permission, toggle read-only, remove
+ * - Handles permission restoration
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { FolderOpen, ChevronDown, Copy, RefreshCw, Loader2, AlertCircle } from 'lucide-react'
-import { useCurrentFolderAccess, useFolderAccessStore } from '@/store/folder-access.store'
-import { useAgentStore } from '@/store/agent.store'
+import {
+  FolderOpen,
+  Plus,
+  Lock,
+  X,
+  RefreshCw,
+  Loader2,
+} from 'lucide-react'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 import { getRuntimeCapability } from '@/storage/runtime-capability'
+import { bindRuntimeDirectoryHandle } from '@/native-fs'
 import { useT } from '@/i18n'
 import { cn } from '@/lib/utils'
-
-type MenuState = 'closed' | 'open' | 'selecting'
+import type { RootInfo } from '@/types/folder-access'
 
 export function FolderSelector() {
   const t = useT()
-  const folderAccess = useCurrentFolderAccess()
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const [menuState, setMenuState] = useState<MenuState>('closed')
-  const [localError, setLocalError] = useState<string | null>(null)
-  const [showStorageWarning, setShowStorageWarning] = useState(false)
-  const [isRetryingStorage, setIsRetryingStorage] = useState(false)
+  // Multi-root state
+  const { roots, activeProjectId, addRoot, removeRoot, loadRoots, toggleReadOnly } =
+    useFolderAccessStore()
 
-  // Request persistent storage on first interaction
-  useEffect(() => {
-    let requested = false
+  // UI state
+  const [activeChip, setActiveChip] = useState<string | null>(null) // root.id of open dropdown
+  const [isAdding, setIsAdding] = useState(false)
 
-    const requestStorage = async () => {
-      if (requested) return
-      requested = true
-
-      try {
-        if ('storage' in navigator && 'persist' in navigator.storage) {
-          const persisted = await navigator.storage.persist()
-          if (!persisted) {
-            setShowStorageWarning(true)
-          }
-        }
-      } catch (e) {
-        console.error('[Storage] Error:', e)
-      }
-    }
-
-    const handleInteraction = () => requestStorage()
-    window.addEventListener('click', handleInteraction, { once: true })
-    window.addEventListener('keydown', handleInteraction, { once: true })
-    window.addEventListener('touchstart', handleInteraction, { once: true })
-
-    return () => {
-      window.removeEventListener('click', handleInteraction)
-      window.removeEventListener('keydown', handleInteraction)
-      window.removeEventListener('touchstart', handleInteraction)
-    }
-  }, [])
-
-  const isMenuOpen = menuState === 'open'
-  const isSelecting = folderAccess.isRequesting
-  const isLoading = folderAccess.isChecking || folderAccess.isReleasing
   const runtimeCapability = getRuntimeCapability()
   const canPickDirectory = runtimeCapability.canPickDirectory
 
-  const {
-    pickDirectory,
-    requestPermission,
-    release,
-    folderName,
-    handle: directoryHandle,
-    projectId,
-    error,
-  } = folderAccess
-
-  // Click outside to close menu
+  // Click outside to close dropdown
   useEffect(() => {
-    if (!isMenuOpen) return
-
+    if (!activeChip) return
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setMenuState('closed')
-        setLocalError(null)
+        setActiveChip(null)
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isMenuOpen])
+  }, [activeChip])
 
-  // Handle permission restore button click
-  const handleRestorePermission = async () => {
-    if (!projectId || !folderAccess.isNeedsActivation) return
+  // Load roots on mount/project change
+  useEffect(() => {
+    loadRoots()
+  }, [activeProjectId, loadRoots])
 
+  const handleAddRoot = useCallback(async () => {
+    if (!canPickDirectory || isAdding) return
+    setIsAdding(true)
     try {
-      console.log('[FolderSelector] Requesting permission for folder')
-      const granted = await requestPermission(projectId)
-      if (!granted) {
-        setLocalError(t('folderSelector.permissionDenied'))
-        return
-      }
-
-      // Sync to agent.store
-      const folderRecord = useFolderAccessStore.getState().getRecord()
-      if (folderRecord) {
-        useAgentStore.setState({
-          directoryHandle: folderRecord.handle,
-          directoryName: folderRecord.folderName,
-          pendingHandle: folderRecord.persistedHandle,
-        })
-      }
-    } catch (err) {
-      console.error('[FolderSelector] Permission request error:', err)
-      setLocalError(err instanceof Error ? err.message : t('folderSelector.permissionDenied'))
+      await addRoot()
+    } finally {
+      setIsAdding(false)
     }
-  }
+  }, [addRoot, canPickDirectory, isAdding])
 
-  const handleToggle = () => {
-    if (isSelecting || isLoading) return
+  const handleRemoveRoot = useCallback(
+    async (root: RootInfo) => {
+      const confirmed = window.confirm(
+        t('projectRoots.confirmRemove', { name: root.name })
+      )
+      if (!confirmed) return
+      await removeRoot(root.id)
+      setActiveChip(null)
+    },
+    [removeRoot, t]
+  )
 
-    // If needs user activation, don't toggle menu
-    // User should click the restore button instead
-    if (folderAccess.isNeedsActivation) {
-      return
-    }
+  const handleRestorePermission = useCallback(
+    async (root: RootInfo) => {
+      if (!activeProjectId || !root.persistedHandle) return
+      try {
+        const permission = await root.persistedHandle.requestPermission({ mode: 'readwrite' })
+        if (permission) {
+          bindRuntimeDirectoryHandle(activeProjectId, root.name, root.persistedHandle)
+          await loadRoots()
 
-    if (!directoryHandle) {
-      if (!canPickDirectory) {
-        return
-      }
-      handleSelectFolder()
-      return
-    }
-
-    setMenuState(isMenuOpen ? 'closed' : 'open')
-    setLocalError(null)
-  }
-
-  const handleSelectFolder = async () => {
-    if (!projectId) return
-    if (!canPickDirectory) {
-      setLocalError(t('folderSelector.sandboxMode'))
-      return
-    }
-
-    setMenuState('selecting')
-    setLocalError(null)
-
-    try {
-      const success = await pickDirectory(projectId)
-
-      if (success) {
-        // On success, sync state and close menu
-        const folderRecord = useFolderAccessStore.getState().getRecord()
-        if (folderRecord) {
+          // Sync to agent.store
+          const { useAgentStore } = await import('@/store/agent.store')
           useAgentStore.setState({
-            directoryHandle: folderRecord.handle,
-            directoryName: folderRecord.folderName,
-            pendingHandle: folderRecord.persistedHandle,
+            directoryHandle: root.persistedHandle,
+            directoryName: root.name,
           })
+
+          toast.success(t('projectRoots.permissionRestored'))
+          setActiveChip(null)
+        } else {
+          toast.error(t('projectRoots.permissionDenied'))
         }
-        setMenuState('closed')
-      } else {
-        // On user cancel or failure, keep menu open or restore previous state
-        setMenuState(directoryHandle ? 'open' : 'closed')
-        setLocalError(t('folderSelector.selectionFailed'))
+      } catch (error) {
+        console.error('[FolderSelector] Failed to restore permission:', error)
+        toast.error(t('projectRoots.permissionFailed'))
       }
-    } catch (err) {
-      console.error('[FolderSelector] Select folder error:', err)
-      setLocalError(err instanceof Error ? err.message : t('folderSelector.selectionFailed'))
-      setMenuState(directoryHandle ? 'open' : 'closed')
-    }
-  }
+    },
+    [activeProjectId, loadRoots, t]
+  )
 
-  const handleRelease = async () => {
-    if (!projectId) return
+  const handleToggleReadOnly = useCallback(
+    async (rootId: string) => {
+      await toggleReadOnly(rootId)
+      setActiveChip(null)
+    },
+    [toggleReadOnly]
+  )
 
-    await release(projectId)
-
-    // Sync clear state to agent.store
-    useAgentStore.setState({
-      directoryHandle: null,
-      directoryName: null,
-      pendingHandle: null,
-    })
-
-    setMenuState('closed')
-    setLocalError(null)
-  }
-
-  const handleCopyPath = async () => {
-    if (folderName) {
-      await navigator.clipboard.writeText(folderName)
-      setMenuState('closed')
-    }
-  }
-
-  // Button content
-  const renderButtonContent = () => {
-    if (folderAccess.isChecking || isLoading) {
-      return (
-        <>
-          <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" />
-          <span className="text-xs font-normal text-secondary">{t('folderSelector.loading')}</span>
-        </>
-      )
-    }
-
-    if (folderAccess.isNeedsActivation) {
-      return (
-        <>
-          <AlertCircle className="h-[14px] w-[14px] text-warning" />
-          <span className="text-xs font-normal text-warning">{t('folderSelector.needsPermissionRestore')}</span>
-        </>
-      )
-    }
-
-    if (directoryHandle && folderName) {
-      return (
-        <>
-          <span className="h-1.5 w-1.5 rounded-full bg-success" />
-          <FolderOpen className="h-[14px] w-[14px] text-primary-600" />
-          <span className="max-w-[120px] truncate text-xs font-normal text-secondary">
-            {folderName}
-          </span>
-          <ChevronDown
-            className={cn('text-tertiary h-3 w-3 transition-transform', isMenuOpen && 'rotate-180')}
-          />
-        </>
-      )
-    }
-
-    if (!canPickDirectory) {
-      return (
-        <>
-          <FolderOpen className="h-[14px] w-[14px]" />
-          <span className="text-xs font-normal text-secondary">{t('folderSelector.sandboxMode')}</span>
-        </>
-      )
-    }
-
+  // No roots: show simple "Open Folder" button
+  if (roots.length === 0) {
     return (
-      <>
-        <FolderOpen className="h-[14px] w-[14px]" />
-        <span className="text-xs font-normal text-secondary">{t('folderSelector.openFolder')}</span>
-      </>
-    )
-  }
-
-  return (
-    <div className="relative flex items-center gap-2" ref={containerRef}>
-      {/* Storage warning - shown on the left of folder button */}
-      {showStorageWarning && (
+      <div className="relative flex items-center gap-2" ref={containerRef}>
         <button
           type="button"
-          onClick={async () => {
-            setIsRetryingStorage(true)
-            try {
-              if ('storage' in navigator && 'persist' in navigator.storage) {
-                const persisted = await navigator.storage.persist()
-                if (persisted) {
-                  setShowStorageWarning(false)
-                  toast.success(t('folderSelector.storageSuccess') || 'Storage persisted')
-                } else {
-                  toast.warning(t('folderSelector.storageFailed') || 'Cannot get persistent storage')
-                }
-              }
-            } catch {
-              toast.error(t('folderSelector.storageRequestFailed') || 'Request failed')
-            } finally {
-              setIsRetryingStorage(false)
-            }
-          }}
-          disabled={isRetryingStorage}
-          className="flex items-center gap-1 rounded bg-yellow-50 px-1.5 py-0.5 text-[10px] text-yellow-600 hover:bg-yellow-100 dark:bg-yellow-950 dark:text-yellow-400 dark:hover:bg-yellow-900"
-          title={t('folderSelector.storageTooltip') || 'Persistent storage not granted. Click to retry.'}
-        >
-          <RefreshCw className={cn('h-2.5 w-2.5', isRetryingStorage && 'animate-spin')} />
-          <span>{t('folderSelector.storageWarning') || 'Cache'}</span>
-        </button>
-      )}
-
-      {/* Restore permission button when needs activation */}
-      {folderAccess.isNeedsActivation && (
-        <button
-          type="button"
-          onClick={handleRestorePermission}
-          disabled={isSelecting}
-          className={cn(
-            'flex h-8 items-center gap-1.5 rounded-md border-2 border-warning bg-warning-bg px-3 py-1',
-            'text-xs font-medium text-warning',
-            'transition-colors hover:bg-warning focus:outline-none focus:ring-2 focus:ring-warning',
-            isSelecting && 'cursor-wait opacity-70'
-          )}
-          title={`${t('folderSelector.restorePermission')} (${folderName || t('folderSelector.unknown')})`}
-        >
-          <AlertCircle className="h-[14px] w-[14px] text-warning" />
-          <span>{t('folderSelector.restorePermission')}</span>
-          {folderName && <span className="text-warning">({folderName})</span>}
-        </button>
-      )}
-
-      {/* Normal folder selector button when no pending handle */}
-      {!folderAccess.isNeedsActivation && (
-        <button
-          type="button"
-          onClick={handleToggle}
-          disabled={isSelecting || isLoading || (!directoryHandle && !canPickDirectory)}
+          onClick={handleAddRoot}
+          disabled={!canPickDirectory || isAdding}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
             'transition-colors hover:bg-primary-50 focus:outline-none dark:border-border dark:bg-card dark:hover:bg-muted',
-            (isSelecting || isLoading) && 'cursor-wait opacity-70',
-            !directoryHandle && !canPickDirectory && 'cursor-not-allowed opacity-70'
+            isAdding && 'cursor-wait opacity-70',
+            !canPickDirectory && 'cursor-not-allowed opacity-70'
           )}
           title={
-            !canPickDirectory && !directoryHandle
+            !canPickDirectory
               ? t('folderSelector.sandboxMode')
-              : folderName
-                ? t('folderSelector.switchFolder')
-                : t('folderSelector.openFolder')
+              : t('folderSelector.openFolder')
           }
         >
-          {renderButtonContent()}
+          {isAdding ? (
+            <Loader2 className="h-[14px] w-[14px] animate-spin text-primary-600" />
+          ) : (
+            <FolderOpen className="h-[14px] w-[14px]" />
+          )}
+          <span className="text-xs font-normal text-secondary">
+            {isAdding ? t('folderSelector.loading') : t('folderSelector.openFolder')}
+          </span>
+        </button>
+      </div>
+    )
+  }
+
+  // Has roots: show chips + [+] button
+  return (
+    <div className="relative flex items-center gap-1.5" ref={containerRef}>
+      {roots.map((root) => (
+        <RootChip
+          key={root.id}
+          root={root}
+          isOpen={activeChip === root.id}
+          onToggle={() => setActiveChip(activeChip === root.id ? null : root.id)}
+          onRemove={() => handleRemoveRoot(root)}
+          onRestorePermission={() => handleRestorePermission(root)}
+          onToggleReadOnly={() => handleToggleReadOnly(root.id)}
+          t={t}
+        />
+      ))}
+
+      {/* Add button */}
+      {canPickDirectory && (
+        <button
+          type="button"
+          onClick={handleAddRoot}
+          disabled={isAdding}
+          className={cn(
+            'flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-border',
+            'text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600',
+            'dark:border-border dark:hover:border-primary-600 dark:hover:bg-muted',
+            isAdding && 'cursor-wait opacity-70'
+          )}
+          title={t('projectRoots.addFolder')}
+        >
+          {isAdding ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}
         </button>
       )}
+    </div>
+  )
+}
+
+/**
+ * Individual root chip with dropdown menu
+ */
+function RootChip({
+  root,
+  isOpen,
+  onToggle,
+  onRemove,
+  onRestorePermission,
+  onToggleReadOnly,
+  t,
+}: {
+  root: RootInfo
+  isOpen: boolean
+  onToggle: () => void
+  onRemove: () => void
+  onRestorePermission: () => void
+  onToggleReadOnly: () => void
+  t: (key: string, params?: Record<string, string>) => string
+}) {
+  const isReady = root.status === 'ready'
+  const needsActivation = root.status === 'needs_user_activation'
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-normal',
+          'transition-colors focus:outline-none',
+          needsActivation
+            ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30'
+            : isReady
+              ? 'border-border bg-white text-secondary hover:bg-primary-50 dark:border-border dark:bg-card dark:hover:bg-muted'
+              : 'border-border bg-card text-muted-foreground hover:bg-muted'
+        )}
+      >
+        {/* Status dot */}
+        <span
+          className={cn(
+            'h-1.5 w-1.5 rounded-full flex-shrink-0',
+            isReady ? 'bg-success' : needsActivation ? 'bg-amber-400' : 'bg-gray-300'
+          )}
+        />
+        <span className="max-w-[100px] truncate">{root.name}</span>
+        {root.readOnly && <Lock className="h-3 w-3 flex-shrink-0 text-muted-foreground" />}
+      </button>
 
       {/* Dropdown menu */}
-      {isMenuOpen && (
-        <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-border bg-white py-1 shadow-lg dark:border-border dark:bg-card">
-          {/* Switch folder */}
-          {canPickDirectory && (
+      {isOpen && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-border bg-white py-1 shadow-lg dark:border-border dark:bg-card"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          {/* Restore permission */}
+          {needsActivation && (
             <button
               type="button"
-              onClick={handleSelectFolder}
-              disabled={isSelecting || isLoading}
-              className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary',
-                'hover:bg-muted dark:hover:bg-muted dark:hover:bg-muted disabled:cursor-wait disabled:opacity-50'
-              )}
+              onClick={onRestorePermission}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
             >
-              <RefreshCw className={cn('h-4 w-4', isSelecting && 'animate-spin')} />
-              <span>{t('folderSelector.switchFolder')}</span>
+              <RefreshCw className="h-4 w-4" />
+              <span>{t('projectRoots.restorePermission')}</span>
             </button>
           )}
 
-          {/* Release handle - only shown when folder is selected */}
-          {directoryHandle && (
-            <button
-              type="button"
-              onClick={handleRelease}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger-bg"
-            >
-              <FolderOpen className="h-4 w-4" />
-              <span>{t('folderSelector.releaseHandle')}</span>
-            </button>
-          )}
+          {/* Toggle read-only */}
+          <button
+            type="button"
+            onClick={onToggleReadOnly}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-muted dark:hover:bg-muted"
+          >
+            <Lock className="h-4 w-4" />
+            <span>{root.readOnly ? t('projectRoots.enableWrite') : t('projectRoots.makeReadOnly')}</span>
+          </button>
 
-          {/* Copy path - only shown when folder is selected */}
-          {directoryHandle && folderName && (
-            <button
-              type="button"
-              onClick={handleCopyPath}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-muted dark:hover:bg-muted dark:hover:bg-muted"
-            >
-              <Copy className="h-4 w-4" />
-              <span>{t('folderSelector.copyPath')}</span>
-            </button>
-          )}
-
-          {/* Error message */}
-          {(localError || error) && (
-            <div className="mx-2 mt-1 rounded bg-danger-bg px-2 py-1 text-xs text-danger">
-              {localError || error}
-            </div>
-          )}
+          {/* Remove */}
+          <button
+            type="button"
+            onClick={onRemove}
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/5"
+          >
+            <X className="h-4 w-4" />
+            <span>{t('projectRoots.removeRoot')}</span>
+          </button>
         </div>
       )}
     </div>

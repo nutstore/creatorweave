@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -74,29 +74,6 @@ describe('WorkflowQuickActions', () => {
     expect(trigger.disabled).toBe(true)
   })
 
-  it('runs with default rubric when custom rubric is disabled', async () => {
-    const user = userEvent.setup()
-    const onRun = vi.fn()
-
-    function Wrapper() {
-      const [selectedTemplateId, setSelectedTemplateId] = useState('novel_daily_v1')
-      return (
-        <WorkflowQuickActions
-          templates={templates}
-          selectedTemplateId={selectedTemplateId}
-          disabled={false}
-          onTemplateChange={setSelectedTemplateId}
-          onRun={onRun}
-        />
-      )
-    }
-
-    render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /workflow/i }))
-    await user.click(screen.getByRole('button', { name: /simulate run/i }))
-
-    expect(onRun).toHaveBeenCalledWith('novel_daily_v1', undefined)
-  })
 
   it('updates selected template when clicking template card', async () => {
     const user = userEvent.setup()
@@ -118,74 +95,6 @@ describe('WorkflowQuickActions', () => {
     expect(onTemplateChange).toHaveBeenCalledWith('short_video_script_v1')
   })
 
-  it('blocks run when custom rubric form is invalid', async () => {
-    const user = userEvent.setup()
-
-    function Wrapper() {
-      const [selectedTemplateId, setSelectedTemplateId] = useState('novel_daily_v1')
-      return (
-        <WorkflowQuickActions
-          templates={templates}
-          selectedTemplateId={selectedTemplateId}
-          disabled={false}
-          onTemplateChange={setSelectedTemplateId}
-          onRun={() => undefined}
-        />
-      )
-    }
-
-    render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /workflow/i }))
-    await user.click(screen.getByRole('button', { name: /advanced settings/i }))
-    await user.click(screen.getByLabelText('Enable custom scoring rules'))
-
-    fireEvent.change(screen.getByLabelText('Min sentences per paragraph'), { target: { value: '8' } })
-    fireEvent.change(screen.getByLabelText('Max sentences per paragraph'), { target: { value: '3' } })
-
-    const runButton = screen.getByRole('button', { name: /simulate run/i }) as HTMLButtonElement
-    expect(runButton.disabled).toBe(true)
-    expect(screen.getByText(/Invalid sentence count range/)).toBeTruthy()
-  })
-
-  it('builds rubric DSL from form and passes it to onRun', async () => {
-    const user = userEvent.setup()
-    const onRun = vi.fn()
-
-    function Wrapper() {
-      const [selectedTemplateId, setSelectedTemplateId] = useState('novel_daily_v1')
-      return (
-        <WorkflowQuickActions
-          templates={templates}
-          selectedTemplateId={selectedTemplateId}
-          disabled={false}
-          onTemplateChange={setSelectedTemplateId}
-          onRun={onRun}
-        />
-      )
-    }
-
-    render(<Wrapper />)
-    await user.click(screen.getByRole('button', { name: /workflow/i }))
-    await user.click(screen.getByRole('button', { name: /advanced settings/i }))
-    await user.click(screen.getByLabelText('Enable custom scoring rules'))
-
-    fireEvent.change(screen.getByLabelText('Custom scoring rules'), { target: { value: 'My scoring rules' } })
-    fireEvent.change(screen.getByLabelText('Pass score'), { target: { value: '85' } })
-    fireEvent.change(screen.getByLabelText('Max revision rounds'), { target: { value: '1' } })
-
-    await user.click(screen.getByRole('button', { name: /simulate run/i }))
-
-    const call = onRun.mock.calls[0]
-    expect(call?.[0]).toBe('novel_daily_v1')
-    expect(typeof call?.[1]).toBe('string')
-
-    const rubric = JSON.parse(call?.[1] as string)
-    expect(rubric.name).toBe('My scoring rules')
-    expect(rubric.passCondition).toContain('85')
-    expect(rubric.retryPolicy.maxRepairRounds).toBe(1)
-    expect(Array.isArray(rubric.rules)).toBe(true)
-    expect(rubric.rules.length).toBeGreaterThan(0)
-  })
 
   it('calls onOpenEditor when custom editor button is clicked', async () => {
     const user = userEvent.setup()

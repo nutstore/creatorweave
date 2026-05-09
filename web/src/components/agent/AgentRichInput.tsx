@@ -7,7 +7,7 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
-import { Plus, Trash2, Check, FileIcon, Paperclip, X, ImageIcon } from 'lucide-react'
+import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
 
@@ -23,8 +23,6 @@ export interface AgentMentionCandidate {
 export interface AgentRichInputValue {
   text: string
   mentionedAgentIds: string[]
-  /** Selected file paths (displayed as tags above the editor). */
-  selectedFiles: string[]
 }
 
 export interface AgentInfo {
@@ -143,7 +141,7 @@ const SuggestionDropdown = forwardRef(
               <button
                 key={getItemKey(item)}
                 type="button"
-                className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors ${
+                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   selected
                     ? selectedColor
                     : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
@@ -288,11 +286,8 @@ export function AgentRichInput({
   const fileSuggestionCommandRef = useRef<((item: FileMentionItem) => void) | null>(null)
   useEffect(() => { fileSuggestionItemsRef.current = fileSuggestionItems }, [fileSuggestionItems])
   useEffect(() => { fileSuggestionCommandRef.current = fileSuggestionCommand }, [fileSuggestionCommand])
-
-  // Selected files – displayed as tags above the editor, not inline in text
-  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
-  const selectedFilesRef = useRef<string[]>([])
-  useEffect(() => { selectedFilesRef.current = selectedFiles }, [selectedFiles])
+  const fileSuggestionRangeRef = useRef<{ from: number; to: number } | null>(null)
+  const fileSuggestionEditorRef = useRef<Editor | null>(null)
 
   const disabledRef = useRef(disabled)
   const onSubmitRef = useRef(onSubmit)
@@ -307,7 +302,7 @@ export function AgentRichInput({
     (editor: Editor) => {
       const text = getPlainText(editor)
       const mentionedAgentIds = getMentionedAgentIds(editor)
-      onChangeRef.current({ text, mentionedAgentIds, selectedFiles: selectedFilesRef.current })
+      onChangeRef.current({ text, mentionedAgentIds })
     },
     [],
   )
@@ -402,31 +397,34 @@ export function AgentRichInput({
                 // Track selection index locally so Enter works even when
                 // the React dropdown hasn't rendered yet (async items).
                 let activeIdx = 0
-                // We save the suggestion range + editor so we can delete the
-                // `#query` trigger text when a file is selected, without
-                // inserting an inline fileMention node.
-                let savedRange: { from: number; to: number } | null = null
-                let savedEditor: Editor | null = null
-
-                /** Select a file: delete the `#query` trigger text and add the path to selectedFiles. */
+                /** Select a file/dir: replace the `#query` trigger with a fileMention node. */
                 const selectFile = (item: FileMentionItem) => {
-                  if (savedRange && savedEditor) {
-                    savedEditor.chain().focus().deleteRange(savedRange).run()
+                  const range = fileSuggestionRangeRef.current
+                  const editorInstance = fileSuggestionEditorRef.current
+                  if (range && editorInstance) {
+                    editorInstance
+                      .chain()
+                      .focus()
+                      .insertContentAt(range, [
+                        {
+                          type: 'fileMention',
+                          attrs: {
+                            path: item.path,
+                            name: item.name,
+                            extension: item.extension ?? '',
+                          },
+                        },
+                        { type: 'text', text: ' ' },
+                      ])
+                      .run()
                   }
-                  setSelectedFiles((prev) => {
-                    const next = prev.includes(item.path) ? prev : [...prev, item.path]
-                    selectedFilesRef.current = next
-                    // Manually emit value since editor onUpdate won't capture selectedFiles change
-                    const text = getPlainText(savedEditor!)
-                    const mentionedAgentIds = getMentionedAgentIds(savedEditor!)
-                    onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
-                    return next
-                  })
                   // Clear suggestion state
                   setFileSuggestionItems([])
                   setFileSuggestionCommand(null)
                   fileSuggestionItemsRef.current = []
                   fileSuggestionCommandRef.current = null
+                  fileSuggestionRangeRef.current = null
+                  fileSuggestionEditorRef.current = null
                 }
 
                 return {
@@ -440,8 +438,8 @@ export function AgentRichInput({
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
                     fileSuggestionCommandRef.current = selectFile
                     activeIdx = 0
-                    savedRange = props.range
-                    savedEditor = props.editor
+                    fileSuggestionRangeRef.current = props.range
+                    fileSuggestionEditorRef.current = props.editor
                   },
                   onUpdate: async (props) => {
                     const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
@@ -450,8 +448,8 @@ export function AgentRichInput({
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
                     fileSuggestionCommandRef.current = selectFile
                     activeIdx = 0
-                    savedRange = props.range
-                    savedEditor = props.editor
+                    fileSuggestionRangeRef.current = props.range
+                    fileSuggestionEditorRef.current = props.editor
                   },
                   onKeyDown: (props) => {
                     if (props.event.key === 'Escape') {
@@ -557,7 +555,6 @@ export function AgentRichInput({
   useEffect(() => {
     if (!editor) return
     editor.commands.clearContent()
-    setSelectedFiles([])
     // Clear pending asset uploads when input resets (message sent)
     useAssetStore.getState().clearAll()
     emitValue(editor)
@@ -746,39 +743,6 @@ export function AgentRichInput({
       <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-14 py-4 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
-            {selectedFiles.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {selectedFiles.map((filePath) => (
-                  <span
-                    key={filePath}
-                    className="inline-flex items-center gap-1 rounded-md bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/60 dark:text-sky-200"
-                  >
-                    <FileIcon className="h-3 w-3 shrink-0 opacity-60" />
-                    <span className="max-w-[200px] truncate">{filePath}</span>
-                    <button
-                      type="button"
-                      className="ml-0.5 rounded p-0.5 hover:bg-sky-200 dark:hover:bg-sky-800"
-                      onClick={() => {
-                        setSelectedFiles((prev) => {
-                          const next = prev.filter((p) => p !== filePath)
-                          selectedFilesRef.current = next
-                          // Notify parent of selectedFiles change
-                          if (editor) {
-                            const text = getPlainText(editor)
-                            const mentionedAgentIds = getMentionedAgentIds(editor)
-                            onChangeRef.current({ text, mentionedAgentIds, selectedFiles: next })
-                          }
-                          return next
-                        })
-                      }}
-                      aria-label={`Remove ${filePath}`}
-                    >
-                      <Trash2 className="h-2.5 w-2.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
             <EditorContent editor={editor} />
 
             {/* Pending asset uploads preview */}
@@ -824,7 +788,7 @@ export function AgentRichInput({
         )}
         {!isFocused && isEmpty && (
           <div
-            className={`pointer-events-none absolute left-11 pr-16 text-sm text-neutral-400 dark:text-neutral-500 ${selectedFiles.length > 0 ? 'top-12' : 'top-4'}`}
+            className="pointer-events-none absolute left-11 top-4 pr-16 text-sm text-neutral-400 dark:text-neutral-500"
           >
             {placeholder}
           </div>
@@ -966,19 +930,25 @@ export function AgentRichInput({
           items={fileSuggestionItems}
           getItemKey={(f) => f.path}
           onSelect={(f) => fileSuggestionCommand?.(f)}
-          width="w-80"
+          width="w-[26rem]"
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file, _selected) => (
             <>
-              <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+              <span className="mt-0.5 shrink-0 text-neutral-400 dark:text-neutral-500">
+                {file.isDirectory ? (
+                  <FolderIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <FileIcon className="h-3.5 w-3.5" />
+                )}
+              </span>
               <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{file.name}</div>
-                <div className="truncate text-xs text-neutral-400 dark:text-neutral-500">
-                  {file.path}
+                <div className="truncate font-medium leading-5">{file.name}</div>
+                <div className="truncate text-[11px] leading-4 text-neutral-400 dark:text-neutral-500">
+                  {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
-              {file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+              {!file.isDirectory && file.extension && (
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}

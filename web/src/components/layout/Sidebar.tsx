@@ -33,48 +33,21 @@ import {
   ContextMenuTrigger,
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
-import { useAgentStore } from '@/store/agent.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useT } from '@/i18n'
 import { ExportConversationDialog } from '@/components/conversation/ExportConversationDialog'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 
 type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 
-const STORAGE_KEY_RATIO = 'sidebar-conversation-ratio'
-
-const DEFAULT_CONVERSATION_RATIO = 50 // percentage
 const MIN_CONVERSATION_RATIO = 20 // minimum percentage
 const MAX_CONVERSATION_RATIO = 80 // maximum percentage
-
-// Load saved conversation ratio from localStorage
-function loadConversationRatio(): number {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_RATIO)
-    if (saved) {
-      const ratio = Number(saved)
-      if (ratio >= MIN_CONVERSATION_RATIO && ratio <= MAX_CONVERSATION_RATIO) {
-        return ratio
-      }
-    }
-  } catch {
-    // Ignore storage errors
-  }
-  return DEFAULT_CONVERSATION_RATIO
-}
-
-// Save conversation ratio to localStorage
-function saveConversationRatio(ratio: number): void {
-  try {
-    localStorage.setItem(STORAGE_KEY_RATIO, String(ratio))
-  } catch {
-    // Ignore storage errors
-  }
-}
 
 interface SidebarProps {
   /** Called when user clicks a file in the tree */
@@ -87,6 +60,10 @@ interface SidebarProps {
   isMobile?: boolean
   /** Request parent to close mobile sidebar */
   onRequestClose?: () => void
+  /** Target file path to reveal in tree (relative path without root prefix) */
+  revealTargetPath?: string | null
+  /** Called when reveal has been processed */
+  onRevealComplete?: () => void
 }
 
 export function Sidebar({
@@ -95,6 +72,8 @@ export function Sidebar({
   selectedFilePath,
   isMobile = false,
   onRequestClose,
+  revealTargetPath,
+  onRevealComplete,
 }: SidebarProps) {
   const t = useT()
 
@@ -109,7 +88,8 @@ export function Sidebar({
     updateTitle,
   } = useConversationStore()
 
-  const { directoryHandle, directoryName } = useAgentStore()
+  // Multi-root: get all roots from folder-access store
+  const roots = useFolderAccessStore((state) => state.roots)
   const workspaceStats = useConversationContextStore((state) => state.workspaces)
   const workspaceIds = workspaceStats.map((w) => w.id)
   const currentPendingCount = useConversationContextStore((state) => state.currentPendingCount)
@@ -132,9 +112,17 @@ export function Sidebar({
     return map
   }, [workspaceStats])
 
-  // Sidebar state
-  const [collapsed, setCollapsed] = useState(false)
-  const [width, setWidth] = useState(320)
+  // Sidebar state — read layout preferences from store
+  const {
+    panelSizes,
+    panelState: storePanelState,
+    setSidebarWidth,
+    setConversationRatio,
+    setSidebarCollapsed,
+  } = useWorkspacePreferencesStore()
+
+  const [collapsed, setCollapsed] = useState(storePanelState.sidebarCollapsed)
+  const width = panelSizes.sidebarWidth
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [workspaceTab, setWorkspaceTab] = useState<'active' | 'archived'>('active')
 
@@ -165,7 +153,7 @@ export function Sidebar({
     [scopedConversations, workspaceStatusMap]
   )
   const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
-  const [conversationRatio, _setConversationRatio] = useState(loadConversationRatio)
+  const conversationRatio = panelSizes.conversationRatio
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
   const [clearingConversations, setClearingConversations] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -177,6 +165,9 @@ export function Sidebar({
   const deleteConfirmRef = useRef<HTMLDivElement>(null)
   const renameInputRef = useRef<HTMLInputElement>(null)
 
+  // Track the target rename ID to prevent click interference
+  const pendingRenameIdRef = useRef<string | null>(null)
+
   const closeMobileSidebar = useCallback(() => {
     if (isMobile) {
       onRequestClose?.()
@@ -185,9 +176,9 @@ export function Sidebar({
 
   // Rename handlers
   const startRename = useCallback((convId: string, currentTitle: string) => {
+    pendingRenameIdRef.current = convId
     setEditingId(convId)
     setEditingTitle(currentTitle)
-    // Focus the input after React renders it
     requestAnimationFrame(() => {
       renameInputRef.current?.focus()
       renameInputRef.current?.select()
@@ -197,7 +188,6 @@ export function Sidebar({
   const confirmRename = useCallback(() => {
     if (editingId && editingTitle.trim()) {
       const trimmedTitle = editingTitle.trim()
-      // Find current conversation to check if title actually changed
       const conv = scopedConversations.find((c) => c.id === editingId)
       if (conv && conv.title !== trimmedTitle) {
         updateTitle(editingId, trimmedTitle)
@@ -205,12 +195,22 @@ export function Sidebar({
     }
     setEditingId(null)
     setEditingTitle('')
+    pendingRenameIdRef.current = null
   }, [editingId, editingTitle, updateTitle, scopedConversations])
+
+  const handleRenameBlur = useCallback(() => {
+    setTimeout(() => {
+      if (document.activeElement !== renameInputRef.current) {
+        confirmRename()
+      }
+    }, 150)
+  }, [confirmRename])
 
   const cancelRename = useCallback(() => {
     setEditingId(null)
     setEditingTitle('')
     setComposing(false)
+    pendingRenameIdRef.current = null
   }, [])
 
   // Drag sidebar width (horizontal)
@@ -223,11 +223,6 @@ export function Sidebar({
     containerHeight: number
   } | null>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
-
-  // Save ratio when it changes
-  useEffect(() => {
-    saveConversationRatio(conversationRatio)
-  }, [conversationRatio])
 
   useEffect(() => {
     if (isMobile && collapsed) {
@@ -279,13 +274,14 @@ export function Sidebar({
   const handleDragStart = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault()
-      dragRef.current = { startX: e.clientX, startWidth: width }
+      const startWidth = width
+      dragRef.current = { startX: e.clientX, startWidth }
 
       const handleMove = (me: MouseEvent) => {
         if (!dragRef.current) return
         const delta = me.clientX - dragRef.current.startX
         const newWidth = Math.max(200, Math.min(400, dragRef.current.startWidth + delta))
-        setWidth(newWidth)
+        setSidebarWidth(newWidth)
       }
 
       const handleUp = () => {
@@ -297,7 +293,7 @@ export function Sidebar({
       document.addEventListener('mousemove', handleMove)
       document.addEventListener('mouseup', handleUp)
     },
-    [width]
+    [width, setSidebarWidth]
   )
 
   // Vertical drag (conversation/resource split)
@@ -321,7 +317,7 @@ export function Sidebar({
 
         // Constrain to min/max values
         newRatio = Math.max(MIN_CONVERSATION_RATIO, Math.min(MAX_CONVERSATION_RATIO, newRatio))
-        _setConversationRatio(newRatio)
+        setConversationRatio(newRatio)
       }
 
       const handleUp = () => {
@@ -333,17 +329,26 @@ export function Sidebar({
       document.addEventListener('mousemove', handleMove)
       document.addEventListener('mouseup', handleUp)
     },
-    [conversationRatio]
+    [conversationRatio, setConversationRatio]
   )
 
-  // Collapsed state
+  // Collapsed state — sync local state with store
+  useEffect(() => {
+    setCollapsed(storePanelState.sidebarCollapsed)
+  }, [storePanelState.sidebarCollapsed])
+
+  const handleSetCollapsed = useCallback((value: boolean) => {
+    setCollapsed(value)
+    setSidebarCollapsed(value)
+  }, [setSidebarCollapsed])
+
   if (collapsed) {
     return (
       <div className="border-subtle flex shrink-0 flex-col border-r bg-white dark:bg-card">
         <BrandButton
           iconButton
           variant="ghost"
-          onClick={() => setCollapsed(false)}
+          onClick={() => handleSetCollapsed(false)}
           title={t('sidebar.expandSidebar')}
         >
           <PanelLeft className="h-4 w-4" />
@@ -383,7 +388,7 @@ export function Sidebar({
                   onRequestClose?.()
                   return
                 }
-                setCollapsed(true)
+                handleSetCollapsed(true)
               }}
               title={isMobile ? t('sidebar.closeSidebar') : t('sidebar.collapseSidebar')}
             >
@@ -473,7 +478,8 @@ export function Sidebar({
                           : 'hover:bg-hover text-secondary'
                       }`}
                       onClick={() => {
-                        if (isEditing) return
+                        // Check both state and ref to handle rapid state changes
+                        if (isEditing || pendingRenameIdRef.current === conv.id) return
                         setActive(conv.id)
                         closeMobileSidebar()
                       }}
@@ -500,22 +506,38 @@ export function Sidebar({
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
                       )}
 
-                      {/* Delete button - visible on hover */}
-                      <button
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded border border-danger/30 bg-danger/10 p-0.5 opacity-0 text-danger transition-all hover:border-danger/50 hover:bg-danger/20 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-1"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          setConfirmDeleteId(conv.id)
-                          // Get button position for portal
-                          const rect = e.currentTarget.getBoundingClientRect()
-                          setConfirmDeletePos({ x: rect.left, y: rect.top })
-                        }}
-                        title={t('sidebar.deleteWorkspace')}
-                        aria-label={t('sidebar.deleteWorkspace')}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      {/* Action buttons - visible on hover */}
+                      {!isEditing && (
+                        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md border border-neutral-200 bg-neutral-100 p-0.5 opacity-0 shadow-sm group-hover:opacity-100 focus-within:opacity-100 transition-opacity dark:border-neutral-600 dark:bg-neutral-700">
+                          <button
+                            className="rounded p-0.5 text-secondary transition-colors hover:bg-neutral-200 hover:text-primary dark:hover:bg-neutral-600 dark:hover:text-primary-300"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              startRename(conv.id, conv.title)
+                            }}
+                            title={t('sidebar.renameWorkspace')}
+                            aria-label={t('sidebar.renameWorkspace')}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                          <div className="mx-0.5 h-3 w-px bg-neutral-300 dark:bg-neutral-500" />
+                          <button
+                            className="rounded p-0.5 text-secondary transition-colors hover:bg-danger/10 hover:text-danger dark:hover:bg-danger/20"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              e.preventDefault()
+                              setConfirmDeleteId(conv.id)
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setConfirmDeletePos({ x: rect.left, y: rect.top })
+                            }}
+                            title={t('sidebar.deleteWorkspace')}
+                            aria-label={t('sidebar.deleteWorkspace')}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
 
                       {isEditing ? (
                         <input
@@ -533,7 +555,7 @@ export function Sidebar({
                               cancelRename()
                             }
                           }}
-                          onBlur={confirmRename}
+                          onBlur={handleRenameBlur}
                           onClick={(e) => e.stopPropagation()}
                           className="min-w-0 flex-1 rounded border border-primary-300 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
                           maxLength={100}
@@ -560,12 +582,6 @@ export function Sidebar({
                         : <Pin className="mr-2 h-3.5 w-3.5" />
                       }
                       {isPinned ? t('sidebar.unpinWorkspace') : t('sidebar.pinWorkspace')}
-                    </ContextMenuItem>
-                    <ContextMenuItem
-                      onClick={() => startRename(conv.id, conv.title)}
-                    >
-                      <Pencil className="mr-2 h-3.5 w-3.5" />
-                      {t('sidebar.renameWorkspace')}
                     </ContextMenuItem>
                     <ContextMenuItem
                       onClick={() => setExportConvId(conv.id)}
@@ -699,13 +715,40 @@ export function Sidebar({
             {/* Tab content */}
             <div className="flex-1 overflow-hidden" data-tour="file-tree">
               {resourceTab === 'files' && (
-                <FileTreePanel
-                  directoryHandle={directoryHandle}
-                  rootName={directoryName}
-                  onFileSelect={handleFileSelect}
-                  selectedPath={selectedFilePath}
-                  onInspect={onInspect}
-                />
+                <div className="custom-scrollbar flex h-full flex-col overflow-y-auto">
+                  {roots.map((root) => {
+                    // Determine if this root should receive the revealTarget
+                    // revealTargetPath is relative (no root prefix)
+                    // In multi-root, we need to check which root matches the selectedFilePath
+                    const rootRevealTarget = (() => {
+                      if (!revealTargetPath) return null
+                      // If selectedFilePath starts with this root name, use the relative path
+                      if (selectedFilePath?.startsWith(`${root.name}/`)) {
+                        return revealTargetPath
+                      }
+                      // Single root case: if there's only one root, always use it
+                      if (roots.length === 1) return revealTargetPath
+                      return null
+                    })()
+
+                    return (
+                    <div key={root.id} className="flex-shrink-0">
+                      <FileTreePanel
+                        directoryHandle={root.handle}
+                        rootName={root.name}
+                        pathPrefix={root.name}
+                        onFileSelect={(path, handle) => {
+                          handleFileSelect(`${root.name}/${path}`, handle)
+                        }}
+                        selectedPath={selectedFilePath?.startsWith(`${root.name}/`) ? selectedFilePath.slice(root.name.length + 1) : null}
+                        onInspect={onInspect ? (path, handle) => onInspect(`${root.name}/${path}`, handle) : undefined}
+                        revealTarget={rootRevealTarget}
+                        onRevealComplete={onRevealComplete}
+                      />
+                    </div>
+                    )
+                  })}
+                </div>
               )}
 
               {resourceTab === 'plugins' && (

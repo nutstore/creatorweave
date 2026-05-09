@@ -11,7 +11,7 @@
  */
 
 import type { LLMProviderType, ModelInfo, ModelCapability } from './types'
-import { LLM_PROVIDER_CONFIGS, PROVIDER_META } from './types'
+import { LLM_PROVIDER_CONFIGS, PROVIDER_META, isCustomProviderType } from './types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -151,10 +151,11 @@ export async function fetchModelsForProvider(
   options?: { apiKey?: string; baseUrl?: string }
 ): Promise<FetchModelsResult> {
   const now = Date.now()
-  const staticModels = PROVIDER_META[providerType]?.models ?? []
+  const isCustom = isCustomProviderType(providerType)
+  const staticModels = isCustom ? [] : (PROVIDER_META[providerType]?.models ?? [])
 
   // Static-only providers always return static list
-  if (STATIC_ONLY_PROVIDERS.includes(providerType)) {
+  if (!isCustom && STATIC_ONLY_PROVIDERS.includes(providerType)) {
     return {
       models: staticModels,
       source: 'static',
@@ -181,7 +182,7 @@ export async function fetchModelsForProvider(
 
     if (providerType === 'google') {
       models = await fetchGoogleModels(apiKey)
-    } else if (OPENAI_COMPATIBLE_PROVIDERS.includes(providerType)) {
+    } else if (isCustom || OPENAI_COMPATIBLE_PROVIDERS.includes(providerType)) {
       models = await fetchOpenAICompatibleModels(baseUrl, apiKey)
     } else {
       // Unknown provider → static fallback
@@ -308,26 +309,131 @@ function guessCapabilities(id: string): ModelCapability[] {
 }
 
 /**
- * Guess context window size based on model ID
+ * Context window registry (static mapping).
+ *
+ * Maintained manually. When adding a new model, add an entry here.
+ * - Exact match has highest priority.
+ * - Prefix match is used as fallback (e.g. "gpt-4o-2024-08-06" matches "gpt-4o").
+ * - Order matters: more specific patterns should come first.
+ *
+ * Last updated: 2025-05
+ */
+const CONTEXT_WINDOW_MAP: Array<{ pattern: string; context: number }> = [
+  // ─── OpenAI ──────────────────────────────────────────────────────────────
+  { pattern: 'gpt-4o', context: 128000 },
+  { pattern: 'gpt-4-turbo', context: 128000 },
+  { pattern: 'gpt-4-0125-preview', context: 128000 },
+  { pattern: 'gpt-4-1106-preview', context: 128000 },
+  { pattern: 'gpt-4-vision', context: 128000 },
+  { pattern: 'gpt-4-32k', context: 32768 },
+  { pattern: 'gpt-4', context: 8192 },
+  { pattern: 'gpt-3.5-turbo-16k', context: 16384 },
+  { pattern: 'gpt-3.5-turbo', context: 16385 },
+  { pattern: 'o4-mini', context: 200000 },
+  { pattern: 'o3', context: 200000 },
+  { pattern: 'o3-mini', context: 200000 },
+  { pattern: 'o1', context: 200000 },
+  { pattern: 'o1-mini', context: 128000 },
+  { pattern: 'o1-pro', context: 200000 },
+
+  // ─── Anthropic ───────────────────────────────────────────────────────────
+  { pattern: 'claude-opus-4', context: 200000 },
+  { pattern: 'claude-sonnet-4', context: 200000 },
+  { pattern: 'claude-3-7-sonnet', context: 200000 },
+  { pattern: 'claude-3-5-sonnet', context: 200000 },
+  { pattern: 'claude-3-5-haiku', context: 200000 },
+  { pattern: 'claude-3-opus', context: 200000 },
+  { pattern: 'claude-3-sonnet', context: 200000 },
+  { pattern: 'claude-3-haiku', context: 200000 },
+  { pattern: 'claude', context: 200000 },
+
+  // ─── Google Gemini ──────────────────────────────────────────────────────
+  { pattern: 'gemini-2.5-pro', context: 1048576 },
+  { pattern: 'gemini-2.5-flash', context: 1048576 },
+  { pattern: 'gemini-2.0-pro', context: 1048576 },
+  { pattern: 'gemini-2.0-flash', context: 1048576 },
+  { pattern: 'gemini-1.5-pro', context: 2097152 },
+  { pattern: 'gemini-1.5-flash', context: 1048576 },
+  { pattern: 'gemini', context: 1048576 },
+
+  // ─── Groq ───────────────────────────────────────────────────────────────
+  { pattern: 'llama-3.3-70b', context: 131072 },
+  { pattern: 'llama-3.1-405b', context: 131072 },
+  { pattern: 'llama-3.1-70b', context: 131072 },
+  { pattern: 'llama-3.1-8b', context: 131072 },
+  { pattern: 'llama3-70b', context: 8192 },
+  { pattern: 'llama3-8b', context: 8192 },
+  { pattern: 'mixtral-8x7b', context: 32768 },
+  { pattern: 'gemma2-9b', context: 8192 },
+
+  // ─── Mistral ────────────────────────────────────────────────────────────
+  { pattern: 'mistral-large', context: 128000 },
+  { pattern: 'mistral-medium', context: 32000 },
+  { pattern: 'mistral-small', context: 32000 },
+  { pattern: 'codestral', context: 256000 },
+  { pattern: 'mistral-7b', context: 32000 },
+  { pattern: 'mixtral-8x22b', context: 65536 },
+  { pattern: 'mixtral-8x7b', context: 32768 },
+
+  // ─── GLM (智谱) ────────────────────────────────────────────────────────
+  { pattern: 'glm-4-plus', context: 128000 },
+  { pattern: 'glm-4-air', context: 128000 },
+  { pattern: 'glm-4-flash', context: 128000 },
+  { pattern: 'glm-4-long', context: 1048576 },
+  { pattern: 'glm-4', context: 128000 },
+  { pattern: 'glm-4v', context: 128000 },
+  { pattern: 'glm', context: 128000 },
+
+  // ─── Kimi (月之暗面) ───────────────────────────────────────────────────
+  { pattern: 'moonshot-v1-128k', context: 131072 },
+  { pattern: 'moonshot-v1-32k', context: 32768 },
+  { pattern: 'moonshot-v1-8k', context: 8192 },
+  { pattern: 'kimi', context: 131072 },
+  { pattern: 'moonshot', context: 131072 },
+
+  // ─── MiniMax ────────────────────────────────────────────────────────────
+  { pattern: 'abab6.5s', context: 245760 },
+  { pattern: 'abab6.5', context: 245760 },
+  { pattern: 'abab5.5', context: 16384 },
+  { pattern: 'minimax', context: 245760 },
+
+  // ─── Qwen (通义千问) ──────────────────────────────────────────────────
+  { pattern: 'qwen-max', context: 32768 },
+  { pattern: 'qwen-plus', context: 131072 },
+  { pattern: 'qwen-turbo', context: 131072 },
+  { pattern: 'qwen-long', context: 1048576 },
+  { pattern: 'qwen2.5', context: 131072 },
+  { pattern: 'qwen2', context: 131072 },
+  { pattern: 'qwen', context: 131072 },
+
+  // ─── DeepSeek ──────────────────────────────────────────────────────────
+  { pattern: 'deepseek-r1', context: 131072 },
+  { pattern: 'deepseek-v3', context: 131072 },
+  { pattern: 'deepseek-chat', context: 131072 },
+  { pattern: 'deepseek-coder', context: 16384 },
+  { pattern: 'deepseek', context: 131072 },
+]
+
+/**
+ * Look up context window size from the static registry.
+ * Exact match first, then prefix match (first match wins).
  */
 function guessContextWindow(id: string): number {
   const lower = id.toLowerCase()
 
-  // Explicit size hints in the ID
+  // 1. Explicit size hints in the ID (e.g. "128k", "32k")
   if (lower.includes('128k')) return 128000
   if (lower.includes('32k')) return 32000
   if (lower.includes('8k')) return 8000
 
-  // Known large context models
-  if (lower.includes('gemini') && (lower.includes('1.5') || lower.includes('2.0'))) return 1000000
-  if (lower.includes('gpt-4') || lower.includes('gpt-4o')) return 128000
-  if (lower.includes('claude')) return 200000
-  if (lower.includes('o1') || lower.includes('o3') || lower.includes('o4')) return 200000
-  if (lower.includes('llama') && lower.includes('3.3')) return 128000
-  if (lower.includes('glm')) return 200000
-  if (lower.includes('qwen')) return 131072
+  // 2. Lookup from registry
+  for (const { pattern, context } of CONTEXT_WINDOW_MAP) {
+    if (lower.startsWith(pattern) || lower.includes(pattern)) {
+      return context
+    }
+  }
 
-  // Default
+  // 3. Default fallback
   return 128000
 }
 

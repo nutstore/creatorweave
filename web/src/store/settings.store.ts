@@ -9,7 +9,14 @@ import { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { LLMProviderType } from '@/agent/providers/types'
-import { LLM_PROVIDER_CONFIGS } from '@/agent/providers/types'
+import {
+  LLM_PROVIDER_CONFIGS,
+  isCustomProviderType,
+  registerDynamicProvider,
+  unregisterDynamicProvider,
+  getProviderConfig,
+  getProviderMeta,
+} from '@/agent/providers/types'
 import type { ThinkingLevel } from '@mariozechner/pi-ai'
 
 // Cache for hasApiKey to avoid repeated database queries
@@ -17,11 +24,16 @@ import type { ThinkingLevel } from '@mariozechner/pi-ai'
 const apiKeyCache = new Map<string, boolean>()
 const apiKeyCachePromise: Map<string, Promise<boolean>> = new Map()
 
+/** API mode for custom providers: chat completions vs OpenAI responses API */
+export type CustomApiMode = 'chat-completions' | 'responses'
+
 export interface CustomProviderConfig {
   id: string
   name: string
   baseUrl: string
   models: string[]
+  /** Which API endpoint format to use. Defaults to 'chat-completions' */
+  apiMode: CustomApiMode
   createdAt: number
   updatedAt: number
 }
@@ -32,13 +44,20 @@ interface EffectiveProviderConfig {
   modelName: string
 }
 
+/** Per-workspace model override */
+export interface WorkspaceModelOverride {
+  providerType: LLMProviderType
+  modelName: string
+  // activeCustomProviderId removed — providerType IS the custom provider id now
+}
+
 interface SettingsState {
   // LLM settings
   providerType: LLMProviderType
   modelName: string
   customBaseUrl: string
+  // Persisted custom provider configs — used to re-register on app load
   customProviders: CustomProviderConfig[]
-  activeCustomProviderId: string
   temperature: number
   maxTokens: number
   maxIterations: number
@@ -52,6 +71,12 @@ interface SettingsState {
   // Use getHasApiKey() or checkHasApiKey() to get the current value
   hasApiKey: boolean
 
+  // Per-workspace model overrides
+  modelOverridesByWorkspace: Record<string, WorkspaceModelOverride>
+
+  // Last used model per provider (for restoring on switch-back)
+  lastUsedModelByProvider: Partial<Record<LLMProviderType, string>>
+
   // Actions
   setProviderType: (type: LLMProviderType) => void
   setModelName: (name: string) => void
@@ -62,9 +87,9 @@ interface SettingsState {
     patch: { name?: string; baseUrl?: string; model?: string }
   ) => boolean
   removeCustomProvider: (providerId: string) => void
-  setActiveCustomProvider: (providerId: string) => void
   addCustomProviderModel: (providerId: string, model: string) => boolean
   removeCustomProviderModel: (providerId: string, model: string) => void
+  setCustomProviderApiMode: (providerId: string, apiMode: import('@/store/settings.store').CustomApiMode) => void
   setTemperature: (temp: number) => void
   setMaxTokens: (tokens: number) => void
   setMaxIterations: (iterations: number) => void
@@ -85,16 +110,63 @@ interface SettingsState {
    * Call this after saving/deleting an API key
    */
   invalidateApiKeyCache: (provider?: string) => void
+
+  /**
+   * Save current model selection to a specific workspace
+   */
+  saveModelOverrideForWorkspace: (workspaceId: string) => void
+
+  /**
+   * Restore model selection from a workspace override (or fallback to defaults)
+   */
+  syncModelForWorkspace: (workspaceId: string | null) => void
+
+  /**
+   * Switch provider and model atomically (used by quick-switcher)
+   */
+  switchProviderAndModel: (providerType: LLMProviderType, modelName: string) => void
+
+  /**
+   * Get all providers that have a saved API key
+   */
+  getAvailableProviders: () => Promise<Array<{
+    providerType: LLMProviderType
+    displayName: string
+    models: Array<{ id: string; name: string }>
+    providerKey: string
+  }>>
+
+  /**
+   * Restore dynamic providers from persisted customProviders on app load
+   */
+  _restoreDynamicProviders: () => void
+}
+
+/** Helper: register a CustomProviderConfig into the dynamic provider registry */
+function registerCustomAsDynamic(cp: CustomProviderConfig) {
+  registerDynamicProvider(
+    cp.id,
+    { baseURL: cp.baseUrl, modelName: cp.models[0] || '', headers: {}, apiMode: cp.apiMode || 'chat-completions' },
+    {
+      category: 'custom',
+      displayName: cp.name,
+      models: cp.models.map((m) => ({
+        id: m,
+        name: m,
+        capabilities: ['code', 'writing'] as const,
+        contextWindow: 128000,
+      })),
+    },
+  )
 }
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
       providerType: 'glm-coding',
-      modelName: 'glm-4.7-flash',
+      modelName: 'glm-5.1',
       customBaseUrl: '',
       customProviders: [],
-      activeCustomProviderId: '',
       temperature: 0.7,
       maxTokens: 4096,
       maxIterations: 20,
@@ -102,20 +174,31 @@ export const useSettingsStore = create<SettingsState>()(
       thinkingLevel: 'medium' as ThinkingLevel,
       enableBatchSpawn: false,
       hasApiKey: false,
+      modelOverridesByWorkspace: {},
+      lastUsedModelByProvider: {},
+
+      _restoreDynamicProviders: () => {
+        const { customProviders } = get()
+        for (const cp of customProviders) {
+          registerCustomAsDynamic(cp)
+        }
+      },
 
       setProviderType: (providerType) => {
         set({ providerType })
-        if (providerType !== 'custom') return
-        const effective = get().getEffectiveProviderConfig()
-        if (effective) {
-          set({
-            customBaseUrl: effective.baseUrl,
-            modelName: effective.modelName,
-          })
-        }
       },
-      setModelName: (modelName) => set({ modelName }),
+      setModelName: (modelName) => {
+        const state = get()
+        set({
+          modelName,
+          lastUsedModelByProvider: {
+            ...state.lastUsedModelByProvider,
+            [state.providerType]: modelName,
+          },
+        })
+      },
       setCustomBaseUrl: (customBaseUrl) => set({ customBaseUrl }),
+
       createCustomProvider: ({ name, baseUrl, model }) => {
         const trimmedName = name.trim()
         const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
@@ -129,19 +212,23 @@ export const useSettingsStore = create<SettingsState>()(
           name: trimmedName,
           baseUrl: trimmedBaseUrl,
           models: [trimmedModel],
+          apiMode: 'chat-completions',
           createdAt: now,
           updatedAt: now,
         }
 
+        // Register in dynamic provider registry
+        registerCustomAsDynamic(provider)
+
         set((state) => ({
           customProviders: [provider, ...state.customProviders],
-          activeCustomProviderId: id,
-          providerType: 'custom',
+          providerType: id,
           customBaseUrl: trimmedBaseUrl,
           modelName: trimmedModel,
         }))
         return true
       },
+
       updateCustomProvider: (providerId, patch) => {
         const providers = get().customProviders
         const target = providers.find((provider) => provider.id === providerId)
@@ -172,45 +259,56 @@ export const useSettingsStore = create<SettingsState>()(
           }),
         }))
 
-        const state = get()
-        if (state.activeCustomProviderId === providerId) {
-          const refreshed = state.customProviders.find((provider) => provider.id === providerId)
+        // Re-register in dynamic registry
+        const updated = get().customProviders.find((p) => p.id === providerId)
+        if (updated) {
+          registerCustomAsDynamic(updated)
+        }
+
+        // If currently active, sync state
+        if (get().providerType === providerId) {
+          const refreshed = get().customProviders.find((p) => p.id === providerId)
           if (refreshed) {
             set({
               customBaseUrl: refreshed.baseUrl,
-              modelName: nextModel ?? state.modelName,
+              modelName: nextModel ?? get().modelName,
             })
           }
         }
 
         return true
       },
+
       removeCustomProvider: (providerId) => {
         const existing = get().customProviders
         const remaining = existing.filter((provider) => provider.id !== providerId)
-        const wasActive = get().activeCustomProviderId === providerId
-        const fallback = remaining[0]
+        const wasActive = get().providerType === providerId
 
-        set({
+        // Unregister from dynamic registry
+        unregisterDynamicProvider(providerId)
+
+        const updates: Partial<SettingsState> = {
           customProviders: remaining,
-          activeCustomProviderId: wasActive ? fallback?.id || '' : get().activeCustomProviderId,
-          customBaseUrl: wasActive ? fallback?.baseUrl || '' : get().customBaseUrl,
-          modelName: wasActive ? fallback?.models[0] || '' : get().modelName,
-        })
+        }
+        if (wasActive) {
+          const fallback = remaining[0]
+          if (fallback) {
+            updates.providerType = fallback.id
+            updates.customBaseUrl = fallback.baseUrl
+            updates.modelName = fallback.models[0] || ''
+          } else {
+            // No custom providers left, switch to default
+            updates.providerType = 'glm-coding'
+            updates.customBaseUrl = ''
+            updates.modelName = 'glm-5.1'
+          }
+        }
+        set(updates as SettingsState)
 
-        apiKeyCache.delete(`custom:${providerId}`)
-        apiKeyCachePromise.delete(`custom:${providerId}`)
+        apiKeyCache.delete(providerId)
+        apiKeyCachePromise.delete(providerId)
       },
-      setActiveCustomProvider: (providerId) => {
-        const provider = get().customProviders.find((item) => item.id === providerId)
-        if (!provider) return
-        set({
-          activeCustomProviderId: provider.id,
-          providerType: 'custom',
-          customBaseUrl: provider.baseUrl,
-          modelName: provider.models[0] || get().modelName,
-        })
-      },
+
       addCustomProviderModel: (providerId, model) => {
         const trimmedModel = model.trim()
         if (!trimmedModel) return false
@@ -229,8 +327,15 @@ export const useSettingsStore = create<SettingsState>()(
               : provider
           ),
         }))
+
+        // Re-register in dynamic registry
+        const updated = get().customProviders.find((p) => p.id === providerId)
+        if (updated) {
+          registerCustomAsDynamic(updated)
+        }
         return true
       },
+
       removeCustomProviderModel: (providerId, model) => {
         const target = get().customProviders.find((provider) => provider.id === providerId)
         if (!target) return
@@ -245,10 +350,33 @@ export const useSettingsStore = create<SettingsState>()(
           ),
         }))
 
-        if (get().activeCustomProviderId === providerId && get().modelName === model) {
+        // Re-register in dynamic registry
+        const updated = get().customProviders.find((p) => p.id === providerId)
+        if (updated) {
+          registerCustomAsDynamic(updated)
+        }
+
+        if (get().providerType === providerId && get().modelName === model) {
           set({ modelName: nextModels[0] })
         }
       },
+
+      setCustomProviderApiMode: (providerId, apiMode) => {
+        set((state) => ({
+          customProviders: state.customProviders.map((provider) =>
+            provider.id === providerId
+              ? { ...provider, apiMode, updatedAt: Date.now() }
+              : provider
+          ),
+        }))
+
+        // Re-register in dynamic registry
+        const updated = get().customProviders.find((p) => p.id === providerId)
+        if (updated) {
+          registerCustomAsDynamic(updated)
+        }
+      },
+
       setTemperature: (temperature) => set({ temperature }),
       setMaxTokens: (maxTokens) => set({ maxTokens }),
       setMaxIterations: (maxIterations) =>
@@ -262,32 +390,16 @@ export const useSettingsStore = create<SettingsState>()(
       setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
+
       getEffectiveProviderConfig: () => {
         const state = get()
-        if (state.providerType !== 'custom') {
-          const config = LLM_PROVIDER_CONFIGS[state.providerType]
-          return {
-            apiKeyProviderKey: state.providerType,
-            baseUrl: config.baseURL,
-            modelName: state.modelName || config.modelName,
-          }
-        }
-
-        const activeCustom =
-          state.customProviders.find((provider) => provider.id === state.activeCustomProviderId) ||
-          state.customProviders[0]
-        if (!activeCustom) return null
-
-        const resolvedModel =
-          state.modelName && activeCustom.models.includes(state.modelName)
-            ? state.modelName
-            : activeCustom.models[0]
-        if (!resolvedModel) return null
+        const config = getProviderConfig(state.providerType)
+        if (!config) return null
 
         return {
-          apiKeyProviderKey: `custom:${activeCustom.id}`,
-          baseUrl: activeCustom.baseUrl,
-          modelName: resolvedModel,
+          apiKeyProviderKey: state.providerType,
+          baseUrl: config.baseURL,
+          modelName: state.modelName || config.modelName,
         }
       },
 
@@ -338,6 +450,99 @@ export const useSettingsStore = create<SettingsState>()(
         apiKeyCache.delete(currentProvider)
         apiKeyCachePromise.delete(currentProvider)
       },
+
+      saveModelOverrideForWorkspace: (workspaceId) => {
+        const state = get()
+        set({
+          modelOverridesByWorkspace: {
+            ...state.modelOverridesByWorkspace,
+            [workspaceId]: {
+              providerType: state.providerType,
+              modelName: state.modelName,
+            },
+          },
+        })
+      },
+
+      syncModelForWorkspace: (workspaceId) => {
+        if (!workspaceId) return
+        const state = get()
+        const override = state.modelOverridesByWorkspace[workspaceId]
+        if (override) {
+          const updates: Partial<SettingsState> = {
+            providerType: override.providerType,
+            modelName: override.modelName,
+          }
+          // If it's a custom provider, also set baseUrl
+          if (isCustomProviderType(override.providerType)) {
+            const cp = state.customProviders.find((p) => p.id === override.providerType)
+            if (cp) {
+              updates.customBaseUrl = cp.baseUrl
+            }
+          }
+          set(updates as SettingsState)
+        }
+      },
+
+      switchProviderAndModel: (newProviderType, newModelName) => {
+        const state = get()
+        const updates: Partial<SettingsState> = {
+          providerType: newProviderType,
+          modelName: newModelName,
+          lastUsedModelByProvider: {
+            ...state.lastUsedModelByProvider,
+            [newProviderType]: newModelName,
+          },
+        }
+        if (isCustomProviderType(newProviderType)) {
+          const cp = state.customProviders.find((p) => p.id === newProviderType)
+          if (cp) {
+            updates.customBaseUrl = cp.baseUrl
+          }
+        }
+        set(updates as SettingsState)
+      },
+
+      getAvailableProviders: async () => {
+        const { loadApiKey } = await import('@/security/api-key-store')
+        const { PROVIDER_META, getModelsForProvider } = await import('@/agent/providers/types')
+        const state = get()
+        const results: Array<{
+          providerType: LLMProviderType
+          displayName: string
+          models: Array<{ id: string; name: string }>
+          providerKey: string
+        }> = []
+
+        // Check built-in providers
+        for (const [type, meta] of Object.entries(PROVIDER_META)) {
+          const providerType = type as LLMProviderType
+          const key = await loadApiKey(providerType)
+          if (key) {
+            results.push({
+              providerType,
+              displayName: meta.displayName,
+              models: getModelsForProvider(providerType).map((m) => ({ id: m.id, name: m.name })),
+              providerKey: providerType,
+            })
+          }
+        }
+
+        // Check custom providers
+        for (const cp of state.customProviders) {
+          const key = await loadApiKey(cp.id)
+          if (key) {
+            results.push({
+              providerType: cp.id,
+              displayName: cp.name,
+              models: cp.models.map((m) => ({ id: m, name: m })),
+              providerKey: cp.id,
+            })
+          }
+        }
+
+        return results
+      },
     }),
     {
       name: 'bfosa-settings',
@@ -347,14 +552,46 @@ export const useSettingsStore = create<SettingsState>()(
         modelName: state.modelName,
         customBaseUrl: state.customBaseUrl,
         customProviders: state.customProviders,
-        activeCustomProviderId: state.activeCustomProviderId,
         temperature: state.temperature,
         maxTokens: state.maxTokens,
         maxIterations: state.maxIterations,
         enableThinking: state.enableThinking,
         thinkingLevel: state.thinkingLevel,
         enableBatchSpawn: state.enableBatchSpawn,
+        modelOverridesByWorkspace: state.modelOverridesByWorkspace,
+        lastUsedModelByProvider: state.lastUsedModelByProvider,
       }),
+      // On rehydration, restore dynamic providers
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          // Migrate old 'custom' providerType to the new dynamic system
+          if ((state.providerType as string) === 'custom') {
+            const first = state.customProviders[0]
+            if (first) {
+              state.providerType = first.id
+              state.modelName = first.models[0] || ''
+              state.customBaseUrl = first.baseUrl
+            } else {
+              state.providerType = 'glm-coding'
+              state.modelName = 'glm-5.1'
+              state.customBaseUrl = ''
+            }
+          }
+          // Migrate old activeCustomProviderId in workspace overrides
+          const overrides = state.modelOverridesByWorkspace
+          for (const wsId of Object.keys(overrides)) {
+            const o = overrides[wsId]
+            if ((o.providerType as string) === 'custom' && (o as any).activeCustomProviderId) {
+              o.providerType = (o as any).activeCustomProviderId
+              delete (o as any).activeCustomProviderId
+            }
+          }
+          // Register all custom providers into dynamic registry
+          for (const cp of state.customProviders) {
+            registerCustomAsDynamic(cp)
+          }
+        }
+      },
     }
   )
 )

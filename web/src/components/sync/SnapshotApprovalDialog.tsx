@@ -68,13 +68,24 @@ export function SnapshotApprovalDialog({
                   {generatingSummary ? t('sidebar.snapshotApproval.generating') : t('sidebar.snapshotApproval.generateAI')}
                 </BrandButton>
               </div>
-              <textarea
-                value={summary}
-                onChange={(e) => onSummaryChange(e.target.value)}
-                rows={8}
-                className="w-full resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
-                placeholder={t('sidebar.snapshotApproval.summaryPlaceholder')}
-              />
+              {generatingSummary ? (
+                // Streaming: read-only display with blinking cursor
+                <div
+                  className="w-full min-h-[10rem] resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary whitespace-pre-wrap break-words overflow-y-auto"
+                >
+                  {summary || ''}
+                  <span className="inline-block w-[2px] h-[1em] bg-primary align-text-bottom animate-pulse" />
+                </div>
+              ) : (
+                // Idle: editable textarea
+                <textarea
+                  value={summary}
+                  onChange={(e) => onSummaryChange(e.target.value)}
+                  rows={8}
+                  className="w-full resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder={t('sidebar.snapshotApproval.summaryPlaceholder')}
+                />
+              )}
               {summaryError && (
                 <p className="text-xs text-warning">{summaryError}</p>
               )}

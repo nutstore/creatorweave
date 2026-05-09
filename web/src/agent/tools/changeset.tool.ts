@@ -1,6 +1,6 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 
 export const detectConflictsDefinition: ToolDefinition = {
@@ -30,7 +30,8 @@ export const detectConflictsExecutor: ToolExecutor = async (args, context) => {
     return toolErrorJson('detect_conflicts', 'no_active_workspace', 'No active workspace')
   }
 
-  const dirHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  // TODO: detectSyncConflicts needs per-path handle resolution for multi-root
+  const { handle: dirHandle } = await resolveNativeDirectoryHandleForPath('', context.directoryHandle, context.workspaceId)
   if (!dirHandle) {
     return toolErrorJson(
       'detect_conflicts',
@@ -154,7 +155,7 @@ export const rollbackSnapshotExecutor: ToolExecutor = async (args, context) => {
     return JSON.stringify({ error: 'No active workspace' })
   }
 
-  const dirHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
+  const { handle: dirHandle } = await resolveNativeDirectoryHandleForPath('', context.directoryHandle, context.workspaceId)
   const result = await active.conversation.rollbackSnapshot(snapshotId, dirHandle)
   await useConversationContextStore.getState().updateCurrentCounts()
   await useConversationContextStore.getState().refreshPendingChanges(true)

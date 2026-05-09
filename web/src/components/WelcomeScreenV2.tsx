@@ -228,6 +228,15 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
         {conversations.length > 0 && (
           <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('welcome.recentHint')}</p>
         )}
+
+        {/* Keyboard shortcut hint */}
+        <p className="mt-4 text-center text-[11px] text-neutral-400 dark:text-neutral-500">
+          <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-0.5 font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">
+            {typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl+'}K
+          </kbd>
+          {' '}
+          {typeof navigator !== 'undefined' && /zh/i.test(navigator.language) ? '打开命令面板' : 'Open command palette'}
+        </p>
       </div>
     </div>
   )

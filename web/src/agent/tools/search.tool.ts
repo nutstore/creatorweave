@@ -1,12 +1,13 @@
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
-import type { PendingFileOverlay } from '@/workers/search-worker-manager'
+import type { PendingFileOverlay, SearchInDirectoryResult } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
 import { getWorkspaceManager } from '@/opfs'
-import { resolveNativeDirectoryHandle } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
 import { resolveVfsTarget } from './vfs-resolver'
+import { rejectPythonMountPath } from './path-guards'
 
 function looksRegexLikeQuery(query: string): boolean {
   // Guard against common LLM misuse where regex operators are passed while regex=false.
@@ -30,7 +31,8 @@ function parseStructuredError(error: unknown): Record<string, unknown> | null {
  * which reads from OPFS cache for files with pending modifications.
  */
 async function collectPendingOverlays(
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  projectId?: string | null
 ): Promise<Record<string, PendingFileOverlay>> {
   try {
     const pendingChanges = useOPFSStore.getState().getPendingChanges()
@@ -58,7 +60,7 @@ async function collectPendingOverlays(
 
       // For modify/create, read the cached content from OPFS
       try {
-        const result = await workspace.readFile(change.path, null)
+        const result = await workspace.readFile(change.path, null, { projectId })
         if (typeof result.content === 'string') {
           overlays[change.path] = { content: result.content }
         }
@@ -73,6 +75,85 @@ async function collectPendingOverlays(
     // Non-critical: if overlay collection fails, search still works from disk
     return {}
   }
+}
+
+/**
+ * Get all root handles for the current project (multi-root aware).
+ */
+async function getAllRootHandles(
+  context: { workspaceId?: string | null; directoryHandle?: FileSystemDirectoryHandle | null; projectId?: string | null }
+): Promise<Map<string, FileSystemDirectoryHandle>> {
+  try {
+    const manager = await getWorkspaceManager()
+    const workspaceId = context.workspaceId
+    if (workspaceId) {
+      const workspace = await manager.getWorkspace(workspaceId)
+      if (workspace) {
+        const handles = await workspace.getAllNativeDirectoryHandles(context.projectId)
+        if (handles.size > 0) return handles
+      }
+    }
+  } catch {
+    // Fall through
+  }
+  // Fallback: single root from context
+  if (context.directoryHandle) {
+    return new Map([['', context.directoryHandle]])
+  }
+  return new Map()
+}
+
+/**
+ * Search all roots sequentially and merge results.
+ * Prepends root prefix to each hit's path for correct routing.
+ */
+async function searchAllRoots(
+  manager: ReturnType<typeof getSearchWorkerManager>,
+  rootHandles: Map<string, FileSystemDirectoryHandle>,
+  baseOptions: Omit<Parameters<typeof manager.searchInDirectory>[1], never>,
+  maxResults: number
+): Promise<SearchInDirectoryResult> {
+  const merged: SearchInDirectoryResult = {
+    results: [],
+    totalMatches: 0,
+    scannedFiles: 0,
+    skippedFiles: 0,
+    truncated: false,
+    deadlineExceeded: false,
+  }
+  let remaining = maxResults
+
+  for (const [rootName, handle] of rootHandles) {
+    if (remaining <= 0) {
+      merged.truncated = true
+      break
+    }
+
+    try {
+      const opts = { ...baseOptions, maxResults: remaining }
+      const rootResult = await manager.searchInDirectory(handle, opts)
+
+      // Prepend root prefix to paths
+      if (rootName) {
+        for (const hit of rootResult.results) {
+          hit.path = `${rootName}/${hit.path}`
+        }
+      }
+
+      merged.results.push(...rootResult.results)
+      merged.totalMatches += rootResult.totalMatches
+      merged.scannedFiles += rootResult.scannedFiles
+      merged.skippedFiles += rootResult.skippedFiles
+      if (rootResult.truncated) merged.truncated = true
+      if (rootResult.deadlineExceeded) merged.deadlineExceeded = true
+
+      remaining -= rootResult.results.length
+    } catch {
+      // Skip roots that fail (e.g., permission denied)
+    }
+  }
+
+  return merged
 }
 
 export const searchDefinition: ToolDefinition = {
@@ -91,7 +172,7 @@ export const searchDefinition: ToolDefinition = {
         },
         path: {
           type: 'string',
-          description: 'Optional subdirectory path to search within.',
+          description: 'Optional subdirectory path to search within. In multi-root projects, use root prefix (e.g., "frontend/src").',
         },
         glob: {
           type: 'string',
@@ -175,6 +256,8 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
   // Loop guard: check consecutive search counter before searching
   const searchPath = typeof args.path === 'string' ? args.path : ''
+  const blockedPath = rejectPythonMountPath('search', searchPath)
+  if (blockedPath) return blockedPath
   const searchGlob = typeof args.glob === 'string' ? args.glob : undefined
   const loopCheck = checkSearchLoop(context, query, searchPath, searchGlob, 0, userMaxResults)
   if (loopCheck.isBlocked) {
@@ -205,12 +288,12 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('search', 'path_not_found', `Failed to resolve VFS path: ${error instanceof Error ? error.message : String(error)}`)
     }
   } else {
-    // Legacy: workspace path resolution
-    directoryHandle = context.directoryHandle
-    if (!directoryHandle) {
-      directoryHandle = await resolveNativeDirectoryHandle(context.directoryHandle, context.workspaceId)
-    }
-    vfsSubPath = searchPath
+    // Multi-root aware path resolution: always resolve to handle path prefix stripping
+    const { handle, nativePath } = await resolveNativeDirectoryHandleForPath(
+      searchPath, context.directoryHandle, context.workspaceId
+    )
+    directoryHandle = handle
+    vfsSubPath = nativePath
   }
 
   if (!directoryHandle) {
@@ -229,11 +312,12 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     }
 
     // Collect pending overlays from OPFS to ensure search consistency with read tool
-    const pendingOverlays = await collectPendingOverlays(context.workspaceId)
+    const pendingOverlays = await collectPendingOverlays(context.workspaceId, context.projectId)
 
-    const result = await manager.searchInDirectory(directoryHandle, {
+    // Build search options (shared across all roots)
+    const buildSearchOptions = (subPath?: string) => ({
       query,
-      path: vfsSubPath || undefined,
+      path: subPath,
       glob: typeof args.glob === 'string' ? args.glob : undefined,
       regex: useRegex,
       caseSensitive: args.case_sensitive === true,
@@ -248,6 +332,24 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
         : undefined,
       pendingOverlays: Object.keys(pendingOverlays).length > 0 ? pendingOverlays : undefined,
     })
+
+    // Determine whether to search a single root or all roots
+    let result: SearchInDirectoryResult
+
+    if (searchPath) {
+      // Specific path provided — search single resolved root
+      result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined))
+    } else {
+      // No path — search ALL roots and merge results
+      const allHandles = await getAllRootHandles(context)
+      if (allHandles.size <= 1) {
+        // Single root or no multi-root — search normally
+        result = await manager.searchInDirectory(directoryHandle, buildSearchOptions())
+      } else {
+        // Multi-root: search each root and merge
+        result = await searchAllRoots(manager, allHandles, buildSearchOptions(), userMaxResults)
+      }
+    }
 
     // Pagination hint when results are truncated
     const paginationHint =

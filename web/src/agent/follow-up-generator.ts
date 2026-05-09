@@ -150,6 +150,7 @@ export async function generateFollowUp(
       providerType,
       baseUrl: config.baseURL,
       model: config.model,
+      // apiMode not needed for built-in flash models
     })
 
     const chatMessages = buildFollowUpMessages(messages)

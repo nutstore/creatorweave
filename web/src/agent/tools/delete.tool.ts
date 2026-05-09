@@ -10,6 +10,7 @@ import type { ToolDefinition, ToolExecutor } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
+import { rejectPythonMountPath } from './path-guards'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -80,6 +81,10 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
 
   if (requestedTargets.length === 0) {
     return JSON.stringify({ error: 'Either path or paths must be provided' })
+  }
+  for (const target of requestedTargets) {
+    const blockedPath = rejectPythonMountPath('delete', target)
+    if (blockedPath) return blockedPath
   }
 
   let targets: string[]

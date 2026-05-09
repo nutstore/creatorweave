@@ -87,6 +87,22 @@ describe('sync tool', () => {
     vi.clearAllMocks()
   })
 
+  it('rejects vfs:// paths because they are already in OPFS', async () => {
+    const result = await syncToOPFSExecutor(
+      { paths: ['vfs://assets/data.xlsx', 'vfs://workspace/src/index.ts'] },
+      { directoryHandle: null, workspaceId: 'ws_1' } as unknown as ToolContext
+    )
+
+    const parsed = parseEnvelope(result)
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error?.code).toBe('invalid_args')
+    expect(parsed.error?.message).toContain('vfs:// paths are already in OPFS')
+    expect(parsed.error?.details?.rejected_paths).toEqual([
+      'vfs://assets/data.xlsx',
+      'vfs://workspace/src/index.ts',
+    ])
+  })
+
   it('returns skipped when files are already present in OPFS even if native has no matches', async () => {
     const nativeRoot = createDirectoryHandle('native', {})
     const opfsRoot = createDirectoryHandle('files', {
@@ -104,6 +120,7 @@ describe('sync tool', () => {
     getWorkspaceManagerMock.mockResolvedValue({
       getWorkspace: vi.fn(async () => ({
         getFilesDir: async () => opfsRoot,
+        getAllNativeDirectoryHandles: vi.fn(async () => new Map<string, FileSystemDirectoryHandle>()),
       })),
     })
 
@@ -129,6 +146,7 @@ describe('sync tool', () => {
     getWorkspaceManagerMock.mockResolvedValue({
       getWorkspace: vi.fn(async () => ({
         getFilesDir: async () => opfsRoot,
+        getAllNativeDirectoryHandles: vi.fn(async () => new Map<string, FileSystemDirectoryHandle>()),
       })),
     })
 

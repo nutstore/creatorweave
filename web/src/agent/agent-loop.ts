@@ -18,6 +18,7 @@ import { getUniversalSystemPrompt } from './prompts/universal-system-prompt'
 import { PiAIProvider } from './llm/pi-ai-provider'
 import { type AgentMode } from './agent-mode'
 import { generateContextSummaryWithLLM } from './loop/context-summary'
+import type { CompressionBaselineState } from './loop/context-compression'
 import { buildRuntimeEnhancedPrompt, triggerPrefetchForMessages } from './loop/enhancements'
 import { executePiCoreLoop } from './loop/pi-core-runner'
 import type { AgentCallbacks, AgentLoopConfig } from './loop/types'
@@ -58,6 +59,7 @@ export class AgentLoop {
   private beforeToolCall?: AgentLoopConfig['beforeToolCall']
   private afterToolCall?: AgentLoopConfig['afterToolCall']
   private onCompressionStateUpdate?: AgentLoopConfig['onCompressionStateUpdate']
+  private compressionBaseline: CompressionBaselineState | null
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
   private mode: AgentMode
@@ -78,6 +80,7 @@ export class AgentLoop {
     this.beforeToolCall = config.beforeToolCall
     this.afterToolCall = config.afterToolCall
     this.onCompressionStateUpdate = config.onCompressionStateUpdate
+    this.compressionBaseline = config.initialCompressionBaseline ?? null
     this.mode = config.mode || 'act'
     this.convertCallCount = config.initialConvertCallCount ?? 0
     this.lastSummaryConvertCall =
@@ -150,6 +153,7 @@ export class AgentLoop {
             compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
           }),
         onAbortRequested: () => this.abortController?.abort(),
+        initialCompressionBaseline: this.compressionBaseline,
       })
       allMessages = result.allMessages
       shouldStopForElicitation = result.shouldStopForElicitation

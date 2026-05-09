@@ -44,6 +44,8 @@ export interface ExecutePiCoreLoopInput {
     maxSummaryTokens: number
   ) => Promise<{ summary: string | null; mode: CompressionSummaryMode }>
   onAbortRequested?: () => void
+  /** Restored compression baseline from a previous run's persisted state. */
+  initialCompressionBaseline?: CompressionBaselineState | null
 }
 
 export interface ExecutePiCoreLoopResult {
@@ -71,7 +73,7 @@ export async function executePiCoreLoop(
   const messageState = { allMessages }
   let shouldStopForElicitation = false
   let reachedMaxIterations = false
-  let compressionBaseline: CompressionBaselineState | null = null
+  let compressionBaseline: CompressionBaselineState | null = input.initialCompressionBaseline ?? null
   let convertCallCount = input.convertCallCount
   let lastSummaryConvertCall = input.lastSummaryConvertCall
 
@@ -132,16 +134,17 @@ export async function executePiCoreLoop(
           summaryMinIntervalConvertCalls: input.summaryMinIntervalConvertCalls,
           compressionTargetRatio: input.compressionTargetRatio,
           generateContextSummaryWithLLM: input.generateContextSummaryWithLLM,
-          onSummaryInjected: (summary) => {
-            const summaryMessage = createAssistantMessage(
+          onSummaryInjected: (summary, cutoffTimestamp) => {
+            const summaryMsg = createAssistantMessage(
               `${input.compressedMemoryPrefix}\n${summary}`,
               undefined,
               undefined,
               null,
               'context_summary'
             )
+            summaryMsg.timestamp = Math.max(0, cutoffTimestamp - 1)
             const nextMessages = produce(messageState.allMessages, (draft) => {
-              draft.push(summaryMessage)
+              draft.push(summaryMsg)
             })
             messageState.allMessages = nextMessages
             allMessages = nextMessages

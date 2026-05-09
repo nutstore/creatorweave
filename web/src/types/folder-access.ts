@@ -23,6 +23,8 @@ export type FolderAccessStatus =
 export interface FolderAccessRecord {
   /** Project ID */
   projectId: string
+  /** Root name (handle.name or projectId for default root) */
+  rootName?: string
   /** Folder name */
   folderName: string | null
   /** Directory handle (in-memory, currently available) */
@@ -60,6 +62,22 @@ export interface FolderAccessActions {
 }
 
 /**
+ * Root info for multi-root display
+ */
+export interface RootInfo {
+  id: string
+  name: string
+  isDefault: boolean
+  readOnly: boolean
+  /** In-memory handle (null if permission lost) */
+  handle: FileSystemDirectoryHandle | null
+  /** Persisted handle (permission-restorable) */
+  persistedHandle: FileSystemDirectoryHandle | null
+  status: FolderAccessStatus
+  error?: string
+}
+
+/**
  * Full store type
  */
 export interface FolderAccessStore extends FolderAccessActions {
@@ -68,10 +86,15 @@ export interface FolderAccessStore extends FolderAccessActions {
   /** Permission records for all projects */
   records: Record<string, FolderAccessRecord>
 
+  // ---- Multi-root state ----
+
+  /** All roots for the active project (hydrated from SQLite) */
+  roots: RootInfo[]
+
   // ---- Shared file path cache ----
 
-  /** All file paths for the current project (flat list, populated by directory traversal, reusable for search etc.) */
-  allFilePaths: string[]
+  /** File path cache per project (keyed by projectId, flat path list for search etc.) */
+  allFilePaths: Record<string, string[]>
 
   /** Get the current project's record */
   getRecord: () => FolderAccessRecord | null
@@ -90,4 +113,17 @@ export interface FolderAccessStore extends FolderAccessActions {
   refreshFilePaths: () => Promise<string[]>
   /** Clear file path cache (called automatically on project switch/release) */
   clearFilePaths: () => void
+
+  // ---- Multi-root actions ----
+
+  /** Load all roots for the active project */
+  loadRoots: () => Promise<void>
+  /** Add a new root (shows folder picker) */
+  addRoot: () => Promise<boolean>
+  /** Remove a root by ID */
+  removeRoot: (rootId: string) => Promise<void>
+  /** Set a root as default */
+  setDefaultRoot: (rootId: string) => Promise<void>
+  /** Toggle read-only flag for a root */
+  toggleReadOnly: (rootId: string) => Promise<void>
 }

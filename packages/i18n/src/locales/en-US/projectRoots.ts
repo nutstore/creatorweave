@@ -1,0 +1,18 @@
+export const projectRoots = {
+    tabLabel: "Folders",
+    title: "Project Folders",
+    description: "Add, remove, or manage project folders",
+    addFolder: "Add Folder",
+    empty: "No folders added yet",
+    emptyHint: "Add a folder to start working with project files",
+    default: "Default",
+    readOnly: "Read-only",
+    restorePermission: "Restore permission",
+    permissionDenied: "Permission denied",
+    permissionFailed: "Failed to restore permission",
+    enableWrite: "Enable write access",
+    makeReadOnly: "Make read-only",
+    setAsDefault: "Set as default",
+    removeRoot: "Remove folder",
+    confirmRemove: 'Are you sure you want to remove "{name}" from this project?',
+} as const

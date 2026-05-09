@@ -37,6 +37,7 @@ import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
 import { scanProjectSkills, syncResourcesToOPFS, syncProjectSkillsToActiveWorkspace } from '@/skills/skill-scanner'
+import type { Skill, SkillResource } from '@/skills/skill-types'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useSkillsStore } from '@/store/skills.store'
 import { createUserMessage } from '@/agent/message-types'
@@ -46,6 +47,7 @@ import {
   KeyboardShortcutsHelp,
   RecentFilesPanel,
   WorkspaceSettingsDialog,
+  GoToFileDialog,
   buildEnhancedCommands,
   type Command,
 } from '@/components/workspace'
@@ -56,6 +58,8 @@ import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
+import { getWorkspaceManager } from '@/opfs'
+import { useFolderAccessStore } from '@/store/folder-access.store'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -80,6 +84,17 @@ export function WorkspaceLayout({
   onCreateProject,
   onManageProjects,
 }: WorkspaceLayoutProps) {
+  const waitForWorkspaceReady = useCallback(async (workspaceId: string, timeoutMs = 30000) => {
+    const manager = await getWorkspaceManager()
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      const workspace = await manager.getWorkspace(workspaceId)
+      if (workspace) return true
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    return false
+  }, [])
+
   const {
     activeConversationId,
     conversations,
@@ -92,8 +107,11 @@ export function WorkspaceLayout({
     loadFromDB,
   } = useConversationStore()
   const { directoryHandle } = useAgentStore()
+  const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
   const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
+  const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
+  const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   const { role } = useRemoteStore()
   const showPreview = useConversationContextStore((state) => state.showPreview)
   const projectWorkspaceIds = useConversationContextStore((state) => state.workspaces.map((w) => w.id))
@@ -108,7 +126,6 @@ export function WorkspaceLayout({
   const [skillsManagerOpen, setSkillsManagerOpen] = useState(false)
   const [toolsPanelOpen, setToolsPanelOpen] = useState(false)
   const [quickActionsOpen, setQuickActionsOpen] = useState(false)
-  const [skillsSyncing, setSkillsSyncing] = useState(false)
   const skillsLoaded = useSkillsStore((s) => s.loaded) // Reactive state
   const loadSkills = useSkillsStore((s) => s.loadSkills)
 
@@ -117,6 +134,7 @@ export function WorkspaceLayout({
     panelState,
     setSidebarCollapsed,
     setActiveResourceTab,
+    panelSizes,
   } = useWorkspacePreferencesStore()
 
   // Phase 4: Dialog states
@@ -125,6 +143,9 @@ export function WorkspaceLayout({
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
   const [showRecentFiles, setShowRecentFiles] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
+  const [showGoToFile, setShowGoToFile] = useState(false)
+  /** Target file path (with rootName prefix) to reveal in file tree */
+  const [revealTargetPath, setRevealTargetPath] = useState<string | null>(null)
   const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
   const openWebContainerPanel = useWebContainerStore((s) => s.openPanel)
   const closeWebContainerPanel = useWebContainerStore((s) => s.closePanel)
@@ -181,6 +202,22 @@ export function WorkspaceLayout({
     if (!loaded) loadFromDB()
   }, [loaded, loadFromDB])
 
+  // Sync workspace-specific model selection when switching workspace
+  useEffect(() => {
+    syncModelForWorkspace(activeConversationId ?? null)
+  }, [activeConversationId, syncModelForWorkspace])
+
+  // Persist current model selection for active workspace
+  useEffect(() => {
+    if (!activeConversationId) return
+    saveModelOverrideForWorkspace(activeConversationId)
+  }, [
+    activeConversationId,
+    providerType,
+    modelName,
+    saveModelOverrideForWorkspace,
+  ])
+
   // Phase 4: Enhanced command palette commands
   const commands: Command[] = buildEnhancedCommands({
     // Conversations
@@ -196,11 +233,7 @@ export function WorkspaceLayout({
     },
     // Files
     onOpenFile: () => {
-      setSidebarCollapsed(false)
-      setActiveResourceTab('files')
-      if (isMobile) {
-        setIsSidebarOpen(true)
-      }
+      setShowGoToFile(true)
     },
     onShowRecentFiles: () => setShowRecentFiles(true),
 
@@ -237,12 +270,20 @@ export function WorkspaceLayout({
     }
   }, [skillsLoaded, loadSkills])
 
-  // Scan project skills when directoryHandle changes
+  // Scan project skills when roots change
   // Must wait for skillsLoaded to be true, otherwise cannot properly filter loaded skills
   useEffect(() => {
     const manager = getSkillManager()
 
-    if (!directoryHandle) {
+    // Collect handles from all roots
+    const handlesToScan: Array<{ handle: FileSystemDirectoryHandle; rootName: string }> = []
+    for (const root of roots) {
+      if (root.handle) {
+        handlesToScan.push({ handle: root.handle, rootName: root.name })
+      }
+    }
+
+    if (handlesToScan.length === 0) {
       manager.clearProjectSkills()
       void loadSkills()
       return
@@ -255,16 +296,45 @@ export function WorkspaceLayout({
         manager.clearProjectSkills()
         await loadSkills()
 
-        console.log('[WorkspaceLayout] Scanning project skills...')
-        const result = await scanProjectSkills(directoryHandle)
-        console.log('[WorkspaceLayout] Scan result:', result.skills.length, 'skills found')
-        if (result.errors.length > 0) {
-          console.warn('[WorkspaceLayout] Scan errors:', result.errors)
+        console.log(`[WorkspaceLayout] Scanning project skills across ${handlesToScan.length} root(s)...`)
+
+        let allSkills: Skill[] = []
+        let allResources: SkillResource[] = []
+        let allErrors: string[] = []
+
+        for (const { handle, rootName } of handlesToScan) {
+          const result = await scanProjectSkills(handle)
+          // Prefix skill IDs with root name for disambiguation, and keep
+          // resources in sync with remapped skill IDs.
+          const skillIdMap = new Map<string, string>()
+          for (const skill of result.skills) {
+            const oldId = skill.id
+            const newId = `project:${rootName}:${oldId.replace('project:', '')}`
+            skill.id = newId
+            skillIdMap.set(oldId, newId)
+          }
+
+          const remappedResources = result.resources.map((resource) => {
+            const mappedSkillId = skillIdMap.get(resource.skillId) ?? resource.skillId
+            return {
+              ...resource,
+              skillId: mappedSkillId,
+              id: `${mappedSkillId}:${resource.resourcePath}`,
+            }
+          })
+
+          allSkills = allSkills.concat(result.skills)
+          allResources = allResources.concat(remappedResources)
+          allErrors = allErrors.concat(result.errors)
         }
 
-        if (result.skills.length > 0) {
-          // Keep project skills runtime-scoped (do not persist in SQLite).
-          manager.setProjectSkills(result.skills, result.resources, activeProjectId)
+        console.log(`[WorkspaceLayout] Scan result: ${allSkills.length} skills found`)
+        if (allErrors.length > 0) {
+          console.warn('[WorkspaceLayout] Scan errors:', allErrors)
+        }
+
+        if (allSkills.length > 0) {
+          manager.setProjectSkills(allSkills, allResources, activeProjectId)
           await loadSkills()
         } else {
           manager.clearProjectSkills()
@@ -275,28 +345,27 @@ export function WorkspaceLayout({
         }
 
         // Sync skill resources to OPFS so Pyodide can access them at /mnt/.skills/
-        await syncResourcesToOPFS(result)
-        // Also sync .skills/ directory directly from disk (covers all workspaces)
-        await syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
+        await syncResourcesToOPFS({ skills: allSkills, resources: allResources, errors: allErrors })
+        // Also sync .skills/ directories from all roots directly to OPFS
+        if (activeConversationId) {
+          const ready = await waitForWorkspaceReady(activeConversationId)
+          if (ready) {
+            for (const { handle, rootName } of handlesToScan) {
+              await syncProjectSkillsToActiveWorkspace(handle, activeConversationId, rootName)
+            }
+          } else {
+            console.warn(
+              `[WorkspaceLayout] Workspace not ready for skill sync after timeout: ${activeConversationId}`
+            )
+          }
+        }
       } catch (error) {
         console.error('Failed to scan project skills:', error)
       }
     }
 
     void scanForSkills()
-  }, [directoryHandle, skillsLoaded, loadSkills, activeProjectId])
-
-  // Sync .skills/ to OPFS when workspace changes (new workspace created or switched)
-  useEffect(() => {
-    if (!directoryHandle || !activeConversationId) return
-
-    setSkillsSyncing(true)
-    syncProjectSkillsToActiveWorkspace(directoryHandle, activeConversationId)
-      .catch((err) => {
-        console.warn('[WorkspaceLayout] Failed to sync skills to workspace:', err)
-      })
-      .finally(() => setSkillsSyncing(false))
-  }, [directoryHandle, activeConversationId])
+  }, [roots, skillsLoaded, loadSkills, activeProjectId, activeConversationId, waitForWorkspaceReady])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -309,9 +378,23 @@ export function WorkspaceLayout({
       }
 
       // Cmd/Ctrl + P to toggle project switcher
-      if ((e.metaKey || e.ctrlKey) && e.key === 'p') {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'p' && !e.shiftKey) {
         e.preventDefault()
         setProjectSwitcherOpen((prev) => !prev)
+        return
+      }
+
+      // Cmd/Ctrl + Shift + P to open Go To File dialog
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault()
+        setShowGoToFile(true)
+        return
+      }
+
+      // Cmd/Ctrl + G to open Go To File dialog (alternative shortcut)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault()
+        setShowGoToFile(true)
         return
       }
 
@@ -340,17 +423,15 @@ export function WorkspaceLayout({
         return
       }
 
-      // ? with Shift to show keyboard shortcuts
-      if (e.key === '?' && e.shiftKey) {
-        e.preventDefault()
-        setShowShortcutsHelp(true)
-        return
-      }
+      // NOTE: removed Shift+? shortcut — too hidden and conflicts with '?' typing.
+      // Shortcuts help is accessible via Command Palette (⌘K → "Keyboard Shortcuts")
 
       // ESC to close panels
       if (e.key === 'Escape') {
         if (showCommandPalette) {
           setShowCommandPalette(false)
+        } else if (showGoToFile) {
+          setShowGoToFile(false)
         } else if (showShortcutsHelp) {
           setShowShortcutsHelp(false)
         } else if (showWorkspaceSettings) {
@@ -372,6 +453,7 @@ export function WorkspaceLayout({
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [
     showCommandPalette,
+    showGoToFile,
     showShortcutsHelp,
     showWorkspaceSettings,
     showRecentFiles,
@@ -512,6 +594,45 @@ export function WorkspaceLayout({
     setSelectedFileHandle(null)
   }, [])
 
+  // Handle "go to file" selection from GoToFileDialog
+  const handleGoToFileSelect = useCallback(
+    (fullPath: string) => {
+      // Determine which root this file belongs to
+      // fullPath format: "rootName/relative/path/to/file.ts" or just "path/to/file.ts"
+      let relativePath: string | null = null
+
+      for (const root of roots) {
+        if (fullPath.startsWith(`${root.name}/`)) {
+          relativePath = fullPath.slice(root.name.length + 1)
+          break
+        }
+      }
+
+      // If no root matched, skip — the path doesn't belong to any known root
+      if (relativePath === null) {
+        console.warn('[WorkspaceLayout] GoToFile: path does not match any root:', fullPath)
+        return
+      }
+
+      // Ensure sidebar is open and files tab is active
+      setSidebarCollapsed(false)
+      setActiveResourceTab('files')
+
+      // Set reveal target for the file tree (relative path without root prefix)
+      setRevealTargetPath(relativePath)
+
+      // Also set the selected file path for preview
+      setSelectedFilePath(fullPath)
+      setSelectedFileHandle(null) // Will be resolved by the tree reveal
+    },
+    [roots, setSidebarCollapsed, setActiveResourceTab]
+  )
+
+  // Handle reveal complete callback from FileTreePanel
+  const handleRevealComplete = useCallback(() => {
+    setRevealTargetPath(null)
+  }, [])
+
   return (
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
       {/* Header */}
@@ -547,6 +668,8 @@ export function WorkspaceLayout({
             onFileSelect={handleSidebarFileSelect}
             onInspect={handleElementInspect}
             selectedFilePath={selectedFilePath}
+            revealTargetPath={revealTargetPath}
+            onRevealComplete={handleRevealComplete}
           />
         )}
         {isMobile && isSidebarOpen && (
@@ -557,6 +680,8 @@ export function WorkspaceLayout({
               onFileSelect={handleSidebarFileSelect}
               onInspect={handleElementInspect}
               selectedFilePath={selectedFilePath}
+              revealTargetPath={revealTargetPath}
+              onRevealComplete={handleRevealComplete}
             />
           </div>
         )}
@@ -569,7 +694,6 @@ export function WorkspaceLayout({
               <ConversationView
                 initialMessage={pendingMessage}
                 onInitialMessageConsumed={handleInitialMessageConsumed}
-                disabled={skillsSyncing}
               />
             ) : (
               <div className="relative h-full min-h-0 w-full overflow-hidden">
@@ -598,7 +722,7 @@ export function WorkspaceLayout({
           <Drawer
             open={!!selectedFilePath}
             onClose={handleCloseFilePreview}
-            width={isMobile ? '100vw' : '50vw'}
+            width={isMobile ? '100vw' : `${panelSizes.previewRatio}vw`}
           >
             <FilePreview
               filePath={selectedFilePath}
@@ -643,6 +767,13 @@ export function WorkspaceLayout({
         commands={commands}
       />
 
+      {/* Go To File Dialog */}
+      <GoToFileDialog
+        open={showGoToFile}
+        onClose={() => setShowGoToFile(false)}
+        onSelectFile={handleGoToFileSelect}
+      />
+
       {/* Phase 4: Keyboard Shortcuts Help */}
       <KeyboardShortcutsHelp
         open={showShortcutsHelp}
@@ -665,8 +796,8 @@ export function WorkspaceLayout({
             <RecentFilesPanel
               onFileSelect={(path) => {
                 setShowRecentFiles(false)
-                // Find and select file
-                const file = document.querySelector(`[data-file-path="${path}"]`) as HTMLElement
+                // Find and select file — CSS.escape prevents injection via path
+                const file = document.querySelector(`[data-file-path="${CSS.escape(path)}"]`) as HTMLElement
                 file?.click()
               }}
             />

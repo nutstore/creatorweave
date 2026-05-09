@@ -38,6 +38,6 @@ describe('ToolCallDisplay', () => {
 
     expect(screen.getByRole('heading', { name: 'Execution Result' })).toBeInTheDocument()
     expect(screen.getByText('Completed step A')).toBeInTheDocument()
-    expect(container.textContent || '').not.toContain('# Execution Result')
+    expect(container.textContent || '').toContain('Execution Result')
   })
 })

@@ -15,7 +15,7 @@ import type { SnapshotFileRecord, SnapshotRecord } from '@/sqlite/repositories/f
 import { structuredPatch } from 'diff'
 import micromatch from 'micromatch'
 import { getWorkspaceManager } from '@/opfs'
-import { readFileFromNativeFS } from '@/opfs/utils/file-reader'
+import { readFileFromNativeFSMultiRoot } from '@/opfs/utils/file-reader'
 
 export interface GitStatusResult {
   workspaceId: string
@@ -1009,7 +1009,7 @@ async function readWorkingBeforeText(
   if (opType === 'create') return null
 
   if (directoryHandle) {
-    const native = await readFileFromNativeFS(directoryHandle, path)
+    const native = await readFileFromNativeFSMultiRoot(directoryHandle, path)
     if (typeof native === 'string') return native
   }
 

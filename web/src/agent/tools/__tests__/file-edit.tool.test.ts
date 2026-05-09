@@ -30,8 +30,40 @@ vi.mock('@/store/remote.store', () => ({
 }))
 
 vi.mock('../vfs-resolver', () => ({
-  resolveVfsTarget: (...args: unknown[]) => resolveVfsTargetMock(...args),
+  resolveVfsTarget: async (...args: unknown[]) => {
+    const target = await resolveVfsTargetMock(...args)
+    if (!target || target.backend) return target
+    if (target.kind === 'workspace') {
+      return {
+        ...target,
+        backend: {
+          label: 'workspace',
+          readFile: async (path: string) => readFileMock(path, null, 'ws-1', 'auto'),
+          writeFile: async (path: string, content: string) => writeFileMock(path, content, null, 'ws-1'),
+        },
+      }
+    }
+    if (target.kind === 'agent') {
+      return {
+        ...target,
+        backend: {
+          label: 'agent',
+          readFile: async (path: string) => {
+            const content = (await readPathMock(target.agentId, path)) ?? ''
+            return {
+              content,
+              metadata: { size: typeof content === 'string' ? content.length : 0, contentType: 'text/plain' },
+            }
+          },
+          writeFile: async (path: string, content: string) =>
+            writePathMock(target.agentId, path, content),
+        },
+      }
+    }
+    return target
+  },
   isVfsPath: (path: string) => path.startsWith('vfs://'),
+  withVfsAgentIdHint: (message: string) => message,
 }))
 
 vi.mock('../tool-utils', () => ({
@@ -108,7 +140,7 @@ describe('file edit tool', () => {
     )
 
     unwrapOk(result)
-    expect(readFileMock).toHaveBeenCalledWith('src/a.ts', null, 'ws-1', 'prefer_opfs')
+    expect(readFileMock).toHaveBeenCalledWith('src/a.ts', null, 'ws-1', 'auto')
     expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
   })
 
@@ -139,9 +171,9 @@ describe('file edit tool', () => {
     )
 
     unwrapOk(result)
-    expect(resolveNativeDirectoryHandleMock).toHaveBeenCalledWith(null, 'ws-1')
-    expect(readFileMock).toHaveBeenCalledWith('src/a.ts', nativeHandle, 'ws-1', 'prefer_native')
-    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', nativeHandle, 'ws-1')
+    expect(resolveNativeDirectoryHandleMock).not.toHaveBeenCalled()
+    expect(readFileMock).toHaveBeenCalledWith('src/a.ts', null, 'ws-1', 'auto')
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
   })
 
   it('rejects multiple matches when replace_all is false', async () => {
@@ -297,7 +329,7 @@ describe('file edit tool', () => {
     const data = unwrapOk(result)
 
     expect(data.noop).toBe(true)
-    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const x = value\n', null, 'ws-1')
+    expect(writeFileMock).not.toHaveBeenCalled()
   })
 
   it('normalizes sanitized old_text and mirrors replacement tokens into new_text', async () => {

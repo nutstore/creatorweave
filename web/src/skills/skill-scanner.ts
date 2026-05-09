@@ -275,21 +275,29 @@ export async function syncResourcesToOPFS(
  */
 export async function syncProjectSkillsToActiveWorkspace(
   rootHandle: FileSystemDirectoryHandle,
-  workspaceId?: string | null
+  workspaceId?: string | null,
+  rootName?: string
 ): Promise<void> {
   let targetFilesDir: FileSystemDirectoryHandle | null = null
 
   if (workspaceId) {
     const { getWorkspaceManager } = await import('@/opfs/workspace')
     const manager = await getWorkspaceManager()
-    const workspace = await manager.getWorkspace(workspaceId)
+    let workspace = await manager.getWorkspace(workspaceId)
+    // New conversation workspace creation is async; wait briefly before giving up.
+    if (!workspace) {
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        workspace = await manager.getWorkspace(workspaceId)
+        if (workspace) break
+      }
+    }
     if (workspace) {
       targetFilesDir = await workspace.getFilesDir()
       console.log(`[SkillScanner] Syncing .skills to explicit workspace: ${workspaceId}`)
     } else {
-      console.warn(
-        `[SkillScanner] Explicit workspace not found: ${workspaceId}, falling back to active workspace`
-      )
+      console.warn(`[SkillScanner] Explicit workspace not found after wait: ${workspaceId}, skipping sync`)
+      return
     }
   }
 
@@ -299,6 +307,11 @@ export async function syncProjectSkillsToActiveWorkspace(
     if (!active) return
     targetFilesDir = await active.workspace.getFilesDir()
     console.log(`[SkillScanner] Syncing .skills to active workspace: ${active.workspaceId}`)
+  }
+
+  // In multi-root mode, sync to files/{rootName}/ instead of files/ directly
+  if (rootName) {
+    targetFilesDir = await targetFilesDir.getDirectoryHandle(rootName, { create: true })
   }
 
   await syncSkillsDirToOPFS(targetFilesDir, rootHandle)
@@ -363,7 +376,7 @@ async function syncResourcesToFilesDir(
   filesDir: FileSystemDirectoryHandle
 ): Promise<void> {
   for (const resource of resources) {
-    const skillDir = resource.skillId.replace(/^project:/, '')
+    const skillDir = resolveSkillDirFromSkillId(resource.skillId)
     const opfsPath = `${skillDir}/${resource.resourcePath}`
 
     try {
@@ -386,4 +399,21 @@ async function syncResourcesToFilesDir(
     }
   }
   console.log(`[SkillScanner] OPFS sync complete: ${resources.length} resources`)
+}
+
+function resolveSkillDirFromSkillId(skillId: string): string {
+  const withoutPrefix = skillId.replace(/^project:/, '')
+  const markerIndex = withoutPrefix.indexOf(':.skills/')
+  if (markerIndex > 0) {
+    const rootName = withoutPrefix.slice(0, markerIndex)
+    const suffix = withoutPrefix.slice(markerIndex + 1) // keep ".skills/..."
+    return `${rootName}/${suffix}`
+  }
+  const claudeMarkerIndex = withoutPrefix.indexOf(':.claude/skills/')
+  if (claudeMarkerIndex > 0) {
+    const rootName = withoutPrefix.slice(0, claudeMarkerIndex)
+    const suffix = withoutPrefix.slice(claudeMarkerIndex + 1) // keep ".claude/skills/..."
+    return `${rootName}/${suffix}`
+  }
+  return withoutPrefix
 }

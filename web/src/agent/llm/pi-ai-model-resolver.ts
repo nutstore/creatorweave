@@ -1,7 +1,7 @@
 import { getModel } from '@mariozechner/pi-ai'
 import type { Api, KnownProvider, Model } from '@mariozechner/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
-import { getModelsForProvider } from '@/agent/providers/types'
+import { getModelsForProvider, isCustomProviderType } from '@/agent/providers/types'
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
@@ -85,11 +85,12 @@ function lookupContextWindow(providerType: LLMProviderType, modelName: string): 
 function createOpenAICompatibleFallback(
   providerType: LLMProviderType,
   modelName: string,
-  baseUrl: string
+  baseUrl: string,
+  apiMode?: 'chat-completions' | 'responses'
 ): Model<Api> {
   const fallbackApi: Api =
-    providerType === 'minimax' || providerType === 'minimax-cn'
-      ? CW_OPENAI_FETCH_API
+    providerType === 'minimax' || providerType === 'minimax-cn' || isCustomProviderType(providerType)
+      ? (apiMode === 'responses' ? 'openai-responses' : CW_OPENAI_FETCH_API)
       : 'openai-completions'
   const contextWindow = lookupContextWindow(providerType, modelName)
 
@@ -115,10 +116,11 @@ function createOpenAICompatibleFallback(
 export function resolvePiAIModel(
   providerType: LLMProviderType,
   modelName: string,
-  baseUrl: string
+  baseUrl: string,
+  apiMode?: 'chat-completions' | 'responses'
 ): Model<Api> {
   const native = tryGetNativeModel(providerType, modelName, baseUrl)
   if (native) return native
   const resolvedModelName = MODEL_ALIASES[providerType]?.[modelName] || modelName
-  return createOpenAICompatibleFallback(providerType, resolvedModelName, baseUrl)
+  return createOpenAICompatibleFallback(providerType, resolvedModelName, baseUrl, apiMode)
 }

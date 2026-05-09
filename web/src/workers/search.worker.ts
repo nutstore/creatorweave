@@ -258,7 +258,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
         if (normalizedPath && !overlayPath.startsWith(normalizedPath + '/') && overlayPath !== normalizedPath) {
           continue
         }
-        if (glob && !micromatch.isMatch(overlayPath, glob)) continue
+        if (glob && !micromatch.isMatch(overlayPath, glob, { dot: true })) continue
         relevantOverlayPaths.push(overlayPath)
       }
     }
@@ -298,7 +298,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
           continue
         }
 
-        if (glob && !micromatch.isMatch(rel, glob)) continue
+        if (glob && !micromatch.isMatch(rel, glob, { dot: true })) continue
 
         // Mark this path as seen on disk
         diskSeenPaths.add(rel)

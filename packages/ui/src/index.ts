@@ -77,3 +77,17 @@ export {
   PopoverTrigger,
   PopoverContent,
 } from './components/ui/popover'
+
+// Select - exported for settings and model selection
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectLabel,
+  SelectItem,
+  SelectSeparator,
+  SelectScrollUpButton,
+  SelectScrollDownButton,
+} from './components/ui/select'

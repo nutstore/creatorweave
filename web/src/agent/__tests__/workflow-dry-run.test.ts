@@ -59,8 +59,8 @@ describe('workflow dry-run', () => {
     expect(result.templateId).toBe('novel_daily_v1')
     expect(result.label).toBe('小说日更')
     expect(result.status).toBe('passed')
-    expect(result.summary).toContain('工作流模拟运行')
-    expect(result.summary).toContain('执行顺序')
+    expect(result.summary).toContain('Workflow dry run')
+    expect(result.summary).toContain('Execution order')
   })
 
   it('returns needs_human when review fails over repair limit', async () => {

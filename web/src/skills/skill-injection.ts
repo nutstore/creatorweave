@@ -118,7 +118,7 @@ Before handling a task, check if any skill below matches it. If one does, call r
 How to use skills:
 - Use the read_skill tool with the <name> value to load the full skill content
 - The skill content will provide detailed instructions, scripts, and workflows
-- For skill scripts, use read_skill_resource to read and understand the script first, then use it in Python via /mnt/.skills/{skill-dir}/
+- For skill scripts, use read_skill_resource to read and understand the script first, then use it in Python via /mnt/{rootName}/.skills/{skill-dir}/... (always include rootName)
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already loaded in your context
 - Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry
@@ -198,7 +198,7 @@ Before handling a task, check if any skill below matches it. If one does, call r
 How to use skills:
 - Use the read_skill tool with the <name> value to load the full skill content
 - The skill content will provide detailed instructions, scripts, and workflows
-- For skill scripts, use read_skill_resource to read and understand the script first, then use it in Python via /mnt/.skills/{skill-dir}/
+- For skill scripts, use read_skill_resource to read and understand the script first, then use it in Python via /mnt/{rootName}/.skills/{skill-dir}/... (always include rootName)
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already loaded in your context
 - Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry

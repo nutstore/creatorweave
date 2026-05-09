@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 5
+export const BASE_SCHEMA_VERSION = 6
 
 // ============================================================================
 // Migration Registry
@@ -108,6 +108,28 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_messages_conv_ts ON messages(conversation_id, timestamp);
 
       PRAGMA user_version = 5;
+    `,
+  },
+  {
+    version: 6,
+    name: 'add_project_roots_table',
+    up: `
+      CREATE TABLE IF NOT EXISTS project_roots (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          is_default INTEGER NOT NULL DEFAULT 0,
+          read_only INTEGER NOT NULL DEFAULT 0,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+          UNIQUE(project_id, name),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_project_roots_project_id ON project_roots(project_id);
+      CREATE INDEX IF NOT EXISTS idx_project_roots_project_default ON project_roots(project_id, is_default);
+
+      PRAGMA user_version = 6;
     `,
   },
 ]

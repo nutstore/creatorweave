@@ -5,22 +5,37 @@
  * 1. Scattered state
  * 2. Permission records not deleted after release()
  * 3. Re-add not showing picker after release
+ *
+ * Multi-root support:
+ * - Each project can have multiple roots (folder handles)
+ * - One root per project is marked as `isDefault`
+ * - Roots stored in SQLite via ProjectRootRepository
+ * - Handles stored in IndexedDB via DirectoryHandleManager
  */
 
 import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import { toast } from 'sonner'
-import type { FolderAccessRecord, FolderAccessStatus, FolderAccessStore } from '@/types/folder-access'
+import type { FolderAccessRecord, FolderAccessStatus, FolderAccessStore, RootInfo } from '@/types/folder-access'
 import { folderAccessRepo } from '@/services/folder-access.repository'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
-import { bindRuntimeDirectoryHandle, unbindRuntimeDirectoryHandle } from '@/native-fs'
+import {
+  bindRuntimeDirectoryHandle,
+  unbindRuntimeDirectoryHandle,
+  getRuntimeHandlesForProject,
+} from '@/native-fs'
+import type { ProjectRoot } from '@/sqlite/repositories/project-root.repository'
+import { getProjectRootRepository } from '@/sqlite'
 
 /**
  * Create an empty record
+ * @param projectId Project ID
+ * @param rootName Root name (defaults to projectId for backward compat)
  */
-function createEmptyRecord(projectId: string): FolderAccessRecord {
+function createEmptyRecord(projectId: string, rootName?: string): FolderAccessRecord {
   return {
     projectId,
+    rootName: rootName ?? projectId,
     folderName: null,
     handle: null,
     persistedHandle: null,
@@ -41,15 +56,47 @@ async function notifyWorkspaceNativeDirectoryGranted(handle: FileSystemDirectory
 }
 
 /**
- * Module-level dedup: prevents concurrent ensureFilePaths from triggering multiple traversals
+ * Module-level dedup: prevents concurrent ensureFilePaths for the same project
  */
-let _filePathPromise: Promise<string[]> | null = null
+const _filePathPromises: Map<string, Promise<string[]>> = new Map()
+
+/**
+ * LRU eviction for allFilePaths cache.
+ * Keeps at most MAX_CACHED_PROJECTS entries. Evicts the least-recently-written
+ * project when the limit is exceeded.
+ */
+const MAX_CACHED_PROJECTS = 10
+/** Insertion-order of project IDs (most recent at the end) */
+const _cacheOrder: string[] = []
+
+function evictLRU(
+  state: { allFilePaths: Record<string, string[]> },
+  justWrittenId: string
+): void {
+  // Move just-written ID to the end (most recently used)
+  const idx = _cacheOrder.indexOf(justWrittenId)
+  if (idx >= 0) _cacheOrder.splice(idx, 1)
+  _cacheOrder.push(justWrittenId)
+
+  // Evict oldest entries that exceed the limit
+  while (_cacheOrder.length > MAX_CACHED_PROJECTS) {
+    const oldest = _cacheOrder.shift()!
+    // Don't evict the project we just wrote — break instead of infinite loop
+    if (oldest === justWrittenId) {
+      _cacheOrder.push(oldest)
+      break
+    }
+    if (state.allFilePaths[oldest]) {
+      delete state.allFilePaths[oldest]
+    }
+  }
+}
 
 export const useFolderAccessStore = create<FolderAccessStore>()(
   immer((set, get) => ({
     activeProjectId: null,
     records: {},
-    allFilePaths: [],
+    allFilePaths: {},
 
     // ========================================================================
     // Actions
@@ -59,8 +106,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
      * Set active project and hydrate
      */
     setActiveProject: async (projectId: string | null) => {
-      // Clear file path cache on project switch
-      get().clearFilePaths()
       set((state) => {
         state.activeProjectId = projectId
       })
@@ -75,6 +120,9 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       }
 
       await get().hydrateProject(projectId)
+
+      // Load multi-root state
+      await get().loadRoots()
     },
 
     /**
@@ -111,12 +159,15 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             set((state) => {
               state.records[projectId] = {
                 ...existing,
+                rootName: existing.rootName ?? handle.name ?? projectId,
                 handle,
                 status: 'ready',
                 updatedAt: Date.now(),
               }
             })
-            bindRuntimeDirectoryHandle(projectId, handle)
+            // Multi-root: bind with rootName (handle.name or existing rootName)
+            const rootName = existing.rootName ?? handle.name ?? projectId
+            bindRuntimeDirectoryHandle(projectId, rootName, handle)
             await notifyWorkspaceNativeDirectoryGranted(handle)
             console.log('[FolderAccessStore] Permission granted, handle ready:', handle.name)
           } else if (permission === 'prompt') {
@@ -191,6 +242,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
         const record: FolderAccessRecord = {
           projectId,
+          rootName: handle.name,
           folderName: handle.name,
           handle,
           persistedHandle: handle,
@@ -202,7 +254,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
         // Persist
         await folderAccessRepo.save(record)
-        bindRuntimeDirectoryHandle(projectId, handle)
+        // Multi-root: bind with rootName = handle.name for per-root lookup
+        bindRuntimeDirectoryHandle(projectId, handle.name, handle)
         await notifyWorkspaceNativeDirectoryGranted(handle)
 
         set((state) => {
@@ -263,6 +316,7 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
       const record: FolderAccessRecord = {
         projectId,
+        rootName: handle.name,
         folderName: handle.name,
         handle,
         persistedHandle: handle,
@@ -274,7 +328,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
       // Persist
       await folderAccessRepo.save(record)
-      bindRuntimeDirectoryHandle(projectId, handle)
+      // Multi-root: bind with rootName = handle.name
+      bindRuntimeDirectoryHandle(projectId, handle.name, handle)
       await notifyWorkspaceNativeDirectoryGranted(handle)
 
       set((state) => {
@@ -320,7 +375,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
           // Update persistence
           await folderAccessRepo.save(get().records[projectId])
-          bindRuntimeDirectoryHandle(projectId, handle)
+          const rootName = record.rootName ?? handle.name ?? projectId
+          bindRuntimeDirectoryHandle(projectId, rootName, handle)
           await notifyWorkspaceNativeDirectoryGranted(handle)
 
           toast.success('Folder permission restored')
@@ -374,7 +430,9 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       try {
         // Critical: fully delete IndexedDB record
         await folderAccessRepo.delete(projectId)
-        unbindRuntimeDirectoryHandle(projectId)
+        const record = get().records[projectId]
+        const rootName = record?.rootName ?? projectId
+        unbindRuntimeDirectoryHandle(projectId, rootName)
 
         set((state) => {
           state.records[projectId] = createEmptyRecord(projectId)
@@ -452,34 +510,83 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
     // ========================================================================
 
     ensureFilePaths: async () => {
-      const existing = get().allFilePaths
-      if (existing.length > 0) return existing
+      const projectId = get().activeProjectId
+      if (!projectId) return []
+      // Return cache if already exists for this project
+      const existing = get().allFilePaths[projectId]
+      if (existing && existing.length > 0) return existing
       // Dedup: concurrent calls share the same traversal Promise
-      if (!_filePathPromise) {
-        _filePathPromise = get().refreshFilePaths().finally(() => {
-          _filePathPromise = null
-        })
-      }
-      return _filePathPromise
+      if (_filePathPromises.has(projectId)) return _filePathPromises.get(projectId)!
+      const promise = get().refreshFilePaths().finally(() => {
+        _filePathPromises.delete(projectId)
+      })
+      _filePathPromises.set(projectId, promise)
+      return promise
     },
 
     refreshFilePaths: async () => {
-      const handle = get().getCurrentHandle()
-      if (!handle) return []
+      const { getRuntimeHandlesForProject } = await import('@/native-fs')
+      const projectId = get().activeProjectId
+      if (!projectId) return []
+
+      // Multi-root: traverse all root handles and prefix paths with rootName
+      const allHandles = getRuntimeHandlesForProject(projectId)
+      if (allHandles.size === 0) {
+        // Fallback: no root handles in memory, try current handle
+        const handle = get().getCurrentHandle()
+        if (!handle) return []
+        const { traverseDirectory } = await import('../services/traversal.service')
+        const paths: string[] = []
+        for await (const entry of traverseDirectory(handle)) {
+          paths.push(entry.path)
+          if (paths.length >= 5000) break
+        }
+        set((state) => {
+          state.allFilePaths[projectId] = paths
+          evictLRU(state, projectId)
+        })
+        return paths
+      }
 
       const { traverseDirectory } = await import('../services/traversal.service')
       const paths: string[] = []
-      for await (const entry of traverseDirectory(handle)) {
-        if (entry.type === 'file') paths.push(entry.path)
+      for (const [rootName, handle] of allHandles) {
         if (paths.length >= 5000) break
+        for await (const entry of traverseDirectory(handle)) {
+          // Prefix with rootName for multi-root routing
+          paths.push(`${rootName}/${entry.path}`)
+          if (paths.length >= 5000) break
+        }
       }
-      set({ allFilePaths: paths })
+      set((state) => {
+        state.allFilePaths[projectId] = paths
+        evictLRU(state, projectId)
+      })
       return paths
     },
 
     clearFilePaths: () => {
-      _filePathPromise = null
-      set({ allFilePaths: [] })
+      const projectId = get().activeProjectId
+      if (projectId) {
+        _filePathPromises.delete(projectId)
+        // Remove from LRU order tracking
+        const idx = _cacheOrder.indexOf(projectId)
+        if (idx >= 0) _cacheOrder.splice(idx, 1)
+        set((state) => {
+          delete state.allFilePaths[projectId]
+        })
+      } else {
+        _filePathPromises.clear()
+        _cacheOrder.length = 0
+        set((state) => {
+          state.allFilePaths = {}
+        })
+      }
+      // Reload multi-root state in case handles changed
+      const pid = get().activeProjectId
+      if (pid) {
+        get().loadRoots()
+      }
     },
 
     // ========================================================================
@@ -496,6 +603,224 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       } catch (error) {
         console.error('[FolderAccessStore] Failed to notify file tree refresh:', error)
       }
+    },
+
+    // ========================================================================
+    // Multi-root actions
+    // ========================================================================
+
+    roots: [],
+
+    loadRoots: async () => {
+      const projectId = get().activeProjectId
+      if (!projectId) {
+        set({ roots: [] })
+        return
+      }
+
+      // Load from SQLite
+      const dbRoots: ProjectRoot[] = await getProjectRootRepository().findByProject(projectId)
+
+      // Load handles from DirectoryHandleManager
+      const runtimeHandles = getRuntimeHandlesForProject(projectId)
+
+      const roots: RootInfo[] = await Promise.all(
+        dbRoots.map(async (dbRoot) => {
+          const runtimeHandle = runtimeHandles.get(dbRoot.name)
+          let handle = runtimeHandle ?? null
+
+          // Try to restore persisted handle
+          let persistedHandle: FileSystemDirectoryHandle | null = null
+          let status: FolderAccessStatus = 'idle'
+          let error: string | undefined
+
+          if (handle) {
+            status = 'ready'
+          } else {
+            try {
+              const record = await folderAccessRepo.findByProjectAndRoot(projectId, dbRoot.name)
+              if (record?.persistedHandle) {
+                persistedHandle = record.persistedHandle
+                // Auto-check if browser still has cached permission
+                const permission = await persistedHandle.queryPermission({ mode: 'readwrite' })
+                if (permission === 'granted') {
+                  handle = persistedHandle
+                  status = 'ready'
+                  bindRuntimeDirectoryHandle(projectId, dbRoot.name, handle)
+                } else {
+                  status = 'needs_user_activation'
+                }
+              } else {
+                status = 'idle'
+              }
+            } catch {
+              status = 'idle'
+            }
+          }
+
+          return {
+            id: dbRoot.id,
+            name: dbRoot.name,
+            isDefault: dbRoot.isDefault,
+            readOnly: dbRoot.readOnly,
+            handle,
+            persistedHandle,
+            status,
+            error,
+          }
+        })
+      )
+
+      set({ roots })
+
+      // Sync first ready handle to agent.store for backward compat
+      const firstReady = roots.find((r) => r.status === 'ready' && r.handle)
+      if (firstReady?.handle) {
+        try {
+          const { useAgentStore } = await import('./agent.store')
+          useAgentStore.setState({
+            directoryHandle: firstReady.handle,
+            directoryName: firstReady.name,
+          })
+        } catch { /* ignore */ }
+      }
+    },
+
+    addRoot: async () => {
+      const projectId = get().activeProjectId
+      if (!projectId) return false
+
+      // Check if we have directory picker capability
+      const { getRuntimeCapability } = await import('@/storage/runtime-capability')
+      const capability = getRuntimeCapability()
+      if (!capability.canPickDirectory) {
+        toast.error('Directory picker not available in this browser')
+        return false
+      }
+
+      // Pick folder
+      const handle = await selectFolderReadWrite()
+      if (!handle) return false
+
+      const rootName = handle.name
+
+      // Check for duplicate name
+      const existing = get().roots
+      if (existing.some((r) => r.name === rootName)) {
+        toast.error(`A root named "${rootName}" already exists`)
+        return false
+      }
+
+      // Create root in SQLite
+      await getProjectRootRepository().createRoot({ projectId, name: rootName })
+
+      // Bind handle to runtime
+      bindRuntimeDirectoryHandle(projectId, rootName, handle)
+
+      // Persist handle
+      await folderAccessRepo.save({
+        projectId,
+        rootName,
+        handle,
+        persistedHandle: handle,
+        folderName: rootName,
+        status: 'ready',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })
+
+      // Reload roots
+      await get().loadRoots()
+
+      // Sync first root to agent.store (used by some tools as default handle)
+      try {
+        const { useAgentStore } = await import('./agent.store')
+        useAgentStore.setState({
+          directoryHandle: handle,
+          directoryName: rootName,
+        })
+      } catch { /* ignore */ }
+
+      // Trigger file tree refresh
+      get().clearFilePaths()
+      get().notifyFileTreeRefresh()
+
+      toast.success(`Added root "${rootName}"`)
+      return true
+    },
+
+    removeRoot: async (rootId: string) => {
+      const projectId = get().activeProjectId
+      if (!projectId) return
+
+      const root = get().roots.find((r) => r.id === rootId)
+      if (!root) return
+
+      // Unbind handle
+      unbindRuntimeDirectoryHandle(projectId, root.name)
+
+      // Delete from SQLite
+      await getProjectRootRepository().deleteRoot(rootId)
+
+      // Delete handle record
+      await folderAccessRepo.deleteByProjectAndRoot(projectId, root.name)
+
+      // If this was the default root, promote another as default
+      if (root.isDefault) {
+        const remaining = get().roots.filter((r) => r.id !== rootId)
+        if (remaining.length > 0) {
+          await getProjectRootRepository().setDefaultRoot(projectId, remaining[0].id)
+        }
+      }
+
+      // Reload roots
+      await get().loadRoots()
+
+      // Sync to agent.store: use first remaining root's handle
+      try {
+        const { useAgentStore } = await import('./agent.store')
+        const remaining = get().roots
+        if (remaining.length > 0 && remaining[0].handle) {
+          useAgentStore.setState({
+            directoryHandle: remaining[0].handle,
+            directoryName: remaining[0].name,
+          })
+        } else {
+          useAgentStore.setState({
+            directoryHandle: null,
+            directoryName: null,
+          })
+        }
+      } catch { /* ignore */ }
+
+      // Trigger file tree refresh
+      get().clearFilePaths()
+      get().notifyFileTreeRefresh()
+
+      toast.success(`Removed root "${root.name}"`)
+    },
+
+    setDefaultRoot: async (rootId: string) => {
+      const projectId = get().activeProjectId
+      if (!projectId) return
+
+      await getProjectRootRepository().setDefaultRoot(projectId, rootId)
+
+      // Reload roots
+      await get().loadRoots()
+    },
+
+    toggleReadOnly: async (rootId: string) => {
+      const root = get().roots.find((r) => r.id === rootId)
+      if (!root) return
+
+      const dbRoot = await getProjectRootRepository().findById(rootId)
+      if (!dbRoot) return
+      await getProjectRootRepository().updateRoot({
+        ...dbRoot,
+        readOnly: !dbRoot.readOnly,
+      })
+      await get().loadRoots()
     },
   }))
 )

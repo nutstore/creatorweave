@@ -467,7 +467,7 @@ import { ContextManager } from '@/agent/context-manager'
 import { getToolRegistry } from '@/agent/tool-registry'
 import { getOrCreateSubagentRuntime } from '@/agent/subagent/runtime'
 import { getApiKeyRepository } from '@/sqlite'
-import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
+import { LLM_PROVIDER_CONFIGS, isCustomProviderType, type LLMProviderType } from '@/agent/providers/types'
 import { generateFollowUp } from '@/agent/follow-up-generator'
 import {
   WORKFLOW_DRY_RUN_MODEL_PREFIX,
@@ -806,6 +806,10 @@ interface ConversationState {
   // Follow-up suggestions (not persisted) - per conversation
   suggestedFollowUps: Map<string, string>
 
+  // Track run IDs that were cancelled by user (not persisted)
+  // Used to suppress follow-up generation for cancelled runs
+  cancelledRunIds: Set<string>
+
   // Track mounted view ref counts per conversation (not persisted)
   // Used to prevent StrictMode mount/unmount churn from cancelling active runs
   mountedConversations: Map<string, number>
@@ -910,6 +914,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     agentLoops: new Map(),
     streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
+    cancelledRunIds: new Set(),
     mountedConversations: new Map(),
     pendingWorkflowDryRuns: new Map(),
     pendingWorkflowRealRuns: new Map(),
@@ -1079,6 +1084,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.activeConversationId = activeId
           state.loaded = true
           state.suggestedFollowUps.clear()
+          state.cancelledRunIds.clear()
         })
 
         // Load messages for the active conversation (it's about to be displayed)
@@ -1489,6 +1495,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.workflowAbortControllers.delete(id)
         }
         state.suggestedFollowUps.delete(id)
+        // Clean up any cancelled run IDs for this conversation's active run
+        const convToDelete = state.conversations.find((c) => c.id === id)
+        if (convToDelete?.activeRunId) {
+          state.cancelledRunIds.delete(convToDelete.activeRunId)
+        }
         state.streamingQueues.delete(id)
         state.mountedConversations.delete(id)
         state.pendingWorkflowDryRuns.delete(id)
@@ -1603,9 +1614,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
-        // Compression summary messages are now injected into the agent
-        // loop's allMessages directly via onMessagesUpdated, so they appear
-        // at the correct chronological position — no longer appended here.
+        // Compression summaries are injected into the agent loop as
+        // system-context messages and mirrored into the runtime message state.
         let committed = false
 
         // Acquire run lock immediately to prevent concurrent duplicate starts.
@@ -1762,7 +1772,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const settingsState = useSettingsStore.getState()
         const effectiveConfig = settingsState.getEffectiveProviderConfig()
         const providerConfig =
-          providerType === 'custom'
+          isCustomProviderType(providerType)
             ? effectiveConfig
             : {
                 apiKeyProviderKey: providerType,
@@ -2043,6 +2053,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           providerType,
           baseUrl: providerConfig.baseUrl,
           model: providerConfig.modelName,
+          apiMode: isCustomProviderType(providerType)
+            ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
+            : undefined,
         })
 
         const contextManager = new ContextManager({
@@ -2260,6 +2273,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           initialConvertCallCount: conv.compressionConvertCallCount ?? 0,
           initialLastSummaryConvertCall:
             conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
+          initialCompressionBaseline:
+            conv.compressedContextSummary && conv.compressedContextCutoffTimestamp
+              ? { summary: conv.compressedContextSummary, cutoffTimestamp: conv.compressedContextCutoffTimestamp }
+              : null,
           onCompressionStateUpdate: (compressionState) => {
             if (!isCurrentRun()) return
             set((state) => {
@@ -2325,12 +2342,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (status === 'idle') {
               c.messages = targetMessages
               // Attach collected assets to the last assistant message
+              // NOTE: Must mutate via Immer draft (c.messages[i]) directly.
+              // Using spread/reverse/find detaches the object from Immer's proxy,
+              // resulting in "Cannot assign to read only property" error.
               if (collectedAssets && collectedAssets.length > 0) {
-                const lastAssistantMsg = [...c.messages]
-                  .reverse()
-                  .find((m) => m.role === 'assistant')
-                if (lastAssistantMsg) {
-                  lastAssistantMsg.assets = collectedAssets
+                for (let i = c.messages.length - 1; i >= 0; i--) {
+                  if (c.messages[i].role === 'assistant') {
+                    c.messages[i] = {
+                      ...c.messages[i],
+                      assets: collectedAssets,
+                    }
+                    break
+                  }
                 }
               }
               c.collectedAssets = []
@@ -2351,6 +2374,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.activeRunId = null
             inner.agentLoops.delete(conversationId)
             inner.streamingQueues.delete(conversationId)
+            if (status === 'idle') {
+              inner.cancelledRunIds.delete(runId)
+            }
           })
 
           if (status === 'idle') {
@@ -2376,17 +2402,22 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               )
             }
 
-            try {
-              const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
-              if (apiKey) {
-                const suggestion = await generateFollowUp(targetMessages, providerType, apiKey)
-                if (suggestion) {
-                  get().setSuggestedFollowUp(conversationId, suggestion)
+            // Only generate follow-up on successful (non-cancelled, non-error) completion
+            const runWasCancelled = get().cancelledRunIds.has(runId)
+            if (!runWasCancelled) {
+              try {
+                const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
+                if (apiKey) {
+                  const suggestion = await generateFollowUp(targetMessages, providerType, apiKey)
+                  if (suggestion) {
+                    get().setSuggestedFollowUp(conversationId, suggestion)
+                  }
                 }
+              } catch (err) {
+                console.error('[conversation.store] Failed to generate follow-up:', err)
               }
-            } catch (err) {
-              console.error('[conversation.store] Failed to generate follow-up:', err)
             }
+            // Clean up cancelled run ID tracking (moved inside set() above)
           }
         }
 
@@ -2829,11 +2860,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isCurrentRun()) return
-            latestMessages = msgs
+            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c || c.activeRunId !== runId) return
-              c.messages = msgs
+              c.messages = msgs.filter((msg) => msg.kind !== 'context_summary')
+              c.compressedContextSummary =
+                msgs.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
+              c.compressedContextCutoffTimestamp =
+                msgs.find((msg) => msg.kind === 'context_summary')?.timestamp ||
+                c.compressedContextCutoffTimestamp ||
+                null
               c.updatedAt = Date.now()
             })
             // Persist immediately — this callback fires at block boundaries
@@ -2847,7 +2884,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               runId,
               messagesCount: msgs.length,
             })
-            latestMessages = msgs
+            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
@@ -3011,6 +3048,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     cancelAgent: (conversationId: string) => {
+      // Track the run being cancelled to suppress follow-up generation
+      const convBeingCancelled = get().conversations.find((c) => c.id === conversationId)
+      const runIdBeingCancelled = convBeingCancelled?.activeRunId
+
       // Clear any pending ask_user_question entries to unblock executor promises
       import('@/store/pending-question.store')
         .then(({ clearPendingQuestions }) => {
@@ -3065,6 +3106,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.status = 'idle'
             c.error = null
             c.activeRunId = null
+            // Mark this run as cancelled so finalizeRun skips follow-up generation
+            if (runIdBeingCancelled) {
+              state.cancelledRunIds.add(runIdBeingCancelled)
+            }
           }
         })
         if (committedPartial) {

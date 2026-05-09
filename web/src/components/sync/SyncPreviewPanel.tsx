@@ -10,17 +10,18 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { type FileChange, type ConflictInfo, type ConflictDetail, type SyncResult } from '@/opfs/types/opfs-types'
-import { isImageFile, readFileFromNativeFS, readFileFromOPFS } from '@/opfs'
+import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
+import { isCustomProviderType } from '@/agent/providers/types'
 import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
-import { ArrowLeft, AlertCircle, Sparkles, Copy, MessageSquare, ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { ArrowLeft, AlertCircle, Sparkles, MessageSquare, ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
@@ -29,6 +30,9 @@ import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
 import { type LineComment } from './comment-types'
+import { useConversationStore } from '@/store/conversation.store'
+import { useAgentStore } from '@/store/agent.store'
+import { createUserMessage } from '@/agent/message-types'
 
 /**
  * Empty state when no changes detected
@@ -109,7 +113,7 @@ export interface SyncPreviewPanelProps {
 
 export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   onSync,
-  onCancel: _onCancel,
+  onCancel,
 }) => {
   const t = useT()
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
@@ -220,7 +224,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [pendingChanges])
 
-  const generateSummaryWithLLM = useCallback(async (changes: FileChange[]): Promise<string | null> => {
+  const generateSummaryWithLLM = useCallback(async (
+    changes: FileChange[],
+    onChunk: (text: string) => void,
+    signal?: AbortSignal,
+  ): Promise<string | null> => {
     try {
       const activeConversation = await getActiveConversation()
       if (!activeConversation) return null
@@ -240,6 +248,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         providerType,
         baseUrl: effectiveConfig.baseUrl,
         model: effectiveConfig.modelName,
+        apiMode: isCustomProviderType(providerType)
+          ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
+          : undefined,
       })
 
       const changesText = changes
@@ -267,7 +278,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         let beforeText = ''
         let afterText = ''
         if (change.type !== 'add' && nativeDir) {
-          const content = await readFileFromNativeFS(nativeDir, change.path)
+          const content = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
           beforeText = content ?? ''
         }
         if (change.type !== 'delete') {
@@ -295,13 +306,22 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
       const prompt = buildSnapshotSummaryPrompt(changes.length, changesText, diffSections)
 
-      const response = await provider.chat({
+      // Use streaming to show text incrementally
+      let content = ''
+      for await (const chunk of provider.chatStream({
         messages: [{ role: 'user', content: prompt }],
         maxTokens: 220,
-      })
-      const content = response.choices[0]?.message?.content?.trim()
-      if (!content) return null
-      return content.slice(0, 3000)
+        disableThinking: true,
+      }, signal)) {
+        const delta = chunk.choices[0]?.delta?.content
+        if (delta) {
+          content += delta
+          onChunk(content.slice(0, 3000))
+        }
+      }
+      const trimmed = content.trim()
+      if (!trimmed) return null
+      return trimmed.slice(0, 3000)
     } catch {
       return null
     }
@@ -578,8 +598,8 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     })
   }, [discardPendingPath])
 
-  /** Copy all comments formatted for LLM consumption */
-  const copyCommentsForLLM = useCallback(async () => {
+  /** Send comments to AI: close drawer, inject user message, trigger agent run */
+  const sendCommentsToAI = useCallback(async () => {
     if (allComments.length === 0) return
 
     const payload = allComments
@@ -592,17 +612,48 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       })
       .join('\n')
 
-    try {
-      await navigator.clipboard.writeText(payload)
-    } catch {
-      const textArea = document.createElement('textarea')
-      textArea.value = payload
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
+    const prompt = `Please review the following inline comments I left on the diff:\n\n${payload}`
+
+    const settings = useSettingsStore.getState()
+    if (!settings.hasApiKey) {
+      toast.error(t('conversation.toast.noApiKey'))
+      return
     }
-  }, [allComments, t])
+
+    // Close drawer first
+    onCancel?.()
+
+    // Ensure conversation exists
+    const conversationStore = useConversationStore.getState()
+    const { directoryHandle } = useAgentStore.getState()
+    let targetConvId = conversationStore.activeConversationId
+    if (!targetConvId) {
+      const conv = conversationStore.createNew('Diff Comments Review')
+      targetConvId = conv.id
+      await conversationStore.setActive(targetConvId)
+    }
+
+    if (conversationStore.isConversationRunning(targetConvId)) {
+      toast.error(t('conversation.toast.stopBeforeSend'))
+      return
+    }
+
+    const userMessage = createUserMessage(prompt)
+    const currentConv = conversationStore.conversations.find((c) => c.id === targetConvId)
+    const currentMessages = currentConv ? [...currentConv.messages, userMessage] : [userMessage]
+    conversationStore.updateMessages(targetConvId, currentMessages)
+
+    // Clear comments after sending
+    setCommentsByPath({})
+
+    await conversationStore.runAgent(
+      targetConvId,
+      settings.providerType,
+      settings.modelName,
+      settings.maxTokens,
+      directoryHandle
+    )
+  }, [allComments, t, onCancel])
 
   /** Remove a single comment by id */
   const removeComment = useCallback((id: string) => {
@@ -715,10 +766,10 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
               </button>
               <button
                 type="button"
-                onClick={copyCommentsForLLM}
+                onClick={sendCommentsToAI}
                 className="inline-flex h-6 items-center gap-1 rounded bg-amber-600 px-2.5 text-[11px] font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
               >
-                <Copy className="h-3 w-3" />
+                <Send className="h-3 w-3" />
                 {t('sidebar.fileDiffViewer.copyCommentsToAI')}
               </button>
             </div>
@@ -802,7 +853,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         onSummaryChange={setSnapshotSummary}
         onGenerateSummary={async () => {
           setGeneratingSummary(true)
-          const aiSummary = await generateSummaryWithLLM(pendingApproveFiles)
+          setSnapshotSummary('')
+          const aiSummary = await generateSummaryWithLLM(
+            pendingApproveFiles,
+            (chunk) => setSnapshotSummary(chunk),
+          )
           if (aiSummary && aiSummary.trim().length > 0) {
             setSnapshotSummary(aiSummary.trim())
             setSummaryError(null)

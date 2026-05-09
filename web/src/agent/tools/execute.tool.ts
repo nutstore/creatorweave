@@ -28,13 +28,20 @@ Two mounted directories:
 - \`/mnt/\` — workspace project files. Read/write project source files here. ALWAYS use /mnt/ prefix. Example: \`open('/mnt/output.csv', 'w')\`
 - \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here. Example: \`pd.read_csv('/mnt_assets/data.csv')\`
 
+Workspace files are accessible under \`/mnt/{rootName}/path/to/file\` (always include rootName).
+
 Important:
 - The default working directory is /home/pyodide, which is NOT synced. Files written there will be lost.
 - /mnt/ reads from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", the file exists on disk but not in OPFS. Use \`sync(paths=["path/to/file"])\` to copy it to OPFS first, then retry.
 - For user-uploaded files (CSV, images, etc.), read from /mnt_assets/.
-- For output files you want the user to see (charts, reports), write to /mnt_assets/.
-- Project skill scripts in .skills/ directory are auto-synced to /mnt/.skills/{skill-dir}/ and can be imported directly
-  Example: if .skills/word-processor/scripts/convert.py exists, use \`exec(open('/mnt/.skills/word-processor/scripts/convert.py').read())\` or \`import sys; sys.path.insert(0, '/mnt/.skills/word-processor/scripts')\`
+- Output path policy (must follow strictly):
+  - If the final result is a normal workspace/project file, write it to /mnt/{rootName}/...
+  - /mnt_assets/ is temporary asset storage in OPFS assets and is NOT the default location for normal project deliverables.
+  - Use /mnt_assets/ only for temporary intermediate files or when the user explicitly asks for asset-style attachments.
+  - Do not default final deliverables to /mnt_assets/ when the expected outcome is a regular workspace file.
+- Project skill scripts in .skills/ directory are auto-synced and can be imported directly.
+  Example (root "lxy"): \`exec(open('/mnt/lxy/.skills/word-processor/scripts/convert.py').read())\`
+  For imports, add the matching scripts directory to \`sys.path\` first.
 - For packages NOT in the built-in list, use micropip to install from PyPI before importing:
   Example: \`import micropip; await micropip.install('requests'); import requests\`
   Note: Only pure-Pinux packages work with micropip. C-extension packages must be pre-built in Pyodide.
@@ -134,11 +141,11 @@ async function executePython(
 
       // Accumulate assets into the conversation store's collectedAssets
       // These will be attached to the final assistant message when the draft is committed
-      const activeConvId = useConversationStore.getState().activeConversationId
-      if (activeConvId) {
-        useConversationStore.getState().collectAssets(activeConvId, newAssets)
+      const targetConvId = active.conversationId || useConversationStore.getState().activeConversationId
+      if (targetConvId) {
+        useConversationStore.getState().collectAssets(targetConvId, newAssets)
       } else {
-        console.warn('[execute.tool] No activeConversationId! Assets will be lost.')
+        console.warn('[execute.tool] No conversationId! Assets will be lost.')
       }
     }
 

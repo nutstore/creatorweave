@@ -24,11 +24,17 @@ import {
   Check,
   Wifi,
   FlaskConical,
+  Globe,
+  Sun,
+  Moon,
+  Server,
+  BookOpen,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useT } from '@/i18n'
+import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
 import { OfflineQueue } from '@/components/mobile/OfflineQueue'
+import { MCPSettings } from '@/components/mcp/MCPSettings'
 import {
   BrandDialog,
   BrandDialogClose,
@@ -40,13 +46,14 @@ import {
 import { BrandButton } from '@creatorweave/ui'
 import { BrandSwitch } from '@creatorweave/ui'
 import { useSettingsStore } from '@/store/settings.store'
+import { useTheme, type ThemeMode } from '@/store/theme.store'
 import { getSessionStateManager } from '@/remote/session-state-serialization'
 
 // =============================================================================
 // Types
 // =============================================================================
 
-type SettingsTab = 'llm' | 'sync' | 'offline' | 'experimental'
+type SettingsTab = 'general' | 'llm' | 'mcp' | 'sync' | 'offline' | 'experimental'
 
 interface SessionSyncMetadata {
   syncId: string
@@ -683,8 +690,10 @@ const SettingsDialogContent = forwardRef<
   HTMLDivElement,
   React.ComponentPropsWithoutRef<typeof BrandDialogContent> & { open?: boolean }
 >(({ className: _className, open, ...props }, ref) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('llm')
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
   const t = useT()
+  const [locale, setLocale] = useLocale()
+  const { mode: themeMode, setTheme } = useTheme()
 
   // Mock device info for sync tab
   const deviceId = useMemo(() => {
@@ -699,12 +708,22 @@ const SettingsDialogContent = forwardRef<
 
   useEffect(() => {
     if (!open) {
-      setActiveTab('llm')
+      setActiveTab('general')
     }
   }, [open])
 
+  const docsUrl = locale === 'zh-CN' ? '/#/docs/zh' : '/#/docs/en'
+
+  const themeOptions: { value: ThemeMode; label: string; icon: React.ReactNode }[] = [
+    { value: 'light', label: t('settings.themeLight'), icon: <Sun className="h-4 w-4" /> },
+    { value: 'dark', label: t('settings.themeDark'), icon: <Moon className="h-4 w-4" /> },
+    { value: 'system', label: t('settings.themeSystem'), icon: <Monitor className="h-4 w-4" /> },
+  ]
+
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'llm', label: t('settings.title'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
+    { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
     { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
     { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
     { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
@@ -757,11 +776,94 @@ const SettingsDialogContent = forwardRef<
 
         {/* Tab content */}
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
+          {/* General Settings Tab */}
+          {activeTab === 'general' && (
+            <div className="space-y-5 py-1">
+              <p className="text-xs text-tertiary">{t('settings.generalDescription')}</p>
+
+              {/* Language Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-tertiary" />
+                  <h3 className="text-sm font-medium text-secondary">{t('settings.language')}</h3>
+                </div>
+                <p className="text-xs text-tertiary">{t('settings.languageDescription')}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(LOCALE_LABELS).map(([code, label]) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setLocale(code as typeof locale)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        locale === code
+                          ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          : 'border-neutral-200 text-secondary hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
+                      }`}
+                    >
+                      {locale === code && <Check className="h-3.5 w-3.5" />}
+                      <span className={locale !== code ? 'ml-[22px]' : ''}>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Theme Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sun className="h-4 w-4 text-tertiary" />
+                  <h3 className="text-sm font-medium text-secondary">{t('settings.theme')}</h3>
+                </div>
+                <p className="text-xs text-tertiary">{t('settings.themeDescription')}</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {themeOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setTheme(opt.value)}
+                      className={`flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm transition-colors ${
+                        themeMode === opt.value
+                          ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          : 'border-neutral-200 text-secondary hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
+                      }`}
+                    >
+                      {opt.icon}
+                      <span className="text-xs">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Documentation Link */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-tertiary" />
+                  <h3 className="text-sm font-medium text-secondary">{t('settings.docs')}</h3>
+                </div>
+                <p className="text-xs text-tertiary">{t('settings.docsDescription')}</p>
+                <BrandButton
+                  variant="outline"
+                  className="h-8 gap-2 text-xs"
+                  onClick={() => window.open(docsUrl, '_blank')}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {t('settings.docs')}
+                </BrandButton>
+              </div>
+            </div>
+          )}
+
           {/* LLM Settings Tab */}
           {activeTab === 'llm' && (
             <BrandDialogBody className="p-0">
               <ModelSettings open={open} />
             </BrandDialogBody>
+          )}
+
+          {/* MCP Settings Tab */}
+          {activeTab === 'mcp' && (
+            <div className="py-1">
+              <MCPSettings />
+            </div>
           )}
 
           {/* Sync Tab */}

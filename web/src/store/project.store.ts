@@ -328,6 +328,10 @@ export const useProjectStore = create<ProjectState>()(
         }
 
         set({ projects, projectStats, activeProjectId })
+
+        // Keep folder-access/agent scoped state aligned to project store active project.
+        const { useAgentStore } = await import('./agent.store')
+        await useAgentStore.getState().setActiveProject(activeProjectId)
       } catch (e) {
         console.error('[ProjectStore] Failed to refresh projects:', e)
       }

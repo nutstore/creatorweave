@@ -1,4 +1,4 @@
-import { LLM_PROVIDER_CONFIGS, type LLMProviderType } from '@/agent/providers/types'
+import { LLM_PROVIDER_CONFIGS, isCustomProviderType, type LLMProviderType } from '@/agent/providers/types'
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 
 type WorkflowMode = 'dry_run' | 'real_run'
@@ -191,7 +191,7 @@ export const runWorkflowExecutor: ToolExecutor = async (args, context) => {
 
   const providerType = settingsState.providerType as LLMProviderType
   const providerConfig =
-    providerType === 'custom'
+    isCustomProviderType(providerType)
       ? effectiveConfig
       : {
           apiKeyProviderKey: providerType,

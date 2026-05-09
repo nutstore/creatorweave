@@ -2,6 +2,7 @@ import {
   createAssistantMessageEventStream,
   parseStreamingJson,
   registerApiProvider,
+  type Api,
   type AssistantMessage,
   type AssistantMessageEventStream,
   type Context,
@@ -10,6 +11,7 @@ import {
   type ToolCall,
   type Usage,
 } from '@mariozechner/pi-ai'
+import '@mariozechner/pi-ai/openai-responses'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
 export const CW_OPENAI_FETCH_API = 'cw-openai-fetch' as const
@@ -17,6 +19,8 @@ export const CW_OPENAI_FETCH_API = 'cw-openai-fetch' as const
 const CUSTOM_PROVIDER_SOURCE_ID = 'creatorweave/cw-openai-fetch'
 
 let customProviderRegistered = false
+
+// ── Chat Completions stream chunk ──
 
 interface OpenAIStreamChunk {
   choices?: Array<{
@@ -60,19 +64,28 @@ type MutableContentBlock =
 export function ensurePiAICustomProvidersRegistered(): void {
   if (customProviderRegistered) return
 
+  // Register Chat Completions API handler
   registerApiProvider(
     {
       api: CW_OPENAI_FETCH_API,
-      stream: streamCwOpenAIFetch,
-      streamSimple: streamCwOpenAIFetch,
+      stream: streamCwOpenAIChatCompletions,
+      streamSimple: streamCwOpenAIChatCompletions,
     },
     CUSTOM_PROVIDER_SOURCE_ID
   )
 
+  // Note: OpenAI Responses API is handled by the official pi-ai provider
+  // (imported above via '@mariozechner/pi-ai/openai-responses').
+  // When apiMode === 'responses', models use api = 'openai-responses' directly.
+
   customProviderRegistered = true
 }
 
-function streamCwOpenAIFetch(
+// =============================================================================
+// Chat Completions API Implementation
+// =============================================================================
+
+function streamCwOpenAIChatCompletions(
   model: Model<typeof CW_OPENAI_FETCH_API>,
   context: Context,
   options?: StreamOptions
@@ -118,40 +131,7 @@ function streamCwOpenAIFetch(
       const blocks = output.content
       const blockIndex = () => blocks.length - 1
 
-      const finishCurrentBlock = (block: MutableContentBlock | null) => {
-        if (!block) return
-
-        if (block.type === 'text') {
-          stream.push({
-            type: 'text_end',
-            contentIndex: blockIndex(),
-            content: block.text,
-            partial: output,
-          })
-          return
-        }
-
-        if (block.type === 'thinking') {
-          stream.push({
-            type: 'thinking_end',
-            contentIndex: blockIndex(),
-            content: block.thinking,
-            partial: output,
-          })
-          return
-        }
-
-        if (block.type === 'toolCall') {
-          block.arguments = parseStreamingJson(block.partialArgs || '')
-          delete block.partialArgs
-          stream.push({
-            type: 'toolcall_end',
-            contentIndex: blockIndex(),
-            toolCall: block,
-            partial: output,
-          })
-        }
-      }
+      const finishCurrentBlock = createBlockFinisher(stream, output)
 
       await readSSE(response.body, (rawData) => {
         if (rawData === '[DONE]') {
@@ -286,6 +266,57 @@ function streamCwOpenAIFetch(
   return stream
 }
 
+// =============================================================================
+// Block finisher helper
+// =============================================================================
+
+function createBlockFinisher(
+  stream: AssistantMessageEventStream,
+  output: AssistantMessage
+) {
+  const blocks = output.content
+  const blockIndex = () => blocks.length - 1
+
+  return (block: MutableContentBlock | null) => {
+    if (!block) return
+
+    if (block.type === 'text') {
+      stream.push({
+        type: 'text_end',
+        contentIndex: blockIndex(),
+        content: block.text,
+        partial: output,
+      })
+      return
+    }
+
+    if (block.type === 'thinking') {
+      stream.push({
+        type: 'thinking_end',
+        contentIndex: blockIndex(),
+        content: block.thinking,
+        partial: output,
+      })
+      return
+    }
+
+    if (block.type === 'toolCall') {
+      block.arguments = parseStreamingJson(block.partialArgs || '')
+      delete block.partialArgs
+      stream.push({
+        type: 'toolcall_end',
+        contentIndex: blockIndex(),
+        toolCall: block,
+        partial: output,
+      })
+    }
+  }
+}
+
+// =============================================================================
+// Payload Builders
+// =============================================================================
+
 export function buildChatCompletionsPayload(
   model: Model<typeof CW_OPENAI_FETCH_API>,
   context: Context,
@@ -321,18 +352,11 @@ export function buildChatCompletionsPayload(
   return payload
 }
 
-function normalizeTemperatureForProvider(
-  provider: string | undefined,
-  temperature: number | undefined
-): number | undefined {
-  if (temperature === undefined || Number.isNaN(temperature)) return undefined
-  if (provider !== 'minimax' && provider !== 'minimax-cn') return temperature
+// =============================================================================
+// Message Converters (Chat Completions format)
+// =============================================================================
 
-  // MiniMax OpenAI-compatible API requires temperature in (0.0, 1.0].
-  return Math.min(1, Math.max(0.01, temperature))
-}
-
-function convertContextMessages(context: Context, model: Model<typeof CW_OPENAI_FETCH_API>): unknown[] {
+function convertContextMessages(context: Context, model: Model<Api>): unknown[] {
   const messages: unknown[] = []
 
   if (context.systemPrompt) {
@@ -430,6 +454,10 @@ function convertContextMessages(context: Context, model: Model<typeof CW_OPENAI_
   return messages
 }
 
+// =============================================================================
+// SSE Utilities
+// =============================================================================
+
 async function readSSE(
   body: ReadableStream<Uint8Array>,
   onData: (data: string) => void
@@ -521,7 +549,7 @@ function createEmptyUsage(): Usage {
   }
 }
 
-function createEmptyAssistantOutput(model: Model<typeof CW_OPENAI_FETCH_API>): AssistantMessage {
+function createEmptyAssistantOutput(model: Model<Api>): AssistantMessage {
   return {
     role: 'assistant',
     content: [],
@@ -541,4 +569,15 @@ async function safeReadText(response: Response): Promise<string> {
   } catch {
     return 'Failed to read response body'
   }
+}
+
+function normalizeTemperatureForProvider(
+  provider: string | undefined,
+  temperature: number | undefined
+): number | undefined {
+  if (temperature === undefined || Number.isNaN(temperature)) return undefined
+  if (provider !== 'minimax' && provider !== 'minimax-cn') return temperature
+
+  // MiniMax OpenAI-compatible API requires temperature in (0.0, 1.0].
+  return Math.min(1, Math.max(0.01, temperature))
 }
