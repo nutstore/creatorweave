@@ -110,6 +110,9 @@ Updating agent-space files:
 - **IMPORTANT**: Python reads files from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", use \`sync\` to copy the file from disk to OPFS first.
 - **ALWAYS use /mnt/ or /mnt_assets/ prefix** for file operations in Python. The default working directory (/home/pyodide) is NOT synced — files written there will be lost.
 - **Do NOT use /mnt/ or /mnt_assets/** with non-python tools (ls/read/write/edit/delete/search). Those tools use workspace paths or vfs:// paths, not Pyodide mount paths.
+- Rewrite rule for non-python tools:
+  - \`/mnt/{rootName}/path/to/file\` -> \`{rootName}/path/to/file\`
+  - \`/mnt_assets/file.ext\` -> \`vfs://assets/file.ext\`
 - For user-uploaded files (CSV, images, etc.), read from \`/mnt_assets/\`.
 - Output path policy (must follow strictly):
   - If the requested result is a normal project/workspace file that should participate in disk sync, write to \`/mnt/{rootName}/...\`.
