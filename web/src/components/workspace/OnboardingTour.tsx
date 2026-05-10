@@ -42,7 +42,8 @@ export function OnboardingTour({
 }: OnboardingTourProps) {
   const t = useT()
   const [locale] = useLocale()
-  const { onboardingCompleted, setOnboardingCompleted } = useWorkspacePreferencesStore()
+  const onboardingCompleted = useWorkspacePreferencesStore((s) => s.onboardingCompleted)
+  const setOnboardingCompleted = useWorkspacePreferencesStore((s) => s.setOnboardingCompleted)
   const [currentStepIndex, setCurrentStepIndex] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [dontShowAgain, setDontShowAgain] = useState(false)

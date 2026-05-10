@@ -6,7 +6,6 @@
  */
 
 import { create } from 'zustand'
-import { immer } from 'zustand/middleware/immer'
 import { toast } from 'sonner'
 import { ProjectManager, type AgentMeta, type AgentInfo } from '@/opfs'
 import { useProjectStore } from './project.store'
@@ -54,8 +53,7 @@ interface AgentsState {
   deleteSkill: (agentId: string, skillName: string) => Promise<boolean>
 }
 
-export const useAgentsStore = create<AgentsState>()(
-  immer((set, get) => ({
+export const useAgentsStore = create<AgentsState>()((set, get) => ({
     activeAgentId: null,
     activeAgent: null,
     agents: [],
@@ -69,11 +67,15 @@ export const useAgentsStore = create<AgentsState>()(
     },
 
     initialize: async (projectId) => {
-      const { projectManager } = get()
+      const { projectManager, isInitialized } = get()
       if (!projectManager) {
         set({ error: 'ProjectManager not set', isInitialized: true })
         return
       }
+      // Already initialized — skip to avoid creating new array references
+      // that trigger cascade re-renders. On project switch, reset first:
+      //   useAgentsStore.setState({ isInitialized: false, agents: [] })
+      if (isInitialized) return
 
       set({ isLoading: true, error: null })
 
@@ -413,6 +415,4 @@ export const useAgentsStore = create<AgentsState>()(
       }
     },
   }))
-)
-
 export type { AgentsState }

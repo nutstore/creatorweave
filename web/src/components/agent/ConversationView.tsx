@@ -11,8 +11,8 @@
  *   - ContextUsageBar        — context window usage display
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { Send, StopCircle, ChevronDown } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { Send, StopCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput } from './AgentRichInput'
@@ -20,6 +20,7 @@ import { WorkflowQuickActions } from './WorkflowQuickActions'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import type { FileMentionItem } from './FileMentionExtension'
 import { useInitialMessage } from './useInitialMessage'
 import { ConversationMessages } from './ConversationMessages'
@@ -27,6 +28,7 @@ import { ConversationEmptyState } from './ConversationEmptyState'
 import { AgentDropdown } from './AgentDropdown'
 import { ThinkingDropdown } from './ThinkingDropdown'
 import { ContextUsageBar } from './ContextUsageBar'
+import { ScrollToBottomButton } from './ScrollToBottomButton'
 
 /** Lightweight keyboard shortcut hint shown near the input area */
 function ShortcutHint() {
@@ -41,6 +43,47 @@ function ShortcutHint() {
     </span>
   )
 }
+
+/** Send / Cancel button — memoized to only re-render when its specific props change */
+const SendCancelButton = memo(function SendCancelButton({
+  isProcessing,
+  isSendDisabled,
+  onSend,
+  onCancel,
+  sendTitle,
+  cancelTitle,
+}: {
+  isProcessing: boolean
+  isSendDisabled: boolean
+  onSend: () => void
+  onCancel: () => void
+  sendTitle: string
+  cancelTitle: string
+}) {
+  if (isProcessing) {
+    return (
+      <button
+        type="button"
+        onClick={onCancel}
+        className="absolute bottom-4 right-4 rounded-xl bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600"
+        title={cancelTitle}
+      >
+        <StopCircle className="h-4 w-4" />
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={onSend}
+      disabled={isSendDisabled}
+      className="absolute bottom-4 right-4 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-30 disabled:hover:bg-primary-600"
+      title={sendTitle}
+    >
+      <Send className="h-4 w-4" />
+    </button>
+  )
+})
 
 interface ConversationViewProps {
   initialMessage?: string | null
@@ -59,20 +102,21 @@ export function ConversationView({
 
   const logic = useConversationLogic()
   const {
-    input, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
-    showScrollToBottom, scrollToBottom,
+    hasInput, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
+    isUserAtBottomRef,
     draftTextToRestore, onDraftRestored,
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
-    convId, activeMessages, activeDraftAssistant, activeStreamingState,
-    activeWorkflowExecution, conversationError, activeContextWindowUsage,
+    convId, activeMessages,
+    conversationError, activeContextWindowUsage,
     isProcessing, status, suggestedFollowUp, workflowTemplates, toolResults,
-    streamingState, streamingContentMessage,
+    staticSnapshot,
     hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
     agentMode, setAgentMode,
     handleSend, handleCancel, handleRunWorkflow, handleRealRunWorkflow,
-    handleDeleteAgentLoop, handleEditAndResend, regenerateUserMessage,
+    handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
     runCustomWorkflowDryRun,
     useConversationStore: convStore,
+    useConversationRuntimeStore: rtStore,
   } = logic
 
   // ── File search for # file mention ──
@@ -227,6 +271,15 @@ export function ConversationView({
     [],
   )
 
+  // ── Stable onChange for AgentRichInput ──
+  const handleInputChange = useCallback(
+    ({ text, mentionedAgentIds: ids }: { text: string; mentionedAgentIds: string[] }) => {
+      setInput(text)
+      setMentionedAgentIds(ids)
+    },
+    [setInput, setMentionedAgentIds],
+  )
+
   // Cleanup debounce timer on unmount
   useEffect(() => {
     return () => {
@@ -254,22 +307,20 @@ export function ConversationView({
     }
   }, [workflowTemplates, selectedWorkflowTemplateId])
 
-  // ── Derived: isWaitingForModel ──
-  const isWaitingForModel =
-    status === 'pending' ||
-    (status === 'tool_calling' &&
-      !activeStreamingState?.currentToolCall &&
-      (activeStreamingState?.activeToolCalls?.length || 0) === 0)
+  // ── Stable error handler for ErrorBoundary ──
+  const handleErrorBoundaryError = useCallback(
+    (error: Error) => {
+      console.error('[ConversationView] Error:', error)
+      if (convId) {
+        useConversationRuntimeStore.getState().resetConversationState(convId)
+      }
+    },
+    [convId],
+  )
 
   return (
     <ErrorBoundary
-      onError={(error) => {
-        console.error('[ConversationView] Error:', error)
-        if (convId) {
-          const { resetConversationState } = convStore.getState()
-          resetConversationState(convId)
-        }
-      }}
+      onError={handleErrorBoundaryError}
     >
       <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
         {/* Messages area */}
@@ -282,18 +333,11 @@ export function ConversationView({
               activeMessages={activeMessages}
               toolResults={toolResults}
               isProcessing={isProcessing}
-              isWaitingForModel={isWaitingForModel}
-              streamingState={streamingState}
-              streamingContentMessage={streamingContentMessage}
-              activeDraftAssistant={activeDraftAssistant}
-              activeStreamingState={activeStreamingState}
-              activeWorkflowExecution={activeWorkflowExecution}
               status={status}
+              staticSnapshot={staticSnapshot}
               onDeleteAgentLoop={handleDeleteAgentLoop}
               onEditAndResend={handleEditAndResend}
-              onRegenerate={
-                convId ? (id: string) => regenerateUserMessage(convId, id) : undefined
-              }
+              onRegenerate={handleRegenerate}
               onCancel={handleCancel}
               messagesEndRef={messagesEndRef}
               conversationId={convId}
@@ -303,17 +347,13 @@ export function ConversationView({
           )}
         </div>
 
-        {/* Scroll-to-bottom floating button */}
-        {showScrollToBottom && (
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            className="absolute bottom-3 right-4 rounded-full bg-neutral-800/70 p-2 text-white shadow-lg backdrop-blur-sm transition-opacity hover:bg-neutral-700/80 dark:bg-neutral-200/70 dark:text-neutral-900 dark:hover:bg-neutral-200/90"
-            title={t('conversation.buttons.scrollToBottom')}
-          >
-            <ChevronDown className="h-4 w-4" />
-          </button>
-        )}
+        {/* Scroll-to-bottom floating button — isolated component to avoid re-rendering ConversationView on scroll */}
+        <ScrollToBottomButton
+          scrollContainerRef={scrollContainerRef}
+          messagesEndRef={messagesEndRef}
+          isUserAtBottomRef={isUserAtBottomRef}
+          convId={convId}
+        />
       </div>
 
         {conversationError && (
@@ -348,32 +388,17 @@ export function ConversationView({
                 onSetActiveAgent={setActiveAgent}
                 onCreateAgent={createAgent}
                 onDeleteAgent={deleteAgent}
-                onChange={({ text, mentionedAgentIds: ids }) => {
-                  setInput(text)
-                  setMentionedAgentIds(ids)
-                }}
+                onChange={handleInputChange}
                 onSubmit={handleSend}
               />
-              {isProcessing ? (
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="absolute bottom-4 right-4 rounded-xl bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600"
-                  title={t('conversation.buttons.stop')}
-                >
-                  <StopCircle className="h-4 w-4" />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={(!input.trim() && !suggestedFollowUp) || !hasApiKey || disabled}
-                  className="absolute bottom-4 right-4 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-30 disabled:hover:bg-primary-600"
-                  title={t('conversation.buttons.send')}
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              )}
+              <SendCancelButton
+                isProcessing={isProcessing}
+                isSendDisabled={(!hasInput && !suggestedFollowUp) || !hasApiKey || disabled}
+                onSend={handleSend}
+                onCancel={handleCancel}
+                sendTitle={t('conversation.buttons.send')}
+                cancelTitle={t('conversation.buttons.stop')}
+              />
             </div>
           </div>
 

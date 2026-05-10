@@ -15,8 +15,10 @@ export interface ConversationBadgeProps {
 }
 
 export const ConversationBadge: React.FC<ConversationBadgeProps> = ({ onClick, compact = false }) => {
-  const { activeWorkspaceId: activeConversationId, workspaces: conversations, currentPendingCount, initialized } =
-    useConversationContextStore()
+  const activeConversationId = useConversationContextStore((s) => s.activeWorkspaceId)
+  const conversations = useConversationContextStore((s) => s.workspaces)
+  const currentPendingCount = useConversationContextStore((s) => s.currentPendingCount)
+  const initialized = useConversationContextStore((s) => s.initialized)
   const t = useT()
 
   // Get current conversation info

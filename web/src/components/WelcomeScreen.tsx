@@ -21,7 +21,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
   const [input, setInput] = useState('')
   const { hasApiKey } = useSettingsStore()
   const { directoryHandle, setDirectoryHandle } = useAgentStore()
-  const { conversations } = useConversationStore()
+  const hasConversations = useConversationStore((s) => s.conversations.length > 0)
   const t = useT()
 
   const handleSubmit = () => {
@@ -97,7 +97,7 @@ export function WelcomeScreen({ onStartConversation }: WelcomeScreenProps) {
         </div>
 
         {/* Recent conversations hint */}
-        {conversations.length > 0 && (
+        {hasConversations && (
           <p className="mt-8 text-center text-xs text-tertiary dark:text-tertiary">{t('welcome.recentHint')}</p>
         )}
       </div>

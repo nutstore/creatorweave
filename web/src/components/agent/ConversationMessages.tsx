@@ -1,9 +1,16 @@
 /**
  * ConversationMessages — renders the list of message turns,
  * draft assistant bubble, and workflow progress panels.
+ *
+ * Streaming data (draftAssistant, streamingState, streamingContent, toolResults)
+ * is subscribed directly from the runtime store inside this component,
+ * so that parent components (ConversationView) do NOT re-render on every
+ * streaming token (~60fps). Only this component tree re-renders.
  */
 
-import { Fragment, useMemo } from 'react'
+import { Fragment, memo, useMemo } from 'react'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
+import { useShallow } from 'zustand/react/shallow'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
@@ -14,25 +21,9 @@ import type { FileMentionItem } from './FileMentionExtension'
 
 type ConversationMessagesProps = {
   activeMessages: Message[]
+  /** Tool results from committed messages only (not runtime) */
   toolResults: Map<string, string>
   isProcessing: boolean
-  isWaitingForModel: boolean
-  streamingState: { reasoning: boolean; content: boolean } | undefined
-  streamingContentMessage: { reasoning: string; content: string } | undefined
-  activeDraftAssistant: {
-    toolCalls: ToolCall[]
-    steps: DraftAssistantStep[]
-    toolResults: Record<string, string>
-    reasoning: string
-    content: string
-  } | null
-  activeStreamingState: {
-    currentToolCall: ToolCall | null
-    streamingToolArgs: string
-    streamingToolArgsByCallId: Record<string, string>
-    activeToolCalls: ToolCall[]
-  } | null
-  activeWorkflowExecution: WorkflowExecutionState | null
   status: string
   onDeleteAgentLoop: (messageId: string) => void
   onEditAndResend: (userMessageId: string, newContent: string) => void
@@ -45,16 +36,35 @@ type ConversationMessagesProps = {
   mentionAgents: { id: string; name?: string }[]
   /** Async file search callback for # file mention in edit mode */
   onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
+  /**
+   * Stable snapshot of low-frequency data computed by the parent.
+   * These fields change only when the processing state or messages change,
+   * NOT on every streaming token.
+   */
+  staticSnapshot: {
+    activeWorkflowExecution: WorkflowExecutionState | null
+  }
 }
 
 /** Build runtime props for an AssistantTurnBubble. Returns undefined values when not active. */
 function getRuntimeProps(
   active: boolean,
   isWaiting: boolean,
-  draftAssistant: ConversationMessagesProps['activeDraftAssistant'],
-  streamingState: ConversationMessagesProps['activeStreamingState'],
-  streamingStateDerived: ConversationMessagesProps['streamingState'],
-  streamingContent: ConversationMessagesProps['streamingContentMessage'],
+  draftAssistant: {
+    toolCalls: ToolCall[]
+    steps: DraftAssistantStep[]
+    toolResults: Record<string, string>
+    reasoning: string
+    content: string
+  } | null,
+  streamingState: {
+    currentToolCall: ToolCall | null
+    streamingToolArgs: string
+    streamingToolArgsByCallId: Record<string, string>
+    activeToolCalls: ToolCall[]
+  } | null,
+  streamingStateDerived: { reasoning: boolean; content: boolean } | undefined,
+  streamingContent: { reasoning: string; content: string } | undefined,
   status: string,
 ) {
   return {
@@ -69,16 +79,10 @@ function getRuntimeProps(
   }
 }
 
-export function ConversationMessages({
+export const ConversationMessages = memo(function ConversationMessages({
   activeMessages,
-  toolResults,
+  toolResults: committedToolResults,
   isProcessing,
-  isWaitingForModel,
-  streamingState,
-  streamingContentMessage,
-  activeDraftAssistant,
-  activeStreamingState,
-  activeWorkflowExecution,
   status,
   onDeleteAgentLoop,
   onEditAndResend,
@@ -88,7 +92,98 @@ export function ConversationMessages({
   conversationId,
   mentionAgents,
   onSearchFiles,
+  staticSnapshot,
 }: ConversationMessagesProps) {
+  const { activeWorkflowExecution } = staticSnapshot
+
+  // ── Subscribe to streaming data directly from runtime store ──
+  // This component is the ONLY place that reads streaming data at high frequency.
+  // Parent components do NOT receive these props and will NOT re-render on tokens.
+  const streamingData = useConversationRuntimeStore(
+    useShallow((s) => {
+      if (!conversationId) return null
+      const rt = s.runtimes.get(conversationId)
+      if (!rt) return null
+      return {
+        draftAssistant: rt.draftAssistant,
+        streamingContent: rt.streamingContent,
+        streamingReasoning: rt.streamingReasoning,
+        isReasoningStreaming: rt.isReasoningStreaming,
+        isContentStreaming: rt.isContentStreaming,
+        currentToolCall: rt.currentToolCall,
+        activeToolCalls: rt.activeToolCalls || [],
+        streamingToolArgs: rt.streamingToolArgs,
+        streamingToolArgsByCallId: rt.streamingToolArgsByCallId || {},
+      }
+    }),
+  )
+
+  // Derive the same shapes that used to come from props
+  const activeDraftAssistant = streamingData ? {
+    toolCalls: streamingData.draftAssistant?.toolCalls || [],
+    steps: streamingData.draftAssistant?.steps || [],
+    toolResults: streamingData.draftAssistant?.toolResults || {},
+    reasoning: streamingData.draftAssistant?.reasoning || '',
+    content: streamingData.draftAssistant?.content || '',
+  } : null
+
+  const activeStreamingState = streamingData ? {
+    currentToolCall: streamingData.currentToolCall,
+    streamingToolArgs: streamingData.streamingToolArgs,
+    streamingToolArgsByCallId: streamingData.streamingToolArgsByCallId,
+    activeToolCalls: streamingData.activeToolCalls,
+  } : null
+
+  const isWaitingForModel =
+    status === 'pending' ||
+    (status === 'tool_calling' &&
+      !activeStreamingState?.currentToolCall &&
+      (activeStreamingState?.activeToolCalls?.length || 0) === 0)
+
+  // ── Merge tool results: committed + runtime ──
+  // This MUST be subscribed here (not in parent) because runtime toolResults
+  // change at high frequency during multi-tool agent loops.
+  const toolResults = useMemo(() => {
+    const merged = new Map(committedToolResults)
+    const runtimeResults = activeDraftAssistant?.toolResults || {}
+    for (const [toolCallId, result] of Object.entries(runtimeResults)) {
+      if (!merged.has(toolCallId)) merged.set(toolCallId, result)
+    }
+    return merged
+  }, [committedToolResults, activeDraftAssistant?.toolResults])
+
+  const streamingState = useMemo(
+    () =>
+      !streamingData || !isProcessing
+        ? undefined
+        : {
+            reasoning: streamingData.isReasoningStreaming,
+            content: streamingData.isContentStreaming,
+          },
+    [streamingData?.isReasoningStreaming, streamingData?.isContentStreaming, isProcessing],
+  )
+
+  const streamingContentMessage = useMemo(() => {
+    if (!streamingData || !streamingData.draftAssistant || !isProcessing) return undefined
+    const reasoning = streamingData.draftAssistant.reasoning || streamingData.streamingReasoning
+    const content = streamingData.draftAssistant.content || streamingData.streamingContent
+    if (!reasoning && !content) return undefined
+    const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant')
+    if (
+      lastAssistant &&
+      (lastAssistant.reasoning || '') === (reasoning || '') &&
+      (lastAssistant.content || '') === (content || '')
+    ) return undefined
+    return { reasoning, content }
+  }, [
+    streamingData?.streamingReasoning,
+    streamingData?.streamingContent,
+    streamingData?.draftAssistant?.reasoning,
+    streamingData?.draftAssistant?.content,
+    activeMessages,
+    isProcessing,
+  ])
+
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
 
@@ -191,4 +286,4 @@ export function ConversationMessages({
       </div>
     </div>
   )
-}
+})

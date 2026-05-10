@@ -135,9 +135,12 @@ async function syncAgentsForProject(projectId: string): Promise<void> {
       import('./agents.store'),
       ProjectManager.create(),
     ])
-    const agentsStore = agentsModule.useAgentsStore.getState()
-    agentsStore.setProjectManager(pm)
-    await agentsStore.initialize(projectId)
+    const agentsStore = agentsModule.useAgentsStore
+    // Reset so initialize() will re-run (needed for project switch)
+    agentsStore.setState({ isInitialized: false, agents: [] })
+    const state = agentsStore.getState()
+    state.setProjectManager(pm)
+    await state.initialize(projectId)
   } catch (error) {
     console.warn('[ProjectStore] Failed to sync agents store:', error)
   }

@@ -31,6 +31,7 @@ interface OpenAIStreamChunk {
       reasoning?: string
       reasoning_text?: string
       tool_calls?: Array<{
+        index?: number
         id?: string
         function?: {
           name?: string
@@ -54,6 +55,7 @@ interface OpenAIStreamChunk {
 
 type MutableToolCall = ToolCall & {
   partialArgs?: string
+  toolCallIndex?: number
 }
 
 type MutableContentBlock =
@@ -130,6 +132,7 @@ function streamCwOpenAIChatCompletions(
       let currentBlock: MutableContentBlock | null = null
       const blocks = output.content
       const blockIndex = () => blocks.length - 1
+      const toolCallIdByIndex = new Map<number, string>()
 
       const finishCurrentBlock = createBlockFinisher(stream, output)
 
@@ -203,24 +206,43 @@ function streamCwOpenAIChatCompletions(
 
         if (delta.tool_calls && delta.tool_calls.length > 0) {
           for (const toolCallDelta of delta.tool_calls) {
+            const toolIndex = typeof toolCallDelta.index === 'number' ? toolCallDelta.index : undefined
+            if (toolIndex !== undefined && toolCallDelta.id) {
+              toolCallIdByIndex.set(toolIndex, toolCallDelta.id)
+            }
+            const stableToolId =
+              toolCallDelta.id ||
+              (toolIndex !== undefined
+                ? (toolCallIdByIndex.get(toolIndex) || `pending_tool_${toolIndex}`)
+                : `pending_tool_${blocks.length}`)
+
+            const isCurrentToolBlock = !!currentBlock && currentBlock.type === 'toolCall'
+            const sameIndexedCall =
+              isCurrentToolBlock &&
+              toolIndex !== undefined &&
+              (currentBlock.toolCallIndex === undefined || currentBlock.toolCallIndex === toolIndex)
+            const sameIdCall = isCurrentToolBlock && currentBlock.id === stableToolId
+            const shouldStartNewToolBlock =
+              !isCurrentToolBlock || (!sameIndexedCall && !sameIdCall)
+
             if (
-              !currentBlock ||
-              currentBlock.type !== 'toolCall' ||
-              (toolCallDelta.id && currentBlock.id !== toolCallDelta.id)
+              shouldStartNewToolBlock
             ) {
               finishCurrentBlock(currentBlock)
               currentBlock = {
                 type: 'toolCall',
-                id: toolCallDelta.id || '',
+                id: stableToolId,
                 name: toolCallDelta.function?.name || '',
                 arguments: {},
                 partialArgs: '',
+                toolCallIndex: toolIndex,
               }
               blocks.push(currentBlock)
               stream.push({ type: 'toolcall_start', contentIndex: blockIndex(), partial: output })
             }
 
             if (toolCallDelta.id) currentBlock.id = toolCallDelta.id
+            if (toolIndex !== undefined) currentBlock.toolCallIndex = toolIndex
             if (toolCallDelta.function?.name) currentBlock.name = toolCallDelta.function.name
 
             const argsDelta = toolCallDelta.function?.arguments || ''

@@ -1,40 +1,34 @@
 /**
- * useActiveConversation — selects the active conversation from store
- * with a single find, then derives all per-conversation fields.
+ * useActiveConversation — selects the active conversation's persisted data.
+ *
+ * IMPORTANT: This hook does NOT subscribe to streaming/high-frequency data
+ * (draftAssistant, streamingContent, etc.). That data is subscribed directly
+ * inside ConversationMessages to prevent parent components from re-rendering
+ * on every streaming token (~60fps).
+ *
+ * Only low-frequency data is exposed: messages, status, error, workflow execution.
  */
 
 import { useConversationStore } from '@/store/conversation.store'
-import type { DraftAssistantStep, Message, ToolCall, WorkflowExecutionState } from '@/agent/message-types'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
+import { useShallow } from 'zustand/react/shallow'
+import type { Message, WorkflowExecutionState } from '@/agent/message-types'
 
 const EMPTY_MESSAGES: Message[] = []
+
+const NULL_SLICE: ActiveConversationSlice = {
+  convId: null,
+  messages: EMPTY_MESSAGES,
+  status: 'idle' as const,
+  workflowExecution: null,
+  error: null,
+  contextWindowUsage: null,
+}
 
 export interface ActiveConversationSlice {
   convId: string | null
   messages: Message[]
   status: 'idle' | 'pending' | 'tool_calling' | 'streaming' | 'error'
-  draftAssistant: {
-    reasoning: string
-    content: string
-    toolCalls: ToolCall[]
-    toolResults: Record<string, string>
-    toolCall: ToolCall | null
-    toolArgs: string
-    steps: DraftAssistantStep[]
-    activeReasoningStepId?: string | null
-    activeContentStepId?: string | null
-    activeToolStepId?: string | null
-    activeCompressionStepId?: string | null
-  } | null
-  streamingState: {
-    streamingContent: string
-    streamingReasoning: string
-    isReasoningStreaming: boolean
-    isContentStreaming: boolean
-    currentToolCall: ToolCall | null
-    activeToolCalls: ToolCall[]
-    streamingToolArgs: string
-    streamingToolArgsByCallId: Record<string, string>
-  } | null
   workflowExecution: WorkflowExecutionState | null
   error: string | null
   contextWindowUsage: {
@@ -47,57 +41,54 @@ export interface ActiveConversationSlice {
 }
 
 /**
- * Single selector that reads the active conversation once per render,
- * then returns all derived fields. Consumers use finer-grained
- * sub-selectors if they want to avoid re-renders on unrelated changes.
+ * Reads persisted data (messages, lastContextWindowUsage) from the main store
+ * and low-frequency runtime data (status, error, workflow, contextWindowUsage)
+ * from the runtime store.
+ *
+ * Streaming data (draftAssistant, streamingContent, etc.) is intentionally
+ * excluded — it is subscribed directly in ConversationMessages.
  */
 export function useActiveConversation(): ActiveConversationSlice {
-  return useConversationStore((s) => {
-    if (!s.activeConversationId) {
+  // Persisted data from main store
+  const convSlice = useConversationStore(
+    useShallow((s) => {
+      if (!s.activeConversationId) return null
+      const conv = s.conversations.find((c) => c.id === s.activeConversationId)
+      if (!conv) return null
       return {
-        convId: null,
-        messages: EMPTY_MESSAGES,
-        status: 'idle' as const,
-        draftAssistant: null,
-        streamingState: null,
-        workflowExecution: null,
-        error: null,
-        contextWindowUsage: null,
+        id: conv.id,
+        messages: conv.messages || EMPTY_MESSAGES,
+        lastContextWindowUsage: conv.lastContextWindowUsage || null,
       }
-    }
+    }),
+  )
 
-    const conv = s.conversations.find((c) => c.id === s.activeConversationId)
-    if (!conv) {
+  // Low-frequency runtime data from runtime store.
+  // Only select fields that change at low rates (status transitions, error events),
+  // NOT per-token streaming fields.
+  const rtSlice = useConversationRuntimeStore(
+    useShallow((s) => {
+      if (!convSlice) return null
+      const rt = s.runtimes.get(convSlice.id)
+      if (!rt) return null
       return {
-        convId: null,
-        messages: EMPTY_MESSAGES,
-        status: 'idle' as const,
-        draftAssistant: null,
-        streamingState: null,
-        workflowExecution: null,
-        error: null,
-        contextWindowUsage: null,
+        status: rt.status,
+        error: rt.error,
+        workflowExecution: rt.workflowExecution,
+        contextWindowUsage: rt.contextWindowUsage,
       }
-    }
+    }),
+  )
 
-    return {
-      convId: conv.id,
-      messages: conv.messages || EMPTY_MESSAGES,
-      status: conv.status,
-      draftAssistant: conv.draftAssistant || null,
-      streamingState: {
-        streamingContent: conv.streamingContent,
-        streamingReasoning: conv.streamingReasoning,
-        isReasoningStreaming: conv.isReasoningStreaming,
-        isContentStreaming: conv.isContentStreaming,
-        currentToolCall: conv.currentToolCall,
-        activeToolCalls: conv.activeToolCalls || [],
-        streamingToolArgs: conv.streamingToolArgs,
-        streamingToolArgsByCallId: conv.streamingToolArgsByCallId || {},
-      },
-      workflowExecution: conv.workflowExecution || null,
-      error: conv.status === 'error' ? conv.error?.trim() || null : null,
-      contextWindowUsage: conv.contextWindowUsage || conv.lastContextWindowUsage || null,
-    }
-  })
+  if (!convSlice) return NULL_SLICE
+  const rt = rtSlice
+
+  return {
+    convId: convSlice.id,
+    messages: convSlice.messages,
+    status: rt?.status || 'idle',
+    workflowExecution: rt?.workflowExecution || null,
+    error: rt?.status === 'error' ? rt.error?.trim() || null : null,
+    contextWindowUsage: rt?.contextWindowUsage || convSlice.lastContextWindowUsage || null,
+  }
 }

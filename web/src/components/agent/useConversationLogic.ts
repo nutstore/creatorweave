@@ -1,12 +1,19 @@
 /**
  * useConversationLogic — all store selectors, effects, and handlers
  * extracted from ConversationView.
+ *
+ * IMPORTANT: Streaming data (draftAssistant, streamingContent, etc.) is
+ * NOT exposed from this hook. It is subscribed directly inside
+ * ConversationMessages to prevent ConversationView from re-rendering
+ * on every streaming token (~60fps).
  */
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { useAgentStore } from '@/store/agent.store'
 import { useConversationStore } from '@/store/conversation.store'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useProjectStore } from '@/store/project.store'
@@ -19,25 +26,36 @@ import { writePendingAssetsToOPFS } from '@/services/asset.service'
 import { useInputDraftStore } from '@/store/input-draft.store'
 import { useActiveConversation } from './useActiveConversation'
 
+/** Stable empty array so mentionAgents selector returns same ref when unchanged */
+const EMPTY_MENTION_AGENTS: { id: string; name: string }[] = []
+
 export function useConversationLogic() {
   const t = useT()
 
   // ── Local UI state ──
-  const [input, setInput] = useState('')
-  const [mentionedAgentIds, setMentionedAgentIds] = useState<string[]>([])
+  // Input text is stored in a ref to avoid re-rendering ConversationView on every keystroke.
+  // Only a boolean `hasInput` state is kept to drive the send button's disabled state.
+  const inputRef = useRef('')
+  const [hasInput, setHasInput] = useState(false)
+  // Mentioned agent IDs also live in a ref — they are only read inside stable callbacks.
+  const mentionedAgentIdsRef = useRef<string[]>([])
+  const setMentionedAgentIds = useCallback((ids: string[]) => { mentionedAgentIdsRef.current = ids }, [])
   const [inputResetToken, setInputResetToken] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const isUserAtBottomRef = useRef(true)
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
-
   // ── Draft persistence (save/restore across workspace switches) ──
   const prevConvIdRef = useRef<string | null>(null)
-  // Sync latest values to refs inline (no useEffect delay — safe for render-time reads)
-  const inputRef = useRef(input)
-  const mentionedAgentIdsRef = useRef(mentionedAgentIds)
-  inputRef.current = input
-  mentionedAgentIdsRef.current = mentionedAgentIds
+
+  /**
+   * setInput — updates the input ref and only triggers a re-render
+   * when the empty↔non-empty boundary changes (to update send button state).
+   */
+  const setInput = useCallback((text: string) => {
+    inputRef.current = text
+    const next = text.trim().length > 0
+    setHasInput((prev) => (prev !== next ? next : prev))
+  }, [])
 
   // The draft text to inject into the editor when switching back to a workspace.
   // This is separate from `input` because Tiptap manages its own content.
@@ -45,8 +63,8 @@ export function useConversationLogic() {
   // Track which convId the draft belongs to, so we can clear it after restore
   const draftConvIdRef = useRef<string | null>(null)
 
-  // ── Agent store ──
-  const { directoryHandle } = useAgentStore()
+  // ── Agent store (fine-grained selector) ──
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
 
   // ── Project store ──
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
@@ -59,19 +77,24 @@ export function useConversationLogic() {
   const setActiveAgent = useAgentsStore((s) => s.setActiveAgent)
   const createAgent = useAgentsStore((s) => s.createAgent)
   const deleteAgent = useAgentsStore((s) => s.deleteAgent)
-  const mentionAgents = useAgentsStore((s) =>
-    s.agents
-      .filter((agent) => agent.id !== 'default')
-      .map((agent) => ({ id: agent.id, name: agent.name }))
+  const mentionAgents = useAgentsStore(
+    useShallow((s) => {
+      const filtered = s.agents
+        .filter((agent) => agent.id !== 'default')
+        .map((agent) => ({ id: agent.id, name: agent.name }))
+      return filtered.length === 0 ? EMPTY_MENTION_AGENTS : filtered
+    }),
   )
 
-  // ── Active conversation (single selector, one find) ──
+  // ── Active conversation — only select NON-streaming data ──
+  // Streaming data is subscribed inside ConversationMessages directly.
   const active = useActiveConversation()
   const convId = active.convId
   const activeMessages = active.messages
   const status = active.status
-  const activeDraftAssistant = active.draftAssistant
-  const activeStreamingState = active.streamingState
+  // NOTE: active.draftAssistant and active.streamingState are intentionally
+  // NOT destructured here. They change at ~60fps during streaming and would
+  // cause ConversationView to re-render on every token.
   const activeWorkflowExecution = active.workflowExecution
   const conversationError = active.error
   const activeContextWindowUsage = active.contextWindowUsage
@@ -87,32 +110,37 @@ export function useConversationLogic() {
   const runCustomWorkflowDryRun = useConversationStore((s) => s.runCustomWorkflowDryRun)
   const listWorkflowTemplates = useConversationStore((s) => s.listWorkflowTemplates)
   const cancelAgent = useConversationStore((s) => s.cancelAgent)
-  const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
-  const getSuggestedFollowUp = useConversationStore((s) => s.getSuggestedFollowUp)
-  const clearSuggestedFollowUp = useConversationStore((s) => s.clearSuggestedFollowUp)
-  const mountConversation = useConversationStore((s) => s.mountConversation)
-  const unmountConversation = useConversationStore((s) => s.unmountConversation)
+  const isConversationRunning = useConversationRuntimeStore((s) => s.isConversationRunning)
+  const getSuggestedFollowUp = useConversationRuntimeStore((s) => s.getSuggestedFollowUp)
+  const clearSuggestedFollowUp = useConversationRuntimeStore((s) => s.clearSuggestedFollowUp)
+  const mountConversation = useConversationRuntimeStore((s) => s.mountConversation)
+  const unmountConversation = useConversationRuntimeStore((s) => s.unmountConversation)
   const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
   const editAndResendUserMessage = useConversationStore((s) => s.editAndResendUserMessage)
 
-  // ── Settings store ──
-  const {
-    providerType,
-    modelName,
-    maxTokens,
-    hasApiKey,
-    enableThinking,
-    thinkingLevel,
-    setEnableThinking,
-    setThinkingLevel,
-  } = useSettingsStore()
+  // ── Settings store (fine-grained selectors to avoid cascade re-renders) ──
+  const providerType = useSettingsStore((s) => s.providerType)
+  const modelName = useSettingsStore((s) => s.modelName)
+  const maxTokens = useSettingsStore((s) => s.maxTokens)
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey)
+  const enableThinking = useSettingsStore((s) => s.enableThinking)
+  const thinkingLevel = useSettingsStore((s) => s.thinkingLevel)
+  const setEnableThinking = useSettingsStore((s) => s.setEnableThinking)
+  const setThinkingLevel = useSettingsStore((s) => s.setThinkingLevel)
 
-  // ── Workspace preferences store ──
-  const { agentMode, setAgentMode } = useWorkspacePreferencesStore()
+  // ── Workspace preferences store (fine-grained selectors) ──
+  const agentMode = useWorkspacePreferencesStore((s) => s.agentMode)
+  const setAgentMode = useWorkspacePreferencesStore((s) => s.setAgentMode)
 
   // ── Derived state ──
   const isRunning = convId ? isConversationRunning(convId) : false
   const isProcessing = isRunning
+
+  // ── Static snapshot for ConversationMessages ──
+  // Only contains data that changes at low frequency (not per-token).
+  const staticSnapshot = useMemo(() => ({
+    activeWorkflowExecution,
+  }), [activeWorkflowExecution])
 
   // ── Refs ──
   const lastRenderedMessageCountRef = useRef(0)
@@ -198,19 +226,8 @@ export function useConversationLogic() {
   // ── Smart auto-scroll (only scroll when user is already at the bottom) ──
   const activeMessagesLength = activeMessages.length
 
-  // Track whether user is near the bottom of the scroll container
-  useEffect(() => {
-    const el = scrollContainerRef.current
-    if (!el) return
-    const handleScroll = () => {
-      const threshold = 80 // px from bottom
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < threshold
-      isUserAtBottomRef.current = atBottom
-      setShowScrollToBottom(!atBottom)
-    }
-    el.addEventListener('scroll', handleScroll, { passive: true })
-    return () => el.removeEventListener('scroll', handleScroll)
-  }, [convId]) // re-bind on conversation switch
+  // Scroll-to-bottom state is managed by ScrollToBottomButton component
+  // to avoid re-rendering ConversationView (and AgentRichInput) on every scroll event.
 
   useEffect(() => {
     // Don't auto-scroll if user is browsing history above
@@ -220,12 +237,6 @@ export function useConversationLogic() {
     lastRenderedMessageCountRef.current = activeMessagesLength
     messagesEndRef.current?.scrollIntoView({ behavior })
   }, [activeMessagesLength, status])
-
-  // Scroll-to-bottom handler (for the floating button)
-  const scrollToBottom = useCallback(() => {
-    isUserAtBottomRef.current = true
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
 
   // ── Tool results map ──
   const buildToolResultsMap = useCallback((messages: Message[]) => {
@@ -238,14 +249,9 @@ export function useConversationLogic() {
     return map
   }, [])
 
-  const toolResults = useMemo(() => {
-    const merged = buildToolResultsMap(activeMessages)
-    const runtimeResults = activeDraftAssistant?.toolResults || {}
-    for (const [toolCallId, result] of Object.entries(runtimeResults)) {
-      if (!merged.has(toolCallId)) merged.set(toolCallId, result)
-    }
-    return merged
-  }, [activeMessages, activeDraftAssistant?.toolResults, buildToolResultsMap])
+  // Only committed tool results from messages.
+  // Runtime tool results are merged inside ConversationMessages (subscribed directly).
+  const toolResults = useMemo(() => buildToolResultsMap(activeMessages), [activeMessages, buildToolResultsMap])
 
   // ── Follow-up suggestion ──
   const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
@@ -253,47 +259,30 @@ export function useConversationLogic() {
   // ── Workflow templates ──
   const workflowTemplates = useMemo(() => listWorkflowTemplates(), [listWorkflowTemplates])
 
-  // ── Streaming state (derived) ──
-  const streamingState =
-    !activeStreamingState || !isProcessing
-      ? undefined
-      : {
-          reasoning: activeStreamingState.isReasoningStreaming,
-          content: activeStreamingState.isContentStreaming,
-        }
-
-  const streamingContentMessage =
-    !activeStreamingState || !activeDraftAssistant || !isProcessing
-      ? undefined
-      : (() => {
-          const reasoning = activeDraftAssistant.reasoning || activeStreamingState.streamingReasoning
-          const content = activeDraftAssistant.content || activeStreamingState.streamingContent
-          if (!reasoning && !content) return undefined
-          const lastAssistant = [...activeMessages].reverse().find((m) => m.role === 'assistant')
-          if (
-            lastAssistant &&
-            (lastAssistant.reasoning || '') === (reasoning || '') &&
-            (lastAssistant.content || '') === (content || '')
-          ) return undefined
-          return { reasoning, content }
-        })()
-
   // ── Handlers ──
-  const sendMessage = async (text: string, options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }) => {
+  // Refs for reading latest values inside stable callbacks
+  const convIdRef = useRef(convId)
+  convIdRef.current = convId
+
+  const sendMessage = useCallback(async (text: string, options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }) => {
     if (!text.trim()) return
-    if (!hasApiKey) {
+    // Read latest from store to avoid stale closures
+    const { hasApiKey: hasKey, providerType: pType, modelName: mName, maxTokens: mTokens } = useSettingsStore.getState()
+    if (!hasKey) {
       toast.error(t('conversation.toast.noApiKey'))
       return
     }
 
-    let targetConvId = convId
+    const { directoryHandle: dh } = useAgentStore.getState()
+    let targetConvId = convIdRef.current
+    const { createNew, setActive, isConversationRunning: isRunning, updateMessages, runAgent } = useConversationStore.getState()
     if (!targetConvId) {
       const conv = createNew(text.slice(0, 30))
       targetConvId = conv.id
       setActive(targetConvId)
     }
 
-    if (isConversationRunning(targetConvId)) {
+    if (useConversationRuntimeStore.getState().isConversationRunning(targetConvId)) {
       toast.error(t('conversation.toast.stopBeforeSend'))
       return
     }
@@ -312,14 +301,17 @@ export function useConversationLogic() {
     draftConvIdRef.current = null
 
     await runAgent(
-      targetConvId, providerType, modelName, maxTokens, directoryHandle,
+      targetConvId, pType, mName, mTokens, dh,
       options?.agentOverrideId ?? null
     )
-  }
+  }, [t])
 
-  const handleSend = async () => {
-    const inputTrimmed = input.trim()
-    let textToSend = inputTrimmed ? input : suggestedFollowUp
+  const handleSend = useCallback(async () => {
+    const inputTrimmed = inputRef.current.trim()
+    const currentConvId = convIdRef.current
+    const currentMentionedAgentIds = mentionedAgentIdsRef.current
+    const { getSuggestedFollowUp, clearSuggestedFollowUp } = useConversationRuntimeStore.getState()
+    let textToSend = inputTrimmed ? inputRef.current : (currentConvId ? getSuggestedFollowUp(currentConvId) : '')
     if (textToSend) {
       // Upload pending assets to OPFS and get AssetMeta[]
       const { pendingAssets, clearAll } = useAssetStore.getState()
@@ -336,12 +328,15 @@ export function useConversationLogic() {
         clearAll()
       }
 
-      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (mentionedAgentIds[0] ?? null) : null, assets })
-      if (!inputTrimmed && convId) clearSuggestedFollowUp(convId)
+      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null, assets })
+      if (!inputTrimmed && currentConvId) clearSuggestedFollowUp(currentConvId)
     }
-  }
+  }, [sendMessage])
 
-  const handleCancel = () => { if (convId) cancelAgent(convId) }
+  const handleCancel = useCallback(() => {
+    const currentConvId = convIdRef.current
+    if (currentConvId) useConversationStore.getState().cancelAgent(currentConvId)
+  }, [])
 
   const handleRunWorkflow = async (templateId: string, rubricDsl?: string) => {
     if (!convId || !templateId || isProcessing) return
@@ -353,38 +348,47 @@ export function useConversationLogic() {
     await runWorkflowRealRun(convId, templateId, { rubricDsl })
   }
 
-  const handleDeleteAgentLoop = (messageId: string) => {
-    if (!convId) return
-    if (deleteAgentLoop(convId, messageId)) toast.success(t('conversation.toast.deletedTurn'))
-  }
+  const handleDeleteAgentLoop = useCallback((messageId: string) => {
+    const currentConvId = convIdRef.current
+    if (!currentConvId) return
+    if (deleteAgentLoop(currentConvId, messageId)) toast.success(t('conversation.toast.deletedTurn'))
+  }, [deleteAgentLoop, t])
 
-  const handleEditAndResend = (userMessageId: string, newContent: string) => {
-    if (!convId) return
-    editAndResendUserMessage(convId, userMessageId, newContent)
-  }
+  const handleEditAndResend = useCallback((userMessageId: string, newContent: string) => {
+    const currentConvId = convIdRef.current
+    if (!currentConvId) return
+    editAndResendUserMessage(currentConvId, userMessageId, newContent)
+  }, [editAndResendUserMessage])
+
+  const handleRegenerate = useCallback(
+    convId ? (id: string) => regenerateUserMessage(convId, id) : undefined,
+    [convId, regenerateUserMessage],
+  )
 
   return {
     // Local UI state
-    input, setInput, mentionedAgentIds, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
-    showScrollToBottom, scrollToBottom,
+    hasInput, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
+    isUserAtBottomRef,
     draftTextToRestore, onDraftRestored,
     // Agent store
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
-    // Conversation state
-    convId, activeMessages, activeDraftAssistant, activeStreamingState,
-    activeWorkflowExecution, conversationError, activeContextWindowUsage,
+    // Conversation state (NO streaming data — that's subscribed in ConversationMessages)
+    convId, activeMessages,
+    conversationError, activeContextWindowUsage,
     isProcessing, isRunning, status, suggestedFollowUp, workflowTemplates,
-    toolResults, streamingState, streamingContentMessage,
+    toolResults,
+    // Static snapshot for ConversationMessages
+    staticSnapshot,
     // Settings
     hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
     // Workspace preferences
     agentMode, setAgentMode,
     // Handlers
     sendMessage, handleSend, handleCancel, handleRunWorkflow, handleRealRunWorkflow,
-    handleDeleteAgentLoop, handleEditAndResend, regenerateUserMessage,
+    handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
     clearSuggestedFollowUp, runCustomWorkflowDryRun,
-    // Store ref (for ErrorBoundary reset)
-    useConversationStore,
+    // Store refs (for ErrorBoundary reset)
+    useConversationStore, useConversationRuntimeStore,
   }
 }
 

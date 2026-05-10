@@ -18,9 +18,12 @@ export function applyPiAssistantUpdate(
   if (event.type === 'toolcall_start') {
     const partial = event.partial.content[event.contentIndex]
     if (partial?.type === 'toolCall') {
-      toolCallIdByIndex?.set(event.contentIndex, partial.id)
+      const existingId = toolCallIdByIndex?.get(event.contentIndex)
+      const fallbackId = existingId || `pending_tool_${event.contentIndex}`
+      const stableId = partial.id || fallbackId
+      toolCallIdByIndex?.set(event.contentIndex, stableId)
       onToolCallStart?.({
-        id: partial.id,
+        id: stableId,
         type: 'function',
         function: { name: partial.name, arguments: JSON.stringify(partial.arguments || {}) },
       })

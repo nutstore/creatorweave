@@ -23,13 +23,11 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
 }) => {
   const t = useT()
   const [open, setOpen] = useState(false)
-  const {
-    activeWorkspaceId: activeConversationId,
-    workspaces: conversations,
-    switchWorkspace,
-    deleteWorkspace,
-    isLoading,
-  } = useConversationContextStore()
+  const activeConversationId = useConversationContextStore((s) => s.activeWorkspaceId)
+  const conversations = useConversationContextStore((s) => s.workspaces)
+  const switchWorkspace = useConversationContextStore((s) => s.switchWorkspace)
+  const deleteWorkspace = useConversationContextStore((s) => s.deleteWorkspace)
+  const isLoading = useConversationContextStore((s) => s.isLoading)
 
   // Sort conversations: active first, then by lastActiveAt
   const sortedConversations = useMemo(() => {

@@ -37,6 +37,20 @@ import {
   TooltipTrigger,
 } from '@creatorweave/ui'
 
+/** Stable tooltip wrapper — defined at module level to avoid recreating on every render. */
+const ActionTooltip = ({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) => (
+  <Tooltip>
+    <TooltipTrigger asChild>{children}</TooltipTrigger>
+    <TooltipContent side="bottom">{label}</TooltipContent>
+  </Tooltip>
+)
+
 interface TopBarProps {
   onSkillsManagerOpen?: () => void
   onToolsPanelOpen?: () => void
@@ -88,19 +102,6 @@ export function TopBar({
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const t = useT()
   const conversationName = activeConversationName ?? activeWorkspaceName
-
-  const ActionTooltip = ({
-    label,
-    children,
-  }: {
-    label: string
-    children: ReactNode
-  }) => (
-    <Tooltip>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side="bottom">{label}</TooltipContent>
-    </Tooltip>
-  )
 
   useEffect(() => {
     if (!mobileMoreOpen) return

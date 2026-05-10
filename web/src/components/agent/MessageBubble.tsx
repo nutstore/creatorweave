@@ -5,7 +5,7 @@
  * Streaming is just a transient state prop, not a different component.
  */
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { User, Bot, Trash2, Pencil } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
@@ -63,7 +63,7 @@ interface MessageBubbleProps {
   onSearchFiles?: (query: string) => Promise<import('./FileMentionExtension').FileMentionItem[]>
 }
 
-export function MessageBubble({
+export const MessageBubble = memo(function MessageBubble({
   message,
   streaming,
   showAvatar = true,
@@ -256,4 +256,4 @@ export function MessageBubble({
       </div>
     </div>
   )
-}
+})

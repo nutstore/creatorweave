@@ -123,7 +123,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
   const [droppedItems, setDroppedItems] = useState<DroppedItem[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  const { setDirectoryHandle } = useAgentStore()
+  const setDirectoryHandle = useAgentStore((s) => s.setDirectoryHandle)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {

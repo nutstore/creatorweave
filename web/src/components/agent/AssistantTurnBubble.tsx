@@ -88,34 +88,17 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const committedToolCallIds = new Set(
     turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])
   )
-  const committedReasoningSet = new Set(
-    turn.messages.map((msg) => msg.reasoning || '').filter((x): x is string => !!x)
-  )
-  const committedContentSet = new Set(
-    turn.messages.map((msg) => msg.content || '').filter((x): x is string => !!x)
-  )
   const draftToolCalls = (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id))
-  // Find the latest committed message timestamp to filter stale compression steps.
-  // When the loop iterates, new assistant messages are committed; any compression
-  // step from a previous iteration should no longer appear in the runtime timeline.
-  const lastCommittedTimestamp = turn.messages.length > 0
-    ? Math.max(...turn.messages.map((msg) => msg.timestamp ?? 0))
-    : 0
   const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
-    if (step.type === 'reasoning') {
-      return step.streaming || !committedReasoningSet.has(step.content)
-    }
-    if (step.type === 'content') {
-      return step.streaming || !committedContentSet.has(step.content)
-    }
+    // Streaming steps are always visible — they represent in-progress content
+    if (step.streaming) return true
+    // Completed tool_call steps: hide if their id is already in a committed message
     if (step.type === 'tool_call') {
-      return step.streaming || !committedToolCallIds.has(step.toolCall.id)
+      return !committedToolCallIds.has(step.toolCall.id)
     }
-    // Compression steps: hide once a newer committed message exists,
-    // meaning the loop has moved past the iteration where compression occurred.
-    if (step.type === 'compression') {
-      return step.streaming || (typeof step.timestamp === 'number' && step.timestamp >= lastCommittedTimestamp)
-    }
+    // Completed reasoning/content/compression steps: keep visible during the
+    // agent loop. They are only cleared when the loop finishes and the final
+    // message is committed (which sets draftAssistant = null, clearing all steps).
     return true
   })
   const hasCurrentToolCallInDraft = !!(
@@ -136,7 +119,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   }
   const mergedTimelineItems = isProcessing
     ? [
-        // Committed messages first, preserving their insertion order
+        // Committed messages
         ...turn.messages.map((message, index) => ({
           kind: 'message' as const,
           key: `msg-${message.id}`,
@@ -144,23 +127,23 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
           timestamp: message.timestamp,
           message,
         })),
-        // Runtime steps after all committed messages, sorted by timestamp
-        ...orderedRuntimeSteps
-          .map((step, index) => ({
-            kind: 'runtime' as const,
-            key: `step-${step.id}`,
-            order: index,
-            timestamp:
-              typeof step.timestamp === 'number'
-                ? step.timestamp
-                : turn.timestamp + index + 1,
-            step,
-          }))
-          .sort((a, b) => {
-            if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
-            return a.order - b.order
-          }),
-      ]
+        // Runtime steps (streaming)
+        ...orderedRuntimeSteps.map((step, index) => ({
+          kind: 'runtime' as const,
+          key: `step-${step.id}`,
+          order: index,
+          timestamp:
+            typeof step.timestamp === 'number'
+              ? step.timestamp
+              : turn.timestamp + index + 1,
+          step,
+        })),
+      ].sort((a, b) => {
+        // Global sort: mix committed messages and runtime steps by timestamp
+        // so they appear in chronological order (interleaved), not grouped by type.
+        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
+        return a.order - b.order
+      })
     : []
   const hasCurrentToolCallInRuntimeSteps = !!(
     currentToolCall &&

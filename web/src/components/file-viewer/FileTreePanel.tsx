@@ -18,7 +18,7 @@
  * - "Copy Path" action copies file/directory path to clipboard
  */
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2, Cloud } from 'lucide-react'
 import { Icon } from '@iconify/react'
@@ -234,7 +234,7 @@ function closeAllContextMenus() {
 }
 
 /** Single tree node row with custom context menu */
-function TreeNodeRow({
+const TreeNodeRow = memo(function TreeNodeRow({
   node,
   depth,
   expanded,
@@ -394,10 +394,10 @@ function TreeNodeRow({
         )}
     </>
   )
-}
+})
 
 /** Recursive tree component */
-function TreeBranch({
+const TreeBranch = memo(function TreeBranch({
   nodes,
   depth,
   expandedPaths,
@@ -466,9 +466,9 @@ function TreeBranch({
       })}
     </>
   )
-}
+})
 
-export function FileTreePanel({
+export const FileTreePanel = memo(function FileTreePanel({
   directoryHandle,
   rootName,
   pathPrefix,
@@ -1096,4 +1096,4 @@ export function FileTreePanel({
       </div>
     </div>
   )
-}
+})

@@ -160,10 +160,6 @@ export class AgentManager {
 
       if (!meta) return null
 
-      // 更新访问时间
-      meta.lastAccessedAt = Date.now()
-      await this.writeMeta(agentDir, meta)
-
       return {
         id,
         meta,

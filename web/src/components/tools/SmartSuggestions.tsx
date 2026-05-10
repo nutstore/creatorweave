@@ -63,7 +63,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
 
-  const { directoryHandle } = useAgentStore()
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
   const dropZoneRef = useRef<HTMLDivElement>(null)
 
   // Generate suggestions based on context

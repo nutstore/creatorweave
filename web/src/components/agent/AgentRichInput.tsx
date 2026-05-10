@@ -267,7 +267,9 @@ export function AgentRichInput({
 
   // Asset upload state
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { pendingAssets, addFiles, removeAsset } = useAssetStore()
+  const pendingAssets = useAssetStore((s) => s.pendingAssets)
+  const addFiles = useAssetStore((s) => s.addFiles)
+  const removeAsset = useAssetStore((s) => s.removeAsset)
 
   // Handle files from file picker or drag-drop
   const handleFiles = useCallback(

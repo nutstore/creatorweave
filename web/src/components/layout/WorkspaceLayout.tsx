@@ -95,18 +95,20 @@ export function WorkspaceLayout({
     return false
   }, [])
 
-  const {
-    activeConversationId,
-    conversations,
-    createNew,
-    setActive,
-    runAgent,
-    isConversationRunning,
-    updateMessages,
-    loaded,
-    loadFromDB,
-  } = useConversationStore()
-  const { directoryHandle } = useAgentStore()
+  const activeConversationId = useConversationStore((s) => s.activeConversationId)
+  // Only select what we need from conversations — avoids re-renders when
+  // agent streaming updates change the conversations array reference.
+  const hasActiveConversation = useConversationStore(
+    (s) => !!s.activeConversationId && s.conversations.some((c) => c.id === s.activeConversationId),
+  )
+  const createNew = useConversationStore((s) => s.createNew)
+  const setActive = useConversationStore((s) => s.setActive)
+  const runAgent = useConversationStore((s) => s.runAgent)
+  const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
+  const updateMessages = useConversationStore((s) => s.updateMessages)
+  const loaded = useConversationStore((s) => s.loaded)
+  const loadFromDB = useConversationStore((s) => s.loadFromDB)
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
   const roots = useFolderAccessStore((s) => s.roots)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
 
@@ -118,13 +120,15 @@ export function WorkspaceLayout({
     .map((r) => `${r.name}:${r.status}:${r.handle ? 'y' : 'n'}`)
     .join('|')
   const skillsScanVersion = useSkillsStore((s) => s.skillsScanVersion)
-  const { providerType, modelName, maxTokens, hasApiKey } = useSettingsStore()
+  const providerType = useSettingsStore((s) => s.providerType)
+  const modelName = useSettingsStore((s) => s.modelName)
+  const maxTokens = useSettingsStore((s) => s.maxTokens)
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey)
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
-  const { role } = useRemoteStore()
+  const role = useRemoteStore((s) => s.role)
   const showPreview = useConversationContextStore((state) => state.showPreview)
-  const projectWorkspaceIds = useConversationContextStore((state) => state.workspaces.map((w) => w.id))
-  const workspaceCount = projectWorkspaceIds.length
+  const workspaceCount = useConversationContextStore((state) => state.workspaces.length)
   const hidePreviewPanel = useConversationContextStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
@@ -138,13 +142,11 @@ export function WorkspaceLayout({
   const skillsLoaded = useSkillsStore((s) => s.loaded) // Reactive state
   const loadSkills = useSkillsStore((s) => s.loadSkills)
 
-  // Phase 4: Workspace preferences state
-  const {
-    panelState,
-    setSidebarCollapsed,
-    setActiveResourceTab,
-    panelSizes,
-  } = useWorkspacePreferencesStore()
+  // Phase 4: Workspace preferences state (use selectors)
+  const panelState = useWorkspacePreferencesStore((s) => s.panelState)
+  const setSidebarCollapsed = useWorkspacePreferencesStore((s) => s.setSidebarCollapsed)
+  const setActiveResourceTab = useWorkspacePreferencesStore((s) => s.setActiveResourceTab)
+  const panelSizes = useWorkspacePreferencesStore((s) => s.panelSizes)
 
   // Phase 4: Dialog states
   const [showCommandPalette, setShowCommandPalette] = useState(false)
@@ -235,6 +237,7 @@ export function WorkspaceLayout({
       setActive(newConv.id)
     },
     onContinueLast: () => {
+      const { conversations } = useConversationStore.getState()
       if (conversations.length === 0) return
       const sorted = [...conversations].sort((a, b) => b.updatedAt - a.updatedAt)
       const target = sorted.find((conv) => conv.id !== activeConversationId) || sorted[0]
@@ -557,8 +560,7 @@ export function WorkspaceLayout({
     isConversationRunning,
   ])
 
-  const hasActiveConversation =
-    !!activeConversationId && conversations.some((c) => c.id === activeConversationId)
+  // hasActiveConversation is computed via store selector above (avoids re-renders)
 
   // Close preview panel (hide without clearing changes)
   const handleClosePreview = useCallback(() => {

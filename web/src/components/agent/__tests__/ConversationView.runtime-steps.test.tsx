@@ -8,9 +8,11 @@ type AssistantTurnBubbleProps = {
 
 const {
   useConversationStoreMock,
+  useConversationRuntimeStoreMock,
   useSettingsStoreMock,
   assistantTurnBubbleSpy,
   conversationState,
+  runtimeState,
 } = vi.hoisted(() => {
   const assistantTurnBubbleSpy = vi.fn<(props: AssistantTurnBubbleProps) => void>()
 
@@ -38,26 +40,7 @@ const {
           },
         ],
         status: 'pending',
-        draftAssistant: {
-          reasoning: '',
-          content: '',
-          toolCalls: [],
-          toolResults: {},
-          toolCall: null,
-          toolArgs: '',
-          steps: [
-            {
-              id: 'compression-1',
-              type: 'compression',
-              content: '上下文已压缩并生成摘要',
-              streaming: false,
-            },
-          ],
-          activeReasoningStepId: null,
-          activeContentStepId: null,
-          activeToolStepId: null,
-          activeCompressionStepId: null,
-        },
+        draftAssistant: null,
         streamingContent: '',
         streamingReasoning: '',
         isReasoningStreaming: false,
@@ -92,12 +75,65 @@ const {
     resetConversationState: vi.fn(),
   }
 
+  const runtimeState = {
+    runtimes: new Map([
+      [
+        'conv-1',
+        {
+          status: 'pending',
+          error: null,
+          workflowExecution: null,
+          contextWindowUsage: null,
+          draftAssistant: {
+            reasoning: '',
+            content: '',
+            toolCalls: [],
+            toolResults: {},
+            toolCall: null,
+            toolArgs: '',
+            steps: [
+              {
+                id: 'compression-1',
+                type: 'compression',
+                content: '上下文已压缩并生成摘要',
+                streaming: false,
+              },
+            ],
+            activeReasoningStepId: null,
+            activeContentStepId: null,
+            activeToolStepId: null,
+            activeCompressionStepId: null,
+          },
+          streamingContent: '',
+          streamingReasoning: '',
+          isReasoningStreaming: false,
+          isContentStreaming: false,
+          currentToolCall: null,
+          activeToolCalls: [],
+          streamingToolArgs: '',
+          streamingToolArgsByCallId: {},
+        },
+      ],
+    ]),
+    isConversationRunning: vi.fn(() => true),
+    getSuggestedFollowUp: vi.fn(() => ''),
+    clearSuggestedFollowUp: vi.fn(),
+    mountConversation: vi.fn(),
+    unmountConversation: vi.fn(),
+    resetConversationState: vi.fn(),
+  }
+
   const useConversationStoreMock = ((selector: (state: typeof conversationState) => unknown) =>
     selector(
       conversationState
     )) as unknown as typeof import('@/store/conversation.store').useConversationStore
   ;(useConversationStoreMock as unknown as { getState: () => typeof conversationState }).getState =
     () => conversationState
+
+  const useConversationRuntimeStoreMock = ((selector: (state: typeof runtimeState) => unknown) =>
+    selector(runtimeState)) as unknown as typeof import('@/store/conversation-runtime.store').useConversationRuntimeStore
+  ;(useConversationRuntimeStoreMock as unknown as { getState: () => typeof runtimeState }).getState =
+    () => runtimeState
 
   const useSettingsStoreMock = (selector?: (state: unknown) => unknown) => {
     const state = {
@@ -115,14 +151,20 @@ const {
 
   return {
     useConversationStoreMock,
+    useConversationRuntimeStoreMock,
     useSettingsStoreMock,
     assistantTurnBubbleSpy,
     conversationState,
+    runtimeState,
   }
 })
 
 vi.mock('@/store/conversation.store', () => ({
   useConversationStore: useConversationStoreMock,
+}))
+
+vi.mock('@/store/conversation-runtime.store', () => ({
+  useConversationRuntimeStore: useConversationRuntimeStoreMock,
 }))
 
 vi.mock('@/store/agent.store', () => ({
@@ -214,6 +256,10 @@ describe('ConversationView runtime step placement', () => {
   beforeEach(() => {
     assistantTurnBubbleSpy.mockClear()
     conversationState.conversations[0].status = 'pending'
+    const rt = runtimeState.runtimes.get('conv-1')
+    if (rt) {
+      rt.status = 'pending'
+    }
   })
 
   it('attaches runtime steps to a single bubble while pending between loop iterations', () => {

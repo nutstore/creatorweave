@@ -23,7 +23,9 @@ interface RecentFilesPanelProps {
 
 export function RecentFilesPanel({ onFileSelect, className = '' }: RecentFilesPanelProps) {
   const t = useT()
-  const { recentFiles, removeRecentFile, clearRecentFiles } = useWorkspacePreferencesStore()
+  const recentFiles = useWorkspacePreferencesStore((s) => s.recentFiles)
+  const removeRecentFile = useWorkspacePreferencesStore((s) => s.removeRecentFile)
+  const clearRecentFiles = useWorkspacePreferencesStore((s) => s.clearRecentFiles)
 
   // Get locale for date formatting
   const locale = t('locale') === 'zh-CN' ? zhCN : enUS

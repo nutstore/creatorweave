@@ -74,7 +74,8 @@ export function PendingPanel({
 }) {
   const t = useT()
   const { getPendingChanges, syncPendingChanges, isLoading } = useOPFSStore()
-  const { activeWorkspaceId, currentPendingCount } = useConversationContextStore()
+  const activeWorkspaceId = useConversationContextStore((s) => s.activeWorkspaceId)
+  const currentPendingCount = useConversationContextStore((s) => s.currentPendingCount)
 
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{

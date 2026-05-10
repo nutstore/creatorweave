@@ -22,25 +22,18 @@ import { registerServiceWorker } from '@/pwa/register-service-worker'
 // Import Python module to initialize window.__executePython
 import '@/python'
 
-// React Grab - Dev environment initialization only
+// React Scan - Visualize unnecessary re-renders in dev
 if (import.meta.env.DEV) {
-  import('react-grab')
-    .then(({ init }) => {
-      init({
-        theme: {
-          enabled: true,
-          hue: 180, // Cyan theme, coordinated with project colors
-        },
-        onElementSelect: (element) => {
-          console.log('🎯 React Grab: Selected element', element)
-        },
-        onCopySuccess: () => {
-          console.log('📋 React Grab: Copied to clipboard')
-        },
+  import('react-scan')
+    .then(({ scan }) => {
+      scan({
+        enabled: true,
+        log: true, // Also log render info to console
+        showToolbar: true, // Show floating toolbar for toggling
       })
     })
     .catch((err) => {
-      console.warn('React Grab failed to load (can be ignored):', err.message)
+      console.warn('React Scan failed to load (can be ignored):', err.message)
     })
 }
 

@@ -18,9 +18,10 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
   const [input, setInput] = useState('')
   const [isDragging, setIsDragging] = useState(false)
   const [draggedFiles, setDraggedFiles] = useState<FileList | null>(null)
-  const { hasApiKey } = useSettingsStore()
-  const { directoryHandle, setDirectoryHandle } = useAgentStore()
-  const { conversations } = useConversationStore()
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey)
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
+  const setDirectoryHandle = useAgentStore((s) => s.setDirectoryHandle)
+  const hasConversations = useConversationStore((s) => s.conversations.length > 0)
   const t = useT()
   const isInputDisabled = !hasApiKey
 
@@ -225,7 +226,7 @@ export function WelcomeScreenV2({ onStartConversation }: WelcomeScreenProps) {
         </div>
 
         {/* Recent conversations hint */}
-        {conversations.length > 0 && (
+        {hasConversations && (
           <p className="mt-8 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('welcome.recentHint')}</p>
         )}
 

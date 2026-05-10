@@ -187,7 +187,12 @@ function App() {
   // this component from re-rendering on every workspace switch (which caused
   // the syncFromRoute infinite loop and CPU spikes).
   const activeConversationId = useConversationStore((s) => s.activeConversationId)
-  const conversations = useConversationStore((s) => s.conversations)
+  // Only select the active conversation's title — avoids re-renders when
+  // agent streaming updates change the conversations array reference.
+  const activeConversationTitle = useConversationStore((s) => {
+    if (!s.activeConversationId) return undefined
+    return s.conversations.find((c) => c.id === s.activeConversationId)?.title
+  })
   const t = useT() // i18n hook
   const [locale] = useLocale()
   const docsLanguage: 'zh' | 'en' = locale === 'zh-CN' ? 'zh' : 'en'
@@ -283,6 +288,19 @@ function App() {
         streamingQueues: new Map(),
         suggestedFollowUps: new Map(),
         mountedConversations: new Map(),
+      })
+      // Also reset the runtime store
+      const { useConversationRuntimeStore } = await import('@/store/conversation-runtime.store')
+      useConversationRuntimeStore.setState({
+        runtimes: new Map(),
+        agentLoops: new Map(),
+        streamingQueues: new Map(),
+        suggestedFollowUps: new Map(),
+        cancelledRunIds: new Set(),
+        mountedConversations: new Map(),
+        pendingWorkflowDryRuns: new Map(),
+        pendingWorkflowRealRuns: new Map(),
+        workflowAbortControllers: new Map(),
       })
 
       await runInitStep('reinitializeProjectsAfterReset', () => useProjectStore.getState().initialize())
@@ -637,7 +655,7 @@ function App() {
   const activeProject = projects.find((project) => project.id === activeProjectId)
 
   const activeConversation = activeConversationId
-    ? conversations.find((conversation) => conversation.id === activeConversationId)
+    ? { title: activeConversationTitle }
     : undefined
 
   const navigateToRoute = (route: AppRoute, replace = false) => {

@@ -200,10 +200,16 @@ export function QuickActionsPanel({
     }>
   >([])
 
-  const { directoryHandle, setDirectoryHandle } = useAgentStore()
-  const { activeConversationId, createNew, setActive, runAgent, updateMessages } =
-    useConversationStore()
-  const { providerType, modelName, maxTokens } = useSettingsStore()
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
+  const setDirectoryHandle = useAgentStore((s) => s.setDirectoryHandle)
+  const activeConversationId = useConversationStore((s) => s.activeConversationId)
+  const createNew = useConversationStore((s) => s.createNew)
+  const setActive = useConversationStore((s) => s.setActive)
+  const runAgent = useConversationStore((s) => s.runAgent)
+  const updateMessages = useConversationStore((s) => s.updateMessages)
+  const providerType = useSettingsStore((s) => s.providerType)
+  const modelName = useSettingsStore((s) => s.modelName)
+  const maxTokens = useSettingsStore((s) => s.maxTokens)
 
   // Load recent files from localStorage
   useState(() => {

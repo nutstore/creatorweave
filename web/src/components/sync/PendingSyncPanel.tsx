@@ -7,9 +7,10 @@
  * - No extra scrolling, integrated in sidebar
  */
 
-import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
+import React, { useState, useCallback, useMemo, useEffect as useReactEffect, useRef } from 'react'
 import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
+import type { ChangeDetectionResult } from '@/opfs/types/opfs-types'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
@@ -35,9 +36,56 @@ import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import type { ConflictInfo, ConflictDetail, SyncResult } from '@/opfs/types/opfs-types'
 
+/**
+ * Custom equality function for pendingChanges selector.
+ * Compares by content (paths + types) rather than reference identity.
+ * This prevents unnecessary re-renders when refreshPendingChanges()
+ * creates a new object with the same logical content.
+ */
+function arePendingChangesEqual(
+  a: ChangeDetectionResult | null,
+  b: ChangeDetectionResult | null,
+): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  if (a.changes.length !== b.changes.length) return false
+  return a.changes.every(
+    (c, i) => c.path === b.changes[i]?.path && c.type === b.changes[i]?.type,
+  )
+}
+
+/** Throttle a callback to at most once per animation frame */
+function useThrottledCallback<T extends (...args: any[]) => void>(
+  callback: T,
+): T {
+  const rafRef = useRef<number | null>(null)
+  const latestArgsRef = useRef<Parameters<T> | null>(null)
+
+  return useCallback(
+    (...args: Parameters<T>) => {
+      latestArgsRef.current = args
+      if (rafRef.current !== null) return // already scheduled
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null
+        if (latestArgsRef.current) {
+          callback(...latestArgsRef.current)
+        }
+      })
+    },
+    [callback],
+  ) as T
+}
+
 export function PendingSyncPanel() {
   const t = useT()
-  const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
+
+  // Use custom equality selector to prevent re-renders when pendingChanges
+  // has the same logical content but a different object reference
+  // (e.g. when refreshPendingChanges creates a new object during streaming)
+  const pendingChanges = useConversationContextStore(
+    (state) => state.pendingChanges,
+    arePendingChangesEqual,
+  )
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -59,6 +107,10 @@ export function PendingSyncPanel() {
   const summaryAbortRef = React.useRef<AbortController | null>(null)
   const listRef = React.useRef<HTMLDivElement>(null)
   const activeConflict = conflictQueue[conflictIndex] ?? null
+
+  // Throttle streaming summary updates to once per animation frame
+  // to avoid re-rendering the entire panel on every LLM token
+  const throttledSetSnapshotSummary = useThrottledCallback(setSnapshotSummary)
 
   // Handle keyboard shortcuts
   useReactEffect(() => {
@@ -677,7 +729,7 @@ export function PendingSyncPanel() {
 
             return (
               <div
-                key={`${change.path}-${index}`}
+                key={change.path}
                 role="option"
                 aria-selected={isSelected}
                 className={`group flex items-center gap-2 px-2 h-7 transition-all cursor-pointer ${
@@ -846,7 +898,7 @@ export function PendingSyncPanel() {
           setSnapshotSummary('')
           const aiSummary = await generateSummaryWithLLM(
             pendingApprovePaths,
-            (chunk) => setSnapshotSummary(chunk),
+            (chunk) => throttledSetSnapshotSummary(chunk),
             controller.signal,
           )
           // Only update state if this controller is still the active one

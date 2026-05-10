@@ -326,13 +326,11 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const {
-    activeWorkspaceId: activeConversationId,
-    workspaces: conversations,
-    initialized,
-    error: contextError,
-    switchWorkspace,
-  } = useConversationContextStore()
+  const activeConversationId = useConversationContextStore((s) => s.activeWorkspaceId)
+  const conversations = useConversationContextStore((s) => s.workspaces)
+  const initialized = useConversationContextStore((s) => s.initialized)
+  const contextError = useConversationContextStore((s) => s.error)
+  const switchWorkspace = useConversationContextStore((s) => s.switchWorkspace)
   const deleteConversation = useConversationStore((state) => state.deleteConversation)
   // Extract conversation id→title pairs (shallow-equal stable reference, won't re-render on streaming updates)
   const conversationTitles = useConversationStore(

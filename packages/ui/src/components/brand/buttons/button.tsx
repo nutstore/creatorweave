@@ -62,7 +62,7 @@ export interface BrandButtonProps
   variant?: VariantProps<typeof buttonVariants>["variant"] | VariantProps<typeof iconButtonVariants>["variant"]
 }
 
-const BrandButton = React.forwardRef<HTMLButtonElement, BrandButtonProps>(
+const BrandButton = React.memo(React.forwardRef<HTMLButtonElement, BrandButtonProps>(
   ({ className, variant, iconButton, ...props }, ref) => {
   if (iconButton) {
     return (
@@ -92,7 +92,7 @@ const BrandButton = React.forwardRef<HTMLButtonElement, BrandButtonProps>(
       {...props}
     />
   )
-})
+}))
 BrandButton.displayName = "BrandButton"
 
 export { BrandButton, buttonVariants, iconButtonVariants }
