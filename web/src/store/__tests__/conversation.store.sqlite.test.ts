@@ -82,14 +82,21 @@ vi.mock('@/sqlite', () => ({
   })),
 }))
 
-vi.mock('@/agent/providers/types', () => ({
-  LLM_PROVIDER_CONFIGS: {
-    openai: {
-      baseURL: 'https://example.com',
-      modelName: 'mock-model',
+vi.mock('@/agent/providers/types', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/agent/providers/types')>()
+  return {
+    ...actual,
+    LLM_PROVIDER_CONFIGS: {
+      ...actual.LLM_PROVIDER_CONFIGS,
+      openai: {
+        ...actual.LLM_PROVIDER_CONFIGS.openai,
+        baseURL: 'https://example.com',
+        modelName: 'mock-model',
+      },
     },
-  },
-}))
+    isCustomProviderType: vi.fn(() => false),
+  }
+})
 
 vi.mock('@/agent/llm/provider-factory', () => ({
   createLLMProvider: vi.fn(() => ({
@@ -304,6 +311,57 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     const agentLoopConfig = (globalThis as any).__lastAgentLoopConfig
     expect(agentLoopConfig?.maxIterations).toBe(37)
+  })
+
+  it('should persist latest context usage metadata after run completion', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-persist')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+    expect(conversationRepoSaveMetaMock).toHaveBeenCalled()
+    conversationRepoSaveMetaMock.mockClear()
+    useConversationStore.setState((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conv.id
+          ? {
+            ...c,
+            lastContextWindowUsage: {
+              usedTokens: 1234,
+              maxTokens: 4096,
+              reserveTokens: 1024,
+              usagePercent: 24,
+              modelMaxTokens: 5120,
+            },
+            contextWindowUsage: {
+              usedTokens: 1234,
+              maxTokens: 4096,
+              reserveTokens: 1024,
+              usagePercent: 24,
+              modelMaxTokens: 5120,
+            },
+          }
+          : c
+      ),
+    }))
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+    const afterRun = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(afterRun?.error).toBeNull()
+
+    await vi.waitFor(() => {
+      expect(conversationRepoSaveMetaMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: conv.id,
+          contextUsage: expect.objectContaining({
+            usedTokens: 1234,
+            maxTokens: 4096,
+            reserveTokens: 1024,
+            modelMaxTokens: 5120,
+          }),
+        })
+      )
+    })
   })
 
   it('should carry compression counters across runAgent invocations', async () => {

@@ -38,8 +38,20 @@ import {
   emitError,
 } from '@/streaming-bus'
 import { useConversationContextStore } from './conversation-context.store'
+import { useConversationRuntimeStore, createEmptyRuntime } from './conversation-runtime.store'
+import type { ConversationRuntime } from './conversation-runtime.store'
 import { useI18nStore } from '@/i18n/store'
 import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
+
+/** Helper to get or create a runtime in the runtime store (Immer draft) */
+function ensureRuntime(state: import('./conversation-runtime.store').ConversationRuntimeState, convId: string): ConversationRuntime {
+  let rt = state.runtimes.get(convId)
+  if (!rt) {
+    rt = createEmptyRuntime()
+    state.runtimes.set(convId, rt)
+  }
+  return rt
+}
 
 function i18nText(key: string, fallback: string): string {
   const locale = useI18nStore.getState().locale
@@ -156,13 +168,31 @@ function findDraftStep(draft: DraftAssistantState, stepId: string): DraftAssista
   return draft.steps.find((s) => s.id === stepId)
 }
 
+function findLatestToolStepByToolCallId(
+  draft: DraftAssistantState,
+  toolCallId: string,
+  streamingOnly = false
+): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined {
+  for (let i = draft.steps.length - 1; i >= 0; i--) {
+    const step = draft.steps[i]
+    if (step.type !== 'tool_call') continue
+    if (step.toolCall.id !== toolCallId) continue
+    if (streamingOnly && !step.streaming) continue
+    return step
+  }
+  return undefined
+}
+
 function ensureDraftTextStep(
   draft: DraftAssistantState,
   stepType: 'reasoning' | 'content'
 ): string {
+  // Only reuse the last step if it is the same type AND still streaming.
+  // Completed steps must NOT be reused — a new iteration of the agent loop
+  // should produce a brand-new step so the UI shows distinct content blocks
+  // in chronological order rather than overwriting the previous one.
   const last = draft.steps[draft.steps.length - 1]
-  if (last && last.type === stepType) {
-    last.streaming = true
+  if (last && last.type === stepType && last.streaming) {
     if (!last.timestamp) {
       last.timestamp = Date.now()
     }
@@ -233,29 +263,27 @@ function hasExplicitReasoningStep(draft: DraftAssistantState): boolean {
   return draft.steps.some((step) => step.type === 'reasoning')
 }
 
-function ensureDraftAssistantForMessageStart(conv: Conversation): DraftAssistantState {
+/**
+ * Minimal interface for objects that hold a draftAssistant.
+ * Both Conversation and ConversationRuntime satisfy this.
+ */
+interface DraftAssistantHolder {
+  draftAssistant: DraftAssistantState | null
+}
+
+function ensureDraftAssistantForMessageStart(conv: DraftAssistantHolder): DraftAssistantState {
   const previous = conv.draftAssistant
   const next: DraftAssistantState = {
     reasoning: '',
     content: '',
-    toolCalls: [],
-    toolResults: {},
+    toolCalls: previous?.toolCalls ? [...previous.toolCalls] : [],
+    toolResults: previous?.toolResults ? { ...previous.toolResults } : {},
     toolCall: null,
     toolArgs: '',
-    // Keep streaming timeline across assistant restarts in one run,
-    // but discard completed text/tool steps (they have already been
-    // committed to messages and would otherwise cause duplicate renders
-    // when committedContentSet hasn't caught up yet).
-    steps:
-      previous?.steps.filter((s) => {
-        if (s.streaming) return true
-        // Completed text steps (content/reasoning) are already committed
-        if (s.type === 'content' || s.type === 'reasoning') return false
-        // Completed tool_call steps are also committed
-        if (s.type === 'tool_call') return false
-        // Keep compression steps for status continuity
-        return true
-      }) || [],
+    // Preserve ALL steps from previous iterations so the timeline remains
+    // continuous across agent-loop iterations. Steps are only cleared when
+    // the entire run finishes (draftAssistant = null).
+    steps: previous?.steps ? [...previous.steps] : [],
     activeReasoningStepId: null,
     activeContentStepId: null,
     activeToolStepId: null,
@@ -265,7 +293,7 @@ function ensureDraftAssistantForMessageStart(conv: Conversation): DraftAssistant
   return next
 }
 
-function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent): void {
+function applyDraftAssistantEvent(conv: DraftAssistantHolder, event: DraftAssistantEvent): void {
   if (event.type === 'message_start') {
     ensureDraftAssistantForMessageStart(conv)
     return
@@ -337,46 +365,60 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
       return
     }
     case 'tool_start': {
-      const stepId = `tool-${event.toolCall.id}`
+      const stepId = `tool-${event.toolCall.id}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       const now = Date.now()
       draft.toolCall = event.toolCall
       if (!draft.toolCalls.some((x) => x.id === event.toolCall.id)) {
         draft.toolCalls.push(event.toolCall)
       }
-      const existing = findDraftStep(draft, stepId)
+      const activeStep = draft.activeToolStepId ? findDraftStep(draft, draft.activeToolStepId) : undefined
+      const existing =
+        activeStep && activeStep.type === 'tool_call' && activeStep.toolCall.id === event.toolCall.id
+          ? activeStep
+          : findLatestToolStepByToolCallId(draft, event.toolCall.id, true)
       if (existing && existing.type === 'tool_call') {
         existing.streaming = true
         existing.toolCall = event.toolCall
         if (!existing.timestamp) {
           existing.timestamp = now
         }
+        draft.activeToolStepId = existing.id
       } else {
-        draft.steps.push({
+        const created: DraftAssistantStep = {
           id: stepId,
           timestamp: now,
           type: 'tool_call',
           toolCall: event.toolCall,
           args: '',
           streaming: true,
-        })
+        }
+        draft.steps.push(created)
+        draft.activeToolStepId = created.id
       }
-      draft.activeToolStepId = stepId
       return
     }
     case 'tool_delta': {
       if (event.isCurrentToolDelta) {
         draft.toolArgs += event.argsDelta
       }
-      const stepId = event.toolCallId ? `tool-${event.toolCallId}` : draft.activeToolStepId
-      if (!stepId) return
-      const step = findDraftStep(draft, stepId)
+      const step =
+        event.toolCallId
+          ? findLatestToolStepByToolCallId(draft, event.toolCallId, true) ||
+            findLatestToolStepByToolCallId(draft, event.toolCallId, false)
+          : (draft.activeToolStepId ? findDraftStep(draft, draft.activeToolStepId) : undefined)
       if (step && step.type === 'tool_call') {
         step.args += event.argsDelta
       }
       return
     }
     case 'tool_complete': {
-      const completedStepId = `tool-${event.toolCall.id}`
+      const activeStep = draft.activeToolStepId ? findDraftStep(draft, draft.activeToolStepId) : undefined
+      const completedStep =
+        activeStep && activeStep.type === 'tool_call' && activeStep.toolCall.id === event.toolCall.id
+          ? activeStep
+          : findLatestToolStepByToolCallId(draft, event.toolCall.id, true) ||
+            findLatestToolStepByToolCallId(draft, event.toolCall.id, false)
+      const completedStepId = completedStep?.id
       draft.toolResults[event.toolCall.id] = event.result || ''
       const streamedArgs = event.streamedArgsByCallId[event.toolCall.id] || ''
       if (streamedArgs && draft.toolCalls) {
@@ -391,7 +433,6 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
           }
         }
       }
-      const completedStep = findDraftStep(draft, completedStepId)
       if (completedStep && completedStep.type === 'tool_call') {
         completedStep.result = event.result || ''
         completedStep.streaming = false
@@ -399,7 +440,7 @@ function applyDraftAssistantEvent(conv: Conversation, event: DraftAssistantEvent
       if (!event.isCurrentTool) return
       draft.toolCall = null
       draft.toolArgs = ''
-      if (draft.activeToolStepId === completedStepId) {
+      if (completedStepId && draft.activeToolStepId === completedStepId) {
         draft.activeToolStepId = null
       }
       if (event.nextToolCall) {
@@ -1614,33 +1655,71 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
+        let lastContextUsageMetaPersistAt = 0
         // Compression summaries are injected into the agent loop as
         // system-context messages and mirrored into the runtime message state.
         let committed = false
 
         // Acquire run lock immediately to prevent concurrent duplicate starts.
-        set((state) => {
-          const c = state.conversations.find((x) => x.id === conversationId)
-          if (!c) return
-          c.runEpoch = (c.runEpoch || 0) + 1
-          runEpoch = c.runEpoch
-          c.activeRunId = runId
-          c.status = 'pending'
-          c.error = null
-          c.currentToolCall = null
-          c.activeToolCalls = []
-          c.streamingToolArgs = ''
-          c.streamingToolArgsByCallId = {}
-          c.streamingContent = ''
-          c.streamingReasoning = ''
-          c.completedContent = null
-          c.completedReasoning = null
-          c.isContentStreaming = false
-          c.isReasoningStreaming = false
-          c.contextWindowUsage = null
-          c.workflowExecution = null
-          c.collectedAssets = []
-          c.draftAssistant = {
+        useConversationRuntimeStore.setState((state) => {
+          let rt = state.runtimes.get(conversationId)
+          if (!rt) {
+            rt = createEmptyRuntime()
+            state.runtimes.set(conversationId, rt)
+          }
+          rt.runEpoch = (rt.runEpoch || 0) + 1
+          runEpoch = rt.runEpoch
+          rt.activeRunId = runId
+          rt.status = 'pending'
+          rt.error = null
+          rt.currentToolCall = null
+          rt.activeToolCalls = []
+          rt.streamingToolArgs = ''
+          rt.streamingToolArgsByCallId = {}
+          rt.streamingContent = ''
+          rt.streamingReasoning = ''
+          rt.completedContent = null
+          rt.completedReasoning = null
+          rt.isContentStreaming = false
+          rt.isReasoningStreaming = false
+          rt.contextWindowUsage = null
+          rt.workflowExecution = null
+          rt.collectedAssets = []
+          rt.draftAssistant = {
+            reasoning: '',
+            content: '',
+            toolCalls: [],
+            toolResults: {},
+            toolCall: null,
+            toolArgs: '',
+            steps: [],
+            activeReasoningStepId: null,
+            activeContentStepId: null,
+            activeToolStepId: null,
+            activeCompressionStepId: null,
+          }
+        })
+        // Mirror run-lock state to runtime store so streaming callbacks can guard on activeRunId
+        useConversationRuntimeStore.setState((state) => {
+          const r = ensureRuntime(state, conversationId)
+          r.runEpoch = runEpoch
+          r.activeRunId = runId
+          r.status = 'pending'
+          r.error = null
+          r.currentToolCall = null
+          r.activeToolCalls = []
+          r.streamingToolArgs = ''
+          r.streamingToolArgsByCallId = {}
+          r.streamingContent = ''
+          r.streamingReasoning = ''
+          r.completedContent = null
+          r.completedReasoning = null
+          r.isContentStreaming = false
+          r.isReasoningStreaming = false
+          r.contextWindowUsage = null
+          r.workflowExecution = null
+          r.collectedAssets = []
+          r.draftAssistant = {
             reasoning: '',
             content: '',
             toolCalls: [],
@@ -1656,25 +1735,25 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         })
 
         const isCurrentRun = () => {
-          const current = get().conversations.find((c) => c.id === conversationId)
-          return !!current && current.activeRunId === runId && (current.runEpoch || 0) === runEpoch
+          const rt = useConversationRuntimeStore.getState().runtimes.get(conversationId)
+          return !!rt && rt.activeRunId === runId && (rt.runEpoch || 0) === runEpoch
         }
 
         const failRunEarly = (message: string) => {
           if (!isCurrentRun()) return
-          set((state) => {
-            const c = state.conversations.find((x) => x.id === conversationId)
-            if (!c || c.activeRunId !== runId) return
-            c.status = 'error'
-            c.error = message
-            c.activeRunId = null
-            c.draftAssistant = null
-            c.currentToolCall = null
-            c.activeToolCalls = []
-            c.streamingToolArgs = ''
-            c.streamingToolArgsByCallId = {}
-            c.streamingContent = ''
-            c.streamingReasoning = ''
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId !== runId) return
+            r.status = 'error'
+            r.error = message
+            r.activeRunId = null
+            r.draftAssistant = null
+            r.currentToolCall = null
+            r.activeToolCalls = []
+            r.streamingToolArgs = ''
+            r.streamingToolArgsByCallId = {}
+            r.streamingContent = ''
+            r.streamingReasoning = ''
           })
         }
 
@@ -1734,24 +1813,31 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           )
           latestMessages = [...conv.messages, dryRunAssistant]
 
+          // Persisted: update messages in main store
           set((state) => {
             const c = state.conversations.find((x) => x.id === conversationId)
-            if (!c || c.activeRunId !== runId) return
+            if (!c) return
             c.messages = latestMessages
-            c.status = 'idle'
-            c.error = null
-            c.currentToolCall = null
-            c.activeToolCalls = []
-            c.streamingToolArgs = ''
-            c.streamingToolArgsByCallId = {}
-            c.streamingContent = ''
-            c.streamingReasoning = ''
-            c.completedContent = null
-            c.completedReasoning = null
-            c.isContentStreaming = false
-            c.isReasoningStreaming = false
-            c.draftAssistant = null
-            c.activeRunId = null
+          })
+
+          // Runtime: reset all runtime state
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId !== runId) return
+            r.status = 'idle'
+            r.error = null
+            r.currentToolCall = null
+            r.activeToolCalls = []
+            r.streamingToolArgs = ''
+            r.streamingToolArgsByCallId = {}
+            r.streamingContent = ''
+            r.streamingReasoning = ''
+            r.completedContent = null
+            r.completedReasoning = null
+            r.isContentStreaming = false
+            r.isReasoningStreaming = false
+            r.draftAssistant = null
+            r.activeRunId = null
             state.agentLoops.delete(conversationId)
             state.streamingQueues.delete(conversationId)
           })
@@ -1818,16 +1904,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         // ---- Workflow Real-Run interception ----
         // Detect pending real-run request (triggered by runWorkflowRealRun action).
         // Uses the same provider/model as normal chat — no special model name.
-        const pendingRealRunRequest = get().pendingWorkflowRealRuns.get(conversationId)
+        const pendingRealRunRequest = useConversationRuntimeStore.getState().pendingWorkflowRealRuns.get(conversationId)
         if (pendingRealRunRequest) {
-          set((state) => {
+          useConversationRuntimeStore.setState((state) => {
             state.pendingWorkflowRealRuns.delete(conversationId)
           })
 
           try {
             // Create AbortController so cancelAgent can abort this workflow
             const abortController = new AbortController()
-            set((state) => {
+            useConversationRuntimeStore.setState((state) => {
               state.workflowAbortControllers.set(conversationId, abortController)
             })
 
@@ -1835,10 +1921,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const { getWorkflowTemplateBundle } = await import('@/agent/workflow/templates')
             const bundle = getWorkflowTemplateBundle(pendingRealRunRequest.templateId)
             if (bundle) {
-              set((state) => {
-                const c = state.conversations.find((x) => x.id === conversationId)
-                if (!c || c.activeRunId !== runId) return
-                c.workflowExecution = {
+              useConversationRuntimeStore.setState((state) => {
+                const r = ensureRuntime(state, conversationId)
+                if (r.activeRunId !== runId) return
+                r.workflowExecution = {
                   templateId: bundle.id,
                   label: bundle.label,
                   nodes: bundle.workflow.nodes.map((n) => ({
@@ -1871,14 +1957,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   currentAgentId: activeAgentId ?? null,
                 }),
               onNodeStart: (nodeId, _kind) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId) return
-                  c.status = 'streaming'
-                  c.isContentStreaming = true
-                  if (!c.workflowExecution) return
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId) return
+                  r.status = 'streaming'
+                  r.isContentStreaming = true
+                  if (!r.workflowExecution) return
                   // Mark this node as running, set prior pending nodes that were skipped
-                  for (const node of c.workflowExecution.nodes) {
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId) {
                       node.status = 'running'
                     }
@@ -1886,11 +1972,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeComplete: (nodeId, output) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId) return
-                  if (!c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId) return
+                  if (!r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId) {
                       node.status = 'completed'
                       if (output) node.output = output
@@ -1899,11 +1985,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeError: (nodeId, error) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId) return
-                  if (!c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId) return
+                  if (!r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId) {
                       node.status = 'failed'
                       node.error = error
@@ -1912,10 +1998,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeStepStart: (nodeId, stepId, stepType) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId || !c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId || !r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId) {
                       if (!node.steps) node.steps = []
                       node.steps.push({
@@ -1929,10 +2015,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeReasoningDelta: (nodeId, delta) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId || !c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                // Write to runtime store only — avoids touching conversations[] at streaming rate
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId || !r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId && node.steps) {
                       const lastStep = node.steps[node.steps.length - 1]
                       if (lastStep && lastStep.type === 'reasoning' && lastStep.streaming) {
@@ -1943,10 +2030,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeContentDelta: (nodeId, delta) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId || !c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                // Write to runtime store only — avoids touching conversations[] at streaming rate
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId || !r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId && node.steps) {
                       const lastStep = node.steps[node.steps.length - 1]
                       if (lastStep && lastStep.type === 'content' && lastStep.streaming) {
@@ -1957,10 +2045,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               },
               onNodeStepEnd: (nodeId, stepId) => {
-                set((state) => {
-                  const c = state.conversations.find((x) => x.id === conversationId)
-                  if (!c || c.activeRunId !== runId || !c.workflowExecution) return
-                  for (const node of c.workflowExecution.nodes) {
+                useConversationRuntimeStore.setState((state) => {
+                  const r = ensureRuntime(state, conversationId)
+                  if (r.activeRunId !== runId || !r.workflowExecution) return
+                  for (const node of r.workflowExecution.nodes) {
                     if (node.id === nodeId && node.steps) {
                       for (const step of node.steps) {
                         if (step.id === stepId) {
@@ -1998,24 +2086,31 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               )
               latestMessages = [...conv.messages, realRunAssistant]
 
+              // Persisted: update messages in main store
               set((state) => {
                 const c = state.conversations.find((x) => x.id === conversationId)
-                if (!c || c.activeRunId !== runId) return
+                if (!c) return
                 c.messages = latestMessages
-                c.status = 'idle'
-                c.error = null
-                c.currentToolCall = null
-                c.activeToolCalls = []
-                c.streamingToolArgs = ''
-                c.streamingToolArgsByCallId = {}
-                c.streamingContent = ''
-                c.streamingReasoning = ''
-                c.completedContent = null
-                c.completedReasoning = null
-                c.isContentStreaming = false
-                c.isReasoningStreaming = false
-                c.draftAssistant = null
-                c.activeRunId = null
+              })
+
+              // Runtime: reset all runtime state
+              useConversationRuntimeStore.setState((state) => {
+                const r = ensureRuntime(state, conversationId)
+                if (r.activeRunId !== runId) return
+                r.status = 'idle'
+                r.error = null
+                r.currentToolCall = null
+                r.activeToolCalls = []
+                r.streamingToolArgs = ''
+                r.streamingToolArgsByCallId = {}
+                r.streamingContent = ''
+                r.streamingReasoning = ''
+                r.completedContent = null
+                r.completedReasoning = null
+                r.isContentStreaming = false
+                r.isReasoningStreaming = false
+                r.draftAssistant = null
+                r.activeRunId = null
                 state.agentLoops.delete(conversationId)
                 state.streamingQueues.delete(conversationId)
               })
@@ -2106,6 +2201,24 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 startedAt: Date.now(),
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.workflowExecution = {
+                  templateId: payload.templateId,
+                  label: payload.label,
+                  nodes: payload.nodes.map((node) => ({
+                    id: node.id,
+                    kind: node.kind,
+                    label: node.label,
+                    status: 'pending' as const,
+                  })),
+                  totalTokens: 0,
+                  startedAt: Date.now(),
+                }
+              }
+            })
           },
           onNodeStart: ({ nodeId }) => {
             if (!isCurrentRun()) return
@@ -2115,6 +2228,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               for (const node of c.workflowExecution.nodes) {
                 if (node.id === nodeId) {
                   node.status = 'running'
+                }
+              }
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId && r.workflowExecution) {
+                for (const node of r.workflowExecution.nodes) {
+                  if (node.id === nodeId) {
+                    node.status = 'running'
+                  }
                 }
               }
             })
@@ -2131,6 +2255,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 }
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId && r.workflowExecution) {
+                for (const node of r.workflowExecution.nodes) {
+                  if (node.id === nodeId) {
+                    node.status = 'completed'
+                    if (output) node.output = output
+                  }
+                }
+              }
+            })
           },
           onNodeError: ({ nodeId, error }) => {
             if (!isCurrentRun()) return
@@ -2144,6 +2280,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 }
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId && r.workflowExecution) {
+                for (const node of r.workflowExecution.nodes) {
+                  if (node.id === nodeId) {
+                    node.status = 'failed'
+                    node.error = error
+                  }
+                }
+              }
+            })
           },
           onFinish: ({ totalTokens }) => {
             if (!isCurrentRun()) return
@@ -2152,6 +2300,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               if (!c || c.activeRunId !== runId || !c.workflowExecution) return
               if (typeof totalTokens === 'number') {
                 c.workflowExecution.totalTokens = totalTokens
+              }
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId && r.workflowExecution) {
+                if (typeof totalTokens === 'number') {
+                  r.workflowExecution.totalTokens = totalTokens
+                }
               }
             })
           },
@@ -2329,6 +2486,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
           committed = true
           const targetMessages = finalMessages || latestMessages
+          const runtimeUsageAtFinalize =
+            useConversationRuntimeStore.getState().runtimes.get(conversationId)?.contextWindowUsage ||
+            null
 
           // Collect any assets accumulated during this agent run before overwriting messages
           const currentConv = get().conversations.find((c) => c.id === conversationId)
@@ -2341,6 +2501,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (!c) return
             if (status === 'idle') {
               c.messages = targetMessages
+              if (runtimeUsageAtFinalize) {
+                c.contextWindowUsage = runtimeUsageAtFinalize
+                c.lastContextWindowUsage = runtimeUsageAtFinalize
+              }
               // Attach collected assets to the last assistant message
               // NOTE: Must mutate via Immer draft (c.messages[i]) directly.
               // Using spread/reverse/find detaches the object from Immer's proxy,
@@ -2379,6 +2543,34 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           })
 
+          // Reset runtime store for this conversation
+          useConversationRuntimeStore.setState((state) => {
+            const r = state.runtimes.get(conversationId)
+            if (r) {
+              r.status = status
+              r.error = error || null
+              r.currentToolCall = null
+              r.activeToolCalls = []
+              r.streamingToolArgs = ''
+              r.streamingToolArgsByCallId = {}
+              r.streamingContent = ''
+              r.streamingReasoning = ''
+              r.completedContent = null
+              r.completedReasoning = null
+              r.isContentStreaming = false
+              r.isReasoningStreaming = false
+              r.draftAssistant = null
+              r.activeRunId = null
+              if (status === 'idle') {
+                r.collectedAssets = []
+                // Keep r.contextWindowUsage so the ContextUsageBar remains visible
+                // after the agent loop finishes. It will be cleared when a new
+                // run starts (runAgent).
+                r.workflowExecution = null
+              }
+            }
+          })
+
           if (status === 'idle') {
             emitComplete()
             const finalConv = get().conversations.find((c) => c.id === conversationId)
@@ -2390,6 +2582,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 )
                 toast.error('对话保存失败，部分内容可能丢失')
               })
+            if (finalConv) {
+              persistConversationMeta(finalConv).catch((err) => {
+                console.warn(
+                  '[conversation.store] Failed to persist context usage meta on complete:',
+                  err
+                )
+              })
+            }
 
             try {
               const { useConversationContextStore } =
@@ -2425,11 +2625,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         let fullReasoningAccumulator = ''
         const reasoningQueue = new StreamingQueue((_key: string, accumulated: string) => {
           fullReasoningAccumulator += accumulated
-          set((state) => {
-            const c = state.conversations.find((c) => c.id === conversationId)
-            if (c && c.activeRunId === runId) {
-              c.streamingReasoning = fullReasoningAccumulator
-              applyDraftAssistantEvent(c, {
+          // Write to runtime store only — avoids touching conversations[] at 60fps
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId === runId) {
+              r.streamingReasoning = fullReasoningAccumulator
+              applyDraftAssistantEvent(r, {
                 type: 'reasoning_stream_sync',
                 reasoning: fullReasoningAccumulator,
               })
@@ -2443,11 +2644,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         let fullContentAccumulator = ''
         const contentQueue = new StreamingQueue((_key: string, accumulated: string) => {
           fullContentAccumulator += accumulated
-          set((state) => {
-            const c = state.conversations.find((c) => c.id === conversationId)
-            if (c && c.activeRunId === runId) {
-              c.streamingContent = fullContentAccumulator
-              applyDraftAssistantEvent(c, {
+          // Write to runtime store only — avoids touching conversations[] at 60fps
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId === runId) {
+              r.streamingContent = fullContentAccumulator
+              applyDraftAssistantEvent(r, {
                 type: 'content_stream_sync',
                 content: fullContentAccumulator,
               })
@@ -2488,6 +2690,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 applyDraftAssistantEvent(c, { type: 'message_start' })
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.streamingContent = ''
+                r.streamingReasoning = ''
+                r.isReasoningStreaming = false
+                r.completedReasoning = ''
+                r.isContentStreaming = false
+                r.completedContent = ''
+                applyDraftAssistantEvent(r, { type: 'message_start' })
+              }
+            })
           },
           onReasoningStart: () => {
             if (!isCurrentRun()) return
@@ -2497,6 +2712,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.status = 'streaming'
                 c.isReasoningStreaming = true
                 applyDraftAssistantEvent(c, { type: 'reasoning_start' })
+              }
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.status = 'streaming'
+                r.isReasoningStreaming = true
+                applyDraftAssistantEvent(r, { type: 'reasoning_start' })
               }
             })
             emitThinkingStart()
@@ -2521,6 +2745,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 })
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.isReasoningStreaming = false
+                r.completedReasoning = reasoning
+                r.streamingReasoning = ''
+                applyDraftAssistantEvent(r, {
+                  type: 'reasoning_complete',
+                  reasoning,
+                })
+              }
+            })
           },
           onContentStart: () => {
             if (!isCurrentRun()) return
@@ -2530,6 +2767,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.status = 'streaming'
                 c.isContentStreaming = true
                 applyDraftAssistantEvent(c, { type: 'content_start' })
+              }
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.status = 'streaming'
+                r.isContentStreaming = true
+                applyDraftAssistantEvent(r, { type: 'content_start' })
               }
             })
           },
@@ -2547,6 +2793,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.completedContent = content
                 c.streamingContent = ''
                 applyDraftAssistantEvent(c, {
+                  type: 'content_complete',
+                  content,
+                })
+              }
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.isContentStreaming = false
+                r.completedContent = content
+                r.streamingContent = ''
+                applyDraftAssistantEvent(r, {
                   type: 'content_complete',
                   content,
                 })
@@ -2608,6 +2867,49 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 }
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.status = 'tool_calling'
+                if (runWorkflowArgs?.mode === 'real_run' && !r.workflowExecution) {
+                  const bundle = getWorkflowTemplateBundle(runWorkflowArgs.workflowId)
+                  r.workflowExecution = {
+                    templateId: bundle?.id || runWorkflowArgs.workflowId,
+                    label: bundle?.label || runWorkflowArgs.workflowId,
+                    nodes:
+                      bundle?.workflow.nodes.map((node) => ({
+                        id: node.id,
+                        kind: node.kind,
+                        label: node.kind,
+                        status: 'pending' as const,
+                      })) || [],
+                    totalTokens: 0,
+                    startedAt: Date.now(),
+                  }
+                }
+                const isSameTool = r.currentToolCall?.id === tc.id
+                r.currentToolCall = tc
+                r.activeToolCalls = r.activeToolCalls || []
+                if (!r.activeToolCalls.some((x) => x.id === tc.id)) {
+                  r.activeToolCalls.push(tc)
+                }
+                r.streamingToolArgsByCallId = r.streamingToolArgsByCallId || {}
+                if (!r.streamingToolArgsByCallId[tc.id]) {
+                  r.streamingToolArgsByCallId[tc.id] = ''
+                }
+                applyDraftAssistantEvent(r, {
+                  type: 'tool_start',
+                  toolCall: tc,
+                })
+                if (!isSameTool) {
+                  r.streamingToolArgs = ''
+                  if (r.draftAssistant) {
+                    r.draftAssistant.toolArgs = ''
+                  }
+                }
+              }
+            })
             if (shouldEmitToolStart) {
               emitToolStart({
                 name: tc.function.name,
@@ -2618,26 +2920,25 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onToolCallDelta: (_index: number, argsDelta: string, toolCallId?: string) => {
             if (!isCurrentRun()) return
-            set((state) => {
-              const c = state.conversations.find((c) => c.id === conversationId)
-              if (c && c.activeRunId === runId) {
-                if (c.draftAssistant) {
-                  const isCurrentToolDelta = !toolCallId || c.currentToolCall?.id === toolCallId
-                  if (isCurrentToolDelta) {
-                    c.streamingToolArgs += argsDelta
-                  }
-                  if (toolCallId) {
-                    c.streamingToolArgsByCallId = c.streamingToolArgsByCallId || {}
-                    c.streamingToolArgsByCallId[toolCallId] =
-                      (c.streamingToolArgsByCallId[toolCallId] || '') + argsDelta
-                  }
-                  applyDraftAssistantEvent(c, {
-                    type: 'tool_delta',
-                    argsDelta,
-                    toolCallId,
-                    isCurrentToolDelta: !!isCurrentToolDelta,
-                  })
+            // Write to runtime store only — avoids touching conversations[] at 60fps
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId && r.draftAssistant) {
+                const isCurrentToolDelta = !toolCallId || r.currentToolCall?.id === toolCallId
+                if (isCurrentToolDelta) {
+                  r.streamingToolArgs += argsDelta
                 }
+                if (toolCallId) {
+                  r.streamingToolArgsByCallId = r.streamingToolArgsByCallId || {}
+                  r.streamingToolArgsByCallId[toolCallId] =
+                    (r.streamingToolArgsByCallId[toolCallId] || '') + argsDelta
+                }
+                applyDraftAssistantEvent(r, {
+                  type: 'tool_delta',
+                  argsDelta,
+                  toolCallId,
+                  isCurrentToolDelta: !!isCurrentToolDelta,
+                })
               }
             })
           },
@@ -2683,6 +2984,37 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 delete c.streamingToolArgsByCallId[tc.id]
               }
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                const isCurrentTool = r.currentToolCall?.id === tc.id
+                if (isCurrentTool) {
+                  r.currentToolCall = null
+                  r.streamingToolArgs = ''
+                }
+                r.activeToolCalls = (r.activeToolCalls || []).filter((x) => x.id !== tc.id)
+                const hasMoreTools = (r.activeToolCalls || []).length > 0
+                if (hasMoreTools) {
+                  r.currentToolCall = r.activeToolCalls[r.activeToolCalls.length - 1]
+                  r.streamingToolArgs =
+                    (r.streamingToolArgsByCallId || {})[r.currentToolCall.id] || ''
+                  r.status = 'tool_calling'
+                } else {
+                  r.status = 'pending'
+                }
+                r.streamingToolArgsByCallId = r.streamingToolArgsByCallId || {}
+                applyDraftAssistantEvent(r, {
+                  type: 'tool_complete',
+                  toolCall: tc,
+                  result: _result,
+                  isCurrentTool,
+                  nextToolCall: r.currentToolCall,
+                  streamedArgsByCallId: r.streamingToolArgsByCallId,
+                })
+                delete r.streamingToolArgsByCallId[tc.id]
+              }
+            })
           },
           onContextUsageUpdate: (payload) => {
             if (!isCurrentRun()) return
@@ -2698,6 +3030,32 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               }
               c.lastContextWindowUsage = c.contextWindowUsage
             })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                r.contextWindowUsage = {
+                  usedTokens: payload.usedTokens,
+                  maxTokens: payload.maxTokens,
+                  reserveTokens: payload.reserveTokens,
+                  usagePercent: payload.usagePercent,
+                  modelMaxTokens: payload.modelMaxTokens ?? payload.maxTokens + payload.reserveTokens,
+                }
+              }
+            })
+            const now = Date.now()
+            if (now - lastContextUsageMetaPersistAt >= 1000) {
+              lastContextUsageMetaPersistAt = now
+              const currentConv = get().conversations.find((x) => x.id === conversationId)
+              if (currentConv) {
+                persistConversationMeta(currentConv).catch((err) => {
+                  console.warn(
+                    '[conversation.store] Failed to persist context usage meta during run:',
+                    err
+                  )
+                })
+              }
+            }
           },
           onContextCompressionStart: (payload) => {
             if (!isCurrentRun()) return
@@ -2713,6 +3071,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.status = 'pending'
               }
               applyDraftAssistantEvent(c, { type: 'compression_start' })
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                if (r.status !== 'streaming' && r.status !== 'tool_calling') {
+                  r.status = 'pending'
+                }
+                applyDraftAssistantEvent(r, { type: 'compression_start' })
+              }
             })
           },
           onContextCompressionComplete: (payload) => {
@@ -2732,6 +3100,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 type: 'compression_complete',
                 mode: payload.mode === 'skip' ? 'skip' : 'compress',
               })
+            })
+            // Sync to runtime store
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                applyDraftAssistantEvent(r, {
+                  type: 'compression_complete',
+                  mode: payload.mode === 'skip' ? 'skip' : 'compress',
+                })
+              }
             })
             // Summary message is now injected by AgentLoop directly into
             // allMessages via onMessagesUpdated, so no need to collect it here.
@@ -2911,6 +3289,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               inner.agentLoops.delete(conversationId)
               inner.streamingQueues.delete(conversationId)
             })
+            // Reset runtime store on error
+            useConversationRuntimeStore.setState((state) => {
+              const r = state.runtimes.get(conversationId)
+              if (r) {
+                r.status = 'error'
+                r.error = err.message
+                r.activeRunId = null
+                r.draftAssistant = null
+              }
+            })
             emitError(err.message)
           },
         })
@@ -2937,6 +3325,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             state.agentLoops.delete(conversationId)
             state.streamingQueues.delete(conversationId)
           })
+          // Reset runtime store
+          useConversationRuntimeStore.setState((state) => {
+            const r = state.runtimes.get(conversationId)
+            if (r) {
+              r.status = 'idle'
+              r.activeRunId = null
+              r.draftAssistant = null
+            }
+          })
           return
         }
         set((state) => {
@@ -2949,6 +3346,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           }
           state.agentLoops.delete(conversationId)
           state.streamingQueues.delete(conversationId)
+        })
+        // Reset runtime store on generic error
+        useConversationRuntimeStore.setState((state) => {
+          const r = state.runtimes.get(conversationId)
+          if (r) {
+            r.status = 'error'
+            r.error = error instanceof Error ? error.message : String(error)
+            r.activeRunId = null
+            r.draftAssistant = null
+          }
         })
       }
     },
@@ -3086,6 +3493,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           state.pendingWorkflowDryRuns.delete(conversationId)
           const c = state.conversations.find((c) => c.id === conversationId)
           if (c) {
+            // Sync draft from runtime store to main store before committing
+            // (streaming updates write draftAssistant to runtime store only)
+            const rtDraft = useConversationRuntimeStore.getState().runtimes.get(conversationId)?.draftAssistant
+            if (rtDraft && !c.draftAssistant) {
+              c.draftAssistant = rtDraft
+            }
             committedPartial = commitDraftToMessages(c)
             if (committedPartial) {
               c.updatedAt = Date.now()
@@ -3110,6 +3523,25 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (runIdBeingCancelled) {
               state.cancelledRunIds.add(runIdBeingCancelled)
             }
+          }
+        })
+        // Reset runtime store for cancelled conversation
+        useConversationRuntimeStore.setState((state) => {
+          const r = state.runtimes.get(conversationId)
+          if (r) {
+            r.status = 'idle'
+            r.error = null
+            r.activeRunId = null
+            r.draftAssistant = null
+            r.currentToolCall = null
+            r.activeToolCalls = []
+            r.streamingToolArgs = ''
+            r.streamingToolArgsByCallId = {}
+            r.streamingContent = ''
+            r.streamingReasoning = ''
+            r.isContentStreaming = false
+            r.isReasoningStreaming = false
+            r.workflowExecution = null
           }
         })
         if (committedPartial) {
@@ -3161,6 +3593,25 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         c.isContentStreaming = false
         c.isReasoningStreaming = false
         c.workflowExecution = null
+      })
+      // Reset runtime store for cancelled workflow
+      useConversationRuntimeStore.setState((state) => {
+        const r = state.runtimes.get(conversationId)
+        if (r) {
+          r.status = 'idle'
+          r.error = null
+          r.activeRunId = null
+          r.draftAssistant = null
+          r.currentToolCall = null
+          r.activeToolCalls = []
+          r.streamingToolArgs = ''
+          r.streamingToolArgsByCallId = {}
+          r.streamingContent = ''
+          r.streamingReasoning = ''
+          r.isContentStreaming = false
+          r.isReasoningStreaming = false
+          r.workflowExecution = null
+        }
       })
     },
 
@@ -3302,6 +3753,29 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           c.draftAssistant = null
           c.contextWindowUsage = null
           c.workflowExecution = null
+        }
+      })
+
+      // Reset runtime store for this conversation
+      useConversationRuntimeStore.setState((state) => {
+        const r = state.runtimes.get(id)
+        if (r) {
+          r.status = 'idle'
+          r.streamingContent = ''
+          r.streamingReasoning = ''
+          r.isReasoningStreaming = false
+          r.completedReasoning = null
+          r.isContentStreaming = false
+          r.completedContent = null
+          r.currentToolCall = null
+          r.activeToolCalls = []
+          r.streamingToolArgs = ''
+          r.streamingToolArgsByCallId = {}
+          r.error = null
+          r.activeRunId = null
+          r.draftAssistant = null
+          r.contextWindowUsage = null
+          r.workflowExecution = null
         }
       })
     },
