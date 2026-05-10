@@ -340,6 +340,7 @@ export function ConversationView({
               onRegenerate={handleRegenerate}
               onCancel={handleCancel}
               messagesEndRef={messagesEndRef}
+              scrollContainerRef={scrollContainerRef}
               conversationId={convId}
               mentionAgents={mentionAgents}
               onSearchFiles={debouncedSearchFiles}
