@@ -63,7 +63,7 @@ export const MessageNavBar = memo(function MessageNavBar({
       const triggerLine = scrollTop + el.clientHeight * 0.33
       let newActive = -1
       for (let i = 0; i < userItems.length; i++) {
-        const node = el.querySelector(`[data-index="${userItems[i].turnIndex}"]`)
+        const node = el.querySelector(`[data-turn-index="${userItems[i].turnIndex}"]`)
         if (node) {
           const top = node.getBoundingClientRect().top - el.getBoundingClientRect().top + scrollTop
           if (top <= triggerLine) newActive = i

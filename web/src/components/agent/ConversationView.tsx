@@ -24,12 +24,13 @@ import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import type { FileMentionItem } from './FileMentionExtension'
 import { useInitialMessage } from './useInitialMessage'
 import { ConversationMessages } from './ConversationMessages'
+import type { ConversationMessagesHandle } from './ConversationMessages'
 import { ConversationEmptyState } from './ConversationEmptyState'
 import { AgentDropdown } from './AgentDropdown'
 import { ThinkingDropdown } from './ThinkingDropdown'
 import { ContextUsageBar } from './ContextUsageBar'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
-
+import { MessageNavBar } from './MessageNavBar'
 /** Lightweight keyboard shortcut hint shown near the input area */
 function ShortcutHint() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
@@ -99,6 +100,7 @@ export function ConversationView({
   const t = useT()
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
   const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
+  const conversationMessagesRef = useRef<ConversationMessagesHandle>(null)
 
   const logic = useConversationLogic()
   const {
@@ -330,6 +332,7 @@ export function ConversationView({
             <ConversationEmptyState />
           ) : (
             <ConversationMessages
+              ref={conversationMessagesRef}
               activeMessages={activeMessages}
               toolResults={toolResults}
               isProcessing={isProcessing}
@@ -354,6 +357,15 @@ export function ConversationView({
           isUserAtBottomRef={isUserAtBottomRef}
           convId={convId}
         />
+
+        {/* Message navigation dots */}
+        {activeMessages.length > 1 && (
+          <MessageNavBar
+            messagesHandle={conversationMessagesRef}
+            scrollContainerRef={scrollContainerRef}
+            messageCount={activeMessages.length}
+          />
+        )}
 
       </div>
 

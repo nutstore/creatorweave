@@ -8,7 +8,7 @@
  * streaming token (~60fps). Only this component tree re-renders.
  */
 
-import { Fragment, memo, useMemo } from 'react'
+import { Fragment, memo, useMemo, forwardRef, useImperativeHandle, useCallback } from 'react'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useShallow } from 'zustand/react/shallow'
 import { MessageBubble } from './MessageBubble'
@@ -46,6 +46,11 @@ type ConversationMessagesProps = {
   }
 }
 
+export interface ConversationMessagesHandle {
+  getUserNavItems: () => Array<{ turnIndex: number; preview: string; number: number }>
+  scrollToTurnIndex: (index: number, align?: 'start' | 'center' | 'end') => void
+}
+
 /** Build runtime props for an AssistantTurnBubble. Returns undefined values when not active. */
 function getRuntimeProps(
   active: boolean,
@@ -79,7 +84,7 @@ function getRuntimeProps(
   }
 }
 
-export const ConversationMessages = memo(function ConversationMessages({
+export const ConversationMessages = memo(forwardRef(function ConversationMessages({
   activeMessages,
   toolResults: committedToolResults,
   isProcessing,
@@ -93,7 +98,7 @@ export const ConversationMessages = memo(function ConversationMessages({
   mentionAgents,
   onSearchFiles,
   staticSnapshot,
-}: ConversationMessagesProps) {
+}: ConversationMessagesProps, ref: React.Ref<ConversationMessagesHandle | null>) {
   const { activeWorkflowExecution } = staticSnapshot
 
   // ── Subscribe to streaming data directly from runtime store ──
@@ -187,6 +192,30 @@ export const ConversationMessages = memo(function ConversationMessages({
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
 
+  // ── Expose navigation handle to parent ──
+  useImperativeHandle(ref, useCallback(() => ({
+    getUserNavItems: () => {
+      const items: Array<{ turnIndex: number; preview: string; number: number }> = []
+      let num = 0
+      for (let i = 0; i < turns.length; i++) {
+        if (turns[i].type === 'user') {
+          num++
+          const content = turns[i].message.content || ''
+          items.push({
+            turnIndex: i,
+            preview: content.length > 36 ? content.slice(0, 36) + '…' : content,
+            number: num,
+          })
+        }
+      }
+      return items
+    },
+    scrollToTurnIndex: (index: number, _align: 'start' | 'center' | 'end' = 'start') => {
+      const el = document.querySelector(`[data-turn-index="${index}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    },
+  }), [turns]))
+
   const anchorIndex = useWorkflowProgressAnchor({
     activeWorkflowExecution,
     activeDraftAssistant,
@@ -217,9 +246,9 @@ export const ConversationMessages = memo(function ConversationMessages({
           )
 
           return turn.type === 'user' ? (
-            <MessageBubble
-              key={turn.message.id}
-              message={turn.message}
+            <div key={turn.message.id} data-turn-index={idx}>
+              <MessageBubble
+                message={turn.message}
               onDeleteAgentLoop={onDeleteAgentLoop}
               onEditAndResend={onEditAndResend}
               onRegenerate={onRegenerate}
@@ -229,6 +258,7 @@ export const ConversationMessages = memo(function ConversationMessages({
               mentionAgents={mentionAgents}
               onSearchFiles={onSearchFiles}
             />
+            </div>
           ) : (
             <Fragment key={turn.messages[0].id}>
               <AssistantTurnBubble
@@ -286,4 +316,4 @@ export const ConversationMessages = memo(function ConversationMessages({
       </div>
     </div>
   )
-})
+}))
