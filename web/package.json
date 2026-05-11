@@ -38,7 +38,6 @@
     "@monaco-editor/react": "^4.7.0",
     "@mozilla/readability": "^0.6.0",
     "@sqlite.org/sqlite-wasm": "3.51.2-build6",
-    "@tanstack/react-virtual": "^3.13.24",
     "@tiptap/core": "^3.20.5",
     "@tiptap/extension-code": "^3.20.5",
     "@tiptap/extension-document": "^3.20.5",

@@ -5,7 +5,7 @@
  * not as a separate component.
  */
 
-import { memo, useMemo, type ReactNode } from 'react'
+import { memo, type ReactNode } from 'react'
 import { Bot } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
@@ -85,87 +85,70 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const t = useT()
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
-
-  // Memoize committed tool call IDs — only changes when turn.messages changes
-  const committedToolCallIds = useMemo(
-    () => new Set(turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])),
-    [turn.messages],
+  const committedToolCallIds = new Set(
+    turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])
   )
-
-  // Memoize filtered runtime steps — depends on runtimeSteps reference + committed IDs
-  const orderedRuntimeSteps = useMemo(
-    () =>
-      (runtimeSteps || []).filter((step) => {
-        if (step.streaming) return true
-        if (step.type === 'tool_call') {
-          return !committedToolCallIds.has(step.toolCall.id)
-        }
-        return true
-      }),
-    [runtimeSteps, committedToolCallIds],
-  )
-
-  const draftToolCalls = useMemo(
-    () => (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id)),
-    [runtimeToolCalls, committedToolCallIds],
-  )
-
+  const draftToolCalls = (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id))
+  const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
+    // Streaming steps are always visible — they represent in-progress content
+    if (step.streaming) return true
+    // Completed tool_call steps: hide if their id is already in a committed message
+    if (step.type === 'tool_call') {
+      return !committedToolCallIds.has(step.toolCall.id)
+    }
+    // Completed reasoning/content/compression steps: keep visible during the
+    // agent loop. They are only cleared when the loop finishes and the final
+    // message is committed (which sets draftAssistant = null, clearing all steps).
+    return true
+  })
   const hasCurrentToolCallInDraft = !!(
     currentToolCall && draftToolCalls.some((tc) => tc.id === currentToolCall.id)
   )
-
-  // Memoize suppress set — depends on steps + toolResults + currentToolCall
-  const suppressExecutingToolCallIds = useMemo(() => {
-    const set = new Set<string>()
-    if (isProcessing) {
-      for (const step of orderedRuntimeSteps) {
-        if (step.type !== 'tool_call') continue
-        const hasResult = !!(step.result ?? toolResults.get(step.toolCall.id))
-        if (step.streaming && !hasResult) {
-          set.add(step.toolCall.id)
-        }
-      }
-      if (currentToolCall && !toolResults.get(currentToolCall.id)) {
-        set.add(currentToolCall.id)
+  const suppressExecutingToolCallIds = new Set<string>()
+  if (isProcessing) {
+    for (const step of orderedRuntimeSteps) {
+      if (step.type !== 'tool_call') continue
+      const hasResult = !!(step.result ?? toolResults.get(step.toolCall.id))
+      if (step.streaming && !hasResult) {
+        suppressExecutingToolCallIds.add(step.toolCall.id)
       }
     }
-    return set
-  }, [isProcessing, orderedRuntimeSteps, toolResults, currentToolCall])
-
-  // Memoize merged timeline — the expensive sort+concat
-  const mergedTimelineItems = useMemo(
-    () =>
-      isProcessing
-        ? [
-            ...turn.messages.map((message, index) => ({
-              kind: 'message' as const,
-              key: `msg-${message.id}`,
-              order: index,
-              timestamp: message.timestamp,
-              message,
-            })),
-            ...orderedRuntimeSteps.map((step, index) => ({
-              kind: 'runtime' as const,
-              key: `step-${step.id}`,
-              order: index,
-              timestamp:
-                typeof step.timestamp === 'number'
-                  ? step.timestamp
-                  : turn.timestamp + index + 1,
-              step,
-            })),
-          ].sort((a, b) => {
-            if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
-            return a.order - b.order
-          })
-        : [],
-    [isProcessing, turn.messages, turn.timestamp, orderedRuntimeSteps],
-  )
-
+    if (currentToolCall && !toolResults.get(currentToolCall.id)) {
+      suppressExecutingToolCallIds.add(currentToolCall.id)
+    }
+  }
+  const mergedTimelineItems = isProcessing
+    ? [
+        // Committed messages
+        ...turn.messages.map((message, index) => ({
+          kind: 'message' as const,
+          key: `msg-${message.id}`,
+          order: index,
+          timestamp: message.timestamp,
+          message,
+        })),
+        // Runtime steps (streaming)
+        ...orderedRuntimeSteps.map((step, index) => ({
+          kind: 'runtime' as const,
+          key: `step-${step.id}`,
+          order: index,
+          timestamp:
+            typeof step.timestamp === 'number'
+              ? step.timestamp
+              : turn.timestamp + index + 1,
+          step,
+        })),
+      ].sort((a, b) => {
+        // Global sort: mix committed messages and runtime steps by timestamp
+        // so they appear in chronological order (interleaved), not grouped by type.
+        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
+        return a.order - b.order
+      })
+    : []
   const hasCurrentToolCallInRuntimeSteps = !!(
     currentToolCall &&
     orderedRuntimeSteps.some(
-      (step) => step.type === 'tool_call' && step.toolCall.id === currentToolCall.id,
+      (step) => step.type === 'tool_call' && step.toolCall.id === currentToolCall.id
     )
   )
   const shouldRenderMergedTimeline = isProcessing && mergedTimelineItems.length > 0

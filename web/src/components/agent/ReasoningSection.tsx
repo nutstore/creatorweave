@@ -3,7 +3,7 @@
  * MessageBubble, AssistantTurnBubble, and StreamingBubble.
  */
 
-import { memo, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import { useT } from '@/i18n'
 
@@ -13,7 +13,7 @@ interface ReasoningSectionProps {
   streaming?: boolean
 }
 
-export const ReasoningSection = memo(function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps) {
+export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps) {
   const t = useT()
   const [open, setOpen] = useState(!!streaming)
 
@@ -45,4 +45,4 @@ export const ReasoningSection = memo(function ReasoningSection({ reasoning, stre
       )}
     </>
   )
-})
+}
