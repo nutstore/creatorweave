@@ -114,6 +114,7 @@ const ConversationItem = memo(function ConversationItem({
   isActive,
   pendingReviewCount,
   isEditing,
+  isArchived,
   isPinned,
   onSelect,
   onStartRename,
@@ -256,10 +257,13 @@ const ConversationItem = memo(function ConversationItem({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
-          onClick={() => onArchive(id, isPinned)}
+          onClick={() => onArchive(id, isArchived)}
         >
-          <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
-          {t('sidebar.unarchiveWorkspace')}
+          {isArchived
+            ? <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
+            : <Archive className="mr-2 h-3.5 w-3.5" />
+          }
+          {isArchived ? t('sidebar.unarchiveWorkspace') : t('sidebar.archiveWorkspace')}
         </ContextMenuItem>
         <ContextMenuItem
           className="text-danger focus:text-danger"
