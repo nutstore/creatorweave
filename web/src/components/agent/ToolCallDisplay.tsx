@@ -10,6 +10,8 @@ import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'
 import { MarkdownContent } from './MarkdownContent'
 import { QuestionCard } from './QuestionCard'
+import { ExtensionErrorCard } from '@/components/extension'
+import { useExtensionStore } from '@/store/extension.store'
 import { getPendingQuestion, removePendingQuestion } from '@/store/pending-question.store'
 import { useT } from '@/i18n'
 
@@ -195,6 +197,15 @@ export function ToolCallDisplay({
     )
   }
 
+  // web_search / web_fetch with BRIDGE_UNAVAILABLE: show ExtensionErrorCard
+  const isWebBridgeTool = toolCall.function.name === 'web_search' || toolCall.function.name === 'web_fetch'
+  const bridgeError = isWebBridgeTool && parsedResult && !parsedResult.ok && (parsedResult.error as { code?: string })?.code === 'BRIDGE_UNAVAILABLE'
+  if (bridgeError) {
+    const openInstallGuide = useExtensionStore.getState().openInstallGuide
+    return <ExtensionErrorCard onInstallClick={() => openInstallGuide()} />
+  }
+
+
   return (
     <div className="my-1 rounded border border-neutral-200 bg-neutral-50 text-sm dark:border-neutral-700 dark:bg-neutral-800">
       <button
@@ -230,8 +241,8 @@ export function ToolCallDisplay({
         </span>
       </button>
 
-      {/* SubAgent progress section — always visible */}
-      {isSubagentTool && subagentEvents && subagentEvents.length > 0 && (
+      {/* SubAgent progress section — visible when expanded */}
+      {expanded && isSubagentTool && subagentEvents && subagentEvents.length > 0 && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <SubagentProgressSection events={subagentEvents} />
         </div>

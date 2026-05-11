@@ -20,4 +20,9 @@ echo "⚛️  Cleaning frontend artifacts..."
 cd "$PROJECT_ROOT/web"
 rm -rf dist node_modules/.vite
 
+# Clean browser extension
+echo "🔌 Cleaning browser extension artifacts..."
+cd "$PROJECT_ROOT/browser-extension"
+rm -rf dist .wxt
+
 echo "✅ Clean completed!"

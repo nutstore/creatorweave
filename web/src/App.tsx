@@ -19,6 +19,8 @@ import {
 import { useT } from '@/i18n'
 import { useLocale } from '@/i18n'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
+import { useExtensionStore } from '@/store/extension.store'
+import { ExtensionInstallGuide } from '@/components/extension'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
@@ -198,6 +200,20 @@ function App() {
   const docsLanguage: 'zh' | 'en' = locale === 'zh-CN' ? 'zh' : 'en'
   const tRef = useRef(t)
   tRef.current = t
+
+  // Extension install guide dialog (global, shared across all pages)
+  const extensionGuideOpen = useExtensionStore((s) => s.installGuideOpen)
+  const extensionCloseGuide = useExtensionStore((s) => s.closeInstallGuide)
+  const extensionCheckStatus = useExtensionStore((s) => s.checkStatus)
+
+  // Periodic extension status check
+  // Delay first check to allow content script injection (runAt: document_idle)
+  // Without this, the banner flashes on briefly then disappears.
+  useEffect(() => {
+    const initial = setTimeout(extensionCheckStatus, 2000)
+    const interval = setInterval(extensionCheckStatus, 5000)
+    return () => { clearTimeout(initial); clearInterval(interval) }
+  }, [extensionCheckStatus])
 
   const runInitStep = async <T,>(
     label: string,
@@ -962,6 +978,10 @@ function App() {
       {rootView}
       <InstallPrompt />
       <DatabaseRefreshDialog isOpen={false} />
+      <ExtensionInstallGuide
+        open={extensionGuideOpen}
+        onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
+      />
       <Toaster position="bottom-right" />
     </>
   )

@@ -43,6 +43,8 @@ import {
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
+import { useExtensionStore } from '@/store/extension.store'
+import { ExtensionBanner } from '@/components/extension'
 
 // Design system styles
 const designStyles = `
@@ -744,6 +746,9 @@ export function ProjectHome({
   return (
     <div className="relative min-h-screen bg-background home-grain">
       <style>{designStyles}</style>
+
+      {/* Extension install banner */}
+      <ExtensionBanner onInstallClick={() => useExtensionStore.getState().openInstallGuide()} />
 
       {/* Hero section */}
       <header className="relative overflow-hidden">

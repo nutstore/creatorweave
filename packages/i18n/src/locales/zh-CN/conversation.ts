@@ -70,6 +70,10 @@ export const conversation = {
         "输入 {promptTokens} + 输出 {completionTokens} = {totalTokens} tokens",
     },
 
+    // 导航
+    nav: {
+      label: "消息导航",
+    },
     // 导出会话
     export: {
       title: "导出会话记录",

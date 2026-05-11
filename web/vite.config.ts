@@ -6,6 +6,7 @@ import { sqlitePlugin } from './src/sqlite/vite-plugin-sqlite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { syncGuardPlugin } from './vite-plugin-sync-guard'
 import { docsSyncPlugin } from './vite-plugin-docs-sync'
+import { extensionServePlugin } from './vite-plugin-extension-serve'
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -99,6 +100,7 @@ export default defineConfig({
     pyodideServePlugin(),
     syncGuardPlugin(),
     ...(isVitest ? [] : [docsSyncPlugin()]),
+    ...(isVitest ? [] : [extensionServePlugin()]),
     sqlitePlugin(),
     VitePWA({
       registerType: 'autoUpdate',

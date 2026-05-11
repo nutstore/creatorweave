@@ -28,6 +28,7 @@ import { fileTree } from './fileTree'
 import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
+import { extension } from './extension'
 
 export const zhCN = {
   common,
@@ -76,4 +77,5 @@ export const zhCN = {
   goToFile,
   workflow,
   questionCard,
+  extension,
 } as const

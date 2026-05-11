@@ -70,6 +70,11 @@ export const conversation = {
         "Input {promptTokens} + Output {completionTokens} = {totalTokens} tokens",
     },
 
+    // Navigation
+    nav: {
+      label: "Message navigation",
+    },
+
     // Export conversation
     export: {
       title: "Export Conversation",

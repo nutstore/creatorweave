@@ -19,6 +19,15 @@ else
     exit 1
 fi
 
+# Build browser extension
+echo "📦 Building browser extension..."
+cd "$PROJECT_ROOT/browser-extension"
+if [ -d "node_modules" ]; then
+    pnpm run build
+else
+    pnpm install && pnpm run build
+fi
+
 # Build frontend
 echo "📦 Building frontend..."
 cd "$PROJECT_ROOT/web"
@@ -27,6 +36,7 @@ pnpm run build
 echo ""
 echo "✅ Build completed successfully!"
 echo "📂 Output: $PROJECT_ROOT/web/dist/"
+echo "🔌 Extension: $PROJECT_ROOT/web/dist/extension/"
 echo ""
 echo "To preview the build:"
 echo "  cd web && pnpm run preview"

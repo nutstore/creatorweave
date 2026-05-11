@@ -50,6 +50,20 @@ echo "Copying Pyodide..."
 mkdir -p dist/assets/pyodide
 cp -r node_modules/pyodide/* dist/assets/pyodide/
 
+# Build browser extension and copy to dist
+echo "Building browser extension..."
+cd ../browser-extension
+pnpm install
+pnpm run build
+cd ../web
+mkdir -p dist/extension
+cp -r ../browser-extension/dist/chrome-mv3/* dist/extension/
+echo "Extension copied to dist/extension/"
+
+# Copy EdgeOne config
+rm -f dist/middleware.js dist/package.json && rm -rf dist/cloud-functions
+cp ../edgeone.json dist/edgeone.json
+
 echo "=== Build Complete ==="
 echo "Output directory: web/dist"
 ls -la dist/

@@ -3,7 +3,7 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   outDir: 'dist',
   manifest: {
-    name: 'Browser Extension',
+    name: 'CreatorWeave',
     description: 'Provides web_search and web_fetch capabilities for in-browser Agents',
     version: '1.0.1',
     permissions: ['scripting', 'tabs'],

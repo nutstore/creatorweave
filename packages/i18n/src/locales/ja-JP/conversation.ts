@@ -56,6 +56,11 @@ export const conversation = {
         "入力 {promptTokens} + 出力 {completionTokens} = {totalTokens} tokens",
     },
 
+    // ナビゲーション
+    nav: {
+      label: "メッセージナビゲーション",
+    },
+
     // 会話エクスポート
     export: {
       title: "会話をエクスポート",

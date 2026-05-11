@@ -46,6 +46,7 @@ install: install-deps ## Alias for install-deps
 install-deps: ## Install pnpm dependencies
 	@echo '$(BLUE)Installing dependencies...$(NC)'
 	@cd web && pnpm install
+	@cd browser-extension && pnpm install
 	@echo '$(GREEN)✅ Dependencies installed!$(NC)'
 
 dev: ## Start development server
@@ -63,6 +64,11 @@ build-web: ## Build frontend only
 	@echo '$(BLUE)Building frontend...$(NC)'
 	@cd web && pnpm run build
 	@echo '$(GREEN)✅ Frontend built!$(NC)'
+
+build-extension: ## Build browser extension only
+	@echo '$(BLUE)Building browser extension...$(NC)'
+	@cd browser-extension && ([ -d node_modules ] || pnpm install) && pnpm run build
+	@echo '$(GREEN)✅ Browser extension built!$(NC)'
 
 test: ## Run all tests
 	@bash scripts/test.sh

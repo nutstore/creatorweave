@@ -53,6 +53,8 @@ import {
 } from '@/components/workspace'
 import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
+import { useExtensionStore } from '@/store/extension.store'
+import { ExtensionBanner } from '@/components/extension'
 import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
@@ -671,6 +673,10 @@ export function WorkspaceLayout({
         projectSwitcherOpen={projectSwitcherOpen}
         onProjectSwitcherOpenChange={setProjectSwitcherOpen}
       />
+
+      {/* Extension install banner — opens guide dialog via store */}
+      <ExtensionBanner onInstallClick={() => useExtensionStore.getState().openInstallGuide()} />
+
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Mobile sidebar overlay */}
         {isMobile && isSidebarOpen && (

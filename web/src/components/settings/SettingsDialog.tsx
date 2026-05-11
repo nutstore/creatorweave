@@ -29,6 +29,11 @@ import {
   Moon,
   Server,
   BookOpen,
+  Puzzle,
+  Search,
+  FileText,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
@@ -47,13 +52,14 @@ import { BrandButton } from '@creatorweave/ui'
 import { BrandSwitch } from '@creatorweave/ui'
 import { useSettingsStore } from '@/store/settings.store'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
+import { useExtensionStore } from '@/store/extension.store'
 import { getSessionStateManager } from '@/remote/session-state-serialization'
 
 // =============================================================================
 // Types
 // =============================================================================
 
-type SettingsTab = 'general' | 'llm' | 'mcp' | 'sync' | 'offline' | 'experimental'
+type SettingsTab = 'general' | 'llm' | 'mcp' | 'extension' | 'sync' | 'offline' | 'experimental'
 
 interface SessionSyncMetadata {
   syncId: string
@@ -683,6 +689,85 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
 }
 
 // =============================================================================
+// Extension Settings Panel
+// =============================================================================
+
+function ExtensionSettingsPanel() {
+  const t = useT()
+  const { status, checkStatus, openInstallGuide } = useExtensionStore()
+
+  // Refresh status when this panel renders
+  const currentStatus = checkStatus()
+  const isInstalled = currentStatus === 'installed'
+
+  return (
+    <div className="space-y-5 py-1">
+      <p className="text-xs text-tertiary">{t('extension.settingsDescription')}</p>
+
+      {/* Status */}
+      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="flex items-center gap-3">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full ${isInstalled ? 'bg-green-100 dark:bg-green-900/40' : 'bg-neutral-100 dark:bg-neutral-700'}`}>
+            {isInstalled ? (
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+            ) : (
+              <Puzzle className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+              {isInstalled ? t('extension.settingsInstalled') : t('extension.settingsNotInstalled')}
+            </p>
+            {isInstalled && (
+              <p className="text-xs text-green-600 dark:text-green-400">● Connected</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Capabilities */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-secondary dark:text-neutral-200">
+          {t('extension.settingsCapabilities')}
+        </h4>
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
+            <Search className="h-4 w-4 text-blue-500" />
+            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.featureSearch')}</span>
+            {isInstalled ? (
+              <CheckCircle2 className="ml-auto h-4 w-4 text-green-500" />
+            ) : (
+              <XCircle className="ml-auto h-4 w-4 text-neutral-300 dark:text-neutral-600" />
+            )}
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
+            <FileText className="h-4 w-4 text-blue-500" />
+            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.featureFetch')}</span>
+            {isInstalled ? (
+              <CheckCircle2 className="ml-auto h-4 w-4 text-green-500" />
+            ) : (
+              <XCircle className="ml-auto h-4 w-4 text-neutral-300 dark:text-neutral-600" />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Install / Refresh button */}
+      {!isInstalled && (
+        <BrandButton
+          variant="default"
+          className="w-full"
+          onClick={() => openInstallGuide()}
+        >
+          <Puzzle className="mr-2 h-4 w-4" />
+          {t('extension.settingsInstallButton')}
+        </BrandButton>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
 // Settings Dialog Content
 // =============================================================================
 
@@ -724,6 +809,7 @@ const SettingsDialogContent = forwardRef<
     { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
     { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
+    { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
     { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
     { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
     { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
@@ -864,6 +950,11 @@ const SettingsDialogContent = forwardRef<
             <div className="py-1">
               <MCPSettings />
             </div>
+          )}
+
+          {/* Extension Tab */}
+          {activeTab === 'extension' && (
+            <ExtensionSettingsPanel />
           )}
 
           {/* Sync Tab */}

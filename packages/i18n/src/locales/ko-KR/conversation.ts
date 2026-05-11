@@ -56,6 +56,11 @@ export const conversation = {
         "입력 {promptTokens} + 출력 {completionTokens} = {totalTokens} tokens",
     },
 
+    // 내비게이션
+    nav: {
+      label: "메시지 내비게이션",
+    },
+
     // 대화 내보내기
     export: {
       title: "대화 내보내기",
