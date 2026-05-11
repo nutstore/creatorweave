@@ -97,6 +97,14 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const committedHasContent = turn.messages.some((msg) => !!msg.content)
   const committedHasReasoning = turn.messages.some((msg) => !!msg.reasoning)
 
+  // Find the latest committed message timestamp to detect stale compression steps.
+  // When a committed message has a newer timestamp than a completed compression step,
+  // the compression step belongs to a previous loop iteration and should be hidden.
+  const latestCommittedTimestamp = turn.messages.reduce(
+    (max, msg) => Math.max(max, typeof msg.timestamp === 'number' ? msg.timestamp : 0),
+    0
+  )
+
   const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
     // Streaming steps are always visible — they represent in-progress content
     if (step.streaming) return true
@@ -110,7 +118,13 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
     if (step.type === 'content' && committedHasContent) return false
     // Completed reasoning step: same dedup logic.
     if (step.type === 'reasoning' && committedHasReasoning) return false
-    // Compression steps: always keep visible (no committed equivalent).
+    // Completed compression step: hide if any committed message is newer.
+    // This prevents stale compression cards from appearing after the LLM
+    // response that was generated after the compression.
+    if (step.type === 'compression') {
+      const stepTs = typeof step.timestamp === 'number' ? step.timestamp : 0
+      return stepTs >= latestCommittedTimestamp
+    }
     return true
   })
   const hasCurrentToolCallInDraft = !!(
@@ -131,7 +145,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   }
   const mergedTimelineItems = isProcessing
     ? [
-        // Committed messages
+        // Committed messages (kept in insertion order)
         ...turn.messages.map((message, index) => ({
           kind: 'message' as const,
           key: `msg-${message.id}`,
@@ -139,22 +153,28 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
           timestamp: message.timestamp,
           message,
         })),
-        // Runtime steps (streaming)
-        ...orderedRuntimeSteps.map((step, index) => ({
-          kind: 'runtime' as const,
-          key: `step-${step.id}`,
-          order: index,
-          timestamp:
-            typeof step.timestamp === 'number'
-              ? step.timestamp
-              : turn.timestamp + index + 1,
-          step,
-        })),
+        // Runtime steps sorted by timestamp within their group.
+        // Committed messages come first (stable), then runtime steps are
+        // ordered by timestamp so that e.g. compression cards appear before
+        // the tool calls that follow them.  A full cross-group timestamp
+        // sort is intentionally avoided because it caused tool_call cards to
+        // jump above committed text when message_end had a later timestamp
+        // than tool_start.
+        ...[...orderedRuntimeSteps]
+          .map((step, index) => ({
+            kind: 'runtime' as const,
+            key: `step-${step.id}`,
+            order: index,
+            timestamp:
+              typeof step.timestamp === 'number'
+                ? step.timestamp
+                : turn.timestamp + index + 1,
+            step,
+          }))
+          .sort((a, b) => a.timestamp - b.timestamp),
       ]
-      // Keep original insertion order: committed messages first, then runtime steps.
-      // Previously sorted by timestamp which caused tool_call cards to jump above
-      // committed text when the message_end timestamp was later than tool_start.
-      // This ensures the UI order matches the LLM output order.
+      // No global timestamp sort — committed messages are stable at the top,
+      // runtime steps are sorted amongst themselves.
     : []
   const hasCurrentToolCallInRuntimeSteps = !!(
     currentToolCall &&
