@@ -10,7 +10,7 @@ export const extension = {
   guideTitle: "Install CreatorWeave Browser Extension",
   guideSubtitle: "Connect your AI assistant to the internet",
   guideAlreadyInstalled: "Already installed?",
-  verifyInstallLink: "Verify installation",
+  verifyInstallLink: "Refresh Page",
   estimatedTime: "Estimated time: 3-5 minutes",
   prerequisite: "You'll need: Chrome or Edge browser",
   previewNote: "The extension is currently in developer preview and requires manual installation (no coding needed)",
@@ -24,13 +24,13 @@ export const extension = {
   stepDownload: "Download",
   stepExtract: "Extract",
   stepInstall: "Install",
-  stepVerify: "Verify",
+  stepRefresh: "Refresh",
 
   stepIntroDesc: "Learn what this extension can do",
   stepDownloadDesc: "Download the extension package",
   stepExtractDesc: "Extract the downloaded file",
   stepInstallDesc: "Load the extension in your browser",
-  stepVerifyDesc: "Confirm the installation",
+  stepRefreshDesc: "Refresh the page to activate",
 
   // Download step
   downloadButton: "Download Extension Package",
@@ -53,8 +53,8 @@ export const extension = {
   installStepCSelect: "Select the extracted chrome-extension folder",
   installSuccessHint: "You should see \"CreatorWeave\" appear in the extensions list",
 
-  // Verify step
-  verifyTitle: "Verify Installation",
+  // Verify step (kept for backwards compat)
+  verifyTitle: "Refresh the Page",
   verifyChecking: "Detecting extension status...",
   verifySuccess: "Extension is ready!",
   verifyFailed: "Extension not detected",
@@ -63,6 +63,13 @@ export const extension = {
   verifyTroubleshoot1: "Make sure the extension is enabled in chrome://extensions",
   verifyTroubleshoot2: "Try refreshing this page and checking again",
   verifyTroubleshoot3: "Confirm you selected the correct extracted folder",
+
+  // Refresh step
+  refreshTitle: "Final Step: Refresh the Page",
+  refreshDescription: "The extension needs a page refresh to take effect. Click the button below to reload.",
+  refreshButton: "Refresh Page",
+  refreshHint: "After refreshing, the extension will be active and you can start using web search.",
+  refreshPageLink: "Refresh Page",
 
   // Success
   successTitle: "Installation Successful!",

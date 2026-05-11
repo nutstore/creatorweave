@@ -2,10 +2,10 @@
  * ExtensionInstallGuide — full-screen modal that walks users through
  * installing the browser extension step-by-step.
  *
- * 5 steps: Intro → Download → Extract → Install → Verify
+ * 5 steps: Intro → Download → Extract → Install → Refresh
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState } from 'react'
 import {
   Globe,
   Search,
@@ -14,13 +14,11 @@ import {
   Archive,
   Puzzle,
   CheckCircle2,
-  AlertCircle,
   Loader2,
   Copy,
   Check,
   ChevronLeft,
   ChevronRight,
-  PartyPopper,
   RefreshCw,
   X,
 } from 'lucide-react'
@@ -331,144 +329,44 @@ function StepInstall() {
 }
 
 // ---------------------------------------------------------------------------
-// Step 5: Verify
+// Step 5: Refresh Page
 // ---------------------------------------------------------------------------
 
-function StepVerify({ onVerified }: { onVerified: () => void }) {
+function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
   const t = useT()
-  const status = useExtensionStore((s) => s.status)
-  const checkStatus = useExtensionStore((s) => s.checkStatus)
-  const [verifying, setVerifying] = useState(false)
-  const [verified, setVerified] = useState(false)
-  const [showTroubleshoot, setShowTroubleshoot] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const startPolling = useCallback(() => {
-    setVerifying(true)
-    intervalRef.current = setInterval(() => {
-      const newStatus = checkStatus()
-      if (newStatus === 'installed') {
-        setVerified(true)
-        setVerifying(false)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-        onVerified()
-      }
-    }, 2000)
-  }, [checkStatus, onVerified])
-
-  // Auto-start polling on mount
-  useEffect(() => {
-    // Check immediately
-    const current = checkStatus()
-    if (current === 'installed') {
-      setVerified(true)
-      onVerified()
-    } else {
-      startPolling()
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-  }, [checkStatus, startPolling, onVerified])
-
-  // Timeout after 60s
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (verifying) {
-        setVerifying(false)
-        if (intervalRef.current) clearInterval(intervalRef.current)
-      }
-    }, 60000)
-    return () => clearTimeout(timeout)
-  }, [verifying])
-
-  const handleRetry = () => {
-    setShowTroubleshoot(false)
-    startPolling()
-  }
-
-  if (verified) {
-    return (
-      <div className="space-y-5 py-4">
-        <div className="flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
-            <PartyPopper className="h-8 w-8 text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-        <div className="text-center">
-          <h3 className="text-lg font-semibold text-green-700 dark:text-green-300">
-            🎉 {t('extension.successTitle')}
-          </h3>
-          <p className="mt-2 text-sm text-secondary dark:text-neutral-300">
-            {t('extension.successDescription')}
-          </p>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
-          {verifying ? (
-            <Loader2 className="h-7 w-7 animate-spin text-blue-600 dark:text-blue-400" />
-          ) : (
-            <AlertCircle className="h-7 w-7 text-amber-600 dark:text-amber-400" />
-          )}
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
+          <RefreshCw className="h-8 w-8 text-green-600 dark:text-green-400" />
         </div>
       </div>
 
       <div className="text-center">
-        <h3 className="text-sm font-medium text-secondary dark:text-neutral-200">
-          {t('extension.verifyTitle')}
+        <h3 className="text-lg font-semibold text-secondary dark:text-neutral-100">
+          {t('extension.refreshTitle')}
         </h3>
-        {verifying && (
-          <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-            {t('extension.verifyChecking')}
-          </p>
-        )}
-        {!verifying && !verified && (
-          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-            {t('extension.verifyFailed')}
-          </p>
-        )}
+        <p className="mt-2 text-sm text-secondary dark:text-neutral-300">
+          {t('extension.refreshDescription')}
+        </p>
       </div>
 
-      {!verifying && (
-        <div className="space-y-2">
-          <button
-            type="button"
-            onClick={handleRetry}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t('extension.verifyRetry')}
-          </button>
+      <button
+        type="button"
+        onClick={onRefresh}
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+      >
+        <RefreshCw className="h-4 w-4" />
+        {t('extension.refreshButton')}
+      </button>
 
-          <button
-            type="button"
-            onClick={() => setShowTroubleshoot(!showTroubleshoot)}
-            className="w-full text-center text-xs text-tertiary hover:text-secondary dark:text-neutral-400 dark:hover:text-neutral-300"
-          >
-            {t('extension.verifyTroubleshootTitle')}
-          </button>
-
-          {showTroubleshoot && (
-            <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="text-xs text-secondary dark:text-neutral-300">
-                • {t('extension.verifyTroubleshoot1')}
-              </p>
-              <p className="text-xs text-secondary dark:text-neutral-300">
-                • {t('extension.verifyTroubleshoot2')}
-              </p>
-              <p className="text-xs text-secondary dark:text-neutral-300">
-                • {t('extension.verifyTroubleshoot3')}
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+        <span className="text-sm">💡</span>
+        <p className="text-xs text-amber-800 dark:text-amber-300">
+          {t('extension.refreshHint')}
+        </p>
+      </div>
     </div>
   )
 }
@@ -487,29 +385,14 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
   const installGuideStep = useExtensionStore((s) => s.installGuideStep)
   const goToStep = useExtensionStore((s) => s.goToStep)
   const closeInstallGuide = useExtensionStore((s) => s.closeInstallGuide)
-  const checkStatus = useExtensionStore((s) => s.checkStatus)
-  const [verified, setVerified] = useState(false)
-
-  // Reset verified state when dialog opens
-  useEffect(() => {
-    if (open) {
-      setVerified(false)
-      // Check if already installed
-      const status = checkStatus()
-      if (status === 'installed') {
-        setVerified(true)
-      }
-    }
-  }, [open, checkStatus])
 
   const handleClose = () => {
     closeInstallGuide()
     onOpenChange(false)
   }
 
-  const handleVerified = () => {
-    setVerified(true)
-    goToStep(5)
+  const handleRefresh = () => {
+    window.location.reload()
   }
 
   const stepLabels = [
@@ -517,7 +400,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
     t('extension.stepDownload'),
     t('extension.stepExtract'),
     t('extension.stepInstall'),
-    t('extension.stepVerify'),
+    t('extension.stepRefresh'),
   ]
 
   return (
@@ -546,14 +429,10 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
             <StepIndicator current={installGuideStep} total={TOTAL_STEPS} />
             <button
               type="button"
-              onClick={() => {
-                goToStep(5)
-                const s = checkStatus()
-                if (s === 'installed') setVerified(true)
-              }}
+              onClick={() => goToStep(5)}
               className="text-xs text-blue-600 hover:underline dark:text-blue-400"
             >
-              {t('extension.verifyInstallLink')}
+              {t('extension.refreshPageLink')}
             </button>
           </div>
           <div className="mt-2 flex gap-1 overflow-x-auto">
@@ -580,7 +459,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
           {installGuideStep === 2 && <StepDownload />}
           {installGuideStep === 3 && <StepExtract />}
           {installGuideStep === 4 && <StepInstall />}
-          {installGuideStep === 5 && <StepVerify onVerified={handleVerified} />}
+          {installGuideStep === 5 && <StepRefresh onRefresh={handleRefresh} />}
         </div>
 
         {/* Navigation */}
