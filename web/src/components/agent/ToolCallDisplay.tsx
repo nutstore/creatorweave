@@ -230,8 +230,8 @@ export function ToolCallDisplay({
         </span>
       </button>
 
-      {/* SubAgent progress section — visible when expanded */}
-      {expanded && isSubagentTool && subagentEvents && subagentEvents.length > 0 && (
+      {/* SubAgent progress section — always visible */}
+      {isSubagentTool && subagentEvents && subagentEvents.length > 0 && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <SubagentProgressSection events={subagentEvents} />
         </div>

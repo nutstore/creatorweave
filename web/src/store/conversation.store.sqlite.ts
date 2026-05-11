@@ -2335,38 +2335,56 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             agentMode,
           },
           onNotification: (event: SubagentTaskNotification) => {
+            // Helper: find the spawn_subagent/batch_spawn step in a draftAssistant
+            const findSpawnStep = (draft: { activeToolStepId?: string | null; steps: DraftAssistantStep[] } | null): DraftAssistantStep | undefined => {
+              if (!draft) return undefined
+              // Primary: try activeToolStepId (fast path)
+              if (draft.activeToolStepId) {
+                const activeStep = draft.steps.find((s) => s.id === draft.activeToolStepId)
+                if (activeStep && activeStep.type === 'tool_call') {
+                  const name = activeStep.toolCall.function.name
+                  if (name === 'spawn_subagent' || name === 'batch_spawn') return activeStep
+                }
+              }
+              // Fallback: find most recent spawn step that is still streaming
+              for (let i = draft.steps.length - 1; i >= 0; i--) {
+                const step = draft.steps[i]
+                if (
+                  step.type === 'tool_call' &&
+                  step.streaming &&
+                  (step.toolCall.function.name === 'spawn_subagent' ||
+                    step.toolCall.function.name === 'batch_spawn')
+                ) return step
+              }
+              return undefined
+            }
+            const subagentEvent = {
+              agentId: event.agentId,
+              status: event.status,
+              summary: event.summary,
+              timestamp: event.timestamp,
+            }
+            // Update conversations store
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c) return
-              // Bridge to active tool step if spawn_subagent/batch_spawn is executing
-              if (c.draftAssistant?.activeToolStepId) {
-                const step = c.draftAssistant.steps.find(
-                  (s) => s.id === c.draftAssistant!.activeToolStepId
-                )
-                if (step && step.type === 'tool_call') {
-                  const name = step.toolCall.function.name
-                  if (name === 'spawn_subagent' || name === 'batch_spawn') {
-                    applyDraftAssistantEvent(c, {
-                      type: 'subagent_progress',
-                      agentId: event.agentId,
-                      status: event.status,
-                      summary: event.summary,
-                      timestamp: event.timestamp,
-                    })
-                    c.updatedAt = Date.now()
-                    return
-                  }
-                }
+              const targetStep = findSpawnStep(c.draftAssistant)
+              if (targetStep) {
+                if (!targetStep.subagentEvents) targetStep.subagentEvents = []
+                targetStep.subagentEvents.push(subagentEvent)
+                c.updatedAt = Date.now()
               }
-              // Fallback: plain text message for non-spawn notifications
-              const line = `[task_notification] ${event.status} ${event.agentId} - ${event.summary}`
-              c.messages.push(createAssistantMessage(line))
-              c.updatedAt = Date.now()
             })
-            const snapshot = get().conversations.find((c) => c.id === conversationId)
-            if (snapshot) {
-              void persistMessageReplace(conversationId, snapshot.messages, false)
-            }
+            // Mirror to runtime store (UI reads draftAssistant from runtime store)
+            useConversationRuntimeStore.setState((state) => {
+              const r = state.runtimes.get(conversationId)
+              if (!r) return
+              const targetStep = findSpawnStep(r.draftAssistant)
+              if (targetStep) {
+                if (!targetStep.subagentEvents) targetStep.subagentEvents = []
+                targetStep.subagentEvents.push(subagentEvent)
+              }
+            })
           },
         })
 
