@@ -392,7 +392,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Waiting indicator - three pulsing dots while waiting for next model response */}
         {isWaiting && !currentToolCall && !isStreamingReasoning && !isStreamingContent && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
             <span className="flex items-center gap-1.5">
               <span
                 className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
@@ -465,11 +465,11 @@ const StreamingContentSection = memo(function StreamingContentSection({
 
       {/* Content */}
       {content && (
-        <div className="rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+        <div className="rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
           {lightweight ? (
             <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
           ) : (
-            <div className="prose-sm max-w-prose overflow-x-auto break-words">
+            <div className="prose max-w-prose overflow-x-auto break-words">
               <MarkdownContent content={content} />
             </div>
           )}
@@ -523,12 +523,12 @@ const AssistantStep = memo(function AssistantStep({
             <div
               className={
                 isContextSummary
-                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'
+                  ? 'rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-base text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'
                   : isWorkflowDryRun
-                    ? 'rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100'
+                    ? 'rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-base text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100'
                     : isWorkflowRealRun
-                      ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100'
-                      : 'rounded-lg bg-white px-4 py-2 text-sm text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
+                      ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100'
+                      : 'rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
               }
             >
               {isContextSummary && (
@@ -557,7 +557,7 @@ const AssistantStep = memo(function AssistantStep({
                 </div>
               )}
               {isWorkflowRealRun && <WorkflowRealRunHeader payload={message.workflowRealRun} />}
-              <div className="prose-sm max-w-prose overflow-x-auto break-words">
+              <div className="prose max-w-prose overflow-x-auto break-words">
                 <MarkdownContent content={message.content!} />
               </div>
             </div>

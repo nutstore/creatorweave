@@ -343,6 +343,11 @@
   animation: edge-flow 0.8s linear infinite;
 }
 
+/* ── MessageNavBar: hover-expand dots ── */
+.msg-nav-rail:hover .msg-nav-dots {
+  opacity: 1;
+}
+
 /* ── Documentation Content Styles ── */
 .docs-content {
   /* Typography */
