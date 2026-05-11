@@ -34,6 +34,7 @@ import {
   ContextMenuTrigger,
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
@@ -538,8 +539,23 @@ export const Sidebar = memo(function Sidebar({
   const setActive = useConversationStore((s) => s.setActive)
   const deleteConversation = useConversationStore((s) => s.deleteConversation)
   const deleteConversations = useConversationStore((s) => s.deleteConversations)
-  const isConversationRunning = useConversationStore((s) => s.isConversationRunning)
   const updateTitle = useConversationStore((s) => s.updateTitle)
+
+  // Subscribe to runtime store for running status — this ensures Sidebar
+  // re-renders when agent status changes (idle → pending → streaming → idle),
+  // without subscribing to high-frequency streaming deltas.
+  const runningConversationIds = useConversationRuntimeStore(
+    useShallow((s) => {
+      const running: string[] = []
+      s.runtimes.forEach((rt, id) => {
+        if (rt.status !== 'idle' && rt.status !== 'error') {
+          running.push(id)
+        }
+      })
+      return running
+    })
+  )
+  const runningSet = useMemo(() => new Set(runningConversationIds), [runningConversationIds])
 
   // Multi-root: get all roots from folder-access store
   const roots = useFolderAccessStore((state) => state.roots)
@@ -958,7 +974,7 @@ export const Sidebar = memo(function Sidebar({
 
           <div className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
             {displayedConversations.map((conv) => {
-              const isRunning = isConversationRunning(conv.id)
+              const isRunning = runningSet.has(conv.id)
               const isActive = conv.id === activeConversationId
               const pendingReviewCount = pendingCountByConversationId.get(conv.id) || 0
               const isEditing = editingId === conv.id
