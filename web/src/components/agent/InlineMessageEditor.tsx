@@ -488,8 +488,7 @@ export function InlineMessageEditor({
   }
 
   const currentText = editor ? getPlainText(editor).trim() : ''
-  const normalizedInitial = initialContent.trim()
-  const canSubmit = currentText.length > 0 && currentText !== normalizedInitial
+  const canSubmit = currentText.length > 0
   const showSuggestion = suggestionItems.length > 0 && !!suggestionCommand
   const showFileSuggestion = fileSuggestionItems.length > 0 && !!fileSuggestionCommand
 

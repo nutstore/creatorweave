@@ -96,7 +96,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   const handleSubmitEdit = (newContent: string) => {
     const trimmed = newContent.trim()
-    if (trimmed && trimmed !== message.content && onEditAndResend) {
+    if (trimmed && onEditAndResend) {
       onEditAndResend(message.id, trimmed)
     }
     setIsEditing(false)

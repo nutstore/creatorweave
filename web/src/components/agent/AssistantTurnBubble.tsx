@@ -89,6 +89,14 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
     turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])
   )
   const draftToolCalls = (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id))
+  // Collect committed content/reasoning to deduplicate against runtime steps.
+  // When a content_complete fires, the runtime step is kept (to avoid a render gap),
+  // but the committed message already contains the same content. Without dedup,
+  // both render: the runtime step as plain text (lightweight=true) and the
+  // committed message as full Markdown — causing "duplicate text block" glitch.
+  const committedHasContent = turn.messages.some((msg) => !!msg.content)
+  const committedHasReasoning = turn.messages.some((msg) => !!msg.reasoning)
+
   const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
     // Streaming steps are always visible — they represent in-progress content
     if (step.streaming) return true
@@ -96,9 +104,13 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
     if (step.type === 'tool_call') {
       return !committedToolCallIds.has(step.toolCall.id)
     }
-    // Completed reasoning/content/compression steps: keep visible during the
-    // agent loop. They are only cleared when the loop finishes and the final
-    // message is committed (which sets draftAssistant = null, clearing all steps).
+    // Completed content step: hide if a committed message already has content.
+    // This prevents showing both a lightweight plain-text step AND a full
+    // Markdown-rendered committed message with identical content.
+    if (step.type === 'content' && committedHasContent) return false
+    // Completed reasoning step: same dedup logic.
+    if (step.type === 'reasoning' && committedHasReasoning) return false
+    // Compression steps: always keep visible (no committed equivalent).
     return true
   })
   const hasCurrentToolCallInDraft = !!(
@@ -138,12 +150,11 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               : turn.timestamp + index + 1,
           step,
         })),
-      ].sort((a, b) => {
-        // Global sort: mix committed messages and runtime steps by timestamp
-        // so they appear in chronological order (interleaved), not grouped by type.
-        if (a.timestamp !== b.timestamp) return a.timestamp - b.timestamp
-        return a.order - b.order
-      })
+      ]
+      // Keep original insertion order: committed messages first, then runtime steps.
+      // Previously sorted by timestamp which caused tool_call cards to jump above
+      // committed text when the message_end timestamp was later than tool_start.
+      // This ensures the UI order matches the LLM output order.
     : []
   const hasCurrentToolCallInRuntimeSteps = !!(
     currentToolCall &&
