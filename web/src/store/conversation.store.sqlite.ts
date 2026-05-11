@@ -945,6 +945,9 @@ interface ConversationState {
   setSuggestedFollowUp: (conversationId: string, suggestion: string) => void
   clearSuggestedFollowUp: (conversationId: string) => void
   getSuggestedFollowUp: (conversationId: string) => string
+
+  // Emergency draft persistence (beforeunload)
+  commitAndPersistRunningDrafts: () => void
 }
 
 export const useConversationStoreSQLite = create<ConversationState>()(
@@ -1741,6 +1744,31 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           }
         })
 
+        // Also set run state on the main conversation store so that
+        // commitAndPersistRunningDrafts (used by beforeunload/pagehide handlers)
+        // can correctly detect running conversations and save streaming drafts.
+        set((state) => {
+          const c = state.conversations.find((c) => c.id === conversationId)
+          if (c) {
+            c.activeRunId = runId
+            c.status = 'pending'
+            c.error = null
+            c.draftAssistant = {
+              reasoning: '',
+              content: '',
+              toolCalls: [],
+              toolResults: {},
+              toolCall: null,
+              toolArgs: '',
+              steps: [],
+              activeReasoningStepId: null,
+              activeContentStepId: null,
+              activeToolStepId: null,
+              activeCompressionStepId: null,
+            }
+          }
+        })
+
         const isCurrentRun = () => {
           const rt = useConversationRuntimeStore.getState().runtimes.get(conversationId)
           return !!rt && rt.activeRunId === runId && (rt.runEpoch || 0) === runEpoch
@@ -1748,6 +1776,21 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         const failRunEarly = (message: string) => {
           if (!isCurrentRun()) return
+          set((state) => {
+            const c = state.conversations.find((c) => c.id === conversationId)
+            if (c && c.activeRunId === runId) {
+              c.status = 'error'
+              c.error = message
+              c.activeRunId = null
+              c.draftAssistant = null
+              c.currentToolCall = null
+              c.activeToolCalls = []
+              c.streamingToolArgs = ''
+              c.streamingToolArgsByCallId = {}
+              c.streamingContent = ''
+              c.streamingReasoning = ''
+            }
+          })
           useConversationRuntimeStore.setState((state) => {
             const r = ensureRuntime(state, conversationId)
             if (r.activeRunId !== runId) return
@@ -3834,6 +3877,89 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
     getSuggestedFollowUp: (conversationId: string) => {
       return get().suggestedFollowUps.get(conversationId) || ''
+    },
+
+    /**
+     * Emergency draft persistence for beforeunload.
+     *
+     * When the page is about to close/refresh, this commits any in-flight
+     * streaming drafts into conversation messages and triggers persistence.
+     * This prevents content loss if the user refreshes the page.
+     *
+     * Must be called synchronously from beforeunload/pagehide.
+     * The async persist calls are fire-and-forget — the browser will
+     * typically let in-flight IndexedDB writes complete.
+     */
+    commitAndPersistRunningDrafts: () => {
+      const state = get()
+      const runningConvs = state.conversations.filter((c) => !!c.activeRunId)
+      if (runningConvs.length === 0) return
+
+      // Collect messages to persist for each running conversation.
+      // We use set() to properly mutate through immer and collect the
+      // resulting messages for persistence.
+      const toPersist: Array<{ convId: string; messages: Message[] }> = []
+
+      // Phase 1: Flush streaming queues OUTSIDE of set() so that the runtime
+      // store's draftAssistant is fully up-to-date before we read it.
+      // flushNow() is synchronous — it cancels pending RAF and invokes callbacks
+      // which call useConversationRuntimeStore.setState() synchronously.
+      for (const convRef of runningConvs) {
+        const queues = state.streamingQueues.get(convRef.id)
+        if (queues) {
+          queues.reasoning.flushNow()
+          queues.content.flushNow()
+        }
+      }
+
+      // Phase 2: Now read the (freshly flushed) runtime draft and commit.
+      set((draft) => {
+        for (const convRef of runningConvs) {
+          const c = draft.conversations.find((x) => x.id === convRef.id)
+          if (!c) continue
+
+          // Sync runtime draft to main store (same pattern as cancelAgent)
+          const rtDraft =
+            useConversationRuntimeStore.getState().runtimes.get(c.id)?.draftAssistant
+          if (rtDraft && !c.draftAssistant) {
+            c.draftAssistant = rtDraft
+          }
+
+          // Commit draft into messages
+          const committed = commitDraftToMessages(c)
+          if (committed) {
+            c.updatedAt = Date.now()
+            // Clean up streaming/draft UI state
+            c.draftAssistant = null
+            c.currentToolCall = null
+            c.activeToolCalls = []
+            c.streamingToolArgs = ''
+            c.streamingToolArgsByCallId = {}
+            c.streamingContent = ''
+            c.streamingReasoning = ''
+            c.isContentStreaming = false
+            c.isReasoningStreaming = false
+            c.status = 'idle'
+            c.error = null
+            c.activeRunId = null
+
+            toPersist.push({ convId: c.id, messages: [...c.messages] })
+          }
+        }
+      })
+
+      // Persist outside of set() — fire-and-forget async writes
+      for (const { convId, messages } of toPersist) {
+        persistMessageReplace(convId, messages, true).catch((err) => {
+          console.error(
+            '[conversation.store] Failed to persist draft on beforeunload:',
+            err,
+          )
+        })
+        console.info(
+          `[conversation.store] Saved streaming draft for conversation ${convId} on page unload`,
+        )
+      }
     },
   }))
 )
