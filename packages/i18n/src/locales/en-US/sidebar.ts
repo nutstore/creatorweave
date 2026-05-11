@@ -169,17 +169,7 @@ export const sidebar = {
       copyCommentsToAI: "Send to AI",
       commentsSummary: "{files} files with comments, {comments} total",
       close: "Close",
-      // AI review prompt
-      reviewPromptIntro:
-        "Please review the following file snapshot and provide modification suggestions:",
-      file: "File",
-      changeType: "Change Type",
-      snapshot: "Snapshot",
-      recordedAt: "Recorded at",
-      reviewOutput: "Please output:",
-      issueList: "Issue list (by severity)",
-      actionableSuggestions: "Directly actionable modification suggestions",
-      codePatch: "If code changes are needed, provide minimal patch",
+      
       noWorkspace: "No active workspace",
       // Error messages
       loadFailedError: "Failed to load file",

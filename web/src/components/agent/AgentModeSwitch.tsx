@@ -12,7 +12,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@creatorweave/ui'
-import { getModeDescription, type AgentMode } from '@/agent/agent-mode'
+import { type AgentMode } from '@/agent/agent-mode'
+import { useT } from '@/i18n'
 
 export interface AgentModeSwitchProps {
   /** Current mode */
@@ -27,8 +28,6 @@ export interface AgentModeSwitchProps {
 
 const MODE_CONFIG = {
   plan: {
-    label: 'Plan',
-    description: 'Read-only analysis mode',
     // Subtle amber/ochre for "contemplation"
     bgLight: 'bg-amber-50',
     bgDark: 'dark:bg-amber-950/40',
@@ -42,8 +41,6 @@ const MODE_CONFIG = {
     accentBorder: 'border-amber-300/50',
   },
   act: {
-    label: 'Act',
-    description: 'Full read/write access',
     // Confident blue for "action"
     bgLight: 'bg-blue-50',
     bgDark: 'dark:bg-blue-950/40',
@@ -119,6 +116,10 @@ export function AgentModeSwitchCompact({
   const config = MODE_CONFIG[mode]
   const nextMode: AgentMode = mode === 'plan' ? 'act' : 'plan'
   const nextConfig = MODE_CONFIG[nextMode]
+  const t = useT()
+
+  const modeLabel = mode === 'plan' ? t('agent.mode.plan') : t('agent.mode.act')
+  const nextModeLabel = nextMode === 'plan' ? t('agent.mode.plan') : t('agent.mode.act')
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -141,7 +142,7 @@ export function AgentModeSwitchCompact({
               }
               ${className}
             `}
-            aria-label={`Current: ${mode === 'plan' ? 'Plan' : 'Act'} mode. Click to switch.`}
+            aria-label={t('agent.mode.currentAriaLabel', { mode: modeLabel })}
           >
             {/* Icon */}
             {mode === 'plan' ? (
@@ -151,7 +152,7 @@ export function AgentModeSwitchCompact({
             )}
 
             {/* Label */}
-            <span>{config.label}</span>
+            <span>{modeLabel}</span>
 
             {/* Divider line */}
             <span className="mx-0.5 h-3 w-px bg-current opacity-20" />
@@ -200,10 +201,10 @@ export function AgentModeSwitchCompact({
               </div>
               <div className="flex-1">
                 <div className={`text-sm font-bold uppercase tracking-wide ${config.textLight} ${config.textDark}`}>
-                  {config.label} Mode
+                  {mode === 'plan' ? t('agent.mode.planModeTitle') : t('agent.mode.actModeTitle')}
                 </div>
                 <div className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  {mode === 'plan' ? 'Read-only analysis' : 'Full access enabled'}
+                  {mode === 'plan' ? t('agent.mode.planShort') : t('agent.mode.actShort')}
                 </div>
               </div>
             </div>
@@ -211,7 +212,7 @@ export function AgentModeSwitchCompact({
             {/* Description */}
             <div className="border-t border-neutral-100 px-4 py-3 dark:border-neutral-800">
               <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-300">
-                {getModeDescription(mode)}
+                {mode === 'plan' ? t('agent.mode.planDescription') : t('agent.mode.actDescription')}
               </p>
             </div>
 
@@ -226,10 +227,10 @@ export function AgentModeSwitchCompact({
               >
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    Switch to
+                    {t('agent.mode.switchTo')}
                   </span>
                   <span className={`text-xs font-semibold uppercase ${nextConfig.textLight} ${nextConfig.textDark}`}>
-                    {nextConfig.label}
+                    {nextModeLabel}
                   </span>
                 </div>
                 <ArrowIcon className={`h-3.5 w-3.5 ${nextConfig.textLight} ${nextConfig.textDark} opacity-60`} />
@@ -256,6 +257,7 @@ export function AgentModeSwitch({
   const isAct = mode === 'act'
   const planConfig = MODE_CONFIG.plan
   const actConfig = MODE_CONFIG.act
+  const t = useT()
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -281,14 +283,14 @@ export function AgentModeSwitch({
               `}
             >
               <PlanIcon className="h-3.5 w-3.5" />
-              <span>Plan</span>
+              <span>{t('agent.mode.plan')}</span>
             </div>
 
             <BrandSwitch
               checked={isAct}
               onCheckedChange={(checked) => onModeChange(checked ? 'act' : 'plan')}
               disabled={disabled}
-              aria-label={`Switch to ${isAct ? 'Plan' : 'Act'} mode`}
+              aria-label={t('agent.mode.switchAriaLabel', { mode: isAct ? t('agent.mode.plan') : t('agent.mode.act') })}
               className="data-[state=checked]:bg-blue-600 data-[state=unchecked]:bg-amber-500"
             />
 
@@ -303,7 +305,7 @@ export function AgentModeSwitch({
               `}
             >
               <ActIcon className="h-3.5 w-3.5" />
-              <span>Act</span>
+              <span>{t('agent.mode.act')}</span>
             </div>
           </div>
         </TooltipTrigger>
@@ -337,10 +339,10 @@ export function AgentModeSwitch({
               </div>
               <div className="flex-1">
                 <div className={`text-sm font-bold uppercase tracking-wide ${isAct ? `${actConfig.textLight} ${actConfig.textDark}` : `${planConfig.textLight} ${planConfig.textDark}`}`}>
-                  {mode} Mode
+                  {isAct ? t('agent.mode.actModeTitle') : t('agent.mode.planModeTitle')}
                 </div>
                 <div className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
-                  {mode === 'plan' ? 'Read-only' : 'Full access'}
+                  {mode === 'plan' ? t('agent.mode.planReadonly') : t('agent.mode.actFullAccess')}
                 </div>
               </div>
             </div>

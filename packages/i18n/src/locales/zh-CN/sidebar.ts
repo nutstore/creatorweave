@@ -161,16 +161,7 @@ export const sidebar = {
       copyCommentsToAI: "发给 AI",
       commentsSummary: "{files} 个文件有评论，共 {comments} 条",
       close: "关闭",
-      // AI review prompt
-      reviewPromptIntro: "请基于下面这个文件快照做审阅并给出修改建议：",
-      file: "文件",
-      changeType: "变更类型",
-      snapshot: "快照",
-      recordedAt: "记录时间",
-      reviewOutput: "请输出：",
-      issueList: "问题清单（按严重度）",
-      actionableSuggestions: "可直接执行的修改建议",
-      codePatch: "如需改代码，请给出最小改动补丁",
+      
       noWorkspace: "未激活的工作区",
       // Error messages
       loadFailedError: "加载文件失败",

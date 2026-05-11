@@ -158,17 +158,7 @@ export const sidebar = {
       copyCommentsToAI: "AIに送信",
       commentsSummary: "{files} ファイルにコメントあり、合計 {comments} 件",
       close: "閉じる",
-      // AI review prompt
-      reviewPromptIntro:
-        "以下のファイルスナップショットをレビューして修正提案をください：",
-      file: "ファイル",
-      changeType: "変更タイプ",
-      snapshot: "スナップショット",
-      recordedAt: "記録時間",
-      reviewOutput: "以下を出力してください：",
-      issueList: "問題リスト（重大度順）",
-      actionableSuggestions: "直接実行可能な修正提案",
-      codePatch: "コード変更が必要な場合は、最小限のパッチを提供してください",
+      
       noWorkspace: "アクティブなワークスペースがありません",
       // Error messages
       loadFailedError: "ファイルの読み込みに失敗しました",

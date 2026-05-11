@@ -158,17 +158,7 @@ export const sidebar = {
       copyCommentsToAI: "AI에 보내기",
       commentsSummary: "{files}개 파일에 댓글 있음, 총 {comments}개",
       close: "닫기",
-      // AI review prompt
-      reviewPromptIntro:
-        "다음 파일 스냅샷을 검토하고 수정 제안을 제공해 주세요:",
-      file: "파일",
-      changeType: "변경 유형",
-      snapshot: "스냅샷",
-      recordedAt: "기록 시간",
-      reviewOutput: "다음을 출력해 주세요:",
-      issueList: "문제 목록 (심각도순)",
-      actionableSuggestions: "직접 실행 가능한 수정 제안",
-      codePatch: "코드 변경이 필요한 경우 최소 패치를 제공하세요",
+      
       noWorkspace: "활성 워크스페이스 없음",
       // Error messages
       loadFailedError: "파일 불러오기 실패",

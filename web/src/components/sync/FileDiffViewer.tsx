@@ -17,7 +17,7 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFSMultiRoot,
 } from '@/opfs'
-import { Columns2, UnfoldVertical, Copy, X, MousePointer2, FileText } from 'lucide-react'
+import { Columns2, UnfoldVertical, X, MousePointer2, FileText } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
 
@@ -444,46 +444,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     }))
   }
 
-  const copySnapshotTemplateForLLM = async () => {
-    if (!isSnapshotMode || !fileChange) return
-
-    const beforeType = snapshotDiff?.beforeKind === 'binary' ? 'binary' : snapshotDiff?.beforeKind === 'text' ? 'text' : 'none'
-    const afterType = snapshotDiff?.afterKind === 'binary' ? 'binary' : snapshotDiff?.afterKind === 'text' ? 'text' : 'none'
-
-    const beforeContent = beforeType === 'text' ? (snapshotDiff?.originalText || '') : `[${beforeType}]`
-    const afterContent = afterType === 'text' ? (snapshotDiff?.modifiedText || '') : `[${afterType}]`
-
-    const template = [
-      t('sidebar.fileDiffViewer.reviewPromptIntro'),
-      `${t('sidebar.fileDiffViewer.file')}: ${fileChange.path}`,
-      `${t('sidebar.fileDiffViewer.changeType')}: ${fileChange.type}`,
-      `${t('sidebar.fileDiffViewer.snapshot')}: ${snapshotDiff?.snapshotTitle || '-'}`,
-      `${t('sidebar.fileDiffViewer.recordedAt')}: ${formatTime(snapshotDiff?.capturedAt)}`,
-      `before(${beforeType}, ${formatSize(snapshotDiff?.beforeSize)}):`,
-      '```',
-      beforeContent,
-      '```',
-      `after(${afterType}, ${formatSize(snapshotDiff?.afterSize)}):`,
-      '```',
-      afterContent,
-      '```',
-      t('sidebar.fileDiffViewer.reviewOutput'),
-      `1) ${t('sidebar.fileDiffViewer.issueList')}`,
-      `2) ${t('sidebar.fileDiffViewer.actionableSuggestions')}`,
-      `3) ${t('sidebar.fileDiffViewer.codePatch')}`,
-    ].join('\n')
-
-    try {
-      await navigator.clipboard.writeText(template)
-    } catch {
-      const textArea = document.createElement('textarea')
-      textArea.value = template
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-    }
-  }
+  
 
   const renderTextDiff = () => {
     if (hasBinarySnapshot) {
@@ -832,16 +793,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               </TooltipProvider>
             </>
           )}
-          {isSnapshotMode && (
-            <button
-              type="button"
-              onClick={copySnapshotTemplateForLLM}
-              className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
-            >
-              <Copy className="h-3 w-3" />
-              {t('sidebar.fileDiffViewer.template')}
-            </button>
-          )}
+          
 
         </div>
       </div>

@@ -25,11 +25,10 @@ import {
   BrandDialogBody,
   BrandDialogFooter,
 } from '@creatorweave/ui'
-import { RefreshCw, Sparkles, ChevronRight, X, Check, AlertTriangle } from 'lucide-react'
+import { RefreshCw, ChevronRight, X, Check, AlertTriangle } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
-import { sendChangeReviewToConversation, ReviewErrorKey } from './review-request'
 import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { toast } from 'sonner'
@@ -98,7 +97,6 @@ export function PendingSyncPanel() {
   const [snapshotSummary, setSnapshotSummary] = useState('')
   const [generatingSummary, setGeneratingSummary] = useState(false)
   const [summaryError, setSummaryError] = useState<string | null>(null)
-  const [isReviewing, setIsReviewing] = useState(false)
   const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
   const [conflictQueue, setConflictQueue] = useState<ConflictDetail[]>([])
   const [conflictIndex, setConflictIndex] = useState(0)
@@ -601,35 +599,6 @@ export function PendingSyncPanel() {
     setSkippedConflictPaths(new Set())
   }, [])
 
-  const handleReview = useCallback(async () => {
-    if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
-
-    const filesToReview = selectedItems.size > 0
-      ? pendingChanges.changes.filter((c) => selectedItems.has(c.path))
-      : pendingChanges.changes
-
-    if (filesToReview.length === 0) return
-
-    setIsReviewing(true)
-    try {
-      await sendChangeReviewToConversation(filesToReview)
-      toast.success(t('settings.pendingSyncPanel.reviewRequestSent'))
-    } catch (error) {
-      let message = t('settings.pendingSyncPanel.sendReviewRequestFailed')
-      if (error instanceof Error) {
-        const errorKey = error.message as (typeof ReviewErrorKey)[keyof typeof ReviewErrorKey]
-        if (Object.values(ReviewErrorKey).includes(errorKey)) {
-          message = t(`settings.pendingSyncPanel.${errorKey}`)
-        } else {
-          message = error.message
-        }
-      }
-      toast.error(message)
-    } finally {
-      setIsReviewing(false)
-    }
-  }, [pendingChanges, selectedItems, isReviewing, t])
-
   // Show empty state when no pending changes
   if (isEmpty) {
     return (
@@ -693,24 +662,9 @@ export function PendingSyncPanel() {
           </div>
         }
         right={
-          <div className="flex items-center gap-1">
-            {selectedCount > 0 && (
-              <span className="text-xs text-secondary">{selectedCount}</span>
-            )}
-            <button
-              onClick={handleReview}
-              disabled={isSyncing || isReviewing}
-              className="h-6 w-6 flex items-center justify-center text-tertiary hover:text-primary transition-colors rounded hover:bg-hover/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              title={isReviewing ? t('settings.pendingSyncPanel.reviewInProgress') : t('settings.pendingSyncPanel.review')}
-              type="button"
-            >
-              {isReviewing ? (
-                <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Sparkles className="w-3 h-3" />
-              )}
-            </button>
-          </div>
+          selectedCount > 0 && (
+            <span className="text-xs text-secondary">{selectedCount}</span>
+          )
         }
       />
 
@@ -817,7 +771,7 @@ export function PendingSyncPanel() {
             variant="outline"
             className="h-8 flex-1 text-xs"
             onClick={() => setShowClearConfirm(true)}
-            disabled={isSyncing || isReviewing}
+            disabled={isSyncing}
             aria-label={t('settings.pendingSyncPanel.rejectAll')}
           >
             {t('settings.pendingSyncPanel.reject')}
@@ -826,7 +780,7 @@ export function PendingSyncPanel() {
             variant="primary"
             className="h-8 flex-1 text-xs"
             onClick={handleSync}
-            disabled={isSyncing || isReviewing || selectedCount === 0}
+            disabled={isSyncing || selectedCount === 0}
             aria-label={t('settings.pendingSyncPanel.approveSelected')}
           >
             {isSyncing ? (
