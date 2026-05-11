@@ -255,4 +255,87 @@ describe('AssistantTurnBubble timeline ordering', () => {
     const text = container.textContent || ''
     expect(text).toContain('Context compressed and summary generated')
   })
+
+  it('preserves committed message order even when context_summary timestamp is backdated', () => {
+    const { container } = render(
+      <AssistantTurnBubble
+        turn={{
+          type: 'assistant',
+          messages: [
+            {
+              id: 'assistant-before-summary',
+              role: 'assistant',
+              content: 'Current loop response body',
+              timestamp: 500,
+              toolCalls: [],
+            },
+            {
+              id: 'summary-backdated',
+              role: 'assistant',
+              content: 'Earlier conversation summary:\nBackdated summary',
+              kind: 'context_summary',
+              timestamp: 100,
+              toolCalls: [],
+            },
+          ],
+          timestamp: 500,
+          totalUsage: null,
+        }}
+        toolResults={new Map()}
+        isProcessing={true}
+      />
+    )
+
+    const text = container.textContent || ''
+    const responseIndex = text.indexOf('Current loop response body')
+    const summaryIndex = text.indexOf('Backdated summary')
+    expect(responseIndex).toBeGreaterThanOrEqual(0)
+    expect(summaryIndex).toBeGreaterThan(responseIndex)
+  })
+
+  it('keeps completed runtime content visible after previous content was already committed', () => {
+    const runtimeSteps: DraftAssistantStep[] = [
+      {
+        id: 'content-old',
+        timestamp: 120,
+        type: 'content',
+        content: 'Old runtime content',
+        streaming: false,
+      },
+      {
+        id: 'content-new',
+        timestamp: 220,
+        type: 'content',
+        content: 'New runtime content not yet committed',
+        streaming: false,
+      },
+    ]
+
+    const { container } = render(
+      <AssistantTurnBubble
+        turn={{
+          type: 'assistant',
+          messages: [
+            {
+              id: 'assistant-committed',
+              role: 'assistant',
+              content: 'Already committed content',
+              timestamp: 200,
+              toolCalls: [],
+            },
+          ],
+          timestamp: 200,
+          totalUsage: null,
+        }}
+        toolResults={new Map()}
+        isProcessing={true}
+        runtimeSteps={runtimeSteps}
+      />
+    )
+
+    const text = container.textContent || ''
+    expect(text).toContain('Already committed content')
+    expect(text).toContain('New runtime content not yet committed')
+    expect(text).not.toContain('Old runtime content')
+  })
 })

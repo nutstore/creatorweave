@@ -280,14 +280,25 @@ function ensureDraftAssistantForMessageStart(conv: DraftAssistantHolder): DraftA
     toolResults: previous?.toolResults ? { ...previous.toolResults } : {},
     toolCall: null,
     toolArgs: '',
-    // Preserve ALL steps from previous iterations so the timeline remains
-    // continuous across agent-loop iterations. Steps are only cleared when
-    // the entire run finishes (draftAssistant = null).
-    steps: previous?.steps ? [...previous.steps] : [],
+    // Preserve steps from previous iterations, but only those that are still
+    // actively streaming OR are tool_call/compression steps with results.
+    // Completed content/reasoning/compression steps from previous iterations
+    // are stale — their content has been persisted as committed messages.
+    steps: previous?.steps
+      ? previous.steps.filter((s) => {
+          // Always keep streaming steps (actively in-progress)
+          if (s.streaming) return true
+          // Keep tool_call steps (they show tool execution progress + results)
+          if (s.type === 'tool_call') return true
+          // Drop completed content, reasoning, and compression steps — they're
+          // now represented in committed messages via message_end → onMessagesUpdated
+          return false
+        })
+      : [],
     activeReasoningStepId: null,
     activeContentStepId: null,
     activeToolStepId: null,
-    activeCompressionStepId: previous?.activeCompressionStepId || null,
+    activeCompressionStepId: null,
   }
   conv.draftAssistant = next
   return next
@@ -3306,11 +3317,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isCurrentRun()) return
-            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
+            latestMessages = msgs
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c || c.activeRunId !== runId) return
-              c.messages = msgs.filter((msg) => msg.kind !== 'context_summary')
+              c.messages = msgs
               c.compressedContextSummary =
                 msgs.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
               c.compressedContextCutoffTimestamp =
@@ -3330,7 +3341,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               runId,
               messagesCount: msgs.length,
             })
-            latestMessages = msgs.filter((msg) => msg.kind !== 'context_summary')
+            latestMessages = msgs
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()

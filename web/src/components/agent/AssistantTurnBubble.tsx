@@ -1,8 +1,27 @@
 /**
  * AssistantTurnBubble - renders a grouped agent turn (one avatar, multiple steps, summary footer).
  *
- * Streaming state is passed as props and rendered as part of the current turn,
- * not as a separate component.
+ * Rendering model:
+ * ┌─────────────────────────────────────────────┐
+ * │  [avatar]  │  Step 1: reasoning (streaming)  │
+ * │            │  Step 2: content (committed)     │
+ * │            │  Step 3: tool_call (streaming)   │
+ * │            │  Step 4: compression (committed) │
+ * │            │  Step 5: content (streaming)     │
+ * │            │  ─── summary footer ───          │
+ * └─────────────────────────────────────────────┘
+ *
+ * A "step" is either:
+ * - A **committed message** (persisted, immutable) from `turn.messages`
+ * - A **runtime step** (streaming, mutable) from `draftAssistant.steps`
+ *
+ * During streaming (isProcessing=true on the last turn):
+ *   Committed messages + runtime steps are merged into a single timeline
+ *   sorted by timestamp. This allows context_summary, tool calls, and
+ *   compression cards to appear in chronological order.
+ *
+ * When not processing:
+ *   Only committed messages are rendered (no runtime steps).
  */
 
 import { memo, type ReactNode } from 'react'
@@ -21,6 +40,8 @@ import { CopyButton } from './CopyButton'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 
+// ─── Types ────────────────────────────────────────────────────────────
+
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
   if (n < 1000) return String(n)
@@ -36,6 +57,13 @@ interface StreamingContent {
   reasoning?: string
   content?: string
 }
+
+/** A single item in the unified timeline */
+type TimelineItem =
+  | { kind: 'committed'; key: string; message: Message }
+  | { kind: 'runtime'; key: string; step: DraftAssistantStep }
+  | { kind: 'fallback-content'; key: string; content: StreamingContent; streaming: StreamingState }
+  | { kind: 'fallback-toolcall'; key: string; toolCall: ToolCall; streamingArgs?: string }
 
 interface AssistantTurnBubbleProps {
   turn: Extract<Turn, { type: 'assistant' }>
@@ -66,6 +94,212 @@ interface AssistantTurnBubbleProps {
   conversationId?: string | null
 }
 
+// ─── Timeline builder ─────────────────────────────────────────────────
+
+/**
+ * Build a unified timeline from committed messages and runtime steps.
+ *
+ * Strategy:
+ * 1. When NOT processing: just render committed messages in array order.
+ * 2. When processing:
+ *    a. Collect "already committed" info for dedup.
+ *    b. Filter runtime steps: hide steps that duplicate committed content.
+ *    c. Merge committed + visible runtime steps, sorted by timestamp.
+ *    d. If no runtime steps visible, add fallback streaming content/tool calls.
+ */
+function buildTimeline(
+  committed: Message[],
+  runtimeSteps: DraftAssistantStep[],
+  runtimeToolCalls: ToolCall[],
+  currentToolCall: ToolCall | null,
+  streamingContent: StreamingContent | undefined,
+  streamingState: StreamingState | undefined,
+  isProcessing: boolean,
+  turnTimestamp: number,
+): TimelineItem[] {
+  // ── Non-processing: just committed messages in array order ──
+  if (!isProcessing) {
+    return committed.map((msg) => ({
+      kind: 'committed' as const,
+      key: `msg-${msg.id}`,
+      message: msg,
+    }))
+  }
+
+  // ── Processing mode: merge committed + runtime steps ──
+
+  // Collect committed info for dedup
+  const committedToolCallIds = new Set(
+    committed.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || []),
+  )
+  const latestCommittedTs = committed.reduce(
+    (max, msg) => Math.max(max, typeof msg.timestamp === 'number' ? msg.timestamp : 0),
+    0,
+  )
+
+  // Filter runtime steps
+  const visibleSteps: DraftAssistantStep[] = []
+  const runtimeToolCallIds = new Set<string>()
+
+  for (const step of runtimeSteps) {
+    // Streaming steps are always visible — they represent currently active blocks
+    if (step.streaming) {
+      visibleSteps.push(step)
+      if (step.type === 'tool_call') runtimeToolCallIds.add(step.toolCall.id)
+      continue
+    }
+
+    // Completed steps: hide if their content is already represented in committed messages
+    switch (step.type) {
+      case 'tool_call':
+        // Hide if this tool call ID already appears in a committed message
+        if (!committedToolCallIds.has(step.toolCall.id)) {
+          visibleSteps.push(step)
+          runtimeToolCallIds.add(step.toolCall.id)
+        }
+        break
+      case 'content':
+        // Keep completed content that belongs to current in-flight iteration.
+        // Older completed content has already been committed and should be hidden.
+        {
+          const stepTs = typeof step.timestamp === 'number' ? step.timestamp : 0
+          if (stepTs >= latestCommittedTs) visibleSteps.push(step)
+        }
+        break
+      case 'reasoning':
+        // Same as content: keep only latest in-flight completed reasoning.
+        {
+          const stepTs = typeof step.timestamp === 'number' ? step.timestamp : 0
+          if (stepTs >= latestCommittedTs) visibleSteps.push(step)
+        }
+        break
+      case 'compression':
+        // Hide if stale: completed compression from a previous iteration
+        // (its timestamp is older than the latest committed message)
+        {
+          const stepTs = typeof step.timestamp === 'number' ? step.timestamp : 0
+          if (stepTs >= latestCommittedTs) visibleSteps.push(step)
+        }
+        break
+    }
+  }
+
+  // ── Build interleaved timeline sorted by timestamp ──
+  type SortableItem = {
+    timestamp: number
+    subIndex: number
+    source: 'committed' | 'runtime'
+    sourceIndex: number
+    item: TimelineItem
+  }
+  const sortableItems: SortableItem[] = []
+
+  // Committed messages get even sub-indices for stable ordering at same timestamp
+  committed.forEach((msg, idx) => {
+    sortableItems.push({
+      timestamp: typeof msg.timestamp === 'number' ? msg.timestamp : 0,
+      subIndex: idx * 2,
+      source: 'committed',
+      sourceIndex: idx,
+      item: { kind: 'committed', key: `msg-${msg.id}`, message: msg },
+    })
+  })
+
+  // Runtime steps get odd sub-indices
+  visibleSteps.forEach((step, idx) => {
+    const ts = typeof step.timestamp === 'number' ? step.timestamp : turnTimestamp + idx + 1
+    sortableItems.push({
+      timestamp: ts,
+      subIndex: idx * 2 + 1,
+      source: 'runtime',
+      sourceIndex: idx,
+      item: { kind: 'runtime', key: `step-${step.id}`, step },
+    })
+  })
+
+  // Keep committed message order stable (append order from message array),
+  // then interleave runtime steps by timestamp around that stable backbone.
+  sortableItems.sort((a, b) => {
+    if (a.source === 'committed' && b.source === 'committed') {
+      return a.sourceIndex - b.sourceIndex
+    }
+    return a.timestamp - b.timestamp || a.subIndex - b.subIndex
+  })
+
+  const items: TimelineItem[] = sortableItems.map((si) => si.item)
+
+  // ── Fallbacks (only when no runtime steps are visible) ──
+  const hasVisibleRuntimeSteps = visibleSteps.length > 0
+
+  // Fallback: draft tool calls not yet in steps or committed
+  if (!hasVisibleRuntimeSteps) {
+    for (const tc of runtimeToolCalls) {
+      if (committedToolCallIds.has(tc.id)) continue
+      items.push({
+        kind: 'fallback-toolcall',
+        key: `draft-tc-${tc.id}`,
+        toolCall: tc,
+      })
+    }
+  }
+
+  // Fallback: streaming content blobs
+  if (
+    !hasVisibleRuntimeSteps &&
+    streamingContent &&
+    (streamingContent.reasoning || streamingContent.content)
+  ) {
+    items.push({
+      kind: 'fallback-content',
+      key: 'fallback-streaming',
+      content: streamingContent,
+      streaming: streamingState ?? {},
+    })
+  }
+
+  // Fallback: current tool call not yet in steps/draft
+  const allToolCallIds = new Set([
+    ...committedToolCallIds,
+    ...runtimeToolCallIds,
+    ...runtimeToolCalls.map((tc) => tc.id),
+  ])
+  if (currentToolCall && !allToolCallIds.has(currentToolCall.id)) {
+    items.push({
+      kind: 'fallback-toolcall',
+      key: `current-tc-${currentToolCall.id}`,
+      toolCall: currentToolCall,
+    })
+  }
+
+  return items
+}
+
+/**
+ * Compute tool call IDs to suppress in committed message rendering.
+ * A tool call is suppressed when it's actively executing (streaming, no result)
+ * and already shown as a runtime step — avoids "double card" for the same call.
+ */
+function buildSuppressedIds(
+  runtimeSteps: DraftAssistantStep[],
+  toolResults: Map<string, string>,
+  currentToolCall: ToolCall | null,
+): Set<string> {
+  const suppressed = new Set<string>()
+  for (const step of runtimeSteps) {
+    if (step.type !== 'tool_call') continue
+    const hasResult = !!(step.result ?? toolResults.get(step.toolCall.id))
+    if (step.streaming && !hasResult) {
+      suppressed.add(step.toolCall.id)
+    }
+  }
+  if (currentToolCall && !toolResults.get(currentToolCall.id)) {
+    suppressed.add(currentToolCall.id)
+  }
+  return suppressed
+}
+
+// ─── Main component ───────────────────────────────────────────────────
+
 export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   turn,
   toolResults,
@@ -85,106 +319,25 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const t = useT()
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
-  const committedToolCallIds = new Set(
-    turn.messages.flatMap((msg) => msg.toolCalls?.map((tc) => tc.id) || [])
-  )
-  const draftToolCalls = (runtimeToolCalls || []).filter((tc) => !committedToolCallIds.has(tc.id))
-  // Collect committed content/reasoning to deduplicate against runtime steps.
-  // When a content_complete fires, the runtime step is kept (to avoid a render gap),
-  // but the committed message already contains the same content. Without dedup,
-  // both render: the runtime step as plain text (lightweight=true) and the
-  // committed message as full Markdown — causing "duplicate text block" glitch.
-  const committedHasContent = turn.messages.some((msg) => !!msg.content)
-  const committedHasReasoning = turn.messages.some((msg) => !!msg.reasoning)
 
-  // Find the latest committed message timestamp to detect stale compression steps.
-  // When a committed message has a newer timestamp than a completed compression step,
-  // the compression step belongs to a previous loop iteration and should be hidden.
-  const latestCommittedTimestamp = turn.messages.reduce(
-    (max, msg) => Math.max(max, typeof msg.timestamp === 'number' ? msg.timestamp : 0),
-    0
+  // Build unified timeline
+  const timeline = buildTimeline(
+    turn.messages,
+    runtimeSteps || [],
+    runtimeToolCalls || [],
+    currentToolCall ?? null,
+    streamingContent,
+    streamingState,
+    !!isProcessing,
+    turn.timestamp,
   )
 
-  const orderedRuntimeSteps = (runtimeSteps || []).filter((step) => {
-    // Streaming steps are always visible — they represent in-progress content
-    if (step.streaming) return true
-    // Completed tool_call steps: hide if their id is already in a committed message
-    if (step.type === 'tool_call') {
-      return !committedToolCallIds.has(step.toolCall.id)
-    }
-    // Completed content step: hide if a committed message already has content.
-    // This prevents showing both a lightweight plain-text step AND a full
-    // Markdown-rendered committed message with identical content.
-    if (step.type === 'content' && committedHasContent) return false
-    // Completed reasoning step: same dedup logic.
-    if (step.type === 'reasoning' && committedHasReasoning) return false
-    // Completed compression step: hide if any committed message is newer.
-    // This prevents stale compression cards from appearing after the LLM
-    // response that was generated after the compression.
-    if (step.type === 'compression') {
-      const stepTs = typeof step.timestamp === 'number' ? step.timestamp : 0
-      return stepTs >= latestCommittedTimestamp
-    }
-    return true
-  })
-  const hasCurrentToolCallInDraft = !!(
-    currentToolCall && draftToolCalls.some((tc) => tc.id === currentToolCall.id)
-  )
-  const suppressExecutingToolCallIds = new Set<string>()
-  if (isProcessing) {
-    for (const step of orderedRuntimeSteps) {
-      if (step.type !== 'tool_call') continue
-      const hasResult = !!(step.result ?? toolResults.get(step.toolCall.id))
-      if (step.streaming && !hasResult) {
-        suppressExecutingToolCallIds.add(step.toolCall.id)
-      }
-    }
-    if (currentToolCall && !toolResults.get(currentToolCall.id)) {
-      suppressExecutingToolCallIds.add(currentToolCall.id)
-    }
-  }
-  const mergedTimelineItems = isProcessing
-    ? [
-        // Committed messages (kept in insertion order)
-        ...turn.messages.map((message, index) => ({
-          kind: 'message' as const,
-          key: `msg-${message.id}`,
-          order: index,
-          timestamp: message.timestamp,
-          message,
-        })),
-        // Runtime steps sorted by timestamp within their group.
-        // Committed messages come first (stable), then runtime steps are
-        // ordered by timestamp so that e.g. compression cards appear before
-        // the tool calls that follow them.  A full cross-group timestamp
-        // sort is intentionally avoided because it caused tool_call cards to
-        // jump above committed text when message_end had a later timestamp
-        // than tool_start.
-        ...[...orderedRuntimeSteps]
-          .map((step, index) => ({
-            kind: 'runtime' as const,
-            key: `step-${step.id}`,
-            order: index,
-            timestamp:
-              typeof step.timestamp === 'number'
-                ? step.timestamp
-                : turn.timestamp + index + 1,
-            step,
-          }))
-          .sort((a, b) => a.timestamp - b.timestamp),
-      ]
-      // No global timestamp sort — committed messages are stable at the top,
-      // runtime steps are sorted amongst themselves.
-    : []
-  const hasCurrentToolCallInRuntimeSteps = !!(
-    currentToolCall &&
-    orderedRuntimeSteps.some(
-      (step) => step.type === 'tool_call' && step.toolCall.id === currentToolCall.id
-    )
-  )
-  const shouldRenderMergedTimeline = isProcessing && mergedTimelineItems.length > 0
+  // Compute suppressed tool call IDs for committed message rendering
+  const suppressedIds = isProcessing
+    ? buildSuppressedIds(runtimeSteps || [], toolResults, currentToolCall ?? null)
+    : new Set<string>()
 
-  // Find the last message with content for copy button
+  // Last message with content for copy button
   const lastMessageWithContent = [...turn.messages].reverse().find((msg) => msg.content)
 
   return (
@@ -197,214 +350,21 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
       {/* Steps column */}
       <div className={showAvatar ? 'w-[90%] min-w-0 space-y-2' : 'w-full min-w-0 space-y-2'}>
-        {shouldRenderMergedTimeline &&
-          mergedTimelineItems.map((item, index) => {
-            const showDivider = index > 0
-            if (item.kind === 'message') {
-              return (
-                <div key={item.key}>
-                  {showDivider && (
-                    <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />
-                  )}
-                  <AssistantStep
-                    message={item.message}
-                    toolResults={toolResults}
-                    showDivider={false}
-                    suppressExecutingToolCallIds={suppressExecutingToolCallIds}
-                    conversationId={conversationId ?? undefined}
-                  />
-                </div>
-              )
-            }
+        {/* Timeline */}
+        {timeline.map((item, index) => (
+          <TimelineRow key={item.key} showDivider={index > 0}>
+            {renderTimelineItem(
+              item,
+              toolResults,
+              suppressedIds,
+              streamingToolArgs ?? null,
+              streamingToolArgsByCallId,
+              conversationId,
+            )}
+          </TimelineRow>
+        ))}
 
-            const step = item.step
-            if (step.type === 'reasoning') {
-              if (!step.content) return null
-              return (
-                <div key={item.key}>
-                  {showDivider && (
-                    <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />
-                  )}
-                  <StreamingContentSection
-                    reasoning={step.content}
-                    isStreamingReasoning={step.streaming}
-                    isStreamingContent={false}
-                    lightweight={true}
-                    showDivider={false}
-                  />
-                </div>
-              )
-            }
-            if (step.type === 'content') {
-              if (!step.content) return null
-              return (
-                <div key={item.key}>
-                  {showDivider && (
-                    <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />
-                  )}
-                  <StreamingContentSection
-                    content={step.content}
-                    isStreamingReasoning={false}
-                    isStreamingContent={step.streaming}
-                    lightweight={true}
-                    showDivider={false}
-                  />
-                </div>
-              )
-            }
-            if (step.type === 'compression') {
-              return (
-                <div key={item.key}>
-                  {showDivider && (
-                    <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />
-                  )}
-                  <CompressionStatusCard text={step.content} streaming={step.streaming} />
-                </div>
-              )
-            }
-            return (
-              <div key={item.key}>
-                {showDivider && (
-                  <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />
-                )}
-                <ToolCallDisplay
-                  toolCall={step.toolCall}
-                  result={step.result ?? toolResults.get(step.toolCall.id)}
-                  isExecuting={
-                    step.streaming && !(step.result ?? toolResults.get(step.toolCall.id))
-                  }
-                  streamingArgs={
-                    step.streaming
-                      ? step.args ||
-                        streamingToolArgsByCallId?.[step.toolCall.id] ||
-                        streamingToolArgs ||
-                        undefined
-                      : undefined
-                  }
-                  subagentEvents={step.subagentEvents}
-                  conversationId={conversationId ?? undefined}
-                />
-              </div>
-            )
-          })}
-
-        {/* Legacy path: non-processing render */}
-        {!shouldRenderMergedTimeline &&
-          turn.messages.map((msg, idx) => (
-            <AssistantStep
-              key={msg.id}
-              message={msg}
-              toolResults={toolResults}
-              showDivider={idx > 0}
-              suppressExecutingToolCallIds={suppressExecutingToolCallIds}
-              conversationId={conversationId ?? undefined}
-            />
-          ))}
-
-        {/* Legacy path: explicit runtime render when merge is disabled */}
-        {!shouldRenderMergedTimeline &&
-          isProcessing &&
-          orderedRuntimeSteps.length > 0 &&
-          orderedRuntimeSteps.map((step) => {
-            if (step.type === 'reasoning') {
-              if (!step.content) return null
-              return (
-                <StreamingContentSection
-                  key={step.id}
-                  reasoning={step.content}
-                  isStreamingReasoning={step.streaming}
-                  isStreamingContent={false}
-                  lightweight={true}
-                />
-              )
-            }
-            if (step.type === 'content') {
-              if (!step.content) return null
-              return (
-                <StreamingContentSection
-                  key={step.id}
-                  content={step.content}
-                  isStreamingReasoning={false}
-                  isStreamingContent={step.streaming}
-                  lightweight={true}
-                />
-              )
-            }
-            if (step.type === 'compression') {
-              return (
-                <CompressionStatusCard
-                  key={step.id}
-                  text={step.content}
-                  streaming={step.streaming}
-                />
-              )
-            }
-            return (
-              <ToolCallDisplay
-                key={step.id}
-                toolCall={step.toolCall}
-                result={step.result ?? toolResults.get(step.toolCall.id)}
-                isExecuting={step.streaming && !(step.result ?? toolResults.get(step.toolCall.id))}
-                streamingArgs={
-                  step.streaming
-                    ? step.args ||
-                      streamingToolArgsByCallId?.[step.toolCall.id] ||
-                      streamingToolArgs ||
-                      undefined
-                    : undefined
-                }
-                subagentEvents={step.subagentEvents}
-                conversationId={conversationId ?? undefined}
-              />
-            )
-          })}
-
-        {/* Fallback for older runtime path without ordered steps */}
-        {!shouldRenderMergedTimeline &&
-          isProcessing &&
-          orderedRuntimeSteps.length === 0 &&
-          draftToolCalls.map((tc) => (
-            <ToolCallDisplay
-              key={tc.id}
-              toolCall={tc}
-              result={toolResults.get(tc.id)}
-              isExecuting={true}
-              streamingArgs={
-                streamingToolArgsByCallId?.[tc.id] ||
-                (currentToolCall?.id === tc.id ? streamingToolArgs || undefined : undefined)
-              }
-              conversationId={conversationId ?? undefined}
-            />
-          ))}
-
-        {isProcessing &&
-          orderedRuntimeSteps.length === 0 &&
-          streamingContent &&
-          (streamingContent.reasoning || streamingContent.content) && (
-            <StreamingContentSection
-              reasoning={streamingContent.reasoning}
-              content={streamingContent.content}
-              isStreamingReasoning={isStreamingReasoning}
-              isStreamingContent={isStreamingContent}
-            />
-          )}
-
-        {/* Active tool call streaming */}
-        {isProcessing &&
-          currentToolCall &&
-          !hasCurrentToolCallInDraft &&
-          !hasCurrentToolCallInRuntimeSteps && (
-            <ToolCallDisplay
-              toolCall={currentToolCall}
-              isExecuting={true}
-              streamingArgs={
-                streamingToolArgsByCallId?.[currentToolCall.id] || streamingToolArgs || undefined
-              }
-              conversationId={conversationId ?? undefined}
-            />
-          )}
-
-        {/* Waiting indicator - three pulsing dots while waiting for next model response */}
+        {/* Waiting indicator */}
         {isWaiting && !currentToolCall && !isStreamingReasoning && !isStreamingContent && (
           <div className="inline-block rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
             <span className="flex items-center gap-1.5">
@@ -426,7 +386,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {workflowProgress}
 
-        {/* Summary footer: timestamp + aggregated token usage + copy button (only show when not processing) */}
+        {/* Summary footer (only when not processing) */}
         {!isProcessing && !isWaiting && (
           <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span>
@@ -436,15 +396,12 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               })}
             </span>
             {turn.totalUsage && (
-              <span
-                title={`${t('workflow.input')} ${turn.totalUsage.promptTokens} + ${t('workflow.output')} ${turn.totalUsage.completionTokens} = ${turn.totalUsage.totalTokens} tokens`}
-              >
-                ↑{formatTokens(turn.totalUsage.promptTokens)} ↓
-                {formatTokens(turn.totalUsage.completionTokens)}
+              <span>
+                · {formatTokens(turn.totalUsage.totalTokens)} tokens
               </span>
             )}
             {lastMessageWithContent?.content && (
-              <CopyButton content={lastMessageWithContent.content} />
+              <CopyButton text={lastMessageWithContent.content} />
             )}
           </div>
         )}
@@ -452,6 +409,134 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
     </div>
   )
 })
+
+// ─── Timeline rendering helpers ───────────────────────────────────────
+
+function renderTimelineItem(
+  item: TimelineItem,
+  toolResults: Map<string, string>,
+  suppressedIds: Set<string>,
+  streamingToolArgs: string | null,
+  streamingToolArgsByCallId: Record<string, string> | undefined,
+  conversationId: string | null | undefined,
+): ReactNode {
+  switch (item.kind) {
+    case 'committed':
+      return (
+        <AssistantStep
+          message={item.message}
+          toolResults={toolResults}
+          showDivider={false}
+          suppressExecutingToolCallIds={suppressedIds}
+          conversationId={conversationId ?? undefined}
+        />
+      )
+
+    case 'runtime':
+      return renderRuntimeStep(
+        item.step,
+        toolResults,
+        streamingToolArgs,
+        streamingToolArgsByCallId,
+        conversationId,
+      )
+
+    case 'fallback-content':
+      return (
+        <StreamingContentSection
+          reasoning={item.content.reasoning}
+          content={item.content.content}
+          isStreamingReasoning={item.streaming.reasoning ?? false}
+          isStreamingContent={item.streaming.content ?? false}
+          lightweight={false}
+          showDivider={false}
+        />
+      )
+
+    case 'fallback-toolcall':
+      return (
+        <ToolCallDisplay
+          toolCall={item.toolCall}
+          isExecuting={true}
+          streamingArgs={
+            streamingToolArgsByCallId?.[item.toolCall.id] ||
+            streamingToolArgs ||
+            undefined
+          }
+          conversationId={conversationId ?? undefined}
+        />
+      )
+  }
+}
+
+function renderRuntimeStep(
+  step: DraftAssistantStep,
+  toolResults: Map<string, string>,
+  streamingToolArgs: string | null,
+  streamingToolArgsByCallId: Record<string, string> | undefined,
+  conversationId: string | null | undefined,
+): ReactNode {
+  if (step.type === 'reasoning') {
+    if (!step.content) return null
+    return (
+      <StreamingContentSection
+        reasoning={step.content}
+        isStreamingReasoning={step.streaming}
+        isStreamingContent={false}
+        lightweight={true}
+        showDivider={false}
+      />
+    )
+  }
+
+  if (step.type === 'content') {
+    if (!step.content) return null
+    return (
+      <StreamingContentSection
+        content={step.content}
+        isStreamingReasoning={false}
+        isStreamingContent={step.streaming}
+        lightweight={true}
+        showDivider={false}
+      />
+    )
+  }
+
+  if (step.type === 'compression') {
+    return <CompressionStatusCard text={step.content} streaming={step.streaming} />
+  }
+
+  // tool_call
+  return (
+    <ToolCallDisplay
+      toolCall={step.toolCall}
+      result={step.result ?? toolResults.get(step.toolCall.id)}
+      isExecuting={step.streaming && !(step.result ?? toolResults.get(step.toolCall.id))}
+      streamingArgs={
+        step.streaming
+          ? step.args ||
+            streamingToolArgsByCallId?.[step.toolCall.id] ||
+            streamingToolArgs ||
+            undefined
+          : undefined
+      }
+      subagentEvents={step.subagentEvents}
+      conversationId={conversationId ?? undefined}
+    />
+  )
+}
+
+/** Row wrapper that optionally renders a divider above children */
+function TimelineRow({ showDivider, children }: { showDivider: boolean; children: ReactNode }) {
+  return (
+    <>
+      {showDivider && <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />}
+      {children}
+    </>
+  )
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────
 
 /** Renders streaming content section within the turn */
 const StreamingContentSection = memo(function StreamingContentSection({
@@ -471,7 +556,6 @@ const StreamingContentSection = memo(function StreamingContentSection({
 }) {
   return (
     <>
-      {/* Show divider if there's content above */}
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
       {/* Reasoning */}
@@ -526,13 +610,10 @@ const AssistantStep = memo(function AssistantStep({
     <>
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
-      {/* Unified container for reasoning, content, and tool calls */}
       {(hasReasoning || hasContent || hasToolCalls || hasAssets) && (
         <div className="space-y-2">
-          {/* Reasoning section */}
           {hasReasoning && <ReasoningSection reasoning={message.reasoning!} />}
 
-          {/* Content section */}
           {hasContent && (
             <div
               className={
@@ -577,31 +658,33 @@ const AssistantStep = memo(function AssistantStep({
             </div>
           )}
 
-          {/* Tool calls section */}
           {hasToolCalls && (
             <div className="space-y-1">
               {visibleToolCalls.map((tc) => (
-                <ToolCallDisplay key={tc.id} toolCall={tc} result={toolResults.get(tc.id)} conversationId={conversationId} />
+                <ToolCallDisplay
+                  key={tc.id}
+                  toolCall={tc}
+                  result={toolResults.get(tc.id)}
+                  conversationId={conversationId}
+                />
               ))}
             </div>
           )}
 
-          {/* Assets section (generated charts, images, etc.) */}
-          {message.assets && message.assets.length > 0 && (
-            <AssetCompactList assets={message.assets} />
-          )}
+          {message.assets && message.assets.length > 0 && <AssetCompactList assets={message.assets} />}
         </div>
       )}
     </>
   )
 })
 
+/** Compression status card — shows progress of context compression */
 function CompressionStatusCard({ text, streaming }: { text: string; streaming: boolean }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-300">
       <span>{text}</span>
       {streaming && (
-        <span className="ml-2 inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-middle" />
+        <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent align-text-bottom" />
       )}
     </div>
   )
