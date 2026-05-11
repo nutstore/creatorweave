@@ -766,7 +766,11 @@ function App() {
 
       if (!workspaceId) {
         if (scopedWorkspaceIds.length > 0) {
-          const fallbackWorkspaceId = scopedWorkspaceIds[0]
+          // Pick the most recently accessed workspace, ignoring pinned sort order
+          const allWorkspaces = useConversationContextStore.getState().workspaces
+          const scoped = allWorkspaces.filter((w) => scopedWorkspaceIds.includes(w.id))
+          const lastActive = scoped.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0]
+          const fallbackWorkspaceId = lastActive?.id || scopedWorkspaceIds[0]
           navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId }, true)
           if (useConversationStore.getState().activeConversationId !== fallbackWorkspaceId) {
             await useConversationStore.getState().setActive(fallbackWorkspaceId)
@@ -799,7 +803,11 @@ function App() {
       }
 
       if (scopedWorkspaceIds.length > 0) {
-        const fallbackWorkspaceId = scopedWorkspaceIds[0]
+        // Pick the most recently accessed workspace, ignoring pinned sort order
+        const allWorkspaces = useConversationContextStore.getState().workspaces
+        const scoped = allWorkspaces.filter((w) => scopedWorkspaceIds.includes(w.id))
+        const lastActive = scoped.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0]
+        const fallbackWorkspaceId = lastActive?.id || scopedWorkspaceIds[0]
         navigateToRoute(
           { kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId },
           true
@@ -835,6 +843,17 @@ function App() {
   useEffect(() => {
     if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
     if (!activeProjectId || !activeConversationId) return
+    // Guard only against init-time rollback: when route pins an explicit workspace
+    // and a switch to a *different* workspace is still in-flight.
+    // Once the switch completes (switchingWorkspaceId === null), we should allow
+    // the URL to update to match the new activeConversationId.
+    if (currentRoute.workspaceId && currentRoute.workspaceId !== activeConversationId) {
+      const switchingWorkspaceId = useConversationContextStore.getState().switchingWorkspaceId
+      // Only block if a switch is actively in-flight to a DIFFERENT workspace than
+      // the one we want to navigate to. A null switchingWorkspaceId means the switch
+      // completed — we should proceed with the URL update.
+      if (switchingWorkspaceId && switchingWorkspaceId !== activeConversationId) return
+    }
     const scopedWorkspaceIds = new Set(useConversationContextStore.getState().workspaces.map((workspace) => workspace.id))
     const convState = useConversationStore.getState()
     const activeConversation = convState.conversations.find(

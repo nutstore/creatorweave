@@ -534,7 +534,6 @@ export const Sidebar = memo(function Sidebar({
       s.conversations.map((c) => ({ id: c.id, title: c.title }))
     )
   )
-  const activeConversationId = useConversationStore((s) => s.activeConversationId)
   const createNew = useConversationStore((s) => s.createNew)
   const setActive = useConversationStore((s) => s.setActive)
   const deleteConversation = useConversationStore((s) => s.deleteConversation)
@@ -560,14 +559,16 @@ export const Sidebar = memo(function Sidebar({
   // Multi-root: get all roots from folder-access store
   const roots = useFolderAccessStore((state) => state.roots)
   const workspaceStats = useConversationContextStore((state) => state.workspaces)
+  const activeWorkspaceId = useConversationContextStore((state) => state.activeWorkspaceId)
+  const switchWorkspace = useConversationContextStore((state) => state.switchWorkspace)
   const workspaceIds = workspaceStats.map((w) => w.id)
   const currentPendingCount = useConversationContextStore((state) => state.currentPendingCount)
   const scopedWorkspaceIdSet = useMemo(() => new Set(workspaceIds), [workspaceIds])
   const scopedConversations = useMemo(
     () => conversationListItems.filter(
-      (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeConversationId
+      (conv) => scopedWorkspaceIdSet.has(conv.id) || conv.id === activeWorkspaceId
     ),
-    [conversationListItems, scopedWorkspaceIdSet, activeConversationId]
+    [conversationListItems, scopedWorkspaceIdSet, activeWorkspaceId]
   )
   const pendingCountByConversationId = useMemo(() => {
     const map = new Map<string, number>()
@@ -825,9 +826,9 @@ export const Sidebar = memo(function Sidebar({
   // Stable callbacks for ConversationItem memoization
   const handleItemSelect = useCallback((id: string) => {
     if (pendingRenameIdRef.current === id) return
-    setActive(id)
+    void switchWorkspace(id)
     closeMobileSidebar()
-  }, [setActive, closeMobileSidebar])
+  }, [switchWorkspace, closeMobileSidebar])
 
   const handleItemDeleteClick = useCallback((id: string, x: number, y: number) => {
     setConfirmDeleteId(id)
@@ -975,7 +976,7 @@ export const Sidebar = memo(function Sidebar({
           <div className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
             {displayedConversations.map((conv) => {
               const isRunning = runningSet.has(conv.id)
-              const isActive = conv.id === activeConversationId
+              const isActive = conv.id === activeWorkspaceId
               const pendingReviewCount = pendingCountByConversationId.get(conv.id) || 0
               const isEditing = editingId === conv.id
               const isArchived = workspaceStatusMap.get(conv.id) === 'archived'

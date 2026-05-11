@@ -284,18 +284,17 @@ export const useProjectStore = create<ProjectState>()(
         await useConversationContextStore.getState().refreshWorkspaces()
 
         // Keep active conversation within current project scope.
-        // Use workspaces order (last_accessed_at DESC) instead of conversations order (updated_at DESC)
-        // to select the most recently accessed workspace.
+        // Select the most recently ACCESSED workspace (by lastAccessedAt),
+        // NOT the display order (which puts pinned workspaces first).
         const { useConversationStore } = await import('./conversation.store')
-        const conversationContextIds = new Set(
-          useConversationContextStore.getState().workspaces.map((w) => w.id)
-        )
+        const workspaces = useConversationContextStore.getState().workspaces
         const conversationStore = useConversationStore.getState()
-        // Pick the first workspace-sorted ID that exists in conversations
+        const conversationIds = new Set(conversationStore.conversations.map((c) => c.id))
         const nextActiveConversationId =
-          useConversationContextStore.getState().workspaces.find((w) =>
-            conversationStore.conversations.some((c) => c.id === w.id)
-          )?.id ?? null
+          [...workspaces]
+            .sort((a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0))
+            .find((w) => conversationIds.has(w.id))
+            ?.id ?? null
         await conversationStore.setActive(nextActiveConversationId)
         broadcastProjectChange({ type: 'updated', projectId })
         return true

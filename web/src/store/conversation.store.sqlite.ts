@@ -1086,8 +1086,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const workspaceStore = useConversationContextStore.getState()
         await workspaceStore.refreshWorkspaces()
 
-        const workspaceIds = new Set(workspaceStore.workspaces.map((w) => w.id))
-        const activeId = conversations.find((conv) => workspaceIds.has(conv.id))?.id || null
+        // Prefer workspace store's active selection (persisted active workspace).
+        // Fallback to first scoped workspace only if active selection is missing/out-of-scope.
+        const preferredWorkspaceId = workspaceStore.activeWorkspaceId
+        const activeId =
+          (preferredWorkspaceId && conversations.some((c) => c.id === preferredWorkspaceId))
+            ? preferredWorkspaceId
+            : (workspaceStore.workspaces.find((w) =>
+              conversations.some((c) => c.id === w.id)
+            )?.id || null)
 
         // Switch to active workspace if exists
         if (activeId) {

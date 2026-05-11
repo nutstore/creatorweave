@@ -355,8 +355,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Ignore preference loading errors, keep default order
             }
 
-            // Set first workspace as active if none active
-            const activeId = workspaces.length > 0 ? workspaces[0].id : null
+            // Prefer persisted active workspace from SQLite singleton.
+            // Fallback to most recent workspace only when singleton is missing/out-of-scope.
+            const persistedActive = await repo.findActiveWorkspace()
+            const persistedActiveId = persistedActive?.id || null
+            const activeId =
+              (persistedActiveId && workspaces.some((w) => w.id === persistedActiveId))
+                ? persistedActiveId
+                : (workspaces.length > 0 ? workspaces[0].id : null)
 
             set({
               workspaces,
