@@ -101,10 +101,10 @@ export const MessageNavBar = memo(function MessageNavBar({
             {/* Track + fill line (always visible) */}
             <div className="relative flex flex-1 w-full">
               {/* Background line */}
-              <div className="absolute left-1/2 w-px -translate-x-1/2 bg-neutral-200/70 dark:bg-neutral-800/70" style={{ top: 0, bottom: 0 }} />
+              <div className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-neutral-200/70 dark:bg-neutral-800/70" style={{ top: 0, bottom: 0 }} />
               {/* Fill line */}
               <div
-                className="absolute left-1/2 w-px -translate-x-1/2 bg-primary-400 dark:bg-primary-600"
+                className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-primary-400 dark:bg-primary-600"
                 style={{
                   top: 0,
                   height: fillRatio > 0 ? `${fillRatio * 100}%` : 0,

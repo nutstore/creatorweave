@@ -344,6 +344,15 @@
 }
 
 /* ── MessageNavBar: hover-expand dots ── */
+.msg-nav-rail .msg-nav-line {
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 1px;
+}
+
+.msg-nav-rail:hover .msg-nav-line {
+  width: 2.5px;
+}
+
 .msg-nav-rail:hover .msg-nav-dots {
   opacity: 1;
 }
