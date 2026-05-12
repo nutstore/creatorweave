@@ -1,6 +1,6 @@
 // 会話
 export const conversation = {
-    thinking: "思考中...",
+    thinking: "思考：オフ",
     reasoning: "推論プロセス",
     toolCall: "ツール呼び出し",
     regenerate: "再生成",

@@ -1,6 +1,6 @@
 // 对话相关
 export const conversation = {
-    thinking: "思考中...",
+    thinking: "思考：关",
     reasoning: "推理过程",
     toolCall: "工具调用",
     regenerate: "重新生成",

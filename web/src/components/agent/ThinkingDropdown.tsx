@@ -59,7 +59,7 @@ export function ThinkingDropdown({
         }`}
       >
         <Brain className="h-3 w-3" />
-        <span className="max-w-[48px] truncate">
+        <span className="max-w-[72px] truncate">
           {enableThinking
             ? t(`conversation.thinkingLevels.${thinkingLevel}`)
             : t('conversation.thinking')}

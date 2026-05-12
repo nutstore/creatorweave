@@ -1,5 +1,5 @@
 export const conversation = {
-    thinking: "Thinking...",
+    thinking: "Thinking: Off",
     reasoning: "Reasoning",
     toolCall: "Tool Call",
     regenerate: "Regenerate",
