@@ -197,6 +197,11 @@ function ProviderCard({
       await deleteApiKey(providerKey)
       setHasKey(false)
       invalidateApiKeyCache(providerKey)
+      // Update global hasApiKey state if this is the active provider
+      const activeConfig = useSettingsStore.getState().getEffectiveProviderConfig()
+      if (activeConfig && activeConfig.apiKeyProviderKey === providerKey) {
+        useSettingsStore.getState().setHasApiKey(false)
+      }
       toast.success(t('settings.toast.apiKeyCleared'))
       return
     }
@@ -204,6 +209,11 @@ function ProviderCard({
     setHasKey(true)
     setSaved(true)
     invalidateApiKeyCache(providerKey)
+    // Update global hasApiKey state if this is the active provider
+    const activeConfig = useSettingsStore.getState().getEffectiveProviderConfig()
+    if (activeConfig && activeConfig.apiKeyProviderKey === providerKey) {
+      useSettingsStore.getState().setHasApiKey(true)
+    }
 
     // Auto-refresh model list after saving API key so users don't need a manual refresh click.
     const url = isCustom
