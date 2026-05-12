@@ -230,6 +230,42 @@ export class WorkspaceRepository {
   }
 
   /**
+   * Get the last active workspace for a specific project.
+   * Returns null if no record exists for the project.
+   */
+  async findActiveWorkspaceByProject(projectId: string): Promise<Workspace | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<WorkspaceRow>(
+      `SELECT w.* FROM workspaces w
+       JOIN project_active_workspace paw ON w.id = paw.workspace_id
+       WHERE paw.project_id = ? AND w.status = 'active'`,
+      [projectId]
+    )
+    return row ? this.rowToWorkspace(row) : null
+  }
+
+  /**
+   * Set the last active workspace for a specific project.
+   */
+  async setActiveWorkspaceForProject(projectId: string, workspaceId: string): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute(
+      `INSERT INTO project_active_workspace (project_id, workspace_id, last_modified)
+       VALUES (?, ?, ?)
+       ON CONFLICT(project_id) DO UPDATE SET workspace_id = excluded.workspace_id, last_modified = excluded.last_modified`,
+      [projectId, workspaceId, Date.now()]
+    )
+  }
+
+  /**
+   * Clear the last active workspace for a specific project.
+   */
+  async clearActiveWorkspaceForProject(projectId: string): Promise<void> {
+    const db = getSQLiteDB()
+    await db.execute('DELETE FROM project_active_workspace WHERE project_id = ?', [projectId])
+  }
+
+  /**
    * Clear active workspace
    */
   async clearActiveWorkspace(): Promise<void> {

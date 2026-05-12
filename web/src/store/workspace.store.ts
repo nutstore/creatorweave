@@ -355,10 +355,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Ignore preference loading errors, keep default order
             }
 
-            // Prefer persisted active workspace from SQLite singleton.
-            // Fallback to most recent workspace only when singleton is missing/out-of-scope.
-            const persistedActive = await repo.findActiveWorkspace()
-            const persistedActiveId = persistedActive?.id || null
+            // Prefer per-project persisted active workspace.
+            // Fallback to most recent workspace only when no record exists.
+            const projectActiveWs = activeProjectId
+              ? await repo.findActiveWorkspaceByProject(activeProjectId)
+              : null
+            const persistedActiveId = projectActiveWs?.id || null
             const activeId =
               (persistedActiveId && workspaces.some((w) => w.id === persistedActiveId))
                 ? persistedActiveId
@@ -440,6 +442,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               currentPendingCount: workspace.pendingCount,
               isLoading: false,
             })
+
+            // Persist per-project active workspace
+            try {
+              await repo.setActiveWorkspaceForProject(activeProjectId, id)
+            } catch (e) {
+              console.warn('[WorkspaceStore] Failed to persist project active workspace on create:', e)
+            }
 
             return newWorkspace
           } catch (e: unknown) {
@@ -568,6 +577,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 isLoading: false,
               })
 
+              // Persist per-project active workspace
+              try {
+                await repo.setActiveWorkspaceForProject(activeProjectId, id)
+              } catch (e) {
+                console.warn('[WorkspaceStore] Failed to persist project active workspace on new conversation:', e)
+              }
+
               // Also switch active conversation
               const convStore = useConversationStore.getState()
               if (convStore.activeConversationId !== id) {
@@ -645,6 +661,14 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             // Update last access time in SQLite
             await repo.updateWorkspaceAccessTime(id)
+
+            // Persist per-project active workspace so switching back to this
+            // project restores the workspace the user was using.
+            try {
+              await repo.setActiveWorkspaceForProject(activeProjectId, id)
+            } catch (e) {
+              console.warn('[WorkspaceStore] Failed to persist project active workspace:', e)
+            }
 
             set({
               workspaces: get().workspaces.map((w) =>
@@ -733,6 +757,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (newActiveId !== null) {
               const { useConversationStore } = await import('./conversation.store')
               await useConversationStore.getState().setActive(newActiveId)
+
+              // Update per-project active workspace record
+              try {
+                const activeProjectId = await resolveActiveProjectId()
+                if (activeProjectId) {
+                  await repo.setActiveWorkspaceForProject(activeProjectId, newActiveId)
+                }
+              } catch (e) {
+                console.warn('[WorkspaceStore] Failed to update project active workspace after delete:', e)
+              }
             }
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to delete workspace'
@@ -797,6 +831,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (wasActive && newActiveId) {
               const { useConversationStore } = await import('./conversation.store')
               await useConversationStore.getState().setActive(newActiveId)
+
+              // Update per-project active workspace record
+              try {
+                const activeProjectId = await resolveActiveProjectId()
+                if (activeProjectId) {
+                  await repo.setActiveWorkspaceForProject(activeProjectId, newActiveId)
+                }
+              } catch (e) {
+                console.warn('[WorkspaceStore] Failed to update project active workspace after archive:', e)
+              }
             }
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to archive workspace'

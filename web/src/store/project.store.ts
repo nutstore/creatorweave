@@ -284,17 +284,35 @@ export const useProjectStore = create<ProjectState>()(
         await useConversationContextStore.getState().refreshWorkspaces()
 
         // Keep active conversation within current project scope.
-        // Select the most recently ACCESSED workspace (by lastAccessedAt),
-        // NOT the display order (which puts pinned workspaces first).
+        // Prefer the per-project remembered workspace; fall back to most recently accessed.
         const { useConversationStore } = await import('./conversation.store')
         const workspaces = useConversationContextStore.getState().workspaces
         const conversationStore = useConversationStore.getState()
         const conversationIds = new Set(conversationStore.conversations.map((c) => c.id))
-        const nextActiveConversationId =
-          [...workspaces]
-            .sort((a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0))
-            .find((w) => conversationIds.has(w.id))
-            ?.id ?? null
+
+        let nextActiveConversationId: string | null = null
+
+        // Try to restore the per-project remembered workspace first
+        try {
+          const { getWorkspaceRepository } = await import('@/sqlite/repositories/workspace.repository')
+          const wsRepo = getWorkspaceRepository()
+          const remembered = await wsRepo.findActiveWorkspaceByProject(projectId)
+          if (remembered && conversationIds.has(remembered.id)) {
+            nextActiveConversationId = remembered.id
+          }
+        } catch {
+          // Ignore – fall through to default
+        }
+
+        // Fallback: pick the most recently accessed workspace
+        if (!nextActiveConversationId) {
+          nextActiveConversationId =
+            [...workspaces]
+              .sort((a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0))
+              .find((w) => conversationIds.has(w.id))
+              ?.id ?? null
+        }
+
         await conversationStore.setActive(nextActiveConversationId)
         broadcastProjectChange({ type: 'updated', projectId })
         return true

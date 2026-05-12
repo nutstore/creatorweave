@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 6;
+PRAGMA user_version = 7;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -351,6 +351,17 @@ CREATE TRIGGER IF NOT EXISTS active_workspace_singleton
     BEGIN
         SELECT RAISE(ABORT, 'Only one active workspace allowed with singleton_id=0');
     END;
+
+-- Per-project active workspace tracking
+-- Remembers the last active workspace for each project, so switching back to
+-- a project restores the workspace the user was using.
+CREATE TABLE IF NOT EXISTS project_active_workspace (
+    project_id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+);
 
 -- ============================================================================
 -- File Metadata Table (for OPFS workspace files)

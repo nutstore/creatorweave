@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 6
+export const BASE_SCHEMA_VERSION = 7
 
 // ============================================================================
 // Migration Registry
@@ -130,6 +130,21 @@ export const migrations: Migration[] = [
       CREATE INDEX IF NOT EXISTS idx_project_roots_project_default ON project_roots(project_id, is_default);
 
       PRAGMA user_version = 6;
+    `,
+  },
+  {
+    version: 7,
+    name: 'add_project_active_workspace_table',
+    up: `
+      CREATE TABLE IF NOT EXISTS project_active_workspace (
+          project_id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL,
+          last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
+      );
+
+      PRAGMA user_version = 7;
     `,
   },
 ]
