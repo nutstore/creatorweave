@@ -25,7 +25,7 @@
  */
 
 import { memo, type ReactNode, useState } from 'react'
-import { Bot, Database, GitBranch } from 'lucide-react'
+import { Bot, Database, GitFork } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -426,17 +426,17 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               </span>
             )}
             {lastMessageWithContent?.content && (
-              <CopyButton text={lastMessageWithContent.content} />
+              <CopyButton content={lastMessageWithContent.content} />
             )}
             <button
               type="button"
               onClick={handleBranch}
               disabled={isBranching || !conversationId}
               className={`inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50`}
-              title={t('conversation.branch') || '从此处创建分支'}
-              aria-label={t('conversation.branch') || '从此处创建分支'}
+              title={t('conversation.branch') || 'Branch from here'}
+              aria-label={t('conversation.branch') || 'Branch from here'}
             >
-              <GitBranch className={`h-3.5 w-3.5 ${isBranching ? 'animate-pulse' : ''}`} />
+              <GitFork className={`h-3.5 w-3.5 ${isBranching ? 'animate-pulse' : ''}`} />
             </button>
           </div>
         )}

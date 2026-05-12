@@ -13,6 +13,7 @@ export const conversation = {
     stopAndResendMessage: "이 메시지 중지 후 다시 보내기",
     resendMessage: "이 메시지 다시 보내기",
     editAndResend: "편집하여 다시 보내기",
+    branch: "여기서 분기",
     thinkingMode: "생각 모드",
     thinkingLevels: {
       minimal: "최소",
@@ -44,6 +45,7 @@ export const conversation = {
     toast: {
       noApiKey: "먼저 설정에서 API Key를 구성하세요",
       deletedTurn: "완전한 대화 턴 삭제됨",
+      branchCreated: "분기 대화가 생성되었습니다",
     },
     error: {
       requestFailed: "요청 실패:",

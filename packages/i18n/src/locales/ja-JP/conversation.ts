@@ -13,6 +13,7 @@ export const conversation = {
     stopAndResendMessage: "このメッセージの停止して再送信",
     resendMessage: "このメッセージを再送信",
     editAndResend: "編集して再送信",
+    branch: "ここから分岐",
     thinkingMode: "思考モード",
     thinkingLevels: {
       minimal: "浅",
@@ -44,6 +45,7 @@ export const conversation = {
     toast: {
       noApiKey: "まず設定で API Key を設定してください",
       deletedTurn: "完全な会話ターンを削除しました",
+      branchCreated: "分岐会話を作成しました",
     },
     error: {
       requestFailed: "リクエスト失敗：",

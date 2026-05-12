@@ -1611,7 +1611,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
       void metaPersist.catch(() => {})
 
-      toast.success(i18nText('conversation.toast.branchCreated', '已创建分支对话'))
+      toast.success(i18nText('conversation.toast.branchCreated', 'Branched conversation created'))
 
       return branched
     },
