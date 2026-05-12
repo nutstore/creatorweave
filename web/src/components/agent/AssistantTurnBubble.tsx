@@ -397,7 +397,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             </span>
             {turn.totalUsage && (
               <span>
-                · {formatTokens(turn.totalUsage.totalTokens)} tokens
+                · ↑{formatTokens(turn.totalUsage.promptTokens)} ↓{formatTokens(turn.totalUsage.completionTokens)}
               </span>
             )}
             {lastMessageWithContent?.content && (
