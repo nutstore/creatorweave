@@ -67,6 +67,7 @@ function aggregateUsage(messages: Message[]): MessageUsage | null {
   let prompt = 0
   let completion = 0
   let total = 0
+  let cacheRead = 0
 
   for (const msg of messages) {
     if (msg.usage) {
@@ -74,10 +75,11 @@ function aggregateUsage(messages: Message[]): MessageUsage | null {
       prompt += msg.usage.promptTokens
       completion += msg.usage.completionTokens
       total += msg.usage.totalTokens
+      cacheRead += msg.usage.cacheReadTokens || 0
     }
   }
 
   return hasUsage
-    ? { promptTokens: prompt, completionTokens: completion, totalTokens: total }
+    ? { promptTokens: prompt, completionTokens: completion, totalTokens: total, cacheReadTokens: cacheRead }
     : null
 }

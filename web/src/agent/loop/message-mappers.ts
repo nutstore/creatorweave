@@ -179,6 +179,7 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
         promptTokens: message.usage?.input || 0,
         completionTokens: message.usage?.output || 0,
         totalTokens: message.usage?.totalTokens || 0,
+        cacheReadTokens: message.usage?.cacheRead || 0,
       },
       reasoning || null
     )

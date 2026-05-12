@@ -264,7 +264,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
               <AssistantTurnBubble
                 turn={turn}
                 toolResults={toolResults}
-                isProcessing={isProcessing}
+                isProcessing={isLast}
                 isWaiting={runtime.isWaiting}
                 streamingState={runtime.streamingState}
                 streamingContent={runtime.streamingContent}

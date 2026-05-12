@@ -67,6 +67,7 @@ export interface SerializedMessage {
     promptTokens: number
     completionTokens: number
     totalTokens: number
+    cacheReadTokens?: number
   }
 }
 
@@ -262,6 +263,7 @@ export function serializeMessage(message: Message): SerializedMessage {
       promptTokens: message.usage.promptTokens,
       completionTokens: message.usage.completionTokens,
       totalTokens: message.usage.totalTokens,
+      ...(message.usage.cacheReadTokens ? { cacheReadTokens: message.usage.cacheReadTokens } : {}),
     }
   }
 
@@ -308,6 +310,7 @@ export function deserializeMessage(data: SerializedMessage): Message {
       promptTokens: data.usage.promptTokens,
       completionTokens: data.usage.completionTokens,
       totalTokens: data.usage.totalTokens,
+      ...(data.usage.cacheReadTokens ? { cacheReadTokens: data.usage.cacheReadTokens } : {}),
     }
   }
 

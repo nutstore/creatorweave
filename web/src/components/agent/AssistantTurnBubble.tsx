@@ -25,7 +25,7 @@
  */
 
 import { memo, type ReactNode } from 'react'
-import { Bot } from 'lucide-react'
+import { Bot, Database } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -396,8 +396,14 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               })}
             </span>
             {turn.totalUsage && (
-              <span>
-                · ↑{formatTokens(turn.totalUsage.promptTokens)} ↓{formatTokens(turn.totalUsage.completionTokens)}
+              <span className="inline-flex items-center gap-1.5">
+                <span>↑{formatTokens(turn.totalUsage.promptTokens)}</span>
+                <span>↓{formatTokens(turn.totalUsage.completionTokens)}</span>
+                {turn.totalUsage.cacheReadTokens ? (
+                  <span className="inline-flex items-center gap-0.5">
+                    <Database className="h-3 w-3 text-neutral-400" />{formatTokens(turn.totalUsage.cacheReadTokens)}
+                  </span>
+                ) : null}
               </span>
             )}
             {lastMessageWithContent?.content && (

@@ -29,6 +29,7 @@ export interface MessageUsage {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  cacheReadTokens?: number
 }
 
 export interface WorkflowDryRunPayload {
