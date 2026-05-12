@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useWorkspaceStore, type WorkspaceWithStats } from '@/store/workspace.store'
-import { getWorkspaceRepository } from '@/sqlite'
+import { getWorkspaceRepository, getProjectRepository } from '@/sqlite'
 import type { Workspace } from '@/sqlite/repositories/workspace.repository'
 import { getWorkspaceManager } from '@/opfs'
 import {
@@ -91,6 +91,18 @@ export interface UseStorageInfoResult {
   clearAllCache: () => Promise<void>
 }
 
+/** Resolve the active project's workspaces from SQLite (project-scoped). */
+async function findActiveProjectWorkspaces(): Promise<Workspace[]> {
+  const repo = getWorkspaceRepository()
+  const projectRepo = getProjectRepository()
+  const activeProject = await projectRepo.findActiveProject()
+  if (activeProject) {
+    return repo.findWorkspacesByProject(activeProject.id)
+  }
+  // Fallback: no active project, return all workspaces
+  return repo.findAllWorkspaces()
+}
+
 /** Convert SQLite Workspace to WorkspaceWithStats shape. */
 function sqliteWorkspaceToWithStats(workspace: Workspace): WorkspaceWithStats {
   return {
@@ -126,8 +138,7 @@ export function useStorageInfo(): UseStorageInfoResult {
 
   const loadWorkspacesFromSQLite = async (): Promise<WorkspaceWithStats[]> => {
     try {
-      const repo = getWorkspaceRepository()
-      const sqliteWorkspaces = await repo.findAllWorkspaces()
+      const sqliteWorkspaces = await findActiveProjectWorkspaces()
       if (sqliteWorkspaces.length > 0) {
         return sqliteWorkspaces.map(sqliteWorkspaceToWithStats)
       }
@@ -294,7 +305,7 @@ export function useStorageInfo(): UseStorageInfoResult {
   const clearAllCache = useCallback(async (): Promise<void> => {
     const repo = getWorkspaceRepository()
     const manager = await getWorkspaceManager()
-    const allWorkspaces = await repo.findAllWorkspaces()
+    const allWorkspaces = await findActiveProjectWorkspaces()
 
     // Get real pending counts to skip workspaces with unsaved changes
     const pendingCounts = await repo.getRealPendingCounts()
@@ -323,7 +334,7 @@ export function useStorageInfo(): UseStorageInfoResult {
     async (scope: CleanupScope, days: number = 30): Promise<CleanupPreview | null> => {
       const repo = getWorkspaceRepository()
       const workspacesToClean =
-        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await repo.findAllWorkspaces()
+        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await findActiveProjectWorkspaces()
 
       if (workspacesToClean.length === 0) {
         return null
@@ -372,7 +383,7 @@ export function useStorageInfo(): UseStorageInfoResult {
       const repo = getWorkspaceRepository()
       const manager = await getWorkspaceManager()
       const workspacesToClean =
-        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await repo.findAllWorkspaces()
+        scope === 'old' ? await repo.findInactiveWorkspaces(days) : await findActiveProjectWorkspaces()
 
       // Get real pending counts to skip workspaces with unsaved changes
       const pendingCounts = await repo.getRealPendingCounts()

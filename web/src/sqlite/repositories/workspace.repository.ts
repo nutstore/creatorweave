@@ -278,6 +278,9 @@ export class WorkspaceRepository {
    */
   async deleteWorkspace(id: string): Promise<void> {
     const db = getSQLiteDB()
+    // Remove project_active_workspace records first to avoid NOT NULL constraint violation
+    // (workspace_id is NOT NULL but FK has ON DELETE SET NULL — we must delete the rows instead)
+    await db.execute('DELETE FROM project_active_workspace WHERE workspace_id = ?', [id])
     // Cascade delete will handle related records
     await db.execute('DELETE FROM workspaces WHERE id = ?', [id])
     // Also clear active workspace if this was the active one

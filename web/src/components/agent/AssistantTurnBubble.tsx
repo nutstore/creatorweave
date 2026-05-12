@@ -217,13 +217,14 @@ function buildTimeline(
     })
   })
 
-  // Keep committed message order stable (append order from message array),
-  // then interleave runtime steps by timestamp around that stable backbone.
+  // Committed messages first (array order), then runtime steps (LLM emission order).
+  // The visibleSteps filter already guarantees that visible runtime steps are from
+  // after the last committed message, so no timestamp-based interleaving is needed.
   sortableItems.sort((a, b) => {
-    if (a.source === 'committed' && b.source === 'committed') {
-      return a.sourceIndex - b.sourceIndex
+    if (a.source !== b.source) {
+      return a.source === 'committed' ? -1 : 1
     }
-    return a.timestamp - b.timestamp || a.subIndex - b.subIndex
+    return a.sourceIndex - b.sourceIndex
   })
 
   const items: TimelineItem[] = sortableItems.map((si) => si.item)
