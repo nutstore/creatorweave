@@ -116,10 +116,10 @@ const ConversationDropdown: React.FC<ConversationDropdownProps> = ({
     <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-white shadow-lg dark:border-border dark:bg-card">
       {/* Header - Current conversation */}
       <div className="px-4 py-3">
-        <div className="flex items-center justify-between">
-          <span className="text-tertiary text-xs font-medium">{t('workspaceStorage.currentConversation')}</span>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <span className="text-tertiary shrink-0 text-xs font-medium">{t('workspaceStorage.currentConversation')}</span>
           {activeConversationId && (
-            <span className="text-xs font-semibold text-primary-600">
+            <span className="min-w-0 truncate text-xs font-semibold text-primary-600">
               {currentConversationTitle}
             </span>
           )}
