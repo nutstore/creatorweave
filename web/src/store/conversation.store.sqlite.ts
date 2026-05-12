@@ -26,6 +26,7 @@ import {
   createAssistantMessage,
   createConversation,
   createToolMessage,
+  generateId,
 } from '@/agent/message-types'
 import { parseThinkTags } from '@/agent/think-tags'
 import { extractFirstMentionedAgentId } from '@/agent/agent-mention'
@@ -957,6 +958,9 @@ interface ConversationState {
   clearSuggestedFollowUp: (conversationId: string) => void
   getSuggestedFollowUp: (conversationId: string) => string
 
+  // Branch conversation (fork)
+  branchConversation: (sourceConversationId: string, upToMessageId: string) => Promise<Conversation>
+
   // Emergency draft persistence (beforeunload)
   commitAndPersistRunningDrafts: () => void
 }
@@ -1535,6 +1539,81 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       } else {
         toast.error(i18nText('conversation.toast.modelNotConfigured', '模型未配置，请先在设置中选择服务商和模型'))
       }
+    },
+
+    branchConversation: async (sourceConversationId, upToMessageId) => {
+      const sourceConv = get().conversations.find((c) => c.id === sourceConversationId)
+      if (!sourceConv) {
+        throw new Error('Source conversation not found')
+      }
+
+      // Ensure source messages are loaded
+      let sourceMessages = sourceConv.messages
+      if (sourceMessages.length === 0) {
+        const msgRepo = getMessageRepository()
+        sourceMessages = await msgRepo.findByConversation(sourceConversationId)
+      }
+
+      if (sourceMessages.length === 0) {
+        throw new Error('Cannot branch an empty conversation')
+      }
+
+      // Only include messages up to (and including) the branch point
+      const branchIndex = sourceMessages.findIndex((msg) => msg.id === upToMessageId)
+      if (branchIndex === -1) {
+        throw new Error('Branch point message not found in source conversation')
+      }
+      const messagesToCopy = sourceMessages.slice(0, branchIndex + 1)
+
+      // Create a new conversation (new ID)
+      const branched = createConversation()
+      const sourceTitle = sourceConv.title || 'Chat'
+      branched.title = `分支: ${sourceTitle}`
+      branched.titleMode = 'auto'
+
+      // Deep-copy messages with new IDs (to avoid primary key conflicts)
+      const branchedMessages: Message[] = messagesToCopy.map((msg) => ({
+        ...msg,
+        id: generateId(),
+      }))
+
+      // Set messages on the new conversation
+      branched.messages = branchedMessages
+
+      // Add to state
+      set((state) => {
+        state.conversations.unshift(branched)
+        state.activeConversationId = branched.id
+      })
+
+      // Persist conversation metadata
+      const metaPersist = persistConversationMeta(branched)
+        .catch((error) => {
+          console.error('[conversation.store] Failed to persist branched conversation:', error)
+          toast.error('分支对话保存失败，刷新页面后可能丢失')
+          throw error
+        })
+        .finally(() => {
+          if (pendingConversationMetaPersists.get(branched.id) === metaPersist) {
+            pendingConversationMetaPersists.delete(branched.id)
+          }
+        })
+      pendingConversationMetaPersists.set(branched.id, metaPersist)
+
+      // Persist messages to SQLite
+      const msgRepo = getMessageRepository()
+      await msgRepo.insertBatch(branched.id, branchedMessages)
+
+      // Switch workspace (this creates a new OPFS workspace directory)
+      await useConversationContextStore
+        .getState()
+        .switchWorkspace(branched.id)
+
+      void metaPersist.catch(() => {})
+
+      toast.success(i18nText('conversation.toast.branchCreated', '已创建分支对话'))
+
+      return branched
     },
 
     deleteConversation: async (id) => {

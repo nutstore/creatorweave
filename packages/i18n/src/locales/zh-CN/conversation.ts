@@ -12,6 +12,7 @@ export const conversation = {
     stopAndResendMessage: "停止并重新发送此消息",
     resendMessage: "重新发送此消息",
     editAndResend: "编辑并重新发送",
+    branch: "从此处创建分支",
     thinkingMode: "思考模式",
     thinkingLevels: {
       minimal: "浅",
@@ -56,6 +57,7 @@ export const conversation = {
       stopBeforeEditResend: "请先停止当前运行，再编辑发送",
       conversationMissingForEditResend: "会话不存在，无法编辑重发",
       onlyUserMessageEditResend: "只能编辑并重发用户消息",
+      branchCreated: "已创建分支对话",
     },
     // 错误
     error: {

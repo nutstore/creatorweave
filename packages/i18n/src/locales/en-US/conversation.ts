@@ -12,6 +12,7 @@ export const conversation = {
     stopAndResendMessage: "Stop and resend this message",
     resendMessage: "Resend this message",
     editAndResend: "Edit and Resend",
+    branch: "Branch from here",
     thinkingMode: "Thinking Mode",
     thinkingLevels: {
       minimal: "Minimal",
@@ -56,6 +57,7 @@ export const conversation = {
       stopBeforeEditResend: "Please stop the current run before edit-and-resend.",
       conversationMissingForEditResend: "Conversation not found. Cannot edit and resend.",
       onlyUserMessageEditResend: "Only user messages can be edited and resent.",
+      branchCreated: "Branched conversation created",
     },
     // Error
     error: {

@@ -24,8 +24,8 @@
  *   Only committed messages are rendered (no runtime steps).
  */
 
-import { memo, type ReactNode } from 'react'
-import { Bot, Database } from 'lucide-react'
+import { memo, type ReactNode, useState } from 'react'
+import { Bot, Database, GitBranch } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -39,6 +39,7 @@ import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
+import { useConversationStore } from '@/store/conversation.store'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -341,6 +342,23 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   // Last message with content for copy button
   const lastMessageWithContent = [...turn.messages].reverse().find((msg) => msg.content)
 
+  // Branch conversation state
+  const [isBranching, setIsBranching] = useState(false)
+  const handleBranch = async () => {
+    if (!conversationId || isBranching) return
+    // Use the last message in this turn as the branch point
+    const branchPointMessageId = turn.messages[turn.messages.length - 1]?.id
+    if (!branchPointMessageId) return
+    setIsBranching(true)
+    try {
+      await useConversationStore.getState().branchConversation(conversationId, branchPointMessageId)
+    } catch (error) {
+      console.error('[AssistantTurnBubble] Failed to branch conversation:', error)
+    } finally {
+      setIsBranching(false)
+    }
+  }
+
   return (
     <div className={showAvatar ? 'flex gap-3' : ''}>
       {showAvatar && (
@@ -410,6 +428,16 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             {lastMessageWithContent?.content && (
               <CopyButton text={lastMessageWithContent.content} />
             )}
+            <button
+              type="button"
+              onClick={handleBranch}
+              disabled={isBranching || !conversationId}
+              className={`inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50`}
+              title={t('conversation.branch') || '从此处创建分支'}
+              aria-label={t('conversation.branch') || '从此处创建分支'}
+            >
+              <GitBranch className={`h-3.5 w-3.5 ${isBranching ? 'animate-pulse' : ''}`} />
+            </button>
           </div>
         )}
       </div>
