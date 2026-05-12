@@ -620,17 +620,6 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'bfosa-settings',
       version: 1,
-      // Migrate from version 0: only clear the hardcoded default provider/model.
-      // User-configured values are preserved.
-      migrate: (persisted: any, version?: number) => {
-        if ((version ?? 0) < 1) {
-          if (persisted.providerType === 'glm-coding' && persisted.modelName === 'glm-5.1') {
-            persisted.providerType = ''
-            persisted.modelName = ''
-          }
-        }
-        return persisted
-      },
       // Don't persist hasApiKey - it's derived from SQLite
       partialize: (state) => ({
         providerType: state.providerType,
