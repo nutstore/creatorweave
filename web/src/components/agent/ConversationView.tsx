@@ -16,7 +16,6 @@ import { Send, StopCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput } from './AgentRichInput'
-import { WorkflowQuickActions } from './WorkflowQuickActions'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
@@ -430,15 +429,6 @@ export function ConversationView({
                 thinkingLevel={thinkingLevel}
                 setEnableThinking={setEnableThinking}
                 setThinkingLevel={setThinkingLevel}
-              />
-              <WorkflowQuickActions
-                templates={workflowTemplates}
-                selectedTemplateId={selectedWorkflowTemplateId}
-                disabled={isProcessing}
-                onTemplateChange={setSelectedWorkflowTemplateId}
-                onRun={(id, dsl) => void handleRunWorkflow(id, dsl)}
-                onRealRun={(id, dsl) => void handleRealRunWorkflow(id, dsl)}
-                onOpenEditor={() => setWorkflowEditorOpen(true)}
               />
               <AgentModeSwitchCompact mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
             </div>

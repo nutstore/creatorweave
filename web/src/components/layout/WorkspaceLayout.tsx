@@ -160,7 +160,6 @@ export function WorkspaceLayout({
   /** Target file path (with rootName prefix) to reveal in file tree */
   const [revealTargetPath, setRevealTargetPath] = useState<string | null>(null)
   const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
-  const openWebContainerPanel = useWebContainerStore((s) => s.openPanel)
   const closeWebContainerPanel = useWebContainerStore((s) => s.closePanel)
   const [locale] = useLocale()
   const t = useT()
@@ -661,7 +660,6 @@ export function WorkspaceLayout({
         onToolsPanelOpen={() => setToolsPanelOpen(true)}
         onCommandPaletteOpen={() => setShowCommandPalette(true)}
         onWorkspaceSettingsOpen={() => setShowWorkspaceSettings(true)}
-        onWebContainerOpen={openWebContainerPanel}
         onBackToProjects={onBackToProjects}
         activeProjectName={projectName}
         activeConversationName={activeConversationName}

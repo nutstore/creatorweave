@@ -34,6 +34,8 @@ import {
   FileText,
   CheckCircle2,
   XCircle,
+  Terminal,
+  Radio,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
@@ -54,12 +56,15 @@ import { useSettingsStore } from '@/store/settings.store'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { getSessionStateManager } from '@/remote/session-state-serialization'
+import { RemoteBadge } from '@/components/remote/RemoteBadge'
+import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
+import { useWebContainerStore } from '@/store/webcontainer.store'
 
 // =============================================================================
 // Types
 // =============================================================================
 
-type SettingsTab = 'general' | 'llm' | 'mcp' | 'extension' | 'sync' | 'offline' | 'experimental'
+type SettingsTab = 'general' | 'llm' | 'mcp' | 'extension' | 'sync' | 'offline' | 'experimental' | 'remote' | 'webcontainer'
 
 interface SessionSyncMetadata {
   syncId: string
@@ -768,6 +773,47 @@ function ExtensionSettingsPanel() {
 }
 
 // =============================================================================
+// WebContainer Settings Panel
+// =============================================================================
+
+function WebContainerSettingsPanel() {
+  const t = useT()
+  const openPanel = useWebContainerStore((s) => s.openPanel)
+  const status = useWebContainerStore((s) => s.status)
+
+  return (
+    <div className="space-y-4 py-1">
+      <p className="text-xs text-tertiary">{t('topbar.tooltips.webContainer')}</p>
+
+      <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-700">
+            <Terminal className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+              WebContainer
+            </p>
+            <p className="text-xs text-tertiary">
+              Status: {status}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <BrandButton
+        variant="default"
+        className="w-full"
+        onClick={openPanel}
+      >
+        <Terminal className="mr-2 h-4 w-4" />
+        Open WebContainer Panel
+      </BrandButton>
+    </div>
+  )
+}
+
+// =============================================================================
 // Settings Dialog Content
 // =============================================================================
 
@@ -812,6 +858,8 @@ const SettingsDialogContent = forwardRef<
     { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
     { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
     { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
+    { id: 'remote', label: t('remote.title'), icon: <Radio className="h-4 w-4" /> },
+    { id: 'webcontainer', label: 'WebContainer', icon: <Terminal className="h-4 w-4" /> },
     { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
   ]
 
@@ -993,6 +1041,23 @@ const SettingsDialogContent = forwardRef<
                 onChange={(v) => useSettingsStore.getState().setEnableBatchSpawn(v)}
               />
             </div>
+          )}
+
+          {/* Remote Control Tab */}
+          {activeTab === 'remote' && (
+            <div className="space-y-4 py-1">
+              <p className="text-xs text-tertiary">{t('remote.title')}</p>
+              <div className="flex items-center justify-center rounded-lg border border-neutral-200 p-6 dark:border-neutral-700">
+                <RemoteBadgeErrorBoundary>
+                  <RemoteBadge />
+                </RemoteBadgeErrorBoundary>
+              </div>
+            </div>
+          )}
+
+          {/* WebContainer Tab */}
+          {activeTab === 'webcontainer' && (
+            <WebContainerSettingsPanel />
           )}
         </div>
       </div>

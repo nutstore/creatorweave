@@ -18,13 +18,10 @@ import {
   Keyboard,
   Menu,
   ArrowLeft,
-  Terminal,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
-import { RemoteBadge } from '@/components/remote/RemoteBadge'
-import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { ConversationStorageBadge } from '@/components/conversation'
 import { FolderSelector } from './FolderSelector'
 import { ModelQuickSwitch } from './ModelQuickSwitch'
@@ -56,7 +53,6 @@ interface TopBarProps {
   onToolsPanelOpen?: () => void
   onCommandPaletteOpen?: () => void
   onWorkspaceSettingsOpen?: () => void
-  onWebContainerOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
   activeConversationName?: string
@@ -83,7 +79,6 @@ export function TopBar({
   onToolsPanelOpen,
   onCommandPaletteOpen,
   onWorkspaceSettingsOpen,
-  onWebContainerOpen,
   onBackToProjects,
   activeProjectName,
   activeConversationName,
@@ -231,13 +226,6 @@ export function TopBar({
               <ModelQuickSwitch />
             </div>
 
-            {/* Remote */}
-            <div className="shrink-0">
-              <RemoteBadgeErrorBoundary>
-                <RemoteBadge />
-              </RemoteBadgeErrorBoundary>
-            </div>
-
             {/* Conversation Storage - OPFS conversation status with storage dropdown */}
             <div className="shrink-0">
               <ConversationStorageBadge compact />
@@ -256,13 +244,6 @@ export function TopBar({
             <ActionTooltip label={t('topbar.tooltips.toolsPanel')}>
               <BrandButton iconButton className="shrink-0" onClick={onToolsPanelOpen} data-tour="tools">
                 <List className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
-
-            {/* WebContainer */}
-            <ActionTooltip label={t('topbar.tooltips.webContainer')}>
-              <BrandButton iconButton onClick={onWebContainerOpen}>
-                <Terminal className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
 
@@ -342,26 +323,9 @@ export function TopBar({
               <Keyboard className="h-3.5 w-3.5" />
               {t('topbar.mobile.commandPalette')}
             </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                onWebContainerOpen?.()
-                closeMobileMorePanel()
-              }}
-            >
-              <Terminal className="h-3.5 w-3.5" />
-              {t('topbar.mobile.webContainer')}
-            </BrandButton>
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.connection')}</div>
-              <RemoteBadgeErrorBoundary>
-                <RemoteBadge />
-              </RemoteBadgeErrorBoundary>
-            </div>
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
               <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.storage')}</div>
               <ConversationStorageBadge compact />
