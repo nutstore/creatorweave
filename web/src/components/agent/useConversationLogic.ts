@@ -287,7 +287,33 @@ export function useConversationLogic() {
       return
     }
 
-    const userMsg = createUserMessage(text, options?.assets)
+    // Resolve assets: use provided assets OR fall back to pending assets from store
+    let assets = options?.assets
+    if (!assets || assets.length === 0) {
+      const { pendingAssets, clearAll } = useAssetStore.getState()
+      if (pendingAssets.length > 0) {
+        try {
+          // Ensure workspace is ready for asset writes.
+          // setActive() above fires switchWorkspace asynchronously, so we
+          // may need to wait for it to complete before the OPFS directory exists.
+          const { useWorkspaceStore } = await import('@/store/workspace.store')
+          const wsState = useWorkspaceStore.getState()
+          if (wsState.activeWorkspaceId !== targetConvId) {
+            await wsState.switchWorkspace(targetConvId)
+          }
+
+          assets = await writePendingAssetsToOPFS(
+            pendingAssets.map((a) => ({ name: a.name, file: a.file })),
+          )
+        } catch (err) {
+          toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
+          return // Don't send — user can retry
+        }
+        clearAll()
+      }
+    }
+
+    const userMsg = createUserMessage(text, assets)
     const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)
     updateMessages(targetConvId, conv ? [...conv.messages, userMsg] : [userMsg])
     setInput('')
@@ -313,22 +339,8 @@ export function useConversationLogic() {
     const { getSuggestedFollowUp, clearSuggestedFollowUp } = useConversationRuntimeStore.getState()
     let textToSend = inputTrimmed ? inputRef.current : (currentConvId ? getSuggestedFollowUp(currentConvId) : '')
     if (textToSend) {
-      // Upload pending assets to OPFS and get AssetMeta[]
-      const { pendingAssets, clearAll } = useAssetStore.getState()
-      let assets = undefined
-      if (pendingAssets.length > 0) {
-        try {
-          assets = await writePendingAssetsToOPFS(
-            pendingAssets.map((a) => ({ name: a.name, file: a.file })),
-          )
-        } catch (err) {
-          toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
-          return // Don't send — user can retry
-        }
-        clearAll()
-      }
-
-      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null, assets })
+      // Assets are resolved inside sendMessage (from options or pendingAssets store)
+      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null })
       if (!inputTrimmed && currentConvId) clearSuggestedFollowUp(currentConvId)
     }
   }, [sendMessage])

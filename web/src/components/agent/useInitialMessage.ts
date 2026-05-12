@@ -1,6 +1,10 @@
 /**
  * useInitialMessage — handles sending an initial message on mount
  * with StrictMode safety (dedup via ref keys).
+ *
+ * All logic lives in a single useEffect to avoid StrictMode double-mount
+ * races where a separate "reset on convId change" effect could clear the
+ * handled flag before the main effect re-fires.
  */
 
 import { useRef, useEffect } from 'react'
@@ -22,35 +26,30 @@ export function useInitialMessage({
   onConsumed,
 }: UseInitialMessageOptions) {
   const handled = useRef(false)
-  const keyRef = useRef<string | null>(null)
-
-  // Reset on conversation change
-  useEffect(() => {
-    handled.current = false
-    keyRef.current = null
-  }, [convId])
+  const lastConvIdRef = useRef<string | null>(null)
 
   useEffect(() => {
+    // Reset handled flag when conversation changes
+    if (convId !== lastConvIdRef.current) {
+      lastConvIdRef.current = convId
+      handled.current = false
+    }
+
     if (!initialMessage || !convId || isRunning) return
-    const key = `${convId}:${initialMessage}`
-    if (keyRef.current === key || handled.current) return
+    if (handled.current) return
 
-    // StrictMode guard: check if already appended
+    // StrictMode guard: check if message already appended to conversation
     const currentConv = useConversationStore.getState().conversations.find((c) => c.id === convId)
     const lastMessage = currentConv?.messages[currentConv.messages.length - 1]
     if (lastMessage?.role === 'user' && lastMessage.content === initialMessage) {
       handled.current = true
-      keyRef.current = key
       onConsumed?.()
       return
     }
 
-    keyRef.current = key
-    if (!handled.current) {
-      handled.current = true
-      sendMessage(initialMessage)
-      onConsumed?.()
-    }
+    handled.current = true
+    sendMessage(initialMessage)
+    onConsumed?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage, convId, isRunning])
 }
