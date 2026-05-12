@@ -332,6 +332,18 @@
   cursor: pointer !important;
 }
 
+/* ── Tool Renderers: row fade-in ── */
+@keyframes tool-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ── Workflow Editor: Edge Flow Animation ── */
 @keyframes edge-flow {
   to {

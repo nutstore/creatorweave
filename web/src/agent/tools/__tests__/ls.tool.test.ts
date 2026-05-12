@@ -73,6 +73,18 @@ function createDirectoryHandleWithFiles(fileNames: string[], name = 'root'): Fil
   } as unknown as FileSystemDirectoryHandle
 }
 
+/** Parse the Tool Envelope V2 result */
+function parseEnvelope(result: string) {
+  return JSON.parse(result) as {
+    ok: boolean
+    tool: string
+    version: number
+    data: unknown
+    meta?: Record<string, unknown>
+    error?: { code: string; message: string }
+  }
+}
+
 describe('ls tool', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -88,8 +100,10 @@ describe('ls tool', () => {
       { directoryHandle: null } as unknown as ToolContext
     )
 
-    expect(result).toContain('No files matching pattern')
-    expect(result).not.toContain('No directory selected.')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    expect(envelope.data).toEqual([])
+    expect(envelope.meta?._hint).toContain('No files matching pattern')
   })
 
   it('returns no-directory error when all handle sources are unavailable', async () => {
@@ -98,8 +112,9 @@ describe('ls tool', () => {
       { directoryHandle: null } as unknown as ToolContext
     )
 
-    const parsed = JSON.parse(result)
-    expect(parsed.error).toContain('No directory selected.')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(false)
+    expect(envelope.error?.message).toContain('No directory selected.')
   })
 
   it('falls back to workspace files dir when native directory is unavailable', async () => {
@@ -117,8 +132,9 @@ describe('ls tool', () => {
       { directoryHandle: null, workspaceId: 'ws_1' } as unknown as ToolContext
     )
 
-    expect(result).toContain('No files matching pattern')
-    expect(result).not.toContain('No directory selected.')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    expect(envelope.data).toEqual([])
     expect(getNativeDirectoryHandle).toHaveBeenCalled()
     expect(getFilesDir).toHaveBeenCalled()
   })
@@ -140,7 +156,9 @@ describe('ls tool', () => {
       { directoryHandle: null } as unknown as ToolContext
     )
 
-    expect(result).toContain('No files matching pattern')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    expect(envelope.data).toEqual([])
     expect(getDirectoryHandle).toHaveBeenCalledWith('default', '', { allowMissing: false })
   })
 
@@ -163,8 +181,12 @@ describe('ls tool', () => {
       { directoryHandle: null } as unknown as ToolContext
     )
 
-    expect(result).toContain('default/')
-    expect(result).toContain('novel-editor/')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    expect(envelope.data).toEqual([
+      { name: 'default', kind: 'directory' },
+      { name: 'novel-editor', kind: 'directory' },
+    ])
   })
 
   it('supports glob scans on vfs://agents root and returns namespaced paths', async () => {
@@ -203,7 +225,10 @@ describe('ls tool', () => {
       { directoryHandle: null } as unknown as ToolContext
     )
 
-    expect(result).toContain('novel-editor/SOUL.md')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    const data = envelope.data as Array<{ name: string; path: string }>
+    expect(data.some(e => e.path === 'novel-editor/SOUL.md')).toBe(true)
     expect(resolveAgentHandle).toHaveBeenCalledWith('novel-editor', '', { allowMissing: false })
   })
 
@@ -219,8 +244,10 @@ describe('ls tool', () => {
       { directoryHandle: rootHandle } as unknown as ToolContext
     )
 
-    expect(result).toContain('loan-contract-template.docx')
-    expect(result).not.toContain('No files matching pattern')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    const data = envelope.data as Array<{ name: string }>
+    expect(data.some(e => e.name === 'loan-contract-template.docx')).toBe(true)
   })
 
   it('matches exact filename pattern when path is "./"', async () => {
@@ -235,7 +262,9 @@ describe('ls tool', () => {
       { directoryHandle: rootHandle } as unknown as ToolContext
     )
 
-    expect(result).toContain('loan-contract-template.docx')
-    expect(result).not.toContain('No files matching pattern')
+    const envelope = parseEnvelope(result)
+    expect(envelope.ok).toBe(true)
+    const data = envelope.data as Array<{ name: string }>
+    expect(data.some(e => e.name === 'loan-contract-template.docx')).toBe(true)
   })
 })

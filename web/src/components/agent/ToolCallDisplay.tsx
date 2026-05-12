@@ -1,7 +1,15 @@
 /**
- * ToolCallDisplay - shows tool call details (name, args, result).
- * Supports streaming mode where arguments are still being received.
- * Enhanced rendering for spawn_subagent / batch_spawn with subagent progress.
+ * ToolCallDisplay - renders tool call details with tool-specific views.
+ *
+ * Architecture:
+ *   1. ask_user_question → QuestionCard (interactive)
+ *   2. web_search/web_fetch bridge error → ExtensionErrorCard
+ *   3. spawn_subagent/batch_spawn → SubagentRenderer (rich progress)
+ *   4. Lookup registry → tool-specific Summary + Detail
+ *   5. Fallback → Generic JSON card (original behavior)
+ *
+ * All tool renderers are imported via the side-effect import below
+ * which calls registerRenderer() at module load time.
  */
 
 import { useState } from 'react'
@@ -14,6 +22,21 @@ import { ExtensionErrorCard } from '@/components/extension'
 import { useExtensionStore } from '@/store/extension.store'
 import { getPendingQuestion, removePendingQuestion } from '@/store/pending-question.store'
 import { useT } from '@/i18n'
+import { getRenderer } from './tool-renderers/registry'
+import type { ToolRenderCtx } from './tool-renderers/types'
+
+// Side-effect imports: each file calls registerRenderer() on load
+import './tool-renderers/FileReadRenderer'
+import './tool-renderers/FileEditRenderer'
+import './tool-renderers/SearchRenderer'
+import './tool-renderers/FileWriteRenderer'
+import './tool-renderers/ListDirRenderer'
+import './tool-renderers/GitDiffRenderer'
+import './tool-renderers/GitStatusRenderer'
+import './tool-renderers/PythonRenderer'
+import './tool-renderers/WebRenderers'
+
+// ─── Subagent types (kept local) ──────────────────────────────
 
 interface SubagentEvent {
   agentId: string
@@ -21,6 +44,8 @@ interface SubagentEvent {
   summary: string
   timestamp: number
 }
+
+// ─── Props ────────────────────────────────────────────────────
 
 interface ToolCallDisplayProps {
   toolCall: ToolCall
@@ -34,9 +59,10 @@ interface ToolCallDisplayProps {
   conversationId?: string
 }
 
+// ─── Subagent helpers (kept from original) ────────────────────
+
 const SUBAGENT_TOOLS = new Set(['spawn_subagent', 'batch_spawn'])
 
-/** Status badge color for subagent events */
 function SubagentStatusBadge({ status }: { status: string }) {
   const base = 'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium'
   switch (status) {
@@ -55,14 +81,11 @@ function SubagentStatusBadge({ status }: { status: string }) {
 
 function SubagentProgressSection({ events }: { events: SubagentEvent[] }) {
   if (events.length === 0) return null
-
-  // Show last event per agentId (dedup)
   const latestByAgent = new Map<string, SubagentEvent>()
   for (const ev of events) {
     latestByAgent.set(ev.agentId, ev)
   }
   const uniqueEvents = Array.from(latestByAgent.values())
-
   return (
     <div className="mb-2 rounded border border-neutral-200 bg-white p-2 dark:border-neutral-600 dark:bg-neutral-850">
       <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
@@ -82,12 +105,10 @@ function SubagentProgressSection({ events }: { events: SubagentEvent[] }) {
   )
 }
 
-/** Extract a clean description from spawn args */
 function extractSubagentDescription(parsedArgs: Record<string, unknown>): string | undefined {
   return typeof parsedArgs.description === 'string' ? parsedArgs.description : undefined
 }
 
-/** Parse spawn result JSON and extract content */
 function parseSpawnResult(result: string | undefined): { content?: string; agentId?: string; usage?: { total_tokens?: number; duration_ms?: number } } | null {
   if (!result) return null
   try {
@@ -108,70 +129,68 @@ function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
-export function ToolCallDisplay({
-  toolCall,
-  result,
-  isExecuting,
-  streamingArgs,
-  subagentEvents,
-  conversationId,
-}: ToolCallDisplayProps) {
-  const t = useT()
-  const [expanded, setExpanded] = useState(false)
+// ─── Build render context from props ─────────────────────────
 
-  const isSubagentTool = SUBAGENT_TOOLS.has(toolCall.function.name)
+function buildCtx(props: ToolCallDisplayProps): ToolRenderCtx {
+  const { toolCall, result, isExecuting, streamingArgs } = props
   const rawArgs = streamingArgs ?? toolCall.function.arguments
-  let parsedArgs: Record<string, unknown> = {}
-  try {
-    parsedArgs = JSON.parse(rawArgs)
-  } catch {
-    // Incomplete JSON during streaming — ignore parse error
-  }
+  let args: Record<string, unknown> = {}
+  try { args = JSON.parse(rawArgs) } catch { /* streaming partial JSON */ }
 
   let parsedResult: Record<string, unknown> | null = null
   if (result) {
-    try {
-      parsedResult = JSON.parse(result) as Record<string, unknown>
-    } catch {
-      parsedResult = null
-    }
+    try { parsedResult = JSON.parse(result) as Record<string, unknown> } catch { parsedResult = null }
   }
 
-  const hasToolError =
-    parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'error')
-      ? true
-      : result
-        ? result.includes('"error"')
-        : false
+  const hasToolError = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'error')
+    ? true
+    : result ? result.includes('"error"') : false
   const hasExplicitFailure = parsedResult?.success === false
   const isError = hasToolError || hasExplicitFailure
   const isStreaming = streamingArgs !== undefined && !result
 
-  // Extract path for summary display (non-subagent tools)
-  const displayPath = !isSubagentTool && typeof parsedArgs.path === 'string' ? parsedArgs.path : undefined
+  return {
+    toolName: toolCall.function.name,
+    args,
+    rawArgs,
+    result: parsedResult,
+    rawResult: result,
+    isExecuting: !!isExecuting,
+    isStreaming,
+    isError,
+  }
+}
 
-  // Subagent-specific display
-  const subagentDesc = isSubagentTool ? extractSubagentDescription(parsedArgs) : undefined
-  const spawnResult = isSubagentTool ? parseSpawnResult(result) : null
+// ─── Status icon (shared) ────────────────────────────────────
 
-  // ask_user_question: render as interactive QuestionCard
-  const isAskQuestion = toolCall.function.name === 'ask_user_question'
-  if (isAskQuestion) {
-    // Extract the answer from result for the "answered" state
+function StatusIcon({ ctx, executingText }: { ctx: ToolRenderCtx; executingText?: string }) {
+  if (ctx.isStreaming) return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+  if (ctx.isExecuting) return <span className="text-blue-500 text-xs">{executingText ?? 'executing...'}</span>
+  if (ctx.isError) return <XCircle className="h-4 w-4 text-red-500" />
+  if (ctx.rawResult) return <CheckCircle2 className="h-4 w-4 text-green-500" />
+  return null
+}
+
+// ─── Main Component ──────────────────────────────────────────
+
+export function ToolCallDisplay(props: ToolCallDisplayProps) {
+  const t = useT()
+  const { toolCall, result, isExecuting, streamingArgs, subagentEvents, conversationId } = props
+  const [expanded, setExpanded] = useState(false)
+
+  const ctx = buildCtx(props)
+  const toolName = toolCall.function.name
+
+  // ── 1. ask_user_question → interactive QuestionCard ──
+  if (toolName === 'ask_user_question') {
     let resultAnswer: string | undefined
     if (result) {
       try {
         const parsed = JSON.parse(result) as Record<string, unknown>
         const data = parsed.data as Record<string, unknown> | undefined
-        if (data && typeof data.answer === 'string') {
-          resultAnswer = data.answer
-        }
-      } catch {
-        // ignore
-      }
+        if (data && typeof data.answer === 'string') resultAnswer = data.answer
+      } catch { /* ignore */ }
     }
-
-    // Bridge: find the pending question resolver so the UI can answer it
     const toolCallId = toolCall.id
     const handleAnswer = conversationId
       ? (answer: string) => {
@@ -185,11 +204,11 @@ export function ToolCallDisplay({
 
     return (
       <QuestionCard
-        question={typeof parsedArgs.question === 'string' ? parsedArgs.question : ''}
-        type={(parsedArgs.type as 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text') ?? 'yes_no'}
-        options={Array.isArray(parsedArgs.options) ? parsedArgs.options as string[] : undefined}
-        defaultAnswer={typeof parsedArgs.default_answer === 'string' ? parsedArgs.default_answer : undefined}
-        context={parsedArgs.context as { affected_files?: string[]; preview?: string } | undefined}
+        question={typeof ctx.args.question === 'string' ? ctx.args.question : ''}
+        type={(ctx.args.type as 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text') ?? 'yes_no'}
+        options={Array.isArray(ctx.args.options) ? ctx.args.options as string[] : undefined}
+        defaultAnswer={typeof ctx.args.default_answer === 'string' ? ctx.args.default_answer : undefined}
+        context={ctx.args.context as { affected_files?: string[]; preview?: string } | undefined}
         answered={!!result}
         resultAnswer={resultAnswer}
         onAnswer={handleAnswer}
@@ -197,15 +216,62 @@ export function ToolCallDisplay({
     )
   }
 
-  // web_search / web_fetch with BRIDGE_UNAVAILABLE: show ExtensionErrorCard
-  const isWebBridgeTool = toolCall.function.name === 'web_search' || toolCall.function.name === 'web_fetch'
-  const bridgeError = isWebBridgeTool && parsedResult && !parsedResult.ok && (parsedResult.error as { code?: string })?.code === 'BRIDGE_UNAVAILABLE'
-  if (bridgeError) {
+  // ── 2. web bridge error → ExtensionErrorCard ──
+  const isWebBridgeTool = toolName === 'web_search' || toolName === 'web_fetch'
+  if (isWebBridgeTool && ctx.result && !ctx.result.ok && (ctx.result.error as { code?: string })?.code === 'BRIDGE_UNAVAILABLE') {
     const openInstallGuide = useExtensionStore.getState().openInstallGuide
     return <ExtensionErrorCard onInstallClick={() => openInstallGuide()} />
   }
 
+  // ── 3. spawn_subagent / batch_spawn → rich subagent view ──
+  if (SUBAGENT_TOOLS.has(toolName)) {
+    return (
+      <SubagentCard
+        ctx={ctx}
+        expanded={expanded}
+        onToggle={() => setExpanded(!expanded)}
+        subagentEvents={subagentEvents}
+        t={t}
+      />
+    )
+  }
 
+  // ── 4. Registry lookup → tool-specific renderer ──
+  const renderer = getRenderer(toolName)
+  if (renderer) {
+    return (
+      <div className="my-1.5 rounded-lg border border-neutral-200 bg-neutral-50 text-sm
+        dark:border-neutral-800 dark:bg-neutral-900/50 overflow-hidden
+        hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors">
+        <button
+          type="button"
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left
+            hover:bg-neutral-100/60 dark:hover:bg-neutral-800/40 transition-colors"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+          )}
+          {renderer.icon ?? <Wrench className="h-3.5 w-3.5 text-neutral-500 shrink-0" />}
+          <span className="flex-1 flex items-center gap-1.5 min-w-0">
+            <renderer.Summary {...ctx} />
+          </span>
+          <span className="shrink-0">
+            <StatusIcon ctx={ctx} executingText={t('toolCallDisplay.executing')} />
+          </span>
+        </button>
+        {expanded && (
+          <div className="border-t border-neutral-200 dark:border-neutral-800">
+            <renderer.Detail {...ctx} />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── 5. Fallback: generic JSON card (original behavior) ──
   return (
     <div className="my-1 rounded border border-neutral-200 bg-neutral-50 text-sm dark:border-neutral-700 dark:bg-neutral-800">
       <button
@@ -218,38 +284,95 @@ export function ToolCallDisplay({
         ) : (
           <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
         )}
-        {isSubagentTool ? (
-          <Bot className="h-3.5 w-3.5 text-violet-500" />
-        ) : (
-          <Wrench className="h-3.5 w-3.5 text-neutral-500" />
+        <Wrench className="h-3.5 w-3.5 text-neutral-500" />
+        <code className="font-medium text-neutral-700 dark:text-neutral-200">{toolName}</code>
+        {typeof ctx.args.path === 'string' && (
+          <span className="truncate text-neutral-400 dark:text-neutral-500">{ctx.args.path as string}</span>
         )}
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">{toolCall.function.name}</code>
+        <span className="ml-auto">
+          <StatusIcon ctx={ctx} executingText={t('toolCallDisplay.executing')} />
+        </span>
+      </button>
+      {expanded && (
+        <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <div className="mb-2">
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
+              <CopyIconButton
+                content={Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
+              />
+            </div>
+            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+              {Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
+              {ctx.isStreaming && (
+                <span className="inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
+              )}
+            </pre>
+          </div>
+          {result && (
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
+                <CopyIconButton content={result} />
+              </div>
+              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+                {result}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Subagent card (extracted from original, unchanged logic) ──
+
+function SubagentCard({
+  ctx,
+  expanded,
+  onToggle,
+  subagentEvents,
+  t,
+}: {
+  ctx: ToolRenderCtx
+  expanded: boolean
+  onToggle: () => void
+  subagentEvents?: SubagentEvent[]
+  t: (key: string) => string
+}) {
+  const subagentDesc = extractSubagentDescription(ctx.args)
+  const spawnResult = parseSpawnResult(ctx.rawResult)
+
+  return (
+    <div className="my-1 rounded border border-neutral-200 bg-neutral-50 text-sm dark:border-neutral-700 dark:bg-neutral-800">
+      <button
+        type="button"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-neutral-100 dark:hover:bg-neutral-700"
+        onClick={onToggle}
+      >
+        {expanded ? (
+          <ChevronDown className="h-3.5 w-3.5 text-neutral-400" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
+        )}
+        <Bot className="h-3.5 w-3.5 text-violet-500" />
+        <code className="font-medium text-neutral-700 dark:text-neutral-200">{ctx.toolName}</code>
         {subagentDesc && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{subagentDesc}&quot;</span>
         )}
-        {displayPath && <span className="truncate text-neutral-400 dark:text-neutral-500">{displayPath}</span>}
         <span className="ml-auto">
-          {isStreaming ? (
-            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-          ) : isExecuting ? (
-            <span className="text-blue-500">{t('toolCallDisplay.executing')}</span>
-          ) : isError ? (
-            <XCircle className="h-4 w-4 text-red-500" />
-          ) : result ? (
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          ) : null}
+          <StatusIcon ctx={ctx} executingText={t('toolCallDisplay.executing')} />
         </span>
       </button>
 
-      {/* SubAgent progress section — visible when expanded */}
-      {expanded && isSubagentTool && subagentEvents && subagentEvents.length > 0 && (
+      {expanded && subagentEvents && subagentEvents.length > 0 && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <SubagentProgressSection events={subagentEvents} />
         </div>
       )}
 
-      {/* SubAgent result summary — visible when expanded */}
-      {expanded && isSubagentTool && spawnResult?.content && !isExecuting && (
+      {expanded && spawnResult?.content && !ctx.isExecuting && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <div className="rounded bg-white p-2 text-xs text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
             <div className="prose-sm max-w-none break-words">
@@ -275,24 +398,24 @@ export function ToolCallDisplay({
             <div className="mb-1 flex items-center justify-between">
               <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
               <CopyIconButton
-                content={Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
+                content={Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
               />
             </div>
             <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-              {Object.keys(parsedArgs).length > 0 ? JSON.stringify(parsedArgs, null, 2) : rawArgs}
-              {isStreaming && (
+              {Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
+              {ctx.isStreaming && (
                 <span className="inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
               )}
             </pre>
           </div>
-          {result && (
+          {ctx.rawResult && (
             <div>
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
-                <CopyIconButton content={result} />
+                <CopyIconButton content={ctx.rawResult} />
               </div>
               <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
-                {result}
+                {ctx.rawResult}
               </pre>
             </div>
           )}

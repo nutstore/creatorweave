@@ -11,6 +11,7 @@
 
 import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
 import micromatch from 'micromatch'
+import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { resolveVfsTarget } from './vfs-resolver'
 import { resolveNativeDirectoryHandle, resolveWorkspaceDirectoryHandle } from './tool-utils'
 import {
@@ -340,9 +341,7 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
         if (allHandles.size > 0) {
           const roots = useFolderAccessStore.getState().roots
           if (roots.length > 0) {
-            return roots.map((r: { name: string; readOnly: boolean }) =>
-              `${r.name}/${r.readOnly ? ' (read-only)' : ''}`
-            ).join('\n')
+            return toolOkJson('ls', roots.map((r: { name: string; readOnly: boolean }) => ({ name: r.name, kind: 'directory', readOnly: r.readOnly })))
           }
         }
       }
@@ -355,9 +354,9 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message === 'No directory selected.') {
-      return JSON.stringify({ error: message })
+      return toolErrorJson('ls', 'no_directory', message)
     }
-    return JSON.stringify({ error: message.startsWith('List failed:') ? message : `List failed: ${message}` })
+    return toolErrorJson('ls', 'list_failed', message.startsWith('List failed:') ? message : `List failed: ${message}`)
   }
 
   const rawMaxDepth = args.max_depth ?? args.maxDepth
@@ -376,9 +375,9 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     if (scope.kind === 'agents-root') {
       const agents = await scope.listAgents()
       if (agents.length === 0) {
-        return 'No agents found'
+        return toolOkJson('ls', [])
       }
-      return agents.map((agent) => `${agent.id}/`).join('\n')
+      return toolOkJson('ls', agents.map((agent) => ({ name: agent.id, kind: 'directory' })))
     }
 
     // Resolve native FS handle (disk files)
@@ -460,40 +459,24 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     }
 
     if (timedOut) {
-      return JSON.stringify({
-        error: 'deadline_exceeded',
-        message: `List scan exceeded deadline ${deadlineMs}ms. Narrow path or increase deadline_ms.`,
-        scannedEntries: entries.length,
-      })
+      return toolErrorJson('ls', 'deadline_exceeded', `List scan exceeded deadline ${deadlineMs}ms. Narrow path or increase deadline_ms.`, { retryable: true, details: { scannedEntries: entries.length } })
     }
 
     if (entries.length === 0) {
-      return scope.subPath ? `Directory "${scope.subPath}" is empty` : 'Project directory is empty'
+      return toolOkJson('ls', [], { _hint: scope.subPath ? `Directory "${scope.subPath}" is empty` : 'Project directory is empty' })
     }
 
     // Build tree output
-    const lines: string[] = []
-
-    for (const entry of entries) {
-      const indent = '  '.repeat(entry.depth)
-      const name = entry.path.split('/').pop() || entry.path
-      if (entry.type === 'directory') {
-        lines.push(`${indent}${name}/`)
-      } else {
-        const size = formatSize(entry.size)
-        lines.push(`${indent}${name}${size ? ` (${size})` : ''}`)
-      }
-    }
-
-    const suffixes: string[] = []
-    if (isTruncated && maxEntries !== undefined) {
-      suffixes.push(`... (limited to ${maxEntries} entries)`)
-    }
-    return lines.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
-  } catch (error) {
-    return JSON.stringify({
-      error: `List failed: ${error instanceof Error ? error.message : String(error)}`,
+    return toolOkJson('ls', entries.map(e => ({
+      name: e.path.split('/').pop() || e.path,
+      path: e.path,
+      kind: e.type,
+      ...(e.size > 0 ? { size: e.size } : {}),
+    })), {
+      ...(isTruncated ? { truncated: true, maxEntries } : {}),
     })
+  } catch (error) {
+    return toolErrorJson('ls', 'list_failed', `List failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
@@ -514,11 +497,9 @@ async function executeGlobMode(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     if (message === 'No directory selected.') {
-      return JSON.stringify({ error: message })
+      return toolErrorJson('ls', 'no_directory', message)
     }
-    return JSON.stringify({
-      error: message.startsWith('Glob search failed:') ? message : `Glob search failed: ${message}`,
-    })
+    return toolErrorJson('ls', 'glob_failed', message.startsWith('Glob search failed:') ? message : `Glob search failed: ${message}`)
   }
 
   const maxResultsRaw = args.max_results ?? args.maxResults ?? args.max_entries ?? args.maxEntries
@@ -535,7 +516,7 @@ async function executeGlobMode(
     if (scope.kind === 'agents-root') {
       const agents = await scope.listAgents()
       if (agents.length === 0) {
-        return `No files matching pattern "${pattern}" in vfs://agents`
+        return toolOkJson('ls', [], { _hint: `No files matching pattern "${pattern}" in vfs://agents` })
       }
 
       const staticPrefix = getStaticGlobPrefix(pattern)
@@ -547,7 +528,7 @@ async function executeGlobMode(
 
       for (const agent of agents) {
         if (abortSignal?.aborted) {
-          return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+          return toolErrorJson('ls', 'aborted', 'Glob search failed: operation aborted')
         }
         if (Date.now() > deadlineAt) {
           timedOut = true
@@ -568,7 +549,7 @@ async function executeGlobMode(
 
         while (stack.length > 0) {
           if (abortSignal?.aborted) {
-            return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+            return toolErrorJson('ls', 'aborted', 'Glob search failed: operation aborted')
           }
           const current = stack.pop()!
           if (Date.now() > deadlineAt) {
@@ -579,7 +560,7 @@ async function executeGlobMode(
           const handles = await readDirectoryEntriesSorted(current.handle)
           for (const handle of handles) {
             if (abortSignal?.aborted) {
-              return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+              return toolErrorJson('ls', 'aborted', 'Glob search failed: operation aborted')
             }
             if (Date.now() > deadlineAt) {
               timedOut = true
@@ -624,22 +605,16 @@ async function executeGlobMode(
       }
 
       if (timedOut) {
-        return JSON.stringify({
-          error: 'deadline_exceeded',
-          message: `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`,
-          matchedSoFar: matches.length,
-        })
+        return toolErrorJson('ls', 'deadline_exceeded', `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`, { retryable: true, details: { matchedSoFar: matches.length } })
       }
 
       if (matches.length === 0) {
-        return `No files matching pattern "${pattern}" in vfs://agents`
+        return toolOkJson('ls', [], { _hint: `No files matching pattern "${pattern}" in vfs://agents` })
       }
 
-      const suffixes: string[] = []
-      if (isTruncated && maxResults !== undefined) {
-        suffixes.push(`... (limited to ${maxResults} results)`)
-      }
-      return matches.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
+      return toolOkJson('ls', matches.map(m => ({ name: m, path: m, kind: 'file' as const })), {
+        ...(isTruncated ? { truncated: true, maxResults } : {}),
+      })
     }
 
     const staticPrefix = scope.subPath ? '' : getStaticGlobPrefix(pattern)
@@ -677,7 +652,7 @@ async function executeGlobMode(
     }
 
     if (searchHandles.length === 0) {
-      return `No files matching pattern "${pattern}"`
+      return toolOkJson('ls', [], { _hint: `No files matching pattern "${pattern}"` })
     }
 
     // Always enable dot matching for glob: micromatch's `**` skips dot-prefixed
@@ -701,7 +676,7 @@ async function executeGlobMode(
 
       while (stack.length > 0) {
         if (abortSignal?.aborted) {
-          return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+          return toolErrorJson('ls', 'aborted', 'Glob search failed: operation aborted')
         }
         const current = stack.pop()!
         if (Date.now() > deadlineAt) {
@@ -712,7 +687,7 @@ async function executeGlobMode(
         const handles = await readDirectoryEntriesSorted(current.handle)
         for (const handle of handles) {
           if (abortSignal?.aborted) {
-            return JSON.stringify({ error: 'Glob search failed: operation aborted' })
+            return toolErrorJson('ls', 'aborted', 'Glob search failed: operation aborted')
           }
           if (Date.now() > deadlineAt) {
             timedOut = true
@@ -753,25 +728,17 @@ async function executeGlobMode(
     }
 
     if (timedOut) {
-      return JSON.stringify({
-        error: 'deadline_exceeded',
-        message: `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`,
-        matchedSoFar: matches.length,
-      })
+      return toolErrorJson('ls', 'deadline_exceeded', `Glob scan exceeded deadline ${deadlineMs}ms. Narrow pattern/path or increase deadline_ms.`, { retryable: true, details: { matchedSoFar: matches.length } })
     }
 
     if (matches.length === 0) {
-      return `No files matching pattern "${pattern}"${scope.subPath ? ` in ${scope.subPath}` : ''}`
+      return toolOkJson('ls', [], { _hint: `No files matching pattern "${pattern}"${scope.subPath ? ` in ${scope.subPath}` : ''}` })
     }
 
-    const suffixes: string[] = []
-    if (isTruncated && maxResults !== undefined) {
-      suffixes.push(`... (limited to ${maxResults} results)`)
-    }
-    return matches.join('\n') + (suffixes.length > 0 ? `\n${suffixes.join('\n')}` : '')
-  } catch (error) {
-    return JSON.stringify({
-      error: `Glob search failed: ${error instanceof Error ? error.message : String(error)}`,
+    return toolOkJson('ls', matches.map(m => ({ name: m.split('/').pop() || m, path: m, kind: 'file' as const })), {
+      ...(isTruncated ? { truncated: true, maxResults } : {}),
     })
+  } catch (error) {
+    return toolErrorJson('ls', 'glob_failed', `Glob search failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
