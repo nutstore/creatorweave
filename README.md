@@ -212,7 +212,6 @@ pnpm -C web run test:e2e
 
 ## Roadmap
 
-- [ ] **Attachment Directory (Planned)**: Workspace-level attachment storage for uploading files during conversations. Agent accesses attachments via `vfs://attachments/` using existing `read`/`ls` tools. See [Attachment Directory Design](./docs/design/attachment-directory-design.md).
 - [ ] **SubAgent Orchestration (Planned)**: Add native subagent dispatching, parallel execution scheduling, result aggregation, and guardrails for cross-agent context isolation and handoff quality.
 - [ ] **LLM Wiki (Pending)**: Build an evolving knowledge-base workflow for `ingest` / `query` / `lint`, with structured claims and source traceability. See [LLM Wiki Unified Spec](./docs/design/llm-wiki-mvp-unified-spec.md) and [SubAgent Prerequisite for LLM Wiki](./docs/design/subagent-prerequisite-for-llm-wiki.md).
 
