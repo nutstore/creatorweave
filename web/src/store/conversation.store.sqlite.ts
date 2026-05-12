@@ -2383,6 +2383,20 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               : 20
 
         const agentMode = getCurrentWorkspaceAgentMode()
+
+        // Resolve OPFS workspace dir for subagent transcript storage
+        let subagentGetWorkspaceDir: (() => Promise<FileSystemDirectoryHandle>) | undefined
+        try {
+          const { getWorkspaceManager } = await import('@/opfs')
+          const wsManager = await getWorkspaceManager()
+          const wsRuntime = await wsManager.getWorkspace(conversationId)
+          if (wsRuntime) {
+            subagentGetWorkspaceDir = async () => wsRuntime.workspaceDir
+          }
+        } catch {
+          // Transcript storage is optional — subagent continues without it
+        }
+
         const subagentRuntime = getOrCreateSubagentRuntime({
           workspaceId: conversationId,
           provider,
@@ -2395,6 +2409,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             currentAgentId: activeAgentId,
             agentMode,
           },
+          getWorkspaceDir: subagentGetWorkspaceDir,
           onNotification: (event: SubagentTaskNotification) => {
             // Helper: find the spawn_subagent/batch_spawn step in a draftAssistant
             const findSpawnStep = (draft: { activeToolStepId?: string | null; steps: DraftAssistantStep[] } | null): DraftAssistantStep | undefined => {
