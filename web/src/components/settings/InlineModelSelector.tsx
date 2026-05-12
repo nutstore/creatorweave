@@ -38,8 +38,10 @@ export function InlineModelSelector() {
   const {
     providerType,
     modelName,
+    hasApiKey,
     switchProviderAndModel,
     getAvailableProviders,
+    _providerRefreshVersion: providerRefreshVersion,
   } = useSettingsStore()
 
   const [providers, setProviders] = useState<ProviderWithModels[]>([])
@@ -82,7 +84,7 @@ export function InlineModelSelector() {
     }
     void load()
     return () => { cancelled = true }
-  }, [getAvailableProviders, providerType])
+  }, [getAvailableProviders, providerType, providerRefreshVersion])
 
   const currentProvider = useMemo(
     () => providers.find((p) => p.providerType === providerType),
@@ -122,9 +124,9 @@ export function InlineModelSelector() {
       <div className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
         <Sparkles className="h-4 w-4 shrink-0 text-[var(--brand,#0d9488)]" />
         <span className="text-sm font-medium text-primary truncate">
-          {currentProvider?.displayName || getProviderMeta(providerType)?.displayName || providerType}
-          {' / '}
-          {selectedModel?.name || modelName}
+          {!hasApiKey || !providerType || !modelName
+            ? t('topbar.modelSwitcher.unavailable')
+            : `${currentProvider?.displayName || getProviderMeta(providerType)?.displayName || providerType} / ${selectedModel?.name || modelName}`}
         </span>
       </div>
 

@@ -16,8 +16,10 @@ export function ModelQuickSwitch() {
   const t = useT()
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
+  const hasApiKey = useSettingsStore((s) => s.hasApiKey)
   const getAvailableProviders = useSettingsStore((s) => s.getAvailableProviders)
   const switchProviderAndModel = useSettingsStore((s) => s.switchProviderAndModel)
+  const providerRefreshVersion = useSettingsStore((s) => s._providerRefreshVersion)
 
   const [open, setOpen] = useState(false)
   const [providers, setProviders] = useState<AvailableProvider[]>([])
@@ -40,7 +42,7 @@ export function ModelQuickSwitch() {
     return () => {
       cancelled = true
     }
-  }, [getAvailableProviders, open])
+  }, [getAvailableProviders, open, providerRefreshVersion])
 
   // Filter out providers with no models available
   const visibleProviders = useMemo(() =>
@@ -49,6 +51,14 @@ export function ModelQuickSwitch() {
   )
 
   const currentLabel = useMemo(() => {
+    // No API key configured → always show "unavailable" regardless of persisted values
+    if (!hasApiKey) {
+      return t('topbar.modelSwitcher.unavailable')
+    }
+    // No model selected yet
+    if (!providerType || !modelName) {
+      return t('topbar.modelSwitcher.unavailable')
+    }
     // Always show current provider/model, even if not in pinned list
     const currentProvider = providers.find(
       (p) => p.providerType === providerType
@@ -58,16 +68,15 @@ export function ModelQuickSwitch() {
       return `${currentProvider.displayName} / ${model?.name || modelName}`
     }
     return modelName || t('topbar.modelSwitcher.unavailable')
-  }, [providerType, providers, modelName, t])
+  }, [hasApiKey, providerType, providers, modelName, t])
 
   const handleSelect = (provider: AvailableProvider, nextModelName: string) => {
     switchProviderAndModel(provider.providerType, nextModelName)
     setOpen(false)
   }
 
-  if (providers.length === 0 && !loading) {
-    return null
-  }
+  // Always show the button so users can see it even when nothing is configured
+  // (previously it was hidden when no providers existed)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

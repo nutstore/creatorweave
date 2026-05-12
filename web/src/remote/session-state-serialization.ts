@@ -380,7 +380,7 @@ export class SessionStateManager {
       agent: {
         memories: [],
         preferences: {
-          model: 'glm-4.7',
+          model: '',
           temperature: 0.7,
           maxIterations: 20,
           autoPrefetch: true,
@@ -436,7 +436,7 @@ export class SessionStateManager {
       agent: {
         memories: this.options.includeMemories ? memories.slice(-100) : [],
         preferences: {
-          model: 'glm-4.7',
+          model: '',
           temperature: 0.7,
           maxIterations: 20,
           autoPrefetch: true,

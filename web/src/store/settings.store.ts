@@ -148,6 +148,14 @@ interface SettingsState {
   pinModel: (providerType: LLMProviderType, modelId: string) => void
   unpinModel: (providerType: LLMProviderType, modelId: string) => void
   setPinnedModels: (providerType: LLMProviderType, modelIds: string[]) => void
+
+  /**
+   * Runtime version counter — incremented when provider/model list changes
+   * (API key saved, model pinned/unpinned, custom provider removed).
+   * UI components watch this to decide when to refresh their provider lists.
+   */
+  _providerRefreshVersion: number
+  triggerProviderRefresh: () => void
 }
 
 /** Helper: register a CustomProviderConfig into the dynamic provider registry */
@@ -171,8 +179,8 @@ function registerCustomAsDynamic(cp: CustomProviderConfig) {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set, get) => ({
-      providerType: 'glm-coding',
-      modelName: 'glm-5.1',
+      providerType: '' as LLMProviderType,
+      modelName: '',
       customBaseUrl: '',
       customProviders: [],
       temperature: 0.7,
@@ -185,6 +193,11 @@ export const useSettingsStore = create<SettingsState>()(
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
       pinnedModelsByProvider: {},
+      _providerRefreshVersion: 0,
+
+      triggerProviderRefresh: () => {
+        set((s) => ({ _providerRefreshVersion: s._providerRefreshVersion + 1 }))
+      },
 
       _restoreDynamicProviders: () => {
         const { customProviders } = get()
@@ -299,14 +312,14 @@ export const useSettingsStore = create<SettingsState>()(
         if (wasActive) {
           const fallback = remaining[0]
           if (fallback) {
-            updates.providerType = fallback.id
+            updates.providerType = fallback.id as LLMProviderType
             updates.customBaseUrl = fallback.baseUrl
             updates.modelName = fallback.models[0] || ''
           } else {
-            // No custom providers left, switch to default
-            updates.providerType = 'glm-coding'
+            // No custom providers left, clear selection
+            updates.providerType = '' as LLMProviderType
             updates.customBaseUrl = ''
-            updates.modelName = 'glm-5.1'
+            updates.modelName = ''
           }
         }
         set(updates as SettingsState)
@@ -576,6 +589,7 @@ export const useSettingsStore = create<SettingsState>()(
             ...state.pinnedModelsByProvider,
             [providerType]: [...current, modelId],
           },
+          _providerRefreshVersion: state._providerRefreshVersion + 1,
         })
       },
 
@@ -588,6 +602,7 @@ export const useSettingsStore = create<SettingsState>()(
             ...state.pinnedModelsByProvider,
             [providerType]: current.filter((id) => id !== modelId),
           },
+          _providerRefreshVersion: state._providerRefreshVersion + 1,
         })
       },
 
@@ -598,11 +613,24 @@ export const useSettingsStore = create<SettingsState>()(
             ...state.pinnedModelsByProvider,
             [providerType]: modelIds,
           },
+          _providerRefreshVersion: state._providerRefreshVersion + 1,
         })
       },
     }),
     {
       name: 'bfosa-settings',
+      version: 1,
+      // Migrate from version 0: only clear the hardcoded default provider/model.
+      // User-configured values are preserved.
+      migrate: (persisted: any, version?: number) => {
+        if ((version ?? 0) < 1) {
+          if (persisted.providerType === 'glm-coding' && persisted.modelName === 'glm-5.1') {
+            persisted.providerType = ''
+            persisted.modelName = ''
+          }
+        }
+        return persisted
+      },
       // Don't persist hasApiKey - it's derived from SQLite
       partialize: (state) => ({
         providerType: state.providerType,
@@ -626,12 +654,12 @@ export const useSettingsStore = create<SettingsState>()(
           if ((state.providerType as string) === 'custom') {
             const first = state.customProviders[0]
             if (first) {
-              state.providerType = first.id
+              state.providerType = first.id as LLMProviderType
               state.modelName = first.models[0] || ''
               state.customBaseUrl = first.baseUrl
             } else {
-              state.providerType = 'glm-coding'
-              state.modelName = 'glm-5.1'
+              state.providerType = '' as LLMProviderType
+              state.modelName = ''
               state.customBaseUrl = ''
             }
           }

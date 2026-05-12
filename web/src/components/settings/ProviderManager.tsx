@@ -82,6 +82,7 @@ function ProviderCard({
     pinnedModelsByProvider,
     pinModel,
     unpinModel,
+    triggerProviderRefresh,
   } = useSettingsStore()
 
   const providerKey = providerType
@@ -202,6 +203,7 @@ function ProviderCard({
       if (activeConfig && activeConfig.apiKeyProviderKey === providerKey) {
         useSettingsStore.getState().setHasApiKey(false)
       }
+      triggerProviderRefresh()
       toast.success(t('settings.toast.apiKeyCleared'))
       return
     }
@@ -233,6 +235,9 @@ function ProviderCard({
       }
     }
 
+    // Notify top-bar model switcher and settings panel to refresh their provider lists
+    triggerProviderRefresh()
+
     setTimeout(() => setSaved(false), 2000)
   }, [
     apiKey,
@@ -244,6 +249,7 @@ function ProviderCard({
     refreshModels,
     providerType,
     addCustomProviderModel,
+    triggerProviderRefresh,
     t,
   ])
 

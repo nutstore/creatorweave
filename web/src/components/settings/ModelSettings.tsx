@@ -200,6 +200,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     setThinkingLevel,
     switchProviderAndModel,
     getAvailableProviders,
+    _providerRefreshVersion: providerRefreshVersion,
   } = useSettingsStore()
   const t = useT()
 
@@ -230,7 +231,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     return () => {
       cancelled = true
     }
-  }, [getAvailableProviders, open])
+  }, [getAvailableProviders, open, providerRefreshVersion])
 
   // Build flat options for Select: value = "providerType:modelId"
   const currentSelectValue = `${providerType}:${modelName}`
