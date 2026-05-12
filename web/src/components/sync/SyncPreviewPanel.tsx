@@ -309,7 +309,10 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       // Use streaming to show text incrementally
       let content = ''
       for await (const chunk of provider.chatStream({
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: 'You are a commit message generator. Follow the user instructions exactly. Output only the commit message text, nothing else.' },
+          { role: 'user', content: prompt },
+        ],
         maxTokens: 220,
         disableThinking: true,
       }, signal)) {
