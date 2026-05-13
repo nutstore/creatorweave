@@ -38,18 +38,48 @@ registerRenderer({
   },
   Detail(ctx) {
     const output = extractOutput(ctx)
+    const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
+    const codeLines = code ? code.split('\n').length : 0
 
-    if (ctx.isExecuting) return <StreamingPlaceholder />
+    if (ctx.isExecuting) {
+      return (
+        <div className="px-3 py-2 space-y-2">
+          {/* Code being executed */}
+          {code && (
+            <div>
+              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+                code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
+              </div>
+              <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
+                <pre className="text-[11px] leading-5 font-mono text-neutral-300 whitespace-pre-wrap">{code}</pre>
+              </div>
+            </div>
+          )}
+
+          {/* Running indicator */}
+          <RunningIndicator />
+        </div>
+      )
+    }
 
     const hasOutput = output.stdout || output.stderr || output.errorText
     if (!hasOutput) {
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">No output</div>
+        <div className="px-3 py-2 space-y-2">
+          {code && (
+            <div>
+              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+                code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
+              </div>
+              <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
+                <pre className="text-[11px] leading-5 font-mono text-neutral-300 whitespace-pre-wrap">{code}</pre>
+              </div>
+            </div>
+          )}
+          <div className="text-xs text-neutral-400 dark:text-neutral-500">No output</div>
+        </div>
       )
     }
-
-    const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
-    const codeLines = code ? code.split('\n').length : 0
 
     return (
       <div className="px-3 py-2 space-y-2">
@@ -138,14 +168,14 @@ function extractOutput(ctx: ToolRenderCtx): {
   return { stdout: undefined, stderr: undefined, errorText: undefined, isError: ctx.isError }
 }
 
-function StreamingPlaceholder() {
+function RunningIndicator() {
   return (
-    <div className="px-3 py-2">
-      <div className="rounded-md bg-black dark:bg-neutral-950 p-2 space-y-1.5">
-        {[60, 80, 45, 70].map((w, i) => (
-          <div key={i} className="h-3 rounded bg-neutral-800 animate-pulse" style={{ width: w + '%' }} />
-        ))}
-      </div>
+    <div className="flex items-center gap-2 text-xs text-blue-500">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+      </span>
+      <span>Running...</span>
     </div>
   )
 }
