@@ -5,7 +5,7 @@
  * It is classified as a "read" tool so it's available in both Plan and Act modes.
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import type { AgentMode } from '../agent-mode'
 import {
   getCurrentWorkspaceAgentMode,
@@ -92,4 +92,12 @@ export function createSwitchModeExecutor(opts?: {
           : 'Only read-only tools are available. Write operations are disabled.',
     })
   }
+}
+
+export const switchModePromptDoc: ToolPromptDoc = {
+  category: 'meta',
+  section: '### Agent Mode Switching',
+  lines: [
+    '- `switch_agent_mode(mode, reason)` - Switch between Plan (read-only) and Act (full access) modes',
+  ],
 }

@@ -285,8 +285,20 @@ export type AskQuestionType = 'yes_no' | 'single_choice' | 'multi_choice' | 'fre
 /** Tool executor function signature */
 export type ToolExecutor = (args: Record<string, unknown>, context: ToolContext) => Promise<string>
 
+/** Prompt doc for a single tool — used to auto-generate Available Tools section */
+export interface ToolPromptDoc {
+  /** Grouping category for display ordering (e.g. 'file-ops', 'git', 'subagent') */
+  category: string
+  /** Section heading (e.g. '### Git Tools'). If omitted, lines are appended to the previous section. */
+  section?: string
+  /** One or more markdown lines describing the tool usage. */
+  lines: string[]
+}
+
 /** Complete tool registration entry */
 export interface ToolEntry {
   definition: ToolDefinition
   executor: ToolExecutor
+  /** Prompt doc for auto-generating system prompt Available Tools section */
+  promptDoc?: ToolPromptDoc
 }

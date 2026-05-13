@@ -9,7 +9,7 @@
  * so agent sees the same files as Pyodide, including pending changes and synced resources.
  */
 
-import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolContext, ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import micromatch from 'micromatch'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { resolveVfsTarget } from './vfs-resolver'
@@ -741,4 +741,14 @@ async function executeGlobMode(
   } catch (error) {
     return toolErrorJson('ls', 'glob_failed', `Glob search failed: ${error instanceof Error ? error.message : String(error)}`)
   }
+}
+
+export const lsPromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Discovery',
+  lines: [
+    '- `ls()` - List root directories (in multi-root: shows all root names)',
+    '- `ls(pattern)` - Find files by pattern (e.g., "**/*.csv", "src/**/*.tsx")',
+    '- `ls(path)` - Show directory structure',
+  ],
 }

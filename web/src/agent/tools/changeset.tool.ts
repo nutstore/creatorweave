@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
@@ -176,4 +176,14 @@ export const rollbackSnapshotExecutor: ToolExecutor = async (args, context) => {
         ? `Rolled back ${result.reverted} change(s) from snapshot ${snapshotId}.`
         : `Rolled back ${result.reverted} change(s), ${result.unresolved.length} unresolved.`,
   })
+}
+
+export const changesetPromptDoc: ToolPromptDoc = {
+  category: 'changeset',
+  section: '### Snapshot & Sync Tools',
+  lines: [
+    '- `create_snapshot(summary?)` - Create a snapshot for current file changes (review point before applying to disk)',
+    '- `rollback_snapshot(snapshot_id)` - Rollback pending file changes from a snapshot',
+    '- `detect_conflicts(paths?)` - Detect file conflicts between OPFS pending changes and disk files',
+  ],
 }

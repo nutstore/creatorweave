@@ -2,7 +2,7 @@ import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { collectAssetsFromWrite } from './io.tool'
 import { resolveVfsTarget } from './vfs-resolver'
 import { SubagentError } from './tool-types'
-import type { ToolContext } from './tool-types'
+import type { ToolContext, ToolPromptDoc } from './tool-types'
 import {
   validateAgentId,
   validateDescription,
@@ -468,4 +468,17 @@ export const listSubagentsExecutor: ToolExecutor = async (args, context) => {
     offset: typeof args.offset === 'number' ? args.offset : undefined,
   })
   return toolOkJson(TOOL_NAME_LIST, result)
+}
+
+export const subagentPromptDoc: ToolPromptDoc = {
+  category: 'subagent',
+  section: '### Subagent Delegation',
+  lines: [
+    '- `spawn_subagent(description, prompt, ...)` - Delegate an independent sub-task to a child agent',
+    '- `send_message_to_subagent(to, message)` - Send follow-up instruction to a running/pending child',
+    '- `stop_subagent(agentId)` - Stop a child task when scope changes',
+    '- `resume_subagent(agentId, prompt)` - Resume a stopped/failed/completed child with new instructions',
+    '- `get_subagent_status(agentId)` - Query child status, queue depth, and errors',
+    '- `list_subagents(status?, limit?, offset?)` - Enumerate all child tasks in this workspace',
+  ],
 }

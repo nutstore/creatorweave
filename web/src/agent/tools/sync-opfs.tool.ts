@@ -9,7 +9,7 @@
  * by the on-disk version. Only files that do NOT exist in OPFS are synced.
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import type { WorkspaceRuntime } from '@/opfs/workspace/workspace-runtime'
 import { resolveNativeDirectoryHandle } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
@@ -481,4 +481,12 @@ async function getWorkspaceRuntime(
   } catch {
     return null
   }
+}
+
+export const syncPromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Sync (disk → OPFS)',
+  lines: [
+    '- `sync(paths)` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before `python` when the script needs workspace files not yet available in OPFS. Example: `sync(paths=["data/*.csv", "config.json"])`. In multi-root: `sync(paths=["rootName/data/*.csv"])`.',
+  ],
 }

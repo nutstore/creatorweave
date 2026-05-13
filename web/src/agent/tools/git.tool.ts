@@ -4,7 +4,7 @@
  * 提供浏览器版本的 Git 命令，基于现有的变更追踪和快照系统实现。
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 
@@ -569,4 +569,16 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
       { retryable: true }
     )
   }
+}
+
+export const gitPromptDoc: ToolPromptDoc = {
+  category: 'git',
+  section: '### Git Tools (Version Control)',
+  lines: [
+    '- `git_status(format?)` - Show the working tree status',
+    '- `git_diff(mode?, path?, ...)` - Show changes between commits, commit and working tree, etc.',
+    '- `git_log(limit?, path?, ...)` - Show the commit history',
+    '- `git_show(snapshot_id?, ...)` - Show detailed info about a commit (snapshot)',
+    '- `git_restore(paths?, staged?, snapshot_id?)` - Restore working tree files',
+  ],
 }

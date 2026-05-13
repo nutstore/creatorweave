@@ -7,7 +7,7 @@
  * - edit: Edit file (already unified)
  */
 
-import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { useConversationStore } from '@/store/conversation.store'
@@ -755,6 +755,28 @@ function getResolvedPathForLoopGuard(target: Awaited<ReturnType<typeof resolveVf
   }
   // For agent targets, construct a synthetic path
   return `vfs://agents/${(target as any).agentId}/${target.path}`
+}
+
+//-----------------------------------------------------------------------------
+// Prompt docs (auto-generated Available Tools section)
+//-----------------------------------------------------------------------------
+
+export const readPromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Operations',
+  lines: [
+    '- `read(path)` - Read file contents (supports relative workspace paths and `vfs://workspace/...`, `vfs://agents/{id}/...`)',
+    '- `read(paths)` - Read multiple files',
+  ],
+}
+
+export const writePromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Operations',
+  lines: [
+    '- `write(path, content)` - Create new files or completely replace a file (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
+    '- `write(files)` - Write multiple files',
+  ],
 }
 
 /**

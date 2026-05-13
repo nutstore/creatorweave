@@ -12,7 +12,7 @@
  * - free_text: Open-ended text input
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 
 export const askUserQuestionDefinition: ToolDefinition = {
@@ -211,4 +211,12 @@ export const askUserQuestionExecutor: ToolExecutor = async (
       clearTimeout(timeoutId)
     }
   }
+}
+
+export const askUserQuestionPromptDoc: ToolPromptDoc = {
+  category: 'interaction',
+  section: '### User Interaction',
+  lines: [
+    '- `ask_user_question(question, type?, options?, ...)` - Ask the user a question and wait for their response within the current loop',
+  ],
 }

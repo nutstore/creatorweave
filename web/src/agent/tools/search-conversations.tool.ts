@@ -5,7 +5,7 @@
  * Uses SQLite LIKE on messages.content_json/meta_json.
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { getSQLiteDB } from '@/sqlite/sqlite-database'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 
@@ -142,4 +142,12 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       { retryable: true }
     )
   }
+}
+
+export const searchConversationsPromptDoc: ToolPromptDoc = {
+  category: 'search',
+  section: '### Cross-Workspace Search',
+  lines: [
+    '- `search_conversations(query, limit?)` - Search across all workspaces chat history for a keyword or phrase',
+  ],
 }

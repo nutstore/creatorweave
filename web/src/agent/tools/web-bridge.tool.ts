@@ -7,7 +7,7 @@
 // is detected at runtime.
 // ============================================================
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 
 // ---------------------------------------------------------------------------
@@ -232,4 +232,13 @@ export const webFetchExecutor: ToolExecutor = async (args) => {
   } catch (err) {
     return toolErrorJson('web_fetch', 'FETCH_ERROR', (err as Error).message, { retryable: true })
   }
+}
+
+export const webBridgePromptDoc: ToolPromptDoc = {
+  category: 'web',
+  section: '### Web Tools (requires Browser Extension)',
+  lines: [
+    '- `web_search(query, count?)` - Search the web using DuckDuckGo',
+    '- `web_fetch(url, ...)` - Fetch the content of a web page by URL',
+  ],
 }

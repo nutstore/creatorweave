@@ -11,6 +11,7 @@ import {
   shouldShowToolDiscovery,
 } from '../prompts/universal-system-prompt'
 import type { ToolRegistry } from '../tool-registry'
+import { buildAvailableToolsPrompt } from '../tool-registry'
 import type { ToolContext } from '../tools/tool-types'
 import { buildAvailableWorkflowsBlock } from '../workflow/workflow-injection'
 import type { AgentMode } from '../agent-mode'
@@ -50,6 +51,29 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // ── STABLE SECTION ──────────────────────────────────────────────────
   // ① + ②: Base prompt + agent mode (changes infrequently)
   let enhancedPrompt = buildStableSystemPrompt(input.baseSystemPrompt, input.mode)
+
+  // ①.5: Inject dynamic Available Tools doc (replaces hardcoded section in base prompt)
+  try {
+    const toolsDoc = buildAvailableToolsPrompt()
+    if (toolsDoc) {
+      // Replace the {{AVAILABLE_TOOLS}} placeholder in the base prompt
+      const sentinelIdx = enhancedPrompt.indexOf('{{AVAILABLE_TOOLS}}')
+      if (sentinelIdx !== -1) {
+        enhancedPrompt = enhancedPrompt.replace('{{AVAILABLE_TOOLS}}', toolsDoc)
+      } else {
+        // Fallback: if no sentinel found, append before Tool Usage Notes
+        const usageNotesIdx = enhancedPrompt.indexOf('\n## Tool Usage Notes')
+        if (usageNotesIdx !== -1) {
+          enhancedPrompt =
+            enhancedPrompt.slice(0, usageNotesIdx) +
+            '\n' + toolsDoc + '\n' +
+            enhancedPrompt.slice(usageNotesIdx)
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject available tools doc:', error)
+  }
 
   // ③: Intelligence enhancements (tool recs, project fingerprint, memory)
   try {

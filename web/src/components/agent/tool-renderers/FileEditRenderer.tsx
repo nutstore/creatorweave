@@ -152,11 +152,15 @@ function shortPath(p: string): string {
   return parts.length > 3 ? '...' + parts.slice(-3).join('/') : p
 }
 
-function extractError(ctx: ToolRenderCtx): string | undefined {
-  if (typeof ctx.result?.error === 'string') return ctx.result.error
-  const data = ctx.result?.data as Record<string, unknown> | undefined
-  if (data && typeof data.error === 'string') return data.error
-  return undefined
+function extractError(ctx: ToolRenderCtx): string {
+  const raw = ctx.result?.error
+  // V2 envelope: error is { code, message, retryable }
+  if (raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).message === 'string') {
+    return (raw as Record<string, unknown>).message as string
+  }
+  // Legacy: error is a plain string
+  if (typeof raw === 'string') return raw
+  return 'Edit failed'
 }
 
 function StreamingPlaceholder() {

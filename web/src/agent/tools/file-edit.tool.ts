@@ -5,7 +5,7 @@
 import { structuredPatch } from 'diff'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
-import type { ToolContext, ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolContext, ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
@@ -416,4 +416,12 @@ async function executeSingleEdit(
       { retryable: true }
     )
   }
+}
+
+export const editPromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Operations',
+  lines: [
+    '- `edit(path, old_text, new_text)` - Replace text in an existing file. REQUIRES prior read(). Use this for ALL modifications to existing files. (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
+  ],
 }

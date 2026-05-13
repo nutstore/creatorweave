@@ -8,7 +8,7 @@
  * - aggregate_data: Group and aggregate data
  */
 
-import type { ToolDefinition, ToolExecutor, ToolContext } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from './tool-types'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import {
   parseCSV,
@@ -650,4 +650,12 @@ function generateRecommendations(parsedData: ParsedData, stats: Map<string, Data
   }
 
   return recommendations
+}
+
+export const analyzeDataPromptDoc: ToolPromptDoc = {
+  category: 'execution',
+  section: '### Code Execution (for data/analysis tasks)',
+  lines: [
+    '- `analyze_data(path, file_type)` - Analyze a CSV or JSON data file and extract insights including statistics, column types, and data quality metrics',
+  ],
 }

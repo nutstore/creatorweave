@@ -2,7 +2,7 @@
  * python tool - Python code execution.
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { pythonExecutor as runtimePythonExecutor } from '@/python'
 import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
 import { useConversationStore } from '@/store/conversation.store'
@@ -221,4 +221,13 @@ function diffAssets(
     }
   }
   return assets
+}
+
+export const pythonPromptDoc: ToolPromptDoc = {
+  category: 'execution',
+  section: '### Code Execution (for data/analysis tasks)',
+  lines: [
+    '- `python(code)` - Execute Python with pandas, numpy, matplotlib',
+    '  Example: python(code="print(\'hello\')")',
+  ],
 }

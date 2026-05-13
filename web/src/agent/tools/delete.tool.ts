@@ -6,7 +6,7 @@
  * happens when user triggers sync-to-disk.
  */
 
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
@@ -147,4 +147,14 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
         ? `${deleted.length} file(s) marked for deletion. ${pendingChanges.length} change(s) pending review.`
         : `${deleted.length} file(s) marked for deletion, ${failed.length} failed. ${pendingChanges.length} change(s) pending review.`,
   })
+}
+
+export const deletePromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### File Operations',
+  lines: [
+    '- `delete(path)` - Soft delete single file (marks as pending deletion)',
+    '- `delete(paths)` - Batch soft delete multiple files',
+    '- `delete(..., dry_run=true)` - Preview deletion targets without making changes',
+  ],
 }

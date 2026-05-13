@@ -1,5 +1,5 @@
 import { LLM_PROVIDER_CONFIGS, isCustomProviderType, type LLMProviderType } from '@/agent/providers/types'
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 
 type WorkflowMode = 'dry_run' | 'real_run'
 
@@ -281,4 +281,12 @@ export const runWorkflowExecutor: ToolExecutor = async (args, context) => {
     node_outputs: result.nodeOutputs,
     total_tokens: result.totalTokens,
   })
+}
+
+export const workflowPromptDoc: ToolPromptDoc = {
+  category: 'workflow',
+  section: '### Workflow Execution',
+  lines: [
+    '- `run_workflow(workflow_id, mode?, inputs?, ...)` - Run predefined structured workflows for multi-step content generation/review',
+  ],
 }

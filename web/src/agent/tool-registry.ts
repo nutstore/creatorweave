@@ -5,22 +5,22 @@
  * Supports mode-based tool filtering (Plan vs Act mode).
  */
 
-import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext } from './tools/tool-types'
+import type { ToolDefinition, ToolExecutor, ToolEntry, ToolContext, ToolPromptDoc } from './tools/tool-types'
 import type { PluginMetadata } from '@/types/plugin'
 import { formatErrorForUser, withAutoRetry } from './error-handling'
 import { isToolAllowedInMode, type AgentMode } from './agent-mode'
 import { useSettingsStore } from '@/store/settings.store'
 
 // Import unified IO tools
-import { readDefinition, readExecutor, writeDefinition, writeExecutor } from './tools/io.tool'
-import { deleteDefinition, deleteExecutor } from './tools/delete.tool'
-import { editDefinition, editExecutor } from './tools/file-edit.tool'
-import { searchDefinition, searchExecutor } from './tools/search.tool'
-import { lsDefinition, lsExecutor } from './tools/ls.tool'
-import { pythonDefinition, pythonToolExecutor } from './tools/execute.tool'
+import { readDefinition, readExecutor, readPromptDoc, writeDefinition, writeExecutor, writePromptDoc } from './tools/io.tool'
+import { deleteDefinition, deleteExecutor, deletePromptDoc } from './tools/delete.tool'
+import { editDefinition, editExecutor, editPromptDoc } from './tools/file-edit.tool'
+import { searchDefinition, searchExecutor, searchPromptDoc } from './tools/search.tool'
+import { lsDefinition, lsExecutor, lsPromptDoc } from './tools/ls.tool'
+import { pythonDefinition, pythonToolExecutor, pythonPromptDoc } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
-import { analyzeDataDefinition, analyzeDataExecutor } from './tools/data-analysis.tool'
-import { runWorkflowDefinition, runWorkflowExecutor } from './tools/workflow.tool'
+import { analyzeDataDefinition, analyzeDataExecutor, analyzeDataPromptDoc } from './tools/data-analysis.tool'
+import { runWorkflowDefinition, runWorkflowExecutor, workflowPromptDoc } from './tools/workflow.tool'
 
 // Git tools
 import {
@@ -34,6 +34,7 @@ import {
   gitShowExecutor,
   gitRestoreDefinition,
   gitRestoreExecutor,
+  gitPromptDoc,
 } from './tools/git.tool'
 
 // Import skill tools
@@ -42,18 +43,20 @@ import {
   readSkillExecutor,
   readSkillResourceDefinition,
   readSkillResourceExecutor,
+  skillPromptDoc,
 } from '@/skills/skill-tools'
 
 // Sync-to-OPFS tool
-import { syncToOPFSDefinition, syncToOPFSExecutor } from './tools/sync-opfs.tool'
+import { syncToOPFSDefinition, syncToOPFSExecutor, syncPromptDoc } from './tools/sync-opfs.tool'
 
 // Switch mode tool
-import { switchAgentModeDefinition, createSwitchModeExecutor } from './tools/switch-mode.tool'
+import { switchAgentModeDefinition, createSwitchModeExecutor, switchModePromptDoc } from './tools/switch-mode.tool'
 
 // Ask user question tool
 import {
   askUserQuestionDefinition,
   askUserQuestionExecutor,
+  askUserQuestionPromptDoc,
 } from './tools/ask-user-question.tool'
 
 import {
@@ -71,6 +74,7 @@ import {
   spawnSubagentExecutor,
   stopSubagentDefinition,
   stopSubagentExecutor,
+  subagentPromptDoc,
 } from './tools/subagent.tool'
 
 // Changeset tools (snapshot, sync, conflicts)
@@ -81,12 +85,14 @@ import {
   createSnapshotExecutor,
   rollbackSnapshotDefinition,
   rollbackSnapshotExecutor,
+  changesetPromptDoc,
 } from './tools/changeset.tool'
 
 // Cross-workspace conversation search
 import {
   searchConversationsDefinition,
   searchConversationsExecutor,
+  searchConversationsPromptDoc,
 } from './tools/search-conversations.tool'
 
 // Web bridge tools (conditional — requires Browser Extension)
@@ -96,6 +102,7 @@ import {
   webSearchExecutor,
   webFetchDefinition,
   webFetchExecutor,
+  webBridgePromptDoc,
 } from './tools/web-bridge.tool'
 
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
@@ -137,6 +144,31 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: resumeSubagentDefinition, executor: resumeSubagentExecutor },
   { definition: getSubagentStatusDefinition, executor: getSubagentStatusExecutor },
   { definition: listSubagentsDefinition, executor: listSubagentsExecutor },
+]
+
+/**
+ * All prompt docs for built-in + skill tools.
+ * Used by buildAvailableToolsPrompt() to inject compact tool summaries.
+ */
+const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
+  readPromptDoc,
+  writePromptDoc,
+  editPromptDoc,
+  deletePromptDoc,
+  lsPromptDoc,
+  searchPromptDoc,
+  syncPromptDoc,
+  pythonPromptDoc,
+  analyzeDataPromptDoc,
+  gitPromptDoc,
+  changesetPromptDoc,
+  searchConversationsPromptDoc,
+  workflowPromptDoc,
+  subagentPromptDoc,
+  switchModePromptDoc,
+  askUserQuestionPromptDoc,
+  webBridgePromptDoc,
+  skillPromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -184,6 +216,33 @@ export class ToolRegistry {
 
     // Plan mode: filter to read-only tools only
     return definitions.filter(tool => isToolAllowedInMode(tool.function.name, mode))
+  }
+
+  /**
+   * Build compact tool summary for system prompt injection.
+   * Groups prompt docs by category/section, returns a single Markdown string.
+   */
+  getAvailableToolsDoc(): string {
+    const sections = new Map<string, string[]>()
+
+    for (const doc of ALL_PROMPT_DOCS) {
+      // Skip web bridge tools if not available
+      if (doc.category === 'web' && !isWebBridgeAvailable()) continue
+
+      const section = doc.section ?? `### ${doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}`
+      if (!sections.has(section)) {
+        sections.set(section, [])
+      }
+      sections.get(section)!.push(...doc.lines)
+    }
+
+    const parts: string[] = []
+    for (const [section, lines] of sections) {
+      parts.push(section)
+      parts.push(...lines)
+      parts.push('')
+    }
+    return parts.join('\n').trim()
   }
 
   /** Filter out tools disabled by feature flags (e.g. batch_spawn) */
@@ -382,4 +441,14 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerWebBridgeTools()
   }
   return instance
+}
+
+/**
+ * Build compact tool summary for system prompt injection.
+ * Standalone function — does not require a ToolRegistry instance.
+ */
+export function buildAvailableToolsPrompt(): string {
+  // Ensure registry is initialized (which also checks web bridge)
+  const registry = getToolRegistry()
+  return registry.getAvailableToolsDoc()
 }

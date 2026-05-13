@@ -1,4 +1,4 @@
-import type { ToolDefinition, ToolExecutor } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
 import type { PendingFileOverlay, SearchInDirectoryResult } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
@@ -394,4 +394,12 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       { retryable: true }
     )
   }
+}
+
+export const searchPromptDoc: ToolPromptDoc = {
+  category: 'file-ops',
+  section: '### Content Search',
+  lines: [
+    '- `search(query, ...)` - Search text in files and return matched file/line locations. **IMPORTANT**: Always use `max_results` parameter (default 50) to limit results. Use `glob` parameter (e.g., "**/*.ts") to filter file types when searching large codebases.',
+  ],
 }

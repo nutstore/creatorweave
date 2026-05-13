@@ -5,7 +5,7 @@
  * instead of injecting all skills into the system prompt.
  */
 
-import type { ToolDefinition, ToolExecutor, ToolContext } from '@/agent/tools/tool-types'
+import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from '@/agent/tools/tool-types'
 import { toolOkJson, toolErrorJson } from '@/agent/tools/tool-envelope'
 import { formatResourceList } from './skill-resources'
 import { getSkillManager } from './skill-manager'
@@ -191,4 +191,13 @@ export const readSkillResourceExecutor: ToolExecutor = async (
 ${resource.content}`
 
   return toolOkJson('read_skill_resource', output)
+}
+
+export const skillPromptDoc: ToolPromptDoc = {
+  category: 'skills',
+  section: '### Skill Tools',
+  lines: [
+    '- `read_skill(skill_name)` - Load the full content of a skill by its name. Only load skills listed in <available_skills>.',
+    '- `read_skill_resource(skill_name, resource_path)` - Read a specific resource file from a skill (reference, script, or asset)',
+  ],
 }
