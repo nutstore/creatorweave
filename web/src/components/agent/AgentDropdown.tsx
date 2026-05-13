@@ -3,14 +3,14 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Check, ChevronDown, Plus, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Info, Trash2 } from 'lucide-react'
+import { useT } from '@/i18n'
 import type { AgentMeta } from '@/opfs'
 
 interface AgentDropdownProps {
   allAgents: AgentMeta[]
   activeAgentId: string | null
   setActiveAgent: (agentId: string) => void | Promise<void>
-  createAgent: (agentId: string) => Promise<{ id: string } | null>
   deleteAgent: (agentId: string) => Promise<boolean>
 }
 
@@ -18,12 +18,12 @@ export function AgentDropdown({
   allAgents,
   activeAgentId,
   setActiveAgent,
-  createAgent,
   deleteAgent,
 }: AgentDropdownProps) {
+  const t = useT()
   const [isOpen, setIsOpen] = useState(false)
-  const [isCreatingAgent, setIsCreatingAgent] = useState(false)
-  const [newAgentId, setNewAgentId] = useState('')
+
+  const showGuide = allAgents.length <= 1
 
   useEffect(() => {
     if (!isOpen) return
@@ -32,23 +32,12 @@ export function AgentDropdown({
       const target = e.target as HTMLElement
       if (!target.closest('.agent-dropdown-container')) {
         setIsOpen(false)
-        setIsCreatingAgent(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen])
-
-  const handleCreateAgent = async () => {
-    const id = newAgentId.trim()
-    if (!id) return
-    const created = await createAgent(id)
-    if (!created) return
-    await setActiveAgent(created.id)
-    setNewAgentId('')
-    setIsCreatingAgent(false)
-  }
 
   const handleDeleteAgent = async (agentId: string) => {
     if (agentId === 'default') return
@@ -112,45 +101,15 @@ export function AgentDropdown({
             })}
           </div>
 
-          <div className="border-t border-neutral-200 p-2 dark:border-neutral-700">
-            {isCreatingAgent ? (
-              <div className="flex items-center gap-1.5">
-                <input
-                  value={newAgentId}
-                  onChange={(e) => setNewAgentId(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      void handleCreateAgent()
-                    } else if (e.key === 'Escape') {
-                      setIsCreatingAgent(false)
-                      setNewAgentId('')
-                    }
-                  }}
-                  placeholder="agent-id"
-                  autoFocus
-                  className="h-7 flex-1 rounded border border-neutral-300 bg-white px-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
-                />
-                <button
-                  type="button"
-                  onClick={() => void handleCreateAgent()}
-                  disabled={!newAgentId.trim()}
-                  className="rounded bg-primary-600 px-2 py-1 text-xs text-white hover:bg-primary-700 disabled:opacity-40"
-                >
-                  Add
-                </button>
+          {/* Guide hint — only show when there is just the default agent */}
+          {showGuide && (
+            <div className="border-t border-neutral-100 px-3 py-2.5 dark:border-neutral-800">
+              <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500">
+                <Info className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{t('agent.dropdownGuide')}</span>
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setIsCreatingAgent(true)}
-                className="flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
-              >
-                <Plus className="h-3 w-3" />
-                New agent
-              </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>

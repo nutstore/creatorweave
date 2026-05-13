@@ -421,7 +421,6 @@ export function ConversationView({
                 allAgents={allAgents}
                 activeAgentId={activeAgentId}
                 setActiveAgent={setActiveAgent}
-                createAgent={createAgent}
                 deleteAgent={deleteAgent}
               />
               <ThinkingDropdown

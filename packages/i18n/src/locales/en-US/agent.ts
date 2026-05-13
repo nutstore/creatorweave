@@ -3,6 +3,8 @@ export const agent = {
     inputHint: "Type @ to temporarily switch agent",
     createNew: "Create New Agent...",
     noAgents: "No agents available",
+    dropdownGuide: "Want multiple agents? Just say \"Create an agent for …\" in the chat.",
+    dropdownGuideCompact: "Create agents to divide work by role",
     create: "Create",
     delete: "Delete {id}",
     confirmDelete: 'Delete agent "{id}"?',

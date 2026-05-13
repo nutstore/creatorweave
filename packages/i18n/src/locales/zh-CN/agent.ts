@@ -3,6 +3,8 @@ export const agent = {
     inputHint: "输入 @ 临时切换 Agent",
     createNew: "创建新 Agent...",
     noAgents: "暂无可用 Agent",
+    dropdownGuide: "想要多个智能体？直接在对话中说「帮我创建一个…的 agent」即可。",
+    dropdownGuideCompact: "创建多个智能体，按角色分工协作",
     create: "创建",
     delete: "删除 {id}",
     confirmDelete: '确认删除 Agent "{id}"？',
