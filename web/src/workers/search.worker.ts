@@ -74,7 +74,7 @@ const DEFAULT_EXCLUDED_DIRS = new Set([
 ])
 
 let abortController = new AbortController()
-let isProcessing = false
+let searchGeneration = 0
 
 self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
   const message = event.data
@@ -86,7 +86,6 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
         break
       case 'ABORT':
         abortController.abort()
-        isProcessing = false
         break
       default:
         sendError({ message: `Unknown message type: ${(message as any).type}` })
@@ -100,14 +99,20 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
 }
 
 async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
-  if (isProcessing) {
-    sendError({ code: 'search_worker_error', message: 'Already processing a search' })
-    return
-  }
-
-  isProcessing = true
+  // Abort any in-flight search and bump the generation counter so that
+  // the stale handler's `finally` block won't clobber the new state.
+  abortController.abort()
+  const generation = ++searchGeneration
   abortController = new AbortController()
   const signal = abortController.signal
+
+  // Only send if this is still the active generation.
+  const sendResultIfActive = (payload: SearchResultPayload): void => {
+    if (searchGeneration === generation) sendResult(payload)
+  }
+  const sendErrorIfActive = (payload: SearchErrorPayload): void => {
+    if (searchGeneration === generation) sendError(payload)
+  }
 
   try {
     const {
@@ -128,7 +133,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
     } = payload
 
     if (!query || !query.trim()) {
-      sendResult({
+      sendResultIfActive({
         results: [],
         totalMatches: 0,
         scannedFiles: 0,
@@ -150,7 +155,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
         root = await resolveSubdir(directoryHandle, normalizedPath)
       } catch (error) {
         if (isNotFoundError(error)) {
-          sendError({
+          sendErrorIfActive({
             code: 'path_not_found',
             message: `Search path "${normalizedPath}" not found under current root "${directoryHandle.name}".`,
             requestedPath: normalizedPath,
@@ -180,7 +185,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       // Check for overlay first
       const overlay = pendingOverlays?.[searchSingleFile]
       if (overlay?.deleted) {
-        sendResult({
+        sendResultIfActive({
           results: [],
           totalMatches: 0,
           scannedFiles,
@@ -200,7 +205,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
           const fileHandle = await resolveSubfile(directoryHandle, searchSingleFile)
           const file = await fileHandle.getFile()
           if (file.size > Math.max(1, maxFileSize)) {
-            sendError({
+            sendErrorIfActive({
               code: 'file_too_large',
               message: `File "${searchSingleFile}" exceeds maximum size of ${maxFileSize} bytes.`,
             })
@@ -208,7 +213,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
           }
           text = await file.text()
         } catch (err) {
-          sendError({
+          sendErrorIfActive({
             code: 'path_not_found',
             message: `Could not read file "${searchSingleFile}".`,
             requestedPath: searchSingleFile,
@@ -218,7 +223,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       }
 
       if (isProbablyBinary(text)) {
-        sendResult({
+        sendResultIfActive({
           results: [],
           totalMatches: 0,
           scannedFiles,
@@ -235,7 +240,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
         truncated = true
       }
 
-      sendResult({
+      sendResultIfActive({
         results: hits,
         totalMatches: hits.length,
         scannedFiles,
@@ -403,7 +408,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       }
     }
 
-    sendResult({
+    sendResultIfActive({
       results: hits,
       totalMatches: hits.length,
       scannedFiles,
@@ -412,12 +417,12 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       deadlineExceeded,
     })
   } catch (error) {
-    sendError({
+    sendErrorIfActive({
       code: 'search_worker_error',
       message: error instanceof Error ? error.message : String(error),
     })
   } finally {
-    isProcessing = false
+    // Nothing to do — generation-based dedup handles staleness.
   }
 }
 
