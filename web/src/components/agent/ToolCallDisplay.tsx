@@ -12,7 +12,7 @@
  * which calls registerRenderer() at module load time.
  */
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Bot } from 'lucide-react'
 import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'
@@ -139,10 +139,8 @@ function buildCtx(props: ToolCallDisplayProps): ToolRenderCtx {
 
   let parsedResult: Record<string, unknown> | null = null
   if (result) {
-    try { parsedResult = JSON.parse(result) as Record<string, unknown> } catch (e) {
-      console.error('[buildCtx] JSON.parse(result) failed for tool:', toolCall.function.name, (e as Error).message)
-      console.error('[buildCtx] result type:', typeof result, 'length:', result.length)
-      console.error('[buildCtx] result first 200 chars:', result.slice(0, 200))
+    try { parsedResult = JSON.parse(result) as Record<string, unknown> } catch {
+      // Non-JSON tool results are valid (e.g. LLM provider validation errors, plain text)
       parsedResult = null
     }
   }
@@ -178,7 +176,7 @@ function StatusIcon({ ctx, executingText }: { ctx: ToolRenderCtx; executingText?
 
 // ─── Main Component ──────────────────────────────────────────
 
-export function ToolCallDisplay(props: ToolCallDisplayProps) {
+export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisplayProps) {
   const t = useT()
   const { toolCall, result, isExecuting, streamingArgs, subagentEvents, conversationId } = props
   const [expanded, setExpanded] = useState(false)
@@ -329,7 +327,7 @@ export function ToolCallDisplay(props: ToolCallDisplayProps) {
       )}
     </div>
   )
-}
+})
 
 // ─── Subagent card (extracted from original, unchanged logic) ──
 
