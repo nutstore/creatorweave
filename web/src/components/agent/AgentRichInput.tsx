@@ -284,6 +284,11 @@ export function AgentRichInput({
   const [suggestionItems, setSuggestionItems] = useState<AgentMentionCandidate[]>([])
   const [suggestionCommand, setSuggestionCommand] = useState<((item: { id: string }) => void) | null>(null)
   const suggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
+  // Refs for accessing latest suggestion state inside editorProps.handleKeyDown (avoids stale closures)
+  const suggestionItemsRef = useRef<AgentMentionCandidate[]>([])
+  const suggestionCommandRef = useRef<((item: { id: string }) => void) | null>(null)
+  useEffect(() => { suggestionItemsRef.current = suggestionItems }, [suggestionItems])
+  useEffect(() => { suggestionCommandRef.current = suggestionCommand }, [suggestionCommand])
 
   // File suggestion state – driven by tiptap FileMention/Suggestion
   const [fileSuggestionItems, setFileSuggestionItems] = useState<FileMentionItem[]>([])
@@ -521,6 +526,20 @@ export function AgentRichInput({
         // Suggestion handles its own Enter, so this only fires when the
         // suggestion popup is closed.
         if (event.key === 'Enter' && !event.shiftKey) {
+          // Guard: if the agent-mention (@) suggestion popup is showing, block submit.
+          // Same issue as file-mention: Suggestion plugin's onKeyDown runs AFTER
+          // editorProps.handleKeyDown in ProseMirror, so we must intercept here.
+          const agentItems = suggestionItemsRef.current
+          if (agentItems.length > 0) {
+            const handled = suggestionDropdownRef.current?.onKeyDown(event) ?? false
+            if (handled) return true
+            // Fallback: select first item directly
+            const cmd = suggestionCommandRef.current
+            if (cmd) {
+              cmd(agentItems[0])
+              return true
+            }
+          }
           // Guard: if the file-mention suggestion popup is showing, block submit.
           // The Suggestion plugin's onKeyDown runs AFTER editorProps.handleKeyDown
           // in ProseMirror, so it never gets a chance to handle Enter.  We must
