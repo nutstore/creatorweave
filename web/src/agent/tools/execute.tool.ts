@@ -8,6 +8,7 @@ import { getActiveConversation, useConversationContextStore } from '@/store/conv
 import { useConversationStore } from '@/store/conversation.store'
 import type { AssetMeta, FileSnapshot } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
+import { toolOkJson, toolErrorJson } from './tool-envelope'
 
 //=============================================================================
 // Tool Definition
@@ -66,6 +67,8 @@ Examples:
   },
 }
 
+const TOOL_NAME = 'python'
+
 export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const code = args.code as string
   const timeout = (args.timeout as number) || 60000
@@ -77,6 +80,12 @@ export const pythonToolExecutor: ToolExecutor = async (args, context) => {
 // Python Execution
 //=============================================================================
 
+interface PythonOutputData {
+  stdout?: string
+  stderr?: string
+  executionTime?: number
+}
+
 async function executePython(
   code: string,
   timeout: number,
@@ -84,7 +93,7 @@ async function executePython(
 ): Promise<string> {
   const active = await getActiveConversation()
   if (!active) {
-    return JSON.stringify({ error: 'No active workspace' })
+    return toolErrorJson(TOOL_NAME, 'NO_WORKSPACE', 'No active workspace')
   }
 
   try {
@@ -119,25 +128,23 @@ async function executePython(
     const afterAssets = await snapshotAssetsDir(assetsDirHandle)
     const newAssets = diffAssets(beforeAssets, afterAssets)
 
-    // Format result as string
-    let output = ''
-    if (result.stdout) {
-      output += result.stdout
-    }
-    if (result.stderr) {
-      output += '\n' + result.stderr
-    }
     if (result.error) {
-      return JSON.stringify({ error: result.error })
+      return toolErrorJson(TOOL_NAME, 'EXEC_ERROR', result.error, { retryable: true })
+    }
+
+    // Build structured output for PythonRenderer
+    const stdoutParts: string[] = []
+    if (result.stdout) {
+      stdoutParts.push(result.stdout)
     }
     if (result.result !== undefined) {
-      output += '\n' + String(result.result)
+      stdoutParts.push(String(result.result))
     }
     if (detected.changes.length > 0) {
-      output += `\n[conversation] detected ${detected.changes.length} file change(s)`
+      stdoutParts.push(`[conversation] detected ${detected.changes.length} file change(s)`)
     }
     if (newAssets.length > 0) {
-      output += `\n[assets] generated ${newAssets.length} file(s): ${newAssets.map(a => a.name).join(', ')}`
+      stdoutParts.push(`[assets] generated ${newAssets.length} file(s): ${newAssets.map(a => a.name).join(', ')}`)
 
       // Accumulate assets into the conversation store's collectedAssets
       // These will be attached to the final assistant message when the draft is committed
@@ -149,12 +156,16 @@ async function executePython(
       }
     }
 
-    return output.trim() || 'Execution completed'
-  } catch (error) {
-    if (error instanceof Error) {
-      return JSON.stringify({ error: error.message })
+    const data: PythonOutputData = {
+      stdout: stdoutParts.join('\n') || undefined,
+      stderr: result.stderr || undefined,
+      executionTime: result.executionTime,
     }
-    return JSON.stringify({ error: String(error) })
+
+    return toolOkJson(TOOL_NAME, data)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return toolErrorJson(TOOL_NAME, 'INTERNAL_ERROR', message, { retryable: false })
   }
 }
 

@@ -89,8 +89,8 @@ registerRenderer({
         {output.errorText && !output.stderr && (
           <div>
             <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">error</div>
-            <div className="rounded-md bg-red-950/50 p-2 overflow-x-auto max-h-32">
-              <pre className="text-[11px] leading-5 font-mono text-red-400 whitespace-pre-wrap">{output.errorText}</pre>
+            <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-32">
+              <pre className="text-[11px] leading-5 font-mono text-red-300 whitespace-pre-wrap">{output.errorText}</pre>
             </div>
           </div>
         )}
@@ -118,6 +118,13 @@ function extractOutput(ctx: ToolRenderCtx): {
       errorText: typeof data.error === 'string' ? data.error : undefined,
       isError: ctx.isError,
     }
+  }
+
+  // V2 envelope error: { ok: false, error: { code, message } }
+  if (ctx.result && !ctx.result.ok && ctx.result.error) {
+    const err = ctx.result.error as Record<string, unknown>
+    const msg = typeof err.message === 'string' ? err.message : String(err)
+    return { stdout: undefined, stderr: undefined, errorText: msg, isError: true }
   }
 
   // Fallback: try rawResult

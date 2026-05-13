@@ -28,6 +28,11 @@ const context: ToolContext = {
 function parseError(result: string): { error: string } | null {
   try {
     const parsed = JSON.parse(result)
+    // V2 envelope error: { ok: false, error: { code, message } }
+    if (parsed && parsed.error && typeof parsed.error.message === 'string') {
+      return { error: parsed.error.message }
+    }
+    // Legacy: { error: "string" }
     if (parsed && typeof parsed.error === 'string') {
       return parsed
     }
