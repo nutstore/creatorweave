@@ -75,34 +75,36 @@ export const detectConflictsExecutor: ToolExecutor = async (args, context) => {
   }
 }
 
-export const createSnapshotDefinition: ToolDefinition = {
+export const createCheckpointDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'create_snapshot',
+    name: 'create_checkpoint',
     description:
-      'Create a snapshot for current file changes. ' +
-      'Use this as a review point before approving changes to disk. ' +
-      'Important: this does NOT apply changes to native disk.',
+      'Create a checkpoint for current OPFS file changes during the agent loop. ' +
+      'Use this to save a safe point after making significant modifications — if subsequent changes go wrong, you can rollback to this checkpoint and restore OPFS files to that state. ' +
+      'Important: this does NOT apply changes to native disk. ' +
+      'This is NOT the same as a snapshot (which is a committed change set synced to disk).',
     parameters: {
       type: 'object',
       properties: {
         summary: {
           type: 'string',
-          description: 'Optional short note describing this snapshot',
+          description: 'Optional short note describing this checkpoint',
         },
       },
     },
   },
 }
 
-export const createSnapshotExecutor: ToolExecutor = async (args) => {
+export const createCheckpointExecutor: ToolExecutor = async (args, context) => {
   const summary = args.summary as string | undefined
   const active = await getActiveConversation()
   if (!active) {
     return JSON.stringify({ error: 'No active workspace' })
   }
 
-  const result = await active.conversation.createDraftSnapshot(summary)
+  const { handle: dirHandle } = await resolveNativeDirectoryHandleForPath('', context.directoryHandle, context.workspaceId)
+  const result = await active.conversation.createDraftSnapshot(summary, dirHandle)
   await useConversationContextStore.getState().updateCurrentCounts()
   await useConversationContextStore.getState().refreshPendingChanges(true)
 
@@ -110,44 +112,45 @@ export const createSnapshotExecutor: ToolExecutor = async (args) => {
     return JSON.stringify({
       success: true,
       created: false,
-      message: 'No draft changes to save as snapshot.',
+      message: 'No draft changes to save as checkpoint.',
     })
   }
 
   return JSON.stringify({
     success: true,
     created: true,
-    snapshotId: result.snapshotId,
+    checkpointId: result.snapshotId,
     opCount: result.opCount,
-    message: `Saved snapshot ${result.snapshotId} (${result.opCount} change(s)).`,
+    message: `Saved checkpoint ${result.snapshotId} (${result.opCount} change(s)).`,
   })
 }
 
-export const rollbackSnapshotDefinition: ToolDefinition = {
+export const rollbackCheckpointDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'rollback_snapshot',
+    name: 'rollback_checkpoint',
     description:
-      'Rollback pending file changes from a snapshot. ' +
-      'New files from that snapshot are removed from workspace. ' +
+      'Rollback OPFS file changes to a previously created checkpoint. ' +
+      'OPFS files will be restored to the state they were in when the checkpoint was created. ' +
+      'New files created after the checkpoint are removed from the OPFS workspace. ' +
       'Modified/deleted existing files may require a directory handle to restore from disk.',
     parameters: {
       type: 'object',
       properties: {
-        snapshot_id: {
+        checkpoint_id: {
           type: 'string',
-          description: 'Snapshot id to rollback',
+          description: 'Checkpoint id to rollback to',
         },
       },
-      required: ['snapshot_id'],
+      required: ['checkpoint_id'],
     },
   },
 }
 
-export const rollbackSnapshotExecutor: ToolExecutor = async (args, context) => {
-  const snapshotId = args.snapshot_id as string | undefined
-  if (!snapshotId) {
-    return JSON.stringify({ error: 'snapshot_id is required' })
+export const rollbackCheckpointExecutor: ToolExecutor = async (args, context) => {
+  const checkpointId = args.checkpoint_id as string | undefined
+  if (!checkpointId) {
+    return JSON.stringify({ error: 'checkpoint_id is required' })
   }
 
   const active = await getActiveConversation()
@@ -156,7 +159,7 @@ export const rollbackSnapshotExecutor: ToolExecutor = async (args, context) => {
   }
 
   const { handle: dirHandle } = await resolveNativeDirectoryHandleForPath('', context.directoryHandle, context.workspaceId)
-  const result = await active.conversation.rollbackSnapshot(snapshotId, dirHandle)
+  const result = await active.conversation.rollbackSnapshot(checkpointId, dirHandle)
   await useConversationContextStore.getState().updateCurrentCounts()
   await useConversationContextStore.getState().refreshPendingChanges(true)
   const hasUnresolved = result.unresolved.length > 0
@@ -173,17 +176,17 @@ export const rollbackSnapshotExecutor: ToolExecutor = async (args, context) => {
           : undefined,
     message:
       !hasUnresolved
-        ? `Rolled back ${result.reverted} change(s) from snapshot ${snapshotId}.`
+        ? `Rolled back ${result.reverted} change(s) to checkpoint ${checkpointId}.`
         : `Rolled back ${result.reverted} change(s), ${result.unresolved.length} unresolved.`,
   })
 }
 
 export const changesetPromptDoc: ToolPromptDoc = {
   category: 'changeset',
-  section: '### Snapshot & Sync Tools',
+  section: '### Checkpoint & Sync Tools',
   lines: [
-    '- `create_snapshot(summary?)` - Create a snapshot for current file changes (review point before applying to disk)',
-    '- `rollback_snapshot(snapshot_id)` - Rollback pending file changes from a snapshot',
+    '- `create_checkpoint(summary?)` - Create a checkpoint for current OPFS file changes (save point for rollback during agent loop)',
+    '- `rollback_checkpoint(checkpoint_id)` - Rollback OPFS files to a previously created checkpoint state',
     '- `detect_conflicts(paths?)` - Detect file conflicts between OPFS pending changes and disk files',
   ],
 }

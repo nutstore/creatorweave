@@ -25,6 +25,7 @@ import {
   bindRuntimeDirectoryHandle,
   getRuntimeDirectoryHandle,
 } from '@/native-fs'
+import { getToolRegistry } from '@/agent/tool-registry'
 import { toast } from 'sonner'
 
 // ---------------------------------------------------------------------------
@@ -1072,6 +1073,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           set({ hasDirectoryHandle: true })
 
+          // Register checkpoint tools (require native directory handle)
+          try { getToolRegistry().registerCheckpointTools() } catch {}
+
           if (activeWorkspaceId) {
             try {
               const manager = await getWorkspaceManager()
@@ -1115,6 +1119,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               await releaseDirectoryHandle(activeProjectId, rootName)
             }
             set({ hasDirectoryHandle: false })
+
+            // Unregister checkpoint tools (no longer have native directory handle)
+            try { getToolRegistry().unregisterCheckpointTools() } catch {}
           } catch (e) {
             console.error('Failed to release directory handle:', e)
           }

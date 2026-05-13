@@ -1581,10 +1581,59 @@ export class WorkspaceRuntime {
     return this.getIndexedPaths()
   }
 
-  async createDraftSnapshot(summary?: string): Promise<{ snapshotId: string; opCount: number } | null> {
+  async createDraftSnapshot(
+    summary?: string,
+    directoryHandle?: FileSystemDirectoryHandle | null
+  ): Promise<{ snapshotId: string; opCount: number } | null> {
     if (!this.initialized) await this.initialize()
     const repo = getFSOverlayRepository()
-    return await repo.commitLatestDraftSnapshot(this.workspaceId, summary)
+    const result = await repo.commitLatestDraftSnapshot(this.workspaceId, summary)
+    if (!result) return null
+
+    // Save before/after content for each op so rollback can restore files
+    const snapshotOps = await repo.listSnapshotOps(this.workspaceId, result.snapshotId)
+    for (const op of snapshotOps) {
+      let beforeContent: string | ArrayBuffer | null = null
+      let afterContent: string | ArrayBuffer | null = null
+
+      try {
+        if (op.type === 'create') {
+          const fileResult = await this.readFile(op.path)
+          afterContent = await this.normalizeContentForSnapshot(fileResult.content)
+        } else if (op.type === 'modify') {
+          if (directoryHandle) {
+            try {
+              beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+            } catch {
+              // Native file may not exist — keep before as null
+            }
+          }
+          const fileResult = await this.readFile(op.path)
+          afterContent = await this.normalizeContentForSnapshot(fileResult.content)
+        } else if (op.type === 'delete') {
+          if (directoryHandle) {
+            try {
+              beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+            } catch {
+              // Native file may not exist — keep before as null
+            }
+          }
+        }
+      } catch {
+        // Keep missing side as null
+      }
+
+      await repo.upsertSnapshotFileContent({
+        snapshotId: result.snapshotId,
+        workspaceId: this.workspaceId,
+        path: op.path,
+        opType: op.type,
+        beforeContent,
+        afterContent,
+      })
+    }
+
+    return result
   }
 
   async createApprovedSnapshotForPaths(

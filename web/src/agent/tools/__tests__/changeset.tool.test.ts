@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
-import { createSnapshotExecutor, detectConflictsExecutor, rollbackSnapshotExecutor } from '../changeset.tool'
+import { createCheckpointExecutor, detectConflictsExecutor, rollbackCheckpointExecutor } from '../changeset.tool'
 
 const createDraftSnapshotMock = vi.fn()
 const rollbackSnapshotMock = vi.fn()
 const updateCurrentCountsMock = vi.fn()
 const refreshPendingChangesMock = vi.fn()
 const getActiveConversationMock = vi.fn()
+const resolveNativeDirectoryHandleForPathMock = vi.fn()
 
 vi.mock('@/store/conversation-context.store', () => ({
   getActiveConversation: () => getActiveConversationMock(),
@@ -18,52 +19,72 @@ vi.mock('@/store/conversation-context.store', () => ({
   },
 }))
 
+vi.mock('../tool-utils', () => ({
+  resolveNativeDirectoryHandleForPath: (...args: unknown[]) => resolveNativeDirectoryHandleForPathMock(...args),
+}))
+
 const context: ToolContext = {
   directoryHandle: null,
 }
 
-describe('snapshot tools', () => {
+describe('checkpoint tools', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     updateCurrentCountsMock.mockResolvedValue(undefined)
     refreshPendingChangesMock.mockResolvedValue(undefined)
+    resolveNativeDirectoryHandleForPathMock.mockResolvedValue({ handle: null, nativePath: '' })
   })
 
-  it('create_snapshot returns created payload when draft exists', async () => {
+  it('create_checkpoint returns created payload when draft exists', async () => {
     createDraftSnapshotMock.mockResolvedValue({ snapshotId: 'snap_1', opCount: 3 })
     getActiveConversationMock.mockResolvedValue({
       conversation: { createDraftSnapshot: createDraftSnapshotMock },
     })
 
-    const result = await createSnapshotExecutor({ summary: 'batch update' }, context)
+    const result = await createCheckpointExecutor({ summary: 'batch update' }, context)
     const parsed = JSON.parse(result)
 
     expect(parsed.success).toBe(true)
     expect(parsed.created).toBe(true)
-    expect(parsed.snapshotId).toBe('snap_1')
+    expect(parsed.checkpointId).toBe('snap_1')
     expect(parsed.opCount).toBe(3)
+    // Verify directoryHandle was passed to createDraftSnapshot
+    expect(createDraftSnapshotMock).toHaveBeenCalledWith('batch update', null)
   })
 
-  it('create_snapshot returns no-op when no draft exists', async () => {
+  it('create_checkpoint passes directoryHandle to createDraftSnapshot', async () => {
+    const mockHandle = {} as FileSystemDirectoryHandle
+    resolveNativeDirectoryHandleForPathMock.mockResolvedValue({ handle: mockHandle, nativePath: '' })
+    createDraftSnapshotMock.mockResolvedValue({ snapshotId: 'snap_2', opCount: 1 })
+    getActiveConversationMock.mockResolvedValue({
+      conversation: { createDraftSnapshot: createDraftSnapshotMock },
+    })
+
+    await createCheckpointExecutor({ summary: 'test' }, context)
+
+    expect(createDraftSnapshotMock).toHaveBeenCalledWith('test', mockHandle)
+  })
+
+  it('create_checkpoint returns no-op when no draft exists', async () => {
     createDraftSnapshotMock.mockResolvedValue(null)
     getActiveConversationMock.mockResolvedValue({
       conversation: { createDraftSnapshot: createDraftSnapshotMock },
     })
 
-    const result = await createSnapshotExecutor({}, context)
+    const result = await createCheckpointExecutor({}, context)
     const parsed = JSON.parse(result)
 
     expect(parsed.success).toBe(true)
     expect(parsed.created).toBe(false)
   })
 
-  it('rollback_snapshot validates required snapshot_id', async () => {
-    const result = await rollbackSnapshotExecutor({}, context)
+  it('rollback_checkpoint validates required checkpoint_id', async () => {
+    const result = await rollbackCheckpointExecutor({}, context)
     const parsed = JSON.parse(result)
-    expect(parsed.error).toContain('snapshot_id is required')
+    expect(parsed.error).toContain('checkpoint_id is required')
   })
 
-  it('rollback_snapshot returns unresolved paths', async () => {
+  it('rollback_checkpoint returns unresolved paths', async () => {
     rollbackSnapshotMock.mockResolvedValue({ reverted: 1, unresolved: ['src/a.ts'] })
     getActiveConversationMock.mockResolvedValue({
       conversation: {
@@ -72,7 +93,7 @@ describe('snapshot tools', () => {
       },
     })
 
-    const result = await rollbackSnapshotExecutor({ snapshot_id: 'snap_1' }, context)
+    const result = await rollbackCheckpointExecutor({ checkpoint_id: 'snap_1' }, context)
     const parsed = JSON.parse(result)
 
     expect(parsed.success).toBe(false)

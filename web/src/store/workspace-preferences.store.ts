@@ -345,8 +345,12 @@ export function setCurrentWorkspaceAgentMode(mode: 'plan' | 'act'): void {
 }
 
 // Keep current UI mode in sync with active workspace changes.
+// Lazy-init to avoid TDZ from circular dependency with workspace.store.ts:
+// workspace-preferences.store → (static import) → workspace.store
+// workspace.store → (dynamic import) → workspace-preferences.store
+// If we eagerly subscribe at module load, useWorkspaceStore may not yet be initialized.
 let workspaceModeSyncInitialized = false
-function initializeWorkspaceModeSync() {
+function ensureWorkspaceModeSync() {
   if (workspaceModeSyncInitialized) return
   workspaceModeSyncInitialized = true
 
@@ -358,4 +362,6 @@ function initializeWorkspaceModeSync() {
   useWorkspacePreferencesStore.getState().syncAgentModeForWorkspace(useWorkspaceStore.getState().activeWorkspaceId)
 }
 
-initializeWorkspaceModeSync()
+// Defer sync setup to the next microtask so the module graph finishes
+// initializing first. This breaks the synchronous TDZ reference.
+queueMicrotask(() => ensureWorkspaceModeSync())

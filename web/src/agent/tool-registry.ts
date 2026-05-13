@@ -77,14 +77,14 @@ import {
   subagentPromptDoc,
 } from './tools/subagent.tool'
 
-// Changeset tools (snapshot, sync, conflicts)
+// Changeset tools (checkpoint, sync, conflicts)
 import {
   detectConflictsDefinition,
   detectConflictsExecutor,
-  createSnapshotDefinition,
-  createSnapshotExecutor,
-  rollbackSnapshotDefinition,
-  rollbackSnapshotExecutor,
+  createCheckpointDefinition,
+  createCheckpointExecutor,
+  rollbackCheckpointDefinition,
+  rollbackCheckpointExecutor,
   changesetPromptDoc,
 } from './tools/changeset.tool'
 
@@ -128,9 +128,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
   // Sync native files to OPFS
   { definition: syncToOPFSDefinition, executor: syncToOPFSExecutor },
-  // Changeset & sync tools
-  { definition: createSnapshotDefinition, executor: createSnapshotExecutor },
-  { definition: rollbackSnapshotDefinition, executor: rollbackSnapshotExecutor },
+  // Changeset & sync tools (detect_conflicts always available; checkpoint tools registered dynamically)
   { definition: detectConflictsDefinition, executor: detectConflictsExecutor },
   // Cross-workspace conversation search
   { definition: searchConversationsDefinition, executor: searchConversationsExecutor },
@@ -385,6 +383,30 @@ export class ToolRegistry {
   unregisterWebBridgeTools(): void {
     this.unregister('web_search')
     this.unregister('web_fetch')
+  }
+
+  //=============================================================================
+  // Checkpoint Tools (require native directory handle)
+  //=============================================================================
+
+  /**
+   * Register create_checkpoint and rollback_checkpoint tools.
+   * Called when a native directory handle is granted.
+   */
+  registerCheckpointTools(): void {
+    if (this.has('create_checkpoint')) return // Already registered
+    this.register(createCheckpointDefinition, createCheckpointExecutor)
+    this.register(rollbackCheckpointDefinition, rollbackCheckpointExecutor)
+    console.log('[ToolRegistry] ✅ Checkpoint tools registered (native directory handle available)')
+  }
+
+  /**
+   * Unregister checkpoint tools.
+   * Called when the native directory handle is released.
+   */
+  unregisterCheckpointTools(): void {
+    this.unregister('create_checkpoint')
+    this.unregister('rollback_checkpoint')
   }
 
   //=============================================================================
