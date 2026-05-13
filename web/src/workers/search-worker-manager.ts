@@ -73,16 +73,25 @@ type WorkerResponse =
       }
     }
 
+interface PendingRequest {
+  resolve: (value: SearchInDirectoryResult) => void
+  reject: (err: Error) => void
+}
+
 class SearchWorkerManager {
   private worker: Worker | null = null
-  private pending: { resolve: (value: SearchInDirectoryResult) => void; reject: (err: Error) => void } | null =
-    null
+  private current: PendingRequest | null = null
+  /**
+   * FIFO queue for search requests that arrive while the worker is busy.
+   * Each entry holds the message to send and the promise callbacks.
+   */
+  private queue: Array<{ message: WorkerMessage; pending: PendingRequest }> = []
 
   private getWorker(): Worker {
     if (!this.worker) {
       this.worker = new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' })
       this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-        if (!this.pending) return
+        if (!this.current) return
         if (event.data.type === 'ERROR') {
           const payload = event.data.payload
           const structured = {
@@ -91,17 +100,19 @@ class SearchWorkerManager {
             requestedPath: payload.requestedPath,
             resolvedRootName: payload.resolvedRootName,
           }
-          this.pending.reject(new Error(JSON.stringify(structured)))
+          this.current.reject(new Error(JSON.stringify(structured)))
         } else {
-          this.pending.resolve(event.data.payload)
+          this.current.resolve(event.data.payload)
         }
-        this.pending = null
+        this.current = null
+        this.processQueue()
       }
 
       this.worker.onerror = (event: ErrorEvent) => {
-        if (this.pending) {
-          this.pending.reject(new Error(event.message || 'Search worker error'))
-          this.pending = null
+        if (this.current) {
+          this.current.reject(new Error(event.message || 'Search worker error'))
+          this.current = null
+          this.processQueue()
         }
       }
     }
@@ -109,30 +120,52 @@ class SearchWorkerManager {
     return this.worker
   }
 
+  /**
+   * Drain the next queued request (if any) and dispatch it to the worker.
+   */
+  private processQueue(): void {
+    if (this.current || this.queue.length === 0) return
+    const { message, pending } = this.queue.shift()!
+    this.current = pending
+    const worker = this.getWorker()
+    worker.postMessage(message)
+  }
+
   async searchInDirectory(
     directoryHandle: FileSystemDirectoryHandle,
     options: SearchInDirectoryOptions
   ): Promise<SearchInDirectoryResult> {
-    if (this.pending) {
-      throw new Error('Search worker is busy')
+    const message: WorkerMessage = {
+      type: 'SEARCH',
+      payload: {
+        directoryHandle,
+        ...options,
+      },
     }
 
-    const worker = this.getWorker()
     return new Promise<SearchInDirectoryResult>((resolve, reject) => {
-      this.pending = { resolve, reject }
-      worker.postMessage({
-        type: 'SEARCH',
-        payload: {
-          directoryHandle,
-          ...options,
-        },
-      } as WorkerMessage)
+      const pending: PendingRequest = { resolve, reject }
+      if (!this.current) {
+        // Worker is idle — dispatch immediately
+        this.current = pending
+        const worker = this.getWorker()
+        worker.postMessage(message)
+      } else {
+        // Worker is busy — enqueue for sequential execution
+        this.queue.push({ message, pending })
+      }
     })
   }
 
   abort(): void {
-    if (!this.worker) return
-    this.worker.postMessage({ type: 'ABORT' } as WorkerMessage)
+    // Clear the queue and reject all pending requests
+    for (const { pending } of this.queue) {
+      pending.reject(new Error('Search aborted'))
+    }
+    this.queue = []
+    if (this.worker) {
+      this.worker.postMessage({ type: 'ABORT' } as WorkerMessage)
+    }
   }
 
   terminate(): void {
@@ -140,7 +173,15 @@ class SearchWorkerManager {
       this.worker.terminate()
       this.worker = null
     }
-    this.pending = null
+    // Reject any in-flight or queued requests
+    if (this.current) {
+      this.current.reject(new Error('Search worker terminated'))
+      this.current = null
+    }
+    for (const { pending } of this.queue) {
+      pending.reject(new Error('Search worker terminated'))
+    }
+    this.queue = []
   }
 }
 
