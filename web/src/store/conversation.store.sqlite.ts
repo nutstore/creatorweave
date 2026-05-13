@@ -3188,6 +3188,34 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 delete r.streamingToolArgsByCallId[tc.id]
               }
             })
+
+            // ── Auto-refresh agents list when write/delete tools touch agents/ directory ──
+            // Detects paths like vfs://agents/{id}/... and refreshes useAgentsStore so the
+            // @-mention dropdown picks up newly created agents without a page reload.
+            try {
+              const toolName = tc.function.name
+              if (toolName === 'write' || toolName === 'delete') {
+                const args = JSON.parse(tc.function.arguments)
+                const paths: string[] = args.path
+                  ? [args.path]
+                  : Array.isArray(args.files)
+                    ? args.files.map((f: { path: string }) => f.path)
+                    : Array.isArray(args.paths)
+                      ? args.paths
+                      : []
+                const touchesAgents = paths.some((p: string) => {
+                  const norm = p.replace(/^vfs:\/\/workspace\//, '')
+                  return norm.startsWith('agents/') || p.startsWith('vfs://agents/')
+                })
+                if (touchesAgents) {
+                  import('./agents.store').then(({ useAgentsStore }) => {
+                    useAgentsStore.getState().refreshAgents()
+                  })
+                }
+              }
+            } catch {
+              // Best-effort: never let agent-refresh failure break tool completion
+            }
           },
           onContextUsageUpdate: (payload) => {
             if (!isCurrentRun()) return

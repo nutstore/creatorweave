@@ -25,6 +25,50 @@ const SUBAGENT_OUTPUT_OFFLOAD_THRESHOLD = 8000
 /** Characters from the start of the content to include in the summary. */
 const SUBAGENT_SUMMARY_PREVIEW = 2000
 
+//-----------------------------------------------------------------------------
+// Subagent Health Detection
+//-----------------------------------------------------------------------------
+
+export interface SubagentHealth {
+  ok: boolean
+  reason?: string
+  message?: string
+  suggestion?: string
+}
+
+/**
+ * Detect whether a completed subagent likely failed due to an API error.
+ *
+ * Heuristic: status is "completed" but the output is suspiciously short while
+ * the agent already performed multiple tool calls — this pattern strongly
+ * suggests the LLM response was truncated by an upstream error.
+ */
+function detectSubagentHealth(result: {
+  content: string
+  status: string
+  usage?: { output_tokens?: number; tool_calls?: number }
+}): SubagentHealth {
+  const contentLength = (result.content || '').trim().length
+  const outputTokens = result.usage?.output_tokens ?? 0
+  const toolCalls = result.usage?.tool_calls ?? 0
+
+  if (
+    result.status === 'completed' &&
+    contentLength < 50 &&
+    outputTokens < 100 &&
+    toolCalls > 0
+  ) {
+    return {
+      ok: false,
+      reason: 'suspicious_low_output',
+      message: `Subagent completed but output is suspiciously short (output_tokens=${outputTokens}, tool_calls=${toolCalls}, content_length=${contentLength}). This likely indicates an API error interrupted the response. Try \`resume_subagent\` to continue.`,
+      suggestion: 'resume_subagent',
+    }
+  }
+
+  return { ok: true }
+}
+
 /**
  * If content exceeds the offload threshold, write the full output to an asset
  * file and return a summary + file path. Otherwise return content unchanged.
@@ -282,12 +326,20 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
       name,
       mode: args.mode === 'plan' || args.mode === 'act' ? args.mode : undefined,
     })
+
+    // Health check: detect suspicious low output that likely indicates an API error
+    const health = detectSubagentHealth(result)
+
     const offloaded = await offloadLargeContent(result.content, result.agentId, context)
-    return toolOkJson(TOOL_NAME_SPAWN, {
-      ...result,
-      content: offloaded.content,
-      ...(offloaded.assetPath ? { assetPath: offloaded.assetPath } : {}),
-    })
+    return toolOkJson(
+      TOOL_NAME_SPAWN,
+      {
+        ...result,
+        content: offloaded.content,
+        ...(offloaded.assetPath ? { assetPath: offloaded.assetPath } : {}),
+      },
+      health.ok ? undefined : { health },
+    )
   } catch (error) {
     return formatError(TOOL_NAME_SPAWN, error)
   }
@@ -315,10 +367,12 @@ export const batchSpawnExecutor: ToolExecutor = async (args, context) => {
     const offloadedCompleted = await Promise.all(
       result.completed.map(async (item) => {
         const offloaded = await offloadLargeContent(item.content, item.agentId, context)
+        const health = detectSubagentHealth(item)
         return {
           ...item,
           content: offloaded.content,
           ...(offloaded.assetPath ? { assetPath: offloaded.assetPath } : {}),
+          ...(health.ok ? {} : { health }),
         }
       }),
     )
