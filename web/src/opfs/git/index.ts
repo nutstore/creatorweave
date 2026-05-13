@@ -56,7 +56,7 @@ export interface GitDiffRenderOptions {
 }
 
 export interface GitLogResult {
-  workspaceId: string
+  projectId: string
   head: string | null
   commits: SnapshotCommit[]
   hasMore: boolean
@@ -71,6 +71,7 @@ export interface SnapshotCommit {
   committedAt: number | null
   opCount: number
   isCurrent?: boolean
+  workspaceName?: string
 }
 
 export interface FileChange {
@@ -105,6 +106,7 @@ export interface GitShowResult {
   createdAt: number
   committedAt: number | null
   opCount: number
+  workspaceName?: string
   files: SnapshotFileInfo[]
   diff?: GitDiffResult
 }
@@ -494,7 +496,7 @@ function renderPatchDiff(diff: GitDiffResult): string {
 //=============================================================================
 
 export async function gitLog(
-  workspaceId: string,
+  projectId: string,
   options?: {
     limit?: number
     path?: string
@@ -505,7 +507,8 @@ export async function gitLog(
   const limit = options?.limit || 10
   const hasFilter = Boolean(options?.status || options?.path)
   const fetchLimit = hasFilter ? Math.max(limit * 20, 200) : limit + 1
-  const snapshots = await repo.listSnapshots(workspaceId, fetchLimit)
+
+  const snapshots = await repo.listProjectSnapshots(projectId, fetchLimit)
 
   let filtered = snapshots
 
@@ -517,7 +520,7 @@ export async function gitLog(
     const prefix = options.path
     const matched = await Promise.all(
       filtered.map(async (snapshot) => {
-        const ops = await repo.listSnapshotOps(workspaceId, snapshot.id)
+        const ops = await repo.listSnapshotOps(snapshot.workspaceId, snapshot.id)
         return ops.some((op) => op.path.startsWith(prefix)) ? snapshot : null
       })
     )
@@ -527,11 +530,10 @@ export async function gitLog(
   const hasMore = filtered.length > limit
   const commits = filtered.slice(0, limit).map(mapSnapshotToCommit)
 
-  // Get HEAD commit (most recent)
   const head = commits.length > 0 ? commits[0].id : null
 
   return {
-    workspaceId,
+    projectId,
     head,
     commits,
     hasMore,
@@ -545,6 +547,9 @@ export function formatGitLog(log: GitLogResult): string {
     const date = new Date(commit.createdAt).toLocaleString()
     const isCurrent = commit.isCurrent ? ' (current)' : ''
     lines.push(`commit ${commit.id}${isCurrent}`)
+    if (commit.workspaceName) {
+      lines.push(`Workspace: ${commit.workspaceName}`)
+    }
     lines.push(`Date:   ${date}`)
     if (commit.summary) {
       lines.push('')
@@ -590,7 +595,7 @@ export function formatGitLogOneline(log: GitLogResult): string {
 //=============================================================================
 
 export async function gitShow(
-  workspaceId: string,
+  projectId: string,
   snapshotId?: string,
   options?: {
     includeDiff?: boolean
@@ -602,11 +607,11 @@ export async function gitShow(
   let targetId: string
 
   if (snapshotId) {
-    snapshot = await repo.getSnapshotById(workspaceId, snapshotId)
+    snapshot = await repo.getProjectSnapshotById(projectId, snapshotId)
     if (!snapshot) return null
     targetId = snapshot.id
   } else {
-    const snapshots = await repo.listSnapshots(workspaceId, 1)
+    const snapshots = await repo.listProjectSnapshots(projectId, 1)
     if (snapshots.length === 0) return null
     snapshot = snapshots[0]
     targetId = snapshot.id
@@ -615,7 +620,7 @@ export async function gitShow(
   const files = await repo.listSnapshotFiles(snapshot.id)
   let diff: GitDiffResult | undefined
   if (options?.includeDiff) {
-    diff = await gitDiff(workspaceId, {
+    diff = await gitDiff(snapshot.workspaceId, {
       mode: 'snapshot',
       snapshotId: targetId,
       path: options.path,
@@ -630,6 +635,7 @@ export async function gitShow(
     createdAt: snapshot.createdAt,
     committedAt: snapshot.committedAt,
     opCount: snapshot.opCount,
+    workspaceName: snapshot.workspaceName,
     files: files.map((f) => ({
       path: f.path,
       opType: f.opType,
@@ -645,6 +651,9 @@ export function formatGitShow(data: GitShowResult): string {
 
   const lines: string[] = []
   lines.push(`commit ${data.id}`)
+  if (data.workspaceName) {
+    lines.push(`Workspace: ${data.workspaceName}`)
+  }
   lines.push(`Date:   ${date}`)
   lines.push(`Status: ${data.status}`)
   lines.push('')
@@ -832,8 +841,10 @@ function mapSnapshotToCommit(snapshot: SnapshotRecord): SnapshotCommit {
     committedAt: snapshot.committedAt,
     opCount: snapshot.opCount,
     isCurrent: snapshot.isCurrent,
+    workspaceName: snapshot.workspaceName,
   }
 }
+
 
 function normalizeDiffContextLines(value: number | undefined): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {

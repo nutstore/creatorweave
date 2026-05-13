@@ -33,6 +33,7 @@ import './tool-renderers/FileWriteRenderer'
 import './tool-renderers/ListDirRenderer'
 import './tool-renderers/GitDiffRenderer'
 import './tool-renderers/GitStatusRenderer'
+import './tool-renderers/GitLogShowRenderer'
 import './tool-renderers/PythonRenderer'
 import './tool-renderers/WebRenderers'
 

@@ -49,6 +49,7 @@ vi.mock('@/store/conversation-context.store', () => ({
 
 const context = {
   workspaceId: 'ws_1',
+  projectId: 'project_1',
   directoryHandle: null,
 } as ToolContext
 
@@ -148,11 +149,36 @@ describe('git.tool envelope + validation', () => {
     expect(parsed.error.code).toBe('invalid_arguments')
   })
 
+  it('git_log calls gitLog with projectId', async () => {
+    const raw = await gitLogExecutor({ limit: 5 }, context)
+    const parsed = JSON.parse(raw)
+    expect(parsed.ok).toBe(true)
+    expect(mocked.gitLogMock).toHaveBeenCalledWith(
+      'project_1',
+      expect.objectContaining({
+        limit: 5,
+      })
+    )
+  })
+
   it('git_show validates include_diff type', async () => {
     const raw = await gitShowExecutor({ include_diff: 'yes' }, context)
     const parsed = JSON.parse(raw)
     expect(parsed.ok).toBe(false)
     expect(parsed.error.code).toBe('invalid_arguments')
+  })
+
+  it('git_show calls gitShow with projectId', async () => {
+    const raw = await gitShowExecutor({ snapshot_id: 's1' }, context)
+    const parsed = JSON.parse(raw)
+    expect(parsed.ok).toBe(true)
+    expect(mocked.gitShowMock).toHaveBeenCalledWith(
+      'project_1',
+      's1',
+      expect.objectContaining({
+        includeDiff: false,
+      })
+    )
   })
 
   it('git_restore accepts empty paths and applies to all eligible paths', async () => {
@@ -179,10 +205,24 @@ describe('git.tool envelope + validation', () => {
     )
   })
 
-  it('returns no_active_workspace when workspace missing', async () => {
+  it('returns no_active_workspace when workspace missing (git_status)', async () => {
     const raw = await gitStatusExecutor({}, { directoryHandle: null } as ToolContext)
     const parsed = JSON.parse(raw)
     expect(parsed.ok).toBe(false)
     expect(parsed.error.code).toBe('no_active_workspace')
+  })
+
+  it('returns no_active_project when project missing (git_log)', async () => {
+    const raw = await gitLogExecutor({}, { workspaceId: 'ws_1', directoryHandle: null } as ToolContext)
+    const parsed = JSON.parse(raw)
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error.code).toBe('no_active_project')
+  })
+
+  it('returns no_active_project when project missing (git_show)', async () => {
+    const raw = await gitShowExecutor({}, { workspaceId: 'ws_1', directoryHandle: null } as ToolContext)
+    const parsed = JSON.parse(raw)
+    expect(parsed.ok).toBe(false)
+    expect(parsed.error.code).toBe('no_active_project')
   })
 })

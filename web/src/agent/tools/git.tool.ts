@@ -35,6 +35,12 @@ function ensureWorkspaceId(context: { workspaceId?: string | null }): string | n
   return workspaceId
 }
 
+function ensureProjectId(context: { projectId?: string | null }): string | null {
+  const projectId = context.projectId
+  if (!projectId) return null
+  return projectId
+}
+
 function parseBooleanArg(value: unknown, name: string): { ok: true; value: boolean } | { ok: false; error: string } {
   if (value === undefined) return { ok: true, value: false }
   if (typeof value === 'boolean') return { ok: true, value }
@@ -326,9 +332,9 @@ export const gitLogDefinition: ToolDefinition = {
 
 export const gitLogExecutor: ToolExecutor = async (args, context) => {
   try {
-    const workspaceId = ensureWorkspaceId(context)
-    if (!workspaceId) {
-      return toolErrorJson('git_log', 'no_active_workspace', 'No active workspace')
+    const projectId = ensureProjectId(context)
+    if (!projectId) {
+      return toolErrorJson('git_log', 'no_active_project', 'No active project')
     }
     if (args.limit !== undefined) {
       if (
@@ -359,7 +365,7 @@ export const gitLogExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('git_log', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitLog(workspaceId, {
+    const result = await gitLog(projectId, {
       limit,
       path,
       status,
@@ -426,9 +432,9 @@ export const gitShowDefinition: ToolDefinition = {
 
 export const gitShowExecutor: ToolExecutor = async (args, context) => {
   try {
-    const workspaceId = ensureWorkspaceId(context)
-    if (!workspaceId) {
-      return toolErrorJson('git_show', 'no_active_workspace', 'No active workspace')
+    const projectId = ensureProjectId(context)
+    if (!projectId) {
+      return toolErrorJson('git_show', 'no_active_project', 'No active project')
     }
     const snapshotId = args.snapshot_id as string | undefined
     if (args.include_diff !== undefined && typeof args.include_diff !== 'boolean') {
@@ -441,7 +447,7 @@ export const gitShowExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('git_show', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitShow(workspaceId, snapshotId, {
+    const result = await gitShow(projectId, snapshotId, {
       includeDiff: includeDiff === true,
       path,
     })

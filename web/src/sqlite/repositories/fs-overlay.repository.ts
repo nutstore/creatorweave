@@ -229,6 +229,61 @@ export class FSOverlayRepository {
     }))
   }
 
+  async getProjectSnapshotById(projectId: string, snapshotId: string): Promise<SnapshotRecord | null> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<{
+      id: string
+      project_id: string
+      workspace_id: string
+      workspace_name: string
+      status: string
+      summary: string | null
+      source: string
+      created_at: number
+      committed_at: number | null
+      op_count: number
+      is_current: number
+    }>(
+      `SELECT c.id,
+              w.project_id,
+              c.workspace_id,
+              w.name AS workspace_name,
+              c.status,
+              c.summary,
+              c.source,
+              c.created_at,
+              c.committed_at,
+              COUNT(o.id) AS op_count,
+              CASE WHEN w.current_snapshot_id = c.id THEN 1 ELSE 0 END AS is_current
+       FROM fs_changesets c
+       JOIN workspaces w ON w.id = c.workspace_id
+       LEFT JOIN fs_ops o
+         ON o.changeset_id = c.id
+        AND o.workspace_id = c.workspace_id
+       WHERE w.project_id = ?
+         AND c.id = ?
+         AND c.status != 'draft'
+       GROUP BY c.id
+       LIMIT 1`,
+      [projectId, snapshotId]
+    )
+
+    if (!row) return null
+    return {
+      id: row.id,
+      projectId: row.project_id,
+      workspaceId: row.workspace_id,
+      workspaceName: row.workspace_name,
+      status: row.status,
+      summary: row.summary,
+      source: row.source,
+      createdAt: row.created_at,
+      committedAt: row.committed_at,
+      opCount: Number(row.op_count || 0),
+      isCurrent: row.is_current === 1,
+    }
+  }
+
   async getOrCreateDraftChangeset(workspaceId: string, source: string = 'tool'): Promise<string> {
     const db = getSQLiteDB()
     const existing = await db.queryFirst<{ id: string }>(
