@@ -506,6 +506,21 @@ let messageQueue = Promise.resolve()
 async function handleMessage(/** @type {any} */ data) {
   const { id, type } = data
 
+  // Handle 'warmup' type - pre-initialize Pyodide without executing code
+  if (type === 'warmup') {
+    try {
+      if (!pyodide) {
+        console.log('[Pyodide Worker] Warmup: initializing Pyodide...')
+        pyodide = await initPyodide()
+        console.log('[Pyodide Worker] Warmup complete')
+      }
+      sendResponse(id, true, { success: true })
+    } catch (error) {
+      sendError(id, error instanceof Error ? error.message : String(error))
+    }
+    return
+  }
+
   // Handle 'mount' type - mount a directory to /mnt
   if (type === 'mount') {
     try {
@@ -595,6 +610,21 @@ async function handleMessage(/** @type {any} */ data) {
     } catch {
       // If find_imports fails (e.g. syntax error in user code), skip silently.
       // runPythonAsync below will produce a more precise error message.
+    }
+
+    // Step 1.5: Pandas dependency patch
+    // Pyodide's loadPackagesFromImports loads pandas but does NOT auto-activate
+    // its runtime dependency 'six' (included in Pyodide distribution but not
+    // installed). This causes a circular-import crash on `import pandas`:
+    //   dateutil → six (missing) → pandas partially initialized → _pandas_datetime_CAPI not found
+    // Pre-loading 'six' when pandas is detected prevents this.
+    // Ref: https://github.com/pandas-dev/pandas/issues/59527
+    if (/(?:^|\n)\s*(?:import|from)\s+pandas\b/.test(code)) {
+      try {
+        await pyodide.loadPackage('six')
+      } catch {
+        // six may already be loaded, safe to ignore
+      }
     }
 
     // Step 2: Auto-install non-built-in packages from micropip whitelist

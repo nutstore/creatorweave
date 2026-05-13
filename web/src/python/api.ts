@@ -101,6 +101,49 @@ export class PythonExecutor {
   }
 
   /**
+   * Warm up Pyodide by pre-initializing the runtime in the background.
+   *
+   * This eliminates the cold-start delay when the user first executes Python code.
+   * Safe to call multiple times — no-op if Pyodide is already initialized.
+   * Does NOT pre-load any packages or mount any directories.
+   *
+   * @returns Promise that resolves when warmup is complete (or fails silently)
+   */
+  async warmup(): Promise<void> {
+    this.ensureWorker()
+
+    const id = generateId()
+
+    logger('Sending warmup request to worker...')
+
+    const responsePromise = new Promise<boolean>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error('Warmup request timeout'))
+      }, 60000) as unknown as number
+
+      this.pendingRequests.set(id, {
+        resolve: (res) => {
+          clearTimeout(timeout)
+          resolve(res.result.success)
+        },
+        reject,
+        timeout,
+      })
+    })
+
+    this.worker!.postMessage({ id, type: 'warmup' })
+
+    try {
+      await responsePromise
+      logger('Pyodide warmup complete')
+    } catch (error) {
+      // Warmup failure is non-fatal — execute() will retry initPyodide()
+      logger(`Warmup failed (non-fatal): ${error}`, 'warn')
+    }
+  }
+
+  /**
    * Terminate the worker and clean up resources
    */
   terminate(): void {

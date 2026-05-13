@@ -24,7 +24,7 @@ export interface ImageOutput {
   data: string // base64
 }
 
-export type WorkerMessage = ExecuteRequest | MountRequest | SyncRequest
+export type WorkerMessage = ExecuteRequest | MountRequest | SyncRequest | WarmupRequest
 
 export interface ExecuteRequest {
   id: string
@@ -105,6 +105,22 @@ export interface UnmountRequest {
  * Unmount result type
  */
 export interface UnmountResult {
+  success: boolean
+  error?: string
+}
+
+/**
+ * Warmup request type - pre-initialize Pyodide without executing code
+ */
+export interface WarmupRequest {
+  id: string
+  type: 'warmup'
+}
+
+/**
+ * Warmup result type
+ */
+export interface WarmupResult {
   success: boolean
   error?: string
 }

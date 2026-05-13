@@ -214,6 +214,23 @@ export function WorkspaceLayout({
     if (!loaded) loadFromDB()
   }, [loaded, loadFromDB])
 
+  // Pre-initialize Pyodide runtime in the background so first Python execution is fast
+  useEffect(() => {
+    const trigger = () => {
+      import('@/python/api').then(({ pythonExecutor }) => {
+        pythonExecutor.warmup()
+      }).catch(() => {
+        // Warmup failure is non-fatal, ignore
+      })
+    }
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(trigger, { timeout: 10000 })
+    } else {
+      setTimeout(trigger, 5000)
+    }
+  }, [])
+
   // Sync workspace-specific model selection when switching workspace
   useEffect(() => {
     syncModelForWorkspace(activeConversationId ?? null)
