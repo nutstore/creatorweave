@@ -53,6 +53,7 @@ export type BuiltinLLMProviderType =
   | 'minimax'
   | 'minimax-cn'
   | 'qwen'
+  | 'volcengine-coding'
 
 /** Provider type: built-in or dynamically registered custom provider (e.g. "custom-abc123") */
 export type LLMProviderType = BuiltinLLMProviderType | string
@@ -113,6 +114,11 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
   qwen: {
     baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     modelName: 'qwen-turbo',
+    headers: {},
+  },
+  'volcengine-coding': {
+    baseURL: 'https://ark.cn-beijing.volces.com/api/coding',
+    modelName: '',
     headers: {},
   },
 }
@@ -450,6 +456,12 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
         contextWindow: 10000000,
       },
     ],
+  },
+  'volcengine-coding': {
+    category: 'chinese',
+    displayName: '火山方舟 Coding',
+    website: 'https://console.volcengine.com/ark',
+    models: [],
   },
 }
 
