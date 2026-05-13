@@ -300,6 +300,9 @@ function buildSuppressedIds(
   return suppressed
 }
 
+// ─── Stable empty set for suppressed IDs (avoids new Set() per render) ──
+const EMPTY_STRING_SET: Set<string> = new Set()
+
 // ─── Main component ───────────────────────────────────────────────────
 
 export const AssistantTurnBubble = memo(function AssistantTurnBubble({
@@ -337,7 +340,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   // Compute suppressed tool call IDs for committed message rendering
   const suppressedIds = isProcessing
     ? buildSuppressedIds(runtimeSteps || [], toolResults, currentToolCall ?? null)
-    : new Set<string>()
+    : EMPTY_STRING_SET
 
   // Last message with content for copy button
   const lastMessageWithContent = [...turn.messages].reverse().find((msg) => msg.content)
@@ -711,6 +714,44 @@ const AssistantStep = memo(function AssistantStep({
       )}
     </>
   )
+}, (prev, next) => {
+  // Fast-path: same references → skip
+  if (
+    prev.message === next.message &&
+    prev.toolResults === next.toolResults &&
+    prev.showDivider === next.showDivider &&
+    prev.suppressExecutingToolCallIds === next.suppressExecutingToolCallIds &&
+    prev.conversationId === next.conversationId
+  ) {
+    return true
+  }
+
+  // Message identity is the primary key — if it's the same message object, no re-render needed
+  if (prev.message !== next.message) return false
+
+  if (prev.showDivider !== next.showDivider) return false
+  if (prev.conversationId !== next.conversationId) return false
+
+  // Only check tool results for the tool calls this message actually uses
+  const toolCalls = prev.message.toolCalls
+  if (toolCalls && toolCalls.length > 0) {
+    for (const tc of toolCalls) {
+      if (prev.toolResults.get(tc.id) !== next.toolResults.get(tc.id)) return false
+    }
+  }
+
+  // Shallow-compare suppressed set by checking each entry
+  const prevSup = prev.suppressExecutingToolCallIds
+  const nextSup = next.suppressExecutingToolCallIds
+  if (prevSup !== nextSup) {
+    if (!prevSup || !nextSup) return false
+    if (prevSup.size !== nextSup.size) return false
+    for (const id of prevSup) {
+      if (!nextSup.has(id)) return false
+    }
+  }
+
+  return true
 })
 
 /** Compression status card — shows progress of context compression */
