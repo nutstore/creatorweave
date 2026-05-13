@@ -82,7 +82,12 @@ export class AgentBackend implements VfsBackend {
   }
 
   async exists(path: string): Promise<boolean> {
-    const content = await this.agentManager.readPath(this.agentId, path)
-    return content != null
+    try {
+      const content = await this.agentManager.readPath(this.agentId, path)
+      return content != null
+    } catch {
+      // Agent directory or file does not exist — not an error, just "not found"
+      return false
+    }
   }
 }
