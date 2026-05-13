@@ -96,9 +96,11 @@ registerRenderer({
 
     if (ctx.isExecuting) return <StreamingPlaceholder />
 
-    const title = typeof data?.title === 'string' ? data.title : undefined
-    const excerpt = typeof data?.excerpt === 'string' ? data.excerpt : undefined
-    const status = typeof (ctx.result as Record<string, unknown>)?.status === 'number' ? (ctx.result as Record<string, unknown>).status : undefined
+    // Tool envelope v2: result.data = { status, headers, body, readability: { title, excerpt, ... } }
+    const readability = data?.readability as Record<string, unknown> | undefined
+    const title = typeof readability?.title === 'string' ? readability.title : undefined
+    const excerpt = typeof readability?.excerpt === 'string' ? readability.excerpt : undefined
+    const status = typeof data?.status === 'number' ? data.status : undefined
 
     return (
       <div className="px-3 py-2 space-y-2">
@@ -132,9 +134,11 @@ interface SearchResult {
 }
 
 function extractSearchResults(ctx: ToolRenderCtx): SearchResult[] {
-  const data = ctx.result?.data
-  if (!Array.isArray(data)) return []
-  return data.map((item: Record<string, unknown>) => ({
+  const payload = ctx.result?.data as Record<string, unknown> | undefined
+  // Tool envelope v2: result.data = { results: [...], total: N }
+  const results = payload?.results ?? payload
+  if (!Array.isArray(results)) return []
+  return results.map((item: Record<string, unknown>) => ({
     title: typeof item.title === 'string' ? item.title : '',
     url: typeof item.url === 'string' ? item.url : typeof item.link === 'string' ? item.link : '',
     snippet: typeof item.snippet === 'string' ? item.snippet : typeof item.description === 'string' ? item.description : '',
@@ -143,7 +147,7 @@ function extractSearchResults(ctx: ToolRenderCtx): SearchResult[] {
 
 function extractFetchMeta(ctx: ToolRenderCtx): string | undefined {
   const data = ctx.result?.data as Record<string, unknown> | undefined
-  const status = typeof (ctx.result as Record<string, unknown>)?.status === 'number' ? (ctx.result as Record<string, unknown>).status : undefined
+  const status = typeof data?.status === 'number' ? data.status : undefined
   if (status) return `${status} OK`
   return undefined
 }
