@@ -36,6 +36,10 @@ export const conversation = {
       placeholder: "输入消息... (Shift+Enter 换行)",
       placeholderNoKey: "请先在设置中配置 API Key",
       ariaLabel: "输入消息",
+      hints: {
+        fileMention: "输入 # 引用文件",
+        agentMention: "输入 @ 提及智能体",
+      },
     },
     // 按钮
     buttons: {

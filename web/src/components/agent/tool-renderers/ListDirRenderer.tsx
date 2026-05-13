@@ -8,6 +8,7 @@ import type { ToolRenderCtx } from './types'
 
 interface LsEntry {
   name: string
+  path?: string
   kind?: string
   type?: string
   size?: number
@@ -71,7 +72,7 @@ registerRenderer({
         {dirs.slice(0, maxShow).map((entry, i) => (
           <div key={`d-${i}`} className="flex items-center gap-2 text-xs" style={{ animation: `tool-row-in .2s ease-out ${i * 20}ms backwards` }}>
             <FolderIcon />
-            <span className="text-neutral-600 dark:text-neutral-300 font-medium">{entry.name}/</span>
+            <span className="text-neutral-600 dark:text-neutral-300 font-medium truncate" title={entry.path || entry.name}>{(entry.path || entry.name)}/</span>
           </div>
         ))}
 
@@ -79,7 +80,7 @@ registerRenderer({
         {files.slice(0, maxShow - dirs.length).map((entry, i) => (
           <div key={`f-${i}`} className="flex items-center gap-2 text-xs" style={{ animation: `tool-row-in .2s ease-out ${(dirs.length + i) * 20}ms backwards` }}>
             <FileIcon name={entry.name} />
-            <span className="text-neutral-500 dark:text-neutral-400">{entry.name}</span>
+            <span className="text-neutral-500 dark:text-neutral-400 truncate" title={entry.path || entry.name}>{entry.path || entry.name}</span>
           </div>
         ))}
 

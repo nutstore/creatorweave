@@ -795,10 +795,20 @@ export function AgentRichInput({
           </>
         )}
         {!isFocused && isEmpty && (
-          <div
-            className="pointer-events-none absolute left-11 top-4 pr-16 text-sm text-neutral-400 dark:text-neutral-500"
-          >
-            {placeholder}
+          <div className="pointer-events-none absolute left-11 top-4 pr-16">
+            <div className="text-sm text-neutral-400 dark:text-neutral-500">
+              {placeholder}
+            </div>
+            <div className="mt-2.5 flex items-center gap-3 text-[11px] leading-none text-neutral-300 dark:text-neutral-600">
+              <span className="inline-flex items-center gap-0.5">
+                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">#</kbd>
+                <span>{t('conversation.input.hints.fileMention')}</span>
+              </span>
+              <span className="inline-flex items-center gap-0.5">
+                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">@</kbd>
+                <span>{t('conversation.input.hints.agentMention')}</span>
+              </span>
+            </div>
           </div>
         )}
 

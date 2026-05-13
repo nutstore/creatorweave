@@ -36,6 +36,10 @@ export const conversation = {
       placeholder: "Type a message... (Shift+Enter for new line)",
       placeholderNoKey: "Please configure API Key in settings first",
       ariaLabel: "Type a message",
+      hints: {
+        fileMention: "Type # to mention a file",
+        agentMention: "Type @ to mention an agent",
+      },
     },
     // Buttons
     buttons: {
