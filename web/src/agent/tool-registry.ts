@@ -452,3 +452,26 @@ export function buildAvailableToolsPrompt(): string {
   const registry = getToolRegistry()
   return registry.getAvailableToolsDoc()
 }
+
+/**
+ * Build a map from tool name → { section, category } for UI grouping.
+ * Each entry comes from the tool's ToolPromptDoc.
+ */
+export function getToolCategoryMap(): Map<string, { section: string; category: string }> {
+  const result = new Map<string, { section: string; category: string }>()
+  // Map tool names from definitions back to their prompt doc section
+  // We derive this from ALL_PROMPT_DOCS + BUILTIN_TOOLS ordering
+  const registry = getToolRegistry()
+  const names = registry.getToolDefinitions().map((d) => d.function.name)
+  for (const doc of ALL_PROMPT_DOCS) {
+    const section = doc.section ?? `### ${doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}`
+    // Extract tool names from doc lines (e.g. "- `read(path)`" → "read")
+    for (const line of doc.lines) {
+      const m = line.match(/^- `(\w+)/)
+      if (m && names.includes(m[1]!)) {
+        result.set(m[1]!, { section, category: doc.category })
+      }
+    }
+  }
+  return result
+}

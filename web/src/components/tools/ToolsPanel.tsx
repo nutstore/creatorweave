@@ -14,11 +14,8 @@ import {
   ChevronRight,
   Info,
   Code,
-  FileSearch,
-  Terminal,
-  Zap,
 } from 'lucide-react'
-import { getToolRegistry } from '@/agent/tool-registry'
+import { getToolRegistry, getToolCategoryMap } from '@/agent/tool-registry'
 
 //=============================================================================
 // Types
@@ -30,49 +27,6 @@ interface ToolInfo {
   parameters: Record<string, { type: string; description: string; required?: boolean }>
   examples?: string[]
 }
-
-//=============================================================================
-// Tool Categories Configuration
-//=============================================================================
-
-const TOOL_CATEGORIES = [
-  {
-    id: 'discovery',
-    name: 'File Discovery',
-    nameKey: 'tools.categories.discovery',
-    icon: FileSearch,
-    description: 'Find and explore files in your project',
-    descriptionKey: 'tools.categories.discovery.description',
-    toolNames: ['ls'],
-  },
-  {
-    id: 'operations',
-    name: 'File Operations',
-    nameKey: 'tools.categories.operations',
-    icon: FileSearch,
-    description: 'Read, write, and edit files',
-    descriptionKey: 'tools.categories.operations.description',
-    toolNames: ['read', 'search', 'write', 'edit'],
-  },
-  {
-    id: 'code',
-    name: 'Code Execution',
-    nameKey: 'tools.categories.code',
-    icon: Terminal,
-    description: 'Run Python code for analysis and automation',
-    descriptionKey: 'tools.categories.code.description',
-    toolNames: ['python'],
-  },
-  {
-    id: 'mcp',
-    name: 'MCP Services',
-    nameKey: 'tools.categories.mcp',
-    icon: Zap,
-    description: 'External AI capabilities via MCP protocol',
-    descriptionKey: 'tools.categories.mcp.description',
-    toolNames: [], // Populated dynamically
-  },
-]
 
 //=============================================================================
 // Component Props
@@ -89,21 +43,20 @@ interface ToolsPanelProps {
 
 export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(['discovery']))
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set([]))
   const [selectedTool, setSelectedTool] = useState<ToolInfo | null>(null)
 
-  // Get tool definitions from registry
+  // Get tool definitions from registry — dynamically build categories
   const toolCategories = useMemo(() => {
     const registry = getToolRegistry()
     const definitions = registry.getToolDefinitions()
+    const categoryMap = getToolCategoryMap()
 
-    // Build tool info map
-    const toolInfoMap = new Map<string, ToolInfo>()
-    for (const def of definitions) {
+    // Build tool info list
+    const allTools: ToolInfo[] = definitions.map((def) => {
       const params = def.function.parameters?.properties || {}
       const required = new Set(def.function.parameters?.required || [])
-
-      toolInfoMap.set(def.function.name, {
+      return {
         name: def.function.name,
         description: def.function.description,
         parameters: Object.fromEntries(
@@ -116,15 +69,31 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
             },
           ])
         ),
-      })
+      }
+    })
+
+    // Group by ToolPromptDoc category
+    const groupMap = new Map<string, ToolInfo[]>()
+    const groupOrder: string[] = []
+    for (const tool of allTools) {
+      const meta = categoryMap.get(tool.name)
+      const group = meta?.section ?? '### Other'
+      if (!groupMap.has(group)) {
+        groupMap.set(group, [])
+        groupOrder.push(group)
+      }
+      groupMap.get(group)!.push(tool)
     }
 
-    // Build categories
-    return TOOL_CATEGORIES.map((cat) => ({
-      ...cat,
-      tools: cat.toolNames
-        .map((name) => toolInfoMap.get(name))
-        .filter((t): t is ToolInfo => t !== undefined),
+    // Sort tools within each group
+    for (const tools of groupMap.values()) {
+      tools.sort((a, b) => a.name.localeCompare(b.name))
+    }
+
+    return groupOrder.map((section) => ({
+      id: section,
+      name: section.replace(/^###\s*/, ''),
+      tools: groupMap.get(section)!,
     }))
   }, [])
 
@@ -205,7 +174,6 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
           ) : (
             <div className="space-y-4">
               {filteredCategories.map((category) => {
-                const Icon = category.icon
                 const isExpanded = expandedCategories.has(category.id)
 
                 return (
@@ -220,11 +188,11 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
                     >
                       <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-primary-50 p-2">
-                          <Icon className="h-4 w-4 text-primary-600" />
+                          <Code className="h-4 w-4 text-primary-600" />
                         </div>
                         <div>
                           <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">{category.name}</h3>
-                          <p className="text-xs text-tertiary dark:text-muted">{category.description}</p>
+                          <p className="text-xs text-tertiary dark:text-muted">{category.tools.length} tools</p>
                         </div>
                       </div>
                       {isExpanded ? (
