@@ -71,11 +71,14 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         }
 
         // 计算当前上下文使用情况，传递给工具用于自我调节
+        // 注意：必须用 contextManager.trimMessages 后的消息来估算，而非全量消息。
+        // 全量消息可能远大于实际发送给 LLM 的上下文，导致 truncateLargeToolResult 误判可用预算不足。
         const existingMessages = messagesToChatMessages(input.getAllMessages())
         const contextConfig = input.contextManager.getConfig()
         const maxContextTokens = contextConfig.maxContextTokens || input.provider.maxContextTokens || 200000
         const reserveTokens = contextConfig.reserveTokens ?? 8192
-        const usedTokens = input.provider.estimateTokens(existingMessages)
+        const trimmedMessages = input.contextManager.trimMessages(existingMessages).messages
+        const usedTokens = input.provider.estimateTokens(trimmedMessages)
 
         // 在调用工具前更新 toolContext 的 contextUsage
         const originalToolContext = input.getToolContext()

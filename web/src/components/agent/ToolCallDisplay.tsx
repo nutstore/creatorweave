@@ -139,7 +139,12 @@ function buildCtx(props: ToolCallDisplayProps): ToolRenderCtx {
 
   let parsedResult: Record<string, unknown> | null = null
   if (result) {
-    try { parsedResult = JSON.parse(result) as Record<string, unknown> } catch { parsedResult = null }
+    try { parsedResult = JSON.parse(result) as Record<string, unknown> } catch (e) {
+      console.error('[buildCtx] JSON.parse(result) failed for tool:', toolCall.function.name, (e as Error).message)
+      console.error('[buildCtx] result type:', typeof result, 'length:', result.length)
+      console.error('[buildCtx] result first 200 chars:', result.slice(0, 200))
+      parsedResult = null
+    }
   }
 
   const hasToolError = parsedResult && Object.prototype.hasOwnProperty.call(parsedResult, 'error')

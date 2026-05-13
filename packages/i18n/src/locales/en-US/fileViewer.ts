@@ -31,6 +31,13 @@ export const filePreview = {
     binaryFile: "Binary file",
     preview: "Preview",
     source: "Source",
+    // Comment feature
+    clickLineToComment: "Click line number to comment",
+    addComment: "Add comment...",
+    send: "Send",
+    commentsCount: "{count} comments",
+    sendToAI: "Send to AI",
+    clearComments: "Clear all comments",
 } as const
 
 // Phase 4: Workspace Features

@@ -32,6 +32,13 @@ export const filePreview = {
     binaryFile: "바이너리 파일",
     preview: "미리보기",
     source: "소스",
+    // 댓글 기능
+    clickLineToComment: "행 번호를 클릭하여 댓글 추가",
+    addComment: "댓글 추가...",
+    send: "보내기",
+    commentsCount: "{count}개 댓글",
+    sendToAI: "AI에게 보내기",
+    clearComments: "모든 댓글 지우기",
 } as const
 
 // 최근 파일

@@ -224,14 +224,17 @@ describe('opfs/git gitDiff', () => {
   })
 
   it('shows concrete text diff for working mode modify with native baseline', async () => {
-    listPendingOpsMock.mockResolvedValue([
+    queryAllMock.mockResolvedValue([
       {
         id: 'op_working_1',
-        workspaceId: 'ws_1',
+        changeset_id: null,
         path: 'src/demo.txt',
-        type: 'modify',
-        fsMtime: 0,
-        timestamp: 0,
+        op_type: 'modify',
+        status: 'pending',
+        review_status: null,
+        fs_mtime: 0,
+        created_at: 0,
+        updated_at: 0,
       },
     ])
     getSnapshotFileContentMock.mockResolvedValue(null)
@@ -250,14 +253,17 @@ describe('opfs/git gitDiff', () => {
   })
 
   it('shows concrete text diff for working mode modify with OPFS baseline fallback', async () => {
-    listPendingOpsMock.mockResolvedValue([
+    queryAllMock.mockResolvedValue([
       {
         id: 'op_working_2',
-        workspaceId: 'ws_1',
+        changeset_id: null,
         path: 'src/fallback.txt',
-        type: 'modify',
-        fsMtime: 0,
-        timestamp: 0,
+        op_type: 'modify',
+        status: 'pending',
+        review_status: null,
+        fs_mtime: 0,
+        created_at: 0,
+        updated_at: 0,
       },
     ])
     getSnapshotFileContentMock.mockResolvedValue(null)
@@ -556,30 +562,38 @@ describe('opfs/git gitShow', () => {
 
 describe('opfs/git gitStatus', () => {
   beforeEach(() => {
-    listSnapshotsMock.mockReset()
-    listPendingOpsMock.mockReset()
+    queryAllMock.mockReset()
     queryFirstMock.mockReset()
   })
 
-  it('treats all pending ops as unstaged in file list output', async () => {
-    listPendingOpsMock.mockResolvedValue([
-      {
-        id: 'op1',
-        workspaceId: 'ws_1',
-        path: 'src/a.ts',
-        type: 'modify',
-        fsMtime: 0,
-        timestamp: 0,
-        snapshotStatus: 'approved',
-      },
+  it('groups ops by review_status and failed status', async () => {
+    queryAllMock.mockResolvedValue([
+      { path: 'src/a.ts', op_type: 'modify', status: 'pending', review_status: 'pending', error_message: null },
+      { path: 'src/b.ts', op_type: 'create', status: 'pending', review_status: 'approved', error_message: null },
+      { path: 'src/c.ts', op_type: 'delete', status: 'failed', review_status: 'approved', error_message: 'write failed' },
     ])
-    listSnapshotsMock.mockResolvedValue([])
     queryFirstMock.mockResolvedValue({ name: 'main' })
 
     const result = await gitStatus('ws_1')
 
-    expect(result.unstaged).toHaveLength(1)
-    expect(result.unstaged[0].status).toBe('unstaged')
+    expect(result.pending).toHaveLength(1)
+    expect(result.pending[0].path).toBe('src/a.ts')
+    expect(result.approved).toHaveLength(1)
+    expect(result.approved[0].path).toBe('src/b.ts')
+    expect(result.conflicts).toHaveLength(1)
+    expect(result.conflicts[0].path).toBe('src/c.ts')
+    expect(result.conflicts[0].error).toBe('write failed')
+    expect(result.counts.total).toBe(3)
+  })
+
+  it('returns clean state when no active ops', async () => {
+    queryAllMock.mockResolvedValue([])
+    queryFirstMock.mockResolvedValue({ name: 'main' })
+
+    const result = await gitStatus('ws_1')
+
+    expect(result.counts.total).toBe(0)
+    expect(result.branch).toBe('main')
   })
 })
 

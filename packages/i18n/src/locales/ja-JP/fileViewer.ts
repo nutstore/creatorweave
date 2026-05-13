@@ -34,6 +34,13 @@ export const filePreview = {
     binaryFile: "バイナリファイル",
     preview: "プレビュー",
     source: "ソース",
+    // コメント機能
+    clickLineToComment: "行番号をクリックしてコメント",
+    addComment: "コメントを追加...",
+    send: "送信",
+    commentsCount: "{count} 件のコメント",
+    sendToAI: "AIに送信",
+    clearComments: "すべてのコメントをクリア",
 } as const
 
 // 最近使ったファイル

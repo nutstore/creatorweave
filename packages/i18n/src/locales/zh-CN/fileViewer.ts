@@ -32,6 +32,13 @@ export const filePreview = {
     binaryFile: "二进制文件",
     preview: "预览",
     source: "源码",
+    // 评论功能
+    clickLineToComment: "点击行号添加评论",
+    addComment: "添加评论...",
+    send: "发送",
+    commentsCount: "{count} 条评论",
+    sendToAI: "发给 AI",
+    clearComments: "清除所有评论",
 } as const
 
 // Phase 4: 工作区功能

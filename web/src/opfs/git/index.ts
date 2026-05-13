@@ -17,13 +17,26 @@ import micromatch from 'micromatch'
 import { getWorkspaceManager } from '@/opfs'
 import { readFileFromNativeFSMultiRoot } from '@/opfs/utils/file-reader'
 
+/** A single file change with sync/review metadata */
+export interface FileChangeEntry {
+  path: string
+  type: 'create' | 'modify' | 'delete'
+  /** Which phase this change is in */
+  stage: 'pending' | 'approved' | 'failed'
+  /** Human-readable error if stage === 'failed' */
+  error?: string
+}
+
 export interface GitStatusResult {
   workspaceId: string
   branch: string
-  staged: SnapshotCommit[]
-  unstaged: FileChange[]
-  untracked: FileChange[]
-  counts: { staged: number; unstaged: number; untracked: number }
+  /** Changes awaiting review (review_status = pending, not yet synced) */
+  pending: FileChangeEntry[]
+  /** Changes approved but not yet written to disk (review_status = approved, status = pending) */
+  approved: FileChangeEntry[]
+  /** Changes that failed to sync (status = failed) */
+  conflicts: FileChangeEntry[]
+  counts: { pending: number; approved: number; conflicts: number; total: number }
 }
 
 export interface GitDiffResult {
@@ -117,26 +130,50 @@ export interface GitRestoreResult {
 //=============================================================================
 
 export async function gitStatus(workspaceId: string): Promise<GitStatusResult> {
-  const repo = getFSOverlayRepository()
   const db = getSQLiteDB()
 
-  // Get pending ops (unstaged changes)
-  const pendingOps = await repo.listPendingOps(workspaceId)
+  // Query ALL active ops for this workspace, regardless of review_status.
+  // This gives us a file-centric view of what's happening:
+  //   - status='pending' + review_status='pending' → awaiting review
+  //   - status='pending' + review_status='approved' → approved, waiting to sync to disk
+  //   - status='failed'                             → sync conflict / error
+  const rows = await db.queryAll<{
+    path: string
+    op_type: 'create' | 'modify' | 'delete'
+    status: string
+    review_status: string | null
+    error_message: string | null
+  }>(
+    `SELECT path, op_type, status, review_status, error_message
+     FROM fs_ops
+     WHERE workspace_id = ?
+       AND status IN ('pending', 'failed')
+     ORDER BY path ASC`,
+    [workspaceId]
+  )
 
-  // Get committed snapshots (staged changes)
-  const snapshots = await repo.listSnapshots(workspaceId, 20)
-  const staged = snapshots.filter((s) => s.status === 'committed' || s.status === 'approved')
+  const pending: FileChangeEntry[] = []
+  const approved: FileChangeEntry[] = []
+  const conflicts: FileChangeEntry[] = []
 
-  // Pending ops returned here are review-pending records, which map to unstaged.
-  const unstaged: FileChange[] = []
-  const untracked: FileChange[] = []
+  for (const row of rows) {
+    const entry: FileChangeEntry = {
+      path: row.path,
+      type: row.op_type,
+      stage: 'pending',
+      error: row.error_message || undefined,
+    }
 
-  for (const op of pendingOps) {
-    unstaged.push({
-      path: op.path,
-      type: op.type,
-      status: 'unstaged',
-    })
+    if (row.status === 'failed') {
+      entry.stage = 'failed'
+      conflicts.push(entry)
+    } else if (row.review_status === 'approved') {
+      entry.stage = 'approved'
+      approved.push(entry)
+    } else {
+      // status='pending' + review_status IN (null, 'pending')
+      pending.push(entry)
+    }
   }
 
   // Get current branch name (from workspaces table)
@@ -146,17 +183,14 @@ export async function gitStatus(workspaceId: string): Promise<GitStatusResult> {
   )
   const branch = workspace?.name || 'main'
 
+  const total = pending.length + approved.length + conflicts.length
   return {
     workspaceId,
     branch,
-    staged: staged.map(mapSnapshotToCommit),
-    unstaged,
-    untracked,
-    counts: {
-      staged: staged.length,
-      unstaged: unstaged.length,
-      untracked: untracked.length,
-    },
+    pending,
+    approved,
+    conflicts,
+    counts: { pending: pending.length, approved: approved.length, conflicts: conflicts.length, total },
   }
 }
 
@@ -166,32 +200,35 @@ export function formatGitStatus(status: GitStatusResult): string {
   lines.push(`On branch ${status.branch}`)
   lines.push('')
 
-  if (status.staged.length > 0) {
-    lines.push(`Staged changes (${status.counts.staged} snapshots):`)
-    for (const commit of status.staged) {
-      lines.push(`  [${commit.id.slice(0, 8)}] ${commit.summary || 'No message'} (${commit.opCount} ops)`)
+  if (status.pending.length > 0) {
+    lines.push(`Changes awaiting review (${status.counts.pending} files):`)
+    for (const entry of status.pending) {
+      const code = entry.type === 'create' ? 'A' : entry.type === 'modify' ? 'M' : 'D'
+      lines.push(`  ${code} ${entry.path}`)
     }
     lines.push('')
   }
 
-  if (status.unstaged.length > 0) {
-    lines.push(`Unstaged changes (${status.counts.unstaged} files):`)
-    for (const change of status.unstaged) {
-      const statusStr = change.type === 'create' ? 'A' : change.type === 'modify' ? 'M' : 'D'
-      lines.push(`  ${statusStr} ${change.path}`)
+  if (status.approved.length > 0) {
+    lines.push(`Changes approved, syncing to disk (${status.counts.approved} files):`)
+    for (const entry of status.approved) {
+      const code = entry.type === 'create' ? 'A' : entry.type === 'modify' ? 'M' : 'D'
+      lines.push(`  ${code} ${entry.path}`)
     }
     lines.push('')
   }
 
-  if (status.untracked.length > 0) {
-    lines.push(`Untracked files (${status.counts.untracked}):`)
-    for (const change of status.untracked) {
-      lines.push(`  ? ${change.path}`)
+  if (status.conflicts.length > 0) {
+    lines.push(`Sync conflicts (${status.counts.conflicts} files):`)
+    for (const entry of status.conflicts) {
+      const code = entry.type === 'create' ? 'A' : entry.type === 'modify' ? 'M' : 'D'
+      const err = entry.error ? ` — ${entry.error}` : ''
+      lines.push(`  ${code} ${entry.path}${err}`)
     }
     lines.push('')
   }
 
-  if (status.counts.staged === 0 && status.counts.unstaged === 0 && status.counts.untracked === 0) {
+  if (status.counts.total === 0) {
     lines.push('No changes to commit (working tree clean)')
   }
 
@@ -213,6 +250,7 @@ export async function gitDiff(
   }
 ): Promise<GitDiffResult> {
   const repo = getFSOverlayRepository()
+  const db = getSQLiteDB()
   const mode = options?.mode || 'working'
   const targetSnapshotId = options?.snapshotId
   const contextLines = normalizeDiffContextLines(options?.contextLines)
@@ -254,19 +292,39 @@ export async function gitDiff(
       ops = Array.from(latestByPath.values())
     }
   } else {
-    // Show working directory pending changes
-    const pending = await repo.listPendingOps(workspaceId)
-    ops = pending.map((op) => ({
-      id: op.id,
-      workspaceId: op.workspaceId,
-      snapshotId: op.snapshotId || null,
-      path: op.path,
-      type: op.type,
-      status: 'pending' as const,
-      reviewStatus: op.reviewStatus as 'pending' | 'approved' | 'rejected' | undefined,
-      fsMtime: op.fsMtime,
-      createdAt: op.timestamp,
-      updatedAt: op.timestamp,
+    // Show ALL active file changes (pending review, approved, or failed sync).
+    // Unlike the old listPendingOps() which only returned review_status='pending',
+    // this directly queries fs_ops so approved-but-not-yet-synced and failed files
+    // are also included in the diff.
+    const activeRows = await db.queryAll<{
+      id: string
+      changeset_id: string | null
+      path: string
+      op_type: 'create' | 'modify' | 'delete'
+      status: string
+      review_status: string | null
+      fs_mtime: number
+      created_at: number
+      updated_at: number
+    }>(
+      `SELECT id, changeset_id, path, op_type, status, review_status, fs_mtime, created_at, updated_at
+       FROM fs_ops
+       WHERE workspace_id = ?
+         AND status IN ('pending', 'failed')
+       ORDER BY path ASC`,
+      [workspaceId]
+    )
+    ops = activeRows.map((row) => ({
+      id: row.id,
+      workspaceId,
+      snapshotId: row.changeset_id,
+      path: row.path,
+      type: row.op_type,
+      status: row.status as 'pending' | 'synced' | 'discarded' | 'failed',
+      reviewStatus: (row.review_status ?? undefined) as 'pending' | 'approved' | 'rejected' | undefined,
+      fsMtime: row.fs_mtime,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     }))
   }
 

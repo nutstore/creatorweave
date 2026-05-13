@@ -8,10 +8,13 @@ import { CopyIconButton } from '../CopyIconButton'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
 
+/** Matches SearchHit from search-worker-manager.ts */
 interface SearchResult {
   path: string
   line?: number
-  text?: string
+  column?: number
+  match?: string
+  preview?: string
   [key: string]: unknown
 }
 
@@ -67,7 +70,7 @@ registerRenderer({
     const maxLinesPerFile = 5
     const shownFiles = grouped.slice(0, maxFiles)
     const hiddenFiles = grouped.length - maxFiles
-    const rawText = results.map(r => `${r.path}${r.line ? `:${r.line}` : ''}${r.text ? ` | ${r.text}` : ''}`).join('\n')
+    const rawText = results.map(r => `${r.path}${r.line ? `:${r.line}` : ''}${r.preview ? ` | ${r.preview}` : r.match ? ` | ${r.match}` : ''}`).join('\n')
 
     return (
       <div className="px-3 py-2 space-y-2">
@@ -95,7 +98,7 @@ registerRenderer({
                     {m.line != null && (
                       <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
                     )}
-                    <span className="truncate">{highlightMatch(m.text ?? '', query)}</span>
+                    <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
                   </div>
                 ))}
                 {matches.length > maxLinesPerFile && (
