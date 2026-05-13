@@ -5,6 +5,7 @@
 import { Search } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { CopyIconButton } from '../CopyIconButton'
+import type { ToolEnvelopeError } from '@/agent/tools/tool-envelope'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
 
@@ -39,6 +40,9 @@ registerRenderer({
         )}
         {!ctx.isExecuting && !ctx.isStreaming && results.length === 0 && !ctx.isError && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">no results</span>
+        )}
+        {ctx.isError && (
+          <ErrorSummary ctx={ctx} />
         )}
       </>
     )
@@ -166,15 +170,49 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   )
 }
 
+function ErrorSummary({ ctx }: { ctx: ToolRenderCtx }) {
+  const error = extractError(ctx)
+  return (
+    <span className="ml-auto text-xs text-red-500 dark:text-red-400 shrink-0 truncate max-w-[200px]">
+      {error.message}
+    </span>
+  )
+}
+
 function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
-  const errMsg = typeof ctx.result?.error === 'string' ? ctx.result.error : 'Search failed'
+  const error = extractError(ctx)
+  const { message, hint, details } = error
+
   return (
     <div className="px-3 py-2">
-      <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-2 text-xs text-red-600 dark:text-red-400">
-        {errMsg}
+      <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-2 space-y-1.5 text-xs text-red-600 dark:text-red-400">
+        <div>{message}</div>
+        {details && Object.keys(details).length > 0 && (
+          <div className="text-[10px] font-mono text-red-400/70 space-y-0.5">
+            {Object.entries(details).map(([k, v]) =>
+              v != null ? <div key={k}>{k}: {String(v)}</div> : null
+            )}
+          </div>
+        )}
+        {hint && (
+          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+            💡 {hint}
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+/** Extract structured error from V2 envelope, with fallback for legacy format. */
+function extractError(ctx: ToolRenderCtx): ToolEnvelopeError & { details?: Record<string, unknown> } {
+  const raw = ctx.result?.error
+  if (raw && typeof raw === 'object' && typeof (raw as Record<string, unknown>).message === 'string') {
+    return raw as ToolEnvelopeError & { details?: Record<string, unknown> }
+  }
+  // Legacy fallback
+  const message = typeof raw === 'string' ? raw : 'Search failed'
+  return { code: 'unknown', message, retryable: false }
 }
 
 function StreamingPlaceholder() {
