@@ -72,6 +72,8 @@ interface TopBarProps {
   projectSwitcherOpen?: boolean
   /** Callback when project switcher open state changes */
   onProjectSwitcherOpenChange?: (open: boolean) => void
+  /** Navigate to a workspace within the current project (updates URL) */
+  onSelectWorkspace?: (workspaceId: string) => void
 }
 
 export function TopBar({
@@ -90,6 +92,7 @@ export function TopBar({
   onManageProjects,
   projectSwitcherOpen,
   onProjectSwitcherOpenChange,
+  onSelectWorkspace,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
@@ -228,7 +231,7 @@ export function TopBar({
 
             {/* Conversation Storage - OPFS conversation status with storage dropdown */}
             <div className="shrink-0">
-              <ConversationStorageBadge compact />
+              <ConversationStorageBadge compact onSelectWorkspace={onSelectWorkspace} />
             </div>
 
             <div className="h-5 w-px bg-muted" />
@@ -328,7 +331,7 @@ export function TopBar({
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
               <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.storage')}</div>
-              <ConversationStorageBadge compact />
+              <ConversationStorageBadge compact onSelectWorkspace={onSelectWorkspace} />
             </div>
           </div>
         </div>

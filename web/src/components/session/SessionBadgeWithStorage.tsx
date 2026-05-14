@@ -300,9 +300,13 @@ const ConversationDropdown: React.FC<ConversationDropdownProps> = ({
 export interface ConversationStorageBadgeProps {
   /** Compact mode (show only counts) */
   compact?: boolean
+  /** Called when user selects a workspace. Should navigate URL. */
+  onSelectWorkspace?: (workspaceId: string) => void
 }
 
-export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> = () => {
+export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> = ({
+  onSelectWorkspace,
+}) => {
   const t = useT()
   const [open, setOpen] = useState(false)
   const [cleanupDialogOpen, setCleanupDialogOpen] = useState(false)
@@ -361,13 +365,17 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
   const handleSwitch = useCallback(
     async (conversationId: string) => {
       try {
-        await switchWorkspace(conversationId)
+        if (onSelectWorkspace) {
+          onSelectWorkspace(conversationId)
+        } else {
+          await switchWorkspace(conversationId)
+        }
         setOpen(false)
       } catch (error) {
         console.error('[ConversationStorageBadge] Failed to switch conversation:', error)
       }
     },
-    [switchWorkspace]
+    [onSelectWorkspace, switchWorkspace]
   )
 
   // Handle conversation delete - open dialog

@@ -1100,12 +1100,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           )
         }
 
-        // Refresh the workspace store for active project scope
-        const workspaceStore = useConversationContextStore.getState()
-        await workspaceStore.refreshWorkspaces()
+        // NOTE: workspace switching is handled by syncFromRoute in App.tsx.
+        // loadFromDB only loads conversation data; it does NOT call refreshWorkspaces or switchWorkspace.
 
-        // Prefer workspace store's active selection (persisted active workspace).
-        // Fallback to first scoped workspace only if active selection is missing/out-of-scope.
+        // Determine the active conversation ID from workspace store's current state.
+        const workspaceStore = useConversationContextStore.getState()
         const preferredWorkspaceId = workspaceStore.activeWorkspaceId
         const activeId =
           (preferredWorkspaceId && conversations.some((c) => c.id === preferredWorkspaceId))
@@ -1113,13 +1112,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             : (workspaceStore.workspaces.find((w) =>
               conversations.some((c) => c.id === w.id)
             )?.id || null)
-
-        // Switch to active workspace if exists
-        if (activeId) {
-          await workspaceStore.switchWorkspace(activeId).catch((e) => {
-            console.error('[conversation.store] Failed to switch to active workspace:', e)
-          })
-        }
 
         set((state) => {
           state.conversations = conversations.map((conv) => ({
@@ -1200,12 +1192,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       pendingConversationMetaPersists.set(conversation.id, metaPersist)
       void metaPersist.catch(() => {})
 
-      useConversationContextStore
-        .getState()
-        .switchWorkspace(conversation.id)
-        .catch((e) => {
-          console.error('[conversation.store] Failed to switch workspace for new conversation:', e)
-        })
+      // NOTE: workspace switching for new conversations is handled by syncFromRoute
+      // in App.tsx after the URL is updated via navigateToRoute.
 
       return conversation
     },
@@ -1232,13 +1220,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             console.error('[conversation.store] Failed to load messages for conversation:', error)
           }
         }
-
-        const workspaceStore = useConversationContextStore.getState()
-        if (workspaceStore.activeWorkspaceId !== id) {
-          workspaceStore.switchWorkspace(id).catch((e) => {
-            console.error('[conversation.store] Failed to switch active workspace:', e)
-          })
-        }
+        // NOTE: workspace switching is handled by syncFromRoute in App.tsx.
+        // This store only manages conversation data; it does NOT call switchWorkspace.
       }
     },
 
@@ -1604,10 +1587,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       const msgRepo = getMessageRepository()
       await msgRepo.insertBatch(branched.id, branchedMessages)
 
-      // Switch workspace (this creates a new OPFS workspace directory)
-      await useConversationContextStore
-        .getState()
-        .switchWorkspace(branched.id)
+      // NOTE: workspace switching for branched conversations is handled by syncFromRoute
+      // in App.tsx after the URL is updated via navigateToRoute.
 
       void metaPersist.catch(() => {})
 

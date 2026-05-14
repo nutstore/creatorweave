@@ -25,7 +25,6 @@ import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
 import { DocsPage } from '@/pages/docs/DocsPage'
-import { shouldApplyRouteWorkspaceToConversation } from '@/app/route-sync'
 
 type AppRoute =
   | { kind: 'projectsHome' }
@@ -698,23 +697,30 @@ function App() {
       // Snapshot current store state to avoid stale closures
       const _projects = useProjectStore.getState().projects
       const _activeProjectId = useProjectStore.getState().activeProjectId
-      const _activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
 
+      // --- Non-workspace routes: clear workspace/conversation state ---
       if (currentRoute.kind === 'projectsHome') {
+        const { useConversationContextStore } = await import('@/store/conversation-context.store')
+        const { useConversationStoreSQLite } = await import('@/store/conversation.store.sqlite')
+        useConversationContextStore.setState({
+          activeWorkspaceId: null,
+          workspaces: [],
+          switchingWorkspaceId: null,
+          pendingChanges: null,
+          showPreview: false,
+          previewSelectedPath: null,
+          initialized: false,
+        })
+        useConversationStoreSQLite.setState({
+          activeConversationId: null,
+          conversations: [],
+          loaded: false,
+        })
         return
       }
-
-      if (currentRoute.kind === 'webcontainerPreview') {
-        return
-      }
-
-      if (currentRoute.kind === 'filePreview') {
-        return
-      }
-
-      if (currentRoute.kind === 'docs') {
-        return
-      }
+      if (currentRoute.kind === 'webcontainerPreview') return
+      if (currentRoute.kind === 'filePreview') return
+      if (currentRoute.kind === 'docs') return
 
       if (currentRoute.kind === 'unknown') {
         navigateToRoute({ kind: 'projectsHome' }, true)
@@ -722,13 +728,10 @@ function App() {
       }
 
       if (currentRoute.kind === 'legacyWorkspace') {
+        const _activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
         if (_activeProjectId && _activeWorkspaceId) {
           navigateToRoute(
-            {
-              kind: 'projectWorkspace',
-              projectId: _activeProjectId,
-              workspaceId: _activeWorkspaceId,
-            },
+            { kind: 'projectWorkspace', projectId: _activeProjectId, workspaceId: _activeWorkspaceId },
             true
           )
         } else if (_activeProjectId) {
@@ -739,8 +742,10 @@ function App() {
         return
       }
 
+      // --- projectWorkspace route ---
       const { projectId, workspaceId } = currentRoute
 
+      // Step 1: Validate project exists
       const projectExists = _projects.some((project) => project.id === projectId)
       if (!projectExists) {
         toast.error(t('app.projectNotFound'))
@@ -748,6 +753,7 @@ function App() {
         return
       }
 
+      // Step 2: Switch project if needed (this clears workspace state & loads new list)
       if (_activeProjectId !== projectId) {
         const switched = await setActiveProject(projectId)
         if (!switched) {
@@ -761,65 +767,70 @@ function App() {
 
       if (cancelled) return
 
-      // Re-read workspace list after potential project switch
-      const scopedWorkspaceIds = useConversationContextStore.getState().workspaces.map((workspace) => workspace.id)
+      // Step 3: Determine which workspace to activate
+      const workspaces = useConversationContextStore.getState().workspaces
+      const scopedWorkspaceIds = workspaces.map((w) => w.id)
+      const activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
 
-      if (!workspaceId) {
-        if (scopedWorkspaceIds.length > 0) {
-          // Pick the most recently accessed workspace, ignoring pinned sort order
-          const allWorkspaces = useConversationContextStore.getState().workspaces
-          const scoped = allWorkspaces.filter((w) => scopedWorkspaceIds.includes(w.id))
-          const lastActive = scoped.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0]
-          const fallbackWorkspaceId = lastActive?.id || scopedWorkspaceIds[0]
-          navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId }, true)
-          if (useConversationStore.getState().activeConversationId !== fallbackWorkspaceId) {
-            await useConversationStore.getState().setActive(fallbackWorkspaceId)
-          }
-        }
-        return
-      }
+      // Resolve target workspace ID:
+      // - If URL specifies one, use it (if valid)
+      // - Otherwise fall back to current active or most recent
+      let targetWorkspaceId: string | null = null
 
-      if (scopedWorkspaceIds.includes(workspaceId)) {
+      if (workspaceId && scopedWorkspaceIds.includes(workspaceId)) {
+        targetWorkspaceId = workspaceId
+      } else if (workspaceId) {
+        // URL workspace not found in this project — check if it's a brand-new conversation
+        // (not yet in workspace list). Allow transient pass-through.
         const convState = useConversationStore.getState()
-        const shouldApplyRouteWorkspace = shouldApplyRouteWorkspaceToConversation({
-          routeWorkspaceId: workspaceId,
-          activeConversationId: convState.activeConversationId,
-          switchingWorkspaceId: useConversationContextStore.getState().switchingWorkspaceId,
-        })
-        if (shouldApplyRouteWorkspace) {
-          await useConversationStore.getState().setActive(workspaceId)
+        const isNewConversation = convState.conversations.some((c) => c.id === workspaceId)
+        if (isNewConversation) {
+          targetWorkspaceId = workspaceId
         }
-        return
       }
 
-      const convState = useConversationStore.getState()
-      const latestSwitchingId = useConversationContextStore.getState().switchingWorkspaceId
-      const isTransientActiveConversation =
-        latestSwitchingId === workspaceId &&
-        convState.activeConversationId === workspaceId &&
-        convState.conversations.some((conversation) => conversation.id === workspaceId)
-      if (isTransientActiveConversation) {
-        return
-      }
-
-      if (scopedWorkspaceIds.length > 0) {
-        // Pick the most recently accessed workspace, ignoring pinned sort order
-        const allWorkspaces = useConversationContextStore.getState().workspaces
-        const scoped = allWorkspaces.filter((w) => scopedWorkspaceIds.includes(w.id))
-        const lastActive = scoped.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0]
-        const fallbackWorkspaceId = lastActive?.id || scopedWorkspaceIds[0]
-        navigateToRoute(
-          { kind: 'projectWorkspace', projectId, workspaceId: fallbackWorkspaceId },
-          true
-        )
-        if (useConversationStore.getState().activeConversationId !== fallbackWorkspaceId) {
-          await useConversationStore.getState().setActive(fallbackWorkspaceId)
+      // Fallback: use active workspace or pick most recent
+      if (!targetWorkspaceId) {
+        if (activeWorkspaceId && scopedWorkspaceIds.includes(activeWorkspaceId)) {
+          targetWorkspaceId = activeWorkspaceId
+        } else if (scopedWorkspaceIds.length > 0) {
+          const sorted = [...workspaces].sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))
+          targetWorkspaceId = sorted[0].id
         }
+      }
+
+      // No workspace available — redirect to bare project URL
+      if (!targetWorkspaceId) {
+        if (currentRoute.kind === 'projectWorkspace' && !currentRoute.workspaceId) {
+          // Already on bare project URL, nothing more to do
+          return
+        }
+        navigateToRoute({ kind: 'projectWorkspace', projectId }, true)
         return
       }
 
-      toast.error(t('app.noWorkspaceInProject'))
-      navigateToRoute({ kind: 'projectWorkspace', projectId }, true)
+      // Step 4: Update URL to include the resolved workspace (replace, not push)
+      if (currentRoute.kind === 'projectWorkspace') {
+        const desiredPath = toPath({ kind: 'projectWorkspace', projectId, workspaceId: targetWorkspaceId })
+        if (getCurrentRoutePath() !== desiredPath) {
+          navigateToRoute({ kind: 'projectWorkspace', projectId, workspaceId: targetWorkspaceId }, true)
+        }
+      }
+
+      if (cancelled) return
+
+      // Step 5: Switch workspace (OPFS/SQLite operations only, no conversation side-effects)
+      if (activeWorkspaceId !== targetWorkspaceId) {
+        await useConversationContextStore.getState().switchWorkspace(targetWorkspaceId)
+      }
+
+      if (cancelled) return
+
+      // Step 6: Activate conversation (loads messages, no workspace side-effects)
+      const activeConversationId = useConversationStore.getState().activeConversationId
+      if (activeConversationId !== targetWorkspaceId) {
+        await useConversationStore.getState().setActive(targetWorkspaceId)
+      }
     }
 
     void syncFromRoute()
@@ -837,50 +848,11 @@ function App() {
     setActiveProject,
   ])
 
-  // URL sync: active conversation → URL path.
-  // This effect ONLY writes to the URL (navigateToRoute), it does NOT modify
-  // store state. Safe to subscribe to activeProjectId/activeConversationId.
-  useEffect(() => {
-    if (!isStorageReady || currentRoute.kind !== 'projectWorkspace') return
-    if (!activeProjectId || !activeConversationId) return
-    // Guard only against init-time rollback: when route pins an explicit workspace
-    // and a switch to a *different* workspace is still in-flight.
-    // Once the switch completes (switchingWorkspaceId === null), we should allow
-    // the URL to update to match the new activeConversationId.
-    if (currentRoute.workspaceId && currentRoute.workspaceId !== activeConversationId) {
-      const switchingWorkspaceId = useConversationContextStore.getState().switchingWorkspaceId
-      // Only block if a switch is actively in-flight to a DIFFERENT workspace than
-      // the one we want to navigate to. A null switchingWorkspaceId means the switch
-      // completed — we should proceed with the URL update.
-      if (switchingWorkspaceId && switchingWorkspaceId !== activeConversationId) return
-    }
-    const scopedWorkspaceIds = new Set(useConversationContextStore.getState().workspaces.map((workspace) => workspace.id))
-    const convState = useConversationStore.getState()
-    const activeConversation = convState.conversations.find(
-      (conversation) => conversation.id === activeConversationId
-    )
-    const allowTransientRoute =
-      !!activeConversation &&
-      !scopedWorkspaceIds.has(activeConversationId) &&
-      Date.now() - activeConversation.createdAt < 15000
-    if (!scopedWorkspaceIds.has(activeConversationId) && !allowTransientRoute) return
-
-    const routePath = toPath({
-      kind: 'projectWorkspace',
-      projectId: activeProjectId,
-      workspaceId: activeConversationId,
-    })
-    if (getCurrentRoutePath() === routePath) return
-
-    navigateToRoute(
-      {
-        kind: 'projectWorkspace',
-        projectId: activeProjectId,
-        workspaceId: activeConversationId,
-      },
-      false
-    )
-  }, [isStorageReady, currentRoute.kind, activeProjectId, activeConversationId])
+  // URL sync removed — the sole source of truth for URL is the route sync effect above.
+  // Previously this effect tried to write activeConversationId back to the URL, which
+  // created a feedback loop with syncFromRoute and caused workspace jumping on project
+  // switch.  All URL mutations now happen explicitly in syncFromRoute and in UI event
+  // handlers (onSwitchProject, sidebar clicks, etc.).
 
   const handleOpenProject = async (projectId: string) => {
     navigateToRoute({ kind: 'projectWorkspace', projectId })
@@ -959,6 +931,11 @@ function App() {
       }}
       onCreateProject={() => navigateToRoute({ kind: 'projectsHome' })}
       onManageProjects={() => navigateToRoute({ kind: 'projectsHome' })}
+      onSelectWorkspace={(workspaceId: string) => {
+        if (activeProjectId) {
+          navigateToRoute({ kind: 'projectWorkspace', projectId: activeProjectId, workspaceId })
+        }
+      }}
     />
   )
 

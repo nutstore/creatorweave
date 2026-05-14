@@ -262,6 +262,29 @@ export const useProjectStore = create<ProjectState>()(
         await bootstrapProjectOpfs(projectId)
         const now = Date.now()
 
+        // 1. Clear stale workspace context atomically BEFORE updating activeProjectId.
+        //    This prevents the URL sync effect from firing with the old project's workspace.
+        //    Also reset `initialized` so refreshWorkspaces() will fully reload.
+        const { useConversationContextStore } = await import('./conversation-context.store')
+        useConversationContextStore.setState({
+          activeWorkspaceId: null,
+          workspaces: [],
+          switchingWorkspaceId: null,
+          pendingChanges: null,
+          showPreview: false,
+          previewSelectedPath: null,
+          initialized: false,
+        })
+
+        // 1b. Clear stale conversation state so old activeConversationId doesn't leak.
+        const { useConversationStoreSQLite } = await import('./conversation.store.sqlite')
+        useConversationStoreSQLite.setState({
+          activeConversationId: null,
+          conversations: [],
+          loaded: false,
+        })
+
+        // 2. Update project store state.
         set({
           activeProjectId: projectId,
           projects: get().projects.map((project) =>
@@ -275,45 +298,17 @@ export const useProjectStore = create<ProjectState>()(
           isLoading: false,
         })
 
+        // 3. Sync dependent stores.
         const { useAgentStore } = await import('./agent.store')
         await useAgentStore.getState().setActiveProject(projectId)
         await syncAgentsForProject(projectId)
 
-        // Keep workspace list in sync with active project selection.
-        const { useConversationContextStore } = await import('./conversation-context.store')
+        // 4. Load workspace list for the new project.
+        //    Do NOT pick a specific workspace here — the route sync effect
+        //    (syncFromRoute in App.tsx) is responsible for selecting the
+        //    correct workspace based on the URL.
         await useConversationContextStore.getState().refreshWorkspaces()
 
-        // Keep active conversation within current project scope.
-        // Prefer the per-project remembered workspace; fall back to most recently accessed.
-        const { useConversationStore } = await import('./conversation.store')
-        const workspaces = useConversationContextStore.getState().workspaces
-        const conversationStore = useConversationStore.getState()
-        const conversationIds = new Set(conversationStore.conversations.map((c) => c.id))
-
-        let nextActiveConversationId: string | null = null
-
-        // Try to restore the per-project remembered workspace first
-        try {
-          const { getWorkspaceRepository } = await import('@/sqlite/repositories/workspace.repository')
-          const wsRepo = getWorkspaceRepository()
-          const remembered = await wsRepo.findActiveWorkspaceByProject(projectId)
-          if (remembered && conversationIds.has(remembered.id)) {
-            nextActiveConversationId = remembered.id
-          }
-        } catch {
-          // Ignore – fall through to default
-        }
-
-        // Fallback: pick the most recently accessed workspace
-        if (!nextActiveConversationId) {
-          nextActiveConversationId =
-            [...workspaces]
-              .sort((a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0))
-              .find((w) => conversationIds.has(w.id))
-              ?.id ?? null
-        }
-
-        await conversationStore.setActive(nextActiveConversationId)
         broadcastProjectChange({ type: 'updated', projectId })
         return true
       } catch (e: unknown) {

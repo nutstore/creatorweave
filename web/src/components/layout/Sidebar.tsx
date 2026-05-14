@@ -309,6 +309,8 @@ interface SidebarProps {
   revealTargetPath?: string | null
   /** Called when reveal has been processed */
   onRevealComplete?: () => void
+  /** Called when user selects a workspace from the sidebar. Should navigate URL. */
+  onSelectWorkspace?: (workspaceId: string) => void
 }
 
 /** Memoized wrapper for FileTreePanel with stable callbacks per root */
@@ -563,6 +565,7 @@ export const Sidebar = memo(function Sidebar({
   onRequestClose,
   revealTargetPath,
   onRevealComplete,
+  onSelectWorkspace,
 }: SidebarProps) {
   const t = useT()
 
@@ -868,9 +871,13 @@ export const Sidebar = memo(function Sidebar({
   // Stable callbacks for ConversationItem memoization
   const handleItemSelect = useCallback((id: string) => {
     if (pendingRenameIdRef.current === id) return
-    void switchWorkspace(id)
+    if (onSelectWorkspace) {
+      onSelectWorkspace(id)
+    } else {
+      void switchWorkspace(id)
+    }
     closeMobileSidebar()
-  }, [switchWorkspace, closeMobileSidebar])
+  }, [onSelectWorkspace, switchWorkspace, closeMobileSidebar])
 
   const handleItemDeleteClick = useCallback((id: string, x: number, y: number) => {
     setConfirmDeleteId(id)

@@ -75,6 +75,8 @@ interface WorkspaceLayoutProps {
   onCreateProject?: () => void
   /** Navigate to project list */
   onManageProjects?: () => void
+  /** Navigate to a workspace within the current project (updates URL) */
+  onSelectWorkspace?: (workspaceId: string) => void
 }
 
 export function WorkspaceLayout({
@@ -85,6 +87,7 @@ export function WorkspaceLayout({
   onSwitchProject,
   onCreateProject,
   onManageProjects,
+  onSelectWorkspace,
 }: WorkspaceLayoutProps) {
   const waitForWorkspaceReady = useCallback(async (workspaceId: string, timeoutMs = 30000) => {
     const manager = await getWorkspaceManager()
@@ -687,6 +690,7 @@ export function WorkspaceLayout({
         onManageProjects={onManageProjects}
         projectSwitcherOpen={projectSwitcherOpen}
         onProjectSwitcherOpenChange={setProjectSwitcherOpen}
+        onSelectWorkspace={onSelectWorkspace}
       />
 
       {/* Extension install banner — opens guide dialog via store */}
@@ -709,6 +713,7 @@ export function WorkspaceLayout({
             selectedFilePath={selectedFilePath}
             revealTargetPath={revealTargetPath}
             onRevealComplete={handleRevealComplete}
+            onSelectWorkspace={onSelectWorkspace}
           />
         )}
         {isMobile && isSidebarOpen && (
@@ -721,6 +726,7 @@ export function WorkspaceLayout({
               selectedFilePath={selectedFilePath}
               revealTargetPath={revealTargetPath}
               onRevealComplete={handleRevealComplete}
+              onSelectWorkspace={onSelectWorkspace}
             />
           </div>
         )}

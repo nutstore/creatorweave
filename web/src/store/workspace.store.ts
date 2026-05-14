@@ -508,9 +508,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             previewSelectedPath: null,
           })
 
-          // Capture target conversation ID before async operations to avoid race condition
-          const targetConversationId = id
-
           try {
             const repo = getWorkspaceRepository()
             const activeProjectId = await resolveActiveProjectId()
@@ -585,11 +582,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 console.warn('[WorkspaceStore] Failed to persist project active workspace on new conversation:', e)
               }
 
-              // Also switch active conversation
-              const convStore = useConversationStore.getState()
-              if (convStore.activeConversationId !== id) {
-                await convStore.setActive(id)
-              }
+              // NOTE: conversation activation is handled by syncFromRoute in App.tsx.
+              // switchWorkspace only manages workspace OPFS/SQLite state.
 
               await refreshForWorkspace()
 
@@ -648,12 +642,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 isLoading: false,
               })
 
-              // Also switch active conversation
-              const { useConversationStore } = await import('./conversation.store')
-              const convStore = useConversationStore.getState()
-              if (convStore.activeConversationId !== id) {
-                await convStore.setActive(id)
-              }
+              // NOTE: conversation activation is handled by syncFromRoute in App.tsx.
 
               await refreshForWorkspace()
 
@@ -681,14 +670,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               switchingWorkspaceId: null,
             })
 
-            // Also switch active conversation to match workspace
-            const { useConversationStore } = await import('./conversation.store')
-            // Only call setActive if conversation is different (avoid circular call)
-            // Check against captured target to avoid race condition
-            const convStore = useConversationStore.getState()
-            if (convStore.activeConversationId !== targetConversationId) {
-              await convStore.setActive(targetConversationId)
-            }
+            // NOTE: conversation activation is handled by syncFromRoute in App.tsx.
+            // switchWorkspace only manages workspace OPFS/SQLite state.
 
             await refreshForWorkspace()
           } catch (e: unknown) {
