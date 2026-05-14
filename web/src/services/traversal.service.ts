@@ -1,4 +1,19 @@
 /**
+ * Default excluded directory names (keep in sync with search.worker.ts)
+ */
+const DEFAULT_EXCLUDED_DIRS = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'build',
+  '.next',
+  'coverage',
+  '.cache',
+  '.turbo',
+  '.pnpm-store',
+])
+
+/**
  * File metadata
  */
 export interface FileMetadata {
@@ -111,6 +126,9 @@ export async function* traverseDirectory(
           continue
         }
       } else if (handle.kind === 'directory') {
+        // Skip excluded directories (node_modules, .git, etc.)
+        if (DEFAULT_EXCLUDED_DIRS.has(handle.name)) continue
+
         // Yield directory metadata first
         yield {
           name: handle.name,
