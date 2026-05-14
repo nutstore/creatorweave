@@ -110,6 +110,14 @@ export class WorkspaceRuntime {
   private metadata: WorkspaceMetadataPersist
 
   /**
+   * Cached projectId for this workspace, resolved from DB.
+   * Avoids repeated DB queries and prevents falling through to
+   * the global activeProject pointer (which may point to a different project
+   * when the user switches browser tabs mid-conversation).
+   */
+  private _cachedProjectId: string | null | undefined = undefined
+
+  /**
    * Multi-root mapping for this workspace's project.
    * Populated lazily on first access via resolvePath().
    * Key = rootName, value = { readOnly, isDefault }.
@@ -2268,13 +2276,12 @@ export class WorkspaceRuntime {
     if (!this.metadata.rootDirectory) return null
 
     try {
-      const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-      const activeProject = await getProjectRepository().findActiveProject()
-      if (activeProject?.id) {
-        const rootMap = await this.ensureRootMap(activeProject.id)
+      const projectId = await this.resolveProjectId()
+      if (projectId) {
+        const rootMap = await this.ensureRootMap(projectId)
         if (rootMap && rootMap.size > 0) {
           const firstRootName = rootMap.keys().next().value!
-          return getRuntimeDirectoryHandle(activeProject.id, firstRootName)
+          return getRuntimeDirectoryHandle(projectId, firstRootName)
         }
       }
 
@@ -2295,9 +2302,7 @@ export class WorkspaceRuntime {
     try {
       let resolvedProjectId = projectId
       if (!resolvedProjectId) {
-        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-        const activeProject = await getProjectRepository().findActiveProject()
-        resolvedProjectId = activeProject?.id
+        resolvedProjectId = await this.resolveProjectId()
       }
       if (!resolvedProjectId) return null
 
@@ -2316,9 +2321,7 @@ export class WorkspaceRuntime {
     try {
       let resolvedProjectId = projectId
       if (!resolvedProjectId) {
-        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-        const activeProject = await getProjectRepository().findActiveProject()
-        resolvedProjectId = activeProject?.id
+        resolvedProjectId = await this.resolveProjectId()
       }
       if (!resolvedProjectId) return new Map()
 
@@ -2331,6 +2334,29 @@ export class WorkspaceRuntime {
   // ===========================================================================
   // Multi-root path resolution
   // ===========================================================================
+
+  /**
+   * Resolve the projectId for this workspace from the DB.
+   * Cached after first lookup to avoid repeated queries.
+   *
+   * IMPORTANT: This should be used instead of findActiveProject() in all
+   * methods that need a projectId, because the global activeProject pointer
+   * may point to a different project if the user switches browser tabs
+   * while an agent conversation is still running.
+   */
+  private async resolveProjectId(): Promise<string | null> {
+    if (this._cachedProjectId !== undefined) return this._cachedProjectId
+    try {
+      const { getWorkspaceRepository } = await import(
+        '@/sqlite/repositories/workspace.repository'
+      )
+      const workspace = await getWorkspaceRepository().findWorkspaceById(this.workspaceId)
+      this._cachedProjectId = workspace?.projectId ?? null
+    } catch {
+      this._cachedProjectId = null
+    }
+    return this._cachedProjectId
+  }
 
   /**
    * Ensure the root map is loaded from SQLite for the given project.
@@ -2409,13 +2435,7 @@ export class WorkspaceRuntime {
 
     // Try to get projectId if not provided
     if (!projectId) {
-      try {
-        const { getProjectRepository } = await import('@/sqlite/repositories/project.repository')
-        const activeProject = await getProjectRepository().findActiveProject()
-        projectId = activeProject?.id ?? undefined
-      } catch {
-        // Ignore
-      }
+      projectId = (await this.resolveProjectId()) ?? undefined
     }
 
     // No project → fallback

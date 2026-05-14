@@ -329,15 +329,15 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
   if (!args.path) {
     try {
       const { getRuntimeHandlesForProject } = await import('@/native-fs')
-      const { useFolderAccessStore } = await import('@/store/folder-access.store')
       const projectId = toolContext.projectId
       if (projectId) {
         const allHandles = getRuntimeHandlesForProject(projectId)
         if (allHandles.size > 0) {
-          const roots = useFolderAccessStore.getState().roots
-          if (roots.length > 0) {
-            return toolOkJson('ls', roots.map((r: { name: string; readOnly: boolean }) => ({ name: r.name, kind: 'directory', readOnly: r.readOnly })))
-          }
+          // Read root metadata from DB (not from global folderAccessStore.roots
+          // which follows the user's active browser tab, not the agent's project).
+          const { getProjectRootRepository } = await import('@/sqlite/repositories/project-root.repository')
+          const dbRoots = await getProjectRootRepository().findByProject(projectId)
+          return toolOkJson('ls', dbRoots.map((r: { name: string; readOnly: boolean }) => ({ name: r.name, kind: 'directory', readOnly: r.readOnly })))
         }
       }
     } catch { /* fall through to normal list */ }
