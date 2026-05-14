@@ -128,7 +128,8 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   }
 
   // ⑥.5: File mention context (when user message contains #path references)
-  const fileMentionMatch = userMessage.match(/#([\w.\-]+\/[\w./\\\-]*)/)
+  // Matches: #path/to/file, #file.ts, #src/App.tsx (with or without path separator)
+  const fileMentionMatch = userMessage.match(/#([\w.\-]+[/\\][\w./\\\-]*|[\w.\-]+\.[\w]+)/)
   if (fileMentionMatch) {
     enhancedPrompt += '\n\n## User-Referenced Files\nThe user used `#path/to/file` notation to reference specific files in their message. These are file paths in their project. When relevant, read these files before responding to provide accurate, context-aware answers.'
   }

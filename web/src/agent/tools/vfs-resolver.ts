@@ -136,14 +136,8 @@ function parseVfsPath(
 }
 
 function resolveProjectId(context: ToolContext): string | null {
-  if (context.projectId && context.projectId.trim()) {
-    return context.projectId
-  }
-  if (typeof localStorage !== 'undefined') {
-    const fromStorage = localStorage.getItem('activeProjectId')
-    if (fromStorage && fromStorage.trim()) return fromStorage
-  }
-  return null
+  // projectId is always provided by the agent loop. If missing, that's a caller bug.
+  return context.projectId?.trim() || null
 }
 
 function resolveActorAgentId(context: ToolContext): string | null {

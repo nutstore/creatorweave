@@ -148,21 +148,21 @@ export class AssetsBackend implements VfsBackend {
     }
   }
 
+  /**
+   * Resolve the assets directory handle.
+   * workspaceId is always provided at construction. If missing, throws (caller bug).
+   */
   private async getDir(): Promise<FileSystemDirectoryHandle> {
     if (this.dirHandle) return this.dirHandle
 
+    if (!this.workspaceId) {
+      throw new Error('workspaceId is required for assets (caller bug)')
+    }
+
     const manager = await getWorkspaceManager()
-    let workspace
-    if (this.workspaceId) {
-      workspace = await manager.getWorkspace(this.workspaceId)
-    }
+    const workspace = await manager.getWorkspace(this.workspaceId)
     if (!workspace) {
-      const { getActiveWorkspace } = await import('@/store/workspace.store')
-      const active = await getActiveWorkspace()
-      workspace = active?.workspace
-    }
-    if (!workspace) {
-      throw new Error('No active workspace for assets')
+      throw new Error(`Workspace not found for assets: ${this.workspaceId}`)
     }
 
     this.dirHandle = await workspace.getAssetsDir()

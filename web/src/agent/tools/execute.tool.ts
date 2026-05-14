@@ -4,7 +4,7 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { pythonExecutor as runtimePythonExecutor } from '@/python'
-import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useConversationStore } from '@/store/conversation.store'
 import type { AssetMeta, FileSnapshot } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
@@ -73,7 +73,7 @@ export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const code = args.code as string
   const timeout = (args.timeout as number) || 60000
 
-  return executePython(code, timeout, context.directoryHandle)
+  return executePython(code, timeout, context.workspaceId, context.directoryHandle)
 }
 
 //=============================================================================
@@ -89,12 +89,22 @@ interface PythonOutputData {
 async function executePython(
   code: string,
   timeout: number,
+  workspaceId?: string | null,
   directoryHandle?: FileSystemDirectoryHandle | null
 ): Promise<string> {
-  const active = await getActiveConversation()
-  if (!active) {
-    return toolErrorJson(TOOL_NAME, 'NO_WORKSPACE', 'No active workspace')
+  // workspaceId is always provided by the agent loop (= conversationId).
+  // If missing, that's a programming error — fail fast.
+  if (!workspaceId) {
+    return toolErrorJson(TOOL_NAME, 'NO_WORKSPACE', 'workspaceId is required but was not provided (caller bug)')
   }
+
+  const { getWorkspaceManager } = await import('@/opfs')
+  const manager = await getWorkspaceManager()
+  const workspace = await manager.getWorkspace(workspaceId)
+  if (!workspace) {
+    return toolErrorJson(TOOL_NAME, 'NO_WORKSPACE', `Workspace not found for id: ${workspaceId}`)
+  }
+  const active = { conversation: workspace, conversationId: workspaceId }
 
   try {
     const beforeSnapshot = await active.conversation.scanFilesWithCache()
@@ -148,7 +158,7 @@ async function executePython(
 
       // Accumulate assets into the conversation store's collectedAssets
       // These will be attached to the final assistant message when the draft is committed
-      const targetConvId = active.conversationId || useConversationStore.getState().activeConversationId
+      const targetConvId = active.conversationId
       if (targetConvId) {
         useConversationStore.getState().collectAssets(targetConvId, newAssets)
       } else {

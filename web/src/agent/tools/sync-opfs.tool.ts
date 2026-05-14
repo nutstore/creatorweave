@@ -459,24 +459,17 @@ async function syncSingleFile(
 }
 
 /**
- * Get the WorkspaceRuntime for the active workspace.
+ * Get the WorkspaceRuntime for the given workspace.
+ * workspaceId is always provided by the agent loop. If missing, returns null.
  */
 async function getWorkspaceRuntime(
   workspaceId?: string | null
 ): Promise<WorkspaceRuntime | null> {
   try {
+    if (!workspaceId) return null
     const { getWorkspaceManager } = await import('@/opfs')
     const manager = await getWorkspaceManager()
-
-    let workspace
-    if (workspaceId) {
-      workspace = await manager.getWorkspace(workspaceId)
-    }
-    if (!workspace) {
-      const { getActiveWorkspace } = await import('@/store/workspace.store')
-      const active = await getActiveWorkspace()
-      workspace = active?.workspace
-    }
+    const workspace = await manager.getWorkspace(workspaceId)
     return workspace ?? null
   } catch {
     return null

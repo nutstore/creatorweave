@@ -1,7 +1,22 @@
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
-import { getActiveConversation, useConversationContextStore } from '@/store/conversation-context.store'
+import { useConversationContextStore } from '@/store/conversation-context.store'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
+
+/**
+ * Resolve the conversation-like object from tool context.
+ * workspaceId is always provided by the agent loop. If missing, returns undefined (caller bug).
+ */
+async function resolveConversation(context: { workspaceId?: string | null }) {
+  if (!context.workspaceId) return undefined
+  const { getWorkspaceManager } = await import('@/opfs')
+  const manager = await getWorkspaceManager()
+  const workspace = await manager.getWorkspace(context.workspaceId)
+  if (workspace) {
+    return { conversation: workspace, conversationId: context.workspaceId }
+  }
+  return undefined
+}
 
 export const detectConflictsDefinition: ToolDefinition = {
   type: 'function',
@@ -25,7 +40,7 @@ export const detectConflictsDefinition: ToolDefinition = {
 
 export const detectConflictsExecutor: ToolExecutor = async (args, context) => {
   const paths = args.paths as string[] | undefined
-  const active = await getActiveConversation()
+  const active = await resolveConversation(context)
   if (!active) {
     return toolErrorJson('detect_conflicts', 'no_active_workspace', 'No active workspace')
   }
@@ -98,7 +113,7 @@ export const createCheckpointDefinition: ToolDefinition = {
 
 export const createCheckpointExecutor: ToolExecutor = async (args, context) => {
   const summary = args.summary as string | undefined
-  const active = await getActiveConversation()
+  const active = await resolveConversation(context)
   if (!active) {
     return JSON.stringify({ error: 'No active workspace' })
   }
@@ -153,7 +168,7 @@ export const rollbackCheckpointExecutor: ToolExecutor = async (args, context) =>
     return JSON.stringify({ error: 'checkpoint_id is required' })
   }
 
-  const active = await getActiveConversation()
+  const active = await resolveConversation(context)
   if (!active) {
     return JSON.stringify({ error: 'No active workspace' })
   }

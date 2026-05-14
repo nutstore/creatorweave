@@ -804,8 +804,9 @@ export function collectAssetsFromWrite(
   }
 
   // Prefer the workspace ID from the tool context (correct for parallel/subagent scenarios)
-  // Fall back to the global activeConversationId for backwards compatibility
-  const targetId = contextWorkspaceId || useConversationStore.getState().activeConversationId
+  // Do NOT fall back to the global activeConversationId — if context doesn't have one,
+  // we simply skip asset collection rather than risk attaching to the wrong conversation.
+  const targetId = contextWorkspaceId
   if (targetId) {
     useConversationStore.getState().collectAssets(targetId, [asset])
   }

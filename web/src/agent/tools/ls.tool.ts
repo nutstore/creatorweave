@@ -124,22 +124,17 @@ function formatSize(bytes: number): string {
 }
 
 /**
- * Get the OPFS files/ directory handle for the active workspace.
+ * Get the OPFS files/ directory handle for the given workspace.
  * Used so ls sees the same files as Pyodide at /mnt/.
+ *
+ * workspaceId is always provided by the agent loop. If missing, returns null.
  */
 async function getOPFSFilesHandle(workspaceId?: string | null): Promise<FileSystemDirectoryHandle | null> {
   try {
+    if (!workspaceId) return null
     const { getWorkspaceManager } = await import('@/opfs')
     const manager = await getWorkspaceManager()
-    let workspace
-    if (workspaceId) {
-      workspace = await manager.getWorkspace(workspaceId)
-    }
-    if (!workspace) {
-      const { getActiveWorkspace } = await import('@/store/workspace.store')
-      const active = await getActiveWorkspace()
-      workspace = active?.workspace
-    }
+    const workspace = await manager.getWorkspace(workspaceId)
     if (!workspace) return null
     return await workspace.getFilesDir()
   } catch {
@@ -335,7 +330,7 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     try {
       const { getRuntimeHandlesForProject } = await import('@/native-fs')
       const { useFolderAccessStore } = await import('@/store/folder-access.store')
-      const projectId = toolContext.projectId ?? useFolderAccessStore.getState().activeProjectId
+      const projectId = toolContext.projectId
       if (projectId) {
         const allHandles = getRuntimeHandlesForProject(projectId)
         if (allHandles.size > 0) {

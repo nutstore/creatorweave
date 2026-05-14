@@ -39,15 +39,11 @@ async function collectPendingOverlays(
     if (!pendingChanges || pendingChanges.length === 0) return {}
 
     // Get workspace to read cached content
-    let targetWorkspaceId = workspaceId
-    if (!targetWorkspaceId) {
-      const { useWorkspaceStore } = await import('@/store/workspace.store')
-      targetWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
-    }
-    if (!targetWorkspaceId) return {}
+    // workspaceId is always provided by the agent loop. If missing, return empty.
+    if (!workspaceId) return {}
 
     const manager = await getWorkspaceManager()
-    const workspace = await manager.getWorkspace(targetWorkspaceId)
+    const workspace = await manager.getWorkspace(workspaceId)
     if (!workspace) return {}
 
     const overlays: Record<string, PendingFileOverlay> = {}
@@ -79,6 +75,7 @@ async function collectPendingOverlays(
 
 /**
  * Get all root handles for the current project (multi-root aware).
+ * workspaceId is always provided by the agent loop.
  */
 async function getAllRootHandles(
   context: { workspaceId?: string | null; directoryHandle?: FileSystemDirectoryHandle | null; projectId?: string | null }
@@ -86,12 +83,24 @@ async function getAllRootHandles(
   try {
     const manager = await getWorkspaceManager()
     const workspaceId = context.workspaceId
-    if (workspaceId) {
-      const workspace = await manager.getWorkspace(workspaceId)
-      if (workspace) {
-        const handles = await workspace.getAllNativeDirectoryHandles(context.projectId)
-        if (handles.size > 0) return handles
-      }
+    if (!workspaceId) {
+      // workspaceId is always provided — if missing, that's a caller bug.
+      // Return empty rather than guessing from global state.
+      return new Map()
+    }
+
+    const workspace = await manager.getWorkspace(workspaceId)
+    if (workspace) {
+      const handles = await workspace.getAllNativeDirectoryHandles(context.projectId)
+      if (handles.size > 0) return handles
+    }
+
+    // Workspace found but no native handles, or workspace not found.
+    // Try projectId as a secondary resolution (not a global fallback).
+    if (context.projectId) {
+      const { getRuntimeHandlesForProject } = await import('@/native-fs')
+      const handles = getRuntimeHandlesForProject(context.projectId)
+      if (handles.size > 0) return handles
     }
   } catch {
     // Fall through
