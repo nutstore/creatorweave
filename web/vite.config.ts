@@ -53,7 +53,7 @@ function pyodideServePlugin(): Plugin {
               '.data': 'application/octet-stream',
             }
             res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
-            res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+            res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
             res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
             fs.createReadStream(resolved).pipe(res)
             return
@@ -75,7 +75,7 @@ function pyodideServePlugin(): Plugin {
                 '.tar': 'application/x-tar',
               }
               res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream')
-              res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp')
+              res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless')
               res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
               const body = await cdnRes.arrayBuffer()
               res.end(Buffer.from(body))
