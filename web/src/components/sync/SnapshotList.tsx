@@ -19,6 +19,7 @@ import { useProjectStore } from '@/store/project.store'
 import { getWorkspaceManager } from '@/opfs'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
+import { SnapshotDetailDrawer } from '@/components/sync/SnapshotDetailDrawer'
 
 interface SnapshotListProps {
   limit?: number
@@ -122,6 +123,8 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
     total: number
     snapshotId: string
   } | null>(null)
+  const [detailSnapshot, setDetailSnapshot] = useState<SnapshotRecord | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const loadSnapshots = useCallback(async (cancelled: { value: boolean } = { value: false }) => {
     setLoading(true)
@@ -415,6 +418,13 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
                 <BrandButton
                   variant="ghost"
                   className="h-6 px-2 text-[11px]"
+                  onClick={() => { setDetailSnapshot(item); setDetailOpen(true) }}
+                >
+                  {t('sidebar.snapshotDetail.viewDetail')}
+                </BrandButton>
+                <BrandButton
+                  variant="ghost"
+                  className="h-6 px-2 text-[11px]"
                   disabled={deletingSnapshotId === item.id || rollingBack !== null || clearingSnapshots}
                   onClick={() => handleDeleteSnapshot(item.id)}
                 >
@@ -513,6 +523,13 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
           </BrandDialogFooter>
         </BrandDialogContent>
       </BrandDialog>
+
+      {/* Snapshot Detail Drawer */}
+      <SnapshotDetailDrawer
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        snapshot={detailSnapshot}
+      />
     </div>
   )
 }

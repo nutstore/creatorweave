@@ -195,6 +195,23 @@ export const sidebar = {
       lineHasComment: "This line has a comment",
     },
 
+    // Snapshot Detail Dialog
+    snapshotDetail: {
+      id: "ID",
+      workspace: "Workspace",
+      source: "Source",
+      createdAt: "Created",
+      committedAt: "Committed",
+      files: "Files",
+      loadingFile: "Loading file content...",
+      binaryFileHint: "Binary files do not support text diff preview",
+      beforeSize: "Before size",
+      afterSize: "After size",
+      fileDeletedHint: "This file was deleted in this snapshot",
+      selectFileHint: "Select a file from the list to view diff",
+      viewDetail: "Detail",
+    },
+
     // Lazy Diff Viewer (hunk-based)
     lazyDiffViewer: {
       noChanges: "No changes",

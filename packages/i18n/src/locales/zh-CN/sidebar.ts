@@ -186,6 +186,23 @@ export const sidebar = {
       lineHasComment: "该行有评论",
     },
 
+    // Snapshot Detail Dialog
+    snapshotDetail: {
+      id: "ID",
+      workspace: "工作区",
+      source: "来源",
+      createdAt: "创建时间",
+      committedAt: "提交时间",
+      files: "文件",
+      loadingFile: "加载文件内容...",
+      binaryFileHint: "二进制文件不支持文本 diff 预览",
+      beforeSize: "变更前大小",
+      afterSize: "变更后大小",
+      fileDeletedHint: "该文件在此快照中被删除",
+      selectFileHint: "从左侧列表选择文件，查看变更差异",
+      viewDetail: "详情",
+    },
+
     // Lazy Diff Viewer (hunk-based)
     lazyDiffViewer: {
       noChanges: "没有变更",
