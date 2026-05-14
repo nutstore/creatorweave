@@ -2019,7 +2019,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         // Resolve runtime routing context from the current conversation/workspace.
         // Do not depend on global active-project pointer for agent prompt injection.
-        let activeProjectId: string | null = null
+        let resolvedProjectId: string | null = null
         let activeAgentId: string | null = null
         let knownAgentIds: Set<string> | null = null
 
@@ -2027,7 +2027,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           const { getWorkspaceRepository } =
             await import('@/sqlite/repositories/workspace.repository')
           const workspace = await getWorkspaceRepository().findWorkspaceById(conversationId)
-          activeProjectId = workspace?.projectId || null
+          resolvedProjectId = workspace?.projectId || null
         } catch {
           // Ignore workspace lookup failures; agent prompt injection will be skipped without projectId.
         }
@@ -2092,7 +2092,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               abortSignal: abortController.signal,
               enhanceSystemPrompt: (basePrompt, userMessage) =>
                 buildEnhancedWorkflowNodePrompt(basePrompt, userMessage, {
-                  projectId: activeProjectId ?? null,
+                  projectId: resolvedProjectId ?? null,
                   directoryHandle: directoryHandle ?? null,
                   currentAgentId: activeAgentId ?? null,
                 }),
@@ -2484,7 +2484,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           baseToolContext: {
             directoryHandle,
             workspaceId: conversationId,
-            projectId: activeProjectId,
+            projectId: resolvedProjectId,
             currentAgentId: activeAgentId,
             agentMode,
           },
@@ -2551,7 +2551,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           toolContext: {
             directoryHandle,
             workspaceId: conversationId,
-            projectId: activeProjectId,
+            projectId: resolvedProjectId,
             currentAgentId: activeAgentId,
             agentMode,
             subagentRuntime,
