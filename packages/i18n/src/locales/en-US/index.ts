@@ -10,7 +10,7 @@ import { skills, skillCard, skillEditor, skillDetail } from './skills'
 import { webContainer } from './webContainer'
 import { workflowEditor, customWorkflowManager, workflowEditorDialog, workflow } from './workflow'
 import { remote, session } from './remote'
-import { fileViewer, standalonePreview, filePreview, recentFiles } from './fileViewer'
+import { fileViewer, standalonePreview, filePreview, recentFiles, officePreview } from './fileViewer'
 import { storageStatusBanner, pendingSync, conversationStorage, workspaceStorage } from './storage'
 import { themeToggle } from './themeToggle'
 import { conversation, toolCallDisplay, questionCard } from './conversation'
@@ -66,6 +66,7 @@ export const enUS = {
   htmlPreview,
   filePreview,
   recentFiles,
+  officePreview,
   commandPalette,
   mcp,
   onboarding,

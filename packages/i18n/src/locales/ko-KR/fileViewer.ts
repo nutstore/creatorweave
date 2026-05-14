@@ -41,6 +41,15 @@ export const filePreview = {
     clearComments: "모든 댓글 지우기",
 } as const
 
+// Office 파일 미리보기
+export const officePreview = {
+    uploading: "파일 업로드 중...",
+    creatingToken: "미리보기 생성 중...",
+    loadingEditor: "에디터 로딩 중...",
+    retry: "재시도",
+    openInNewTab: "새 탭에서 미리보기",
+} as const
+
 // 최근 파일
 export const recentFiles = {
     title: "최근 파일",

@@ -43,6 +43,15 @@ export const filePreview = {
     clearComments: "すべてのコメントをクリア",
 } as const
 
+// Office ファイルプレビュー
+export const officePreview = {
+    uploading: "ファイルをアップロード中...",
+    creatingToken: "プレビューを生成中...",
+    loadingEditor: "エディターを読み込み中...",
+    retry: "再試行",
+    openInNewTab: "新しいタブでプレビュー",
+} as const
+
 // 最近使ったファイル
 export const recentFiles = {
     title: "最近使ったファイル",

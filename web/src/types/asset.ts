@@ -64,6 +64,8 @@ const MIME_MAP: Record<string, string> = {
   xls: 'application/vnd.ms-excel',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   doc: 'application/msword',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ppt: 'application/vnd.ms-powerpoint',
   // Audio
   mp3: 'audio/mpeg',
   wav: 'audio/wav',

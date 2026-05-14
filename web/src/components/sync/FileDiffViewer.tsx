@@ -6,7 +6,7 @@
  * For HTML files, provides "Inspect Element" to preview in a new tab with element inspector.
  */
 
-import React, { Suspense, useCallback, useEffect, useState } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
@@ -20,6 +20,21 @@ import {
 import { Columns2, UnfoldVertical, X, MousePointer2, FileText } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
+const OfficePreview = React.lazy(() => import('@/components/file-viewer/OfficePreview').then(m => ({ default: m.OfficePreview })))
+
+/** Office file extensions that use eo2suite remote preview (xlsx, xls, pptx, ppt, doc) */
+const EO2_OFFICE_EXTS = new Set(['xlsx', 'xls', 'pptx', 'ppt', 'doc'])
+
+/** Check if a file path points to an Office file (xlsx, pptx, doc, etc.) */
+function isOfficeFile(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() ?? ''
+  return EO2_OFFICE_EXTS.has(ext)
+}
+
+/** Check if a file path points to a docx file (rendered locally via docx-preview) */
+function isDocxFile(path: string): boolean {
+  return path.toLowerCase().endsWith('.docx')
+}
 
 /**
  * Read native file content using conversation's resolvePath to get correct root handle.
@@ -144,6 +159,9 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
     error: null,
   })
   const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null)
+  const [officeBlob, setOfficeBlob] = useState<Blob | null>(null)
+  const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
+  const docxContainerRef = useRef<HTMLDivElement>(null)
   const [snapshotImageUrls, setSnapshotImageUrls] = useState<{ before: string | null; after: string | null }>({
     before: null,
     after: null,
@@ -200,6 +218,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         loading: false,
         error: null,
       })
+      setOfficeBlob(null)
+      setDocxBlob(null)
       return
     }
 
@@ -228,6 +248,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         const { conversation, conversationId } = activeConversation
         const filePath = fileChange.path
         const isImage = isImageFile(filePath)
+        const isOffice = isOfficeFile(filePath)
+        const isDocx = isDocxFile(filePath)
         let showNativePanel = fileChange.type !== 'add'
 
         if (fileChange.type !== 'add') {
@@ -268,6 +290,69 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             native: null,
             opfsImageUrl,
             nativeImageUrl,
+            showNativePanel,
+            loading: false,
+            error: null,
+          })
+        } else if (isDocx) {
+          // DOCX file: read binary blob for local docx-preview rendering
+          if (fileChange.type !== 'delete') {
+            try {
+              const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
+              if (opfsBase64) {
+                const binaryStr = atob(opfsBase64)
+                const bytes = new Uint8Array(binaryStr.length)
+                for (let i = 0; i < binaryStr.length; i++) {
+                  bytes[i] = binaryStr.charCodeAt(i)
+                }
+                const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+                setDocxBlob(blob)
+              }
+            } catch (err) {
+              console.warn('[FileDiffViewer] Failed to read DOCX file:', err)
+            }
+          }
+          setContent({
+            opfs: null,
+            native: null,
+            opfsImageUrl: null,
+            nativeImageUrl: null,
+            showNativePanel,
+            loading: false,
+            error: null,
+          })
+        } else if (isOffice) {
+          // Office file: read binary blob for preview
+          if (fileChange.type !== 'delete') {
+            try {
+              const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
+              if (opfsBase64) {
+                const binaryStr = atob(opfsBase64)
+                const bytes = new Uint8Array(binaryStr.length)
+                for (let i = 0; i < binaryStr.length; i++) {
+                  bytes[i] = binaryStr.charCodeAt(i)
+                }
+                const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+                const mimeTypes: Record<string, string> = {
+                  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  xls: 'application/vnd.ms-excel',
+                  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                  ppt: 'application/vnd.ms-powerpoint',
+                  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                  doc: 'application/msword',
+                }
+                const blob = new Blob([bytes], { type: mimeTypes[ext] || 'application/octet-stream' })
+                setOfficeBlob(blob)
+              }
+            } catch (err) {
+              console.warn('[FileDiffViewer] Failed to read Office file:', err)
+            }
+          }
+          setContent({
+            opfs: null,
+            native: null,
+            opfsImageUrl: null,
+            nativeImageUrl: null,
             showNativePanel,
             loading: false,
             error: null,
@@ -321,6 +406,35 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
     loadContents()
   }, [fileChange, snapshotDiff])
+
+  // Render docx into container (same approach as FilePreview)
+  useEffect(() => {
+    if (!docxBlob || !docxContainerRef.current) return
+
+    let cancelled = false
+    const container = docxContainerRef.current
+
+    import('docx-preview').then(({ renderAsync }) => {
+      if (cancelled) return
+      renderAsync(docxBlob, container, undefined, {
+        className: 'docx-preview',
+        inWrapper: true,
+        ignoreWidth: false,
+        ignoreHeight: false,
+        ignoreFonts: false,
+        breakPages: true,
+      }).catch((err: unknown) => {
+        if (!cancelled) {
+          console.warn('[FileDiffViewer] docx-preview render failed:', err)
+        }
+      })
+    })
+
+    return () => {
+      cancelled = true
+      container.innerHTML = ''
+    }
+  }, [docxBlob])
 
   useEffect(() => {
     if (!lightbox) return
@@ -411,6 +525,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
   const isImage = !isSnapshotMode && isImageFile(fileChange.path)
   const isHtml = !isSnapshotMode && isHtmlFile(fileChange.path) && fileChange.type !== 'delete'
+  const isDocx = !isSnapshotMode && isDocxFile(fileChange.path) && fileChange.type !== 'delete'
+  const isOffice = !isSnapshotMode && isOfficeFile(fileChange.path) && fileChange.type !== 'delete'
   const originalText = content.showNativePanel ? (content.native ?? '') : ''
   const modifiedText = content.opfs ?? ''
 
@@ -752,7 +868,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               </Tooltip>
             </TooltipProvider>
           )}
-          {!isImage && (
+          {!isImage && !isOffice && !isDocx && (
             <>
               {/* Switch between Lazy and Full editor */}
               <TooltipProvider delayDuration={200}>
@@ -881,6 +997,22 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               </div>
             )}
           </>
+        ) : isDocx && docxBlob ? (
+          <div className="flex-1 overflow-auto bg-white dark:bg-neutral-950">
+            <div ref={docxContainerRef} className="docx-preview-container h-full" />
+          </div>
+        ) : isOffice && officeBlob ? (
+          <div className="flex-1 overflow-hidden bg-card dark:bg-card">
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
+                  {t('officePreview.loadingEditor')}
+                </div>
+              }
+            >
+              <OfficePreview blob={officeBlob} fileName={fileChange.path.split('/').pop() ?? fileChange.path} fileSize={fileChange.size ?? officeBlob.size} />
+            </Suspense>
+          </div>
         ) : (
           <div className="flex-1 overflow-hidden bg-card dark:bg-card">{renderTextDiff()}</div>
         )}

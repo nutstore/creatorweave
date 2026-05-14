@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { FileText, Image, Download, X, Eye } from 'lucide-react'
+import { FileText, Image, Download, X, Eye, Loader2 } from 'lucide-react'
 import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { getActiveConversation } from '@/store/conversation-context.store'
@@ -12,6 +12,7 @@ import { ImageLightbox } from '@/components/ui/image-lightbox'
 import { HTMLLightbox } from '@/components/ui/html-lightbox'
 import { MarkdownLightbox } from '@/components/ui/markdown-lightbox'
 import { useT } from '@/i18n'
+import { openOfficePreview } from '@/components/file-viewer/office-preview-helper'
 
 /** Check if a MIME type is an image */
 function isImageMime(mime: string): boolean {
@@ -26,6 +27,18 @@ function isHtmlMime(mime: string): boolean {
 /** Check if a MIME type is previewable Markdown */
 function isMarkdownMime(mime: string): boolean {
   return mime === 'text/markdown'
+}
+
+/** Check if a MIME type is an Office file (xlsx, xls, pptx, ppt, doc, docx) */
+function isOfficeMime(mime: string): boolean {
+  return [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/msword',
+  ].includes(mime)
 }
 
 /** Format file size for display */
@@ -95,11 +108,13 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
   const [mdLightboxOpen, setMdLightboxOpen] = useState(false)
+  const [officeLoading, setOfficeLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
   const isHtml = isHtmlMime(mime)
   const isMarkdown = isMarkdownMime(mime)
+  const isOffice = isOfficeMime(mime)
 
   const imageUrlRef = useRef<string | null>(null)
 
@@ -143,6 +158,23 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
       setMdLightboxOpen(true)
     }
   }, [asset.name, mdUrl])
+
+  const handlePreviewOffice = useCallback(async () => {
+    if (officeLoading) return
+    setOfficeLoading(true)
+    try {
+      const blob = await readAssetBlob(asset.name)
+      if (!blob) {
+        console.error(`[AssetCard] Failed to read Office asset: ${asset.name}`)
+        return
+      }
+      await openOfficePreview(blob, asset.name)
+    } catch (err) {
+      console.error('[AssetCard] Office preview failed:', err)
+    } finally {
+      setOfficeLoading(false)
+    }
+  }, [asset.name, officeLoading])
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -265,6 +297,22 @@ export function AssetCard({ asset, compact = false, onRemove }: AssetCardProps) 
             <Eye className="h-4 w-4" />
           </button>
         )}
+        {/* Preview button for Office files */}
+        {isOffice && (
+          <button
+            type="button"
+            onClick={handlePreviewOffice}
+            disabled={officeLoading}
+            className="rounded-md p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 disabled:opacity-50"
+            title={t('officePreview.openInNewTab', { defaultValue: '在新标签页中预览' })}
+          >
+            {officeLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleDownload}
@@ -340,10 +388,12 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [htmlLightboxOpen, setHtmlLightboxOpen] = useState(false)
   const [mdLightboxOpen, setMdLightboxOpen] = useState(false)
+  const [officeLoading, setOfficeLoading] = useState(false)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
   const isHtml = isHtmlMime(mime)
   const isMarkdown = isMarkdownMime(mime)
+  const isOffice = isOfficeMime(mime)
 
   // Load thumbnail for images
   useEffect(() => {
@@ -386,6 +436,23 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
       setMdLightboxOpen(true)
     }
   }, [asset.name, mdUrl])
+
+  const handlePreviewOffice = useCallback(async () => {
+    if (officeLoading) return
+    setOfficeLoading(true)
+    try {
+      const blob = await readAssetBlob(asset.name)
+      if (!blob) {
+        console.error(`[AssetCard] Failed to read Office asset: ${asset.name}`)
+        return
+      }
+      await openOfficePreview(blob, asset.name)
+    } catch (err) {
+      console.error('[AssetCard] Office preview failed:', err)
+    } finally {
+      setOfficeLoading(false)
+    }
+  }, [asset.name, officeLoading])
 
   return (
     <>
@@ -444,6 +511,23 @@ function AssetCompactRow({ asset }: { asset: AssetMeta }) {
             title={t('filePreview.preview')}
           >
             <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
+
+        {/* Preview button for Office files */}
+        {isOffice && (
+          <button
+            type="button"
+            onClick={handlePreviewOffice}
+            disabled={officeLoading}
+            className="flex-shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-600 dark:hover:text-neutral-300 disabled:opacity-50"
+            title={t('officePreview.openInNewTab', { defaultValue: '在新标签页中预览' })}
+          >
+            {officeLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Eye className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
       </div>

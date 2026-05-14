@@ -41,6 +41,15 @@ export const filePreview = {
     clearComments: "清除所有评论",
 } as const
 
+// Office 文件预览
+export const officePreview = {
+    uploading: "正在上传文件...",
+    creatingToken: "正在生成预览...",
+    loadingEditor: "正在加载编辑器...",
+    retry: "重试",
+    openInNewTab: "在新标签页中预览",
+} as const
+
 // Phase 4: 工作区功能
 export const recentFiles = {
     title: "最近文件",

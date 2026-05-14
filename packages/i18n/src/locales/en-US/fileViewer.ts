@@ -40,6 +40,15 @@ export const filePreview = {
     clearComments: "Clear all comments",
 } as const
 
+// Office file preview
+export const officePreview = {
+    uploading: "Uploading file...",
+    creatingToken: "Generating preview...",
+    loadingEditor: "Loading editor...",
+    retry: "Retry",
+    openInNewTab: "Preview in new tab",
+} as const
+
 // Phase 4: Workspace Features
 export const recentFiles = {
     title: "Recent Files",

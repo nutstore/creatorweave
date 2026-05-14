@@ -20,6 +20,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { toast } from 'sonner'
+import { OfficePreview, OFFICE_EXTS } from './OfficePreview'
 
 // ── Comment Types ──────────────────────────────────────────────────────────
 
@@ -80,9 +81,12 @@ const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', '
 /** DOCX extensions for docx-preview rendering */
 const DOCX_EXTS = new Set(['docx'])
 
-/** Binary (non-image, non-docx) extensions */
+/** Office file extensions (previewed via eo2suite) */
+// (imported from OfficePreview: OFFICE_EXTS = xlsx, xls, pptx, ppt, doc)
+
+/** Binary (non-image, non-docx, non-office) extensions */
 const BINARY_EXTS = new Set([
-  'wasm', 'zip', 'gz', 'tar', 'br', 'zst', 'pdf', 'doc', 'xls', 'xlsx',
+  'wasm', 'zip', 'gz', 'tar', 'br', 'zst', 'pdf',
   'mp3', 'mp4', 'webm', 'ogg', 'wav', 'avi', 'woff', 'woff2', 'ttf', 'eot', 'otf',
   'exe', 'dll', 'so', 'dylib',
 ])
@@ -100,11 +104,12 @@ const TEXT_EXTS = new Set([
 /** HTML extensions for rendered preview */
 const HTML_EXTS = new Set(['html', 'htm'])
 
-function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html' {
+function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html' | 'office' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   if (IMAGE_EXTS.has(ext)) return 'image'
   if (DOCX_EXTS.has(ext)) return 'docx'
   if (HTML_EXTS.has(ext)) return 'html'
+  if (OFFICE_EXTS.has(ext)) return 'office'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
   // Unknown extension - try text
@@ -124,6 +129,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
   const [diskNewer, setDiskNewer] = useState(false)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
+  const [officeBlob, setOfficeBlob] = useState<Blob | null>(null)
   const docxContainerRef = useRef<HTMLDivElement>(null)
   // HTML preview: toggle between rendered preview and source code
   const [previewMode, setPreviewMode] = useState<'preview' | 'source'>('source')
@@ -388,6 +394,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       setContent(null)
       setImageUrl(null)
       setDocxBlob(null)
+      setOfficeBlob(null)
       setError(null)
       setDiskNewer(false)
       return
@@ -402,6 +409,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
       setContent(null)
       setImageUrl(null)
       setDocxBlob(null)
+      setOfficeBlob(null)
       setDiskNewer(false)
 
       try {
@@ -422,10 +430,10 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
             text = result.content
             fileSize = new Blob([result.content]).size
           } else {
-            // ArrayBuffer - for docx, keep as Blob; for text, decode it
+            // ArrayBuffer - for docx/office, keep as Blob; for text, decode it
             const buffer = result.content as ArrayBuffer
             fileSize = buffer.byteLength
-            if (fileType === 'docx') {
+            if (fileType === 'docx' || fileType === 'office') {
               blob = new Blob([buffer])
             } else {
               const decoder = new TextDecoder()
@@ -444,7 +452,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
 
             if (opfsMtime !== null && diskMtime > opfsMtime) {
               fileSize = diskFile.size
-              if (fileType === 'image' || fileType === 'docx') {
+              if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
                 blob = diskFile
               } else {
                 text = await diskFile.text()
@@ -452,7 +460,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
               setDiskNewer(true)
             } else if (opfsMtime === null) {
               fileSize = diskFile.size
-              if (fileType === 'image' || fileType === 'docx') {
+              if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
                 blob = diskFile
               } else {
                 text = await diskFile.text()
@@ -482,6 +490,8 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
           setImageUrl(objectUrl)
         } else if (fileType === 'docx' && blob) {
           setDocxBlob(blob)
+        } else if (fileType === 'office' && blob) {
+          setOfficeBlob(blob)
         } else if (text !== undefined) {
           setContent(text)
         }
@@ -664,6 +674,11 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         {/* DOCX preview */}
         {fileType === 'docx' && docxBlob && !loading && !error && (
           <div ref={docxContainerRef} className="docx-preview-container h-full" />
+        )}
+
+        {/* Office file preview (xlsx, xls, pptx, ppt, doc) via eo2suite */}
+        {fileType === 'office' && officeBlob && !loading && !error && (
+          <OfficePreview blob={officeBlob} fileName={fileName} fileSize={fileSize} />
         )}
 
         {/* Binary (non-image) file */}
