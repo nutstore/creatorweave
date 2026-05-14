@@ -1601,22 +1601,18 @@ export class WorkspaceRuntime {
           const fileResult = await this.readFile(op.path)
           afterContent = await this.normalizeContentForSnapshot(fileResult.content)
         } else if (op.type === 'modify') {
-          if (directoryHandle) {
-            try {
-              beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
-            } catch {
-              // Native file may not exist — keep before as null
-            }
+          try {
+            beforeContent = await this.readNativeFileContentForPath(op.path, directoryHandle)
+          } catch {
+            // Native file may not exist — keep before as null
           }
           const fileResult = await this.readFile(op.path)
           afterContent = await this.normalizeContentForSnapshot(fileResult.content)
         } else if (op.type === 'delete') {
-          if (directoryHandle) {
-            try {
-              beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
-            } catch {
-              // Native file may not exist — keep before as null
-            }
+          try {
+            beforeContent = await this.readNativeFileContentForPath(op.path, directoryHandle)
+          } catch {
+            // Native file may not exist — keep before as null
           }
         }
       } catch {
@@ -1689,14 +1685,18 @@ export class WorkspaceRuntime {
           const result = await this.readFile(op.path)
           afterContent = await this.normalizeContentForSnapshot(result.content)
         } else if (op.type === 'modify') {
-          if (directoryHandle) {
-            beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+          try {
+            beforeContent = await this.readNativeFileContentForPath(op.path, directoryHandle)
+          } catch {
+            // Native file may not exist
           }
           const result = await this.readFile(op.path)
           afterContent = await this.normalizeContentForSnapshot(result.content)
         } else if (op.type === 'delete') {
-          if (directoryHandle) {
-            beforeContent = await this.readNativeFileContent(directoryHandle, op.path)
+          try {
+            beforeContent = await this.readNativeFileContentForPath(op.path, directoryHandle)
+          } catch {
+            // Native file may not exist
           }
         }
       } catch {
@@ -2098,6 +2098,40 @@ export class WorkspaceRuntime {
     } catch {
       // Ignore if file doesn't exist.
     }
+  }
+
+  /**
+   * Read native file content for a workspace path, resolving the correct
+   * root handle and stripping the root prefix in multi-root setups.
+   * Falls back to the provided directoryHandle with the raw path if multi-root
+   * resolution fails.
+   */
+  private async readNativeFileContentForPath(
+    path: string,
+    fallbackHandle?: FileSystemDirectoryHandle | null
+  ): Promise<string | ArrayBuffer | null> {
+    try {
+      const allHandles = await this.getAllNativeDirectoryHandles()
+      if (allHandles.size > 0) {
+        const resolved = await this.resolvePath(path)
+        const rootHandle = allHandles.get(resolved.rootName)
+        if (rootHandle && resolved.relativePath) {
+          return await this.readNativeFileContent(rootHandle, resolved.relativePath)
+        }
+        if (rootHandle && !resolved.relativePath) {
+          // Path matched a root name exactly (e.g. "creatorweave") — no file to read
+          return null
+        }
+      }
+    } catch {
+      // Multi-root resolution failed — fall through to single-root path
+    }
+
+    // Single-root fallback: use provided handle with raw path
+    if (fallbackHandle) {
+      return await this.readNativeFileContent(fallbackHandle, path)
+    }
+    return null
   }
 
   private async readNativeFileContent(
