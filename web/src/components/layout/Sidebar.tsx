@@ -17,7 +17,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -320,6 +320,8 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   onFileSelect,
   onInspect,
   onRevealComplete,
+  collapsed,
+  onToggleCollapse,
 }: {
   root: { id: string; name: string; handle: FileSystemDirectoryHandle }
   selectedFilePath?: string | null
@@ -328,6 +330,8 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   onFileSelect: (fullPath: string, handle: FileSystemFileHandle | null) => void
   onInspect?: ((fullPath: string, handle: FileSystemFileHandle | null) => void) | undefined
   onRevealComplete?: (() => void) | undefined
+  collapsed: boolean
+  onToggleCollapse: (rootName: string) => void
 }) {
   const handleFileSelect = useCallback(
     (path: string, handle: FileSystemFileHandle | null) => {
@@ -356,18 +360,39 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
     ? selectedFilePath.slice(root.name.length + 1)
     : null
 
+  // Auto-expand when there's a revealTarget for this root
+  const shouldReveal = rootRevealTarget !== null
+
   return (
     <div className="flex-shrink-0">
-      <FileTreePanel
-        directoryHandle={root.handle}
-        rootName={root.name}
-        pathPrefix={root.name}
-        onFileSelect={handleFileSelect}
-        selectedPath={rootSelectedPath}
-        onInspect={handleInspect}
-        revealTarget={rootRevealTarget}
-        onRevealComplete={onRevealComplete}
-      />
+      {rootsLength > 1 ? (
+        <button
+          type="button"
+          className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-secondary hover:bg-hover"
+          onClick={() => onToggleCollapse(root.name)}
+        >
+          {collapsed && !shouldReveal ? (
+            <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
+          ) : (
+            <ChevronDown className="h-3 w-3 shrink-0 text-tertiary" />
+          )}
+          <FolderTree className="h-3 w-3 shrink-0 text-warning" />
+          <span className="truncate">{root.name}</span>
+        </button>
+      ) : null}
+      {rootsLength <= 1 || !collapsed || shouldReveal ? (
+        <FileTreePanel
+          directoryHandle={root.handle}
+          rootName={root.name}
+          pathPrefix={root.name}
+          onFileSelect={handleFileSelect}
+          selectedPath={rootSelectedPath}
+          onInspect={handleInspect}
+          revealTarget={rootRevealTarget}
+          onRevealComplete={onRevealComplete}
+          showHeader={rootsLength <= 1}
+        />
+      ) : null}
     </div>
   )
 })
@@ -403,6 +428,21 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
   refreshPending: () => Promise<void>
   t: (key: string, params?: Record<string, string | number>) => string
 }) {
+  // Root collapse state for multi-root file tree
+  const [collapsedRoots, setCollapsedRoots] = useState<Set<string>>(new Set())
+
+  const handleToggleCollapse = useCallback((rootName: string) => {
+    setCollapsedRoots((prev) => {
+      const next = new Set(prev)
+      if (next.has(rootName)) {
+        next.delete(rootName)
+      } else {
+        next.add(rootName)
+      }
+      return next
+    })
+  }, [])
+
   return (
     <div
       className="border-subtle flex h-full flex-col overflow-hidden border-t bg-white dark:bg-card"
@@ -481,6 +521,8 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
                 onFileSelect={onFileSelect}
                 onInspect={onInspect}
                 onRevealComplete={onRevealComplete}
+                collapsed={collapsedRoots.has(root.name)}
+                onToggleCollapse={handleToggleCollapse}
               />
             ))}
           </div>
