@@ -90,6 +90,30 @@
     .footer a:hover {
       text-decoration: underline;
     }
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid #f3f4f6;
+      font-size: 12px;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #d1d5db;
+      flex-shrink: 0;
+    }
+    .status-dot.active { background: #22c55e; }
+    .status-dot.inactive { background: #eab308; }
+    .status-dot.disabled { background: #ef4444; }
+    .status.active { background: #f0fdf4; border-color: #bbf7d0; }
+    .status.inactive { background: #fefce8; border-color: #fde68a; }
+    .status.disabled { background: #fef2f2; border-color: #fecaca; }
+    .status-text { color: #6b7280; }
   </style>
 </head>
 <body>
@@ -110,6 +134,10 @@
   </header>
 
   <main class="main">
+    <div class="status" id="status">
+      <span class="status-dot" id="statusDot"></span>
+      <span class="status-text" id="statusText">检测中…</span>
+    </div>
     <p class="desc">
       为页面注入 <code>__agentWeb</code> API，提供网页搜索和内容抓取能力。
     </p>
@@ -132,6 +160,48 @@
 
   <script>
     try { document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
+
+    // Check injection status
+    (function () {
+      var el = document.getElementById('status');
+      var dot = document.getElementById('statusDot');
+      var text = document.getElementById('statusText');
+
+      function setStatus(type, msg) {
+        el.className = 'status ' + type;
+        dot.className = 'status-dot ' + type;
+        text.textContent = msg;
+      }
+
+      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        var tab = tabs && tabs[0];
+        if (!tab || !tab.id) {
+          setStatus('disabled', '无法访问当前页面');
+          return;
+        }
+        var url = tab.url || '';
+        if (url.indexOf('chrome') === 0 || url.indexOf('about:') === 0) {
+          setStatus('disabled', '浏览器内部页面，不支持注入');
+          return;
+        }
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          world: 'MAIN',
+          func: function () { return !!(window.__agentWeb && window.__agentWeb.ready); }
+        }, function (results) {
+          if (chrome.runtime.lastError) {
+            setStatus('disabled', '检测失败');
+            return;
+          }
+          if (results && results[0] && results[0].result === true) {
+            setStatus('active', 'API 已注入，可以使用');
+          } else {
+            setStatus('inactive', '未注入，刷新页面后生效');
+          }
+        });
+      });
+    })();
+
     document.getElementById('openDocs').addEventListener('click', function () {
       chrome.tabs.create({ url: 'https://github.com/nutstore-nut/creatorweave/blob/main/browser-extension/README.md' });
     });
