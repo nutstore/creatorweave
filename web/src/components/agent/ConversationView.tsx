@@ -11,7 +11,7 @@
  *   - ContextUsageBar        — context window usage display
  */
 
-import { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
 import { Send, StopCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
@@ -31,6 +31,7 @@ import { ContextUsageBar } from './ContextUsageBar'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { MessageNavBar } from './MessageNavBar'
 import { AssetsPopover } from './AssetsPopover'
+import { ConversationActionContext } from './ConversationActionContext'
 /** Lightweight keyboard shortcut hint shown near the input area */
 function ShortcutHint() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
@@ -323,7 +324,11 @@ export function ConversationView({
     [convId],
   )
 
+  // Memoize the context value to avoid unnecessary re-renders
+  const actionContextValue = useMemo(() => ({ setInput }), [setInput])
+
   return (
+    <ConversationActionContext.Provider value={actionContextValue}>
     <ErrorBoundary
       onError={handleErrorBoundaryError}
     >
@@ -458,5 +463,6 @@ export function ConversationView({
         }}
       />
     </ErrorBoundary>
+    </ConversationActionContext.Provider>
   )
 }

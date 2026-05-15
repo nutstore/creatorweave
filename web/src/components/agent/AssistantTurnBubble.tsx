@@ -24,7 +24,7 @@
  *   Only committed messages are rendered (no runtime steps).
  */
 
-import { memo, type ReactNode, useState } from 'react'
+import { memo, type ReactNode, useRef, useState } from 'react'
 import { Bot, Database, GitFork } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
@@ -37,6 +37,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { TextSelectionToolbar } from './TextSelectionToolbar'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
@@ -642,6 +643,7 @@ const AssistantStep = memo(function AssistantStep({
   onPreviewAsset?: (name: string, blob: Blob) => void
 }) {
   const t = useT()
+  const contentRef = useRef<HTMLDivElement>(null)
   const hasReasoning = !!message.reasoning
   const hasContent = !!message.content
   const hasAssets = !!(message.assets && message.assets.length > 0)
@@ -698,8 +700,9 @@ const AssistantStep = memo(function AssistantStep({
                 </div>
               )}
               {isWorkflowRealRun && <WorkflowRealRunHeader payload={message.workflowRealRun} />}
-              <div className="prose max-w-prose overflow-x-auto break-words">
+              <div ref={contentRef} className="prose max-w-prose overflow-x-auto break-words select-text">
                 <MarkdownContent content={message.content!} />
+                <TextSelectionToolbar containerRef={contentRef} />
               </div>
             </div>
           )}
