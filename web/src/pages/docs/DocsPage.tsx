@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Menu, X, FileText, BookOpen, Code2, Github } from 'lucide-react'
 import { MarkdownContent } from '@/components/agent/MarkdownContent'
 import { BrandButton } from '@creatorweave/ui'
@@ -160,6 +161,7 @@ async function fetchDocIndex(lang: DocsLanguage, category: 'user' | 'developer')
 }
 
 export function DocsPage({ language, category, page, onBack }: DocsPageProps) {
+  const navigate = useNavigate()
   const [locale, setLocale] = useLocale()
   const docsLang = language ?? localeToDocsLanguage(locale)
   const copy = UI_TEXT[docsLang]
@@ -266,12 +268,12 @@ export function DocsPage({ language, category, page, onBack }: DocsPageProps) {
   const navigateTo = useCallback((cat: 'user' | 'developer', slug?: string, lang?: DocsLanguage) => {
     const parts = ['docs', lang ?? docsLang, cat, slug].filter(Boolean)
     const path = '/' + parts.join('/')
-    window.location.hash = path
-  }, [docsLang])
+    navigate(path)
+  }, [docsLang, navigate])
 
   const navigateToHome = useCallback((lang?: DocsLanguage) => {
-    window.location.hash = `/docs/${lang ?? docsLang}`
-  }, [docsLang])
+    navigate(`/docs/${lang ?? docsLang}`)
+  }, [docsLang, navigate])
 
   const switchLocale = useCallback(async (nextLocale: Locale) => {
     if (locale === nextLocale) return

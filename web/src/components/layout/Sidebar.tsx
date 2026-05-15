@@ -16,6 +16,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
+import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Puzzle, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,6 +38,7 @@ import { useConversationStore } from '@/store/conversation.store'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
+import { useProjectStore } from '@/store/project.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
@@ -568,6 +570,8 @@ export const Sidebar = memo(function Sidebar({
   onSelectWorkspace,
 }: SidebarProps) {
   const t = useT()
+  const navigate = useNavigate()
+  const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   // Use selectors to avoid re-rendering on every streaming delta.
   // Sidebar only needs id/title for the list — not streamingContent/toolCalls/etc.
@@ -852,8 +856,9 @@ export const Sidebar = memo(function Sidebar({
   const handleCreateNewWorkspace = useCallback(() => {
     const conv = createNew()
     void setActive(conv.id)
+    navigate(`/projects/${encodeURIComponent(activeProjectId)}/workspaces/${encodeURIComponent(conv.id)}`)
     closeMobileSidebar()
-  }, [createNew, setActive, closeMobileSidebar])
+  }, [createNew, setActive, activeProjectId, navigate, closeMobileSidebar])
 
   // Stable callback for editing title change
   const handleEditingTitleChange = useCallback((title: string) => setEditingTitle(title), [])
@@ -912,12 +917,19 @@ export const Sidebar = memo(function Sidebar({
     try {
       await deleteConversation(id)
       toast.success(t('sidebar.workspaceDeleted'))
+      // After deleting, navigate to the new active workspace (resolved by workspace store)
+      // so that syncFromRoute runs the full switchWorkspace flow (OPFS init, file tree, etc.)
+      const newActiveId = useConversationContextStore.getState().activeWorkspaceId
+      if (newActiveId && onSelectWorkspace) {
+        onSelectWorkspace(newActiveId)
+      }
     } catch (error) {
       console.error('[Sidebar] Failed to delete conversation:', error)
       toast.error(t('sidebar.deleteWorkspaceFailed'))
     }
-  }, [deleteConversation, t])
+  }, [deleteConversation, t, onSelectWorkspace])
 
+  // collapsed sidebar view
   if (collapsed) {
     return (
       <div className="border-subtle flex shrink-0 flex-col border-r bg-white dark:bg-card">
@@ -1181,14 +1193,21 @@ export const Sidebar = memo(function Sidebar({
           <div className="flex gap-2">
             <button
               className="rounded border border-danger/30 bg-danger/10 px-3 py-1 text-xs text-danger hover:bg-danger/20"
-              onClick={() => {
+              onClick={async () => {
                 if (confirmDeleteId) {
-                  deleteConversation(confirmDeleteId)
-                    .then(() => toast.success(t('sidebar.workspaceDeleted')))
-                    .catch((error) => {
-                      console.error('[Sidebar] Failed to delete conversation:', error)
-                      toast.error(t('sidebar.deleteWorkspaceFailed'))
-                    })
+                  try {
+                    await deleteConversation(confirmDeleteId)
+                    toast.success(t('sidebar.workspaceDeleted'))
+                    // Navigate to the new active workspace (resolved by workspace store)
+                    // so that syncFromRoute runs the full switchWorkspace flow
+                    const newActiveId = useConversationContextStore.getState().activeWorkspaceId
+                    if (newActiveId && onSelectWorkspace) {
+                      onSelectWorkspace(newActiveId)
+                    }
+                  } catch (error) {
+                    console.error('[Sidebar] Failed to delete conversation:', error)
+                    toast.error(t('sidebar.deleteWorkspaceFailed'))
+                  }
                 }
                 setConfirmDeleteId(null)
                 setConfirmDeletePos(null)
