@@ -4,16 +4,12 @@ import { IntelligenceCoordinator } from '../intelligence-coordinator'
 const {
   recommendMock,
   getToolRecommendationsForPromptMock,
-  getMemoryBlockForPromptMock,
-  processMessageMock,
   getProjectMock,
   buildAgentPromptMock,
 } = vi.hoisted(() => {
   return {
     recommendMock: vi.fn(() => []),
     getToolRecommendationsForPromptMock: vi.fn(() => ''),
-    getMemoryBlockForPromptMock: vi.fn(async () => ''),
-    processMessageMock: vi.fn(async () => {}),
     getProjectMock: vi.fn(),
     buildAgentPromptMock: vi.fn(() => 'AGENT_PROMPT'),
   }
@@ -25,13 +21,6 @@ vi.mock('../tools/tool-recommendation', () => ({
     getAllTools: vi.fn(() => ({})),
   }),
   getToolRecommendationsForPrompt: getToolRecommendationsForPromptMock,
-}))
-
-vi.mock('../context-memory', () => ({
-  getContextMemoryManager: () => ({
-    processMessage: processMessageMock,
-  }),
-  getMemoryBlockForPrompt: getMemoryBlockForPromptMock,
 }))
 
 vi.mock('@/opfs', () => ({

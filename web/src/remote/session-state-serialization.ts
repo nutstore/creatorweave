@@ -6,7 +6,6 @@
  */
 
 import type { Conversation, Message, MessageRole } from '@/agent/message-types'
-import type { MemoryEntry } from '@/agent/context-memory'
 
 //=============================================================================
 // Session State Types
@@ -103,9 +102,6 @@ export interface FileHandleMetadata {
 }
 
 export interface AgentState {
-  /** Memory entries */
-  memories: MemoryEntry[]
-
   /** Session preferences */
   preferences: AgentPreferences
 
@@ -328,15 +324,12 @@ export interface SessionStateManagerOptions {
   maxMessagesPerConversation?: number
   /** Include file handles (can be large) */
   includeFileHandles?: boolean
-  /** Include memory entries */
-  includeMemories?: boolean
 }
 
 const DEFAULT_OPTIONS: Required<SessionStateManagerOptions> = {
   maxConversations: 50,
   maxMessagesPerConversation: 100,
   includeFileHandles: false,
-  includeMemories: true,
 }
 
 /**
@@ -378,7 +371,6 @@ export class SessionStateManager {
         activeFile: null,
       },
       agent: {
-        memories: [],
         preferences: {
           model: '',
           temperature: 0.7,
@@ -411,7 +403,6 @@ export class SessionStateManager {
    */
   async createFromCurrentState(
     conversations: Conversation[],
-    memories: MemoryEntry[],
     files: FileSystemState,
     ui: UIState
   ): Promise<SessionState> {
@@ -434,7 +425,6 @@ export class SessionStateManager {
       conversations: serializedConversations,
       files,
       agent: {
-        memories: this.options.includeMemories ? memories.slice(-100) : [],
         preferences: {
           model: '',
           temperature: 0.7,

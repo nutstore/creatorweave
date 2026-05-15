@@ -4,7 +4,6 @@
  * This module coordinates:
  * 1. Agent Configuration (SOUL, IDENTITY, etc.)
  * 2. Tool Recommendation System
- * 3. Context Memory System
  *
  * And injects relevant enhancements into the system prompt.
  */
@@ -13,11 +12,6 @@ import {
   getRecommendationEngine,
   getToolRecommendationsForPrompt,
 } from './tools/tool-recommendation'
-import {
-  getContextMemoryManager,
-  getMemoryBlockForPrompt,
-  type MemoryContext,
-} from './context-memory'
 import { ProjectManager, type AgentInfo } from '@/opfs'
 import { buildAgentPrompt, type PromptOptions } from './prompt-builder'
 import { extractFirstMentionedAgentId } from './agent-mention'
@@ -35,8 +29,6 @@ export interface IntelligenceEnhancement {
   systemPrompt: string
   /** Recommended tools */
   recommendedTools: string[]
-  /** Memory context used */
-  memoryContext: MemoryContext
   /** Agent info (if loaded) */
   agentInfo: AgentInfo | null
 }
@@ -90,19 +82,7 @@ export class IntelligenceCoordinator {
       }
     }
 
-    // 2. Context Memory (previous conversations)
-    const memoryContext: MemoryContext = {
-      activeFile: options.activeFile,
-      recentMessages: options.recentMessages || [],
-      sessionId: options.sessionId,
-    }
-
-    const memoryBlock = await getMemoryBlockForPrompt(memoryContext)
-    if (memoryBlock) {
-      enhancements.push(memoryBlock)
-    }
-
-    // 3. Multi-root project context (inject root names so agent uses correct paths)
+    // 2. Multi-root project context (inject root names so agent uses correct paths)
     try {
       const rootBlock = await buildMultiRootBlock(options.projectId)
       if (rootBlock) {
@@ -134,7 +114,6 @@ export class IntelligenceCoordinator {
     return {
       systemPrompt: enhancedPrompt,
       recommendedTools: [...new Set(recommendedTools)],
-      memoryContext,
       agentInfo,
     }
   }
@@ -199,14 +178,6 @@ export class IntelligenceCoordinator {
   }
 
   /**
-   * Process user message for learning
-   */
-  async processUserMessage(message: string, context: MemoryContext): Promise<void> {
-    const memoryManager = getContextMemoryManager()
-    await memoryManager.processMessage(message, context)
-  }
-
-  /**
    * Get tool recommendations for UI display
    */
   getToolRecommendations(userMessage: string, maxResults = 5) {
@@ -218,22 +189,6 @@ export class IntelligenceCoordinator {
    */
   getAllTools() {
     return getRecommendationEngine().getAllTools()
-  }
-
-  /**
-   * Search memories
-   */
-  async searchMemories(query: string, maxResults = 10) {
-    const manager = getContextMemoryManager()
-    return manager.search(query, maxResults)
-  }
-
-  /**
-   * Cleanup old memories
-   */
-  async cleanupMemories(olderThanDays = 30): Promise<number> {
-    const manager = getContextMemoryManager()
-    return manager.cleanup(olderThanDays)
   }
 }
 
