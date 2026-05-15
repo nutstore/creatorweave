@@ -30,6 +30,7 @@ import { ThinkingDropdown } from './ThinkingDropdown'
 import { ContextUsageBar } from './ContextUsageBar'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { MessageNavBar } from './MessageNavBar'
+import { AssetsPopover } from './AssetsPopover'
 /** Lightweight keyboard shortcut hint shown near the input area */
 function ShortcutHint() {
   const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
@@ -89,12 +90,15 @@ interface ConversationViewProps {
   initialMessage?: string | null
   onInitialMessageConsumed?: () => void
   disabled?: boolean
+  /** Open the file preview drawer with a pre-loaded blob (from AssetsPopover) */
+  onPreviewAsset?: (fileName: string, blob: Blob) => void
 }
 
 export function ConversationView({
   initialMessage,
   onInitialMessageConsumed,
   disabled = false,
+  onPreviewAsset,
 }: ConversationViewProps) {
   const t = useT()
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
@@ -345,6 +349,7 @@ export function ConversationView({
               conversationId={convId}
               mentionAgents={mentionAgents}
               onSearchFiles={debouncedSearchFiles}
+              onPreviewAsset={onPreviewAsset}
             />
           )}
         </div>
@@ -356,6 +361,9 @@ export function ConversationView({
           isUserAtBottomRef={isUserAtBottomRef}
           convId={convId}
         />
+
+        {/* Assets popover — small trigger button, expands to show workspace assets */}
+        <AssetsPopover convId={convId} onPreviewAsset={onPreviewAsset} />
 
         {/* Message navigation dots */}
         {activeMessages.length > 1 && (

@@ -138,6 +138,7 @@ export function WorkspaceLayout({
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [selectedFileHandle, setSelectedFileHandle] = useState<FileSystemFileHandle | null>(null)
+  const [selectedFileBlob, setSelectedFileBlob] = useState<Blob | null>(null)
   const [projectSwitcherOpen, setProjectSwitcherOpen] = useState(false)
 
   // Skills management state
@@ -592,6 +593,7 @@ export function WorkspaceLayout({
   const handleSidebarFileSelect = useCallback((path: string, handle: FileSystemFileHandle | null) => {
     setSelectedFilePath(path)
     setSelectedFileHandle(handle)
+    setSelectedFileBlob(null) // sidebar files are read via OPFS/disk
     if (isMobile) {
       setIsSidebarOpen(false)
     }
@@ -631,6 +633,14 @@ export function WorkspaceLayout({
   const handleCloseFilePreview = useCallback(() => {
     setSelectedFilePath(null)
     setSelectedFileHandle(null)
+    setSelectedFileBlob(null)
+  }, [])
+
+  // Handle asset preview from AssetsPopover — opens the FilePreview drawer with a pre-loaded blob
+  const handleAssetPreview = useCallback((fileName: string, blob: Blob) => {
+    setSelectedFilePath(fileName)
+    setSelectedFileHandle(null)
+    setSelectedFileBlob(blob)
   }, [])
 
   // Handle "go to file" selection from GoToFileDialog
@@ -739,6 +749,7 @@ export function WorkspaceLayout({
               <ConversationView
                 initialMessage={pendingMessage}
                 onInitialMessageConsumed={handleInitialMessageConsumed}
+                onPreviewAsset={handleAssetPreview}
               />
             ) : (
               <div className="relative h-full min-h-0 w-full overflow-hidden">
@@ -773,6 +784,7 @@ export function WorkspaceLayout({
               filePath={selectedFilePath}
               fileHandle={selectedFileHandle}
               onClose={handleCloseFilePreview}
+              blob={selectedFileBlob}
             />
           </Drawer>
 

@@ -93,6 +93,8 @@ interface AssistantTurnBubbleProps {
   workflowProgress?: ReactNode
   /** Conversation ID — needed for ask_user_question to bridge UI answer back to executor */
   conversationId?: string | null
+  /** Open the shared FilePreview drawer with a pre-loaded blob */
+  onPreviewAsset?: (name: string, blob: Blob) => void
 }
 
 // ─── Timeline builder ─────────────────────────────────────────────────
@@ -320,6 +322,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   runtimeSteps,
   workflowProgress,
   conversationId,
+  onPreviewAsset,
 }: AssistantTurnBubbleProps) {
   const t = useT()
   const isStreamingReasoning = streamingState?.reasoning ?? false
@@ -382,6 +385,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               streamingToolArgs ?? null,
               streamingToolArgsByCallId,
               conversationId,
+              onPreviewAsset,
             )}
           </TimelineRow>
         ))}
@@ -457,6 +461,7 @@ function renderTimelineItem(
   streamingToolArgs: string | null,
   streamingToolArgsByCallId: Record<string, string> | undefined,
   conversationId: string | null | undefined,
+  onPreviewAsset?: (name: string, blob: Blob) => void,
 ): ReactNode {
   switch (item.kind) {
     case 'committed':
@@ -467,6 +472,7 @@ function renderTimelineItem(
           showDivider={false}
           suppressExecutingToolCallIds={suppressedIds}
           conversationId={conversationId ?? undefined}
+          onPreviewAsset={onPreviewAsset}
         />
       )
 
@@ -626,12 +632,14 @@ const AssistantStep = memo(function AssistantStep({
   showDivider,
   suppressExecutingToolCallIds,
   conversationId,
+  onPreviewAsset,
 }: {
   message: Message
   toolResults: Map<string, string>
   showDivider: boolean
   suppressExecutingToolCallIds?: Set<string>
   conversationId?: string
+  onPreviewAsset?: (name: string, blob: Blob) => void
 }) {
   const t = useT()
   const hasReasoning = !!message.reasoning
@@ -709,7 +717,7 @@ const AssistantStep = memo(function AssistantStep({
             </div>
           )}
 
-          {message.assets && message.assets.length > 0 && <AssetCompactList assets={message.assets} />}
+          {message.assets && message.assets.length > 0 && <AssetCompactList assets={message.assets} onPreview={onPreviewAsset} />}
         </div>
       )}
     </>
@@ -731,6 +739,7 @@ const AssistantStep = memo(function AssistantStep({
 
   if (prev.showDivider !== next.showDivider) return false
   if (prev.conversationId !== next.conversationId) return false
+  if (prev.onPreviewAsset !== next.onPreviewAsset) return false
 
   // Only check tool results for the tool calls this message actually uses
   const toolCalls = prev.message.toolCalls

@@ -36,6 +36,8 @@ type ConversationMessagesProps = {
   mentionAgents: { id: string; name?: string }[]
   /** Async file search callback for # file mention in edit mode */
   onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
+  /** Open the shared FilePreview drawer with a pre-loaded blob */
+  onPreviewAsset?: (name: string, blob: Blob) => void
   /**
    * Stable snapshot of low-frequency data computed by the parent.
    * These fields change only when the processing state or messages change,
@@ -97,6 +99,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   conversationId,
   mentionAgents,
   onSearchFiles,
+  onPreviewAsset,
   staticSnapshot,
 }: ConversationMessagesProps, ref: React.Ref<ConversationMessagesHandle | null>) {
   const { activeWorkflowExecution } = staticSnapshot
@@ -257,6 +260,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
               isProcessing={isProcessing}
               mentionAgents={mentionAgents}
               onSearchFiles={onSearchFiles}
+              onPreviewAsset={onPreviewAsset}
             />
             </div>
           ) : (
@@ -274,6 +278,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
                 runtimeToolCalls={runtime.runtimeToolCalls}
                 runtimeSteps={runtime.runtimeSteps}
                 conversationId={conversationId}
+                onPreviewAsset={onPreviewAsset}
                 workflowProgress={
                   activeWorkflowExecution && idx === anchorIndex ? (
                     <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />

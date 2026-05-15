@@ -61,6 +61,8 @@ interface MessageBubbleProps {
   mentionAgents?: { id: string; name?: string }[]
   /** Async file search callback for # file mention in edit mode */
   onSearchFiles?: (query: string) => Promise<import('./FileMentionExtension').FileMentionItem[]>
+  /** Open the shared FilePreview drawer with a pre-loaded blob */
+  onPreviewAsset?: (name: string, blob: Blob) => void
 }
 
 export const MessageBubble = memo(function MessageBubble({
@@ -77,6 +79,7 @@ export const MessageBubble = memo(function MessageBubble({
   onEditAndResend,
   mentionAgents = [],
   onSearchFiles,
+  onPreviewAsset,
 }: MessageBubbleProps) {
   const t = useT()
   const isUser = message.role === 'user'
@@ -132,7 +135,7 @@ export const MessageBubble = memo(function MessageBubble({
           {/* User uploaded assets */}
           {message.assets && message.assets.length > 0 && (
             <div className="mt-1">
-              <AssetList assets={message.assets} compact />
+              <AssetList assets={message.assets} compact onPreview={onPreviewAsset} />
             </div>
           )}
 
@@ -224,7 +227,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Agent generated assets */}
         {message.assets && message.assets.length > 0 && (
-          <AssetList assets={message.assets} />
+          <AssetList assets={message.assets} onPreview={onPreviewAsset} />
         )}
 
         {/* Tool calls */}

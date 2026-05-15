@@ -27,6 +27,7 @@ import { fileTree } from './fileTree'
 import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
+import { assets } from './assets'
 
 export const jaJP = {
   common,
@@ -75,4 +76,5 @@ export const jaJP = {
   goToFile,
   workflow,
   questionCard,
+  assets,
 } as const

@@ -39,6 +39,8 @@ interface FilePreviewProps {
   filePath: string | null
   fileHandle: FileSystemFileHandle | null
   onClose: () => void
+  /** Pre-loaded Blob to display (e.g. from OPFS assets/). When provided, skips OPFS/disk read. */
+  blob?: Blob | null
 }
 
 /** Get Monaco language ID from file path */
@@ -118,7 +120,7 @@ function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
-export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps) {
+export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob }: FilePreviewProps) {
   const t = useT()
   const display = useWorkspacePreferencesStore((s) => s.display)
   const [content, setContent] = useState<string | null>(null)
@@ -419,57 +421,73 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         let opfsMtime: number | null = null
         let diskMtime: number | null = null
 
-        try {
-          const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
-          const result = await opfs.readFile(filePath!)
-
-          if (result.content instanceof Blob) {
-            blob = result.content
-            fileSize = result.content.size
-          } else if (typeof result.content === 'string') {
-            text = result.content
-            fileSize = new Blob([result.content]).size
+        // Fast path: external blob provided (e.g. from OPFS assets/)
+        if (externalBlob) {
+          fileSize = externalBlob.size
+          if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+            blob = externalBlob
           } else {
-            // ArrayBuffer - for docx/office, keep as Blob; for text, decode it
-            const buffer = result.content as ArrayBuffer
-            fileSize = buffer.byteLength
-            if (fileType === 'docx' || fileType === 'office') {
-              blob = new Blob([buffer])
-            } else {
-              const decoder = new TextDecoder()
-              text = decoder.decode(buffer)
-            }
+            text = await externalBlob.text()
           }
-          opfsMtime = result.metadata.mtime || null
-        } catch {
-          // OPFS read failed, will try disk
-        }
-
-        if (fileHandle) {
+        } else {
           try {
-            const diskFile = await fileHandle.getFile()
-            diskMtime = diskFile.lastModified
+            const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+            const result = await opfs.readFile(filePath!)
 
-            if (opfsMtime !== null && diskMtime > opfsMtime) {
-              fileSize = diskFile.size
-              if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
-                blob = diskFile
+            if (result.content instanceof Blob) {
+              blob = result.content
+              fileSize = result.content.size
+            } else if (typeof result.content === 'string') {
+              text = result.content
+              fileSize = new Blob([result.content]).size
+            } else {
+              // ArrayBuffer - for docx/office, keep as Blob; for text, decode it
+              const buffer = result.content as ArrayBuffer
+              fileSize = buffer.byteLength
+              if (fileType === 'docx' || fileType === 'office') {
+                blob = new Blob([buffer])
               } else {
-                text = await diskFile.text()
-              }
-              setDiskNewer(true)
-            } else if (opfsMtime === null) {
-              fileSize = diskFile.size
-              if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
-                blob = diskFile
-              } else {
-                text = await diskFile.text()
+                const decoder = new TextDecoder()
+                text = decoder.decode(buffer)
               }
             }
+            opfsMtime = result.metadata.mtime || null
           } catch {
-            // Disk read failed, rely on OPFS if available
+            // OPFS read failed, will try disk
           }
-        } else if (!text && !blob) {
+
+          if (fileHandle) {
+            try {
+              const diskFile = await fileHandle.getFile()
+              diskMtime = diskFile.lastModified
+
+              if (opfsMtime !== null && diskMtime > opfsMtime) {
+                fileSize = diskFile.size
+                if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+                  blob = diskFile
+                } else {
+                  text = await diskFile.text()
+                }
+                setDiskNewer(true)
+              } else if (opfsMtime === null) {
+                fileSize = diskFile.size
+                if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+                  blob = diskFile
+                } else {
+                  text = await diskFile.text()
+                }
+              }
+            } catch {
+              // Disk read failed, rely on OPFS if available
+            }
+          } else if (!text && !blob) {
+            setError(t('filePreview.cannotReadFile'))
+            setLoading(false)
+            return
+          }
+        } // end else (no externalBlob)
+
+        if (!text && !blob) {
           setError(t('filePreview.cannotReadFile'))
           setLoading(false)
           return
@@ -514,7 +532,7 @@ export function FilePreview({ filePath, fileHandle, onClose }: FilePreviewProps)
         URL.revokeObjectURL(objectUrl)
       }
     }
-  }, [filePath, fileHandle, fileType])
+  }, [filePath, fileHandle, fileType, externalBlob])
 
   // Render docx into container
   useEffect(() => {

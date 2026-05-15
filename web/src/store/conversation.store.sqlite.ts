@@ -2756,6 +2756,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               )
             }
 
+            // Refresh asset inventory so the AssetsPopover badge stays up-to-date
+            try {
+              const { useAssetInventoryStore } = await import('@/store/asset-inventory.store')
+              useAssetInventoryStore.getState().refresh().catch(() => {})
+            } catch {
+              // Non-critical — asset inventory refresh failure should not affect the loop
+            }
+
             // Only generate follow-up on successful (non-cancelled, non-error) completion
             const runWasCancelled = get().cancelledRunIds.has(runId)
             if (!runWasCancelled) {

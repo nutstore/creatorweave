@@ -29,6 +29,7 @@ import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { extension } from './extension'
+import { assets } from './assets'
 
 export const enUS = {
   common,
@@ -79,4 +80,5 @@ export const enUS = {
   workflow,
   questionCard,
   extension,
+  assets,
 } as const

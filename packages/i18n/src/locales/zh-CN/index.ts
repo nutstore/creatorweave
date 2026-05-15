@@ -29,6 +29,7 @@ import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { extension } from './extension'
+import { assets } from './assets'
 
 export const zhCN = {
   common,
@@ -79,4 +80,5 @@ export const zhCN = {
   workflow,
   questionCard,
   extension,
+  assets,
 } as const
