@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CreatorWeave</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+      font-size: 13px;
+      color: #1f2937;
+      background: #fff;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    .logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #0d9488, #115e59);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .version {
+      font-size: 11px;
+      color: #9ca3af;
+      margin-left: auto;
+    }
+    .main {
+      padding: 14px 16px;
+    }
+    .desc {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 14px;
+    }
+    .desc code {
+      background: #f0fdfa;
+      color: #0d9488;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 11px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    .api-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .api-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      border-radius: 8px;
+      border: 1px solid #f3f4f6;
+    }
+    .api-name {
+      font-size: 12px;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      color: #0d9488;
+      word-break: break-all;
+    }
+    .api-desc {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+    .footer {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      padding: 10px 16px 14px;
+      border-top: 1px solid #f3f4f6;
+    }
+    .footer a {
+      font-size: 12px;
+      color: #0d9488;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <svg width="22" height="22" viewBox="0 0 512 512" fill="none">
+      <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+      <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#14B8A6"/><stop offset="100%" stop-color="#0D7377"/></linearGradient></defs>
+      <g stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.9">
+        <path d="M100 100C180 180 220 220 256 256"/><path d="M256 256C292 292 332 332 412 412"/>
+      </g>
+      <g stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.75">
+        <path d="M100 412C180 332 220 292 256 256"/><path d="M256 256C292 220 332 180 412 100"/>
+      </g>
+      <circle cx="256" cy="256" r="20" fill="#FBBF24" opacity="0.95"/>
+    </svg>
+    <span class="logo-text">CreatorWeave</span>
+    <span class="version" id="version"></span>
+  </header>
+
+  <main class="main">
+    <p class="desc">
+      为页面注入 <code>__agentWeb</code> API，提供网页搜索和内容抓取能力。
+    </p>
+    <div class="api-list">
+      <div class="api-item">
+        <code class="api-name">__agentWeb.search(query)</code>
+        <span class="api-desc">DuckDuckGo 搜索，返回标题、链接、摘要</span>
+      </div>
+      <div class="api-item">
+        <code class="api-name">__agentWeb.fetch(url, options?)</code>
+        <span class="api-desc">网页抓取，支持 raw / text / readability</span>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <a id="openDocs">使用文档</a>
+    <a id="openGithub">GitHub</a>
+  </footer>
+
+  <script>
+    try { document.getElementById('version').textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
+    document.getElementById('openDocs').addEventListener('click', function () {
+      chrome.tabs.create({ url: 'https://github.com/nutstore-nut/creatorweave/blob/main/browser-extension/README.md' });
+    });
+    document.getElementById('openGithub').addEventListener('click', function () {
+      chrome.tabs.create({ url: 'https://github.com/nutstore-nut/creatorweave' });
+    });
+  </script>
+</body>
+</html>
