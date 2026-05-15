@@ -196,12 +196,41 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'es2020',
-    sourcemap: true,
+    // Production: no sourcemap to avoid giant .map files (>25MB, exceeding EdgeOne limit)
+    // Dev: sourcemaps enabled for debugging
+    sourcemap: process.env.NODE_ENV !== 'production',
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          zustand: ['zustand'],
+        manualChunks(id) {
+          // React core
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'react-vendor'
+          }
+          // Zustand
+          if (id.includes('node_modules/zustand/')) {
+            return 'zustand'
+          }
+          // Monaco Editor - split each language worker into its own chunk
+          // This alone saves ~7MB from the main bundle
+          if (id.includes('node_modules/monaco-editor/')) {
+            return 'monaco-editor'
+          }
+          // TipTap editor
+          if (id.includes('node_modules/@tiptap/') || id.includes('node_modules/prosemirror')) {
+            return 'tiptap'
+          }
+          // SQLite WASM
+          if (id.includes('node_modules/@sqlite.org/')) {
+            return 'sqlite'
+          }
+          // Large utility libraries
+          if (id.includes('node_modules/lodash-es/') || id.includes('node_modules/lodash/')) {
+            return 'lodash'
+          }
+          // XLSX / spreadsheet handling
+          if (id.includes('node_modules/xlsx/') || id.includes('node_modules/exceljs/')) {
+            return 'xlsx'
+          }
         },
       },
     },
