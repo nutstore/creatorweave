@@ -26,12 +26,23 @@ registerRenderer({
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractResults(ctx)
     const fileCount = new Set(results.map(r => r.path)).size
+    const params = extractSearchParams(ctx)
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">search</code>
         {query && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{query}&quot;</span>
+        )}
+        {/* Search parameter pills */}
+        {params.length > 0 && (
+          <span className="flex items-center gap-1 shrink-0">
+            {params.map((p) => (
+              <span key={p.label} className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-1.5 py-0.5 rounded text-[10px]">
+                {p.label}{p.value !== true ? `=${p.display ?? String(p.value)}` : ''}
+              </span>
+            ))}
+          </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && results.length > 0 && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">
@@ -54,16 +65,16 @@ registerRenderer({
 
     const results = extractResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
-    const mode = typeof ctx.args.mode === 'string' ? ctx.args.mode : undefined
-    const glob = typeof ctx.args.glob === 'string' ? ctx.args.glob : undefined
+    const params = extractSearchParams(ctx)
 
     if (results.length === 0) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
       return (
-        <div className="px-3 py-2">
+        <div className="px-3 py-2 space-y-2">
           <div className="text-xs text-neutral-400 dark:text-neutral-500">
             No matches found for &quot;{query}&quot;
           </div>
+          {params.length > 0 && <SearchParamsBar params={params} />}
         </div>
       )
     }
@@ -78,13 +89,8 @@ registerRenderer({
 
     return (
       <div className="px-3 py-2 space-y-2">
-        {/* Search options */}
-        {(mode || glob) && (
-          <div className="flex gap-2 text-[10px]">
-            {mode && <span className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-1.5 py-0.5 rounded">{mode}</span>}
-            {glob && <span className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-1.5 py-0.5 rounded">{glob}</span>}
-          </div>
-        )}
+        {/* Search parameters */}
+        {params.length > 0 && <SearchParamsBar params={params} />}
 
         {/* Results grouped by file */}
         <div className="space-y-2">
@@ -127,6 +133,72 @@ registerRenderer({
     )
   },
 })
+
+/** Extract non-default search parameters for display. */
+interface SearchParam {
+  label: string
+  value: unknown
+  display?: string
+}
+
+function extractSearchParams(ctx: ToolRenderCtx): SearchParam[] {
+  const args = ctx.args
+  const params: SearchParam[] = []
+
+  if (typeof args.mode === 'string' && args.mode) {
+    params.push({ label: 'mode', value: args.mode })
+  }
+  if (typeof args.path === 'string' && args.path) {
+    params.push({ label: 'path', value: args.path })
+  }
+  if (typeof args.glob === 'string' && args.glob) {
+    params.push({ label: 'glob', value: args.glob })
+  }
+  if (args.case_sensitive === true) {
+    params.push({ label: 'case_sensitive', value: true })
+  }
+  if (args.whole_word === true) {
+    params.push({ label: 'whole_word', value: true })
+  }
+  if (typeof args.max_results === 'number' && args.max_results !== 50) {
+    params.push({ label: 'max_results', value: args.max_results })
+  }
+  if (typeof args.context_lines === 'number' && args.context_lines !== 0) {
+    params.push({ label: 'context_lines', value: args.context_lines })
+  }
+  if (typeof args.max_file_size === 'number') {
+    params.push({ label: 'max_file_size', value: args.max_file_size, display: formatBytes(args.max_file_size) })
+  }
+  if (typeof args.deadline_ms === 'number' && args.deadline_ms !== 25000) {
+    params.push({ label: 'deadline_ms', value: args.deadline_ms, display: `${args.deadline_ms}ms` })
+  }
+  if (args.include_ignored === true) {
+    params.push({ label: 'include_ignored', value: true })
+  }
+  if (Array.isArray(args.exclude_dirs) && args.exclude_dirs.length > 0) {
+    params.push({ label: 'exclude_dirs', value: args.exclude_dirs, display: (args.exclude_dirs as string[]).join(', ') })
+  }
+
+  return params
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+function SearchParamsBar({ params }: { params: SearchParam[] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 text-[10px]">
+      {params.map((p) => (
+        <span key={p.label} className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-1.5 py-0.5 rounded">
+          {p.label}{p.value !== true ? `=${p.display ?? String(p.value)}` : ''}
+        </span>
+      ))}
+    </div>
+  )
+}
 
 function extractResults(ctx: ToolRenderCtx): SearchResult[] {
   const data = ctx.result?.data

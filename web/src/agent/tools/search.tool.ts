@@ -74,6 +74,29 @@ async function collectPendingOverlays(
 }
 
 /**
+ * Strip root prefix from overlay keys so they match worker's relative paths.
+ *
+ * The OPFS store records paths like "creatorweave/web/package.json" (with root prefix),
+ * but the search worker traverses files relative to each root handle, producing paths
+ * like "package.json". This function filters overlays to only those belonging to the
+ * given root and strips the root prefix.
+ */
+function stripOverlayRootPrefix(
+  overlays: Record<string, PendingFileOverlay>,
+  rootName: string
+): Record<string, PendingFileOverlay> {
+  if (!rootName) return overlays
+  const prefix = rootName + '/'
+  const result: Record<string, PendingFileOverlay> = {}
+  for (const [key, value] of Object.entries(overlays)) {
+    if (key.startsWith(prefix)) {
+      result[key.slice(prefix.length)] = value
+    }
+  }
+  return result
+}
+
+/**
  * Get all root handles for the current project (multi-root aware).
  * workspaceId is always provided by the agent loop.
  */
@@ -139,7 +162,11 @@ async function searchAllRoots(
     }
 
     try {
-      const opts = { ...baseOptions, maxResults: remaining }
+      const rootOverlays = stripOverlayRootPrefix(
+        (baseOptions.pendingOverlays as Record<string, PendingFileOverlay>) ?? {},
+        rootName
+      )
+      const opts = { ...baseOptions, maxResults: remaining, pendingOverlays: Object.keys(rootOverlays).length > 0 ? rootOverlays : undefined }
       const rootResult = await manager.searchInDirectory(handle, opts)
 
       // Prepend root prefix to paths
@@ -323,39 +350,53 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     // Collect pending overlays from OPFS to ensure search consistency with read tool
     const pendingOverlays = await collectPendingOverlays(context.workspaceId, context.projectId)
 
-    // Build search options (shared across all roots)
-    const buildSearchOptions = (subPath?: string) => ({
-      query,
-      path: subPath,
-      glob: typeof args.glob === 'string' ? args.glob : undefined,
-      regex: useRegex,
-      caseSensitive: args.case_sensitive === true,
-      wholeWord: args.whole_word === true,
-      maxResults: userMaxResults,
-      contextLines,
-      deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : undefined,
-      maxFileSize: typeof args.max_file_size === 'number' ? args.max_file_size : undefined,
-      includeIgnored: args.include_ignored === true,
-      excludeDirs: Array.isArray(args.exclude_dirs)
-        ? args.exclude_dirs.filter((v): v is string => typeof v === 'string')
-        : undefined,
-      pendingOverlays: Object.keys(pendingOverlays).length > 0 ? pendingOverlays : undefined,
-    })
+    // Build search options; rootName is used to strip the root prefix from overlay keys
+    // so they match the worker's relative file paths.
+    const buildSearchOptions = (subPath?: string, rootName?: string) => {
+      const rawOverlays = Object.keys(pendingOverlays).length > 0 ? pendingOverlays : undefined
+      const strippedOverlays = rootName
+        ? (() => {
+            const s = stripOverlayRootPrefix(pendingOverlays, rootName)
+            return Object.keys(s).length > 0 ? s : undefined
+          })()
+        : rawOverlays
+      return {
+        query,
+        path: subPath,
+        glob: typeof args.glob === 'string' ? args.glob : undefined,
+        regex: useRegex,
+        caseSensitive: args.case_sensitive === true,
+        wholeWord: args.whole_word === true,
+        maxResults: userMaxResults,
+        contextLines,
+        deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : undefined,
+        maxFileSize: typeof args.max_file_size === 'number' ? args.max_file_size : undefined,
+        includeIgnored: args.include_ignored === true,
+        excludeDirs: Array.isArray(args.exclude_dirs)
+          ? args.exclude_dirs.filter((v): v is string => typeof v === 'string')
+          : undefined,
+        pendingOverlays: strippedOverlays,
+      }
+    }
 
     // Determine whether to search a single root or all roots
     let result: SearchInDirectoryResult
 
     if (searchPath) {
       // Specific path provided — search single resolved root
-      result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined))
+      // Use full searchPath as rootName so stripOverlayRootPrefix strips the entire prefix,
+      // leaving overlay keys that match the worker's relative paths (relative to resolved handle).
+      const rootName = searchPath || undefined
+      result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
     } else {
       // No path — search ALL roots and merge results
       const allHandles = await getAllRootHandles(context)
       if (allHandles.size <= 1) {
-        // Single root or no multi-root — search normally
-        result = await manager.searchInDirectory(directoryHandle, buildSearchOptions())
+        // Single root or no multi-root — infer root name from handle map
+        const singleRootName = allHandles.size === 1 ? [...allHandles.keys()][0] : undefined
+        result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(undefined, singleRootName))
       } else {
-        // Multi-root: search each root and merge
+        // Multi-root: search each root and merge (searchAllRoots handles prefix stripping per root)
         result = await searchAllRoots(manager, allHandles, buildSearchOptions(), userMaxResults)
       }
     }
