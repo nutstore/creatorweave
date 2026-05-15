@@ -113,6 +113,18 @@ export async function processPiLoopEvents(
     }
 
     if (typedEvent.type === 'message_end') {
+      // Detect error assistant messages from the LLM provider (e.g. HTTP 404, 429, 500).
+      // pi-agent-core finishes the loop normally for these, but we need to propagate
+      // the error so the UI shows it instead of silently completing with an empty message.
+      const rawMessage = typedEvent.message as Record<string, unknown>
+      if (
+        rawMessage?.role === 'assistant' &&
+        (rawMessage as any).stopReason === 'error' &&
+        typeof (rawMessage as any).errorMessage === 'string'
+      ) {
+        throw new Error((rawMessage as any).errorMessage)
+      }
+
       const mapped = input.mapPiToInternal(typedEvent.message)
       if (!mapped || mapped.role === 'user') continue
       if (mapped.role === 'assistant') {
