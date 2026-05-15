@@ -58,7 +58,7 @@ function isValidAgentId(input: string): boolean {
 function normalizeRelativePath(path: string, options?: { allowEmpty?: boolean }): string {
   const allowEmpty = options?.allowEmpty ?? false
   const normalized = path.replace(/\\/g, '/').trim()
-  const withoutQuery = normalized.split('?')[0].split('#')[0]
+  const withoutQuery = normalized.split('?')[0]
   const withoutMnt =
     withoutQuery.startsWith('/mnt/')
       ? withoutQuery.slice('/mnt/'.length)
@@ -92,7 +92,7 @@ function parseVfsPath(
     }
   }
 
-  const raw = rawPath.slice('vfs://'.length).split('?')[0].split('#')[0]
+  const raw = rawPath.slice('vfs://'.length).split('?')[0]
   const parts = raw.split('/').filter(Boolean)
   const namespace = parts[0]
 
