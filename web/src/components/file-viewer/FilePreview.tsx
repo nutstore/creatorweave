@@ -10,7 +10,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2 } from 'lucide-react'
-import { Editor, type OnMount } from '@monaco-editor/react'
+import { Editor, loader, type OnMount } from '@monaco-editor/react'
+import * as monaco from 'monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
 import { formatBytes } from '@/lib/utils'
 import { useT } from '@/i18n'
@@ -21,6 +22,16 @@ import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { toast } from 'sonner'
 import { OfficePreview, OFFICE_EXTS } from './OfficePreview'
+
+// Configure Monaco loader to use the locally bundled monaco-editor package
+// instead of loading from CDN. Without this, the Editor component will try
+// to fetch Monaco from jsdelivr CDN on first render, which may hang forever
+// in offline or network-restricted environments.
+let _loaderConfigured = false
+if (!_loaderConfigured) {
+  loader.config({ monaco })
+  _loaderConfigured = true
+}
 
 // ── Comment Types ──────────────────────────────────────────────────────────
 
