@@ -2,7 +2,8 @@
  * Renderer for `write` tool — file creation/overwrite with content preview.
  */
 
-import { FilePlus } from 'lucide-react'
+import { useState } from 'react'
+import { FilePlus, ChevronDown } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
@@ -85,35 +86,8 @@ registerRenderer({
       return <div className="px-3 py-2 text-xs text-neutral-400">No content</div>
     }
 
-    const lines = content.split('\n')
-    const maxPreview = 30
-    const preview = lines.slice(0, maxPreview)
-    const lnWidth = String(lines.length).length
-
     return (
-      <div className="px-3 py-2 space-y-2">
-        {singlePath && (
-          <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{singlePath}</div>
-        )}
-        <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-hidden">
-          <div className="p-2 text-xs leading-5 font-mono">
-            {preview.map((line, i) => (
-              <div key={i} className="flex">
-                <span className="select-none text-neutral-300 dark:text-neutral-700 shrink-0 text-right" style={{ minWidth: lnWidth + 'ch', marginRight: '12px' }}>{i + 1}</span>
-                <span className="whitespace-pre-wrap break-all text-neutral-600 dark:text-neutral-400 min-w-0">{line || '\u00A0'}</span>
-              </div>
-            ))}
-            {lines.length > maxPreview && (
-              <div className="text-neutral-300 dark:text-neutral-700 select-none">
-                {' '.repeat(lnWidth + 1)}... {lines.length - maxPreview} more lines
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex justify-end">
-          <CopyIconButton content={content} />
-        </div>
-      </div>
+      <ContentPreview singlePath={singlePath} content={content} />
     )
   },
 })
@@ -137,6 +111,50 @@ function extractAction(ctx: ToolRenderCtx): string | undefined {
     return data.action === 'create' ? 'new file' : data.action === 'modify' ? 'overwritten' : data.action
   }
   return undefined
+}
+
+function ContentPreview({ singlePath, content }: { singlePath?: string; content: string }) {
+  const lines = content.split('\n')
+  const total = lines.length
+  const initialPreview = 30
+  const loadMoreStep = 50
+
+  const [visibleCount, setVisibleCount] = useState(Math.min(initialPreview, total))
+  const lnWidth = String(total).length
+  const remaining = total - visibleCount
+
+  return (
+    <div className="px-3 py-2 space-y-2">
+      {singlePath && (
+        <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{singlePath}</div>
+      )}
+      <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-hidden">
+        <div className="p-2 text-xs leading-5 font-mono">
+          {lines.slice(0, visibleCount).map((line, i) => (
+            <div key={i} className="flex">
+              <span className="select-none text-neutral-300 dark:text-neutral-700 shrink-0 text-right" style={{ minWidth: lnWidth + 'ch', marginRight: '12px' }}>{i + 1}</span>
+              <span className="whitespace-pre-wrap break-all text-neutral-600 dark:text-neutral-400 min-w-0">{line || '\u00A0'}</span>
+            </div>
+          ))}
+        </div>
+        {remaining > 0 && (
+          <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={() => setVisibleCount(Math.min(visibleCount + loadMoreStep, total))}
+              className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+            >
+              <ChevronDown className="h-3 w-3" />
+              加载更多（剩余 {remaining} 行）
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="flex justify-end">
+        <CopyIconButton content={content} />
+      </div>
+    </div>
+  )
 }
 
 function shortPath(p: string): string {
