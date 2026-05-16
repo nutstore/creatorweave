@@ -95,12 +95,12 @@ registerRenderer({
         {singlePath && (
           <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{singlePath}</div>
         )}
-        <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-x-auto">
-          <pre className="p-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400 font-mono">
+        <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-hidden">
+          <div className="p-2 text-xs leading-5 font-mono">
             {preview.map((line, i) => (
-              <div key={i}>
-                <span className="select-none text-neutral-300 dark:text-neutral-700" style={{ minWidth: lnWidth + 'ch', display: 'inline-block', textAlign: 'right', marginRight: '12px' }}>{i + 1}</span>
-                {line}
+              <div key={i} className="flex">
+                <span className="select-none text-neutral-300 dark:text-neutral-700 shrink-0 text-right" style={{ minWidth: lnWidth + 'ch', marginRight: '12px' }}>{i + 1}</span>
+                <span className="whitespace-pre-wrap break-all text-neutral-600 dark:text-neutral-400 min-w-0">{line || '\u00A0'}</span>
               </div>
             ))}
             {lines.length > maxPreview && (
@@ -108,7 +108,7 @@ registerRenderer({
                 {' '.repeat(lnWidth + 1)}... {lines.length - maxPreview} more lines
               </div>
             )}
-          </pre>
+          </div>
         </div>
         <div className="flex justify-end">
           <CopyIconButton content={content} />
