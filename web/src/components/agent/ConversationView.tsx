@@ -325,7 +325,7 @@ export function ConversationView({
   )
 
   // Memoize the context value to avoid unnecessary re-renders
-  const actionContextValue = useMemo(() => ({ setInput }), [setInput])
+  const actionContextValue = useMemo(() => ({ setInput, sendMessage: logic.sendMessage }), [setInput, logic.sendMessage])
 
   return (
     <ConversationActionContext.Provider value={actionContextValue}>
