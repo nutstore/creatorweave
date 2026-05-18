@@ -30,6 +30,11 @@ export interface AgentInfo {
   name?: string
 }
 
+/** Imperative handle exposed by AgentRichInput via forwardRef */
+export interface AgentRichInputHandle {
+  focus: () => void
+}
+
 interface AgentRichInputProps {
   ariaLabel?: string
   placeholder: string
@@ -46,6 +51,10 @@ interface AgentRichInputProps {
   onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
   /** Called when IME composition starts/ends — lets the parent suppress search during composition. */
   onSetIsComposing?: (composing: boolean) => void
+  /** Whether the agent is currently processing (running). */
+  isProcessing?: boolean
+  /** Called when user presses Escape while the agent is processing. */
+  onCancel?: () => void
   // Agent selector props
   activeAgentId: string | null
   allAgents: AgentMentionCandidate[]
@@ -238,7 +247,7 @@ function formatFileSize(bytes: number): string {
 // AgentRichInput
 // ---------------------------------------------------------------------------
 
-export function AgentRichInput({
+export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputProps>(function AgentRichInput({
   ariaLabel,
   placeholder,
   disabled = false,
@@ -250,12 +259,14 @@ export function AgentRichInput({
   onChange,
   onSearchFiles,
   onSetIsComposing,
+  isProcessing,
+  onCancel,
   activeAgentId,
   allAgents,
   onSetActiveAgent,
   onCreateAgent,
   onDeleteAgent,
-}: AgentRichInputProps) {
+}: AgentRichInputProps, ref) {
   const t = useT()
   const [isFocused, setIsFocused] = useState(false)
   // Agent selector state
@@ -309,6 +320,8 @@ export function AgentRichInput({
   const agentSelectionRef = useRef(agentSelection)
   const allAgentsRef = useRef(allAgents)
   const agentsRef = useRef(agents)
+  const isProcessingRef = useRef(isProcessing)
+  const onCancelRef = useRef(onCancel)
 
   // ---- emit value --------------------------------------------------------
   const emitValue = useCallback(
@@ -325,6 +338,8 @@ export function AgentRichInput({
   useEffect(() => { onSubmitRef.current = onSubmit }, [onSubmit])
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
   useEffect(() => { agentsRef.current = agents }, [agents])
+  useEffect(() => { isProcessingRef.current = isProcessing }, [isProcessing])
+  useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
   useEffect(() => { showAgentSelectorRef.current = showAgentSelector }, [showAgentSelector])
   useEffect(() => { agentSelectionRef.current = agentSelection }, [agentSelection])
   useEffect(() => { allAgentsRef.current = allAgents }, [allAgents])
@@ -522,6 +537,34 @@ export function AgentRichInput({
         if (disabledRef.current) return false
         if (event.isComposing) return false
 
+        // Escape — cancel agent if processing, otherwise clear editor content.
+        // When a suggestion popup (@-mention or #-fileMention) is open, the
+        // Suggestion plugin should handle Escape to dismiss the popup. Since
+        // editorProps.handleKeyDown runs BEFORE the Suggestion plugin, we must
+        // return false when a popup is open so the plugin can handle it.
+        if (event.key === 'Escape') {
+          // Let suggestion popups dismiss first
+          const hasAgentSuggestion = suggestionItemsRef.current.length > 0
+          const hasFileSuggestion = fileSuggestionItemsRef.current.length > 0
+          if (hasAgentSuggestion || hasFileSuggestion) {
+            return false // delegate to suggestion plugin's onKeyDown
+          }
+          if (isProcessingRef.current) {
+            event.preventDefault()
+            onCancelRef.current?.()
+            return true
+          }
+          // Not processing — clear editor content
+          const ed = editor // editor is in closure from useEditor
+          if (ed && !ed.isEmpty) {
+            event.preventDefault()
+            ed.commands.clearContent()
+            emitValue(ed)
+            return true
+          }
+          return false
+        }
+
         // Enter (without Shift) submits the message.
         // Suggestion handles its own Enter, so this only fires when the
         // suggestion popup is closed.
@@ -577,6 +620,11 @@ export function AgentRichInput({
     if (!editor) return
     editor.setEditable(!disabled)
   }, [disabled, editor])
+
+  // ── Expose focus via imperative handle ──
+  useImperativeHandle(ref, () => ({
+    focus: () => editor?.commands.focus(),
+  }), [editor])
 
   // ── Clear editor on resetToken change (message sent) ──
   useEffect(() => {
@@ -995,4 +1043,4 @@ export function AgentRichInput({
       )}
     </div>
   )
-}
+})
