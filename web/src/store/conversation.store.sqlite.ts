@@ -2651,29 +2651,33 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             ? [...currentConv.collectedAssets]
             : undefined
 
+          // targetMessages may come from an Immer-frozen source.
+          // Build a fresh array/object snapshot before putting it back into state.
+          const finalizedMessages =
+            status === 'idle' && collectedAssets && collectedAssets.length > 0
+              ? (() => {
+                  const cloned = targetMessages.slice()
+                  for (let i = cloned.length - 1; i >= 0; i--) {
+                    if (cloned[i].role === 'assistant') {
+                      cloned[i] = {
+                        ...cloned[i],
+                        assets: collectedAssets,
+                      }
+                      break
+                    }
+                  }
+                  return cloned
+                })()
+              : targetMessages
+
           set((inner) => {
             const c = inner.conversations.find((x) => x.id === conversationId)
             if (!c) return
             if (status === 'idle') {
-              c.messages = targetMessages
+              c.messages = finalizedMessages
               if (runtimeUsageAtFinalize) {
                 c.contextWindowUsage = runtimeUsageAtFinalize
                 c.lastContextWindowUsage = runtimeUsageAtFinalize
-              }
-              // Attach collected assets to the last assistant message
-              // NOTE: Must mutate via Immer draft (c.messages[i]) directly.
-              // Using spread/reverse/find detaches the object from Immer's proxy,
-              // resulting in "Cannot assign to read only property" error.
-              if (collectedAssets && collectedAssets.length > 0) {
-                for (let i = c.messages.length - 1; i >= 0; i--) {
-                  if (c.messages[i].role === 'assistant') {
-                    c.messages[i] = {
-                      ...c.messages[i],
-                      assets: collectedAssets,
-                    }
-                    break
-                  }
-                }
               }
               c.collectedAssets = []
             }
