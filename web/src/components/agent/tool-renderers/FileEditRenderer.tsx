@@ -70,8 +70,8 @@ registerRenderer({
             {replaceAll && <span className="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">replace all</span>}
           </div>
         )}
-        <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-x-auto">
-          <pre className="p-2 text-xs leading-5 font-mono">
+        <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-hidden">
+          <div className="p-2 text-xs leading-5 font-mono">
             {diff.map((d, i) => (
               <div key={i} className={
                 d.type === 'add' ? 'bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-400' :
@@ -79,10 +79,10 @@ registerRenderer({
                 'text-neutral-400 dark:text-neutral-500'
               }>
                 <span className="select-none mr-1">{d.type === 'add' ? '+' : d.type === 'del' ? '-' : ' '}</span>
-                {d.text}
+                <span className="whitespace-pre-wrap break-all">{d.text || '\u00A0'}</span>
               </div>
             ))}
-          </pre>
+          </div>
         </div>
         <div className="flex justify-end">
           <CopyIconButton content={diffText} />
