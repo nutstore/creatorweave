@@ -115,6 +115,7 @@ export function useConversationLogic() {
   const clearSuggestedFollowUp = useConversationRuntimeStore((s) => s.clearSuggestedFollowUp)
   const mountConversation = useConversationRuntimeStore((s) => s.mountConversation)
   const unmountConversation = useConversationRuntimeStore((s) => s.unmountConversation)
+  const getQueueDepth = useConversationRuntimeStore((s) => s.getQueueDepth)
   const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
   const editAndResendUserMessage = useConversationStore((s) => s.editAndResendUserMessage)
 
@@ -135,6 +136,7 @@ export function useConversationLogic() {
   // ── Derived state ──
   const isRunning = convId ? isConversationRunning(convId) : false
   const isProcessing = isRunning
+  const queueDepth = convId ? getQueueDepth(convId) : 0
 
   // ── Static snapshot for ConversationMessages ──
   // Only contains data that changes at low frequency (not per-token).
@@ -283,11 +285,27 @@ export function useConversationLogic() {
     }
 
     if (useConversationRuntimeStore.getState().isConversationRunning(targetConvId)) {
-      toast.error(t('conversation.toast.stopBeforeSend'))
+      // Queue the message instead of rejecting it
+      const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
+        text,
+        assets: options?.assets,
+        agentOverrideId: options?.agentOverrideId ?? null,
+        enqueuedAt: Date.now(),
+      })
+      if (result.enqueued) {
+        setInput('')
+        setMentionedAgentIds([])
+        setInputResetToken((v) => v + 1)
+        useInputDraftStore.getState().clearDraft(targetConvId)
+        setDraftTextToRestore(null)
+        draftConvIdRef.current = null
+      } else {
+        toast.error(t('conversation.toast.queueFull'))
+      }
       return
     }
 
-    // Resolve assets: use provided assets OR fall back to pending assets from store
+    // Resolve assets for direct send (queued messages already have assets resolved above)
     let assets = options?.assets
     if (!assets || assets.length === 0) {
       const { pendingAssets, clearAll } = useAssetStore.getState()
@@ -312,7 +330,6 @@ export function useConversationLogic() {
         clearAll()
       }
     }
-
     const userMsg = createUserMessage(text, assets)
     const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)
     updateMessages(targetConvId, conv ? [...conv.messages, userMsg] : [userMsg])
@@ -388,7 +405,7 @@ export function useConversationLogic() {
     convId, activeMessages,
     conversationError, activeContextWindowUsage,
     isProcessing, isRunning, status, suggestedFollowUp, workflowTemplates,
-    toolResults,
+    toolResults, queueDepth,
     // Static snapshot for ConversationMessages
     staticSnapshot,
     // Settings

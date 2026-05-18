@@ -34,6 +34,7 @@ export const conversation = {
     input: {
       placeholder: "메시지 입력... (Shift+Enter 줄바꿈)",
       placeholderNoKey: "먼저 설정에서 API Key를 구성하세요",
+      placeholderQueuing: "메시지 대기열에 추가... (Shift+Enter 줄바꿈)",
       ariaLabel: "메시지 입력",
     },
     buttons: {
@@ -46,6 +47,8 @@ export const conversation = {
       noApiKey: "먼저 설정에서 API Key를 구성하세요",
       deletedTurn: "완전한 대화 턴 삭제됨",
       branchCreated: "분기 대화가 생성되었습니다",
+      messageQueued: "메시지가 대기열에 추가되었습니다 (위치 {position})",
+      queueFull: "대기열이 가득 찼습니다. 현재 작업이 완료될 때까지 기다려주세요.",
     },
     error: {
       requestFailed: "요청 실패:",
@@ -61,6 +64,12 @@ export const conversation = {
     // 내비게이션
     nav: {
       label: "메시지 내비게이션",
+    },
+    // 메시지 대기열
+    queue: {
+      badge: "{count}개 대기 중",
+      divider: "{count}개의 메시지가 대기 중",
+      remove: "대기열에서 제거",
     },
 
     // 대화 내보내기

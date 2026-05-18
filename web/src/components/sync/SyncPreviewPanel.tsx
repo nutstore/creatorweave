@@ -31,6 +31,7 @@ import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
 import { type LineComment } from './comment-types'
 import { useConversationStore } from '@/store/conversation.store'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useAgentStore } from '@/store/agent.store'
 import { createUserMessage } from '@/agent/message-types'
 
@@ -637,7 +638,16 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
 
     if (conversationStore.isConversationRunning(targetConvId)) {
-      toast.error(t('conversation.toast.stopBeforeSend'))
+      // Queue the message instead of rejecting
+      const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
+        text: prompt,
+        enqueuedAt: Date.now(),
+      })
+      if (result.enqueued) {
+        setCommentsByPath({})
+      } else {
+        toast.error(t('conversation.toast.queueFull'))
+      }
       return
     }
 

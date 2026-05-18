@@ -17,6 +17,7 @@ import { formatBytes } from '@/lib/utils'
 import { useT } from '@/i18n'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useConversationStore } from '@/store/conversation.store'
+import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
@@ -378,7 +379,18 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     }
 
     if (conversationStore.isConversationRunning(targetConvId)) {
-      toast.error(t('conversation.toast.stopBeforeSend'))
+      // Queue the message instead of rejecting
+      const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
+        text: prompt,
+        enqueuedAt: Date.now(),
+      })
+      if (result.enqueued) {
+        setComments([])
+        setComposer(null)
+        anchorLineRef.current = null
+      } else {
+        toast.error(t('conversation.toast.queueFull'))
+      }
       return
     }
 

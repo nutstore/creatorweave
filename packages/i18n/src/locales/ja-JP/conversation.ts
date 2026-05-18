@@ -34,6 +34,7 @@ export const conversation = {
     input: {
       placeholder: "メッセージを入力... (Shift+Enter で改行)",
       placeholderNoKey: "まず設定で API Key を設定してください",
+      placeholderQueuing: "メッセージをキューに追加... (Shift+Enter で改行)",
       ariaLabel: "メッセージを入力",
     },
     buttons: {
@@ -46,6 +47,8 @@ export const conversation = {
       noApiKey: "まず設定で API Key を設定してください",
       deletedTurn: "完全な会話ターンを削除しました",
       branchCreated: "分岐会話を作成しました",
+      messageQueued: "メッセージをキューに追加しました (位置 {position})",
+      queueFull: "キューが満杯です。現在のタスクが完了するまでお待ちください。",
     },
     error: {
       requestFailed: "リクエスト失敗：",
@@ -61,6 +64,12 @@ export const conversation = {
     // ナビゲーション
     nav: {
       label: "メッセージナビゲーション",
+    },
+    // メッセージキュー
+    queue: {
+      badge: "{count} 件待機中",
+      divider: "{count} 件のメッセージが待機中",
+      remove: "キューから削除",
     },
 
     // 会話エクスポート

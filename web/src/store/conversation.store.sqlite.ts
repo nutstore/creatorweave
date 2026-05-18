@@ -26,6 +26,7 @@ import {
   createAssistantMessage,
   createConversation,
   createToolMessage,
+  createUserMessage,
   generateId,
 } from '@/agent/message-types'
 import { parseThinkTags } from '@/agent/think-tags'
@@ -3547,6 +3548,35 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             r.draftAssistant = null
           }
         })
+      }
+
+      // ── Consume queued messages ──
+      // After a successful (idle) run, check if messages were queued during execution.
+      // If so, dequeue the next one and trigger a new agent run.
+      const finalStatus = get().conversations.find((c) => c.id === conversationId)?.status
+      if (finalStatus === 'idle') {
+        const nextMsg = useConversationRuntimeStore.getState().dequeueMessage(conversationId)
+        if (nextMsg) {
+          const userMsg = createUserMessage(nextMsg.text, nextMsg.assets)
+          const currentConv = get().conversations.find((c) => c.id === conversationId)
+          if (currentConv) {
+            get().updateMessages(conversationId, [...currentConv.messages, userMsg])
+            // Schedule the next run on the next microtask to avoid re-entrancy
+            const { useAgentStore } = await import('./agent.store')
+            const { directoryHandle: dh } = useAgentStore.getState()
+            const settingsState = useSettingsStore.getState()
+            queueMicrotask(() => {
+              get().runAgent(
+                conversationId,
+                providerType,
+                modelName,
+                maxTokens,
+                dh,
+                nextMsg.agentOverrideId ?? null,
+              )
+            })
+          }
+        }
       }
     },
 

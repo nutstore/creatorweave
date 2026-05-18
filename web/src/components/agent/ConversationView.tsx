@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
 import { Send, StopCircle } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
-import { AgentRichInput } from './AgentRichInput'
+import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
@@ -62,7 +62,8 @@ const SendCancelButton = memo(function SendCancelButton({
   sendTitle: string
   cancelTitle: string
 }) {
-  if (isProcessing) {
+  // When processing and send is disabled (no input), show only cancel
+  if (isProcessing && isSendDisabled) {
     return (
       <button
         type="button"
@@ -72,6 +73,29 @@ const SendCancelButton = memo(function SendCancelButton({
       >
         <StopCircle className="h-4 w-4" />
       </button>
+    )
+  }
+  // When processing but user has typed text, show both send (queue) and cancel
+  if (isProcessing && !isSendDisabled) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={onSend}
+          className="absolute bottom-4 right-4 rounded-xl bg-blue-500 p-2 text-white shadow-sm transition-colors hover:bg-blue-600"
+          title={sendTitle}
+        >
+          <Send className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute bottom-4 right-14 rounded-xl bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600"
+          title={cancelTitle}
+        >
+          <StopCircle className="h-4 w-4" />
+        </button>
+      </>
     )
   }
   return (
@@ -105,6 +129,7 @@ export function ConversationView({
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
   const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
   const conversationMessagesRef = useRef<ConversationMessagesHandle>(null)
+  const richInputRef = useRef<AgentRichInputHandle>(null)
 
   const logic = useConversationLogic()
   const {
@@ -121,6 +146,7 @@ export function ConversationView({
     handleSend, handleCancel, handleRunWorkflow, handleRealRunWorkflow,
     handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
     runCustomWorkflowDryRun,
+    queueDepth,
     useConversationStore: convStore,
     useConversationRuntimeStore: rtStore,
   } = logic
@@ -324,6 +350,13 @@ export function ConversationView({
     [convId],
   )
 
+  // ── Re-focus input after sending ──
+  const handleSendAndFocus = useCallback(async () => {
+    await handleSend()
+    // Defer focus to next frame so the editor has cleared its content
+    requestAnimationFrame(() => richInputRef.current?.focus())
+  }, [handleSend])
+
   // Memoize the context value to avoid unnecessary re-renders
   const actionContextValue = useMemo(() => ({ setInput, sendMessage: logic.sendMessage }), [setInput, logic.sendMessage])
 
@@ -395,35 +428,47 @@ export function ConversationView({
           <div className="mx-auto flex max-w-3xl flex-col">
             <div className="relative">
               <AgentRichInput
+                ref={richInputRef}
                 key={convId ?? 'new'}
                 placeholder={
                   suggestedFollowUp ||
-                  (hasApiKey ? t('conversation.input.placeholder') : t('conversation.input.placeholderNoKey'))
+                  (isProcessing
+                    ? t('conversation.input.placeholderQueuing')
+                    : hasApiKey
+                      ? t('conversation.input.placeholder')
+                      : t('conversation.input.placeholderNoKey'))
                 }
                 ariaLabel={t('conversation.input.ariaLabel')}
-                disabled={isProcessing || !hasApiKey || disabled}
+                disabled={!hasApiKey || disabled}
                 resetToken={inputResetToken}
                 initialText={draftTextToRestore ?? undefined}
                 onDraftRestored={onDraftRestored}
                 agents={mentionAgents}
                 onSearchFiles={debouncedSearchFiles}
                 onSetIsComposing={setIsComposing}
+                isProcessing={isProcessing}
+                onCancel={handleCancel}
                 activeAgentId={activeAgentId}
                 allAgents={allAgents}
                 onSetActiveAgent={setActiveAgent}
                 onCreateAgent={createAgent}
                 onDeleteAgent={deleteAgent}
                 onChange={handleInputChange}
-                onSubmit={handleSend}
+                onSubmit={handleSendAndFocus}
               />
               <SendCancelButton
                 isProcessing={isProcessing}
                 isSendDisabled={(!hasInput && !suggestedFollowUp) || !hasApiKey || disabled}
-                onSend={handleSend}
+                onSend={handleSendAndFocus}
                 onCancel={handleCancel}
                 sendTitle={t('conversation.buttons.send')}
                 cancelTitle={t('conversation.buttons.stop')}
               />
+              {isProcessing && queueDepth > 0 && (!hasInput && !suggestedFollowUp) && (
+                <span className="absolute bottom-4 right-14 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                  {t('conversation.queue.badge', { count: queueDepth })}
+                </span>
+              )}
             </div>
           </div>
 

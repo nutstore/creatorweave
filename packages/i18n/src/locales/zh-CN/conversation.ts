@@ -35,6 +35,7 @@ export const conversation = {
     input: {
       placeholder: "输入消息... (Shift+Enter 换行)",
       placeholderNoKey: "请先在设置中配置 API Key",
+      placeholderQueuing: "输入消息排队发送... (Shift+Enter 换行)",
       ariaLabel: "输入消息",
       hints: {
         fileMention: "输入 # 引用文件",
@@ -62,6 +63,8 @@ export const conversation = {
       conversationMissingForEditResend: "会话不存在，无法编辑重发",
       onlyUserMessageEditResend: "只能编辑并重发用户消息",
       branchCreated: "已创建分叉对话",
+      messageQueued: "消息已加入队列 (第 {position} 位)",
+      queueFull: "队列已满，请等待当前任务完成后再试",
     },
     // 错误
     error: {
@@ -79,6 +82,12 @@ export const conversation = {
     // 导航
     nav: {
       label: "消息导航",
+    },
+    // 消息队列
+    queue: {
+      badge: "{count} 条排队",
+      divider: "{count} 条消息排队等待中",
+      remove: "撤销排队",
     },
     // 导出会话
     export: {

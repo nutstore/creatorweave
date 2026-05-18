@@ -35,6 +35,7 @@ export const conversation = {
     input: {
       placeholder: "Type a message... (Shift+Enter for new line)",
       placeholderNoKey: "Please configure API Key in settings first",
+      placeholderQueuing: "Queue a message... (Shift+Enter for new line)",
       ariaLabel: "Type a message",
       hints: {
         fileMention: "Type # to mention a file",
@@ -62,6 +63,8 @@ export const conversation = {
       conversationMissingForEditResend: "Conversation not found. Cannot edit and resend.",
       onlyUserMessageEditResend: "Only user messages can be edited and resent.",
       branchCreated: "Branched conversation created",
+      messageQueued: "Message queued (position {position})",
+      queueFull: "Queue is full. Please wait for the current task to finish.",
     },
     // Error
     error: {
@@ -79,6 +82,12 @@ export const conversation = {
     // Navigation
     nav: {
       label: "Message navigation",
+    },
+    // Message queue
+    queue: {
+      badge: "{count} queued",
+      divider: "{count} messages queued",
+      remove: "Remove from queue",
     },
 
     // Export conversation

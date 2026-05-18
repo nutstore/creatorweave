@@ -23,6 +23,17 @@ import type {
 } from '@/agent/message-types'
 import type { AssetMeta } from '@/types/asset'
 
+/** A message waiting in the per-conversation queue */
+export interface QueuedMessage {
+  text: string
+  assets?: AssetMeta[]
+  agentOverrideId?: string | null
+  enqueuedAt: number
+}
+
+/** Maximum queued messages per conversation */
+const MAX_QUEUE_SIZE = 20
+
 // Enable Immer Map/Set support
 enableMapSet()
 
@@ -143,6 +154,9 @@ export interface ConversationRuntimeState {
   }>
   workflowAbortControllers: Map<string, AbortController>
 
+  // ─── Queued user messages (not persisted) ───
+  pendingMessageQueues: Map<string, QueuedMessage[]>
+
   // ─── Computed helpers ───
   getRuntime: (convId: string) => ConversationRuntime | undefined
   getConversationStatus: (convId: string) => ConversationStatus
@@ -164,6 +178,13 @@ export interface ConversationRuntimeState {
   mountConversation: (convId: string) => void
   unmountConversation: (convId: string) => void
   isConversationMounted: (convId: string) => boolean
+
+  // ─── Message queue actions ───
+  enqueueMessage: (convId: string, message: QueuedMessage) => { enqueued: boolean; position: number }
+  dequeueMessage: (convId: string) => QueuedMessage | null
+  getQueueDepth: (convId: string) => number
+  clearQueue: (convId: string) => void
+  removeQueuedMessage: (convId: string, index: number) => void
 }
 
 export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
@@ -177,6 +198,7 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
     pendingWorkflowDryRuns: new Map(),
     pendingWorkflowRealRuns: new Map(),
     workflowAbortControllers: new Map(),
+    pendingMessageQueues: new Map(),
 
     // ─── Computed helpers ───
 
@@ -321,6 +343,63 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
 
     isConversationMounted: (convId: string) => {
       return (get().mountedConversations.get(convId) || 0) > 0
+    },
+
+    // ─── Message queue actions ───
+
+    enqueueMessage: (convId: string, message: QueuedMessage) => {
+      const queue = get().pendingMessageQueues.get(convId)
+      if (queue && queue.length >= MAX_QUEUE_SIZE) {
+        return { enqueued: false, position: -1 }
+      }
+      set((state) => {
+        let q = state.pendingMessageQueues.get(convId)
+        if (!q) {
+          q = []
+          state.pendingMessageQueues.set(convId, q)
+        }
+        q.push(message)
+      })
+      const updated = get().pendingMessageQueues.get(convId)
+      return { enqueued: true, position: updated?.length ?? 0 }
+    },
+
+    dequeueMessage: (convId: string) => {
+      const queue = get().pendingMessageQueues.get(convId)
+      if (!queue || queue.length === 0) return null
+      const item = queue[0]
+      set((state) => {
+        const q = state.pendingMessageQueues.get(convId)
+        if (q && q.length > 0) {
+          q.shift()
+          if (q.length === 0) {
+            state.pendingMessageQueues.delete(convId)
+          }
+        }
+      })
+      return item
+    },
+
+    getQueueDepth: (convId: string) => {
+      return get().pendingMessageQueues.get(convId)?.length ?? 0
+    },
+
+    clearQueue: (convId: string) => {
+      set((state) => {
+        state.pendingMessageQueues.delete(convId)
+      })
+    },
+
+    removeQueuedMessage: (convId: string, index: number) => {
+      set((state) => {
+        const q = state.pendingMessageQueues.get(convId)
+        if (q && index >= 0 && index < q.length) {
+          q.splice(index, 1)
+          if (q.length === 0) {
+            state.pendingMessageQueues.delete(convId)
+          }
+        }
+      })
     },
   }))
 )

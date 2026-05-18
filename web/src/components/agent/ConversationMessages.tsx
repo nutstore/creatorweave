@@ -16,6 +16,8 @@ import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
 import { groupMessagesIntoTurns } from './group-messages'
 import { useWorkflowProgressAnchor } from './useWorkflowProgressAnchor'
+import { Clock, X } from 'lucide-react'
+import { useT } from '@/i18n'
 import type { DraftAssistantStep, Message, ToolCall, WorkflowExecutionState } from '@/agent/message-types'
 import type { FileMentionItem } from './FileMentionExtension'
 
@@ -102,6 +104,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   onPreviewAsset,
   staticSnapshot,
 }: ConversationMessagesProps, ref: React.Ref<ConversationMessagesHandle | null>) {
+  const t = useT()
   const { activeWorkflowExecution } = staticSnapshot
 
   // ── Subscribe to streaming data directly from runtime store ──
@@ -191,6 +194,14 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
     activeMessages,
     isProcessing,
   ])
+
+  // ── Queued messages (visible while agent is processing) ──
+  const queuedMessages = useConversationRuntimeStore(
+    useShallow((s) => {
+      if (!conversationId) return []
+      return s.pendingMessageQueues.get(conversationId)?.map((m) => ({ text: m.text, enqueuedAt: m.enqueuedAt })) ?? []
+    }),
+  )
 
   const turns = useMemo(() => groupMessagesIntoTurns(activeMessages), [activeMessages])
   const lastTurn = turns[turns.length - 1]
@@ -315,6 +326,38 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
         {/* Fallback workflow progress */}
         {activeWorkflowExecution && anchorIndex === -1 && !shouldRenderDraftAssistant && (
           <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />
+        )}
+
+        {/* Queued messages — shown while agent is processing */}
+        {isProcessing && queuedMessages.length > 0 && (
+          <div className="space-y-3">
+            {/* Queue divider */}
+            <div className="flex items-center gap-2 text-xs text-blue-500 dark:text-blue-400">
+              <Clock className="h-3 w-3 shrink-0" />
+              <span>{t('conversation.queue.divider', { count: queuedMessages.length })}</span>
+              <div className="h-px flex-1 bg-blue-200 dark:bg-blue-800" />
+            </div>
+            {/* Queued message bubbles */}
+            {queuedMessages.map((msg, idx) => (
+              <div key={`queued-${idx}-${msg.enqueuedAt}`} className="group/queued relative">
+                <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-blue-50 px-4 py-2.5 text-sm text-neutral-800 opacity-60 dark:bg-blue-900/30 dark:text-neutral-200 dark:opacity-70">
+                  <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (conversationId) {
+                      useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, idx)
+                    }
+                  }}
+                  className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-neutral-500 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-500 group-hover/queued:flex group-hover/queued:opacity-100 dark:bg-neutral-700 dark:text-neutral-400 dark:hover:bg-red-900/60 dark:hover:text-red-400"
+                  title={t('conversation.queue.remove')}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
         <div ref={messagesEndRef} />
