@@ -239,7 +239,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
 
       // Save to localStorage and open in new tab (same pattern as WorkspaceLayout.handleElementInspect)
       localStorage.setItem('preview-content-' + change.path, htmlContent)
-      window.open(`/preview?path=${encodeURIComponent(change.path)}`, '_blank')
+      window.open(`#/preview?path=${encodeURIComponent(change.path)}`, '_blank')
     } catch (err) {
       console.error('[PendingFileList] Failed to open inspector:', err)
     }

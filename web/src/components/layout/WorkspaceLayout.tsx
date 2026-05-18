@@ -623,7 +623,7 @@ export function WorkspaceLayout({
       // Save to localStorage
       localStorage.setItem('preview-content-' + path, content)
       // Open in new tab
-      window.open(`/preview?path=${encodeURIComponent(path)}`, '_blank')
+      window.open(`#/preview?path=${encodeURIComponent(path)}`, '_blank')
     } catch (err) {
       console.error('[WorkspaceLayout] Failed to open inspector:', err)
     }

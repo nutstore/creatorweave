@@ -201,7 +201,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       // Save to localStorage so the StandalonePreview page can read it
       localStorage.setItem('preview-content-' + fileChange.path, htmlContent)
       // Open in new tab with inspector enabled
-      window.open(`/preview?path=${encodeURIComponent(fileChange.path)}`, '_blank')
+      window.open(`#/preview?path=${encodeURIComponent(fileChange.path)}`, '_blank')
     } catch (err) {
       console.error('[FileDiffViewer] Failed to open inspector:', err)
     }
