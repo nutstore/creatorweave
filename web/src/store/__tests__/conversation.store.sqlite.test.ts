@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createAssistantMessage, createToolMessage, createUserMessage } from '@/agent/message-types'
+import { useConversationRuntimeStore } from '../conversation-runtime.store'
 
 const deleteWorkspaceMock = vi.fn(() => Promise.resolve())
 const conversationRepoDeleteMock = vi.fn(() => Promise.resolve())
@@ -362,6 +363,175 @@ describe('conversation.store.sqlite tool-call routing', () => {
         })
       )
     })
+  })
+
+  it('should derive context usage from assistant total tokens on completion', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-finalize-fallback')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+
+    ;(globalThis as any).__conversationStoreCustomRun = async (messages: any[], callbacks: any) => {
+      const assistantWithUsage = createAssistantMessage('done')
+      assistantWithUsage.usage = {
+        promptTokens: 456,
+        completionTokens: 789,
+        totalTokens: 1245,
+      }
+      callbacks.onMessagesUpdated?.([...messages, assistantWithUsage])
+      return [...messages, assistantWithUsage]
+    }
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(updated?.contextWindowUsage?.usedTokens).toBe(1245)
+    expect(updated?.contextWindowUsage?.reserveTokens).toBe(1024)
+    expect(updated?.contextWindowUsage?.modelMaxTokens).toBe(128000)
+  })
+
+  it('should sync context usage immediately from assistant usage when no context callback in run', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-immediate-sync')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+
+    let usedTokensDuringOnMessagesUpdated: number | null = null
+    ;(globalThis as any).__conversationStoreCustomRun = async (messages: any[], callbacks: any) => {
+      const assistantWithUsage = createAssistantMessage('done')
+      assistantWithUsage.usage = {
+        promptTokens: 4300,
+        completionTokens: 120,
+        totalTokens: 4420,
+      }
+      callbacks.onMessagesUpdated?.([...messages, assistantWithUsage])
+      const current = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+      usedTokensDuringOnMessagesUpdated = current?.contextWindowUsage?.usedTokens ?? null
+      return [...messages, assistantWithUsage]
+    }
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    expect(usedTokensDuringOnMessagesUpdated).toBe(4420)
+  })
+
+  it('should still sync usage on message_end when activeRunId becomes null in same epoch', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-same-epoch')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+
+    ;(globalThis as any).__conversationStoreCustomRun = async (messages: any[], callbacks: any) => {
+      useConversationStore.setState((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conv.id ? { ...c, activeRunId: null } : c
+        ),
+      }))
+      const assistantWithUsage = createAssistantMessage('done')
+      assistantWithUsage.usage = {
+        promptTokens: 4310,
+        completionTokens: 10,
+        totalTokens: 4320,
+      }
+      callbacks.onMessagesUpdated?.([...messages, assistantWithUsage])
+      return [...messages, assistantWithUsage]
+    }
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(updated?.lastContextWindowUsage?.usedTokens).toBe(4320)
+    const runtime = useConversationRuntimeStore.getState().runtimes.get(conv.id)
+    expect(runtime?.contextWindowUsage?.usedTokens).toBe(4320)
+  })
+
+  it('should process onMessagesUpdated when activeRunId is cleared but runtime epoch matches', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-runtime-epoch')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+
+    ;(globalThis as any).__conversationStoreCustomRun = async (messages: any[], callbacks: any) => {
+      useConversationStore.setState((state) => ({
+        conversations: state.conversations.map((c) =>
+          c.id === conv.id ? { ...c, activeRunId: null } : c
+        ),
+      }))
+      useConversationRuntimeStore.setState((state) => {
+        const rt = state.runtimes.get(conv.id)
+        if (rt) {
+          rt.activeRunId = null
+        }
+      })
+      const assistantWithUsage = createAssistantMessage('done')
+      assistantWithUsage.usage = {
+        promptTokens: 4201,
+        completionTokens: 99,
+        totalTokens: 4300,
+      }
+      callbacks.onMessagesUpdated?.([...messages, assistantWithUsage])
+      return [...messages, assistantWithUsage]
+    }
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(updated?.lastContextWindowUsage?.usedTokens).toBe(4300)
+  })
+
+  it('should override stale previous-run usage at finalize when current run lacks context callback', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('context-usage-stale-override')
+    useConversationStore.getState().addMessage(conv.id, createUserMessage('hello'))
+
+    // Simulate stale usage from previous run (e.g. 832)
+    useConversationStore.setState((state) => ({
+      conversations: state.conversations.map((c) =>
+        c.id === conv.id
+          ? {
+            ...c,
+            contextWindowUsage: {
+              usedTokens: 832,
+              maxTokens: 198000,
+              reserveTokens: 2000,
+              usagePercent: 0.42,
+              modelMaxTokens: 200000,
+            },
+            lastContextWindowUsage: {
+              usedTokens: 832,
+              maxTokens: 198000,
+              reserveTokens: 2000,
+              usagePercent: 0.42,
+              modelMaxTokens: 200000,
+            },
+          }
+          : c
+      ),
+    }))
+
+    ;(globalThis as any).__conversationStoreCustomRun = async (messages: any[], callbacks: any) => {
+      const assistantWithUsage = createAssistantMessage('done')
+      assistantWithUsage.usage = {
+        promptTokens: 4200,
+        completionTokens: 104,
+        totalTokens: 4304,
+      }
+      callbacks.onMessagesUpdated?.([...messages, assistantWithUsage])
+      return [...messages, assistantWithUsage]
+    }
+
+    await useConversationStore
+      .getState()
+      .runAgent(conv.id, 'openai' as any, 'mock-model', 1024, null)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(updated?.lastContextWindowUsage?.usedTokens).toBe(4304)
+    const runtime = useConversationRuntimeStore.getState().runtimes.get(conv.id)
+    expect(runtime?.contextWindowUsage?.usedTokens).toBe(4304)
   })
 
   it('should carry compression counters across runAgent invocations', async () => {

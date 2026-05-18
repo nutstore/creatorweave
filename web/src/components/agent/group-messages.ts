@@ -63,23 +63,15 @@ export function groupMessagesIntoTurns(messages: Message[]): Turn[] {
 }
 
 function aggregateUsage(messages: Message[]): MessageUsage | null {
-  let hasUsage = false
-  let prompt = 0
-  let completion = 0
-  let total = 0
-  let cacheRead = 0
-
-  for (const msg of messages) {
-    if (msg.usage) {
-      hasUsage = true
-      prompt += msg.usage.promptTokens
-      completion += msg.usage.completionTokens
-      total += msg.usage.totalTokens
-      cacheRead += msg.usage.cacheReadTokens || 0
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const usage = messages[i].usage
+    if (!usage) continue
+    return {
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.totalTokens,
+      cacheReadTokens: usage.cacheReadTokens || 0,
     }
   }
-
-  return hasUsage
-    ? { promptTokens: prompt, completionTokens: completion, totalTokens: total, cacheReadTokens: cacheRead }
-    : null
+  return null
 }

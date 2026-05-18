@@ -20,6 +20,7 @@ import type {
   ToolCall,
   ConversationStatus,
   DraftAssistantStep,
+  ContextWindowUsage,
 } from '@/agent/message-types'
 import type { AssetMeta } from '@/types/asset'
 import {
@@ -808,6 +809,31 @@ function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Mes
     }
   }
   return merged
+}
+
+function deriveContextUsageFromAssistantUsage(
+  messages: Message[],
+  modelMaxTokens: number,
+  reserveTokens: number
+): ContextWindowUsage | null {
+  const latestAssistantWithUsage = [...messages]
+    .reverse()
+    .find((m) => m.role === 'assistant' && m.usage)
+  if (!latestAssistantWithUsage?.usage) return null
+
+  const usedTokens =
+    latestAssistantWithUsage.usage.promptTokens +
+    latestAssistantWithUsage.usage.completionTokens +
+    (latestAssistantWithUsage.usage.cacheReadTokens ?? 0)
+  const maxTokens = Math.max(1, modelMaxTokens - reserveTokens)
+  const usagePercent = Math.max(0, Math.min(100, (usedTokens / maxTokens) * 100))
+  return {
+    usedTokens,
+    maxTokens,
+    reserveTokens,
+    usagePercent,
+    modelMaxTokens,
+  }
 }
 
 interface WorkflowDryRunRequest {
@@ -1776,7 +1802,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
-        let lastContextUsageMetaPersistAt = 0
         // Compression summaries are injected into the agent loop as
         // system-context messages and mirrored into the runtime message state.
         let committed = false
@@ -1862,6 +1887,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           const c = state.conversations.find((c) => c.id === conversationId)
           if (c) {
             c.activeRunId = runId
+            c.runEpoch = runEpoch
             c.status = 'pending'
             c.error = null
             c.draftAssistant = {
@@ -1883,6 +1909,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const isCurrentRun = () => {
           const rt = useConversationRuntimeStore.getState().runtimes.get(conversationId)
           return !!rt && rt.activeRunId === runId && (rt.runEpoch || 0) === runEpoch
+        }
+
+        const isCurrentRunEpoch = () => {
+          const rt = useConversationRuntimeStore.getState().runtimes.get(conversationId)
+          return !!rt && (rt.runEpoch || 0) === runEpoch
         }
 
         const failRunEarly = (message: string) => {
@@ -2679,21 +2710,31 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           // If already committed, nothing to do
           if (committed) return
 
-          // Check if this is the current run OR if we have messages to save (cancel race condition)
-          // When cancelAgent aborts the loop, onComplete is called but may arrive after
-          // cancelAgent's set() has cleared activeRunId. In that case, we still need to save
-          // the messages we have.
+          // Only the current run is allowed to commit message state.
+          // Stale callbacks from prior runs (e.g. after project/workspace switch
+          // or elicitation-triggered nested run) must never overwrite UI history.
           const current = get().conversations.find((c) => c.id === conversationId)
           const isRunCurrent =
             !!current && current.activeRunId === runId && (current.runEpoch || 0) === runEpoch
-          if (!isRunCurrent && !finalMessages) return
+          const isSameEpoch = !!current && (current.runEpoch || 0) === runEpoch
+          if (!isRunCurrent && !isSameEpoch) {
+            console.info('[conversation.store] skip finalize from stale run', {
+              conversationId,
+              runId,
+              status,
+            })
+            return
+          }
 
           committed = true
           const currentSnapshot = get().conversations.find((c) => c.id === conversationId)?.messages || []
           const targetMessages = reconcileMessageSnapshot(currentSnapshot, finalMessages || latestMessages)
-          const runtimeUsageAtFinalize =
-            useConversationRuntimeStore.getState().runtimes.get(conversationId)?.contextWindowUsage ||
-            null
+          const derivedUsageAtFinalize = deriveContextUsageFromAssistantUsage(
+            targetMessages,
+            provider.maxContextTokens,
+            maxTokens
+          )
+          const usageAtFinalize = derivedUsageAtFinalize
 
           // Collect any assets accumulated during this agent run before overwriting messages
           const currentConv = get().conversations.find((c) => c.id === conversationId)
@@ -2725,9 +2766,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             if (!c) return
             if (status === 'idle') {
               c.messages = finalizedMessages
-              if (runtimeUsageAtFinalize) {
-                c.contextWindowUsage = runtimeUsageAtFinalize
-                c.lastContextWindowUsage = runtimeUsageAtFinalize
+              if (usageAtFinalize) {
+                c.contextWindowUsage = usageAtFinalize
+                c.lastContextWindowUsage = usageAtFinalize
               }
               c.collectedAssets = []
             }
@@ -2772,6 +2813,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               r.activeRunId = null
               if (status === 'idle') {
                 r.collectedAssets = []
+                if (usageAtFinalize) {
+                  r.contextWindowUsage = usageAtFinalize
+                }
                 // Keep r.contextWindowUsage so the ContextUsageBar remains visible
                 // after the agent loop finishes. It will be cleared when a new
                 // run starts (runAgent).
@@ -3261,47 +3305,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               // Best-effort: never let agent-refresh failure break tool completion
             }
           },
-          onContextUsageUpdate: (payload) => {
-            if (!isCurrentRun()) return
-            set((state) => {
-              const c = state.conversations.find((x) => x.id === conversationId)
-              if (!c || c.activeRunId !== runId) return
-              c.contextWindowUsage = {
-                usedTokens: payload.usedTokens,
-                maxTokens: payload.maxTokens,
-                reserveTokens: payload.reserveTokens,
-                usagePercent: payload.usagePercent,
-                modelMaxTokens: payload.modelMaxTokens ?? payload.maxTokens + payload.reserveTokens,
-              }
-              c.lastContextWindowUsage = c.contextWindowUsage
-            })
-            // Sync to runtime store
-            useConversationRuntimeStore.setState((state) => {
-              const r = ensureRuntime(state, conversationId)
-              if (r.activeRunId === runId) {
-                r.contextWindowUsage = {
-                  usedTokens: payload.usedTokens,
-                  maxTokens: payload.maxTokens,
-                  reserveTokens: payload.reserveTokens,
-                  usagePercent: payload.usagePercent,
-                  modelMaxTokens: payload.modelMaxTokens ?? payload.maxTokens + payload.reserveTokens,
-                }
-              }
-            })
-            const now = Date.now()
-            if (now - lastContextUsageMetaPersistAt >= 1000) {
-              lastContextUsageMetaPersistAt = now
-              const currentConv = get().conversations.find((x) => x.id === conversationId)
-              if (currentConv) {
-                persistConversationMeta(currentConv).catch((err) => {
-                  console.warn(
-                    '[conversation.store] Failed to persist context usage meta during run:',
-                    err
-                  )
-                })
-              }
-            }
-          },
           onContextCompressionStart: (payload) => {
             if (!isCurrentRun()) return
             emitCompressionEvent({
@@ -3482,13 +3485,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           },
           onMessagesUpdated: (msgs: Message[]) => {
-            if (!isCurrentRun()) return
+            if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             latestMessages = reconciled
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
-              if (!c || c.activeRunId !== runId) return
+              if (!c || (c.runEpoch || 0) !== runEpoch) return
               c.messages = reconciled
               c.compressedContextSummary =
                 reconciled.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
@@ -3498,12 +3501,43 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 null
               c.updatedAt = Date.now()
             })
+            const latestAssistant = [...reconciled]
+              .reverse()
+              .find((m) => m.role === 'assistant' && m.usage)
+            if (latestAssistant?.usage) {
+              const modelMaxTokens = provider.maxContextTokens
+              const reserveTokens = maxTokens
+              const maxInputTokens = Math.max(1, modelMaxTokens - reserveTokens)
+              const usedTokens =
+                latestAssistant.usage.totalTokens ??
+                latestAssistant.usage.promptTokens + latestAssistant.usage.completionTokens
+              const usagePercent = Math.max(0, Math.min(100, (usedTokens / modelMaxTokens) * 100))
+              const usage: ContextWindowUsage = {
+                usedTokens,
+                maxTokens: maxInputTokens,
+                reserveTokens,
+                usagePercent,
+                modelMaxTokens,
+              }
+              set((state) => {
+                const c = state.conversations.find((x) => x.id === conversationId)
+                if (!c || (c.runEpoch || 0) !== runEpoch) return
+                c.contextWindowUsage = usage
+                c.lastContextWindowUsage = usage
+              })
+              useConversationRuntimeStore.setState((state) => {
+                const r = ensureRuntime(state, conversationId)
+                if ((r.runEpoch || 0) === runEpoch) {
+                  r.contextWindowUsage = usage
+                }
+              })
+            }
             // Persist immediately — this callback fires at block boundaries
             // (message_end), so it's the right time to save.
             persistAfterBlockComplete()
           },
           onComplete: async (msgs: Message[]) => {
-            if (!isCurrentRun()) return
+            if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             console.info('[#LoopStop] store_onComplete', {

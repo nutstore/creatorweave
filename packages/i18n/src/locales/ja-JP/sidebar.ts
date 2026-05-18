@@ -193,5 +193,7 @@ export const sidebar = {
       remaining: "残り",
       fullEditor: "フルエディタ",
       openInFullEditor: "フルエディタで開く",
+      htmlPreview: "HTML プレビュー",
+      showDiff: "差分を表示",
     },
 } as const

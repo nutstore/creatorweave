@@ -45,6 +45,25 @@ export interface ConvertAgentMessagesToLlmResult {
   compressionBaseline: CompressionBaselineState | null
 }
 
+/**
+ * Extract the real token usage from the most recent assistant message
+ * in the agent message list.  Returns input + output tokens, because
+ * the output becomes part of the next request's input.
+ * This is the accurate "context already consumed" number.
+ */
+function extractLastTurnUsedTokens(agentMessages: PiAgentMessage[]): number | null {
+  for (let i = agentMessages.length - 1; i >= 0; i--) {
+    const msg = agentMessages[i]
+    if (msg.role === 'assistant') {
+      const usage = (msg as unknown as { usage?: { input?: number; output?: number } }).usage
+      if (usage && typeof usage.input === 'number' && usage.input > 0) {
+        return usage.input + (typeof usage.output === 'number' ? usage.output : 0)
+      }
+    }
+  }
+  return null
+}
+
 export async function convertAgentMessagesToLlm(
   input: ConvertAgentMessagesToLlmInput
 ): Promise<ConvertAgentMessagesToLlmResult> {
@@ -74,6 +93,25 @@ export async function convertAgentMessagesToLlm(
   const inputBudget = Math.max(1, maxContextTokens - reserveTokens)
   const chatMessages = messagesToChatMessages(internalMessages)
   const preTrimTokens = input.provider.estimateTokens(chatMessages)
+
+  // --- Real token usage for compression trigger ---
+  // Each assistant message records usage.input (prompt tokens) and usage.output
+  // (completion tokens).  On the next turn, the output becomes part of the input,
+  // so "context already consumed" = input + output of the last assistant message.
+  // If the user deletes messages, the next API call will correct the numbers.
+  const usedRealTokens = extractLastTurnUsedTokens(input.agentMessages)
+
+  if (usedRealTokens !== null) {
+    console.info('[AgentLoop] Real token usage from last turn', {
+      convertCallCount,
+      usedRealTokens,
+      inputBudget,
+      maxContextTokens,
+      usagePercent: Number(((usedRealTokens / maxContextTokens) * 100).toFixed(2)),
+      triggerThreshold: Math.floor(maxContextTokens * 0.85),
+    })
+  }
+
   const summaryTokenBudget = Math.min(2400, Math.max(500, Math.floor(maxContextTokens * 0.02)))
   let compressionTriggered = false
   let compressionCompletePayload:
@@ -90,6 +128,7 @@ export async function convertAgentMessagesToLlm(
     createSummary: true,
     maxSummaryTokens: summaryTokenBudget,
     summaryStrategy: 'external',
+    usedRealTokens,
   })
   let trimmed = trimmedResult.messages
 
@@ -228,10 +267,15 @@ export async function convertAgentMessagesToLlm(
   }
 
   const usedTokens = input.provider.estimateTokens(trimmed)
-  if (usedTokens > inputBudget) {
+  // For the overflow check, prefer real tokens (input+output) when available,
+  // because the heuristic estimate systematically undercounts.
+  const effectiveUsedTokens = usedRealTokens ?? usedTokens
+  if (effectiveUsedTokens > inputBudget) {
     console.error('[#LoopStop] context_overflow_after_compression_check', {
       convertCallCount,
       usedTokens,
+      usedRealTokens,
+      effectiveUsedTokens,
       inputBudget,
       reserveTokens,
       maxContextTokens,
@@ -242,26 +286,14 @@ export async function convertAgentMessagesToLlm(
       maxContextLimit: maxContextTokens,
       reserveTokens,
       inputBudget,
-      historyTokens: usedTokens,
+      historyTokens: effectiveUsedTokens,
       toolResultTokens: 0,
-      totalInputTokens: usedTokens,
+      totalInputTokens: effectiveUsedTokens,
     })
   }
   if (compressionCompletePayload) {
     input.callbacks?.onContextCompressionComplete?.(compressionCompletePayload)
   }
-  // Use the same denominator as ContextManager (input budget, not raw max)
-  // so the reported percentage aligns with compression trigger thresholds.
-  const usagePercent = Math.max(0, Math.min(100, (usedTokens / Math.max(1, inputBudget)) * 100))
-  input.callbacks?.onContextUsageUpdate?.({
-    usedTokens,
-    // maxTokens is the effective input budget (M - R), modelMaxTokens is the raw model limit M.
-    maxTokens: inputBudget,
-    reserveTokens,
-    usagePercent,
-    modelMaxTokens: maxContextTokens,
-  })
-
   return {
     piMessages: internalToPiMessages(
       trimmed.map((msg) => ({

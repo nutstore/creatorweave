@@ -89,19 +89,6 @@ export interface AgentCallbacks {
     summaryChars: number
     latencyMs: number
   }) => void
-  /** Called before each model turn with estimated context usage */
-  onContextUsageUpdate?: (payload: {
-    /** Actual prompt input tokens sent to model for this turn */
-    usedTokens: number
-    /** Effective input budget E = modelMaxTokens - reserveTokens */
-    maxTokens: number
-    /** Reserved output tokens */
-    reserveTokens: number
-    /** usagePercent = usedTokens / maxTokens * 100 */
-    usagePercent: number
-    /** Raw model context limit M */
-    modelMaxTokens?: number
-  }) => void
 }
 
 export interface AgentLoopConfig {

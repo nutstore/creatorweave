@@ -3,10 +3,10 @@
  *
  * Displays side-by-side diff between OPFS and Native FS versions.
  * Uses Monaco DiffEditor for text comparison.
- * For HTML files, provides "Inspect Element" to preview in a new tab with element inspector.
+ * For HTML files, provides inline preview with iframe.
  */
 
-import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { type FileChange } from '@/opfs/types/opfs-types'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
@@ -17,7 +17,7 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFSMultiRoot,
 } from '@/opfs'
-import { Columns2, UnfoldVertical, X, MousePointer2, FileText } from 'lucide-react'
+import { Columns2, UnfoldVertical, X, Eye, FileText } from 'lucide-react'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
 const OfficePreview = React.lazy(() => import('@/components/file-viewer/OfficePreview').then(m => ({ default: m.OfficePreview })))
@@ -162,6 +162,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const [officeBlob, setOfficeBlob] = useState<Blob | null>(null)
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
   const docxContainerRef = useRef<HTMLDivElement>(null)
+  // HTML inline preview state
+  const [showHtmlPreview, setShowHtmlPreview] = useState(false)
   const [snapshotImageUrls, setSnapshotImageUrls] = useState<{ before: string | null; after: string | null }>({
     before: null,
     after: null,
@@ -184,28 +186,34 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   )
   const currentFileComments = activePath ? commentsByPath[activePath] ?? [] : []
 
+  const isHtml = !isSnapshotMode && fileChange ? isHtmlFile(fileChange.path) && fileChange.type !== 'delete' : false
 
   /**
-   * Open HTML file in a new tab with element inspector.
-   * Uses the OPFS (modified) version of the file content.
-   * Follows the same pattern as handleElementInspect in WorkspaceLayout.
+   * HTML inline preview: create blob URL from OPFS (modified) content.
    */
-  const handleInspectElement = useCallback(async () => {
-    if (!fileChange || fileChange.type === 'delete') return
-
-    try {
-      // Use the OPFS (modified) version which is the pending change
-      const htmlContent = content.opfs
-      if (htmlContent === null) return
-
-      // Save to localStorage so the StandalonePreview page can read it
-      localStorage.setItem('preview-content-' + fileChange.path, htmlContent)
-      // Open in new tab with inspector enabled
-      window.open(`#/preview?path=${encodeURIComponent(fileChange.path)}`, '_blank')
-    } catch (err) {
-      console.error('[FileDiffViewer] Failed to open inspector:', err)
+  const htmlBlobUrl = useMemo(() => {
+    if (!isHtml || !content.opfs) return null
+    const noContextScript = '<script>document.addEventListener("contextmenu",function(e){e.preventDefault()})<\/script>'
+    let html = content.opfs
+    const bodyClose = html.lastIndexOf('</body>')
+    if (bodyClose !== -1) {
+      html = html.slice(0, bodyClose) + noContextScript + html.slice(bodyClose)
+    } else {
+      html += noContextScript
     }
-  }, [fileChange, content.opfs])
+    const blob = new Blob([html], { type: 'text/html' })
+    return URL.createObjectURL(blob)
+  }, [isHtml, content.opfs])
+  // Clean up blob URL
+  useEffect(() => {
+    return () => {
+      if (htmlBlobUrl) URL.revokeObjectURL(htmlBlobUrl)
+    }
+  }, [htmlBlobUrl])
+  // Reset HTML preview when file changes
+  useEffect(() => {
+    setShowHtmlPreview(false)
+  }, [fileChange?.path])
 
   useEffect(() => {
     if (!fileChange) {
@@ -524,7 +532,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   }
 
   const isImage = !isSnapshotMode && isImageFile(fileChange.path)
-  const isHtml = !isSnapshotMode && isHtmlFile(fileChange.path) && fileChange.type !== 'delete'
   const isDocx = !isSnapshotMode && isDocxFile(fileChange.path) && fileChange.type !== 'delete'
   const isOffice = !isSnapshotMode && isOfficeFile(fileChange.path) && fileChange.type !== 'delete'
   const originalText = content.showNativePanel ? (content.native ?? '') : ''
@@ -850,21 +857,25 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               {snapshotDiff?.snapshotTitle || t('sidebar.fileDiffViewer.binarySnapshot')} · {formatTime(snapshotDiff?.capturedAt)}
             </span>
           )}
-          {/* Inspect Element button for HTML files */}
-          {isHtml && (
+          {/* HTML preview toggle button */}
+          {isHtml && htmlBlobUrl && (
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={handleInspectElement}
-                    className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-emerald-600 transition-colors hover:bg-emerald-100/60 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300"
+                    onClick={() => setShowHtmlPreview((v) => !v)}
+                    className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+                      showHtmlPreview
+                        ? 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+                        : 'text-emerald-600 hover:bg-emerald-100/60 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300'
+                    }`}
                   >
-                    <MousePointer2 className="h-3 w-3" />
-                    {t('sidebar.fileDiffViewer.reviewElements')}
+                    <Eye className="h-3 w-3" />
+                    {showHtmlPreview ? t('sidebar.fileDiffViewer.changesOnly') : t('sidebar.fileDiffViewer.reviewElements')}
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>{t('sidebar.fileDiffViewer.previewHTMLNewTab')}</TooltipContent>
+                <TooltipContent>{showHtmlPreview ? t('sidebar.fileDiffViewer.switchToChangesOnly') : t('sidebar.fileDiffViewer.previewHTMLNewTab')}</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           )}
@@ -915,7 +926,15 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {isImage ? (
+        {/* HTML inline preview mode */}
+        {showHtmlPreview && htmlBlobUrl ? (
+          <iframe
+            src={htmlBlobUrl}
+            title="HTML Preview"
+            className="flex-1 w-full border-0 bg-white"
+            sandbox="allow-scripts allow-same-origin"
+          />
+        ) : isImage ? (
           <>
             <div className={`flex flex-1 flex-col ${content.showNativePanel ? 'border-r border dark:border-border' : ''}`}>
               <div className="border-b border bg-muted px-4 py-2 dark:border-border dark:bg-muted">

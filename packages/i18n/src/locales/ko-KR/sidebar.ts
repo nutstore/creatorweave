@@ -193,5 +193,7 @@ export const sidebar = {
       remaining: "남음",
       fullEditor: "전체 에디터",
       openInFullEditor: "전체 에디터에서 열기",
+      htmlPreview: "HTML 미리보기",
+      showDiff: "차이점 보기",
     },
 } as const

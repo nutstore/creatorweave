@@ -53,6 +53,13 @@ export interface SummarizationOptions {
   maxSummaryTokens?: number
   /** Summary generation strategy */
   summaryStrategy?: 'heuristic' | 'external'
+  /**
+   * Real token usage from the last model API response.
+   * Computed as last assistant message's usage.input + usage.output.
+   * When provided, proactive compression uses this for the trigger threshold
+   * check (usedRealTokens > budget * 0.85) instead of the heuristic estimate.
+   */
+  usedRealTokens?: number
 }
 
 export class ContextManager {
@@ -133,8 +140,8 @@ export class ContextManager {
 
     // Proactive compression: when we're close to the context ceiling, summarize
     // oldest groups early to preserve headroom for follow-up turns and tool output.
-    // Use unified usage math against input budget (maxContext - reserve), and include
-    // system tokens in the percentage calculation.
+    // Use real token usage (usage.input + usage.output from last API response) for
+    // the trigger check when available, falling back to heuristic estimate.
     if (
       this.enableSummarization &&
       options?.createSummary &&
@@ -143,14 +150,16 @@ export class ContextManager {
     ) {
       const proactiveTrigger = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TRIGGER)
       const proactiveTarget = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TARGET)
-      let totalUsedTokens = usedTokens + systemTokens
+      // Use real tokens when available; otherwise fall back to heuristic
+      const totalUsedTokens = options.usedRealTokens != null && options.usedRealTokens > 0
+        ? options.usedRealTokens
+        : usedTokens + systemTokens
       if (totalUsedTokens >= proactiveTrigger) {
         while (selectedGroups.length > 8 && totalUsedTokens > proactiveTarget) {
           const droppedGroup = selectedGroups.shift()
           if (!droppedGroup) break
           const droppedTokens = droppedGroup.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
           usedTokens -= droppedTokens
-          totalUsedTokens -= droppedTokens
           droppedGroups++
         }
       }
@@ -167,17 +176,15 @@ export class ContextManager {
     ) {
       const proactiveTrigger = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TRIGGER)
       const proactiveTarget = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TARGET)
-      // Recompute usedTokens from selectedGroups
-      const currentUsed = selectedGroups
-        .flat()
-        .reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
-      let totalUsedTokens = currentUsed + systemTokens
+      // Use real tokens when available; otherwise recompute from selected groups
+      const totalUsedTokens = options.usedRealTokens != null && options.usedRealTokens > 0
+        ? options.usedRealTokens
+        : selectedGroups.flat().reduce((sum, msg) => sum + estimateMessageTokens(msg), 0) + systemTokens
       if (totalUsedTokens >= proactiveTrigger) {
         while (selectedGroups.length > 6 && totalUsedTokens > proactiveTarget) {
           const droppedGroup = selectedGroups.shift()
           if (!droppedGroup) break
           const droppedTokens = droppedGroup.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
-          totalUsedTokens -= droppedTokens
           droppedGroups++
         }
       }

@@ -221,5 +221,7 @@ export const sidebar = {
       remaining: "remaining",
       fullEditor: "Full Editor",
       openInFullEditor: "Open in full editor",
+      htmlPreview: "HTML Preview",
+      showDiff: "Show Diff",
     },
 } as const

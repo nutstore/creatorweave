@@ -12,7 +12,7 @@
 import { useConversationStore } from '@/store/conversation.store'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useShallow } from 'zustand/react/shallow'
-import type { Message, WorkflowExecutionState } from '@/agent/message-types'
+import type { ContextWindowUsage, Message, WorkflowExecutionState } from '@/agent/message-types'
 
 const EMPTY_MESSAGES: Message[] = []
 
@@ -38,6 +38,32 @@ export interface ActiveConversationSlice {
     reserveTokens: number
     modelMaxTokens?: number
   } | null
+}
+
+function deriveUsageFromLatestAssistantMessage(
+  messages: Message[],
+  baseUsage: ContextWindowUsage | null,
+): ContextWindowUsage | null {
+  const latestAssistantWithUsage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && message.usage)
+
+  if (!latestAssistantWithUsage?.usage) return null
+
+  const usedTokens =
+    latestAssistantWithUsage.usage.promptTokens +
+    latestAssistantWithUsage.usage.completionTokens +
+    (latestAssistantWithUsage.usage.cacheReadTokens ?? 0)
+  if (!baseUsage) return null
+  const modelMaxTokens = baseUsage.modelMaxTokens ?? baseUsage.maxTokens + baseUsage.reserveTokens
+  const usagePercent = Math.max(0, Math.min(100, (usedTokens / modelMaxTokens) * 100))
+
+  return {
+    ...baseUsage,
+    usedTokens,
+    usagePercent,
+    modelMaxTokens,
+  }
 }
 
 /**
@@ -82,6 +108,10 @@ export function useActiveConversation(): ActiveConversationSlice {
 
   if (!convSlice) return NULL_SLICE
   const rt = rtSlice
+  const assistantUsage = deriveUsageFromLatestAssistantMessage(
+    convSlice.messages,
+    convSlice.lastContextWindowUsage || rt?.contextWindowUsage || null,
+  )
 
   return {
     convId: convSlice.id,
@@ -89,6 +119,6 @@ export function useActiveConversation(): ActiveConversationSlice {
     status: rt?.status || 'idle',
     workflowExecution: rt?.workflowExecution || null,
     error: rt?.status === 'error' ? rt.error?.trim() || null : null,
-    contextWindowUsage: rt?.contextWindowUsage || convSlice.lastContextWindowUsage || null,
+    contextWindowUsage: assistantUsage,
   }
 }

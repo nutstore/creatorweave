@@ -212,5 +212,7 @@ export const sidebar = {
       remaining: "剩余",
       fullEditor: "完整编辑器",
       openInFullEditor: "在完整编辑器中打开",
+      htmlPreview: "HTML 预览",
+      showDiff: "显示差异",
     },
 } as const
