@@ -26,22 +26,16 @@ registerRenderer({
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractResults(ctx)
     const fileCount = new Set(results.map(r => r.path)).size
-    const params = extractSearchParams(ctx)
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">search</code>
         {query && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{query}&quot;</span>
-        )}
-        {/* Search parameter pills */}
-        {params.length > 0 && (
-          <span className="flex items-center gap-1 shrink-0">
-            {params.map((p) => (
-              <span key={p.label} className="bg-neutral-100 dark:bg-neutral-800 text-neutral-500 px-1.5 py-0.5 rounded text-[10px]">
-                {p.label}{p.value !== true ? `=${p.display ?? String(p.value)}` : ''}
-              </span>
-            ))}
+          <span
+            className="truncate max-w-[320px] text-neutral-400 dark:text-neutral-500"
+            title={query}
+          >
+            &quot;{query}&quot;
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && results.length > 0 && (
