@@ -564,6 +564,7 @@ async function persistNewMessage(convId: string, message: Message, seq: number):
   await convRepo.touch(convId)
 }
 
+
 /**
  * Debounced persist scheduler — coalesces rapid fire-and-forget calls into
  * a single database write while guaranteeing immediate flush for final saves.
@@ -769,6 +770,44 @@ function updateAutoTitleAfterMessageDelete(conv: Conversation): void {
     return
   }
   conv.title = DEFAULT_CONVERSATION_NAME
+}
+
+/**
+ * AgentLoop callbacks are expected to provide a full conversation snapshot,
+ * but under rare races we may receive a partial fragment (for example, only
+ * the current turn messages). Guard against destructive regressions by
+ * merging fragments with the previous in-memory snapshot.
+ */
+function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Message[] {
+  if (incoming.length === 0) return previous
+  if (previous.length === 0) return incoming
+
+  const previousIds = new Set(previous.map((m) => m.id))
+  const overlap = incoming.reduce((count, m) => count + (previousIds.has(m.id) ? 1 : 0), 0)
+  if (overlap === incoming.length && incoming.length >= previous.length) {
+    return incoming
+  }
+
+  // If there is no overlap at all, treat incoming as a fragment for the
+  // current turn and append it after the known history.
+  if (overlap === 0) {
+    return [...previous, ...incoming]
+  }
+
+  // Partial overlap: update matching messages and append unseen ones without
+  // dropping existing history.
+  const merged = previous.slice()
+  const indexById = new Map(merged.map((m, idx) => [m.id, idx]))
+  for (const msg of incoming) {
+    const idx = indexById.get(msg.id)
+    if (idx === undefined) {
+      merged.push(msg)
+      indexById.set(msg.id, merged.length - 1)
+    } else {
+      merged[idx] = msg
+    }
+  }
+  return merged
 }
 
 interface WorkflowDryRunRequest {
@@ -1877,6 +1916,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             r.streamingContent = ''
             r.streamingReasoning = ''
           })
+
+          // Persist messages on early failure so that historical messages
+          // (including the user message that triggered this run) are not lost
+          // if the user refreshes the page.
+          const errorConv = get().conversations.find((c) => c.id === conversationId)
+          if (errorConv) {
+            persistMessageReplace(conversationId, errorConv.messages).catch((err) => {
+              console.error('[conversation.store] Failed to persist on failRunEarly:', err)
+            })
+          }
         }
 
         // Persist conversation to SQLite when a block completes (debounced).
@@ -2640,7 +2689,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           if (!isRunCurrent && !finalMessages) return
 
           committed = true
-          const targetMessages = finalMessages || latestMessages
+          const currentSnapshot = get().conversations.find((c) => c.id === conversationId)?.messages || []
+          const targetMessages = reconcileMessageSnapshot(currentSnapshot, finalMessages || latestMessages)
           const runtimeUsageAtFinalize =
             useConversationRuntimeStore.getState().runtimes.get(conversationId)?.contextWindowUsage ||
             null
@@ -3433,15 +3483,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isCurrentRun()) return
-            latestMessages = msgs
+            const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
+            const reconciled = reconcileMessageSnapshot(previous, msgs)
+            latestMessages = reconciled
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c || c.activeRunId !== runId) return
-              c.messages = msgs
+              c.messages = reconciled
               c.compressedContextSummary =
-                msgs.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
+                reconciled.find((msg) => msg.kind === 'context_summary')?.content || c.compressedContextSummary || null
               c.compressedContextCutoffTimestamp =
-                msgs.find((msg) => msg.kind === 'context_summary')?.timestamp ||
+                reconciled.find((msg) => msg.kind === 'context_summary')?.timestamp ||
                 c.compressedContextCutoffTimestamp ||
                 null
               c.updatedAt = Date.now()
@@ -3452,12 +3504,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
           onComplete: async (msgs: Message[]) => {
             if (!isCurrentRun()) return
+            const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
+            const reconciled = reconcileMessageSnapshot(previous, msgs)
             console.info('[#LoopStop] store_onComplete', {
               conversationId,
               runId,
-              messagesCount: msgs.length,
+              messagesCount: reconciled.length,
             })
-            latestMessages = msgs
+            latestMessages = reconciled
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
@@ -3494,6 +3548,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 r.draftAssistant = null
               }
             })
+            // Persist messages on error so that historical messages are not lost
+            // on page refresh. Without this, only the in-memory store retains
+            // messages after an LLM error.
+            const errorConv = get().conversations.find((x) => x.id === conversationId)
+            if (errorConv) {
+              persistMessageReplace(conversationId, errorConv.messages).catch((persistErr) => {
+                console.error('[conversation.store] Failed to persist on onError:', persistErr)
+              })
+            }
             emitError(err.message)
           },
         })
@@ -3552,6 +3615,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             r.draftAssistant = null
           }
         })
+        // Persist messages on generic error to prevent data loss on page refresh
+        const catchConv = get().conversations.find((c) => c.id === conversationId)
+        if (catchConv) {
+          persistMessageReplace(conversationId, catchConv.messages).catch((persistErr) => {
+            console.error('[conversation.store] Failed to persist on catch:', persistErr)
+          })
+        }
       }
 
       // ── Consume queued messages ──

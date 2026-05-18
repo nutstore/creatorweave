@@ -239,12 +239,12 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     await Promise.resolve()
     await Promise.resolve()
-    expect(messageRepoInsertMock).not.toHaveBeenCalled()
+    expect(messageRepoReplaceAllMock).not.toHaveBeenCalled()
 
     resolveMeta()
     await metaPersisted
     await vi.waitFor(() => {
-      expect(messageRepoInsertMock).toHaveBeenCalledTimes(1)
+      expect(messageRepoReplaceAllMock).toHaveBeenCalledTimes(1)
     })
   })
 

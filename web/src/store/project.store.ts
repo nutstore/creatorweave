@@ -276,12 +276,11 @@ export const useProjectStore = create<ProjectState>()(
           initialized: false,
         })
 
-        // 1b. Clear stale conversation state so old activeConversationId doesn't leak.
+        // 1b. Clear active pointer only; keep conversation cache in memory so
+        //     runs from other projects can continue without being torn down.
         const { useConversationStoreSQLite } = await import('./conversation.store.sqlite')
         useConversationStoreSQLite.setState({
           activeConversationId: null,
-          conversations: [],
-          loaded: false,
         })
 
         // 2. Update project store state.
