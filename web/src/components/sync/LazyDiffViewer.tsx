@@ -5,13 +5,14 @@
  * Users can expand context lines above/below each hunk via "Load more" buttons.
  * Supports line comments — click line numbers to select lines for commenting.
  *
- * The diff is computed using a built-in LCS algorithm (no external dependency).
+ * The diff is computed using the `diff` library (Myers algorithm).
  * Hunks contain ONLY changed lines (added/removed); context lines are rendered
  * separately from the original file content.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '@/i18n'
+import { diffLines } from 'diff'
 import { ChevronDown, ChevronUp, Columns2, UnfoldVertical, Code, MessageSquare } from 'lucide-react'
 import {
   Tooltip,
@@ -188,106 +189,41 @@ function computeDiffHunks(original: string, modified: string): DiffHunk[] {
 }
 
 /**
- * LCS-based line diff. O(N*M) time & space, with fallback for large files.
+ * Line diff using the `diff` library (Myers algorithm).
+ * Produces precise, minimal diffs even for very large files.
  */
 function computeLineDiff(oldLines: string[], newLines: string[]): LineChange[] {
-  const m = oldLines.length
-  const n = newLines.length
-
-  // For very large files, use a simpler approach
-  if (m * n > 5_000_000) {
-    return simpleLineDiff(oldLines, newLines)
-  }
-
-  // Build LCS table
-  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      if (oldLines[i - 1] === newLines[j - 1]) {
-        dp[i][j] = dp[i - 1][j - 1] + 1
-      } else {
-        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1])
-      }
-    }
-  }
-
-  // Backtrack to find diff
-  type SimpleChange = { type: 'equal' | 'removed' | 'added'; line: string }
-  const changes: SimpleChange[] = []
-  let i = m
-  let j = n
-
-  while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      changes.push({ type: 'equal', line: oldLines[i - 1] })
-      i--
-      j--
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      changes.push({ type: 'added', line: newLines[j - 1] })
-      j--
-    } else {
-      changes.push({ type: 'removed', line: oldLines[i - 1] })
-      i--
-    }
-  }
-
-  changes.reverse()
-
-  // Merge consecutive same-type changes
   const result: LineChange[] = []
+  // Concatenate lines back with newlines for diffLines, which operates on text
+  // and splits on newline boundaries. We add a trailing newline to each line
+  // so that diffLines treats them uniformly.
+  const oldText = oldLines.join('\n') + '\n'
+  const newText = newLines.join('\n') + '\n'
+
+  const changes = diffLines(oldText, newText)
+
   for (const change of changes) {
+    // diffLines may include trailing newlines; split and strip empty trailing entry
+    const lines = change.value.endsWith('\n')
+      ? change.value.slice(0, -1).split('\n')
+      : change.value.split('\n')
+
+    if (lines.length === 0) continue
+
+    const type = change.added ? 'added' : change.removed ? 'removed' : 'equal'
     const last = result[result.length - 1]
-    if (last && last.type === change.type) {
-      last.value.push(change.line)
-      last.count++
+
+    // Merge consecutive same-type changes
+    if (last && last.type === type) {
+      last.value.push(...lines)
+      last.count += lines.length
     } else {
       result.push({
-        type: change.type,
-        value: [change.line],
-        count: 1,
+        type,
+        value: lines,
+        count: lines.length,
       })
     }
-  }
-
-  return result
-}
-
-/**
- * Simple O(N+M) diff for large files — finds common prefix/suffix,
- * treats the middle as one big replace block.
- */
-function simpleLineDiff(oldLines: string[], newLines: string[]): LineChange[] {
-  const result: LineChange[] = []
-  let prefixLen = 0
-  const minLen = Math.min(oldLines.length, newLines.length)
-  while (prefixLen < minLen && oldLines[prefixLen] === newLines[prefixLen]) {
-    prefixLen++
-  }
-
-  let suffixLen = 0
-  while (
-    suffixLen < minLen - prefixLen &&
-    oldLines[oldLines.length - 1 - suffixLen] === newLines[newLines.length - 1 - suffixLen]
-  ) {
-    suffixLen++
-  }
-
-  if (prefixLen > 0) {
-    result.push({ type: 'equal', value: oldLines.slice(0, prefixLen), count: prefixLen })
-  }
-
-  const removedEnd = oldLines.length - suffixLen
-  const addedEnd = newLines.length - suffixLen
-
-  if (removedEnd > prefixLen) {
-    result.push({ type: 'removed', value: oldLines.slice(prefixLen, removedEnd), count: removedEnd - prefixLen })
-  }
-  if (addedEnd > prefixLen) {
-    result.push({ type: 'added', value: newLines.slice(prefixLen, addedEnd), count: addedEnd - prefixLen })
-  }
-
-  if (suffixLen > 0) {
-    result.push({ type: 'equal', value: oldLines.slice(oldLines.length - suffixLen), count: suffixLen })
   }
 
   return result
