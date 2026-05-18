@@ -63,8 +63,55 @@ export function internalToPiMessages(
           const dir = a.direction === 'upload' ? 'Uploaded' : 'Generated'
           return `- ${dir}: ${a.name} (${a.mimeType}, ${formatAssetSize(a.size)})`
         })
-        userContent += `\n\n[Attached files]\n${assetLines.join('\n')}\nUse read vfs://assets/<filename> to read file contents.`
+        userContent += `\n\n[Attached files]\n${assetLines.join('\n')}`
+
+        // Inject OCR text for image assets (so AI can read text from screenshots)
+        const ocrTexts = msg.assets
+          .filter((a) => a.ocrText && a.ocrText.trim().length > 0)
+          .map((a) => `[OCR text from ${a.name}]\n${a.ocrText}`)
+        if (ocrTexts.length > 0) {
+          userContent += `\n\n${ocrTexts.join('\n\n')}`
+        }
+
+        // Non-image assets: tell AI to use read tool
+        const nonImageAssets = msg.assets.filter((a) => !a.mimeType.startsWith('image/'))
+        if (nonImageAssets.length > 0) {
+          userContent += '\nUse read vfs://assets/<filename> to read file contents.'
+        }
       }
+
+      // Check if we have image assets with base64 data (for Vision API)
+      const imageAssets = msg.assets?.filter((a) => a.ocrBase64 && a.mimeType.startsWith('image/')) || []
+      if (imageAssets.length > 0 && model.input.includes('image')) {
+        // Vision API mode: send as multimodal content (text + images)
+        const contentParts: Array<
+          | { type: 'text'; text: string }
+          | { type: 'image'; data: string; mimeType: string }
+        > = []
+
+        // Add text content first
+        if (userContent) {
+          contentParts.push({ type: 'text', text: userContent })
+        }
+
+        // Add image parts
+        for (const imgAsset of imageAssets) {
+          contentParts.push({
+            type: 'image',
+            data: imgAsset.ocrBase64!,
+            mimeType: imgAsset.mimeType,
+          })
+        }
+
+        return [
+          {
+            role: 'user',
+            content: contentParts,
+            timestamp: msg.timestamp || Date.now(),
+          },
+        ]
+      }
+
       return [
         {
           role: 'user',

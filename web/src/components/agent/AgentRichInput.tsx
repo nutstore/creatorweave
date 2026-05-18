@@ -7,7 +7,7 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
-import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon } from 'lucide-react'
+import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
 
@@ -533,6 +533,39 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
         class:
           'min-h-[44px] max-h-[200px] overflow-y-auto whitespace-pre-wrap break-words text-sm leading-6 outline-none',
       },
+      handlePaste: (_view, event, _slice) => {
+        // Intercept clipboard images and add them as pending assets
+        // (same flow as drag-drop / file picker).
+        const files: File[] = []
+        if (event.clipboardData && event.clipboardData.items) {
+          for (let i = 0; i < event.clipboardData.items.length; i++) {
+            const item = event.clipboardData.items[i]
+            if (item.kind === 'file') {
+              const file = item.getAsFile()
+              if (file) {
+                // Generate a meaningful filename for clipboard images
+                // (browsers often give empty or generic names like "image.png")
+                const isImage = file.type.startsWith('image/')
+                const name = file.name && file.name !== ''
+                  ? file.name
+                  : isImage
+                    ? `clipboard-${Date.now()}.${file.type.split('/')[1] || 'png'}`
+                    : `clipboard-${Date.now()}.${file.name?.split('.').pop() || 'bin'}`
+                // Wrap with corrected name if needed
+                files.push(file.name === name ? file : new File([file], name, { type: file.type }))
+              }
+            }
+          }
+        }
+        if (files.length > 0) {
+          addFiles(files)
+          // Prevent default paste behaviour for file items so the editor
+          // doesn't try to insert raw data or leave a blank line.
+          return true
+        }
+        // Let TipTap handle normal text/HTML paste
+        return false
+      },
       handleKeyDown: (_view, event) => {
         if (disabledRef.current) return false
         if (event.isComposing) return false
@@ -762,7 +795,11 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!disabled) setIsDragOver(true)
+    if (!disabled) {
+      setIsDragOver(true)
+      // Preload OCR worker when user drags a file over (so it's ready when dropped)
+      import('@/services/ocr.service').then(({ preloadOcrWorker }) => preloadOcrWorker()).catch(() => {})
+    }
   }, [disabled])
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -840,11 +877,20 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                        {asset.name}
+                      <div className="flex items-center gap-1">
+                        <div className="max-w-[140px] truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          {asset.name}
+                        </div>
+                        {/* OCR status indicator */}
+                        {(asset.ocrStatus === 'loading' || asset.ocrStatus === 'processing') && (
+                          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-blue-500" />
+                        )}
                       </div>
                       <div className="text-[10px] text-neutral-400">
                         {formatFileSize(asset.size)}
+                        {asset.ocrStatus === 'done' && asset.ocrText && ' · OCR ✓'}
+                        {asset.ocrStatus === 'failed' && ' · OCR ✗'}
+                        {asset.ocrStatus === 'timeout' && ' · OCR timeout'}
                       </div>
                     </div>
                     <button

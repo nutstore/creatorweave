@@ -101,7 +101,11 @@ function createOpenAICompatibleFallback(
     provider: providerType,
     baseUrl: normalizeBaseUrl(baseUrl),
     reasoning: true,
-    input: ['text', 'image'],
+    // Conservative: only declare 'text' input for unknown/fallback models.
+    // Vision capability ('image') is only set for models explicitly known in
+    // the pi-ai library (via tryGetNativeModel). Sending image_url to a model
+    // that doesn't support it causes the entire API request to fail.
+    input: ['text'],
     cost: {
       input: 0,
       output: 0,

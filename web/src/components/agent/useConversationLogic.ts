@@ -323,6 +323,18 @@ export function useConversationLogic() {
           assets = await writePendingAssetsToOPFS(
             pendingAssets.map((a) => ({ name: a.name, file: a.file })),
           )
+          // Carry over OCR data from PendingAsset to AssetMeta
+          assets = assets.map((assetMeta, idx) => {
+            const pending = pendingAssets[idx]
+            if (pending && (pending.ocrText || pending.ocrBase64)) {
+              return {
+                ...assetMeta,
+                ocrText: pending.ocrText,
+                ocrBase64: pending.ocrBase64,
+              }
+            }
+            return assetMeta
+          })
         } catch (err) {
           toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
           return // Don't send — user can retry

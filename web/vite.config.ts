@@ -223,6 +223,10 @@ export default defineConfig({
           if (id.includes('node_modules/@sqlite.org/')) {
             return 'sqlite'
           }
+          // Tesseract.js OCR (lazy-loaded, only when user uploads an image)
+          if (id.includes('node_modules/tesseract.js/') || id.includes('node_modules/tesseract.js-core/')) {
+            return 'tesseract'
+          }
           // Large utility libraries
           if (id.includes('node_modules/lodash-es/') || id.includes('node_modules/lodash/')) {
             return 'lodash'

@@ -4,11 +4,14 @@
  * Flow:
  * 1. User selects/drops files → stored as PendingAsset objects
  * 2. UI shows preview bar with thumbnails and remove buttons
- * 3. On send: files are written to OPFS assets/, converted to AssetMeta[],
+ * 3. For images: OCR runs automatically in background to extract text
+ * 4. On send: files are written to OPFS assets/, converted to AssetMeta[],
  *    attached to the user message, then pending state is cleared.
  */
 
 import { create } from 'zustand'
+import { performOcr, preloadOcrWorker, isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
+import type { OcrStatus } from '@/services/ocr.service'
 
 /** A file awaiting upload, held in browser memory. */
 export interface PendingAsset {
@@ -24,13 +27,21 @@ export interface PendingAsset {
   file: File
   /** Optional object URL for image preview (set lazily) */
   previewUrl?: string
+  /** OCR recognition status */
+  ocrStatus: OcrStatus
+  /** OCR recognized text (empty string if not yet done or not an image) */
+  ocrText?: string
+  /** Base64-encoded image data for Vision API */
+  ocrBase64?: string
+  /** OCR error message */
+  ocrError?: string
 }
 
 interface AssetStore {
   /** Files staged for upload with the next message */
   pendingAssets: PendingAsset[]
 
-  /** Add files from a FileList or File array */
+  /** Add files from a FileList or File array (triggers OCR for images) */
   addFiles: (files: File[]) => void
 
   /** Remove a pending asset by ID */
@@ -41,6 +52,12 @@ interface AssetStore {
 
   /** Get a preview URL for an asset (creates one lazily for images) */
   getPreviewUrl: (id: string) => string | undefined
+
+  /** Update OCR result for a specific asset (internal) */
+  _updateOcrResult: (id: string, result: { status: OcrStatus; text?: string; base64?: string; error?: string }) => void
+
+  /** Set base64 data for an image asset immediately (internal) */
+  _setBase64: (id: string, base64: string) => void
 }
 
 let nextId = 0
@@ -64,16 +81,49 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
         size: file.size,
         mimeType: file.type || 'application/octet-stream',
         file,
+        ocrStatus: 'idle',
       }
       // Eagerly create preview URL for images
       if (isImageMime(asset.mimeType)) {
         asset.previewUrl = URL.createObjectURL(file)
+        asset.ocrStatus = 'loading'
       }
       return asset
     })
     set((state) => ({
       pendingAssets: [...state.pendingAssets, ...newAssets],
     }))
+
+    // For image assets: convert to base64 immediately (fast, ~ms) so Vision API
+    // data is always available even if the user sends before OCR finishes.
+    // Then trigger OCR text recognition in background.
+    for (const asset of newAssets) {
+      // Immediately convert image to base64 (fast, ~ms) so Vision API data
+      // is available even if user sends before OCR finishes.
+      if (isImageMime(asset.mimeType)) {
+        fileToBase64(asset.file)
+          .then((base64) => { get()._setBase64(asset.id, base64) })
+          .catch(() => { /* best effort */ })
+      }
+      // Trigger OCR text recognition in background (slow, seconds)
+      if (isOcrCompatibleImage(asset.mimeType)) {
+        get()._updateOcrResult(asset.id, { status: 'processing' })
+        performOcr(asset.file)
+          .then((result) => {
+            get()._updateOcrResult(asset.id, {
+              status: result.status,
+              text: result.text,
+              error: result.error,
+            })
+          })
+          .catch((err) => {
+            get()._updateOcrResult(asset.id, {
+              status: 'failed',
+              error: err instanceof Error ? err.message : String(err),
+            })
+          })
+      }
+    }
   },
 
   removeAsset: (id: string) => {
@@ -100,5 +150,29 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
 
   getPreviewUrl: (id: string) => {
     return get().pendingAssets.find((a) => a.id === id)?.previewUrl
+  },
+
+  _updateOcrResult: (id: string, result: { status: OcrStatus; text?: string; base64?: string; error?: string }) => {
+    set((state) => ({
+      pendingAssets: state.pendingAssets.map((a) =>
+        a.id === id
+          ? {
+              ...a,
+              ocrStatus: result.status,
+              ...(result.text !== undefined ? { ocrText: result.text } : {}),
+              ...(result.base64 !== undefined ? { ocrBase64: result.base64 } : {}),
+              ...(result.error !== undefined ? { ocrError: result.error } : {}),
+            }
+          : a
+      ),
+    }))
+  },
+
+  _setBase64: (id: string, base64: string) => {
+    set((state) => ({
+      pendingAssets: state.pendingAssets.map((a) =>
+        a.id === id ? { ...a, ocrBase64: base64 } : a
+      ),
+    }))
   },
 }))

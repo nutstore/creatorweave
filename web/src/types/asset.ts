@@ -18,6 +18,10 @@ export interface AssetMeta {
   direction: 'upload' | 'generated'
   /** Creation timestamp (Date.now()) */
   createdAt: number
+  /** OCR recognized text (only for image assets, if OCR succeeded) */
+  ocrText?: string
+  /** Base64-encoded image data (only for image assets, for Vision API) */
+  ocrBase64?: string
 }
 
 /**
