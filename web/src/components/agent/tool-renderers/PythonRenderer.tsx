@@ -13,11 +13,25 @@ registerRenderer({
   Summary(ctx) {
     const output = extractOutput(ctx)
 
-    if (ctx.isExecuting) {
+    if (ctx.isExecuting && !ctx.isStreaming) {
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
           <span className="text-xs text-blue-500">running...</span>
+        </>
+      )
+    }
+
+    // Streaming — show code line count being composed
+    if (ctx.isStreaming) {
+      const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
+      const codeLines = code ? code.split('\n').length : 0
+      return (
+        <>
+          <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
+          {codeLines > 0 && (
+            <span className="ml-auto text-xs text-neutral-400 shrink-0">{codeLines} lines…</span>
+          )}
         </>
       )
     }
@@ -40,6 +54,28 @@ registerRenderer({
     const output = extractOutput(ctx)
     const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
     const codeLines = code ? code.split('\n').length : 0
+
+    // Streaming — show code being composed
+    if (ctx.isStreaming) {
+      return (
+        <div className="px-3 py-2 space-y-2">
+          {code && (
+            <div>
+              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+                code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
+              </div>
+              <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
+                <pre className="text-[11px] leading-5 font-mono text-neutral-300 whitespace-pre-wrap">{code}</pre>
+              </div>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="inline-block h-2 w-0.5 bg-blue-500 animate-pulse" />
+                <span className="text-[11px] text-neutral-400">编写中…</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
 
     if (ctx.isExecuting) {
       return (

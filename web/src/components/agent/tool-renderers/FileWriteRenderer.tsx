@@ -48,6 +48,9 @@ registerRenderer({
             {lineCount > 0 && <span>{lineCount} lines</span>}
           </span>
         )}
+        {ctx.isStreaming && lineCount > 0 && (
+          <span className="ml-auto text-xs text-neutral-400 shrink-0">{lineCount} lines…</span>
+        )}
       </>
     )
   },
@@ -89,12 +92,12 @@ registerRenderer({
     const content = files?.[0]?.content ?? (typeof ctx.args.content === 'string' ? ctx.args.content : undefined)
 
     if (!content) {
-      if (ctx.isExecuting) return <StreamingPlaceholder />
+      if (ctx.isExecuting || ctx.isStreaming) return <StreamingPlaceholder />
       return <div className="px-3 py-2 text-xs text-neutral-400">No content</div>
     }
 
     return (
-      <ContentPreview singlePath={singlePath} content={content} />
+      <ContentPreview singlePath={singlePath} content={content} isStreaming={ctx.isStreaming} />
     )
   },
 })
@@ -131,7 +134,7 @@ interface LineComment {
 
 // ── ContentPreview with git-diff-style comments ───────────────────
 
-function ContentPreview({ singlePath, content }: { singlePath?: string; content: string }) {
+function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: string; content: string; isStreaming?: boolean }) {
   const lines = content.split('\n')
   const total = lines.length
   const initialPreview = 30
@@ -370,7 +373,13 @@ function ContentPreview({ singlePath, content }: { singlePath?: string; content:
             )
           })}
         </div>
-        {remaining > 0 && (
+        {isStreaming && (
+          <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 flex items-center gap-1.5">
+            <span className="inline-block h-2 w-0.5 bg-blue-500 animate-pulse" />
+            <span className="text-[11px] text-neutral-400">写入中…</span>
+          </div>
+        )}
+        {!isStreaming && remaining > 0 && (
           <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 flex items-center justify-center">
             <button
               type="button"

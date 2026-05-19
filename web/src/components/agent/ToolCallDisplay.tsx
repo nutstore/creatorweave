@@ -14,6 +14,7 @@
 
 import { useState, memo } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Bot } from 'lucide-react'
+import { parse as bestEffortParse } from 'best-effort-json-parser'
 import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'
 import { MarkdownContent } from './MarkdownContent'
@@ -135,8 +136,11 @@ function formatDuration(ms: number): string {
 function buildCtx(props: ToolCallDisplayProps): ToolRenderCtx {
   const { toolCall, result, isExecuting, streamingArgs } = props
   const rawArgs = streamingArgs ?? toolCall.function.arguments
+  // Use best-effort parser so streaming (partial) JSON still yields usable args
   let args: Record<string, unknown> = {}
-  try { args = JSON.parse(rawArgs) } catch { /* streaming partial JSON */ }
+  try { args = JSON.parse(rawArgs) } catch {
+    try { args = bestEffortParse(rawArgs) ?? {} } catch { /* give up */ }
+  }
 
   let parsedResult: Record<string, unknown> | null = null
   if (result) {

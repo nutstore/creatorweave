@@ -28,6 +28,13 @@ registerRenderer({
         {path && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
         )}
+        {ctx.isStreaming && hasChanges && (
+          <span className="ml-auto flex items-center gap-1 shrink-0">
+            {delCount > 0 && <span className="text-xs text-red-400 dark:text-red-500">-{delCount}</span>}
+            {addCount > 0 && <span className="text-xs text-green-500 dark:text-green-400">+{addCount}</span>}
+            <span className="text-xs text-neutral-400">…</span>
+          </span>
+        )}
         {!ctx.isStreaming && !ctx.isExecuting && (
           <span className="ml-auto flex items-center gap-1 shrink-0">
             {delCount > 0 && <span className="text-xs text-red-400 dark:text-red-500">-{delCount}</span>}
@@ -55,8 +62,9 @@ registerRenderer({
     const newText = typeof ctx.args.new_text === 'string' ? ctx.args.new_text : ''
     const replaceAll = ctx.args.replace_all === true
 
-    if (!oldText && !newText && ctx.isExecuting) {
-      return <StreamingPlaceholder />
+    if (!oldText && !newText) {
+      if (ctx.isExecuting || ctx.isStreaming) return <StreamingPlaceholder />
+      return <div className="px-3 py-2 text-xs text-neutral-400">No content</div>
     }
 
     const diff = computeDiff(oldText, newText)
@@ -83,6 +91,12 @@ registerRenderer({
               </div>
             ))}
           </div>
+          {ctx.isStreaming && (
+            <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 flex items-center gap-1.5">
+              <span className="inline-block h-2 w-0.5 bg-blue-500 animate-pulse" />
+              <span className="text-[11px] text-neutral-400">编辑中…</span>
+            </div>
+          )}
         </div>
         <div className="flex justify-end">
           <CopyIconButton content={diffText} />
