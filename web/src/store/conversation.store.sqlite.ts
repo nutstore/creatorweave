@@ -803,9 +803,17 @@ function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Mes
     return incoming
   }
 
-  // If there is no overlap at all, treat incoming as a fragment for the
-  // current turn and append it after the known history.
+  // If there is no overlap at all, we must determine whether incoming is a
+  // small fragment to append (e.g. a new tool result) or a full snapshot that
+  // should replace previous (e.g. re-mapped messages with regenerated IDs
+  // after a cancel). Blindly appending a full snapshot would duplicate the
+  // entire conversation history.
   if (overlap === 0) {
+    // If incoming is large relative to previous, treat it as a replacement
+    // snapshot rather than a tiny fragment to append.
+    if (previous.length > 0 && incoming.length >= previous.length * 0.5) {
+      return incoming
+    }
     return [...previous, ...incoming]
   }
 
@@ -3499,7 +3507,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           },
           onMessagesUpdated: (msgs: Message[]) => {
-            if (!isCurrentRun() && !isCurrentRunEpoch()) return
+            // Ignore stale callbacks after cancel/restart. For message updates we
+            // require exact run identity; same-epoch callbacks are not safe.
+            if (!isCurrentRun()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             latestMessages = reconciled
@@ -3551,7 +3561,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             persistAfterBlockComplete()
           },
           onComplete: async (msgs: Message[]) => {
-            if (!isCurrentRun() && !isCurrentRunEpoch()) return
+            // Ignore stale completion callbacks after cancel/restart.
+            if (!isCurrentRun()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             console.info('[#LoopStop] store_onComplete', {
@@ -3863,6 +3874,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.status = 'idle'
             c.error = null
             c.activeRunId = null
+            // Bump epoch so late callbacks from the cancelled run are ignored.
+            c.runEpoch = (c.runEpoch || 0) + 1
             // Mark this run as cancelled so finalizeRun skips follow-up generation
             if (runIdBeingCancelled) {
               state.cancelledRunIds.add(runIdBeingCancelled)
