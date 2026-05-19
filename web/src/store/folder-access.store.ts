@@ -564,6 +564,8 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       const { traverseDirectory } = await import('../services/traversal.service')
       const paths: string[] = []
       for (const [rootName, handle] of allHandles) {
+        // Add the root folder itself so it appears in # file mention suggestions
+        paths.push(rootName)
         if (paths.length >= 5000) break
         for await (const entry of traverseDirectory(handle)) {
           // Prefix with rootName for multi-root routing
