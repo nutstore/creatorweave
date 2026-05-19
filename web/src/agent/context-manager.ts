@@ -151,15 +151,20 @@ export class ContextManager {
       const proactiveTrigger = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TRIGGER)
       const proactiveTarget = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TARGET)
       // Use real tokens when available; otherwise fall back to heuristic
-      const totalUsedTokens = options.usedRealTokens != null && options.usedRealTokens > 0
+      const triggerTokens = options.usedRealTokens != null && options.usedRealTokens > 0
         ? options.usedRealTokens
         : usedTokens + systemTokens
-      if (totalUsedTokens >= proactiveTrigger) {
-        while (selectedGroups.length > 8 && totalUsedTokens > proactiveTarget) {
+      if (triggerTokens >= proactiveTrigger) {
+        // Recompute current token count each iteration so the loop can exit
+        // early once the target is reached — avoids over-trimming to the
+        // minimum group count.
+        let currentTokens = usedTokens + systemTokens
+        while (selectedGroups.length > 8 && currentTokens > proactiveTarget) {
           const droppedGroup = selectedGroups.shift()
           if (!droppedGroup) break
           const droppedTokens = droppedGroup.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
           usedTokens -= droppedTokens
+          currentTokens -= droppedTokens
           droppedGroups++
         }
       }
@@ -177,14 +182,20 @@ export class ContextManager {
       const proactiveTrigger = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TRIGGER)
       const proactiveTarget = Math.floor(budget * ContextManager.PROACTIVE_COMPRESSION_TARGET)
       // Use real tokens when available; otherwise recompute from selected groups
-      const totalUsedTokens = options.usedRealTokens != null && options.usedRealTokens > 0
+      const triggerTokens = options.usedRealTokens != null && options.usedRealTokens > 0
         ? options.usedRealTokens
         : selectedGroups.flat().reduce((sum, msg) => sum + estimateMessageTokens(msg), 0) + systemTokens
-      if (totalUsedTokens >= proactiveTrigger) {
-        while (selectedGroups.length > 6 && totalUsedTokens > proactiveTarget) {
+      if (triggerTokens >= proactiveTrigger) {
+        // Recompute current tokens each iteration for early exit.
+        let currentTokens = selectedGroups
+          .flat()
+          .reduce((sum, msg) => sum + estimateMessageTokens(msg), 0) + systemTokens
+        while (selectedGroups.length > 6 && currentTokens > proactiveTarget) {
           const droppedGroup = selectedGroups.shift()
           if (!droppedGroup) break
           const droppedTokens = droppedGroup.reduce((sum, msg) => sum + estimateMessageTokens(msg), 0)
+          usedTokens -= droppedTokens
+          currentTokens -= droppedTokens
           droppedGroups++
         }
       }

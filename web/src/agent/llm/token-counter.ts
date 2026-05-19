@@ -1,6 +1,15 @@
 /**
  * Token estimation for LLM context management.
- * Uses heuristic: ~3 characters per token for mixed CJK/English text.
+ *
+ * NOTE: The heuristic intentionally estimates LOW (conservative) so that
+ * trimMessages() — which relies solely on these estimates for the basic
+ * group-fit check — does NOT drop message groups prematurely.  The proactive
+ * compression trigger (in convert-bridge.ts) uses real API usage numbers
+ * (usedRealTokens) for its threshold decision, which compensates for the
+ * undercount at that level.  Raising the coefficient would cause trimMessages
+ * to over-estimate and drop groups while real usage is still well below the
+ * budget, creating a visible mismatch between the UI percentage (derived from
+ * real usage) and compression behaviour.
  */
 
 import type { ChatMessage } from './llm-provider'
@@ -10,10 +19,9 @@ export function estimateStringTokens(text: string): number {
   if (!text) return 0
 
   // CJK characters count as ~1.5 tokens each
-  // ASCII characters average ~0.25 tokens each (4 chars per token)
-  // Mixed content averages ~0.33 tokens per char (3 chars per token)
+  // Non-CJK characters average ~0.25 tokens each (~4 chars per token).
   let cjkChars = 0
-  let asciiChars = 0
+  let otherChars = 0
 
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i)
@@ -25,11 +33,11 @@ export function estimateStringTokens(text: string): number {
     ) {
       cjkChars++
     } else {
-      asciiChars++
+      otherChars++
     }
   }
 
-  return Math.ceil(cjkChars * 1.5 + asciiChars * 0.25)
+  return Math.ceil(cjkChars * 1.5 + otherChars * 0.25)
 }
 
 /** Estimate tokens for a chat message */

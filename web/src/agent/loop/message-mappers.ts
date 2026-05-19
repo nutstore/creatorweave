@@ -219,15 +219,27 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
         },
       }))
 
+    // Only attach usage when the API actually reported non-zero tokens.
+    // When the agent is cancelled mid-stream, the API never sends the final
+    // usage chunk, so all values are 0 — in that case we leave usage undefined
+    // so the UI falls back to the last valid usage from a previous message.
+    const rawUsage = message.usage
+    const hasRealUsage =
+      (rawUsage?.input || 0) > 0 ||
+      (rawUsage?.output || 0) > 0 ||
+      (rawUsage?.totalTokens || 0) > 0
+
     return createAssistantMessage(
       text || null,
       toolCalls.length > 0 ? toolCalls : undefined,
-      {
-        promptTokens: message.usage?.input || 0,
-        completionTokens: message.usage?.output || 0,
-        totalTokens: message.usage?.totalTokens || 0,
-        cacheReadTokens: message.usage?.cacheRead || 0,
-      },
+      hasRealUsage
+        ? {
+            promptTokens: rawUsage!.input || 0,
+            completionTokens: rawUsage!.output || 0,
+            totalTokens: rawUsage!.totalTokens || 0,
+            cacheReadTokens: rawUsage!.cacheRead || 0,
+          }
+        : undefined,
       reasoning || null
     )
   }

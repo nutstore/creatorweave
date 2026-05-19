@@ -132,6 +132,33 @@ export async function convertAgentMessagesToLlm(
   })
   let trimmed = trimmedResult.messages
 
+  // Calibration gate: if real API token usage is well below the trigger
+  // threshold, the heuristic-based trimming in trimMessages() may have
+  // over-counted and dropped groups unnecessarily.  Re-check against the
+  // real number to avoid triggering compression while the UI shows a
+  // comfortable percentage (e.g. 45%).
+  const PROACTIVE_TRIGGER_RATIO = 0.85
+  if (
+    trimmedResult.droppedGroups > 0 &&
+    trimmedResult.droppedContent &&
+    usedRealTokens != null &&
+    usedRealTokens < Math.floor(inputBudget * PROACTIVE_TRIGGER_RATIO)
+  ) {
+    // Real usage is comfortably below the trigger — keep the full (untrimmed)
+    // message list and skip the compression path entirely.
+    const heuristicDroppedGroups = trimmedResult.droppedGroups
+    trimmed = chatMessages
+    trimmedResult.droppedContent = undefined
+    trimmedResult.droppedGroups = 0
+    trimmedResult.wasTruncated = false
+    console.info('[AgentLoop] Compression skipped — real usage below trigger threshold', {
+      convertCallCount,
+      usedRealTokens,
+      triggerThreshold: Math.floor(inputBudget * PROACTIVE_TRIGGER_RATIO),
+      heuristicDroppedGroups,
+    })
+  }
+
   if (trimmedResult.droppedContent) {
     compressionTriggered = true
     const droppedContent = trimmedResult.droppedContent
@@ -267,15 +294,16 @@ export async function convertAgentMessagesToLlm(
   }
 
   const usedTokens = input.provider.estimateTokens(trimmed)
-  // For the overflow check, prefer real tokens (input+output) when available,
-  // because the heuristic estimate systematically undercounts.
-  const effectiveUsedTokens = usedRealTokens ?? usedTokens
-  if (effectiveUsedTokens > inputBudget) {
+  // For the overflow check, use the actual post-trim estimate rather than the
+  // real tokens from the *previous* API response.  The previous response's
+  // usage reflects the pre-compression context size and can be much larger
+  // than the current trimmed messages — using it would cause false overflow
+  // errors even after successful compression.
+  if (usedTokens > inputBudget) {
     console.error('[#LoopStop] context_overflow_after_compression_check', {
       convertCallCount,
       usedTokens,
       usedRealTokens,
-      effectiveUsedTokens,
       inputBudget,
       reserveTokens,
       maxContextTokens,
@@ -286,9 +314,9 @@ export async function convertAgentMessagesToLlm(
       maxContextLimit: maxContextTokens,
       reserveTokens,
       inputBudget,
-      historyTokens: effectiveUsedTokens,
+      historyTokens: usedTokens,
       toolResultTokens: 0,
-      totalInputTokens: effectiveUsedTokens,
+      totalInputTokens: usedTokens,
     })
   }
   if (compressionCompletePayload) {

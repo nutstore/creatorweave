@@ -17,6 +17,7 @@ import { t as translateStatic } from '@creatorweave/i18n'
 import type {
   Conversation,
   Message,
+  MessageUsage,
   ToolCall,
   ConversationStatus,
   DraftAssistantStep,
@@ -104,11 +105,24 @@ function commitDraftToMessages(conv: {
   // Clear the accumulator after collecting
   conv.collectedAssets = []
 
+  // Fallback: find the last valid (non-zero) token usage from previous
+  // assistant messages. When the agent is cancelled mid-stream, the API
+  // never returns final usage, so the committed draft would otherwise show
+  // "input 0 output 0" in the UI.  We use the last known-good usage instead.
+  let fallbackUsage: MessageUsage | undefined
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i]
+    if (m.role === 'assistant' && m.usage && m.usage.totalTokens > 0) {
+      fallbackUsage = m.usage
+      break
+    }
+  }
+
   conv.messages.push(
     createAssistantMessage(
       draft.content || null,
       completedToolCalls.length > 0 ? completedToolCalls : undefined,
-      undefined,
+      fallbackUsage,
       draft.reasoning || null,
       undefined,
       undefined,
