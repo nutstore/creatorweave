@@ -270,6 +270,36 @@ describe('ContextManager', () => {
       expect(compressedSummary).toBeDefined()
     })
 
+    it('should proactively compress when threshold is reached even with fewer message groups', () => {
+      const manager = new ContextManager({
+        maxContextTokens: 400,
+        reserveTokens: 40,
+        enableSummarization: true,
+      })
+
+      const messages: ChatMessage[] = []
+      for (let i = 0; i < 6; i++) {
+        messages.push(
+          createMessage(
+            'user',
+            `Message ${i} with enough content to consume tokens quickly and push context close to model limits. `.repeat(4)
+          )
+        )
+      }
+
+      const result = manager.trimMessages(messages, {
+        createSummary: true,
+        usedRealTokens: 340,
+      })
+
+      expect(result.wasTruncated).toBe(true)
+      expect(result.droppedGroups).toBeGreaterThan(0)
+      const compressedSummary = result.messages.find(
+        (m) => m.role === 'system' && typeof m.content === 'string' && m.content.includes('Compressed memory')
+      )
+      expect(compressedSummary).toBeDefined()
+    })
+
     it('should exclude prior compressed memory messages from external dropped content', () => {
       const manager = new ContextManager({
         maxContextTokens: 260,

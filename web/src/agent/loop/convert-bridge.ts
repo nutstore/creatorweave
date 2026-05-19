@@ -112,6 +112,9 @@ export async function convertAgentMessagesToLlm(
     })
   }
 
+  const shouldAllowCompression =
+    usedRealTokens == null || usedRealTokens >= Math.floor(maxContextTokens * 0.85)
+
   const summaryTokenBudget = Math.min(2400, Math.max(500, Math.floor(maxContextTokens * 0.02)))
   let compressionTriggered = false
   let compressionCompletePayload:
@@ -125,39 +128,12 @@ export async function convertAgentMessagesToLlm(
       }
     | null = null
   const trimmedResult = input.contextManager.trimMessages(chatMessages, {
-    createSummary: true,
+    createSummary: shouldAllowCompression,
     maxSummaryTokens: summaryTokenBudget,
     summaryStrategy: 'external',
     usedRealTokens,
   })
   let trimmed = trimmedResult.messages
-
-  // Calibration gate: if real API token usage is well below the trigger
-  // threshold, the heuristic-based trimming in trimMessages() may have
-  // over-counted and dropped groups unnecessarily.  Re-check against the
-  // real number to avoid triggering compression while the UI shows a
-  // comfortable percentage (e.g. 45%).
-  const PROACTIVE_TRIGGER_RATIO = 0.85
-  if (
-    trimmedResult.droppedGroups > 0 &&
-    trimmedResult.droppedContent &&
-    usedRealTokens != null &&
-    usedRealTokens < Math.floor(inputBudget * PROACTIVE_TRIGGER_RATIO)
-  ) {
-    // Real usage is comfortably below the trigger — keep the full (untrimmed)
-    // message list and skip the compression path entirely.
-    const heuristicDroppedGroups = trimmedResult.droppedGroups
-    trimmed = chatMessages
-    trimmedResult.droppedContent = undefined
-    trimmedResult.droppedGroups = 0
-    trimmedResult.wasTruncated = false
-    console.info('[AgentLoop] Compression skipped — real usage below trigger threshold', {
-      convertCallCount,
-      usedRealTokens,
-      triggerThreshold: Math.floor(inputBudget * PROACTIVE_TRIGGER_RATIO),
-      heuristicDroppedGroups,
-    })
-  }
 
   if (trimmedResult.droppedContent) {
     compressionTriggered = true
