@@ -442,38 +442,22 @@ export const writeDefinition: ToolDefinition = {
   function: {
     name: 'write',
     description:
-      'Write content to file(s). Single: path + content. Batch: files array [{path, content}]. Creates directories if needed. Returns confirmation. Supports workspace relative paths and vfs://workspace/... or vfs://agents/{id}/....',
+      'Write content to a single file. Creates directories if needed. Returns confirmation. Supports workspace relative paths and vfs://workspace/... or vfs://agents/{id}/....',
     parameters: {
       type: 'object',
       properties: {
         path: {
           type: 'string',
-          description: 'Single file path to write',
+          description: 'File path to write',
         },
         content: {
           type: 'string',
-          description: 'Content for single file write',
-        },
-        files: {
-          type: 'array',
-          description: 'Array of files to write [{path, content}]',
-          items: {
-            type: 'object',
-            properties: {
-              path: { type: 'string' },
-              content: { type: 'string' },
-            },
-            required: ['path', 'content'],
-          },
+          description: 'Content to write',
         },
       },
+      required: ['path', 'content'],
     },
   },
-}
-
-interface FileItem {
-  path: string
-  content: string
 }
 
 type PendingChangeType = 'create' | 'modify' | 'delete'
@@ -506,19 +490,12 @@ function getPendingWriteTypeForPath(
 export const writeExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const content = args.content as string | undefined
-  const files = args.files as FileItem[] | undefined
 
-  // Batch mode: files array
-  if (files && Array.isArray(files) && files.length > 0) {
-    return executeBatchWrite(files, context)
-  }
-
-  // Single file mode
   if (!path || content === undefined) {
     return toolErrorJson(
       'write',
       'invalid_arguments',
-      'Either (path + content) or files must be provided'
+      'path and content are required'
     )
   }
   const rewrittenWritePath = rewritePythonMountPathForNonPythonTool(path)
@@ -632,118 +609,6 @@ async function executeSingleWrite(
   }
 }
 
-async function executeBatchWrite(files: FileItem[], context: ToolContext): Promise<string> {
-  const normalizedFiles = files.map((file) => {
-    const rewritten = rewritePythonMountPathForNonPythonTool(file.path)
-    return {
-      ...file,
-      path: rewritten?.rewritten ? rewritten.rewrittenPath : file.path,
-    }
-  })
-  const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
-  const results: Array<{
-    path: string
-    success: boolean
-    error?: { code: string; message: string }
-  }> = []
-  let created = 0
-  let updated = 0
-  let hasWorkspaceWrites = false
-
-  for (const file of normalizedFiles) {
-    try {
-      const target = await resolveVfsTarget(file.path, context, 'write')
-      const resolvedPath = getResolvedPathForLoopGuard(target)
-
-      // Staleness check (best-effort, workspace only)
-      if (target.backend.label === 'workspace') {
-        try {
-          const { handle: writeHandle, nativePath: writeNativePath } = await resolveNativeDirectoryHandleForPath(
-            target.path, context.directoryHandle, context.workspaceId
-          )
-          const fileHandle = await writeHandle
-            ?.getFileHandle(writeNativePath.split('/').pop()!, { create: false })
-            .catch(() => null)
-          if (fileHandle) {
-            // getFile() returns a File object with lastModified
-            const file = await fileHandle.getFile()
-            const warning = checkFileStaleness(context, resolvedPath, file.lastModified)
-            if (warning) {
-              results.push({
-                path: target.path,
-                success: false,
-                error: { code: 'file_stale', message: warning },
-              })
-              continue
-            }
-          }
-        } catch {
-          // Staleness check is best-effort — proceed if it fails
-        }
-      }
-
-      let isNew = false
-
-      // Pre-write: determine isNew for non-workspace backends
-      if (target.backend.label !== 'workspace') {
-        isNew = !(await target.backend.exists?.(target.path) ?? true)
-      }
-
-      // ── Unified backend write ──
-      await target.backend.writeFile(target.path, file.content)
-
-      // Collect asset metadata for assets backend
-      if (target.backend.label === 'assets') {
-        collectAssetsFromWrite(target.path, file.content.length, isNew, context.workspaceId)
-      }
-
-      // Post-write: workspace needs pending tracking
-      if (target.backend.label === 'workspace') {
-        const wasCachedBeforeWrite = hasCachedFile(target.path)
-        const pendingType = getPendingWriteTypeForPath(getPendingChanges(), target.path)
-        isNew = pendingType ? pendingType === 'create' : !wasCachedBeforeWrite
-        hasWorkspaceWrites = true
-      }
-
-      // Refresh timestamp after successful write
-      refreshReadTimestamp(context, resolvedPath, Date.now())
-      results.push({ path: file.path, success: true })
-      if (isNew) created++
-      else updated++
-    } catch (error) {
-      results.push({
-        path: file.path,
-        success: false,
-        error: {
-          code: 'internal_error',
-          message: formatToolErrorMessage(error),
-        },
-      })
-    }
-  }
-
-  const pendingChanges = getPendingChanges()
-  const session = useRemoteStore.getState().session
-  if (session) {
-    session.broadcastFileChange(
-      'batch',
-      'modify',
-      `Batch write: ${created} created, ${updated} updated`
-    )
-  }
-
-  return toolOkJson('write', {
-    total: normalizedFiles.length,
-    created,
-    updated,
-    failed: normalizedFiles.length - created - updated,
-    results,
-    status: hasWorkspaceWrites ? 'pending' : 'saved',
-    pendingCount: pendingChanges.length,
-    message: `${normalizedFiles.length} files processed. ${pendingChanges.length} change(s) pending review.`,
-  })
-}
-
 /**
  * Extract a stable resolved path string for loop guard tracking.
  * For workspace targets: uses the resolved absolute path.
@@ -775,7 +640,6 @@ export const writePromptDoc: ToolPromptDoc = {
   section: '### File Operations',
   lines: [
     '- `write(path, content)` - Create new files or completely replace a file (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
-    '- `write(files)` - Write multiple files',
   ],
 }
 
