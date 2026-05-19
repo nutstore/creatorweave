@@ -3640,36 +3640,38 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               r.draftAssistant = null
             }
           })
-          return
-        }
-        set((state) => {
-          const c = state.conversations.find((c) => c.id === conversationId)
-          if (c) {
-            c.status = 'error'
-            c.error = error instanceof Error ? error.message : String(error)
-            c.activeRunId = null
-            c.draftAssistant = null
-          }
-          state.agentLoops.delete(conversationId)
-          state.streamingQueues.delete(conversationId)
-        })
-        // Reset runtime store on generic error
-        useConversationRuntimeStore.setState((state) => {
-          const r = state.runtimes.get(conversationId)
-          if (r) {
-            r.status = 'error'
-            r.error = error instanceof Error ? error.message : String(error)
-            r.activeRunId = null
-            r.draftAssistant = null
-          }
-        })
-        // Persist messages on generic error to prevent data loss on page refresh
-        const catchConv = get().conversations.find((c) => c.id === conversationId)
-        if (catchConv) {
-          persistMessageReplace(conversationId, catchConv.messages).catch((persistErr) => {
-            console.error('[conversation.store] Failed to persist on catch:', persistErr)
+          // Do NOT return here — fall through to consume queued messages
+          // so that messages enqueued during the cancelled run are processed.
+        } else {
+          set((state) => {
+            const c = state.conversations.find((c) => c.id === conversationId)
+            if (c) {
+              c.status = 'error'
+              c.error = error instanceof Error ? error.message : String(error)
+              c.activeRunId = null
+              c.draftAssistant = null
+            }
+            state.agentLoops.delete(conversationId)
+            state.streamingQueues.delete(conversationId)
           })
-        }
+          // Reset runtime store on generic error
+          useConversationRuntimeStore.setState((state) => {
+            const r = state.runtimes.get(conversationId)
+            if (r) {
+              r.status = 'error'
+              r.error = error instanceof Error ? error.message : String(error)
+              r.activeRunId = null
+              r.draftAssistant = null
+            }
+          })
+          // Persist messages on generic error to prevent data loss on page refresh
+          const catchConv = get().conversations.find((c) => c.id === conversationId)
+          if (catchConv) {
+            persistMessageReplace(conversationId, catchConv.messages).catch((persistErr) => {
+              console.error('[conversation.store] Failed to persist on catch:', persistErr)
+            })
+          }
+        } // end else (non-AbortError path — errors do NOT consume queue)
       }
 
       // ── Consume queued messages ──
