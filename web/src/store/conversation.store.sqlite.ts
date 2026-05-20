@@ -3507,9 +3507,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
           },
           onMessagesUpdated: (msgs: Message[]) => {
-            // Ignore stale callbacks after cancel/restart. For message updates we
-            // require exact run identity; same-epoch callbacks are not safe.
-            if (!isCurrentRun()) return
+            if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             latestMessages = reconciled
@@ -3524,6 +3522,43 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.compressedContextCutoffTimestamp ||
                 null
               c.updatedAt = Date.now()
+              // Evict draft entries already committed to messages.
+              // This prevents commitDraftToMessages (cancel path) from duplicating them.
+              if (c.draftAssistant) {
+                // Clean up tool calls/results already in committed messages
+                const committedToolCallIds = new Set(
+                  reconciled
+                    .filter((m) => m.role === 'assistant' && m.toolCalls)
+                    .flatMap((m) => m.toolCalls!.map((tc) => tc.id))
+                )
+                if (committedToolCallIds.size > 0) {
+                  c.draftAssistant.toolCalls = c.draftAssistant.toolCalls.filter(
+                    (tc) => !committedToolCallIds.has(tc.id)
+                  )
+                  for (const id of committedToolCallIds) {
+                    delete c.draftAssistant.toolResults[id]
+                  }
+                }
+                // Clean up reasoning/content already in committed messages.
+                // The last committed assistant message carries the full text and
+                // reasoning from this iteration — subsequent commits must not replay them.
+                const lastAssistant = [...reconciled].reverse().find((m) => m.role === 'assistant')
+                if (lastAssistant) {
+                  if (lastAssistant.reasoning) {
+                    c.draftAssistant.reasoning = ''
+                  }
+                  if (lastAssistant.content) {
+                    c.draftAssistant.content = ''
+                  }
+                }
+                // Remove completed steps whose content is now in committed messages
+                c.draftAssistant.steps = c.draftAssistant.steps.filter((s) => {
+                  if (s.streaming) return true
+                  if (s.type === 'tool_call' && committedToolCallIds.has(s.toolCall.id)) return false
+                  if ((s.type === 'reasoning' || s.type === 'content') && lastAssistant) return false
+                  return true
+                })
+              }
             })
             const latestAssistant = [...reconciled]
               .reverse()
@@ -3559,10 +3594,45 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             // Persist immediately — this callback fires at block boundaries
             // (message_end), so it's the right time to save.
             persistAfterBlockComplete()
+            // Sync draft eviction to runtime store
+            const committedIds = new Set(
+              reconciled
+                .filter((m) => m.role === 'assistant' && m.toolCalls)
+                .flatMap((m) => m.toolCalls!.map((tc) => tc.id))
+            )
+            const lastAssistantMsg = [...reconciled].reverse().find((m) => m.role === 'assistant')
+            if (committedIds.size > 0 || lastAssistantMsg) {
+              useConversationRuntimeStore.setState((state) => {
+                const r = state.runtimes.get(conversationId)
+                if (r?.draftAssistant && (r.runEpoch || 0) === runEpoch) {
+                  if (committedIds.size > 0) {
+                    r.draftAssistant.toolCalls = r.draftAssistant.toolCalls.filter(
+                      (tc) => !committedIds.has(tc.id)
+                    )
+                    for (const id of committedIds) {
+                      delete r.draftAssistant.toolResults[id]
+                    }
+                  }
+                  if (lastAssistantMsg) {
+                    if (lastAssistantMsg.reasoning) {
+                      r.draftAssistant.reasoning = ''
+                    }
+                    if (lastAssistantMsg.content) {
+                      r.draftAssistant.content = ''
+                    }
+                  }
+                  r.draftAssistant.steps = r.draftAssistant.steps.filter((s) => {
+                    if (s.streaming) return true
+                    if (s.type === 'tool_call' && committedIds.has(s.toolCall.id)) return false
+                    if ((s.type === 'reasoning' || s.type === 'content') && lastAssistantMsg) return false
+                    return true
+                  })
+                }
+              })
+            }
           },
           onComplete: async (msgs: Message[]) => {
-            // Ignore stale completion callbacks after cancel/restart.
-            if (!isCurrentRun()) return
+            if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
             const reconciled = reconcileMessageSnapshot(previous, msgs)
             console.info('[#LoopStop] store_onComplete', {
