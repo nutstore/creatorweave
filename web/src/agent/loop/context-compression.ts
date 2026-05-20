@@ -1,5 +1,5 @@
 import type { ChatMessage } from '../llm/llm-provider'
-import { createAssistantMessage, type Message } from '../message-types'
+import { generateId, type Message } from '../message-types'
 
 /**
  * Compression trigger threshold as a fraction of the model's context window.
@@ -58,17 +58,20 @@ export function applyCompressionBaseline(
     (msg) => typeof msg.timestamp === 'number' && msg.timestamp >= baseline.cutoffTimestamp
   )
 
-  // Use createAssistantMessage with kind='context_summary' so that
-  // internalToPiMessages() can recognise and correctly map it to a system-context
-  // message for the LLM.  The kind flag also allows the store layer to strip
-  // it from persisted conversation history.
-  const summaryMessage = createAssistantMessage(
-    `${compressedMemoryPrefix}\n${baseline.summary}`,
-    undefined,
-    undefined,
-    null,
-    'context_summary'
-  )
-  summaryMessage.timestamp = Math.max(0, baseline.cutoffTimestamp - 1)
+  // Create the summary as a user-role message with kind='context_summary'.
+  // Using role='user' ensures that regardless of which conversion path the
+  // message takes (messagesToChatMessages → trimmed → internalToPiMessages, or
+  // direct internalToPiMessages), it always reaches the LLM as a user message.
+  // Previously this used createAssistantMessage which set role='assistant';
+  // that role leaked through when the conversion pipeline lost the `kind` field.
+  const summaryMessage: Message = {
+    id: generateId(),
+    role: 'user',
+    // Store raw summary without prefix — internalToPiMessages() will prepend
+    // the prefix when mapping to PiMessage for the LLM.
+    content: baseline.summary,
+    kind: 'context_summary',
+    timestamp: Math.max(0, baseline.cutoffTimestamp - 1),
+  }
   return [summaryMessage, ...retained]
 }

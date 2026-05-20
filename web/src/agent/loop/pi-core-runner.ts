@@ -5,7 +5,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import type { AgentMode } from '../agent-mode'
 import type { ContextManager } from '../context-manager'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
-import { createAssistantMessage, type Message } from '../message-types'
+import { createAssistantMessage, generateId, type Message } from '../message-types'
 import type { ToolRegistry } from '../tool-registry'
 import type { ToolContext } from '../tools/tool-types'
 import type { CompressionBaselineState } from './context-compression'
@@ -210,14 +210,17 @@ export async function executePiCoreLoop(
           reserveTokens: contextConfig.reserveTokens ?? 0,
           generateContextSummaryWithLLM: input.generateContextSummaryWithLLM,
           onSummaryInjected: (summary, cutoffTimestamp) => {
-            const summaryMsg = createAssistantMessage(
-              `${input.compressedMemoryPrefix}\n${summary}`,
-              undefined,
-              undefined,
-              null,
-              'context_summary'
-            )
-            summaryMsg.timestamp = Math.max(0, cutoffTimestamp - 1)
+            // Create context_summary as a user-role message so the LLM always
+            // receives it as role='user'.  The kind flag lets the UI render it
+            // with the amber summary styling and lets internalToPiMessages()
+            // prepend the compressed-memory prefix for the LLM.
+            const summaryMsg: Message = {
+              id: generateId(),
+              role: 'user',
+              content: summary,
+              kind: 'context_summary',
+              timestamp: Math.max(0, cutoffTimestamp - 1),
+            }
             const nextMessages = produce(messageState.allMessages, (draft) => {
               draft.push(summaryMsg)
             })

@@ -47,10 +47,10 @@ export function groupMessagesIntoTurns(messages: Message[]): Turn[] {
       continue
     }
 
-    if (msg.role === 'user') {
+    if (msg.role === 'user' && msg.kind !== 'context_summary') {
       flushAssistant()
       turns.push({ type: 'user', message: msg })
-    } else if (msg.role === 'assistant') {
+    } else if (msg.role === 'assistant' || msg.kind === 'context_summary') {
       if (!currentAssistant) {
         currentAssistant = []
       }

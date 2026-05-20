@@ -142,7 +142,7 @@ describe('pi-core-runner', () => {
     })
 
     const hasSummary = result.allMessages.some(
-      (msg) => msg.role === 'assistant' && msg.kind === 'context_summary'
+      (msg) => msg.role === 'user' && msg.kind === 'context_summary'
     )
     expect(hasSummary).toBe(true)
     expect(result.allMessages.some((msg) => msg.role === 'assistant' && msg.content === 'done')).toBe(

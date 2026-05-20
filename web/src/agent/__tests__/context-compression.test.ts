@@ -26,9 +26,9 @@ describe('context-compression helpers', () => {
 
     expect(compressed).toHaveLength(1)
     expect(compressed[0]).toMatchObject({
-      role: 'assistant',
+      role: 'user',
       kind: 'context_summary',
-      content: 'Earlier:\nS',
+      content: 'S',
       timestamp: 20,
     })
   })

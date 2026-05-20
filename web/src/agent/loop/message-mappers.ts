@@ -47,10 +47,15 @@ export function internalToPiMessages(
     if (msg.kind === 'context_summary') {
       // Map context_summary as a user message (system-context block) so the
       // model treats it as memory/context rather than its own prior response.
+      // Guard against legacy data where the content already includes the prefix.
+      const raw = msg.content || ''
+      const content = raw.startsWith(compressedMemoryPrefix)
+        ? raw
+        : `${compressedMemoryPrefix}\n${raw}`
       return [
         {
           role: 'user',
-          content: `${compressedMemoryPrefix}\n${msg.content || ''}`,
+          content,
           timestamp: msg.timestamp || Date.now(),
         },
       ]

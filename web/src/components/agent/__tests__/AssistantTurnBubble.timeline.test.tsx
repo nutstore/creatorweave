@@ -41,7 +41,7 @@ describe('AssistantTurnBubble timeline ordering', () => {
           messages: [
             {
               id: 'summary-1',
-              role: 'assistant',
+              role: 'user',
               content: 'Earlier conversation summary:\nCompressed summary content',
               kind: 'context_summary',
               timestamp: 200,
@@ -271,7 +271,7 @@ describe('AssistantTurnBubble timeline ordering', () => {
             },
             {
               id: 'summary-backdated',
-              role: 'assistant',
+              role: 'user',
               content: 'Earlier conversation summary:\nBackdated summary',
               kind: 'context_summary',
               timestamp: 100,

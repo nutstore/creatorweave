@@ -139,7 +139,7 @@ export async function convertAgentMessagesToLlm(
   if (shouldAllowCompression) {
     // Compression: generate summary via LLM, then replace all messages with [summary].
     const droppedContent = internalMessages
-      .filter((msg) => msg.role !== 'context_summary')
+      .filter((msg) => msg.kind !== 'context_summary')
       .map((msg) => {
         if (msg.role === 'user') return `User: ${(msg.content || '').slice(0, 800)}`
         if (msg.role === 'assistant') return `Assistant: ${(msg.content || '').slice(0, 800)}`
