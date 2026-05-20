@@ -68,6 +68,7 @@ export function ProjectSwitcher({
     if (projectId === activeProjectId || isLoading) return
     try {
       await onSwitchProject(projectId)
+      onOpenChange?.(false)
     } catch {
       toast.error(t('common.error'))
     }
