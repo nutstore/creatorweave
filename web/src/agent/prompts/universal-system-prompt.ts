@@ -90,6 +90,7 @@ Updating agent-space files:
   - \`/mnt_assets/\` — asset files (user uploads & generated outputs). Read user-uploaded files and write output files for the user here.
 - **IMPORTANT**: Python reads files from OPFS, NOT directly from disk. If you see "A requested file or directory could not be found", use \`sync\` to copy the file from disk to OPFS first.
 - **ALWAYS use /mnt/ or /mnt_assets/ prefix** for file operations in Python. The default working directory (/home/pyodide) is NOT synced — files written there will be lost.
+- **Network Requests**: Pyodide runs in the browser and has NO native socket access. \`urllib.request\`, \`requests\`, \`http.client\`, \`aiohttp\` etc. will NOT work. To make HTTP requests in Python, use \`pyodide.http\` (e.g. \`pyfetch\`, \`open_url\`) or \`from js import fetch\`. Do NOT try to install \`requests\` or \`urllib3\` — they cannot work without OS sockets.
 - **Do NOT use /mnt/ or /mnt_assets/** with non-python tools (ls/read/write/edit/delete/search). Those tools use workspace paths or vfs:// paths, not Pyodide mount paths.
 - Rewrite rule for non-python tools:
   - \`/mnt/{rootName}/path/to/file\` -> \`{rootName}/path/to/file\`
@@ -198,7 +199,7 @@ export const TOOL_DISCOVERIES: ToolDiscovery[] = [
   },
   {
     trigger: ['python', 'pandas', 'data', 'csv', 'excel', 'chart', 'graph'],
-    message: `Python is available with pandas, numpy, matplotlib, openpyxl. Use \`sync\` to bring files into OPFS first, then \`python\` to analyze. Write output to \`/mnt_assets/\`.`,
+    message: `Python is available with pandas, numpy, matplotlib, openpyxl. Use \`sync\` to bring files into OPFS first, then \`python\` to analyze. Write output to \`/mnt_assets/\`. NOTE: Network libraries (urllib, requests) do NOT work in Pyodide — use \`pyodide.http\` (pyfetch/open_url) instead.`,
   },
   {
     trigger: ['code', 'debug', 'refactor', 'implement', 'function'],

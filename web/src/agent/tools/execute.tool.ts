@@ -44,8 +44,17 @@ Important:
   Example (root "lxy"): \`exec(open('/mnt/lxy/.skills/word-processor/scripts/convert.py').read())\`
   For imports, add the matching scripts directory to \`sys.path\` first.
 - For packages NOT in the built-in list, use micropip to install from PyPI before importing:
-  Example: \`import micropip; await micropip.install('requests'); import requests\`
+  Example: \`import micropip; await micropip.install('beautifulsoup4'); from bs4 import BeautifulSoup\`
   Note: Only pure-Pinux packages work with micropip. C-extension packages must be pre-built in Pyodide.
+
+**Network Requests (IMPORTANT)**:
+Pyodide runs in the browser and does NOT have native socket access. This means:
+- \`urllib.request\`, \`http.client\`, \`requests\`, \`aiohttp\` etc. will NOT work (they depend on OS-level sockets).
+- To make HTTP requests in Python, use \`pyodide.http\`:
+  - Sync GET: \`from pyodide.http import open_url; response = open_url("https://example.com/api"); data = response.read()\`
+  - Async: \`from pyodide.http import pyfetch; resp = await pyfetch("https://example.com/api"); text = await resp.string()\`
+- Alternatively, use the browser's fetch API via \`from js import fetch; resp = await fetch(url)\`.
+- Do NOT attempt to install \`requests\` or \`urllib3\` via micropip — they cannot work without sockets.
 
 Examples:
 - python(code="print('hello')")
