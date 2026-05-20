@@ -20,7 +20,7 @@ import { lsDefinition, lsExecutor, lsPromptDoc } from './tools/ls.tool'
 import { pythonDefinition, pythonToolExecutor, pythonPromptDoc } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 import { analyzeDataDefinition, analyzeDataExecutor, analyzeDataPromptDoc } from './tools/data-analysis.tool'
-import { runWorkflowDefinition, runWorkflowExecutor, workflowPromptDoc } from './tools/workflow.tool'
+// import { runWorkflowDefinition, runWorkflowExecutor, workflowPromptDoc } from './tools/workflow.tool' -- disabled: workflows unused
 
 // Git tools
 import {
@@ -118,8 +118,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: pythonDefinition, executor: pythonToolExecutor },
   // Data
   { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
-  // Workflow orchestration
-  { definition: runWorkflowDefinition, executor: runWorkflowExecutor },
+  // Workflow orchestration — DISABLED (workflows unused, saves tool definition tokens)
+  // { definition: runWorkflowDefinition, executor: runWorkflowExecutor },
   // Git tools
   { definition: gitStatusDefinition, executor: gitStatusExecutor },
   { definition: gitDiffDefinition, executor: gitDiffExecutor },
@@ -161,7 +161,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   gitPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,
-  workflowPromptDoc,
+  // workflowPromptDoc,  -- disabled: workflows unused
   subagentPromptDoc,
   switchModePromptDoc,
   askUserQuestionPromptDoc,

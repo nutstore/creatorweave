@@ -13,7 +13,7 @@ import {
 import type { ToolRegistry } from '../tool-registry'
 import { buildAvailableToolsPrompt } from '../tool-registry'
 import type { ToolContext } from '../tools/tool-types'
-import { buildAvailableWorkflowsBlock } from '../workflow/workflow-injection'
+// import { buildAvailableWorkflowsBlock } from '../workflow/workflow-injection' -- disabled: workflows unused, saves ~700 tokens/turn
 import type { AgentMode } from '../agent-mode'
 
 export interface InjectEnhancementsInput {
@@ -91,15 +91,15 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     // Continue without intelligence enhancements
   }
 
-  // ④: Workflow catalog (static)
-  try {
-    const workflowBlock = buildAvailableWorkflowsBlock()
-    if (workflowBlock) {
-      enhancedPrompt += '\n\n' + workflowBlock
-    }
-  } catch (error) {
-    console.warn('[AgentLoop] Failed to inject workflow catalog:', error)
-  }
+  // ④: Workflow catalog — DISABLED (workflows unused, saves ~700 tokens/turn)
+  // try {
+  //   const workflowBlock = buildAvailableWorkflowsBlock()
+  //   if (workflowBlock) {
+  //     enhancedPrompt += '\n\n' + workflowBlock
+  //   }
+  // } catch (error) {
+  //   console.warn('[AgentLoop] Failed to inject workflow catalog:', error)
+  // }
 
   // ⑤: MCP services (changes per session)
   try {

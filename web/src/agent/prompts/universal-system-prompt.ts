@@ -18,7 +18,7 @@ export function getUniversalSystemPrompt(): string {
 ## Execution Contract (CRITICAL)
 
 - If the user asks to implement, fix, refactor, remove, or update project files, default to execution in this turn instead of stopping at analysis.
-- Do not treat "I will do X" as completion. Completion requires actually running the relevant tools (for example: \`edit\`, \`write\`, \`delete\`, \`run_workflow\`) or clearly reporting a concrete blocker.
+- Do not treat "I will do X" as completion. Completion requires actually running the relevant tools (for example: \`edit\`, \`write\`, \`delete\`) or clearly reporting a concrete blocker.
 - Only stay in pure analysis when the user explicitly asks for plan/review-only output.
 - If you realize file changes are required while in Plan Mode, switch to Act Mode and continue execution in the same loop.
 
