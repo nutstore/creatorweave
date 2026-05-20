@@ -1,4 +1,3 @@
-import { createHeuristicSummary } from './context-compression'
 import type { CompressionSummaryMode } from './types'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 
@@ -50,14 +49,7 @@ export async function generateContextSummaryWithLLM(input: {
     const summary = response.choices[0]?.message?.content?.trim()
     return { summary: summary || null, mode: 'llm' }
   } catch (error) {
-    console.warn('[AgentLoop] LLM context summary failed, falling back to heuristic summary:', error)
-    return {
-      summary: createHeuristicSummary(
-        input.droppedContent,
-        input.maxSummaryTokens,
-        input.compressedMemoryPrefix
-      ),
-      mode: 'fallback',
-    }
+    console.error('[AgentLoop] LLM context summary failed:', error)
+    throw error
   }
 }

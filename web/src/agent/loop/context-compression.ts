@@ -13,63 +13,6 @@ export interface CompressionBaselineState {
   cutoffTimestamp: number
 }
 
-export interface ShouldCallLLMSummaryInput {
-  droppedGroups: number
-  droppedContent: string
-  convertCallCount: number
-  lastSummaryConvertCall: number
-  minDroppedGroups: number
-  minDroppedContentChars: number
-  minIntervalConvertCalls: number
-}
-
-export function createHeuristicSummary(
-  droppedContent: string,
-  maxSummaryTokens: number,
-  compressedMemoryPrefix: string
-): string {
-  const lines = droppedContent
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  const userGoals: string[] = []
-  const decisions: string[] = []
-  const files: string[] = []
-  const toolFindings: string[] = []
-
-  for (const line of lines) {
-    if (line.startsWith('User:') && userGoals.length < 10) {
-      userGoals.push(line.slice(5).trim())
-    } else if (line.startsWith('Assistant:') && decisions.length < 10) {
-      decisions.push(line.slice(10).trim().slice(0, 500))
-    } else if (line.startsWith('Tool result:') && toolFindings.length < 8) {
-      toolFindings.push(line.slice(12).trim().slice(0, 400))
-    }
-  }
-
-  const parts: string[] = [compressedMemoryPrefix]
-  if (userGoals.length > 0) {
-    parts.push('**User Goal**: ' + userGoals[userGoals.length - 1]) // Most recent goal first
-  }
-  if (decisions.length > 0) {
-    parts.push('**Key Decisions**:')
-    decisions.slice(-5).forEach((d) => parts.push(`- ${d}`))
-  }
-  if (files.length > 0) {
-    parts.push('**Files**: ' + files.join(', '))
-  }
-  if (toolFindings.length > 0) {
-    parts.push('**Tool Findings**:')
-    toolFindings.slice(-5).forEach((f) => parts.push(`- ${f}`))
-  }
-
-  const roughMaxChars = Math.max(200, maxSummaryTokens * 3)
-  const combined = parts.join('\n')
-  if (combined.length <= roughMaxChars) return combined
-  return combined.slice(0, roughMaxChars) + '\n...[truncated]'
-}
-
 export function injectSummaryMessage(
   messages: ChatMessage[],
   summary: string,
@@ -128,13 +71,4 @@ export function applyCompressionBaseline(
   )
   summaryMessage.timestamp = Math.max(0, baseline.cutoffTimestamp - 1)
   return [summaryMessage, ...retained]
-}
-
-export function shouldCallLLMSummary(input: ShouldCallLLMSummaryInput): boolean {
-  if (input.droppedGroups < input.minDroppedGroups) return false
-  if (input.droppedContent.trim().length < input.minDroppedContentChars) return false
-  if (input.convertCallCount - input.lastSummaryConvertCall < input.minIntervalConvertCalls) {
-    return false
-  }
-  return true
 }

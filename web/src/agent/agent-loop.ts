@@ -37,12 +37,6 @@ const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = getUniversalSystemPrompt()
 const DEFAULT_TOOL_TIMEOUT = 30000
 const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question'])
-const SUMMARY_MIN_DROPPED_GROUPS = 2
-const SUMMARY_MIN_DROPPED_CONTENT_CHARS = 800
-const SUMMARY_MIN_INTERVAL_CONVERT_CALLS = 8
-/** After compression, ensure context usage is at or below this ratio of the input budget.
- *  Prevents repeated compression on successive convert calls. */
-const COMPRESSION_TARGET_RATIO = 0.7
 const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 
 export class AgentLoop {
@@ -140,10 +134,6 @@ export class AgentLoop {
         maxIterations: this.maxIterations,
         convertCallCount: this.convertCallCount,
         lastSummaryConvertCall: this.lastSummaryConvertCall,
-        summaryMinDroppedGroups: SUMMARY_MIN_DROPPED_GROUPS,
-        summaryMinDroppedContentChars: SUMMARY_MIN_DROPPED_CONTENT_CHARS,
-        summaryMinIntervalConvertCalls: SUMMARY_MIN_INTERVAL_CONVERT_CALLS,
-        compressionTargetRatio: COMPRESSION_TARGET_RATIO,
         compressedMemoryPrefix: COMPRESSED_MEMORY_PREFIX,
         generateContextSummaryWithLLM: (droppedContent, maxSummaryTokens) =>
           generateContextSummaryWithLLM({

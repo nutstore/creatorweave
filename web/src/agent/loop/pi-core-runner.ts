@@ -88,10 +88,6 @@ export interface ExecutePiCoreLoopInput {
   maxIterations: number
   convertCallCount: number
   lastSummaryConvertCall: number
-  summaryMinDroppedGroups: number
-  summaryMinDroppedContentChars: number
-  summaryMinIntervalConvertCalls: number
-  compressionTargetRatio: number
   compressedMemoryPrefix: string
   generateContextSummaryWithLLM: (
     droppedContent: string,
@@ -200,20 +196,18 @@ export async function executePiCoreLoop(
       maxTokens: model.maxTokens,
       reasoning,
       convertToLlm: async (agentMessages) => {
+        const contextConfig = input.contextManager.getConfig()
         const converted = await convertAgentMessagesToLlm({
           agentMessages,
           model,
           provider: input.provider,
-          contextManager: input.contextManager,
           callbacks: input.callbacks,
           compressedMemoryPrefix: input.compressedMemoryPrefix,
           convertCallCount,
           lastSummaryConvertCall,
           compressionBaseline,
-          summaryMinDroppedGroups: input.summaryMinDroppedGroups,
-          summaryMinDroppedContentChars: input.summaryMinDroppedContentChars,
-          summaryMinIntervalConvertCalls: input.summaryMinIntervalConvertCalls,
-          compressionTargetRatio: input.compressionTargetRatio,
+          maxContextTokens: contextConfig.maxContextTokens,
+          reserveTokens: contextConfig.reserveTokens ?? 0,
           generateContextSummaryWithLLM: input.generateContextSummaryWithLLM,
           onSummaryInjected: (summary, cutoffTimestamp) => {
             const summaryMsg = createAssistantMessage(
