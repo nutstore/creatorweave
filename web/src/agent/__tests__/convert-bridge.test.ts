@@ -199,4 +199,108 @@ describe('convert-bridge', () => {
     expect(onContextCompressionStart).not.toHaveBeenCalled()
     expect(generateContextSummaryWithLLM).not.toHaveBeenCalled()
   })
+
+  it('starts compression when current pre-trim tokens exceed threshold even if last assistant usage is below threshold', async () => {
+    const onContextCompressionStart = vi.fn()
+    const generateContextSummaryWithLLM = vi.fn(async () => ({
+      summary: 'short summary',
+      mode: 'llm' as const,
+    }))
+
+    await convertAgentMessagesToLlm({
+      agentMessages: [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'previous answer' }],
+          timestamp: Date.now(),
+          usage: { input: 700, output: 120 },
+        },
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'continue' }],
+          timestamp: Date.now(),
+        },
+      ] as never[],
+      model: { api: 'openai', provider: 'openai', id: 'test-model' } as never,
+      provider: {
+        maxContextTokens: 1000,
+        estimateTokens: vi.fn(() => 900),
+      } as never,
+      contextManager: {
+        getConfig: () => ({ maxContextTokens: 1000, reserveTokens: 100 }),
+        trimMessages: vi.fn((msgs: unknown, options?: { createSummary?: boolean }) => ({
+          messages: msgs as never[],
+          droppedGroups: options?.createSummary ? 2 : 0,
+          droppedContent: options?.createSummary ? 'dropped old history that should be summarized' : undefined,
+          wasTruncated: true,
+        })),
+        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
+      } as never,
+      callbacks: { onContextCompressionStart },
+      compressedMemoryPrefix: 'Earlier conversation summary:',
+      convertCallCount: 0,
+      lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+      compressionBaseline: null,
+      summaryMinDroppedGroups: 1,
+      summaryMinDroppedContentChars: 1,
+      summaryMinIntervalConvertCalls: 0,
+      compressionTargetRatio: 0.7,
+      generateContextSummaryWithLLM,
+    })
+
+    expect(onContextCompressionStart).toHaveBeenCalled()
+    expect(generateContextSummaryWithLLM).toHaveBeenCalled()
+  })
+
+  it('starts compression when last assistant totalTokens exceeds threshold', async () => {
+    const onContextCompressionStart = vi.fn()
+    const generateContextSummaryWithLLM = vi.fn(async () => ({
+      summary: 'short summary',
+      mode: 'llm' as const,
+    }))
+
+    await convertAgentMessagesToLlm({
+      agentMessages: [
+        {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'previous answer' }],
+          timestamp: Date.now(),
+          usage: { input: 700, output: 120, cacheRead: 50, totalTokens: 900 },
+        },
+        {
+          role: 'user',
+          content: [{ type: 'text', text: 'continue' }],
+          timestamp: Date.now(),
+        },
+      ] as never[],
+      model: { api: 'openai', provider: 'openai', id: 'test-model' } as never,
+      provider: {
+        maxContextTokens: 1000,
+        estimateTokens: vi.fn(() => 100),
+      } as never,
+      contextManager: {
+        getConfig: () => ({ maxContextTokens: 1000, reserveTokens: 100 }),
+        trimMessages: vi.fn((msgs: unknown, options?: { createSummary?: boolean }) => ({
+          messages: msgs as never[],
+          droppedGroups: options?.createSummary ? 2 : 0,
+          droppedContent: options?.createSummary ? 'dropped old history that should be summarized' : undefined,
+          wasTruncated: true,
+        })),
+        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
+      } as never,
+      callbacks: { onContextCompressionStart },
+      compressedMemoryPrefix: 'Earlier conversation summary:',
+      convertCallCount: 0,
+      lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+      compressionBaseline: null,
+      summaryMinDroppedGroups: 1,
+      summaryMinDroppedContentChars: 1,
+      summaryMinIntervalConvertCalls: 0,
+      compressionTargetRatio: 0.7,
+      generateContextSummaryWithLLM,
+    })
+
+    expect(onContextCompressionStart).toHaveBeenCalled()
+    expect(generateContextSummaryWithLLM).toHaveBeenCalled()
+  })
 })

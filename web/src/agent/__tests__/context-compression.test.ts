@@ -7,31 +7,30 @@ import {
 } from '../loop/context-compression'
 
 describe('context-compression helpers', () => {
-  it('getCompressionCutoffTimestamp picks the latest user message timestamp', () => {
+  it('getCompressionCutoffTimestamp returns just after latest message timestamp', () => {
     const messages: Message[] = [
       { id: '1', role: 'user', content: 'first', timestamp: 10 },
       { id: '2', role: 'assistant', content: 'ok', timestamp: 11 },
       { id: '3', role: 'user', content: 'latest', timestamp: 42 },
       { id: '4', role: 'tool', content: 'result', toolCallId: 'tc1', name: 'read', timestamp: 43 },
     ]
-    expect(getCompressionCutoffTimestamp(messages)).toBe(42)
+    expect(getCompressionCutoffTimestamp(messages)).toBe(44)
   })
 
-  it('applyCompressionBaseline prepends summary and retains only messages at/after cutoff', () => {
+  it('applyCompressionBaseline prepends summary and can return summary-only context', () => {
     const messages: Message[] = [
       { id: '1', role: 'user', content: 'old', timestamp: 10 },
       { id: '2', role: 'assistant', content: 'new', timestamp: 20 },
     ]
-    const compressed = applyCompressionBaseline(messages, { summary: 'S', cutoffTimestamp: 20 }, 'Earlier:')
+    const compressed = applyCompressionBaseline(messages, { summary: 'S', cutoffTimestamp: 21 }, 'Earlier:')
 
-    expect(compressed).toHaveLength(2)
+    expect(compressed).toHaveLength(1)
     expect(compressed[0]).toMatchObject({
       role: 'assistant',
       kind: 'context_summary',
       content: 'Earlier:\nS',
-      timestamp: 19,
+      timestamp: 20,
     })
-    expect(compressed[1].id).toBe('2')
   })
 
   it('shouldCallLLMSummary enforces thresholds and cadence', () => {

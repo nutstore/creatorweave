@@ -278,12 +278,9 @@ describe('AgentLoop', () => {
       ])
 
       expect(capturedContextMessages).toHaveLength(2)
-      expect(capturedContextMessages[0]?.role).toBe('assistant')
-      expect(capturedContextMessages[0]?.content?.[0]?.type).toBe('text')
-      expect(capturedContextMessages[0]?.content?.[0]?.text).toContain(
-        'Earlier conversation summary:'
-      )
-      expect(capturedContextMessages[0]?.content?.[0]?.text).toContain('compressed summary')
+      expect(capturedContextMessages[0]?.role).toBe('user')
+      expect(capturedContextMessages[0]?.content).toContain('Earlier conversation summary:')
+      expect(capturedContextMessages[0]?.content).toContain('compressed summary')
       expect(capturedContextMessages[1]?.role).toBe('user')
       expect(capturedContextMessages[1]?.content).toBe('latest user message')
     })
@@ -428,13 +425,9 @@ describe('AgentLoop', () => {
       expect(convertedMessages).toBeTruthy()
       const hasSummary = (convertedMessages || []).some(
         (m: any) =>
-          m.role === 'assistant' &&
-          Array.isArray(m.content) &&
-          m.content.some(
-            (item: any) =>
-              item.type === 'text' &&
-              String(item.text).includes('Earlier conversation summary')
-          )
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('Earlier conversation summary')
       )
       expect(hasSummary).toBe(true)
     })
@@ -500,13 +493,9 @@ describe('AgentLoop', () => {
       expect(mockProvider.chat).toHaveBeenCalledTimes(1)
       const hasSummary = (convertedMessages || []).some(
         (m: any) =>
-          m.role === 'assistant' &&
-          Array.isArray(m.content) &&
-          m.content.some(
-            (item: any) =>
-              item.type === 'text' &&
-              String(item.text).includes('Earlier conversation summary')
-          )
+          m.role === 'user' &&
+          typeof m.content === 'string' &&
+          m.content.includes('Earlier conversation summary')
       )
       expect(hasSummary).toBe(true)
     })
@@ -574,17 +563,14 @@ describe('AgentLoop', () => {
 
       await loop.run([createUserMessage('test')])
 
-      const secondSummary = secondConvertMessages.find(
+      const hasOldUser = secondConvertMessages.some(
+        (m: any) => m.role === 'user' && m.content === 'old user request'
+      )
+      const hasOldAssistant = secondConvertMessages.some(
         (m: any) =>
           m.role === 'assistant' &&
           Array.isArray(m.content) &&
-          m.content.some(
-            (item: any) =>
-              item.type === 'text' && String(item.text).includes('Earlier conversation summary')
-          )
-      )
-      const hasOldUser = secondConvertMessages.some(
-        (m: any) => m.role === 'user' && m.content === 'old user request'
+          m.content.some((item: any) => item.type === 'text' && item.text === 'old assistant response')
       )
       const hasLatestUser = secondConvertMessages.some(
         (m: any) => m.role === 'user' && m.content === 'latest user request'
@@ -594,9 +580,9 @@ describe('AgentLoop', () => {
       )
 
       expect(firstConvertMessages.length).toBeGreaterThan(0)
-      expect(secondSummary).toBeDefined()
       expect(hasOldUser).toBe(false)
-      expect(hasLatestUser).toBe(true)
+      expect(hasOldAssistant).toBe(false)
+      expect(hasLatestUser).toBe(false)
       expect(hasLatestTool).toBe(true)
     })
 

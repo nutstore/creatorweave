@@ -53,8 +53,8 @@ describe('message-mappers', () => {
 
     expect(mapped).toHaveLength(2)
     expect(mapped[0]).toMatchObject({
-      role: 'assistant',
-      content: [{ type: 'text', text: 'Earlier conversation summary:\nsummary body' }],
+      role: 'user',
+      content: 'Earlier conversation summary:\nsummary body',
     })
 
     const assistant = mapped[1] as { role: string; content: Array<{ type: string; arguments?: unknown }> }
@@ -88,5 +88,26 @@ describe('message-mappers', () => {
       name: 'search',
       content: 'ok',
     })
+    expect(internal?.timestamp).toBe(10)
+  })
+
+  it('piToInternalMessage preserves upstream timestamps for assistant and toolResult', () => {
+    const assistant = piToInternalMessage({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'done' }],
+      usage: { input: 1, output: 2, totalTokens: 3 },
+      timestamp: 123456,
+    } as never)
+    expect(assistant).toMatchObject({ role: 'assistant', content: 'done', timestamp: 123456 })
+
+    const tool = piToInternalMessage({
+      role: 'toolResult',
+      toolCallId: 'tc3',
+      toolName: 'read',
+      content: [{ type: 'text', text: 'file' }],
+      isError: false,
+      timestamp: 789012,
+    } as never)
+    expect(tool).toMatchObject({ role: 'tool', content: 'file', timestamp: 789012 })
   })
 })

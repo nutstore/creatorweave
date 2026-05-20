@@ -1,6 +1,13 @@
 import type { ChatMessage } from '../llm/llm-provider'
 import { createAssistantMessage, type Message } from '../message-types'
 
+/**
+ * Compression trigger threshold as a fraction of the model's context window.
+ * When real token usage exceeds this ratio, context compression is activated.
+ * Adjust this value to control when compression kicks in (default: 0.85).
+ */
+export const COMPRESSION_TRIGGER_RATIO = 0.85
+
 export interface CompressionBaselineState {
   summary: string
   cutoffTimestamp: number
@@ -80,17 +87,19 @@ export function injectSummaryMessage(
 
 /**
  * Find cutoff timestamp for rebuilding context after compression.
- * We keep messages from the latest USER message onward.
- * The user's latest message must always be preserved so the agent knows what to do.
+ * We drop all current messages covered by the summary, and keep only messages
+ * that arrive after compression.
  */
 export function getCompressionCutoffTimestamp(messages: Message[]): number | null {
-  // Find the LAST (most recent) user message to use as the cutoff boundary.
-  // We specifically look for 'user' role, not 'tool', because:
-  // - Tool results come AFTER the user's message and should be summarizable
-  // - The user's latest message must ALWAYS be preserved for the agent to know what to do
-  // - Using a tool timestamp as cutoff would exclude the user's message on subsequent turns
-  const boundary = [...messages].reverse().find((msg) => msg.role === 'user')
-  return typeof boundary?.timestamp === 'number' ? boundary.timestamp : null
+  const latestTimestamp = messages.reduce<number | null>((max, msg) => {
+    if (typeof msg.timestamp !== 'number') return max
+    if (max == null || msg.timestamp > max) return msg.timestamp
+    return max
+  }, null)
+  if (latestTimestamp == null) return null
+  // Set cutoff strictly after the latest summarized message so the immediate
+  // compressed request can be summary-only.
+  return latestTimestamp + 1
 }
 
 /**
@@ -105,10 +114,6 @@ export function applyCompressionBaseline(
   const retained = messages.filter(
     (msg) => typeof msg.timestamp === 'number' && msg.timestamp >= baseline.cutoffTimestamp
   )
-
-  if (retained.length === 0) {
-    return messages
-  }
 
   // Use createAssistantMessage with kind='context_summary' so that
   // internalToPiMessages() can recognise and correctly map it to a system-context

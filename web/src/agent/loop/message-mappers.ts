@@ -229,7 +229,7 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
       (rawUsage?.output || 0) > 0 ||
       (rawUsage?.totalTokens || 0) > 0
 
-    return createAssistantMessage(
+    const assistant = createAssistantMessage(
       text || null,
       toolCalls.length > 0 ? toolCalls : undefined,
       hasRealUsage
@@ -242,15 +242,19 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
         : undefined,
       reasoning || null
     )
+    assistant.timestamp = message.timestamp || assistant.timestamp || now
+    return assistant
   }
 
   if (message.role === 'toolResult') {
     const text = extractTextContent(message.content) || ''
-    return createToolMessage({
+    const tool = createToolMessage({
       toolCallId: message.toolCallId,
       name: message.toolName,
       content: text,
     })
+    tool.timestamp = message.timestamp || tool.timestamp || now
+    return tool
   }
 
   return null

@@ -12,6 +12,7 @@
 
 import type { ChatMessage } from './llm/llm-provider'
 import { estimateMessageTokens, estimateStringTokens } from './llm/token-counter'
+import { COMPRESSION_TRIGGER_RATIO } from './loop/context-compression'
 
 const COMPRESSED_MEMORY_PREFIXES = [
   'Earlier conversation summary:',
@@ -63,7 +64,7 @@ export interface SummarizationOptions {
 }
 
 export class ContextManager {
-  private static readonly PROACTIVE_COMPRESSION_TRIGGER = 0.85
+  private static readonly PROACTIVE_COMPRESSION_TRIGGER = COMPRESSION_TRIGGER_RATIO
   private static readonly PROACTIVE_COMPRESSION_TARGET = 0.7
   private maxTokens: number
   private reserveTokens: number

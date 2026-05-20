@@ -5,16 +5,17 @@ import {
   getCompressionCutoffTimestamp,
   injectSummaryMessage,
   shouldCallLLMSummary,
+  COMPRESSION_TRIGGER_RATIO,
   type CompressionBaselineState,
 } from './context-compression'
 import { internalToPiMessages, piToInternalMessage } from './message-mappers'
+import { messagesToChatMessages } from '../llm/llm-provider'
 import {
   buildContextOverflowError,
   ensureLatestToolResultFitsContext,
 } from './tool-execution'
 import type { AgentCallbacks, CompressionSummaryMode } from './types'
 import type { ContextManager } from '../context-manager'
-import { messagesToChatMessages } from '../llm/llm-provider'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 
 export interface ConvertAgentMessagesToLlmInput {
@@ -47,17 +48,28 @@ export interface ConvertAgentMessagesToLlmResult {
 
 /**
  * Extract the real token usage from the most recent assistant message
- * in the agent message list.  Returns input + output tokens, because
- * the output becomes part of the next request's input.
+ * in the agent message list.  Returns totalTokens when available; otherwise
+ * falls back to input + output + cacheRead tokens.
  * This is the accurate "context already consumed" number.
  */
 function extractLastTurnUsedTokens(agentMessages: PiAgentMessage[]): number | null {
   for (let i = agentMessages.length - 1; i >= 0; i--) {
     const msg = agentMessages[i]
     if (msg.role === 'assistant') {
-      const usage = (msg as unknown as { usage?: { input?: number; output?: number } }).usage
-      if (usage && typeof usage.input === 'number' && usage.input > 0) {
-        return usage.input + (typeof usage.output === 'number' ? usage.output : 0)
+      const usage = (msg as unknown as {
+        usage?: { input?: number; output?: number; cacheRead?: number; totalTokens?: number }
+      }).usage
+      if (usage) {
+        if (typeof usage.totalTokens === 'number' && usage.totalTokens > 0) {
+          return usage.totalTokens
+        }
+        const input = typeof usage.input === 'number' ? usage.input : 0
+        const output = typeof usage.output === 'number' ? usage.output : 0
+        const cacheRead = typeof usage.cacheRead === 'number' ? usage.cacheRead : 0
+        const total = input + output + cacheRead
+        if (total > 0) {
+          return total
+        }
       }
     }
   }
@@ -108,12 +120,22 @@ export async function convertAgentMessagesToLlm(
       inputBudget,
       maxContextTokens,
       usagePercent: Number(((usedRealTokens / maxContextTokens) * 100).toFixed(2)),
-      triggerThreshold: Math.floor(maxContextTokens * 0.85),
+      triggerThreshold: Math.floor(maxContextTokens * COMPRESSION_TRIGGER_RATIO),
     })
   }
 
-  const shouldAllowCompression =
-    usedRealTokens == null || usedRealTokens >= Math.floor(maxContextTokens * 0.85)
+  const compressionTriggerThreshold = Math.floor(maxContextTokens * COMPRESSION_TRIGGER_RATIO)
+  const compressionTriggerTokens = Math.max(preTrimTokens, usedRealTokens ?? 0)
+  const shouldAllowCompression = compressionTriggerTokens >= compressionTriggerThreshold
+  console.info('[AgentLoop] Compression gate evaluation', {
+    convertCallCount,
+    preTrimTokens,
+    usedRealTokens,
+    compressionTriggerTokens,
+    compressionTriggerThreshold,
+    maxContextTokens,
+    allowCompression: shouldAllowCompression,
+  })
 
   const summaryTokenBudget = Math.min(2400, Math.max(500, Math.floor(maxContextTokens * 0.02)))
   let compressionTriggered = false
@@ -160,7 +182,7 @@ export async function convertAgentMessagesToLlm(
       reserveTokens,
       modelMaxTokens: maxContextTokens,
       preTrimUsagePercent: Number(preTrimUsagePercent.toFixed(2)),
-      triggerThresholdPercent: 85,
+      triggerThresholdPercent: COMPRESSION_TRIGGER_RATIO * 100,
       targetPercent: input.compressionTargetRatio * 100,
     })
 
@@ -175,8 +197,20 @@ export async function convertAgentMessagesToLlm(
         const cutoffTimestamp = getCompressionCutoffTimestamp(internalMessagesRaw)
         if (typeof cutoffTimestamp === 'number') {
           compressionBaseline = { summary, cutoffTimestamp }
+          // Apply cutoff immediately: rebuild trimmed messages using the baseline
+          // so that pre-cutoff messages are removed from this very request.
+          // Without this, trimmed still contains messages that were already summarized.
+          const retained = internalMessages.filter(
+            (msg) => typeof msg.timestamp === 'number' && msg.timestamp >= cutoffTimestamp
+          )
+          trimmed = injectSummaryMessage(
+            messagesToChatMessages(retained),
+            summary,
+            input.compressedMemoryPrefix
+          )
+        } else {
+          trimmed = injectSummaryMessage(trimmed, summary, input.compressedMemoryPrefix)
         }
-        trimmed = injectSummaryMessage(trimmed, summary, input.compressedMemoryPrefix)
         // First safety pass: summary injection must still fit the context budget.
         trimmed = input.contextManager.trimMessages(trimmed, { createSummary: false }).messages
         // Headroom enforcement: ensure post-compression usage is below the target ratio
