@@ -324,12 +324,36 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       return toolErrorJson('search', 'path_not_found', `Failed to resolve VFS path: ${error instanceof Error ? error.message : String(error)}`)
     }
   } else {
-    // Multi-root aware path resolution: always resolve to handle path prefix stripping
-    const { handle, nativePath } = await resolveNativeDirectoryHandleForPath(
-      searchPath, context.directoryHandle, context.workspaceId
-    )
-    directoryHandle = handle
-    vfsSubPath = nativePath
+    // Multi-root aware path resolution (mirrors ls.tool.ts resolveDiscoveryScope logic):
+    // 1. Check if first segment of path matches a known root name
+    // 2. If so, route to that root's handle directly (avoids fallback to wrong context.directoryHandle)
+    // 3. Otherwise fall through to generic resolveNativeDirectoryHandleForPath
+    let rootRouted = false
+    try {
+      const { getRuntimeHandlesForProject } = await import('@/native-fs')
+      const projectId = context.projectId
+      if (projectId && searchPath) {
+        const allHandles = getRuntimeHandlesForProject(projectId)
+        if (allHandles.size > 0) {
+          const segments = searchPath.split('/')
+          const maybeRoot = segments[0]
+          if (allHandles.has(maybeRoot)) {
+            const rootHandle = allHandles.get(maybeRoot)!
+            directoryHandle = rootHandle
+            vfsSubPath = segments.slice(1).join('/')
+            rootRouted = true
+          }
+        }
+      }
+    } catch { /* fall through to generic resolution */ }
+
+    if (!rootRouted) {
+      const { handle, nativePath } = await resolveNativeDirectoryHandleForPath(
+        searchPath, context.directoryHandle, context.workspaceId
+      )
+      directoryHandle = handle
+      vfsSubPath = nativePath
+    }
   }
 
   if (!directoryHandle) {
