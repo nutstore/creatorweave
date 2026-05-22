@@ -6,7 +6,6 @@ import type { Message } from '../message-types'
 import { triggerPrefetch } from '../prefetch'
 import {
   buildStableSystemPrompt,
-  getScenarioEnhancement,
   getToolDiscoveryMessage,
   shouldShowToolDiscovery,
 } from '../prompts/universal-system-prompt'
@@ -40,7 +39,7 @@ export interface InjectEnhancementsInput {
  * │  ⑥ Scenario detection                    │  ← changes per user message
  * │  ⑦ Skills block                          │  ← changes per user message
  * │  ⑧ Tool discovery                        │  ← changes per user message
- * │  ⑨ Date & time                           │  ← changes every minute
+ * │  ⑨ Current date                          │  ← changes daily
  * └──────────────────────────────────────────┘
  */
 export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput): Promise<string> {
@@ -121,12 +120,6 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // Everything below varies per user message or per minute.
   // Appended at the end to preserve prompt cache for the stable prefix above.
 
-  // ⑥: Scenario-specific enhancement (depends on user message keywords)
-  const scenarioEnhancement = getScenarioEnhancement(userMessage)
-  if (scenarioEnhancement) {
-    enhancedPrompt += scenarioEnhancement
-  }
-
   // ⑥.5: File mention context (when user message contains #path references)
   // Matches: #path/to/file, #file.ts, #src/App.tsx (with or without path separator)
   const fileMentionMatch = userMessage.match(/#([\w.\-]+[/\\][\w./\\\-]*|[\w.\-]+\.[\w]+)/)
@@ -155,13 +148,11 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     }
   }
 
-  // ⑨: Current date and time (changes every minute)
+  // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  const tzOffset = `UTC${now.getTimezoneOffset() <= 0 ? '+' : '-'}${String(Math.floor(Math.abs(now.getTimezoneOffset()) / 60)).padStart(2, '0')}:${String(Math.abs(now.getTimezoneOffset()) % 60).padStart(2, '0')}`
-  enhancedPrompt += `\n\n## Current Date & Time\nCurrent date: ${dateStr} (${weekday})\nCurrent time: ${timeStr}\nTimezone: ${tzOffset}\nUse this information when the user asks about dates, scheduling, or time-sensitive tasks.`
+  enhancedPrompt += `\n\n## Current Date\nCurrent date: ${dateStr} (${weekday})\nUse this only when the user asks about date-sensitive tasks.`
 
   return enhancedPrompt
 }

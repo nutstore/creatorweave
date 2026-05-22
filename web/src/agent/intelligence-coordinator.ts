@@ -8,10 +8,7 @@
  * And injects relevant enhancements into the system prompt.
  */
 
-import {
-  getRecommendationEngine,
-  getToolRecommendationsForPrompt,
-} from './tools/tool-recommendation'
+import { getRecommendationEngine } from './tools/tool-recommendation'
 import { ProjectManager, type AgentInfo } from '@/opfs'
 import { buildAgentPrompt, type PromptOptions } from './prompt-builder'
 import { extractFirstMentionedAgentId } from './agent-mention'
@@ -70,17 +67,8 @@ export class IntelligenceCoordinator {
       options.currentAgentId?.trim() || extractFirstMentionedAgentId(options.userMessage || undefined)
     agentInfo = await this.loadAgentForRun(routedAgentId, options.projectId)
 
-    // 1. Tool Recommendations (based on user message)
-    if (options.userMessage) {
-      const toolRecs = getRecommendationEngine().recommend(options.userMessage, 3)
-      if (toolRecs.length > 0) {
-        const toolBlock = getToolRecommendationsForPrompt(options.userMessage)
-        if (toolBlock) {
-          enhancements.push(toolBlock)
-        }
-        recommendedTools.push(...toolRecs.map((t) => t.toolName))
-      }
-    }
+    // 1. Tool recommendation block injection disabled for prompt-cache stability.
+    // Keep this section static across turns to avoid cache misses.
 
     // 2. Multi-root project context (inject root names so agent uses correct paths)
     try {

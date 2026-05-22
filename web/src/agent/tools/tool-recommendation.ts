@@ -514,29 +514,6 @@ export function getRecommendationEngine(): RecommendationEngine {
 //=============================================================================
 
 /**
- * Get tool recommendations formatted for system prompt injection
- */
-export function getToolRecommendationsForPrompt(userMessage: string): string {
-  const engine = getRecommendationEngine()
-  const recommendations = engine.recommend(userMessage, 3)
-
-  if (recommendations.length === 0) {
-    return ''
-  }
-
-  let output = `\n## Recommended Tools for Your Request\n\n`
-  output += `Based on your message, these tools might be helpful:\n\n`
-
-  for (const rec of recommendations) {
-    output += `**${rec.displayName}**\n`
-    output += `- Why: ${rec.reason}\n`
-    output += `- Example: \`${rec.example}\`\n\n`
-  }
-
-  return output
-}
-
-/**
  * Get tool discovery message for first-time users
  */
 export function getToolDiscoveryMessage(): string {

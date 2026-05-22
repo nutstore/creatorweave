@@ -142,48 +142,6 @@ Remember: You're a versatile assistant - adapt to whatever the user needs.`
 }
 
 //=============================================================================
-// Scenario-Specific Prompt Enhancements
-//=============================================================================
-
-export interface ScenarioEnhancement {
-  keywords: string[]
-  intent: string
-  enhancement: string
-}
-
-export const SCENARIO_ENHANCEMENTS: ScenarioEnhancement[] = [
-  {
-    keywords: [
-      'code', 'function', 'class', 'bug', 'debug', 'refactor', 'api',
-      'implement', 'typescript', 'javascript', 'python', 'rust', 'go',
-    ],
-    intent: 'development',
-    enhancement: `\n## Developer Mode\nFocus on: code structure, bug fixes, refactoring, following project conventions.`,
-  },
-  {
-    keywords: [
-      'data', 'csv', 'excel', 'spreadsheet', 'chart', 'graph',
-      'analyze', 'statistics', 'pandas', 'visualization', 'plot',
-    ],
-    intent: 'analysis',
-    enhancement: `\n## Data Analysis Mode\nFocus on: data structure, insights, visualizations, pandas/python manipulation.`,
-  },
-  {
-    keywords: [
-      'document', 'read', 'summarize', 'explain', 'research',
-      'paper', 'article', 'markdown', 'pdf',
-    ],
-    intent: 'research',
-    enhancement: `\n## Research Mode\nFocus on: extracting key info, summarizing, explaining concepts clearly.`,
-  },
-  {
-    keywords: ['write', 'draft', 'edit', 'format', 'document', 'report', 'content'],
-    intent: 'writing',
-    enhancement: `\n## Writing Mode\nFocus on: clear prose, formatting, tone consistency, grammar.`,
-  },
-]
-
-//=============================================================================
 // Tool Discovery Messages
 //=============================================================================
 
@@ -210,36 +168,6 @@ export const TOOL_DISCOVERIES: ToolDiscovery[] = [
 //=============================================================================
 // Helper Functions
 //=============================================================================
-
-/**
- * Detect scenario from user message
- */
-export function detectScenario(userMessage: string): string | null {
-  const lowerMessage = userMessage.toLowerCase()
-
-  for (const scenario of SCENARIO_ENHANCEMENTS) {
-    if (scenario.keywords.some((kw) => lowerMessage.includes(kw))) {
-      return scenario.intent
-    }
-  }
-
-  return null
-}
-
-/**
- * Get prompt enhancement for detected scenario
- */
-export function getScenarioEnhancement(userMessage: string): string {
-  const lowerMessage = userMessage.toLowerCase()
-
-  for (const scenario of SCENARIO_ENHANCEMENTS) {
-    if (scenario.keywords.some((kw) => lowerMessage.includes(kw))) {
-      return scenario.enhancement
-    }
-  }
-
-  return ''
-}
 
 /**
  * Check if user is asking about capabilities
@@ -282,32 +210,6 @@ export function buildStableSystemPrompt(
   let enhanced = basePrompt
 
   // Add agent mode-specific enhancement (changes infrequently, per session)
-  if (agentMode) {
-    enhanced += getAgentModeEnhancement(agentMode)
-  }
-
-  return enhanced
-}
-
-/**
- * Build enhanced system prompt based on user message.
- * NOTE: Prefer using buildStableSystemPrompt + appending dynamic parts at the end
- * for better prompt cache behavior.
- */
-export function buildEnhancedSystemPrompt(
-  basePrompt: string,
-  userMessage: string,
-  agentMode?: 'plan' | 'act'
-): string {
-  let enhanced = basePrompt
-
-  // Add scenario-specific enhancement
-  const scenarioEnhancement = getScenarioEnhancement(userMessage)
-  if (scenarioEnhancement) {
-    enhanced += scenarioEnhancement
-  }
-
-  // Add agent mode-specific enhancement
   if (agentMode) {
     enhanced += getAgentModeEnhancement(agentMode)
   }

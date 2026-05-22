@@ -5,13 +5,11 @@
  * - Skills injection (matching skills based on node input)
  * - MCP services discovery (available MCP tools)
  * - Intelligence coordinator (agent personality, tool recommendations)
- * - Scenario detection
  *
  * This ensures workflow nodes have access to the same context and capabilities
  * as the main agent loop, rather than making bare LLM calls.
  */
 
-import { buildEnhancedSystemPrompt } from '../prompts/universal-system-prompt'
 import { getIntelligenceCoordinator } from '../intelligence-coordinator'
 import { getMCPManager } from '@/mcp'
 import { getSkillManager } from '@/skills/skill-manager'
@@ -34,10 +32,9 @@ export interface NodeEnhancementOptions {
  * Enhance a workflow node's system prompt with the full AgentLoop pipeline.
  *
  * This applies:
- * 1. Scenario detection (buildEnhancedSystemPrompt)
- * 2. Intelligence coordinator (agent personality, fingerprint, tool recs, memory)
- * 3. MCP services block (available MCP tools)
- * 4. Skills matching (relevant skills for the node's task)
+ * 1. Intelligence coordinator (agent personality, fingerprint, tool recs, memory)
+ * 2. MCP services block (available MCP tools)
+ * 3. Skills matching (relevant skills for the node's task)
  *
  * Each enhancement is applied independently with try/catch so a failure
  * in one doesn't block the others.
@@ -47,10 +44,9 @@ export async function buildEnhancedWorkflowNodePrompt(
   userMessage: string,
   options: NodeEnhancementOptions = {}
 ): Promise<string> {
-  // 1. Scenario detection
-  let enhanced = buildEnhancedSystemPrompt(basePrompt, userMessage)
+  let enhanced = basePrompt
 
-  // 2. Intelligence coordinator (agent personality, fingerprint, tool recs, memory)
+  // 1. Intelligence coordinator (agent personality, fingerprint, tool recs, memory)
   try {
     const coordinator = getIntelligenceCoordinator()
     const result = await coordinator.enhanceSystemPrompt(enhanced, {
