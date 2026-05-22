@@ -39,7 +39,8 @@ import { useExtensionStore } from '@/store/extension.store'
 const TOTAL_STEPS = 5
 
 // The extension zip is built and hosted alongside the web app
-const EXTENSION_DOWNLOAD_URL = '/chrome-extension.zip'
+// Cache-bust via build ID so users always get the latest version
+const EXTENSION_DOWNLOAD_URL = `/chrome-extension.zip?v=${__APP_BUILD_ID__}`
 
 // ---------------------------------------------------------------------------
 // Step indicators

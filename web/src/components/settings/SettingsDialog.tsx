@@ -761,7 +761,7 @@ function ExtensionSettingsPanel() {
       <BrandButton
         variant="outline"
         className="w-full"
-        onClick={() => window.open('/chrome-extension.zip', '_blank')}
+        onClick={() => window.open(`/chrome-extension.zip?v=${__APP_BUILD_ID__}`, '_blank')}
       >
         <Download className="mr-2 h-4 w-4" />
         {t('extension.downloadButton')}
