@@ -577,6 +577,32 @@ export const useSettingsStore = create<SettingsState>()(
           }
         }
 
+        // Check dynamically registered providers (e.g. codex-oauth from extension bridge)
+        const { getDynamicProviderIds, getProviderMeta: getDynamicMeta } = await import('@/agent/providers/types')
+        for (const id of getDynamicProviderIds()) {
+          // Skip if already included via built-in or custom providers
+          if (results.some((r) => r.providerType === id)) continue
+          const key = await loadApiKey(id)
+          if (key) {
+            const meta = getDynamicMeta(id)
+            const pinned = state.pinnedModelsByProvider[id]
+            const allModels = getModelsForProvider(id)
+            const models = pinned
+              ? pinned.map((pid) => {
+                  const found = allModels.find((m) => m.id === pid)
+                  return found ? { id: found.id, name: found.name } : { id: pid, name: pid }
+                })
+              : allModels.map((m) => ({ id: m.id, name: m.name }))
+
+            results.push({
+              providerType: id,
+              displayName: meta?.displayName || id,
+              models,
+              providerKey: id,
+            })
+          }
+        }
+
         return results
       },
 

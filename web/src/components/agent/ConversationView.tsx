@@ -12,7 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
-import { Send, StopCircle } from 'lucide-react'
+import { Send, StopCircle, AlertTriangle, RefreshCw, WifiOff, KeyRound } from 'lucide-react'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
@@ -20,6 +20,8 @@ import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
+import { useSettingsStore } from '@/store/settings.store'
+import { useExtensionStore } from '@/store/extension.store'
 import type { FileMentionItem } from './FileMentionExtension'
 import { useInitialMessage } from './useInitialMessage'
 import { ConversationMessages } from './ConversationMessages'
@@ -415,12 +417,7 @@ export function ConversationView({
       </div>
 
         {conversationError && (
-          <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
-            <div className="mx-auto max-w-3xl">
-              <span className="font-medium">{t('conversation.error.requestFailed')}</span>
-              <span>{conversationError}</span>
-            </div>
-          </div>
+          <ConversationErrorBanner error={conversationError} />
         )}
 
         {/* Input area */}
@@ -511,3 +508,159 @@ export function ConversationView({
     </ConversationActionContext.Provider>
   )
 }
+
+// =============================================================================
+// CodexErrorBanner — detects codex-oauth error codes and shows actionable UI
+// =============================================================================
+
+const CODEX_ERROR_PATTERNS: Array<{
+  codes: string[]
+  icon: typeof AlertTriangle
+  color: 'red' | 'amber' | 'blue'
+  getTitleKey: () => string
+  getDescriptionKey: () => string
+  action?: { labelKey: string; onClick: (store: ReturnType<typeof useExtensionStore.getState>) => void }
+}> = [
+  {
+    codes: ['NOT_AUTHORIZED', 'REAUTH_REQUIRED'],
+    icon: KeyRound,
+    color: 'amber',
+    getTitleKey: () => 'codex.error.authRequired',
+    getDescriptionKey: () => 'codex.error.authRequiredDesc',
+    action: {
+      labelKey: 'codex.error.openExtension',
+      onClick: (store) => store.openInstallGuide?.(),
+    },
+  },
+  {
+    codes: ['EXTENSION_UNAVAILABLE'],
+    icon: WifiOff,
+    color: 'amber',
+    getTitleKey: () => 'codex.error.extensionRequired',
+    getDescriptionKey: () => 'codex.error.extensionRequiredDesc',
+    action: {
+      labelKey: 'codex.error.installExtension',
+      onClick: (store) => store.openInstallGuide?.(),
+    },
+  },
+  {
+    codes: ['UPSTREAM_RATE_LIMITED'],
+    icon: RefreshCw,
+    color: 'blue',
+    getTitleKey: () => 'codex.error.rateLimited',
+    getDescriptionKey: () => 'codex.error.rateLimitedDesc',
+  },
+  {
+    codes: ['NETWORK_ERROR'],
+    icon: WifiOff,
+    color: 'red',
+    getTitleKey: () => 'codex.error.networkError',
+    getDescriptionKey: () => 'codex.error.networkErrorDesc',
+  },
+]
+
+function parseErrorCode(errorMessage: string): string | null {
+  // Error messages from the streaming bridge have format "[ERROR_CODE] message"
+  const bracketMatch = errorMessage.match(/^\[([A-Z_]+)\]/)
+  if (bracketMatch) return bracketMatch[1]
+
+  // Exact-match known codes (no fuzzy matching — too many false positives)
+  const exactMatch = [
+    'EXTENSION_UNAVAILABLE', 'NOT_AUTHORIZED', 'REAUTH_REQUIRED',
+    'UPSTREAM_RATE_LIMITED', 'UPSTREAM_SERVER_ERROR',
+  ].find((code) => errorMessage.startsWith(code))
+  if (exactMatch) return exactMatch
+
+  return null
+}
+
+const colorClasses = {
+  red: {
+    border: 'border-red-200 dark:border-red-900/40',
+    bg: 'bg-red-50 dark:bg-red-950/30',
+    text: 'text-red-700 dark:text-red-300',
+    mutedText: 'text-red-600 dark:text-red-400',
+    icon: 'text-red-500 dark:text-red-400',
+  },
+  amber: {
+    border: 'border-amber-200 dark:border-amber-800',
+    bg: 'bg-amber-50 dark:bg-amber-950/30',
+    text: 'text-amber-800 dark:text-amber-200',
+    mutedText: 'text-amber-600 dark:text-amber-400',
+    icon: 'text-amber-500 dark:text-amber-400',
+  },
+  blue: {
+    border: 'border-blue-200 dark:border-blue-800',
+    bg: 'bg-blue-50 dark:bg-blue-950/30',
+    text: 'text-blue-800 dark:text-blue-200',
+    mutedText: 'text-blue-600 dark:text-blue-400',
+    icon: 'text-blue-500 dark:text-blue-400',
+  },
+}
+
+/**
+ * Error banner — shows Codex-specific actionable UI when the current provider
+ * is codex-oauth and the error matches a known code.  For all other providers
+ * (or unrecognised errors), falls back to a generic red bar.
+ */
+const ConversationErrorBanner = memo(function ConversationErrorBanner({ error }: { error: string }) {
+  const t = useT()
+  const providerType = useSettingsStore((s) => s.providerType)
+  const isCodex = (providerType as string) === 'codex-oauth'
+
+  const store = useExtensionStore.getState()
+
+  // Only match Codex patterns when the active provider is codex-oauth
+  const errorCode = isCodex ? parseErrorCode(error) : null
+  const pattern = errorCode
+    ? CODEX_ERROR_PATTERNS.find((p) => p.codes.includes(errorCode))
+    : null
+
+  // Fallback: generic error banner
+  if (!pattern) {
+    return (
+      <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
+        <div className="mx-auto max-w-3xl">
+          <span className="font-medium">{t('conversation.error.requestFailed')}</span>
+          <span>{error}</span>
+        </div>
+      </div>
+    )
+  }
+
+  const Icon = pattern.icon
+  const colors = colorClasses[pattern.color]
+
+  return (
+    <div className={`border-t ${colors.border} ${colors.bg} px-4 py-3 text-sm`}>
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-start gap-2.5">
+          <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${colors.icon}`} />
+          <div className="min-w-0 flex-1">
+            <p className={`font-medium ${colors.text}`}>
+              {t(pattern.getTitleKey())}
+            </p>
+            <p className={`mt-0.5 ${colors.mutedText}`}>
+              {t(pattern.getDescriptionKey())}
+            </p>
+            {pattern.action && (
+              <button
+                type="button"
+                onClick={() => pattern.action!.onClick(store)}
+                className={`mt-2 rounded-md px-3 py-1.5 text-xs font-medium text-white transition-colors ${
+                  pattern.color === 'amber'
+                    ? 'bg-amber-600 hover:bg-amber-700'
+                    : pattern.color === 'blue'
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {t(pattern.action.labelKey)} →
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+})

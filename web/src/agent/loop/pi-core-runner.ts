@@ -174,14 +174,27 @@ export async function executePiCoreLoop(
         if (Array.isArray(payload.tools) && payload.tools.length > 0 && payload.tool_choice == null) {
           payload.tool_choice = 'auto'
         }
+        // Codex API requires 'instructions' field — ensure it's populated from systemPrompt
+        if (!payload.instructions && context.systemPrompt) {
+          payload.instructions = context.systemPrompt
+        }
+        // Codex API does not support max_output_tokens
+        if (model.provider === 'codex-oauth') {
+          delete payload.max_output_tokens
+        }
         prevOnPayload?.(payload)
       },
     }
 
+    // ── Codex OAuth: fetch is permanently wrapped by installCodexBridgeFetch() ──
+    // The openai-responses handler calls fetch() internally. For codex-oauth,
+    // fetch() is already intercepted at the global level to route through
+    // the extension bridge. No special handling needed here.
+
     return piAiStreamSimple(
       streamModel as Parameters<typeof piAiStreamSimple>[0],
       streamContext as Parameters<typeof piAiStreamSimple>[1],
-      mergedOptions as Parameters<typeof piAiStreamSimple>[2]
+      mergedOptions as Parameters<typeof piAiStreamSimple>[2],
     )
   }) as unknown as StreamFn
 

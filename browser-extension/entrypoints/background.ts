@@ -260,24 +260,511 @@ async function handleFetchRender(message) {
 }
 
 // ============================================================
+// Codex auth + proxy (minimal version)
+// ============================================================
+
+const DEVICEAUTH_USERCODE_URL = 'https://auth.openai.com/api/accounts/deviceauth/usercode';
+const DEVICEAUTH_TOKEN_URL = 'https://auth.openai.com/api/accounts/deviceauth/token';
+const OAUTH_TOKEN_URL = 'https://auth.openai.com/oauth/token';
+const DEVICE_VERIFY_URL = 'https://auth.openai.com/codex/device';
+const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses';
+const CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const CODEX_REDIRECT_URI = 'https://auth.openai.com/deviceauth/callback';
+const CODEX_PENDING_AUTH_KEY = 'codex_pending_auth';
+const CODEX_AUTH_POLL_ALARM = 'codex_auth_poll_alarm';
+const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+
+const CODEX_DEFAULT_MODELS = [
+  { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
+  { id: 'gpt-5.4', name: 'GPT-5.4', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', contextWindow: 128000, capabilities: ['code', 'reasoning'] },
+  { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
+];
+
+
+async function saveCodexTokens(tokens: any) {
+  await chrome.storage.local.set({ codex_tokens: tokens, codex_token_saved_at: Date.now() });
+}
+
+async function getCodexTokens() {
+  const { codex_tokens } = await chrome.storage.local.get('codex_tokens');
+  return codex_tokens || null;
+}
+
+async function savePendingCodexAuth(data: any) {
+  await chrome.storage.local.set({ [CODEX_PENDING_AUTH_KEY]: data });
+}
+
+async function getPendingCodexAuth() {
+  const got = await chrome.storage.local.get(CODEX_PENDING_AUTH_KEY);
+  return got?.[CODEX_PENDING_AUTH_KEY] || null;
+}
+
+async function clearPendingCodexAuth() {
+  await chrome.storage.local.remove(CODEX_PENDING_AUTH_KEY);
+  await chrome.alarms.clear(CODEX_AUTH_POLL_ALARM);
+}
+
+function decodeJwtPayload(token: string): any {
+  try {
+    const [, payload] = String(token || '').split('.');
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '='));
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function codexHeaders(accessToken: string, extraHeaders: Record<string, string> = {}) {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${accessToken}`,
+    'User-Agent': 'codex_cli_rs/0.0.0 (CreatorWeave Extension)',
+    originator: 'codex_cli_rs',
+    ...extraHeaders,
+  };
+
+  const payload = decodeJwtPayload(accessToken);
+  const accountId = payload?.['https://api.openai.com/auth']?.chatgpt_account_id;
+  if (accountId) headers['ChatGPT-Account-ID'] = accountId;
+
+  return headers;
+}
+
+async function parseJsonSafe(resp: Response) {
+  const text = await resp.text();
+  try {
+    return { text, json: text ? JSON.parse(text) : null };
+  } catch {
+    return { text, json: null };
+  }
+}
+
+async function refreshCodexAccessToken(tokens: any) {
+  if (!tokens?.refresh_token) {
+    throw new Error('Missing refresh_token');
+  }
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: String(tokens.refresh_token),
+    client_id: CODEX_CLIENT_ID,
+  });
+
+  const resp = await fetch(OAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  const parsed = await parseJsonSafe(resp);
+  if (!resp.ok || !parsed?.json?.access_token) {
+    throw new Error(`Refresh failed (${resp.status}): ${JSON.stringify(parsed.json || parsed.text)}`);
+  }
+
+  const merged = {
+    ...tokens,
+    ...parsed.json,
+    refresh_token: parsed.json.refresh_token || tokens.refresh_token,
+  };
+  await saveCodexTokens(merged);
+  return merged;
+}
+
+async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
+  const resp = await fetch(DEVICEAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      client_id: CODEX_CLIENT_ID,
+      device_auth_id: deviceAuthId,
+      user_code: userCode,
+    }),
+  });
+  const { text, json } = await parseJsonSafe(resp);
+
+  if (!resp.ok) {
+    const code = json?.error || json?.error_code || 'unknown';
+    if (code === 'authorization_pending' || code === 'slow_down') {
+      return { ok: true, done: false, pending: true, code };
+    }
+    return { ok: false, status: resp.status, error: json || text };
+  }
+
+  if (!json?.authorization_code || !json?.code_verifier) {
+    return { ok: false, error: 'Missing authorization_code/code_verifier in deviceauth response' };
+  }
+
+  const oauthBody = new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: json.authorization_code,
+    code_verifier: json.code_verifier,
+    client_id: CODEX_CLIENT_ID,
+    redirect_uri: CODEX_REDIRECT_URI,
+  });
+
+  const oauthResp = await fetch(OAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: oauthBody,
+  });
+  const oauthParsed = await parseJsonSafe(oauthResp);
+  if (!oauthResp.ok) {
+    return { ok: false, status: oauthResp.status, error: oauthParsed.json || oauthParsed.text };
+  }
+
+  await saveCodexTokens(oauthParsed.json);
+  await clearPendingCodexAuth();
+  return { ok: true, done: true };
+}
+
+// ============================================================
 // Message listener
 // ============================================================
 
 export default defineBackground(() => {
-  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === 'web_search') {
-      handleSearch(message).then(sendResponse);
-      return true; // Keep channel open for async response
+  // ── Proactive token refresh: check on startup and every 5 minutes ──
+  const CODEX_TOKEN_REFRESH_ALARM = 'codex_token_refresh_alarm';
+
+  async function proactiveRefreshIfNeeded() {
+    try {
+      const tokens = await getCodexTokens();
+      if (!tokens?.access_token) return;
+
+      const payload = decodeJwtPayload(tokens.access_token);
+      if (!payload?.exp) return; // can't determine expiry, skip
+
+      const expiresAt = payload.exp * 1000; // JWT exp is in seconds
+      const now = Date.now();
+
+      if (now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+        // Token is expired or about to expire — try refresh
+        if (tokens.refresh_token) {
+          try {
+            await refreshCodexAccessToken(tokens);
+          } catch (err) {
+            console.warn('[Codex] Proactive refresh failed:', err instanceof Error ? err.message : err);
+            // Clear tokens if refresh fails and token is already expired
+            if (now >= expiresAt) {
+              await saveCodexTokens({ ...tokens, access_token: null });
+            }
+          }
+        }
+      }
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  // Check on service worker startup
+  proactiveRefreshIfNeeded();
+
+  // Schedule periodic checks (every 5 minutes)
+  chrome.alarms.create(CODEX_TOKEN_REFRESH_ALARM, { periodInMinutes: 5 });
+
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === CODEX_TOKEN_REFRESH_ALARM) {
+      await proactiveRefreshIfNeeded();
+      return;
     }
 
-    if (message.type === 'web_fetch') {
-      handleFetch(message).then(sendResponse);
-      return true;
+    if (alarm.name !== CODEX_AUTH_POLL_ALARM) return;
+    try {
+      const pending = await getPendingCodexAuth();
+      if (!pending) {
+        await chrome.alarms.clear(CODEX_AUTH_POLL_ALARM);
+        return;
+      }
+      if (!pending.expires_at || pending.expires_at <= Date.now()) {
+        await clearPendingCodexAuth();
+        return;
+      }
+      await pollCodexAuthOnce(pending.device_auth_id, pending.user_code);
+    } catch {
+      // keep alarm for next retry
     }
+  });
 
-    if (message.type === 'web_fetch_render') {
-      handleFetchRender(message).then(sendResponse);
-      return true;
-    }
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    (async () => {
+      try {
+        if (message.type === 'web_search') {
+          sendResponse(await handleSearch(message));
+          return;
+        }
+
+        if (message.type === 'web_fetch') {
+          sendResponse(await handleFetch(message));
+          return;
+        }
+
+        if (message.type === 'web_fetch_render') {
+          sendResponse(await handleFetchRender(message));
+          return;
+        }
+
+        if (message.type === 'codex_auth_start') {
+          const resp = await fetch(DEVICEAUTH_USERCODE_URL, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ client_id: CODEX_CLIENT_ID }),
+          });
+          const { text, json } = await parseJsonSafe(resp);
+          if (!resp.ok) {
+            sendResponse({ ok: false, status: resp.status, error: json || text });
+            return;
+          }
+
+          const data = {
+            ...json,
+            verification_uri: DEVICE_VERIFY_URL,
+            verification_uri_complete: DEVICE_VERIFY_URL,
+          };
+
+          await savePendingCodexAuth({
+            user_code: data.user_code,
+            device_auth_id: data.device_auth_id,
+            verification_uri: data.verification_uri,
+            verification_uri_complete: data.verification_uri_complete,
+            expires_at: Date.now() + (data.expires_in || 900) * 1000,
+            interval: data.interval || 5,
+          });
+
+          await chrome.alarms.create(CODEX_AUTH_POLL_ALARM, { periodInMinutes: 1 });
+
+          sendResponse({ ok: true, data });
+          return;
+        }
+
+        if (message.type === 'codex_auth_poll') {
+          let deviceAuthId = message.deviceAuthId;
+          let userCode = message.userCode;
+
+          if (!deviceAuthId || !userCode) {
+            const pending = await getPendingCodexAuth();
+            deviceAuthId = pending?.device_auth_id;
+            userCode = pending?.user_code;
+          }
+
+          if (!deviceAuthId || !userCode) {
+            sendResponse({ ok: false, error: 'Missing device auth context, please start login again' });
+            return;
+          }
+
+          const result = await pollCodexAuthOnce(deviceAuthId, userCode);
+          sendResponse(result);
+          return;
+        }
+
+        if (message.type === 'codex_get_status') {
+          const tokens = await getCodexTokens();
+          const pending = await getPendingCodexAuth();
+          let authState: string = 'idle';
+          let authorized = false;
+
+          if (tokens?.access_token) {
+            // Check if access token is actually still valid (JWT exp)
+            const payload = decodeJwtPayload(tokens.access_token);
+            const expiresAt = payload?.exp ? payload.exp * 1000 : 0;
+            const now = Date.now();
+
+            if (expiresAt && now >= expiresAt - TOKEN_REFRESH_MARGIN_MS) {
+              // Token expired or about to expire — try proactive refresh
+              if (tokens.refresh_token) {
+                try {
+                  await refreshCodexAccessToken(tokens);
+                  authState = 'authorized';
+                  authorized = true;
+                } catch {
+                  // Refresh failed — token is expired
+                  authState = 'expired';
+                }
+              } else {
+                authState = 'expired';
+              }
+            } else {
+              // Token still valid
+              authState = 'authorized';
+              authorized = true;
+            }
+          } else if (pending && pending.expires_at && pending.expires_at > Date.now()) {
+            authState = 'pending';
+          } else if (tokens && !tokens.access_token) {
+            authState = 'expired';
+          }
+
+          sendResponse({
+            ok: true,
+            data: {
+              authorized,
+              authState,
+              models: CODEX_DEFAULT_MODELS,
+              updatedAt: tokens ? await chrome.storage.local.get('codex_token_saved_at').then(r => r.codex_token_saved_at || null) : null,
+            },
+          });
+          return;
+        }
+
+        if (message.type === 'codex_get_usage') {
+          const { codex_usage } = await chrome.storage.local.get('codex_usage');
+          sendResponse({ ok: true, data: codex_usage || null });
+          return;
+        }
+
+        if (message.type === 'codex_proxy_fetch') {
+          let tokens = await getCodexTokens();
+          if (!tokens?.access_token) {
+            sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
+            return;
+          }
+
+          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const requestInit: RequestInit = {
+            method: message.method || 'POST',
+            body: message.body ? JSON.stringify(message.body) : undefined,
+          };
+
+          let resp = await fetch(requestUrl, {
+            ...requestInit,
+            headers: codexHeaders(tokens.access_token, message.headers || {}),
+          });
+
+          if (resp.status === 401 && tokens?.refresh_token) {
+            try {
+              tokens = await refreshCodexAccessToken(tokens);
+              resp = await fetch(requestUrl, {
+                ...requestInit,
+                headers: codexHeaders(tokens.access_token, message.headers || {}),
+              });
+            } catch (refreshErr) {
+              sendResponse({ ok: false, errorCode: 'REAUTH_REQUIRED', status: 401, message: 'Token refresh failed. Please re-authorize in the extension popup.' });
+              return;
+            }
+          }
+
+          const text = await resp.text();
+          sendResponse({ ok: resp.ok, status: resp.status, text });
+          return;
+        }
+
+        sendResponse({ ok: false, error: `Unknown message type: ${String(message?.type || '')}` });
+      } catch (err: any) {
+        sendResponse({ ok: false, error: String(err?.message || err) });
+      }
+    })();
+
+    return true;
+  });
+
+  // ── Port-based streaming for codex_proxy_fetch_stream ──
+  chrome.runtime.onConnect.addListener((port) => {
+    if (port.name !== 'codex_stream') return;
+
+    port.onMessage.addListener((message) => {
+      if (message.type !== 'codex_proxy_fetch_stream') return;
+
+      (async () => {
+        // Per-request timeout: 5 minutes for streaming (long-running requests)
+        const STREAM_TIMEOUT_MS = 5 * 60 * 1000;
+        let timeoutId = setTimeout(() => {
+          port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: 'Stream request timed out (5 min)' });
+          try { port.disconnect(); } catch {}
+        }, STREAM_TIMEOUT_MS);
+
+        try {
+          let tokens = await getCodexTokens();
+          if (!tokens?.access_token) {
+            clearTimeout(timeoutId);
+            port.postMessage({ type: 'error', errorCode: 'NOT_AUTHORIZED', message: 'Not authorized. Please complete device code login first.' });
+            port.disconnect();
+            return;
+          }
+
+          const requestUrl = message.url || CODEX_RESPONSES_URL;
+          const body = { ...(message.body || {}), stream: true };
+
+          let resp = await fetch(requestUrl, {
+            method: 'POST',
+            body: JSON.stringify(body),
+            headers: codexHeaders(tokens.access_token, message.headers || {}),
+          });
+
+          // Auto-refresh on 401
+          if (resp.status === 401 && tokens?.refresh_token) {
+            try {
+              tokens = await refreshCodexAccessToken(tokens);
+              resp = await fetch(requestUrl, {
+                method: 'POST',
+                body: JSON.stringify(body),
+                headers: codexHeaders(tokens.access_token, message.headers || {}),
+              });
+            } catch (refreshErr) {
+              clearTimeout(timeoutId);
+              port.postMessage({ type: 'error', errorCode: 'REAUTH_REQUIRED', status: 401, message: 'Token refresh failed. Please re-authorize in the extension popup.' });
+              port.disconnect();
+              return;
+            }
+          }
+
+          if (!resp.ok) {
+            clearTimeout(timeoutId);
+            const errText = await resp.text();
+            let errorCode = 'UPSTREAM_ERROR';
+            if (resp.status === 400) errorCode = 'UPSTREAM_BAD_REQUEST';
+            else if (resp.status === 429) errorCode = 'UPSTREAM_RATE_LIMITED';
+            else if (resp.status >= 500) errorCode = 'UPSTREAM_SERVER_ERROR';
+            port.postMessage({ type: 'error', errorCode, status: resp.status, message: errText });
+            port.disconnect();
+            return;
+          }
+
+          // Extract rate-limit headers before streaming body
+          const rateLimitHeaders: Record<string, string> = {};
+          const X_CODEX_PREFIXES = ['x-codex-primary', 'x-codex-secondary', 'x-codex-credits', 'x-codex-active-limit', 'x-codex-plan-type', 'x-codex-code-review', 'x-codex-review', 'x-code-review'];
+          resp.headers.forEach((value, key) => {
+            const lower = key.toLowerCase();
+            if (X_CODEX_PREFIXES.some(p => lower.startsWith(p))) {
+              rateLimitHeaders[lower] = value;
+            }
+          });
+          if (Object.keys(rateLimitHeaders).length > 0) {
+            // Save to storage for popup to read
+            chrome.storage.local.set({
+              codex_usage: {
+                headers: rateLimitHeaders,
+                updatedAt: Date.now(),
+              },
+            });
+          }
+
+          // Stream SSE chunks through the port
+          const reader = resp.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            port.postMessage({ type: 'chunk', data: chunk });
+          }
+
+          // Flush remaining bytes
+          const remaining = decoder.decode();
+          if (remaining) {
+            port.postMessage({ type: 'chunk', data: remaining });
+          }
+
+          port.postMessage({ type: 'done' });
+          clearTimeout(timeoutId);
+          port.disconnect();
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: String(err?.message || err) });
+          port.disconnect();
+        }
+      })();
+    });
   });
 });

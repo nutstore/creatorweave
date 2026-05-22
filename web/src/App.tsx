@@ -489,6 +489,13 @@ function App() {
   const extensionCheckStatus = useExtensionStore((s) => s.checkStatus)
 
   useEffect(() => {
+    // Install Codex bridge fetch wrapper once at app startup.
+    // This wraps globalThis.fetch to intercept chatgpt.com requests
+    // and route them through the extension bridge when available.
+    import('@/agent/loop/codex-bridge-fetch').then(({ installCodexBridgeFetch }) => {
+      installCodexBridgeFetch()
+    })
+
     const initial = setTimeout(extensionCheckStatus, 2000)
     const interval = setInterval(extensionCheckStatus, 5000)
     return () => { clearTimeout(initial); clearInterval(interval) }

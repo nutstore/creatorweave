@@ -53,6 +53,20 @@ export const conversation = {
     error: {
       requestFailed: "요청 실패:",
     },
+    codex: {
+      error: {
+        authRequired: "Codex 인증 필요",
+        authRequiredDesc: "Codex 세션이 만료되었거나 인증되지 않았습니다. 브라우저 확장 프로그램을 열어 다시 인증해주세요.",
+        openExtension: "확장 프로그램 열기",
+        extensionRequired: "확장 프로그램 없음",
+        extensionRequiredDesc: "Codex 제공자는 CreatorWeave 브라우저 확장 프로그램이 설치되어 있고 활성화되어야 합니다.",
+        installExtension: "확장 프로그램 설치",
+        rateLimited: "Codex 요청 제한",
+        rateLimitedDesc: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+        networkError: "네트워크 연결 오류",
+        networkErrorDesc: "Codex 서비스에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도해주세요.",
+      },
+    },
     usage: {
       highRisk: "고위험",
       nearLimit: "한계 근접",

@@ -70,6 +70,21 @@ export const conversation = {
     error: {
       requestFailed: "请求失败：",
     },
+    // Codex OAuth 错误
+    codex: {
+      error: {
+        authRequired: "Codex 需要授权",
+        authRequiredDesc: "您的 Codex 会话已过期或未授权，请打开浏览器扩展重新授权。",
+        openExtension: "打开扩展",
+        extensionRequired: "扩展不可用",
+        extensionRequiredDesc: "Codex 服务需要安装并启用 CreatorWeave 浏览器扩展。",
+        installExtension: "安装扩展",
+        rateLimited: "Codex 请求限流",
+        rateLimitedDesc: "请求过于频繁，请稍后再试。",
+        networkError: "网络连接错误",
+        networkErrorDesc: "无法连接到 Codex 服务，请检查网络连接后重试。",
+      },
+    },
     // Token 使用
     usage: {
       highRisk: "高风险",

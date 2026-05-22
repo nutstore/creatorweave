@@ -70,6 +70,21 @@ export const conversation = {
     error: {
       requestFailed: "Request failed:",
     },
+    // Codex OAuth error
+    codex: {
+      error: {
+        authRequired: "Codex Authorization Required",
+        authRequiredDesc: "Your Codex session has expired or is not authorized. Please open the browser extension to re-authorize.",
+        openExtension: "Open Extension",
+        extensionRequired: "Extension Not Available",
+        extensionRequiredDesc: "The Codex provider requires the CreatorWeave browser extension to be installed and active.",
+        installExtension: "Install Extension",
+        rateLimited: "Codex Rate Limit Reached",
+        rateLimitedDesc: "Too many requests. Please wait a moment and try again.",
+        networkError: "Network Connection Error",
+        networkErrorDesc: "Could not connect to the Codex service. Please check your internet connection and try again.",
+      },
+    },
     // Token usage
     usage: {
       highRisk: "High Risk",

@@ -88,6 +88,23 @@ function createOpenAICompatibleFallback(
   baseUrl: string,
   apiMode?: 'chat-completions' | 'responses'
 ): Model<Api> {
+  // Codex OAuth: use openai-responses handler with bridge fetch interception
+  if (providerType === 'codex-oauth') {
+    const contextWindow = lookupContextWindow(providerType, modelName)
+    return {
+      id: modelName,
+      name: modelName,
+      api: 'openai-responses', // Use official handler — fetch is intercepted by streamFn
+      provider: providerType,
+      baseUrl: normalizeBaseUrl(baseUrl),
+      reasoning: true,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow,
+      maxTokens: DEFAULT_MAX_TOKENS,
+    }
+  }
+
   const fallbackApi: Api =
     providerType === 'minimax' || providerType === 'minimax-cn' || isCustomProviderType(providerType)
       ? (apiMode === 'responses' ? 'openai-responses' : CW_OPENAI_FETCH_API)

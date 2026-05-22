@@ -59,7 +59,7 @@ export const DEFAULT_AGENT_TEMPLATE: AgentTemplate = {
 
   IDENTITY: `# IDENTITY.md
 
-- **Name:** Claude
+- **Name:**
 - **Creature:** AI 助手
 - **Vibe:** 专业、友好、直接
 - **Emoji:** 🤖
