@@ -53,6 +53,21 @@ export const conversation = {
     error: {
       requestFailed: "リクエスト失敗：",
     },
+    // Codex OAuth エラー
+    codex: {
+      error: {
+        authRequired: "Codex 認証が必要です",
+        authRequiredDesc: "Codex セッションが期限切れか認証されていません。ブラウザ拡張機能を開いて再認証してください。",
+        openExtension: "拡張機能を開く",
+        extensionRequired: "拡張機能が利用できません",
+        extensionRequiredDesc: "Codex プロバイダーを使用するには、CreatorWeave ブラウザ拡張機能がインストールされ有効になっている必要があります。",
+        installExtension: "拡張機能をインストール",
+        rateLimited: "Codex リクエスト制限",
+        rateLimitedDesc: "リクエストが多すぎます。しばらく待ってから再試行してください。",
+        networkError: "ネットワーク接続エラー",
+        networkErrorDesc: "Codex サービスに接続できません。インターネット接続を確認して再試行してください。",
+      },
+    },
     usage: {
       highRisk: "高リスク",
       nearLimit: "上限に近い",

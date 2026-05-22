@@ -757,7 +757,17 @@ function ExtensionSettingsPanel() {
         </div>
       </div>
 
-      {/* Install / Refresh button */}
+      {/* Download extension button — always visible */}
+      <BrandButton
+        variant="outline"
+        className="w-full"
+        onClick={() => window.open('/chrome-extension.zip', '_blank')}
+      >
+        <Download className="mr-2 h-4 w-4" />
+        {t('extension.downloadButton')}
+      </BrandButton>
+
+      {/* Install guide button — only when not installed */}
       {!isInstalled && (
         <BrandButton
           variant="default"
