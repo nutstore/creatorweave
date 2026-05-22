@@ -24,7 +24,7 @@
  *   Only committed messages are rendered (no runtime steps).
  */
 
-import { memo, type ReactNode, useRef, useState } from 'react'
+import { Fragment, memo, type ReactNode, useRef, useState } from 'react'
 import { Bot, Database, GitFork } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
@@ -377,8 +377,8 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
       {/* Steps column */}
       <div className={showAvatar ? 'w-[90%] min-w-0 space-y-2' : 'w-full min-w-0 space-y-2'}>
         {/* Timeline */}
-        {timeline.map((item, index) => (
-          <TimelineRow key={item.key} showDivider={index > 0}>
+        {timeline.map((item) => (
+          <Fragment key={item.key}>
             {renderTimelineItem(
               item,
               toolResults,
@@ -388,7 +388,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               conversationId,
               onPreviewAsset,
             )}
-          </TimelineRow>
+          </Fragment>
         ))}
 
         {/* Waiting indicator */}
@@ -568,16 +568,6 @@ function renderRuntimeStep(
       subagentEvents={step.subagentEvents}
       conversationId={conversationId ?? undefined}
     />
-  )
-}
-
-/** Row wrapper that optionally renders a divider above children */
-function TimelineRow({ showDivider, children }: { showDivider: boolean; children: ReactNode }) {
-  return (
-    <>
-      {showDivider && <div className="mb-2 border-t border-neutral-100 dark:border-neutral-700" />}
-      {children}
-    </>
   )
 }
 
