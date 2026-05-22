@@ -40,8 +40,9 @@ export const ScrollToBottomButton = memo(function ScrollToBottomButton({
 
   const handleClick = useCallback(() => {
     isUserAtBottomRef.current = true
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messagesEndRef, isUserAtBottomRef])
+    const el = scrollContainerRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [scrollContainerRef, isUserAtBottomRef])
 
   if (!show) return null
 

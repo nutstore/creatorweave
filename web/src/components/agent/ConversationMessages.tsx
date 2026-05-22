@@ -226,7 +226,13 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
     },
     scrollToTurnIndex: (index: number, _align: 'start' | 'center' | 'end' = 'start') => {
       const el = document.querySelector(`[data-turn-index="${index}"]`)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      if (!el) return
+      // Find the scroll container (nearest overflow-y-auto ancestor)
+      const container = el.closest('[class*="overflow-y-auto"]') as HTMLElement | null
+      if (container) {
+        const targetTop = (el as HTMLElement).offsetTop
+        container.scrollTo({ top: targetTop, behavior: 'smooth' })
+      }
     },
   }), [turns]))
 

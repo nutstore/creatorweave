@@ -237,7 +237,18 @@ export function useConversationLogic() {
     const behavior: ScrollBehavior =
       activeMessagesLength > lastRenderedMessageCountRef.current ? 'smooth' : 'auto'
     lastRenderedMessageCountRef.current = activeMessagesLength
-    messagesEndRef.current?.scrollIntoView({ behavior })
+    // Use scrollTo on the scroll container directly instead of scrollIntoView.
+    // scrollIntoView bubbles up through all scrollable ancestors and can
+    // shift the layout container itself (pushing it out of the viewport),
+    // especially when the scroll height is very large.
+    const container = scrollContainerRef.current
+    if (container) {
+      if (behavior === 'auto') {
+        container.scrollTop = container.scrollHeight
+      } else {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+      }
+    }
   }, [activeMessagesLength, status])
 
   // ── Tool results map ──

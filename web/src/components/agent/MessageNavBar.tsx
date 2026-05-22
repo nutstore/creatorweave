@@ -6,9 +6,13 @@
  *
  * On hover: the rail expands to reveal clickable dots for each user
  * message, with tooltip previews. Clicking a dot scrolls to that message.
+ *
+ * When there are many messages (> MAX_VISIBLE_DOTS), dots are sampled
+ * so they fit within the rail without overflowing. The active dot and
+ * its neighbors are always shown.
  */
 
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { useT } from '@/i18n'
 import type { ConversationMessagesHandle } from './ConversationMessages'
 
@@ -24,7 +28,8 @@ interface MessageNavBarProps {
   messageCount: number
 }
 
-const DENSE_THRESHOLD = 20
+/** Maximum number of dots rendered in the rail to prevent overflow. */
+const MAX_VISIBLE_DOTS = 30
 
 export const MessageNavBar = memo(function MessageNavBar({
   messagesHandle,
@@ -50,8 +55,6 @@ export const MessageNavBar = memo(function MessageNavBar({
       return () => cancelAnimationFrame(id)
     }
   }, [messagesHandle, messageCount])
-
-  const isDense = userItems.length > DENSE_THRESHOLD
 
   // ── Track active dot on scroll ──
   useEffect(() => {
@@ -82,9 +85,57 @@ export const MessageNavBar = memo(function MessageNavBar({
     [messagesHandle],
   )
 
+  // ── Sample dots when there are too many ──
+  // Always include: first, last, active, and evenly spaced items.
+  const displayItems = useMemo(() => {
+    if (userItems.length <= MAX_VISIBLE_DOTS) return userItems
+
+    const result: UserNavItem[] = []
+    const included = new Set<number>()
+
+    // Always include first and last
+    const add = (idx: number) => {
+      if (idx >= 0 && idx < userItems.length && !included.has(idx)) {
+        included.add(idx)
+        result.push(userItems[idx])
+      }
+    }
+
+    add(0)
+    add(userItems.length - 1)
+    if (activeIndex >= 0) {
+      add(activeIndex)
+      // Also include neighbors of active dot for context
+      add(activeIndex - 1)
+      add(activeIndex + 1)
+    }
+
+    // Fill remaining slots with evenly spaced items
+    const remaining = MAX_VISIBLE_DOTS - result.length
+    if (remaining > 0) {
+      const step = (userItems.length - 1) / (remaining + 1)
+      for (let i = 1; i <= remaining; i++) {
+        add(Math.round(step * i))
+      }
+    }
+
+    // Sort by original order
+    result.sort((a, b) => {
+      const ia = userItems.indexOf(a)
+      const ib = userItems.indexOf(b)
+      return ia - ib
+    })
+
+    return result
+  }, [userItems, activeIndex])
+
   if (userItems.length <= 1) return null
 
   const fillRatio = activeIndex >= 0 && userItems.length > 1 ? activeIndex / (userItems.length - 1) : 0
+  const isDense = userItems.length > MAX_VISIBLE_DOTS
+
+  // Map displayItem back to its original index in userItems for active check
+  const getOriginalIndex = (item: UserNavItem) => userItems.indexOf(item)
 
   return (
     // Outer wrapper matches the message content column layout (max-w-3xl mx-auto)
@@ -115,33 +166,37 @@ export const MessageNavBar = memo(function MessageNavBar({
 
             {/* Dots — hidden by default, shown on hover */}
             <div className="msg-nav-dots absolute inset-0 flex flex-col items-center justify-between opacity-0 transition-opacity duration-200">
-              {userItems.map((item, i) => (
-                <div
-                  key={item.turnIndex}
-                  className="group/dot relative z-[2] cursor-pointer"
-                  style={{ padding: isDense ? '1px 0' : '2px 0' }}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`#${item.number} ${item.preview}`}
-                  aria-current={i === activeIndex ? 'true' : undefined}
-                  onClick={() => handleClick(item.turnIndex)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(item.turnIndex) } }}
-                >
+              {displayItems.map((item) => {
+                const i = getOriginalIndex(item)
+                const isActive = i === activeIndex
+                return (
                   <div
-                    className={[
-                      'rounded-full transition-all duration-200',
-                      i === activeIndex ? 'bg-primary-500' : 'bg-neutral-300 hover:bg-primary-400',
-                      'dark:bg-[#2E4245] hover:dark:bg-primary-400',
-                      i === activeIndex && 'dark:bg-[#6B999D]',
-                    ].filter(Boolean).join(' ')}
-                    style={{ width: i === activeIndex ? 6 : 5, height: i === activeIndex ? 6 : 5 }}
-                  />
-                  {/* Tooltip — appears to the left */}
-                  <div className="pointer-events-none absolute right-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 opacity-0 shadow-sm transition-opacity group-hover/dot:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-                    <span className="text-neutral-400 dark:text-neutral-500">#{item.number}</span> {item.preview}
+                    key={item.turnIndex}
+                    className="group/dot relative z-[2] cursor-pointer"
+                    style={{ padding: isDense ? '1px 0' : '2px 0' }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`#${item.number} ${item.preview}`}
+                    aria-current={isActive ? 'true' : undefined}
+                    onClick={() => handleClick(item.turnIndex)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(item.turnIndex) } }}
+                  >
+                    <div
+                      className={[
+                        'rounded-full transition-all duration-200',
+                        isActive ? 'bg-primary-500' : 'bg-neutral-300 hover:bg-primary-400',
+                        'dark:bg-[#2E4245] hover:dark:bg-primary-400',
+                        isActive && 'dark:bg-[#6B999D]',
+                      ].filter(Boolean).join(' ')}
+                      style={{ width: isActive ? 6 : 5, height: isActive ? 6 : 5 }}
+                    />
+                    {/* Tooltip — appears to the left */}
+                    <div className="pointer-events-none absolute right-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 opacity-0 shadow-sm transition-opacity group-hover/dot:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+                      <span className="text-neutral-400 dark:text-neutral-500">#{item.number}</span> {item.preview}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </nav>
         </div>
