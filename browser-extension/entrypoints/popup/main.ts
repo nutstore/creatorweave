@@ -216,7 +216,7 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">' +
         '<span style="font-size:10px;font-weight:600;color:#6b7280;width:22px;">' + label + '</span>' +
         '<div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">' +
-          '<div style="height:100%;width:' + Math.min(100, win.usedPercent) + '%;background:' + color + ';border-radius:3px;transition:width 0.3s;"></div>' +
+          '<div style="height:100%;width:' + Math.min(100, remaining) + '%;background:' + color + ';border-radius:3px;transition:width 0.3s;"></div>' +
         '</div>' +
         '<span style="font-size:10px;font-weight:600;color:' + color + ';min-width:36px;text-align:right;">' + Math.round(remaining) + '% left</span>' +
       '</div>' +
