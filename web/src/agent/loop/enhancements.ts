@@ -37,6 +37,13 @@ export interface InjectEnhancementsInput {
  * └──────────────────────────────────────────┘
  */
 export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput): Promise<string> {
+  // Keep tab-discovered WebMCP tools in sync before generating tool docs.
+  try {
+    await input.toolRegistry.registerWebMCPTools()
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to sync WebMCP tools:', error)
+  }
+
   // ── STABLE SECTION ──────────────────────────────────────────────────
   // ① + ②: Base prompt + agent mode (changes infrequently)
   let enhancedPrompt = buildStableSystemPrompt(input.baseSystemPrompt, input.mode)

@@ -17,13 +17,31 @@ export default defineContentScript({
   world: 'MAIN',
 
   main() {
-    // Prevent duplicate injection
-    if ((window as any).__agentWeb) return;
+    type PendingRequest = {
+      resolve: (value: any) => void
+      timeoutId: number
+      invalidatedTimerId: number | null
+    }
+
+    type BridgeRuntimeState = {
+      dispose?: () => void
+    }
+
+    // If a newer copy of this script was injected, tear down old listeners/state first.
+    const existingState = (window as any).__agentWebBridgeState as BridgeRuntimeState | undefined
+    if (existingState?.dispose) {
+      try {
+        existingState.dispose()
+      } catch {
+        // ignore stale cleanup errors
+      }
+    }
 
     let _requestId = 0;
+    const INVALIDATED_FALLTHROUGH_WAIT_MS = 200
 
     // Pending request promises, keyed by id
-    const _pending = new Map<string, { resolve: (value: any) => void }>();
+    const _pending = new Map<string, PendingRequest>();
 
     // ── Pending stream callbacks, keyed by id ──
     const _streaming = new Map<string, {
@@ -32,8 +50,29 @@ export default defineContentScript({
       onError: (errorCode: string, message: string) => void
     }>();
 
+    const clearPending = (id: string): PendingRequest | null => {
+      const pending = _pending.get(id)
+      if (!pending) return null
+      _pending.delete(id)
+      clearTimeout(pending.timeoutId)
+      if (pending.invalidatedTimerId !== null) {
+        clearTimeout(pending.invalidatedTimerId)
+      }
+      return pending
+    }
+
+    const isExtensionContextInvalidatedResponse = (response: any): boolean => {
+      if (!response || response.ok !== false) return false
+      const code = typeof response.errorCode === 'string' ? response.errorCode : ''
+      const message = typeof response.error === 'string' ? response.error : ''
+      return (
+        code === 'EXTENSION_CONTEXT_INVALIDATED' ||
+        message.toLowerCase().includes('extension context invalidated')
+      )
+    }
+
     // Listen for responses from the ISOLATED-world relay
-    window.addEventListener('message', (event) => {
+    const onBridgeMessage = (event: MessageEvent) => {
       if (event.source !== window) return;
       const data = event.data;
       if (!data || data.__agentWebBridge !== true) return;
@@ -42,8 +81,24 @@ export default defineContentScript({
       if (data.__agentWebResponse === true) {
         const pending = _pending.get(data.id);
         if (pending) {
-          _pending.delete(data.id);
-          pending.resolve(data.response);
+          if (isExtensionContextInvalidatedResponse(data.response)) {
+            // Multiple content-script contexts may race to answer.
+            // Give any healthy context a short chance to return a non-invalidated response first.
+            if (pending.invalidatedTimerId === null) {
+              pending.invalidatedTimerId = window.setTimeout(() => {
+                const finalized = clearPending(data.id)
+                if (finalized) {
+                  finalized.resolve(data.response)
+                }
+              }, INVALIDATED_FALLTHROUGH_WAIT_MS)
+            }
+            return
+          }
+
+          const finalized = clearPending(data.id)
+          if (finalized) {
+            finalized.resolve(data.response)
+          }
         }
         return;
       }
@@ -67,13 +122,21 @@ export default defineContentScript({
           stream.onError('EXTENSION_UNAVAILABLE', 'Extension disconnected unexpectedly');
         }
       }
-    });
+    }
+
+    window.addEventListener('message', onBridgeMessage);
 
     // Send request to ISOLATED relay → background
     function sendToBridge(type: string, payload: Record<string, any>): Promise<any> {
       return new Promise((resolve) => {
         const id = '__aw_' + (++_requestId) + '_' + Date.now();
-        _pending.set(id, { resolve });
+        const timeoutId = window.setTimeout(() => {
+          const pending = clearPending(id)
+          if (pending) {
+            pending.resolve({ ok: false, error: 'Bridge request timeout', errorCode: 'BRIDGE_TIMEOUT' });
+          }
+        }, 35000)
+        _pending.set(id, { resolve, timeoutId, invalidatedTimerId: null });
 
         window.postMessage({
           __agentWebBridge: true,
@@ -81,14 +144,6 @@ export default defineContentScript({
           type,
           payload,
         }, '*');
-
-        // Timeout safety
-        setTimeout(() => {
-          if (_pending.has(id)) {
-            _pending.delete(id);
-            resolve({ ok: false, error: 'Bridge request timeout' });
-          }
-        }, 35000); // Longer timeout for render mode
       });
     }
 
@@ -351,6 +406,24 @@ export default defineContentScript({
       },
 
       /**
+       * Discover WebMCP tools across tabs in current browser window.
+       */
+      async webMCPDiscover(options?: { force?: boolean }) {
+        return sendToBridge('webmcp_discover_tools', { options: options || {} });
+      },
+
+      /**
+       * Invoke a discovered WebMCP tool.
+       */
+      async webMCPInvoke(payload: {
+        fullToolName: string
+        args?: Record<string, unknown>
+        preferredTabId?: number
+      }) {
+        return sendToBridge('webmcp_invoke_tool', payload || {});
+      },
+
+      /**
        * Proxy a Codex API request through the extension with SSE streaming.
        * Returns an async iterable of raw SSE text chunks.
        * The caller should parse SSE events from the yielded strings.
@@ -359,6 +432,25 @@ export default defineContentScript({
         return sendToBridgeStream('codex_proxy_fetch_stream', { body });
       },
     };
+
+    ;(window as any).__agentWebBridgeState = {
+      dispose() {
+        window.removeEventListener('message', onBridgeMessage)
+        for (const [id, pending] of _pending) {
+          _pending.delete(id)
+          clearTimeout(pending.timeoutId)
+          if (pending.invalidatedTimerId !== null) {
+            clearTimeout(pending.invalidatedTimerId)
+          }
+          pending.resolve({
+            ok: false,
+            errorCode: 'BRIDGE_REPLACED',
+            error: 'Bridge instance replaced by a newer injection',
+          })
+        }
+        _streaming.clear()
+      },
+    }
 
     console.log('[Browser Extension] ✅ Ready, window.__agentWeb available');
   },

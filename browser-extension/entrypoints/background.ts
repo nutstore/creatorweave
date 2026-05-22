@@ -2,6 +2,9 @@
 // Background Service Worker
 // ============================================================
 
+import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
+import { invokeWebMCPTool } from './webmcp/invoke'
+
 // Config
 const CONFIG = {
   TIMEOUT_MS: 15000,              // Request timeout in ms
@@ -502,6 +505,16 @@ export default defineBackground(() => {
 
         if (message.type === 'web_fetch_render') {
           sendResponse(await handleFetchRender(message));
+          return;
+        }
+
+        if (message.type === 'webmcp_discover_tools') {
+          sendResponse(await discoverWebMCPToolsInCurrentWindow());
+          return;
+        }
+
+        if (message.type === 'webmcp_invoke_tool') {
+          sendResponse(await invokeWebMCPTool(message));
           return;
         }
 

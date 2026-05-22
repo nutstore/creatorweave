@@ -89,3 +89,4 @@ docs/technical-debt-plan.md
 # Browser extension (WXT)
 browser-extension/.output/
 browser-extension/.wxt/
+.codegraph/

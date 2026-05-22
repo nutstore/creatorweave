@@ -42,6 +42,7 @@ import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
 import { OfflineQueue } from '@/components/mobile/OfflineQueue'
 import { MCPSettings } from '@/components/mcp/MCPSettings'
+import { WebMCPSettings } from '@/components/webmcp/WebMCPSettings'
 import {
   BrandDialog,
   BrandDialogClose,
@@ -64,7 +65,17 @@ import { useWebContainerStore } from '@/store/webcontainer.store'
 // Types
 // =============================================================================
 
-type SettingsTab = 'general' | 'llm' | 'mcp' | 'extension' | 'sync' | 'offline' | 'experimental' | 'remote' | 'webcontainer'
+type SettingsTab =
+  | 'general'
+  | 'llm'
+  | 'mcp'
+  | 'webmcp'
+  | 'extension'
+  | 'sync'
+  | 'offline'
+  | 'experimental'
+  | 'remote'
+  | 'webcontainer'
 
 interface SessionSyncMetadata {
   syncId: string
@@ -865,6 +876,7 @@ const SettingsDialogContent = forwardRef<
     { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
     { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
+    { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
     { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
     { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
     { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
@@ -1007,6 +1019,13 @@ const SettingsDialogContent = forwardRef<
           {activeTab === 'mcp' && (
             <div className="py-1">
               <MCPSettings />
+            </div>
+          )}
+
+          {/* WebMCP Settings Tab */}
+          {activeTab === 'webmcp' && (
+            <div className="py-1">
+              <WebMCPSettings />
             </div>
           )}
 

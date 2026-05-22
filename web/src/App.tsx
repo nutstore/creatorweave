@@ -489,6 +489,9 @@ function App() {
   const extensionCheckStatus = useExtensionStore((s) => s.checkStatus)
 
   useEffect(() => {
+    let disposed = false
+    let stopWebMCPSyncLoop: (() => void) | null = null
+
     // Install Codex bridge fetch wrapper once at app startup.
     // This wraps globalThis.fetch to intercept chatgpt.com requests
     // and route them through the extension bridge when available.
@@ -496,9 +499,20 @@ function App() {
       installCodexBridgeFetch()
     })
 
+    // Keep WebMCP tab tools in sync for AI calls and settings UI.
+    import('@/webmcp').then(({ startWebMCPSyncLoop }) => {
+      if (disposed) return
+      stopWebMCPSyncLoop = startWebMCPSyncLoop()
+    })
+
     const initial = setTimeout(extensionCheckStatus, 1000)
     const interval = setInterval(extensionCheckStatus, 5000)
-    return () => { clearTimeout(initial); clearInterval(interval) }
+    return () => {
+      disposed = true
+      clearTimeout(initial)
+      clearInterval(interval)
+      if (stopWebMCPSyncLoop) stopWebMCPSyncLoop()
+    }
   }, [extensionCheckStatus])
 
   const runInitStep = async <T,>(

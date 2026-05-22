@@ -15,6 +15,14 @@ export default defineContentScript({
   runAt: 'document_idle',
 
   main() {
+    function normalizeRelayError(err: unknown): { errorCode: string; error: string } {
+      const message = err instanceof Error ? err.message : String(err || 'Unknown extension error')
+      if (message.toLowerCase().includes('extension context invalidated')) {
+        return { errorCode: 'EXTENSION_CONTEXT_INVALIDATED', error: message }
+      }
+      return { errorCode: 'EXTENSION_RELAY_ERROR', error: message }
+    }
+
     // ── Request/Response relay (existing) ──
 
     window.addEventListener('message', (event) => {
@@ -70,21 +78,27 @@ export default defineContentScript({
         chrome.runtime.sendMessage(
           { type, ...payload },
           (response) => {
+            const runtimeError = chrome.runtime.lastError
+            const normalizedResponse = runtimeError
+              ? { ok: false, ...normalizeRelayError(runtimeError.message || runtimeError) }
+              : (response || { ok: false, errorCode: 'NO_BACKGROUND_RESPONSE', error: 'No response from background' })
+
             // Send response back to page (MAIN world)
             window.postMessage({
               __agentWebBridge: true,
               __agentWebResponse: true,
               id,
-              response: response || { ok: false, error: 'No response from background' },
+              response: normalizedResponse,
             }, '*');
           },
         );
       } catch (err) {
+        const normalized = normalizeRelayError(err)
         window.postMessage({
           __agentWebBridge: true,
           __agentWebResponse: true,
           id,
-          response: { ok: false, error: err instanceof Error ? err.message : String(err) },
+          response: { ok: false, ...normalized },
         }, '*');
       }
     });
