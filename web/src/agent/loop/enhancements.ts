@@ -1,14 +1,8 @@
 import { getMCPManager } from '@/mcp'
-import { getSkillManager } from '@/skills/skill-manager'
-import type { SkillMatchContext } from '@/skills/skill-types'
 import { getIntelligenceCoordinator } from '../intelligence-coordinator'
 import type { Message } from '../message-types'
 import { triggerPrefetch } from '../prefetch'
-import {
-  buildStableSystemPrompt,
-  getToolDiscoveryMessage,
-  shouldShowToolDiscovery,
-} from '../prompts/universal-system-prompt'
+import { buildStableSystemPrompt } from '../prompts/universal-system-prompt'
 import type { ToolRegistry } from '../tool-registry'
 import { buildAvailableToolsPrompt } from '../tool-registry'
 import type { ToolContext } from '../tools/tool-types'
@@ -43,10 +37,6 @@ export interface InjectEnhancementsInput {
  * └──────────────────────────────────────────┘
  */
 export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput): Promise<string> {
-  // Extract user message for scenario detection (use the last user message)
-  const lastUserMsg = [...input.messages].reverse().find((m) => m.role === 'user')
-  const userMessage = lastUserMsg?.content || ''
-
   // ── STABLE SECTION ──────────────────────────────────────────────────
   // ① + ②: Base prompt + agent mode (changes infrequently)
   let enhancedPrompt = buildStableSystemPrompt(input.baseSystemPrompt, input.mode)
@@ -79,7 +69,6 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     const coordinator = getIntelligenceCoordinator()
     const intelligenceResult = await coordinator.enhanceSystemPrompt(enhancedPrompt, {
       projectId: input.toolContext.projectId ?? null,
-      userMessage,
       sessionId: input.sessionId,
       currentAgentId: input.toolContext.currentAgentId ?? null,
     })
@@ -119,34 +108,6 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // ── DYNAMIC SECTION ─────────────────────────────────────────────────
   // Everything below varies per user message or per minute.
   // Appended at the end to preserve prompt cache for the stable prefix above.
-
-  // ⑥.5: File mention context (when user message contains #path references)
-  // Matches: #path/to/file, #file.ts, #src/App.tsx (with or without path separator)
-  const fileMentionMatch = userMessage.match(/#([\w.\-]+[/\\][\w./\\\-]*|[\w.\-]+\.[\w]+)/)
-  if (fileMentionMatch) {
-    enhancedPrompt += '\n\n## User-Referenced Files\nThe user used `#path/to/file` notation to reference specific files in their message. These are file paths in their project. When relevant, read these files before responding to provide accurate, context-aware answers.'
-  }
-
-  // ⑦: Skills block (depends on user message)
-  if (lastUserMsg) {
-    const context: SkillMatchContext = {
-      userMessage: userMessage,
-    }
-
-    const skillManager = getSkillManager()
-    const skillsBlock = skillManager.getEnhancedSystemPrompt('', context)
-    if (skillsBlock) {
-      enhancedPrompt += skillsBlock
-    }
-  }
-
-  // ⑧: Tool discovery (depends on user message)
-  if (shouldShowToolDiscovery(userMessage)) {
-    const discoveryMsg = getToolDiscoveryMessage(userMessage)
-    if (discoveryMsg) {
-      enhancedPrompt += '\n\n' + discoveryMsg
-    }
-  }
 
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()
