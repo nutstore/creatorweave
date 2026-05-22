@@ -77,7 +77,7 @@ function isReadPolicy(value: unknown): value is ReadPolicy {
   return value === 'auto' || value === 'prefer_opfs' || value === 'prefer_native'
 }
 
-const BASE64_CHUNK_SIZE = 0x8000
+
 
 /**
  * Build a retry hint string for content_too_large errors.
@@ -239,24 +239,13 @@ async function executeSingleRead(
       )
     }
 
-    if (hasRangeOptions(options)) {
-      return toolErrorJson(
-        'read',
-        'range_not_supported_for_binary',
-        'offset/limit/start_line/line_count can only be used for text files.',
-        { details: { path } }
-      )
-    }
-    const base64 = await encodeBinaryContentAsBase64(content)
-    return toolOkJson(
+    return toolErrorJson(
       'read',
-      {
-        path,
-        kind: 'binary_base64',
-        content: base64,
-        metadata: { size: metadata.size, contentType: metadata.contentType },
-      },
-      buildMeta({ source: backendResult.source || target.backend.label })
+      'binary_file_rejected',
+      `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
+        'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
+        `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/{rootName}/${path}.`,
+      { details: { path, contentType: metadata.contentType, size: metadata.size } }
     )
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
@@ -321,27 +310,13 @@ async function executeSingleRead(
               }
             )
           }
-          if (hasRangeOptions(options)) {
-            return toolErrorJson(
-              'read',
-              'range_not_supported_for_binary',
-              'offset/limit/start_line/line_count can only be used for text files.',
-              { details: { path } }
-            )
-          }
-          const base64 = await encodeBinaryContentAsBase64(content)
-          return toolOkJson(
+          return toolErrorJson(
             'read',
-            {
-              path,
-              kind: 'binary_base64',
-              content: base64,
-              metadata: { size: metadata.size, contentType: metadata.contentType },
-            },
-            {
-              ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
-              source: 'native_fallback',
-            }
+            'binary_file_rejected',
+            `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
+              'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
+              `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/{rootName}/${path}.`,
+            { details: { path, contentType: metadata.contentType, size: metadata.size } }
           )
         }
       } catch (fallbackError) {
@@ -363,18 +338,6 @@ async function executeSingleRead(
 
 function hasRangeOptions(options: ReadRangeOptions): boolean {
   return options.startLine !== undefined || options.lineCount !== undefined
-}
-
-async function encodeBinaryContentAsBase64(content: ArrayBuffer | Blob): Promise<string> {
-  const buffer = content instanceof ArrayBuffer ? content : await content.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  if (bytes.length === 0) return ''
-
-  let binary = ''
-  for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + BASE64_CHUNK_SIZE))
-  }
-  return btoa(binary)
 }
 
 function buildReadStateEntry(
