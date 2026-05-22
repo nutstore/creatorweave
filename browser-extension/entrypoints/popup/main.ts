@@ -376,8 +376,8 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 })();
 
 document.getElementById('openDocs')!.addEventListener('click', function () {
-  chrome.tabs.create({ url: 'https://github.com/nutstore-nut/creatorweave/blob/main/browser-extension/README.md' });
+  chrome.tabs.create({ url: 'https://github.com/nutstore/creatorweave/blob/main/browser-extension/README.md' });
 });
 document.getElementById('openGithub')!.addEventListener('click', function () {
-  chrome.tabs.create({ url: 'https://github.com/nutstore-nut/creatorweave' });
+  chrome.tabs.create({ url: 'https://github.com/nutstore/creatorweave' });
 });

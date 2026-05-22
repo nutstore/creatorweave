@@ -87,6 +87,13 @@ interface ExtensionState {
 
   // --- Actions ---
   checkStatus: () => ExtensionStatus
+  /**
+   * Ensure the codex-oauth provider is registered before checking API keys.
+   * Must be awaited before checkHasApiKey() so getProviderConfig('codex-oauth')
+   * returns a valid config instead of null.
+   * No-op if extension is not installed or not authorized.
+   */
+  ensureCodexRegistered: () => Promise<void>
   dismissBanner: () => void
   shouldShowBanner: () => boolean
   openInstallGuide: () => void
@@ -123,44 +130,59 @@ export const useExtensionStore = create<ExtensionState>()(
           set({ status: newStatus, lastCheckAt: Date.now() })
         }
 
-        // Check Codex OAuth status when extension is installed
+        // Fire-and-forget: register codex-oauth when extension is installed
         if (newStatus === 'installed') {
-          const bridge = (window as any).__agentWeb
-          if (bridge?.codexGetStatus) {
-            bridge.codexGetStatus().then(async (resp: any) => {
-              if (resp?.ok && resp.data?.authorized && !get().codexOAuthRegistered) {
-                await registerCodexOAuthProvider(resp.data.models)
-                set({ codexOAuthRegistered: true })
-                // Auto-pin codex models if none pinned yet + refresh provider list
-                try {
-                  const { useSettingsStore } = await import('@/store/settings.store')
-                  const settings = useSettingsStore.getState()
-                  const existing = settings.pinnedModelsByProvider['codex-oauth']
-                  if (!existing || existing.length === 0) {
-                    const models = resp.data.models || []
-                    if (models.length > 0) {
-                      settings.setPinnedModels(
-                        'codex-oauth',
-                        models.map((m: any) => m.id),
-                      )
-                    }
-                  }
-                  useSettingsStore.getState().triggerProviderRefresh()
-                } catch {}
-              } else if ((!resp?.ok || !resp.data?.authorized) && get().codexOAuthRegistered) {
-                unregisterCodexOAuthProvider()
-                set({ codexOAuthRegistered: false })
-              }
-            }).catch(() => {
-              // Silently ignore — extension may not support codex yet
-            })
-          }
+          get().ensureCodexRegistered().catch(() => {})
         } else if (get().codexOAuthRegistered) {
           unregisterCodexOAuthProvider()
           set({ codexOAuthRegistered: false })
         }
 
         return newStatus
+      },
+
+      ensureCodexRegistered: async () => {
+        // Already registered — no-op
+        if (get().codexOAuthRegistered) return
+
+        const bridge = (window as any).__agentWeb
+        if (!bridge?.codexGetStatus) return
+
+        try {
+          const resp = await bridge.codexGetStatus()
+          if (resp?.ok && resp.data?.authorized && !get().codexOAuthRegistered) {
+            await registerCodexOAuthProvider(resp.data.models)
+            set({ codexOAuthRegistered: true })
+            // Auto-pin codex models if none pinned yet + refresh provider list
+            try {
+              const { useSettingsStore } = await import('@/store/settings.store')
+              const settings = useSettingsStore.getState()
+              const existing = settings.pinnedModelsByProvider['codex-oauth']
+              if (!existing || existing.length === 0) {
+                const models = resp.data.models || []
+                if (models.length > 0) {
+                  settings.setPinnedModels(
+                    'codex-oauth',
+                    models.map((m: any) => m.id),
+                  )
+                }
+              }
+              useSettingsStore.getState().triggerProviderRefresh()
+            } catch {}
+            // Re-check API key now that the provider is registered,
+            // so the UI updates from "model unavailable" to ready.
+            try {
+              const { useSettingsStore } = await import('@/store/settings.store')
+              useSettingsStore.getState().invalidateApiKeyCache('codex-oauth')
+              await useSettingsStore.getState().checkHasApiKey()
+            } catch {}
+          } else if ((!resp?.ok || !resp.data?.authorized) && get().codexOAuthRegistered) {
+            unregisterCodexOAuthProvider()
+            set({ codexOAuthRegistered: false })
+          }
+        } catch {
+          // Silently ignore — extension may not support codex yet
+        }
       },
 
       dismissBanner: () => {

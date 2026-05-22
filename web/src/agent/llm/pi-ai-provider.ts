@@ -189,19 +189,22 @@ export class PiAIProvider implements LLMProvider {
       signal,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
-    }
-
-    // When disableThinking is true, inject onPayload callback to suppress reasoning
-    if (request.disableThinking) {
-      streamOptions.onPayload = (payload: Record<string, unknown>) => {
-        // GLM (智谱): thinking.type = "disabled"
-        // Qwen (通义): enable_thinking = false
-        // DeepSeek: no official param
-        // OpenAI o-series: reasoning_effort = "none"
-        payload.thinking = { type: 'disabled' }
-        payload.enable_thinking = false
-        payload.reasoning_effort = 'none'
-      }
+      onPayload: (payload: Record<string, unknown>) => {
+        // Codex API (openai-responses): 'instructions' is required
+        if (!payload.instructions && context.systemPrompt) {
+          payload.instructions = context.systemPrompt
+        }
+        // Codex API does not support max_output_tokens
+        if (this.model.provider === 'codex-oauth') {
+          delete payload.max_output_tokens
+        }
+        // Suppress reasoning when disableThinking is set (Codex API doesn't support these params)
+        if (request.disableThinking && this.model.provider !== 'codex-oauth') {
+          payload.thinking = { type: 'disabled' }
+          payload.enable_thinking = false
+          payload.reasoning_effort = 'none'
+        }
+      },
     }
 
     const eventStream = stream(this.model, context, streamOptions as Parameters<typeof stream>[2])

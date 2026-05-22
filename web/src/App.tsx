@@ -496,7 +496,7 @@ function App() {
       installCodexBridgeFetch()
     })
 
-    const initial = setTimeout(extensionCheckStatus, 2000)
+    const initial = setTimeout(extensionCheckStatus, 1000)
     const interval = setInterval(extensionCheckStatus, 5000)
     return () => { clearTimeout(initial); clearInterval(interval) }
   }, [extensionCheckStatus])
