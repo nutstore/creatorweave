@@ -3,11 +3,18 @@ export { isWebMCPBridgeAvailable, getWebMCPBridge } from './bridge-client'
 export {
   syncWebMCPTools,
   refreshWebMCPTools,
+  applyWebMCPGlobalToggle,
   applyWebMCPHostToggle,
   unregisterAllWebMCPTools,
   getRegisteredWebMCPToolNames,
 } from './manager'
 export { startWebMCPSyncLoop } from './runtime'
+export {
+  WEBMCP_MIN_CHROME_VERSION,
+  WEBMCP_FLAGS_URL,
+  WEBMCP_DOC_URL,
+} from './constants'
+export { detectWebMCPBrowserSupport } from './browser-support'
 export type {
   WebMCPApiMode,
   WebMCPDiscoveredTool,
@@ -17,4 +24,3 @@ export type {
   WebMCPHostCatalog,
   WebMCPBridge,
 } from './types'
-

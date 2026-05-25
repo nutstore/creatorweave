@@ -2,6 +2,7 @@ import { getWebMCPBridge } from './bridge-client'
 import { createWebMCPToolExecutor, webMCPToolToToolDefinition } from './tool-bridge'
 import { useWebMCPStore } from './store'
 import type { WebMCPDiscoveredTool } from './types'
+import { useSettingsStore } from '@/store/settings.store'
 
 type RegistryLike = {
   register: (definition: import('@/agent/tools/tool-types').ToolDefinition, executor: import('@/agent/tools/tool-types').ToolExecutor) => void
@@ -153,6 +154,10 @@ export async function syncWebMCPTools(options: {
   forceDiscovery?: boolean
 } = {}): Promise<number> {
   const registry = await resolveRegistry(options.registry)
+  if (!useSettingsStore.getState().enableWebMCP) {
+    await unregisterAllWebMCPTools(registry)
+    return 0
+  }
   await discoverAndCacheTools(!!options.forceDiscovery)
   return syncFromCatalog(registry)
 }
@@ -168,7 +173,24 @@ export async function applyWebMCPHostToggle(
 ): Promise<number> {
   useWebMCPStore.getState().setHostEnabled(hostname, enabled)
   const resolvedRegistry = await resolveRegistry(registry)
+  if (!useSettingsStore.getState().enableWebMCP) {
+    await unregisterAllWebMCPTools(resolvedRegistry)
+    return 0
+  }
   return syncFromCatalog(resolvedRegistry)
+}
+
+export async function applyWebMCPGlobalToggle(
+  enabled: boolean,
+  registry?: RegistryLike
+): Promise<number> {
+  useSettingsStore.getState().setEnableWebMCP(enabled)
+  const resolvedRegistry = await resolveRegistry(registry)
+  if (!enabled) {
+    await unregisterAllWebMCPTools(resolvedRegistry)
+    return 0
+  }
+  return syncWebMCPTools({ registry: resolvedRegistry, forceDiscovery: true })
 }
 
 export async function unregisterAllWebMCPTools(registry?: RegistryLike): Promise<number> {

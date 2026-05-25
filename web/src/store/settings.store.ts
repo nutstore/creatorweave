@@ -64,6 +64,7 @@ interface SettingsState {
 
   // 实验性功能 (Experimental features, disabled by default)
   enableBatchSpawn: boolean
+  enableWebMCP: boolean
 
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
@@ -97,6 +98,7 @@ interface SettingsState {
   setEnableThinking: (v: boolean) => void
   setThinkingLevel: (v: ThinkingLevel) => void
   setEnableBatchSpawn: (v: boolean) => void
+  setEnableWebMCP: (v: boolean) => void
   setHasApiKey: (has: boolean) => void
   getEffectiveProviderConfig: () => EffectiveProviderConfig | null
 
@@ -187,6 +189,7 @@ export const useSettingsStore = create<SettingsState>()(
       enableThinking: false,
       thinkingLevel: 'medium' as ThinkingLevel,
       enableBatchSpawn: false,
+      enableWebMCP: true,
       hasApiKey: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
@@ -406,6 +409,7 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableThinking: (enableThinking) => set({ enableThinking }),
       setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
+      setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
 
       getEffectiveProviderConfig: () => {
@@ -656,6 +660,7 @@ export const useSettingsStore = create<SettingsState>()(
         enableThinking: state.enableThinking,
         thinkingLevel: state.thinkingLevel,
         enableBatchSpawn: state.enableBatchSpawn,
+        enableWebMCP: state.enableWebMCP,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
         pinnedModelsByProvider: state.pinnedModelsByProvider,
