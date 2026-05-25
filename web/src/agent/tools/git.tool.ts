@@ -47,6 +47,49 @@ function parseBooleanArg(value: unknown, name: string): { ok: true; value: boole
   return { ok: false, error: `${name} must be boolean` }
 }
 
+/**
+ * 当 path 过滤无结果时，构建路径提示信息。
+ * 检查已有文件路径中是否有以某个公共前缀开头的，暗示用户可能遗漏了 root 前缀。
+ */
+function buildPathHint(inputPath: string, existingFiles: Array<{ path: string }>): string | undefined {
+  // 从已有文件路径中提取所有可能的 root 前缀（第一个 / 之前的部分）
+  const roots = new Set<string>()
+  for (const f of existingFiles) {
+    const slashIdx = f.path.indexOf('/')
+    if (slashIdx > 0) {
+      roots.add(f.path.substring(0, slashIdx))
+    }
+  }
+
+  // 如果没有任何 root 前缀（单根项目），无需提示
+  if (roots.size === 0) return undefined
+
+  // 检查用户输入是否以某个 root 开头
+  const alreadyHasRoot = [...roots].some((r) => inputPath.startsWith(r + '/'))
+  if (alreadyHasRoot) {
+    // 已有正确前缀但无结果，可能是路径本身有误
+    return undefined
+  }
+
+  // 猜测：用户可能遗漏了 root 前缀
+  const suggestions = [...roots]
+    .map((r) => `${r}/${inputPath}`)
+    .filter((candidate) =>
+      existingFiles.some((f) => f.path.startsWith(candidate))
+    )
+
+  if (suggestions.length === 1) {
+    return `Did you mean "${suggestions[0]}"? (path needs root prefix)`
+  } else if (suggestions.length > 1) {
+    return `Possible paths: ${suggestions.map((s) => `"${s}"`).join(', ')}`
+  }
+
+  // 没有精确匹配，但还是提示用户 root 前缀
+  const rootList = [...roots].join(', ')
+  const firstRoot = roots.values().next().value
+  return `This project has multi-root layout. Available roots: [${rootList}]. Try "${firstRoot}/${inputPath}"`
+}
+
 //=============================================================================
 // git_status - 查看工作区状态
 //=============================================================================
@@ -258,6 +301,28 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
       contextLines: unified,
     })
 
+    // 如果 path 过滤后无结果，检查是否需要提示路径前缀
+    const filesChanged = result?.summary?.filesChanged ?? result?.files?.length ?? 0
+    const hasPath = !!path
+    let pathHint: string | undefined
+
+    if (hasPath && filesChanged === 0) {
+      // 额外查一次不带 path 的 diff，提取 root 前缀用于提示
+      try {
+        const fullResult = await gitDiff(workspaceId, {
+          mode,
+          snapshotId,
+          path: undefined,
+          directoryHandle: null,
+          contextLines: unified,
+        })
+        pathHint = buildPathHint(path, fullResult?.files ?? [])
+      } catch {
+        // 查询失败不影响主流程
+        pathHint = undefined
+      }
+    }
+
     const renderOptions = {
       nameOnly: nameOnlyParsed.value,
       nameStatus: nameStatusParsed.value,
@@ -266,7 +331,12 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
       patch: args.patch === undefined ? undefined : patchParsed.value,
     }
 
-    const output = formatGitDiff(result, renderOptions)
+    let output = formatGitDiff(result, renderOptions)
+
+    // 附加路径提示
+    if (pathHint) {
+      output = `No changes matched path "${path}".\n${pathHint}\n\n${output}`
+    }
     if (parsedFormat.format === 'json') {
       return toolOkJson('git_diff', {
         format: 'json',
