@@ -210,7 +210,7 @@ const ConversationItem = memo(function ConversationItem({
 
           {isEditing ? (
             <input
-              ref={renameInputRef}
+              ref={renameInputRef as React.LegacyRef<HTMLInputElement>}
               type="text"
               value={editingTitle}
               onChange={(e) => onEditingTitleChange(e.target.value)}
@@ -327,7 +327,7 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   collapsed,
   onToggleCollapse,
 }: {
-  root: { id: string; name: string; handle: FileSystemDirectoryHandle }
+  root: { id: string; name: string; handle: FileSystemDirectoryHandle | null }
   selectedFilePath?: string | null
   revealTargetPath?: string | null
   rootsLength: number
@@ -344,14 +344,14 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
     [onFileSelect, root.name]
   )
 
-  const handleInspect = useCallback(
+  const handleInspect = useCallback<(path: string, handle: FileSystemFileHandle | null) => void>(
     onInspect
-      ? (path: string, handle: FileSystemFileHandle | null) => {
+      ? (path, handle) => {
           onInspect(`${root.name}/${path}`, handle)
         }
-      : undefined,
+      : () => {},
     [onInspect, root.name]
-  ) as ((path: string, handle: FileSystemFileHandle | null) => void) | undefined
+  )
 
   const rootRevealTarget = useMemo(() => {
     if (!revealTargetPath) return null
@@ -421,7 +421,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
 }: {
   resourceTab: ResourceTab
   onTabChange: (tab: ResourceTab) => void
-  roots: { id: string; name: string; handle: FileSystemDirectoryHandle }[]
+  roots: { id: string; name: string; handle: FileSystemDirectoryHandle | null }[]
   selectedFilePath?: string | null
   revealTargetPath?: string | null
   rootsLength: number

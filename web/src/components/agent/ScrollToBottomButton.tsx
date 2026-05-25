@@ -5,7 +5,7 @@ import { useT } from '@/i18n'
 interface ScrollToBottomButtonProps {
   scrollContainerRef: React.RefObject<HTMLDivElement | null>
   messagesEndRef: React.RefObject<HTMLDivElement | null>
-  isUserAtBottomRef: React.RefObject<boolean>
+  isUserAtBottomRef: React.MutableRefObject<boolean>
   convId: string | undefined
 }
 
@@ -18,7 +18,7 @@ interface ScrollToBottomButtonProps {
  */
 export const ScrollToBottomButton = memo(function ScrollToBottomButton({
   scrollContainerRef,
-  messagesEndRef,
+  messagesEndRef: _messagesEndRef,
   isUserAtBottomRef,
   convId,
 }: ScrollToBottomButtonProps) {

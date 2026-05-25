@@ -15,7 +15,8 @@ import remarkGfm from 'remark-gfm'
 // when the MarkdownContent parent re-renders with unchanged content.
 // Previously these were inline literals, causing new array/object refs on
 // every render → 76 unnecessary re-renders on cancel (react-scan profiled).
-const REMARK_PLUGINS = [remarkGfm] as const
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const REMARK_PLUGINS: any = [remarkGfm]
 
 const MARKDOWN_COMPONENTS = {
   // Code blocks

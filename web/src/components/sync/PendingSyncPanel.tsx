@@ -679,7 +679,7 @@ export function PendingSyncPanel() {
         className="flex-1 overflow-y-auto custom-scrollbar"
       >
         <div className="divide-y divide-subtle/50">
-          {pendingChanges.changes.map((change, index) => {
+          {pendingChanges.changes.map((change, _index) => {
             const typeInfo = getChangeTypeInfo(change.type)
             const isSelected = selectedItems.has(change.path)
             const hasConflict = conflictPaths.has(change.path)

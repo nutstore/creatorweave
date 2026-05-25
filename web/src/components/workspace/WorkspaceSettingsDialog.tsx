@@ -14,7 +14,6 @@ import {
   RotateCcw,
   Trash2,
   Keyboard,
-  Monitor,
   X,
   AlertTriangle,
   Info,

@@ -699,7 +699,7 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
 
 function ExtensionSettingsPanel() {
   const t = useT()
-  const { status, checkStatus, openInstallGuide } = useExtensionStore()
+  const { checkStatus, openInstallGuide } = useExtensionStore()
 
   // Refresh status when this panel renders
   const currentStatus = checkStatus()

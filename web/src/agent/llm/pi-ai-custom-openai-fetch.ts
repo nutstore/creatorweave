@@ -104,7 +104,7 @@ function streamCwOpenAIChatCompletions(
       }
 
       const payload = buildChatCompletionsPayload(model, context, options)
-      options?.onPayload?.(payload)
+      options?.onPayload?.(payload, model)
 
       const response = await fetch(`${normalizeBaseUrl(model.baseUrl)}/chat/completions`, {
         method: 'POST',
@@ -129,7 +129,8 @@ function streamCwOpenAIChatCompletions(
 
       stream.push({ type: 'start', partial: output })
 
-      let currentBlock: MutableContentBlock | null = null
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let currentBlock: any = null
       const blocks = output.content
       const blockIndex = () => blocks.length - 1
       const toolCallIdByIndex = new Map<number, string>()

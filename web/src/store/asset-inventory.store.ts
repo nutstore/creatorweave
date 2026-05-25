@@ -37,7 +37,7 @@ interface AssetInventoryState {
   deleteAsset: (name: string) => Promise<void>
 }
 
-export const useAssetInventoryStore = create<AssetInventoryState>((set, get) => ({
+export const useAssetInventoryStore = create<AssetInventoryState>((set, _get) => ({
   items: [],
   loading: false,
   error: null,
@@ -55,7 +55,6 @@ export const useAssetInventoryStore = create<AssetInventoryState>((set, get) => 
       const assetsDir = await active.conversation.getAssetsDir()
       const items: AssetInventoryItem[] = []
 
-      // @ts-expect-error entries() is supported in modern browsers
       for await (const entry of assetsDir.values()) {
         if (entry.kind === 'file') {
           const file = await entry.getFile()

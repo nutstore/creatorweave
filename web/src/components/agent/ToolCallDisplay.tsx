@@ -183,7 +183,7 @@ function StatusIcon({ ctx, executingText }: { ctx: ToolRenderCtx; executingText?
 
 export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisplayProps) {
   const t = useT()
-  const { toolCall, result, isExecuting, streamingArgs, subagentEvents, conversationId } = props
+  const { toolCall, result, subagentEvents, conversationId } = props
   const [expanded, setExpanded] = useState(false)
 
   const ctx = buildCtx(props)

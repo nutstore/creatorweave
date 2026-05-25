@@ -3,7 +3,6 @@
  */
 
 import { Search } from 'lucide-react'
-import type { ReactNode } from 'react'
 import { CopyIconButton } from '../CopyIconButton'
 import type { ToolEnvelopeError } from '@/agent/tools/tool-envelope'
 import { registerRenderer } from './registry'

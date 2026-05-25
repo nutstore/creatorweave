@@ -116,12 +116,6 @@ export const lsDefinition: ToolDefinition = createDirectoryToolDefinition(
   'List directory contents. With pattern: search files matching glob. Without pattern: list tree structure. Supports workspace relative paths and vfs://workspace/..., vfs://agents/{id}/..., or vfs://assets/... in path.'
 )
 
-function formatSize(bytes: number): string {
-  if (bytes === 0) return ''
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)}MB`
-}
 
 /**
  * Get the OPFS files/ directory handle for the given workspace.

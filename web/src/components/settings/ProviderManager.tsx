@@ -76,7 +76,6 @@ function ProviderCard({
     updateCustomProvider,
     removeCustomProvider,
     addCustomProviderModel,
-    removeCustomProviderModel,
     setCustomProviderApiMode,
     invalidateApiKeyCache,
     pinnedModelsByProvider,
@@ -285,19 +284,6 @@ function ProviderCard({
       toast.success(t('settings.toast.modelsRefreshed'))
     }
   }, [providerKey, isCustom, customProvider, config, refreshModels, modelsSource, t, providerType, addCustomProviderModel])
-
-  const handleAddModel = useCallback(() => {
-    if (!customProvider) return
-    const trimmed = newModelDraft.trim()
-    if (!trimmed) {
-      toast.error(t('settings.toast.modelNameRequired'))
-      return
-    }
-    addCustomProviderModel(customProvider.id, trimmed)
-    setNewModelDraft('')
-    setAddingModel(false)
-    toast.success(t('settings.toast.modelAdded'))
-  }, [customProvider, newModelDraft, addCustomProviderModel, t])
 
   const handleSaveCustom = useCallback(() => {
     if (!customProvider) return

@@ -1,6 +1,6 @@
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { SubagentError } from './tool-types'
-import type { ToolContext, ToolPromptDoc } from './tool-types'
+import type { ToolPromptDoc } from './tool-types'
 import {
   validateAgentId,
   validateDescription,
@@ -331,7 +331,7 @@ export const batchSpawnExecutor: ToolExecutor = async (args, context) => {
       max_concurrency,
     })
     const healthCheckedCompleted = result.completed.map((item) => {
-      const health = detectSubagentHealth(item)
+      const health = detectSubagentHealth({ content: item.content, status: 'completed', usage: item.usage })
       return {
         ...item,
         ...(health.ok ? {} : { health }),

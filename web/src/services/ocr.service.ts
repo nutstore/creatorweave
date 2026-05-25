@@ -34,7 +34,6 @@ export type OcrProgressCallback = (status: OcrStatus, progress?: number) => void
 
 let workerInstance: any = null
 let workerInitPromise: Promise<any> | null = null
-let isInitializing = false
 
 // Queue: images waiting for OCR
 type QueueItem = {

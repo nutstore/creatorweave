@@ -169,7 +169,6 @@ registerRenderer({
   icon: <GitBranch className="h-3.5 w-3.5 text-neutral-400" />,
 
   Summary(ctx) {
-    const limit = typeof ctx.args.limit === 'number' ? ctx.args.limit : 10
     const path = typeof ctx.args.path === 'string' ? ctx.args.path : undefined
     const log = extractLogData(ctx)
 

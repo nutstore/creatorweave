@@ -201,7 +201,7 @@ registerRenderer({
     )
   },
   Detail(ctx) {
-    const { branch, entries, counts } = extractStatus(ctx)
+    const { branch, entries } = extractStatus(ctx)
 
     if (entries.length === 0) {
       if (ctx.isExecuting) return <StreamingPlaceholder />

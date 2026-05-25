@@ -12,7 +12,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@creatorweave/ui'
-import { type AgentMode } from '@/agent/agent-mode'
+import { type AgentMode, getModeDescription } from '@/agent/agent-mode'
 import { useT } from '@/i18n'
 
 export interface AgentModeSwitchProps {

@@ -52,7 +52,7 @@ export function getCompressionCutoffTimestamp(messages: Message[]): number | nul
 export function applyCompressionBaseline(
   messages: Message[],
   baseline: CompressionBaselineState,
-  compressedMemoryPrefix: string
+  _compressedMemoryPrefix: string
 ): Message[] {
   const retained = messages.filter(
     (msg) => typeof msg.timestamp === 'number' && msg.timestamp >= baseline.cutoffTimestamp

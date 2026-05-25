@@ -10,12 +10,10 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { LLMProviderType } from '@/agent/providers/types'
 import {
-  LLM_PROVIDER_CONFIGS,
   isCustomProviderType,
   registerDynamicProvider,
   unregisterDynamicProvider,
   getProviderConfig,
-  getProviderMeta,
 } from '@/agent/providers/types'
 import type { ThinkingLevel } from '@mariozechner/pi-ai'
 

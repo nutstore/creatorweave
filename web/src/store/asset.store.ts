@@ -10,7 +10,7 @@
  */
 
 import { create } from 'zustand'
-import { performOcr, preloadOcrWorker, isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
+import { performOcr, isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
 import type { OcrStatus } from '@/services/ocr.service'
 
 /** A file awaiting upload, held in browser memory. */

@@ -25,7 +25,6 @@ import type { LLMProviderType, ModelCapability } from '@/agent/providers/types'
 import { useT } from '@/i18n'
 import { BrandInput } from '@creatorweave/ui'
 import { BrandSlider } from '@creatorweave/ui'
-import { BrandButton } from '@creatorweave/ui'
 import { BrandSwitch } from '@creatorweave/ui'
 import {
   Select,
@@ -80,16 +79,6 @@ export function CapabilityBadge({ capability }: { capability: ModelCapability })
       {label}
     </span>
   )
-}
-
-// =============================================================================
-// Format Utilities
-// =============================================================================
-
-function formatContextWindow(tokens: number): string {
-  if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(tokens % 1000000 === 0 ? 0 : 1)}M`
-  if (tokens >= 1000) return `${(tokens / 1000).toFixed(0)}K`
-  return `${tokens}`
 }
 
 // =============================================================================
