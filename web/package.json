@@ -33,6 +33,7 @@
     "@creatorweave/config": "workspace:*",
     "@creatorweave/encryption": "workspace:*",
     "@creatorweave/i18n": "workspace:*",
+    "@creatorweave/skills-system": "workspace:*",
     "@creatorweave/ui": "workspace:*",
     "@iconify/react": "^6.0.2",
     "@mariozechner/pi-agent-core": "^0.73.0",

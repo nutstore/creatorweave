@@ -109,6 +109,24 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // Everything below varies per user message or per minute.
   // Appended at the end to preserve prompt cache for the stable prefix above.
 
+  // ⑦: Skills block (available skills for on-demand loading)
+  try {
+    const { getSkillManager } = await import('@/skills/skill-manager')
+    const skillManager = getSkillManager()
+    if (skillManager.initialized) {
+      const lastUserMsg = [...input.messages].reverse().find((m) => m.role === 'user')
+      const userMessage = lastUserMsg?.content || ''
+      const { buildAvailableSkillsBlock } = await import('@/skills/skill-injection')
+      const metadata = skillManager.getSkillMetadata()
+      const skillsBlock = buildAvailableSkillsBlock(metadata, { userMessage })
+      if (skillsBlock) {
+        enhancedPrompt += '\n\n' + skillsBlock
+      }
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject skills block:', error)
+  }
+
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`

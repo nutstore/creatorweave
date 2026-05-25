@@ -24,7 +24,12 @@ export interface ImageOutput {
   data: string // base64
 }
 
-export type WorkerMessage = ExecuteRequest | MountRequest | SyncRequest | WarmupRequest
+export type WorkerMessage =
+  | ExecuteRequest
+  | MountRequest
+  | MountSkillsRequest
+  | SyncRequest
+  | WarmupRequest
 
 export interface ExecuteRequest {
   id: string
@@ -38,6 +43,8 @@ export interface ExecuteRequest {
   mountDir?: FileSystemDirectoryHandle
   /** Directory handle to mount at /mnt_assets (File System Access API) */
   assetsDir?: FileSystemDirectoryHandle
+  /** Directory handle to mount at /mnt_skills (global builtin skills) */
+  skillsDir?: FileSystemDirectoryHandle
   /** Whether to sync changes back to native filesystem after execution */
   syncFs?: boolean
 }
@@ -65,6 +72,15 @@ export interface WorkerResponse {
 export interface MountRequest {
   id: string
   type: 'mount'
+  dirHandle: FileSystemDirectoryHandle
+}
+
+/**
+ * Mount skills request type - for mounting the global .skills directory to /mnt_skills
+ */
+export interface MountSkillsRequest {
+  id: string
+  type: 'mountSkills'
   dirHandle: FileSystemDirectoryHandle
 }
 

@@ -163,6 +163,7 @@ export default defineConfig({
         }),
     __DEV__: process.env.NODE_ENV !== 'production' ? JSON.stringify(true) : JSON.stringify(false),
     __APP_BUILD_ID__: JSON.stringify(buildId),
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '0.0.0'),
   },
   worker: {
     format: 'es',

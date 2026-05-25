@@ -76,6 +76,12 @@ let nativefsAssets = null
 /** @type {FileSystemDirectoryHandle | null} Currently mounted assets directory handle */
 let mountedAssetsDirHandle = null
 
+/** @type {any} NativeFS handle for /mnt_skills syncing */
+let nativefsSkills = null
+
+/** @type {FileSystemDirectoryHandle | null} Currently mounted skills directory handle */
+let mountedSkillsDirHandle = null
+
 /** @type {Promise<void>} Serialize mount/unmount operations to avoid /mnt races */
 let fsOpQueue = Promise.resolve()
 
@@ -199,6 +205,15 @@ async function cleanupAssetsFS() {
 }
 
 /**
+ * Cleanup nativefsSkills references
+ */
+async function cleanupSkillsFS() {
+  if (!nativefsSkills) return
+  nativefsSkills = null
+  mountedSkillsDirHandle = null
+}
+
+/**
  * Unmount and remove /mnt directory completely
  */
 async function unmountAndRemoveMnt() {
@@ -284,6 +299,35 @@ async function unmountAndRemoveMntAssetsRaw() {
 }
 
 /**
+ * Unmount and remove /mnt_skills directory completely (internal, no mutex).
+ * Caller must hold runExclusiveFSOperation if needed.
+ */
+async function unmountAndRemoveMntSkillsRaw() {
+  if (!pyodide) return
+
+  await cleanupSkillsFS()
+
+  try {
+    pyodide.FS.unmount('/mnt_skills')
+    console.log('[Pyodide Worker] Unmounted /mnt_skills')
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[Pyodide Worker] /mnt_skills unmount skipped/failed:', msg)
+  }
+
+  try {
+    const mntSkillsPath = pyodide.FS.analyzePath('/mnt_skills')
+    if (mntSkillsPath.exists) {
+      rmrf('/mnt_skills')
+      console.log('[Pyodide Worker] Removed /mnt_skills directory')
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
+    console.warn('[Pyodide Worker] /mnt_skills directory removal failed:', msg)
+  }
+}
+
+/**
  * Mount assets directory handle to /mnt_assets using mountNativeFS.
  * Remounts only when the handle changes; uses syncfs(true) for same-handle refresh.
  * @param {FileSystemDirectoryHandle} dirHandle - Assets directory to mount
@@ -341,6 +385,67 @@ async function ensureAssetsMounted(dirHandle) {
         console.log(`[Pyodide Worker] Assets directory "${dirHandle.name}" mounted at /mnt_assets (retry)`)
       } else {
         console.error('[Pyodide Worker] /mnt_assets mount failed:', mountMsg)
+        throw mountError
+      }
+    }
+  })
+}
+
+/**
+ * Mount global .skills directory handle to /mnt_skills using mountNativeFS.
+ * Remounts only when the handle changes; uses syncfs(true) for same-handle refresh.
+ * @param {FileSystemDirectoryHandle} dirHandle - Skills directory to mount
+ */
+async function ensureSkillsMounted(dirHandle) {
+  return runExclusiveFSOperation(async () => {
+    if (!pyodide) {
+      throw new Error('Pyodide not initialized. Call initPyodide() first.')
+    }
+
+    const sameHandle = mountedSkillsDirHandle && mountedSkillsDirHandle.isSameEntry
+      ? await mountedSkillsDirHandle.isSameEntry(dirHandle)
+      : false
+
+    if (nativefsSkills && sameHandle) {
+      try {
+        await new Promise((resolve, reject) => {
+          pyodide.FS.syncfs(true, (err) => {
+            if (err) reject(err)
+            else resolve(undefined)
+          })
+        })
+        console.log('[Pyodide Worker] /mnt_skills refreshed via syncfs')
+        return
+      } catch {
+        console.warn('[Pyodide Worker] /mnt_skills syncfs failed, falling back to remount')
+      }
+    }
+
+    console.log('[Pyodide Worker] Mounting skills directory:', dirHandle.name)
+
+    await unmountAndRemoveMntSkillsRaw()
+
+    if (!pyodide.FS.analyzePath('/mnt_skills').exists) {
+      pyodide.FS.mkdir('/mnt_skills')
+    }
+
+    try {
+      nativefsSkills = await pyodide.mountNativeFS('/mnt_skills', dirHandle)
+      mountedSkillsDirHandle = dirHandle
+      console.log(`[Pyodide Worker] Skills directory "${dirHandle.name}" mounted at /mnt_skills`)
+    } catch (mountError) {
+      const mountMsg = mountError instanceof Error ? mountError.message : String(mountError)
+      if (mountMsg.includes('already a file system mount point')) {
+        console.warn('[Pyodide Worker] Detected stale /mnt_skills mount point, retrying')
+        await unmountAndRemoveMntSkillsRaw()
+        if (!pyodide.FS.analyzePath('/mnt_skills').exists) {
+          pyodide.FS.mkdir('/mnt_skills')
+        }
+        nativefsSkills = await pyodide.mountNativeFS('/mnt_skills', dirHandle)
+        mountedSkillsDirHandle = dirHandle
+        console.log(`[Pyodide Worker] Skills directory "${dirHandle.name}" mounted at /mnt_skills (retry)`)
+      } else {
+        console.error('[Pyodide Worker] /mnt_skills mount failed:', mountMsg)
         throw mountError
       }
     }
@@ -535,6 +640,20 @@ async function handleMessage(/** @type {any} */ data) {
     return
   }
 
+  // Handle 'mountSkills' type - mount global .skills directory to /mnt_skills
+  if (type === 'mountSkills') {
+    try {
+      if (!pyodide) {
+        pyodide = await initPyodide()
+      }
+      await ensureSkillsMounted(data.dirHandle)
+      sendResponse(id, true, { success: true })
+    } catch (error) {
+      sendError(id, error instanceof Error ? error.message : String(error))
+    }
+    return
+  }
+
   // Handle 'sync' type - sync changes back to native filesystem
   if (type === 'sync') {
     try {
@@ -556,7 +675,8 @@ async function handleMessage(/** @type {any} */ data) {
     try {
       await unmountDir()
       await runExclusiveFSOperation(() => unmountAndRemoveMntAssetsRaw())
-      console.log('[Pyodide Worker] Filesystem unmounted and /mnt, /mnt_assets removed')
+      await runExclusiveFSOperation(() => unmountAndRemoveMntSkillsRaw())
+      console.log('[Pyodide Worker] Filesystem unmounted and /mnt, /mnt_assets, /mnt_skills removed')
       sendResponse(id, true, { success: true })
     } catch (error) {
       sendError(id, error instanceof Error ? error.message : String(error))
@@ -599,6 +719,11 @@ async function handleMessage(/** @type {any} */ data) {
     // Handle assetsDir if provided — mount at /mnt_assets
     if (assetsDir) {
       await ensureAssetsMounted(assetsDir)
+    }
+
+    // Handle skillsDir if provided — mount at /mnt_skills
+    if (data.skillsDir) {
+      await ensureSkillsMounted(data.skillsDir)
     }
 
     // Step 1: Load built-in Pyodide packages via import scanning

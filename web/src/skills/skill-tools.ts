@@ -108,6 +108,12 @@ ${skill.instruction}
     output += formatResourceList(resources)
   }
 
+  // Append /mnt_skills path hint for Python execution
+  const isBuiltin = skill.source === 'builtin'
+  if (isBuiltin) {
+    output += `\n\n**Python execution path:** \`/mnt_skills/builtin/${skill.name.replace(/\s+/g, '-').toLowerCase()}/\``
+  }
+
   output += `\n---\n*Skill: ${skill.name}*`
 
   return toolOkJson('read_skill', output)

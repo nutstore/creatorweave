@@ -17,7 +17,6 @@ import {
   type SessionSkillState,
 } from './skill-injection'
 import { scanProjectSkills } from './skill-scanner'
-import { BUILTIN_SKILLS } from './builtin-skills'
 import { generateResourceId } from './skill-resources'
 
 export class SkillManager {
@@ -53,25 +52,75 @@ export class SkillManager {
 
   private async _doInitialize(): Promise<void> {
     try {
+      // Step 0a: Register built-in slash commands (compact etc.)
+      try {
+        const { registerBuiltinSlashCommands } = await import('./slash-command-registry')
+        registerBuiltinSlashCommands()
+      } catch (error) {
+        console.warn('[SkillManager] Builtin slash commands registration failed:', error)
+      }
+
+      // Step 0b: Materialize builtin skills to OPFS (incremental sync)
+      try {
+        const { initializeSkillsSystem } = await import('./skills-system-init')
+        const result = await initializeSkillsSystem()
+        console.log(
+          '[SkillManager] Skills system init:',
+          result.registryOk ? 'registry OK' : 'registry FAILED',
+          result.materialize
+            ? `${result.materialize.written} written, ${result.materialize.skipped} skipped`
+            : 'no materialize',
+          result.healthy ? 'healthy' : 'UNHEALTHY'
+        )
+      } catch (error) {
+        console.warn('[SkillManager] Skills system init failed (non-fatal):', error)
+      }
+
       // Project skills are now runtime-scoped and must not persist in SQLite.
       await storage.purgeProjectSkillsFromStorage()
 
-      console.log(
-        '[SkillManager] _doInitialize: starting, seeding',
-        BUILTIN_SKILLS.length,
-        'builtin skills'
-      )
-      // Seed builtin skills if they don't exist yet
-      for (const builtin of BUILTIN_SKILLS) {
-        const existing = await storage.getSkillById(builtin.id)
-        if (!existing) {
-          console.log('[SkillManager] Saving builtin skill:', builtin.id)
-          await storage.saveSkill(builtin, '')
-        } else {
-          console.log('[SkillManager] Builtin skill already exists:', builtin.id)
+      // Step 1: Seed materialized builtin skills from OPFS (cw:brainstorm etc.)
+      // These are skills defined in builtin-packages/ with SKILL.md files.
+      const bundledSkillIds: string[] = []
+      try {
+        const { BUNDLED_SKILL_FILES } = await import('./builtin-packages-registry')
+        const { parseSkillMd } = await import('./skill-parser')
+        const skillNames = new Set<string>()
+        for (const key of Object.keys(BUNDLED_SKILL_FILES)) {
+          const slashIdx = key.indexOf('/')
+          if (slashIdx > 0) skillNames.add(key.substring(0, slashIdx))
         }
+        for (const skillName of skillNames) {
+          const skillMd = BUNDLED_SKILL_FILES[`${skillName}/SKILL.md`]
+          if (!skillMd) continue
+          const parsed = parseSkillMd(skillMd, 'builtin')
+          if (!parsed.skill) continue
+          const skill = {
+            ...parsed.skill,
+            id: `builtin:${parsed.skill.id}`,
+          }
+          bundledSkillIds.push(skill.id)
+          const existing = await storage.getSkillById(skill.id)
+          if (!existing) {
+            console.log('[SkillManager] Saving bundled skill:', skill.id)
+            await storage.saveSkill(skill, skillMd)
+          }
+        }
+      } catch (error) {
+        console.warn('[SkillManager] Bundled skill seeding failed:', error)
       }
 
+      await this.refreshCache()
+
+      // Step 2: Prune stale builtin skills that are no longer bundled
+      const validBuiltinIds = new Set(bundledSkillIds)
+      const allSkills = await storage.getAllSkills()
+      for (const skill of allSkills) {
+        if (skill.source === 'builtin' && !validBuiltinIds.has(skill.id)) {
+          console.log('[SkillManager] Pruning stale builtin skill:', skill.id)
+          await storage.deleteSkill(skill.id)
+        }
+      }
       await this.refreshCache()
 
       // Update tool registry with skill tools
