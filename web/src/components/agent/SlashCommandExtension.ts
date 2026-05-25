@@ -1,28 +1,16 @@
 import { Extension } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
 import Suggestion from '@tiptap/suggestion'
+import {
+  searchSlashCommands,
+  type SlashCommandItem,
+} from '@/skills/slash-command-registry'
 
 // ---------------------------------------------------------------------------
-// Types
+// Types (re-export for convenience)
 // ---------------------------------------------------------------------------
 
-export interface SlashCommandItem {
-  /** Command ID, e.g. 'compact' */
-  id: string
-  /** Display label, e.g. 'Compact' */
-  label: string
-  /** Short description shown in the dropdown */
-  description: string
-}
-
-/** v1 hardcoded command list */
-export const SLASH_COMMANDS: SlashCommandItem[] = [
-  {
-    id: 'compact',
-    label: 'Compact',
-    description: '压缩上下文，释放 token 空间',
-  },
-]
+export type { SlashCommandItem } from '@/skills/slash-command-registry'
 
 // ---------------------------------------------------------------------------
 // Plugin key
@@ -49,9 +37,12 @@ export interface SlashCommandOptions {
 /**
  * Slash command extension — shows a command menu when the user types `/`.
  *
- * Unlike FileMention, this does NOT insert a custom node into the editor.
- * On selection it deletes the trigger character and notifies the parent
- * component via `onSelect`.
+ * This extension is a pure UI layer. It does NOT define commands.
+ * All commands come from the slash-command-registry module.
+ *
+ * Command registration happens in:
+ * - `slash-command-registry.ts` → `registerBuiltinSlashCommands()` (compact etc.)
+ * - `skills-system-init.ts` → registers builtin skills
  */
 export const SlashCommandExtension = Extension.create<SlashCommandOptions>({
   name: 'slashCommand',
@@ -76,12 +67,7 @@ export const SlashCommandExtension = Extension.create<SlashCommandOptions>({
         editor: this.editor,
         pluginKey: SlashCommandPluginKey,
         char: '/',
-        items: ({ query }) => {
-          const q = query.toLowerCase().trim()
-          return SLASH_COMMANDS.filter(
-            (cmd) => cmd.id.includes(q) || cmd.label.toLowerCase().includes(q),
-          )
-        },
+        items: ({ query }) => searchSlashCommands(query),
         render: this.options.render,
         command: ({ editor, range, props }) => {
           // Remove the '/' trigger character
