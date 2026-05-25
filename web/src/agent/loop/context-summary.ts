@@ -30,21 +30,25 @@ export async function generateContextSummaryWithLLM(input: {
   droppedContent: string
   maxSummaryTokens: number
   compressedMemoryPrefix: string
+  signal?: AbortSignal
 }): Promise<{ summary: string | null; mode: CompressionSummaryMode }> {
   try {
-    const response = await input.provider.chat({
-      messages: [
-        { role: 'system', content: CONTEXT_SUMMARY_SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content:
-            'Summarize the following dropped conversation context. Keep it concise and actionable.\n\n' +
-            input.droppedContent,
-        },
-      ],
-      maxTokens: input.maxSummaryTokens,
-      temperature: 0.1,
-    })
+    const response = await input.provider.chat(
+      {
+        messages: [
+          { role: 'system', content: CONTEXT_SUMMARY_SYSTEM_PROMPT },
+          {
+            role: 'user',
+            content:
+              'Summarize the following dropped conversation context. Keep it concise and actionable.\n\n' +
+              input.droppedContent,
+          },
+        ],
+        maxTokens: input.maxSummaryTokens,
+        temperature: 0.1,
+      },
+      input.signal,
+    )
 
     const summary = response.choices[0]?.message?.content?.trim()
     return { summary: summary || null, mode: 'llm' }

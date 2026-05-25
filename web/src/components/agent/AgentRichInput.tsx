@@ -7,6 +7,7 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
+import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExtension'
 import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
@@ -61,6 +62,8 @@ interface AgentRichInputProps {
   onSetActiveAgent: (id: string) => Promise<void>
   onCreateAgent: (id: string) => Promise<AgentInfo | null>
   onDeleteAgent: (id: string) => Promise<boolean>
+  /** Slash command callback (e.g. 'compact'). */
+  onSlashCommand?: (command: string) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +269,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   onSetActiveAgent,
   onCreateAgent,
   onDeleteAgent,
+  onSlashCommand,
 }: AgentRichInputProps, ref) {
   const t = useT()
   const [isFocused, setIsFocused] = useState(false)
@@ -313,6 +317,13 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const fileSuggestionRangeRef = useRef<{ from: number; to: number } | null>(null)
   const fileSuggestionEditorRef = useRef<Editor | null>(null)
 
+  // Slash command suggestion state – driven by tiptap SlashCommandExtension Suggestion
+  const [slashSuggestionItems, setSlashSuggestionItems] = useState<SlashCommandItem[]>([])
+  const [slashSuggestionCommand, setSlashSuggestionCommand] = useState<((item: SlashCommandItem) => void) | null>(null)
+  const slashSuggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
+  const slashSuggestionItemsRef = useRef<SlashCommandItem[]>([])
+  useEffect(() => { slashSuggestionItemsRef.current = slashSuggestionItems }, [slashSuggestionItems])
+
   const disabledRef = useRef(disabled)
   const onSubmitRef = useRef(onSubmit)
   const onChangeRef = useRef(onChange)
@@ -322,6 +333,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const agentsRef = useRef(agents)
   const isProcessingRef = useRef(isProcessing)
   const onCancelRef = useRef(onCancel)
+  const onSlashCommandRef = useRef(onSlashCommand)
+  const editorRef = useRef<Editor | null>(null)
 
   // ---- emit value --------------------------------------------------------
   const emitValue = useCallback(
@@ -340,6 +353,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   useEffect(() => { agentsRef.current = agents }, [agents])
   useEffect(() => { isProcessingRef.current = isProcessing }, [isProcessing])
   useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
+  useEffect(() => { onSlashCommandRef.current = onSlashCommand }, [onSlashCommand])
   useEffect(() => { showAgentSelectorRef.current = showAgentSelector }, [showAgentSelector])
   useEffect(() => { agentSelectionRef.current = agentSelection }, [agentSelection])
   useEffect(() => { allAgentsRef.current = allAgents }, [allAgents])
@@ -526,6 +540,41 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             }),
           ]
         : []),
+      // Slash command extension — '/' trigger for commands like /compact
+      SlashCommandExtension.configure({
+        onSelect: (item: SlashCommandItem) => {
+          // Only echo selected command into input.
+          // Actual execution happens when user explicitly sends the message.
+          const ed = editorRef.current
+          if (!ed) return
+          // command() already deleted the '/' trigger, doc is now empty.
+          // Insert command text + trailing space (space breaks Suggestion match → onExit fires).
+          ed.commands.insertContent(`/${item.id} `)
+          emitValue(ed)
+        },
+        render: () => ({
+          onStart: (props: any) => {
+            setSlashSuggestionItems(props.items as SlashCommandItem[])
+            setSlashSuggestionCommand(() => props.command)
+          },
+          onUpdate: (props: any) => {
+            setSlashSuggestionItems(props.items as SlashCommandItem[])
+            setSlashSuggestionCommand(() => props.command)
+          },
+          onKeyDown: (props: any) => {
+            if (props.event.key === 'Escape') {
+              setSlashSuggestionItems([])
+              setSlashSuggestionCommand(null)
+              return true
+            }
+            return slashSuggestionDropdownRef.current?.onKeyDown(props.event) ?? false
+          },
+          onExit: () => {
+            setSlashSuggestionItems([])
+            setSlashSuggestionCommand(null)
+          },
+        }),
+      }),
     ],
     editorProps: {
       attributes: {
@@ -579,7 +628,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           // Let suggestion popups dismiss first
           const hasAgentSuggestion = suggestionItemsRef.current.length > 0
           const hasFileSuggestion = fileSuggestionItemsRef.current.length > 0
-          if (hasAgentSuggestion || hasFileSuggestion) {
+          const hasSlashSuggestion = slashSuggestionItemsRef.current.length > 0
+          if (hasAgentSuggestion || hasFileSuggestion || hasSlashSuggestion) {
             return false // delegate to suggestion plugin's onKeyDown
           }
           if (isProcessingRef.current) {
@@ -632,6 +682,12 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
               return true
             }
           }
+          // Guard: if the slash command suggestion popup is showing, block submit.
+          const slashItems = slashSuggestionItemsRef.current
+          if (slashItems.length > 0) {
+            const handled = slashSuggestionDropdownRef.current?.onKeyDown(event) ?? false
+            if (handled) return true
+          }
           event.preventDefault()
           onSubmitRef.current()
           return true
@@ -652,6 +708,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   useEffect(() => {
     if (!editor) return
     editor.setEditable(!disabled)
+    editorRef.current = editor
   }, [disabled, editor])
 
   // ── Expose focus via imperative handle ──
@@ -790,6 +847,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const isEmpty = editor ? editor.isEmpty : true
   const showSuggestion = !disabled && suggestionItems.length > 0 && !!suggestionCommand
   const showFileSuggestion = !disabled && fileSuggestionItems.length > 0 && !!fileSuggestionCommand
+  const showSlashSuggestion = !disabled && slashSuggestionItems.length > 0 && !!slashSuggestionCommand
 
   // Drag-drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -920,6 +978,10 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
               <span className="inline-flex items-center gap-0.5">
                 <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">@</kbd>
                 <span>{t('conversation.input.hints.agentMention')}</span>
+              </span>
+              <span className="inline-flex items-center gap-0.5">
+                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">/</kbd>
+                <span>{t('conversation.input.hints.slashCommand')}</span>
               </span>
             </div>
           </div>
@@ -1084,6 +1146,25 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                 </span>
               )}
             </>
+          )}
+        />
+      )}
+
+      {/* Slash command suggestions dropdown – rendered by tiptap SlashCommandExtension */}
+      {showSlashSuggestion && slashSuggestionCommand && (
+        <SuggestionDropdown<SlashCommandItem>
+          ref={slashSuggestionDropdownRef}
+          items={slashSuggestionItems}
+          getItemKey={(cmd) => cmd.id}
+          onSelect={(cmd) => slashSuggestionCommand?.(cmd)}
+          width="w-auto"
+          renderItem={(cmd, _selected) => (
+            <span className="text-neutral-700 dark:text-neutral-300">
+              /{cmd.id}
+              <span className="ml-2 text-neutral-400 dark:text-neutral-500">
+                {cmd.description}
+              </span>
+            </span>
           )}
         />
       )}

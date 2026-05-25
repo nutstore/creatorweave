@@ -976,6 +976,7 @@ interface ConversationState {
   setActive: (id: string | null) => Promise<void>
   addMessage: (conversationId: string, message: Message) => void
   updateMessages: (conversationId: string, messages: Message[]) => void
+  invalidateCompressionBaseline: (conv: Conversation, timestamp: number) => void
   deleteUserMessage: (conversationId: string, userMessageId: string) => boolean
   deleteAgentLoop: (conversationId: string, userMessageId: string) => boolean
   regenerateUserMessage: (conversationId: string, userMessageId: string) => void
@@ -1021,6 +1022,9 @@ interface ConversationState {
     workflow: import('@/agent/workflow/types').WorkflowTemplate
   ) => Promise<void>
   cancelAgent: (conversationId: string) => void
+
+  /** Compact conversation: generate context summary and stop (no agent loop). */
+  compactConversation: (conversationId: string) => Promise<void>
 
   // Runtime state actions
   setConversationStatus: (id: string, status: ConversationStatus) => void
@@ -1385,6 +1389,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       }
     },
 
+    /** Invalidate compression baseline if a message at `timestamp` falls within the compressed range. */
+    invalidateCompressionBaseline: (conv, timestamp) => {
+      if (
+        conv.compressedContextSummary &&
+        conv.compressedContextCutoffTimestamp != null &&
+        timestamp < conv.compressedContextCutoffTimestamp
+      ) {
+        conv.compressedContextSummary = null
+        conv.compressedContextCutoffTimestamp = null
+        conv.messages = conv.messages.filter((m) => m.kind !== 'context_summary')
+      }
+    },
+
     deleteUserMessage: (conversationId, userMessageId) => {
       const state = get()
       if (state.isConversationRunning(conversationId)) {
@@ -1398,7 +1415,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (!conv) return
         const idx = conv.messages.findIndex((m) => m.id === userMessageId)
         if (idx < 0 || conv.messages[idx].role !== 'user') return
+        const msgTimestamp = conv.messages[idx].timestamp
         conv.messages.splice(idx, 1)
+        // Invalidate compression summary if the deleted message was within the compressed range
+        get().invalidateCompressionBaseline(conv, msgTimestamp)
         conv.updatedAt = Date.now()
         updateAutoTitleAfterMessageDelete(conv)
         deleted = true
@@ -1432,6 +1452,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const startIdx = conv.messages.findIndex((m) => m.id === userMessageId)
         if (startIdx < 0 || conv.messages[startIdx].role !== 'user') return
 
+        const loopStartTimestamp = conv.messages[startIdx].timestamp
+
         const idsToDelete = new Set<string>()
         idsToDelete.add(conv.messages[startIdx].id)
         for (let i = startIdx + 1; i < conv.messages.length; i++) {
@@ -1441,6 +1463,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
 
         conv.messages = conv.messages.filter((msg) => !idsToDelete.has(msg.id))
+        // Invalidate compression summary if the deleted loop was within the compressed range
+        get().invalidateCompressionBaseline(conv, loopStartTimestamp)
         conv.updatedAt = Date.now()
         updateAutoTitleAfterMessageDelete(conv)
         deleted = true
@@ -1483,6 +1507,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         return
       }
 
+      const userMsgTimestamp = conv.messages[userMsgIndex].timestamp
+
       // 找到该用户消息所属轮次中，需要清理的所有后续消息（直到下一个 user）
       const idsToDelete = new Set<string>()
       for (let i = userMsgIndex + 1; i < conv.messages.length; i++) {
@@ -1499,6 +1525,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (idsToDelete.size > 0) {
           conv.messages = conv.messages.filter((m) => !idsToDelete.has(m.id))
         }
+        // Invalidate compression summary if the regenerated message was within the compressed range
+        get().invalidateCompressionBaseline(conv, userMsgTimestamp)
         // 重置流式状态
         conv.status = 'idle'
         conv.streamingContent = ''
@@ -1517,6 +1545,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         persistMessageReplace(conversationId, updatedConv.messages).catch((error) => {
           console.error('[conversation.store] Failed to persist on regenerate:', error)
         })
+      }
+
+      // If the regenerated message is a slash command (e.g. /compact),
+      // dispatch the corresponding handler instead of runAgent.
+      const originalContent = conv.messages[userMsgIndex]?.content?.trim()
+      if (originalContent === '/compact') {
+        get().compactConversation(conversationId)
+        return
       }
 
       // 获取设置并执行
@@ -1555,6 +1591,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         return
       }
 
+      const userMsgTimestamp = conv.messages[userMsgIndex].timestamp
+
       // 找到该用户消息所属轮次中，需要清理的所有后续消息（直到下一个 user）
       const idsToDelete = new Set<string>()
       for (let i = userMsgIndex + 1; i < conv.messages.length; i++) {
@@ -1579,6 +1617,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           conv.messages = conv.messages.filter((m) => !idsToDelete.has(m.id))
         }
 
+        // Invalidate compression summary if the edited message was within the compressed range
+        get().invalidateCompressionBaseline(conv, userMsgTimestamp)
+
         // 重置流式状态
         conv.status = 'idle'
         conv.streamingContent = ''
@@ -1597,6 +1638,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         persistMessageReplace(conversationId, updatedConv.messages).catch((error) => {
           console.error('[conversation.store] Failed to persist on editAndResend:', error)
         })
+      }
+
+      // If the edited message is a slash command (e.g. /compact),
+      // dispatch the corresponding handler instead of runAgent.
+      if (newContent.trim() === '/compact') {
+        get().compactConversation(conversationId)
+        return
       }
 
       // 获取设置并执行
@@ -2575,7 +2623,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           getWorkspaceDir: subagentGetWorkspaceDir,
           onNotification: (event: SubagentTaskNotification) => {
             // Helper: find the spawn_subagent/batch_spawn step in a draftAssistant
-            const findSpawnStep = (draft: { activeToolStepId?: string | null; steps: DraftAssistantStep[] } | null): DraftAssistantStep | undefined => {
+            const findSpawnStep = (draft: { activeToolStepId?: string | null; steps: DraftAssistantStep[] } | null): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined => {
               if (!draft) return undefined
               // Primary: try activeToolStepId (fast path)
               if (draft.activeToolStepId) {
@@ -3769,7 +3817,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             // Schedule the next run on the next microtask to avoid re-entrancy
             const { useAgentStore } = await import('./agent.store')
             const { directoryHandle: dh } = useAgentStore.getState()
-            const settingsState = useSettingsStore.getState()
             queueMicrotask(() => {
               get().runAgent(
                 conversationId,
@@ -4040,6 +4087,331 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           r.workflowExecution = null
         }
       })
+    },
+
+    // ── Compact conversation ──
+    compactConversation: async (conversationId: string) => {
+      const state = get()
+      if (state.isConversationRunning(conversationId)) {
+        toast.error(i18nText('conversation.toast.stopBeforeCompact', '请等待当前任务完成'))
+        return
+      }
+
+      const conv = state.conversations.find((c) => c.id === conversationId)
+      if (!conv) {
+        toast.error(i18nText('conversation.toast.conversationMissing', '会话不存在'))
+        return
+      }
+
+      // Nothing to compress if only user messages (or empty)
+      const compressibleMessages = conv.messages.filter(
+        (m) => m.kind !== 'context_summary' && m.role !== 'user',
+      )
+      if (compressibleMessages.length === 0) {
+        toast.info(i18nText('conversation.toast.nothingToCompact', '没有可压缩的上下文'))
+        return
+      }
+
+      // 1. Add "/compact" as a user message — reuse existing one if the last
+      //    message is already "/compact" (e.g. regenerated via context menu).
+      const { createUserMessage } = await import('@/agent/message-types')
+      const lastMsg = conv.messages[conv.messages.length - 1]
+      const lastIsCompact = lastMsg?.role === 'user' && lastMsg?.content?.trim() === '/compact'
+      const compactUserMsg = lastIsCompact ? lastMsg : createUserMessage('/compact')
+      const messagesBeforeCompact = lastIsCompact ? conv.messages : [...conv.messages, compactUserMsg]
+      if (!lastIsCompact) {
+        set((state) => {
+          const c = state.conversations.find((c) => c.id === conversationId)
+          if (c) {
+            c.messages = messagesBeforeCompact
+            c.updatedAt = Date.now()
+          }
+        })
+        persistMessageReplace(conversationId, messagesBeforeCompact).catch((err) => {
+          console.error('[conversation.store] Failed to persist /compact user message:', err)
+        })
+      }
+
+      // 2. Create provider / contextManager / toolRegistry (same as runAgent)
+      const settingsState = useSettingsStore.getState()
+      const { hasApiKey: hasKey, providerType: pType, modelName: mName } = settingsState
+      if (!hasKey) {
+        toast.error(i18nText('conversation.toast.noApiKey', '未配置 API Key'))
+        return
+      }
+
+      const effectiveConfig = settingsState.getEffectiveProviderConfig()
+
+      // Resolve provider config (same logic as runAgent — handles custom providers)
+      const providerConfig =
+        isCustomProviderType(pType)
+          ? effectiveConfig
+          : {
+              apiKeyProviderKey: pType,
+              baseUrl: LLM_PROVIDER_CONFIGS[pType]?.baseURL,
+              modelName: mName || LLM_PROVIDER_CONFIGS[pType]?.modelName,
+            }
+
+      if (!providerConfig?.baseUrl || !providerConfig.modelName) {
+        toast.error(i18nText('conversation.toast.noApiKey', '未配置 API Key'))
+        return
+      }
+
+      const apiKeyRepo = getApiKeyRepository()
+      const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
+      if (!apiKey) {
+        toast.error(i18nText('conversation.toast.noApiKey', '未配置 API Key'))
+        return
+      }
+
+      const provider = createLLMProvider({
+        apiKey,
+        providerType: pType,
+        baseUrl: providerConfig.baseUrl,
+        model: providerConfig.modelName,
+        apiMode: isCustomProviderType(pType)
+          ? settingsState.customProviders.find((p) => p.id === pType)?.apiMode || 'chat-completions'
+          : undefined,
+      })
+
+      const maxTokens = settingsState.maxTokens || 4096
+      const contextManager = new ContextManager({
+        maxContextTokens: provider.maxContextTokens,
+        reserveTokens: maxTokens,
+        enableSummarization: true,
+        maxMessageGroups: provider.maxContextTokens >= 200000 ? 80 : 50,
+      })
+
+      const toolRegistry = getToolRegistry()
+      const { useAgentStore } = await import('@/store/agent.store')
+      const directoryHandle = useAgentStore.getState().directoryHandle || null
+
+      const agentLoop = new AgentLoop({
+        provider,
+        toolRegistry,
+        contextManager,
+        toolContext: {
+          directoryHandle,
+          workspaceId: conversationId,
+          projectId: undefined,
+          currentAgentId: 'default',
+          agentMode: 'act',
+        },
+        maxIterations: 1,
+        initialConvertCallCount: conv.compressionConvertCallCount ?? 0,
+        initialLastSummaryConvertCall: conv.compressionLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY,
+        initialCompressionBaseline:
+          conv.compressedContextSummary && conv.compressedContextCutoffTimestamp
+            ? { summary: conv.compressedContextSummary, cutoffTimestamp: conv.compressedContextCutoffTimestamp }
+            : null,
+        onCompressionStateUpdate: (compressionState) => {
+          set((state) => {
+            const c = state.conversations.find((x) => x.id === conversationId)
+            if (!c) return
+            c.compressionConvertCallCount = compressionState.convertCallCount
+            c.compressionLastSummaryConvertCall = compressionState.lastSummaryConvertCall
+          })
+        },
+        onLoopComplete: async () => {
+          const { useConversationContextStore } = await import('@/store/conversation-context.store')
+          await useConversationContextStore.getState().refreshPendingChanges()
+        },
+      })
+
+      // 3. Acquire run lock (simplified version of runAgent)
+      const runId = `${Date.now()}-compact-${Math.random().toString(36).slice(2, 10)}`
+      let runEpoch = 0
+      let committed = false
+
+      useConversationRuntimeStore.setState((state) => {
+        let rt = state.runtimes.get(conversationId)
+        if (!rt) {
+          rt = createEmptyRuntime()
+          state.runtimes.set(conversationId, rt)
+        }
+        rt.runEpoch = (rt.runEpoch || 0) + 1
+        runEpoch = rt.runEpoch
+        rt.activeRunId = runId
+        rt.status = 'pending'
+        rt.error = null
+        rt.draftAssistant = {
+          reasoning: '',
+          content: '',
+          toolCalls: [],
+          toolResults: {},
+          toolCall: null,
+          toolArgs: '',
+          steps: [],
+          activeReasoningStepId: null,
+          activeContentStepId: null,
+          activeToolStepId: null,
+          activeCompressionStepId: null,
+        }
+      })
+
+      // Register the agentLoop so cancelAgent can find and abort it
+      set((state) => {
+        state.agentLoops.set(conversationId, agentLoop)
+        const c = state.conversations.find((c) => c.id === conversationId)
+        if (c) {
+          c.activeRunId = runId
+          c.runEpoch = runEpoch
+          c.status = 'pending'
+          c.error = null
+          c.draftAssistant = {
+            reasoning: '',
+            content: '',
+            toolCalls: [],
+            toolResults: {},
+            toolCall: null,
+            toolArgs: '',
+            steps: [],
+            activeReasoningStepId: null,
+            activeContentStepId: null,
+            activeToolStepId: null,
+            activeCompressionStepId: null,
+          }
+        }
+      })
+
+      const isCurrentRun = () => {
+        const rt = useConversationRuntimeStore.getState().runtimes.get(conversationId)
+        return !!rt && rt.activeRunId === runId && (rt.runEpoch || 0) === runEpoch
+      }
+
+      const emitCompactEvent = (payload: Record<string, unknown>) => {
+        emitCompressionEvent(payload as any)
+      }
+
+      // 4. Run compact — generate summary and update compression baseline only.
+      //    IMPORTANT: We do NOT replace c.messages with the compacted result.
+      //    The UI must keep showing the full history.  The compressed summary is
+      //    stored in c.compressedContextSummary / c.compressedContextCutoffTimestamp
+      //    so that the next LLM call automatically uses the trimmed context via
+      //    applyCompressionBaseline().
+      try {
+        const resultMessages = await agentLoop.runCompactOnly(messagesBeforeCompact, {
+          onContextCompressionStart: (payload) => {
+            if (!isCurrentRun()) return
+            emitCompactEvent({ phase: 'start', ...payload })
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (c && c.activeRunId === runId) {
+                applyDraftAssistantEvent(c, { type: 'compression_start' })
+              }
+            })
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                applyDraftAssistantEvent(r, { type: 'compression_start' })
+              }
+            })
+          },
+          onContextCompressionComplete: (payload) => {
+            if (!isCurrentRun()) return
+            emitCompactEvent({ phase: 'complete', ...payload })
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (c && c.activeRunId === runId) {
+                applyDraftAssistantEvent(c, {
+                  type: 'compression_complete',
+                  mode: payload.mode === 'skip' ? 'skip' : 'compress',
+                })
+              }
+            })
+            useConversationRuntimeStore.setState((state) => {
+              const r = ensureRuntime(state, conversationId)
+              if (r.activeRunId === runId) {
+                applyDraftAssistantEvent(r, {
+                  type: 'compression_complete',
+                  mode: payload.mode === 'skip' ? 'skip' : 'compress',
+                })
+              }
+            })
+          },
+          onMessagesUpdated: (msgs) => {
+            // Do NOT replace c.messages — only update compression baseline state.
+            // The compacted message list is for the LLM, not for the UI.
+            if (!isCurrentRun()) return
+            // messages persisted via onMessagesUpdated callback
+            set((state) => {
+              const c = state.conversations.find((x) => x.id === conversationId)
+              if (!c || (c.runEpoch || 0) !== runEpoch) return
+              // Only update compression metadata — keep original messages intact
+              const summaryMsg = msgs.find((msg) => msg.kind === 'context_summary')
+              if (summaryMsg) {
+                c.compressedContextSummary = summaryMsg.content || c.compressedContextSummary || null
+                c.compressedContextCutoffTimestamp =
+                  typeof summaryMsg.timestamp === 'number' ? summaryMsg.timestamp : c.compressedContextCutoffTimestamp || null
+              }
+              c.updatedAt = Date.now()
+            })
+          },
+          onError: (error) => {
+            console.error('[conversation.store] compactConversation error:', error)
+            toast.error(i18nText('conversation.toast.compactFailed', '压缩失败：') + error.message)
+          },
+        })
+
+        // 5. Finalize — keep original messages + append a visible summary message
+        if (!committed) {
+          committed = true
+          // Extract the summary message from resultMessages to show in UI.
+          // Keep ALL original messages intact (no history loss), just add the summary at the end.
+          const summaryMsg = resultMessages.find((m) => m.kind === 'context_summary')
+          const finalMessages = summaryMsg
+            ? [...messagesBeforeCompact, summaryMsg]
+            : messagesBeforeCompact
+          set((state) => {
+            state.agentLoops.delete(conversationId)
+            const c = state.conversations.find((c) => c.id === conversationId)
+            if (c) {
+              c.messages = finalMessages
+              c.status = 'idle'
+              c.error = null
+              c.activeRunId = null
+              c.draftAssistant = null
+              c.updatedAt = Date.now()
+            }
+          })
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId === runId) {
+              r.status = 'idle'
+              r.error = null
+              r.activeRunId = null
+              r.draftAssistant = null
+            }
+          })
+          persistMessageReplace(conversationId, finalMessages).catch((err) => {
+            console.error('[conversation.store] Failed to persist after compact:', err)
+          })
+        }
+      } catch (error) {
+        if (!committed) {
+          committed = true
+          const errorMsg = error instanceof Error ? error.message : String(error)
+          set((state) => {
+            state.agentLoops.delete(conversationId)
+            const c = state.conversations.find((c) => c.id === conversationId)
+            if (c) {
+              c.status = 'error'
+              c.error = errorMsg
+              c.activeRunId = null
+              c.draftAssistant = null
+            }
+          })
+          useConversationRuntimeStore.setState((state) => {
+            const r = ensureRuntime(state, conversationId)
+            if (r.activeRunId === runId) {
+              r.status = 'error'
+              r.error = errorMsg
+              r.activeRunId = null
+              r.draftAssistant = null
+            }
+          })
+        }
+      }
     },
 
     // Runtime state actions

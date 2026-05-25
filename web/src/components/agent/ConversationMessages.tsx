@@ -212,9 +212,10 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
       const items: Array<{ turnIndex: number; preview: string; number: number }> = []
       let num = 0
       for (let i = 0; i < turns.length; i++) {
-        if (turns[i].type === 'user') {
+        const turn = turns[i]
+        if (turn.type === 'user') {
           num++
-          const content = turns[i].message.content || ''
+          const content = turn.message.content || ''
           items.push({
             turnIndex: i,
             preview: content.length > 36 ? content.slice(0, 36) + '…' : content,
@@ -247,14 +248,6 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
 
   const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
   const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant
-  const draftSteps = shouldAttachRuntimeToDraft ? activeDraftAssistant?.steps || [] : []
-  const draftHasCompressionOnly =
-    draftSteps.length > 0 &&
-    draftSteps.every((step) => step.type === 'compression') &&
-    !activeStreamingState?.currentToolCall &&
-    !streamingContentMessage?.reasoning &&
-    !streamingContentMessage?.content
-
   return (
     <div className="min-h-0 px-4 py-4">
       <div className="mx-auto w-full max-w-3xl space-y-4">
@@ -313,7 +306,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
               key="draft-assistant"
               turn={{ type: 'assistant', messages: [], timestamp: Date.now(), totalUsage: null }}
               toolResults={toolResults}
-              showAvatar={!draftHasCompressionOnly}
+              showAvatar
               isProcessing={true}
               conversationId={conversationId}
               {...getRuntimeProps(

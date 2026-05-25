@@ -40,6 +40,7 @@ export const conversation = {
       hints: {
         fileMention: "Type # to mention a file",
         agentMention: "Type @ to mention an agent",
+        slashCommand: "Type / to use commands",
       },
     },
     // Buttons

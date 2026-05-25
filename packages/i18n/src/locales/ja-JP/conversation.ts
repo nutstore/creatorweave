@@ -36,6 +36,11 @@ export const conversation = {
       placeholderNoKey: "まず設定で API Key を設定してください",
       placeholderQueuing: "メッセージをキューに追加... (Shift+Enter で改行)",
       ariaLabel: "メッセージを入力",
+      hints: {
+        fileMention: "# でファイル参照",
+        agentMention: "@ でエージェントを指定",
+        slashCommand: "/ でコマンドを使用",
+      },
     },
     buttons: {
       stop: "停止",

@@ -145,12 +145,10 @@ export function ConversationView({
     staticSnapshot,
     hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
     agentMode, setAgentMode,
-    handleSend, handleCancel, handleRunWorkflow, handleRealRunWorkflow,
-    handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
+    handleSend, handleCancel,
+    handleDeleteAgentLoop, handleEditAndResend, handleRegenerate,
     runCustomWorkflowDryRun,
     queueDepth,
-    useConversationStore: convStore,
-    useConversationRuntimeStore: rtStore,
   } = logic
 
   // ── File search for # file mention ──
@@ -399,11 +397,11 @@ export function ConversationView({
           scrollContainerRef={scrollContainerRef}
           messagesEndRef={messagesEndRef}
           isUserAtBottomRef={isUserAtBottomRef}
-          convId={convId}
+          convId={convId ?? undefined}
         />
 
         {/* Assets popover — small trigger button, expands to show workspace assets */}
-        <AssetsPopover convId={convId} onPreviewAsset={onPreviewAsset} />
+        <AssetsPopover convId={convId ?? undefined} onPreviewAsset={onPreviewAsset} />
 
         {/* Message navigation dots */}
         {activeMessages.length > 1 && (
@@ -452,6 +450,7 @@ export function ConversationView({
                 onDeleteAgent={deleteAgent}
                 onChange={handleInputChange}
                 onSubmit={handleSendAndFocus}
+                onSlashCommand={logic.handleSlashCommand}
               />
               <SendCancelButton
                 isProcessing={isProcessing}

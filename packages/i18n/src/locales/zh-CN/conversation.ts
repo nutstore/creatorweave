@@ -40,6 +40,7 @@ export const conversation = {
       hints: {
         fileMention: "输入 # 引用文件",
         agentMention: "输入 @ 提及智能体",
+        slashCommand: "输入 / 使用命令",
       },
     },
     // 按钮

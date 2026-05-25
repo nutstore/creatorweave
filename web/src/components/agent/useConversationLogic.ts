@@ -63,9 +63,6 @@ export function useConversationLogic() {
   // Track which convId the draft belongs to, so we can clear it after restore
   const draftConvIdRef = useRef<string | null>(null)
 
-  // ── Agent store (fine-grained selector) ──
-  const directoryHandle = useAgentStore((s) => s.directoryHandle)
-
   // ── Project store ──
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
@@ -100,29 +97,21 @@ export function useConversationLogic() {
   const activeContextWindowUsage = active.contextWindowUsage
 
   // ── Conversation actions (stable refs from store) ──
-  const createNew = useConversationStore((s) => s.createNew)
-  const updateMessages = useConversationStore((s) => s.updateMessages)
   const deleteAgentLoop = useConversationStore((s) => s.deleteAgentLoop)
-  const setActive = useConversationStore((s) => s.setActive)
-  const runAgent = useConversationStore((s) => s.runAgent)
   const runWorkflowDryRun = useConversationStore((s) => s.runWorkflowDryRun)
   const runWorkflowRealRun = useConversationStore((s) => s.runWorkflowRealRun)
   const runCustomWorkflowDryRun = useConversationStore((s) => s.runCustomWorkflowDryRun)
   const listWorkflowTemplates = useConversationStore((s) => s.listWorkflowTemplates)
-  const cancelAgent = useConversationStore((s) => s.cancelAgent)
   const isConversationRunning = useConversationRuntimeStore((s) => s.isConversationRunning)
   const getSuggestedFollowUp = useConversationRuntimeStore((s) => s.getSuggestedFollowUp)
   const clearSuggestedFollowUp = useConversationRuntimeStore((s) => s.clearSuggestedFollowUp)
   const mountConversation = useConversationRuntimeStore((s) => s.mountConversation)
   const unmountConversation = useConversationRuntimeStore((s) => s.unmountConversation)
   const getQueueDepth = useConversationRuntimeStore((s) => s.getQueueDepth)
-  const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
   const editAndResendUserMessage = useConversationStore((s) => s.editAndResendUserMessage)
+  const regenerateUserMessage = useConversationStore((s) => s.regenerateUserMessage)
 
   // ── Settings store (fine-grained selectors to avoid cascade re-renders) ──
-  const providerType = useSettingsStore((s) => s.providerType)
-  const modelName = useSettingsStore((s) => s.modelName)
-  const maxTokens = useSettingsStore((s) => s.maxTokens)
   const hasApiKey = useSettingsStore((s) => s.hasApiKey)
   const enableThinking = useSettingsStore((s) => s.enableThinking)
   const thinkingLevel = useSettingsStore((s) => s.thinkingLevel)
@@ -288,7 +277,7 @@ export function useConversationLogic() {
 
     const { directoryHandle: dh } = useAgentStore.getState()
     let targetConvId = convIdRef.current
-    const { createNew, setActive, isConversationRunning: isRunning, updateMessages, runAgent } = useConversationStore.getState()
+    const { createNew, setActive, updateMessages, runAgent } = useConversationStore.getState()
     if (!targetConvId) {
       const conv = createNew(text.slice(0, 30))
       targetConvId = conv.id
@@ -372,24 +361,47 @@ export function useConversationLogic() {
     )
   }, [t])
 
+  const handleSlashCommand = useCallback(async (command: string) => {
+    if (command === 'compact') {
+      let targetConvId = convIdRef.current
+      if (!targetConvId) {
+        const { createNew, setActive } = useConversationStore.getState()
+        const conv = createNew('/compact')
+        targetConvId = conv.id
+        await setActive(targetConvId)
+      }
+      await useConversationStore.getState().compactConversation(targetConvId)
+    }
+  }, [])
+
   const handleSend = useCallback(async () => {
     const inputTrimmed = inputRef.current.trim()
     const currentConvId = convIdRef.current
     const currentMentionedAgentIds = mentionedAgentIdsRef.current
     const { getSuggestedFollowUp, clearSuggestedFollowUp } = useConversationRuntimeStore.getState()
+
+    // Slash command execution happens only when user explicitly sends.
+    // Clear input BEFORE the async compact to avoid stale text visible during LLM call.
+    if (inputTrimmed === '/compact') {
+      setInput('')
+      setMentionedAgentIds([])
+      setInputResetToken((v) => v + 1)
+      await handleSlashCommand('compact')
+      return
+    }
+
     let textToSend = inputTrimmed ? inputRef.current : (currentConvId ? getSuggestedFollowUp(currentConvId) : '')
     if (textToSend) {
       // Assets are resolved inside sendMessage (from options or pendingAssets store)
       sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null })
       if (!inputTrimmed && currentConvId) clearSuggestedFollowUp(currentConvId)
     }
-  }, [sendMessage])
+  }, [handleSlashCommand, sendMessage, setInput, setMentionedAgentIds])
 
   const handleCancel = useCallback(() => {
     const currentConvId = convIdRef.current
     if (currentConvId) useConversationStore.getState().cancelAgent(currentConvId)
   }, [])
-
   const handleRunWorkflow = async (templateId: string, rubricDsl?: string) => {
     if (!convId || !templateId || isProcessing) return
     await runWorkflowDryRun(convId, templateId, { rubricDsl })
@@ -412,10 +424,9 @@ export function useConversationLogic() {
     editAndResendUserMessage(currentConvId, userMessageId, newContent)
   }, [editAndResendUserMessage])
 
-  const handleRegenerate = useCallback(
-    convId ? (id: string) => regenerateUserMessage(convId, id) : undefined,
-    [convId, regenerateUserMessage],
-  )
+  const handleRegenerate: ((id: string) => void) | undefined = convId
+    ? useCallback((id: string) => regenerateUserMessage(convId, id), [convId, regenerateUserMessage])
+    : undefined
 
   return {
     // Local UI state
@@ -436,7 +447,7 @@ export function useConversationLogic() {
     // Workspace preferences
     agentMode, setAgentMode,
     // Handlers
-    sendMessage, handleSend, handleCancel, handleRunWorkflow, handleRealRunWorkflow,
+    sendMessage, handleSend, handleCancel, handleSlashCommand, handleRunWorkflow, handleRealRunWorkflow,
     handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
     clearSuggestedFollowUp, runCustomWorkflowDryRun,
     // Store refs (for ErrorBoundary reset)

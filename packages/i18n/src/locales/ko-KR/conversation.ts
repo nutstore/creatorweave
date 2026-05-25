@@ -36,6 +36,11 @@ export const conversation = {
       placeholderNoKey: "먼저 설정에서 API Key를 구성하세요",
       placeholderQueuing: "메시지 대기열에 추가... (Shift+Enter 줄바꿈)",
       ariaLabel: "메시지 입력",
+      hints: {
+        fileMention: "#로 파일 언급",
+        agentMention: "@로 에이전트 언급",
+        slashCommand: "/로 명령 사용",
+      },
     },
     buttons: {
       stop: "중지",
