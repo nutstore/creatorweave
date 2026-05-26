@@ -4,6 +4,7 @@
 
 import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
 import { invokeWebMCPTool } from './webmcp/invoke'
+import { listVoices as edgeTTSListVoices } from '../utils/tts'
 
 // Config
 const CONFIG = {
@@ -428,6 +429,152 @@ async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
 // ============================================================
 
 export default defineBackground(() => {
+  // ── Edge TTS: Register declarativeNetRequest rules to spoof Edge UA ──
+  const EDGE_TTS_WS_RULE_ID = 100;
+  const EDGE_TTS_FETCH_RULE_ID = 101;
+
+  let _dnrRulesReady = false;
+
+  async function registerTTSDNRRules() {
+    const edgeUA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0';
+    const secChUa = '" Not;A Brand";v="99", "Microsoft Edge";v="143", "Chromium";v="143"';
+    const muid = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+
+    const rules: chrome.declarativeNetRequest.Rule[] = [
+      {
+        id: EDGE_TTS_WS_RULE_ID,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+          requestHeaders: [
+            { header: 'User-Agent', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: edgeUA },
+            { header: 'Cookie', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: `muid=${muid}` },
+            { header: 'Sec-CH-UA', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: secChUa },
+            { header: 'Sec-CH-UA-Mobile', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: '?0' },
+            { header: 'Origin', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold' },
+            { header: 'Pragma', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'no-cache' },
+            { header: 'Cache-Control', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'no-cache' },
+          ],
+        },
+        condition: {
+          urlFilter: '||speech.platform.bing.com/consumer/speech/synthesize/readaloud',
+          resourceTypes: ['websocket' as chrome.declarativeNetRequest.ResourceType],
+        },
+      },
+      {
+        id: EDGE_TTS_FETCH_RULE_ID,
+        priority: 1,
+        action: {
+          type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+          requestHeaders: [
+            { header: 'User-Agent', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: edgeUA },
+            { header: 'Sec-CH-UA', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: secChUa },
+            { header: 'Sec-CH-UA-Mobile', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: '?0' },
+          ],
+        },
+        condition: {
+          urlFilter: '||speech.platform.bing.com/consumer/speech/synthesize/readaloud',
+          resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
+        },
+      },
+    ];
+
+    try {
+      await chrome.declarativeNetRequest.updateSessionRules({
+        removeRuleIds: [EDGE_TTS_WS_RULE_ID, EDGE_TTS_FETCH_RULE_ID],
+        addRules: rules,
+      });
+      _dnrRulesReady = true;
+      console.log('[Edge TTS] DNR rules registered');
+    } catch (err) {
+      console.error('[Edge TTS] DNR rule registration failed:', err);
+    }
+  }
+
+  // Fire-and-forget registration, but the promise resolves quickly
+  const _dnrReady = registerTTSDNRRules();
+
+  // ── DNR Debug: log when rules match ──
+  if (chrome.declarativeNetRequest.onRuleMatchedDebug) {
+    chrome.declarativeNetRequest.onRuleMatchedDebug.addListener((info) => {
+      console.log('[DNR Debug] Rule matched:', JSON.stringify({
+        ruleId: info.rule.ruleId,
+        rulesetId: info.rule.rulesetId,
+        request: {
+          url: info.request.url,
+          type: info.request.type,
+          method: info.request.method,
+          tabId: info.request.tabId,
+          initiator: info.request.initiator,
+        },
+      }));
+    });
+    console.log('[Edge TTS] DNR debug listener registered');
+  }
+
+  // ── DNR Self-check: verify rules are actually registered ──
+  setTimeout(async () => {
+    try {
+      const sessionRules = await chrome.declarativeNetRequest.getSessionRules();
+      console.log(`[Edge TTS] DNR self-check: ${sessionRules.length} session rules active`);
+      for (const rule of sessionRules) {
+        const condition = rule.condition as any;
+        console.log(`[Edge TTS]   Rule ${rule.id}: urlFilter="${condition?.urlFilter}" resourceTypes=${JSON.stringify(condition?.resourceTypes)}`);
+      }
+    } catch (err) {
+      console.error('[Edge TTS] DNR self-check failed:', err);
+    }
+  }, 1000);
+
+  // ── Offscreen Document for TTS WebSocket ──
+  // DNR doesn't intercept WS headers from service workers (Chromium bug #1285664).
+  // We use an offscreen document (renderer process) where DNR works properly.
+  const OFFSCREEN_DOC_URL = chrome.runtime.getURL('offscreen-tts.html');
+
+  async function ensureOffscreenDocument(): Promise<void> {
+    try {
+      // Check if offscreen document already exists
+      const existingClients = await chrome.offscreen?.hasDocument?.();
+      if (existingClients) {
+        // Verify it's responsive
+        try {
+          await chrome.runtime.sendMessage({ type: 'tts_offscreen_ping' });
+          return; // exists and responsive
+        } catch {
+          // Not responsive, will create new one below
+        }
+      }
+    } catch {
+      // hasDocument might not exist in all Chrome versions
+    }
+
+    // Close any existing document first
+    try { await chrome.offscreen.closeDocument(); } catch {}
+
+    // Create new offscreen document
+    await chrome.offscreen.createDocument({
+      url: OFFSCREEN_DOC_URL,
+      reasons: ['AUDIO_PLAYBACK' as any], // Closest available reason
+      justification: 'Edge TTS WebSocket connection requires renderer process for DNR header modification',
+    });
+    console.log('[Edge TTS] Offscreen document created');
+
+    // Wait a moment for the document to initialize
+    await new Promise(r => setTimeout(r, 200));
+
+    // Verify it's ready
+    try {
+      const pong = await chrome.runtime.sendMessage({ type: 'tts_offscreen_ping' });
+      if (pong?.pong) {
+        console.log('[Edge TTS] Offscreen document is ready');
+      }
+    } catch (err) {
+      console.error('[Edge TTS] Offscreen document not responding:', err);
+    }
+  }
+
+  ensureOffscreenDocument();
+
   // ── Proactive token refresh: check on startup and every 5 minutes ──
   const CODEX_TOKEN_REFRESH_ALARM = 'codex_token_refresh_alarm';
 
@@ -505,6 +652,101 @@ export default defineBackground(() => {
 
         if (message.type === 'web_fetch_render') {
           sendResponse(await handleFetchRender(message));
+          return;
+        }
+
+        if (message.type === 'edge_tts_status') {
+          // Check if TTS is available by trying to list voices
+          // Also include DNR rule status for debugging
+          try {
+            // Ensure DNR rules are registered before checking
+            await _dnrReady;
+            const [voices, sessionRules] = await Promise.all([
+              edgeTTSListVoices(),
+              chrome.declarativeNetRequest.getSessionRules(),
+            ]);
+            const dnrRules = sessionRules.filter((r: any) => r.id >= 100 && r.id <= 199);
+            sendResponse({
+              ok: true,
+              available: true,
+              voicesCount: voices.length,
+              dnr: {
+                totalRules: sessionRules.length,
+                ttsRules: dnrRules.length,
+                rules: dnrRules.map((r: any) => ({
+                  id: r.id,
+                  urlFilter: (r.condition as any)?.urlFilter,
+                  resourceTypes: (r.condition as any)?.resourceTypes,
+                })),
+              },
+            });
+          } catch (err: any) {
+            // Also report DNR status on failure
+            let dnrInfo: any = null;
+            try {
+              const sessionRules = await chrome.declarativeNetRequest.getSessionRules();
+              const dnrRules = sessionRules.filter((r: any) => r.id >= 100 && r.id <= 199);
+              dnrInfo = {
+                totalRules: sessionRules.length,
+                ttsRules: dnrRules.length,
+                rules: dnrRules.map((r: any) => ({
+                  id: r.id,
+                  urlFilter: (r.condition as any)?.urlFilter,
+                  resourceTypes: (r.condition as any)?.resourceTypes,
+                })),
+              };
+            } catch {}
+            sendResponse({
+              ok: true,
+              available: false,
+              error: err?.message || String(err),
+              dnr: dnrInfo,
+            });
+          }
+          return;
+        }
+
+        if (message.type === 'edge_tts_list_voices') {
+          try {
+            const voices = await edgeTTSListVoices();
+            sendResponse({ ok: true, voices });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
+          return;
+        }
+
+        if (message.type === 'edge_tts_synthesize') {
+          try {
+            // Ensure DNR rules are registered and offscreen document is ready
+            await _dnrReady;
+            await ensureOffscreenDocument();
+
+            // Delegate to offscreen document (renderer process)
+            // DNR can modify WS headers from renderer, but NOT from service worker
+            const result = await chrome.runtime.sendMessage({
+              type: 'tts_offscreen_synthesize',
+              text: message.text,
+              voice: message.voice,
+              rate: message.rate,
+              pitch: message.pitch,
+              volume: message.volume,
+              outputFormat: message.outputFormat,
+            });
+
+            if (result?.ok && result?.audioBase64) {
+              sendResponse({
+                ok: true,
+                audioBase64: result.audioBase64,
+                audioFormat: message.outputFormat || 'audio-24khz-48kbitrate-mono-mp3',
+                wordBoundaries: result.wordBoundaries || [],
+              });
+            } else {
+              sendResponse({ ok: false, error: result?.error || 'Synthesis failed in offscreen document' });
+            }
+          } catch (err: any) {
+            sendResponse({ ok: false, error: `TTS error: ${err?.message || String(err)}` });
+          }
           return;
         }
 

@@ -127,7 +127,7 @@ export default defineContentScript({
     window.addEventListener('message', onBridgeMessage);
 
     // Send request to ISOLATED relay → background
-    function sendToBridge(type: string, payload: Record<string, any>): Promise<any> {
+    function sendToBridge(type: string, payload: Record<string, any>, timeoutMs?: number): Promise<any> {
       return new Promise((resolve) => {
         const id = '__aw_' + (++_requestId) + '_' + Date.now();
         const timeoutId = window.setTimeout(() => {
@@ -135,7 +135,7 @@ export default defineContentScript({
           if (pending) {
             pending.resolve({ ok: false, error: 'Bridge request timeout', errorCode: 'BRIDGE_TIMEOUT' });
           }
-        }, 35000)
+        }, timeoutMs || 35000)
         _pending.set(id, { resolve, timeoutId, invalidatedTimerId: null });
 
         window.postMessage({
@@ -430,6 +430,89 @@ export default defineContentScript({
        */
       codexProxyFetchStream(body: Record<string, any>): AsyncIterable<string> & { cancel: () => void } {
         return sendToBridgeStream('codex_proxy_fetch_stream', { body });
+      },
+
+      // ── Edge TTS (Text-to-Speech) ──
+
+      /**
+       * Check if Edge TTS is available through the extension.
+       */
+      async ttsStatus() {
+        return sendToBridge('edge_tts_status', {});
+      },
+
+      /**
+       * List all available Edge TTS voices.
+       */
+      async ttsListVoices() {
+        return sendToBridge('edge_tts_list_voices', {});
+      },
+
+      /**
+       * Synthesize speech using Edge TTS (neural, high quality).
+       * Returns { ok, audioBase64, audioFormat, wordBoundaries }.
+       * The audioBase64 can be decoded into an audio blob for playback.
+       */
+      async ttsSynthesize(text: string, options?: {
+        voice?: string;
+        rate?: string;
+        pitch?: string;
+        volume?: string;
+        outputFormat?: string;
+      }) {
+        return sendToBridge('edge_tts_synthesize', {
+          text,
+          voice: options?.voice || 'en-US-AriaNeural',
+          rate: options?.rate,
+          pitch: options?.pitch,
+          volume: options?.volume,
+          outputFormat: options?.outputFormat,
+        }, 60000); // 60s timeout for TTS synthesis
+      },
+
+      /**
+       * Synthesize speech and play it immediately.
+       * Returns { ok, playing } — the audio plays in the background.
+       * Call ttsStop() to stop playback.
+       */
+      async ttsPlay(text: string, options?: {
+        voice?: string;
+        rate?: string;
+        pitch?: string;
+        volume?: string;
+        outputFormat?: string;
+      }): Promise<{ ok: boolean; playing?: boolean; error?: string }> {
+        const result = await sendToBridge('edge_tts_synthesize', {
+          text,
+          voice: options?.voice || 'en-US-AriaNeural',
+          rate: options?.rate,
+          pitch: options?.pitch,
+          volume: options?.volume,
+          outputFormat: options?.outputFormat,
+        }, 60000);
+
+        if (!result.ok || !result.audioBase64) {
+          return { ok: false, error: result.error || 'Synthesis failed' };
+        }
+
+        // Stop any currently playing TTS audio
+        const prev = (window as any).__ttsAudio as HTMLAudioElement | undefined;
+        if (prev) { prev.pause(); prev.src = ''; }
+
+        const format = result.audioFormat || 'audio-24khz-48kbitrate-mono-mp3';
+        const mimeType = format.includes('mp3') ? 'audio/mp3' : 'audio/ogg';
+        const audio = new Audio(`data:${mimeType};base64,${result.audioBase64}`);
+        (window as any).__ttsAudio = audio;
+        audio.play();
+        return { ok: true, playing: true };
+      },
+
+      /**
+       * Stop currently playing TTS audio.
+       */
+      ttsStop(): void {
+        const audio = (window as any).__ttsAudio as HTMLAudioElement | undefined;
+        if (audio) { audio.pause(); audio.src = ''; }
       },
     };
 

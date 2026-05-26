@@ -37,10 +37,12 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { TTSButton } from './TTSButton'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
+import { useSettingsStore } from '@/store/settings.store'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -329,6 +331,10 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
 
+  // TTS settings
+  const enableTTS = useSettingsStore((s) => s.enableTTS)
+  const ttsVoice = useSettingsStore((s) => s.ttsVoice)
+
   // Build unified timeline
   const timeline = buildTimeline(
     turn.messages,
@@ -435,6 +441,9 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             )}
             {lastMessageWithContent?.content && (
               <CopyButton content={lastMessageWithContent.content} />
+            )}
+            {enableTTS && lastMessageWithContent?.content && (
+              <TTSButton content={lastMessageWithContent.content} voice={ttsVoice} />
             )}
             <button
               type="button"

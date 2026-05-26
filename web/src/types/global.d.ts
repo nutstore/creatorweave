@@ -1,4 +1,17 @@
 // Extend Window interface for File System Access API
+declare module 'remove-markdown' {
+  const removeMarkdown: (md: string, options?: {
+    stripListLeaders?: boolean
+    listUnicodeChar?: string
+    gfm?: boolean
+    useImgAltText?: boolean
+    abbr?: boolean
+    replaceLinksWithURL?: boolean
+    htmlTagsToSkip?: string[]
+  }) => string
+  export default removeMarkdown
+}
+
 declare global {
   interface Window {
     showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>

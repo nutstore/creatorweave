@@ -65,6 +65,8 @@ interface SettingsState {
   // 实验性功能 (Experimental features, disabled by default)
   enableBatchSpawn: boolean
   enableWebMCP: boolean
+  enableTTS: boolean
+  ttsVoice: string
 
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
@@ -99,6 +101,8 @@ interface SettingsState {
   setThinkingLevel: (v: ThinkingLevel) => void
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
+  setEnableTTS: (v: boolean) => void
+  setTTSVoice: (voice: string) => void
   setHasApiKey: (has: boolean) => void
   getEffectiveProviderConfig: () => EffectiveProviderConfig | null
 
@@ -190,6 +194,8 @@ export const useSettingsStore = create<SettingsState>()(
       thinkingLevel: 'medium' as ThinkingLevel,
       enableBatchSpawn: false,
       enableWebMCP: true,
+      enableTTS: false,
+      ttsVoice: 'zh-CN-XiaoxiaoNeural',
       hasApiKey: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
@@ -410,6 +416,8 @@ export const useSettingsStore = create<SettingsState>()(
       setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
+      setEnableTTS: (enableTTS) => set({ enableTTS }),
+      setTTSVoice: (ttsVoice) => set({ ttsVoice }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
 
       getEffectiveProviderConfig: () => {
@@ -661,6 +669,8 @@ export const useSettingsStore = create<SettingsState>()(
         thinkingLevel: state.thinkingLevel,
         enableBatchSpawn: state.enableBatchSpawn,
         enableWebMCP: state.enableWebMCP,
+        enableTTS: state.enableTTS,
+        ttsVoice: state.ttsVoice,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
         pinnedModelsByProvider: state.pinnedModelsByProvider,
