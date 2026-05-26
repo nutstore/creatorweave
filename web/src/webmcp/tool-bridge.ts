@@ -37,7 +37,7 @@ export function webMCPToolToToolDefinition(tool: WebMCPDiscoveredTool): ToolDefi
   }
 }
 
-export function createWebMCPToolExecutor(fullToolName: string): ToolExecutor {
+export function createWebMCPToolExecutor(fullToolName: string, hostname?: string): ToolExecutor {
   return async (args) => {
     const bridge = getWebMCPBridge()
     if (!bridge) {
@@ -48,8 +48,8 @@ export function createWebMCPToolExecutor(fullToolName: string): ToolExecutor {
       )
     }
 
-    const separator = fullToolName.indexOf(':')
-    const hostname = separator > 0 ? fullToolName.slice(0, separator) : ''
+    // Use the original hostname passed from the tool object (not parsed from
+    // the normalized fullName) to look up the preferred tab.
     const preferredTabId = hostname
       ? useWebMCPStore.getState().getPreferredTabIdForHost(hostname)
       : undefined

@@ -140,7 +140,7 @@ async function syncFromCatalog(registry: RegistryLike): Promise<number> {
     }
 
     const definition = webMCPToolToToolDefinition(tool)
-    const executor = createWebMCPToolExecutor(tool.fullName)
+    const executor = createWebMCPToolExecutor(tool.fullName, tool.hostname)
     registry.register(definition, executor)
     registeredWebMCPToolNames.add(tool.fullName)
     registeredWebMCPToolSignatures.set(tool.fullName, signature)

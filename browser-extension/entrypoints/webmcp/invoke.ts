@@ -53,32 +53,24 @@ async function pickTargetTabId(hostname: string, request: WebMCPInvokeRequest): 
   return sorted[0]?.id ?? null
 }
 
-function parseFullToolName(fullToolName: string): { hostname: string; toolName: string } | null {
-  const separator = fullToolName.indexOf(':')
-  if (separator <= 0 || separator === fullToolName.length - 1) return null
-
-  return {
-    hostname: fullToolName.slice(0, separator),
-    toolName: fullToolName.slice(separator + 1),
-  }
-}
-
 export async function invokeWebMCPTool(
   request: WebMCPInvokeRequest
 ): Promise<WebMCPInvokeResponse> {
-  const parsed = parseFullToolName(request.fullToolName || '')
-  if (!parsed) {
+  // Route cache is the source of truth: it holds the original (un-normalized)
+  // hostname and toolName from discovery time.
+  const route = getRecentRoute(request.fullToolName || '')
+  if (!route) {
     return {
       ok: false,
       hostname: '',
       toolName: '',
       fullToolName: request.fullToolName || '',
       errorCode: 'INVALID_TOOL_NAME',
-      error: 'Tool name must be in format "hostname:toolName"',
+      error: 'No route cache entry for tool — try re-discovering WebMCP tools',
     }
   }
 
-  const { hostname, toolName } = parsed
+  const { hostname, toolName } = route
   const tabId = await pickTargetTabId(hostname, request)
   if (tabId === null) {
     return {

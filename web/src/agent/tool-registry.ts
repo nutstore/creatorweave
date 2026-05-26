@@ -393,7 +393,7 @@ export class ToolRegistry {
 
   /**
    * Discover and register WebMCP tools from tabs in the current browser window.
-   * Tool names follow `hostname:toolName`.
+   * Tool names follow a provider-safe format (`<safeHostname>__<safeToolName>`).
    */
   async registerWebMCPTools(forceDiscovery = false): Promise<number> {
     try {

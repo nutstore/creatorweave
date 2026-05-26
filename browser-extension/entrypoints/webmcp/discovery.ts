@@ -1,8 +1,10 @@
 import type { WebMCPApiMode, WebMCPDiscoverResponse, WebMCPDiscoveredTool } from './types'
+import { buildSafeFullName } from './tool-name'
 
 type RouteEntry = {
   tabId: number
   hostname: string
+  toolName: string
   seenAt: number
 }
 
@@ -170,10 +172,11 @@ export async function discoverWebMCPToolsInCurrentWindow(): Promise<WebMCPDiscov
 
       discoveredTabs.add(tab.id)
       for (const tool of result.tools) {
-        const fullName = `${hostname}:${tool.name}`
+        const fullName = buildSafeFullName(hostname, tool.name)
         recentRouteByToolName.set(fullName, {
           tabId: tab.id,
           hostname,
+          toolName: tool.name,
           seenAt: discoveredAt,
         })
 
