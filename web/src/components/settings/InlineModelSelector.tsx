@@ -14,6 +14,7 @@ import {
   isCustomProviderType,
   getProviderMeta,
 } from '@/agent/providers/types'
+import { getModelContextWindow } from '@/agent/providers/model-store'
 import type { ModelInfo } from '@/agent/providers/types'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton } from '@creatorweave/ui'
@@ -63,6 +64,7 @@ export function InlineModelSelector() {
             const allModels = mergeModelLists(
               p.models.map((m) => ({ id: m.id, name: m.name })),
               staticModels,
+              p.providerType,
             )
             return {
               providerType: p.providerType,
@@ -249,6 +251,7 @@ export function InlineModelSelector() {
 function mergeModelLists(
   dynamicOrSimple: Array<{ id: string; name: string }>,
   staticModels: ModelInfo[],
+  providerType: LLMProviderType,
 ): ModelInfo[] {
   const seen = new Set<string>()
   const result: ModelInfo[] = []
@@ -267,7 +270,7 @@ function mergeModelLists(
         id: m.id,
         name: m.name,
         capabilities: ['code'],
-        contextWindow: 128000,
+        contextWindow: getModelContextWindow(providerType, m.id),
       })
     }
   }

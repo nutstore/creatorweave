@@ -11,6 +11,7 @@
  */
 
 import type { LLMProviderType, ModelInfo } from './types'
+import { getModelsForProvider } from './types'
 import type { FetchModelsResult } from './model-fetcher'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -131,4 +132,56 @@ export function setCachedModels(
 
   memoryCache.set(key, entry)
   writeToDisk(key, entry)
+}
+
+/**
+ * Look up context window for a single model ID.
+ *
+ * Predicate (highest priority first):
+ * 1. API-provided value from dynamic model cache (model-store)
+ * 2. Static PROVIDER_META entry
+ * 3. Sensible default (128000)
+ *
+ * This is the single source of truth for context window resolution.
+ * All UI code should use this instead of hardcoding 128000.
+ */
+export function getModelContextWindow(
+  providerType: LLMProviderType,
+  modelId: string,
+  providerKey?: string
+): number {
+  // 1. Dynamic cache (API-provided context_length from OpenRouter etc.)
+  //    Try multiple cache keys because useDynamicModels may store under
+  //    (providerType, providerType) while callers may look up with just providerType.
+  const keysToTry: Array<{ pt: LLMProviderType; pk?: string }> = [
+    { pt: providerType, pk: providerKey },
+    { pt: providerType }, // key without providerKey suffix
+  ]
+  // Also try (providerType, providerType) if providerKey is different or absent
+  if (providerKey !== providerType) {
+    keysToTry.push({ pt: providerType, pk: providerType })
+  }
+
+  const seenIds = new Set<string>()
+  const merged: ModelInfo[] = []
+  for (const { pt, pk } of keysToTry) {
+    const models = getCachedModels(pt, pk)
+    if (!models) continue
+    for (const m of models) {
+      if (seenIds.has(m.id)) continue
+      seenIds.add(m.id)
+      merged.push(m)
+    }
+  }
+
+  const cached = merged.find((m) => m.id === modelId)
+  if (cached && cached.contextWindow > 0) return cached.contextWindow
+
+  // 2. Static registry
+  const staticModels = getModelsForProvider(providerType)
+  const fromStatic = staticModels.find((m) => m.id === modelId)?.contextWindow
+  if (fromStatic !== undefined && fromStatic > 0) return fromStatic
+
+  // 3. Default fallback
+  return 128000
 }

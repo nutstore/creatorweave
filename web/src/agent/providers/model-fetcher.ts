@@ -79,7 +79,7 @@ async function fetchOpenAICompatibleModels(
   const data = await response.json()
 
   // OpenAI format: { data: [{ id: "model-name", ... }, ...] }
-  const rawModels: Array<{ id: string; owned_by?: string; created?: number }> = data.data || data
+  const rawModels: Array<{ id: string; owned_by?: string; created?: number; context_length?: number }> = data.data || data
 
   if (!Array.isArray(rawModels)) {
     throw new Error('Unexpected response format: expected array of models')
@@ -87,7 +87,7 @@ async function fetchOpenAICompatibleModels(
 
   return rawModels
     .filter((m) => m.id && typeof m.id === 'string')
-    .map((m) => parseModelInfo(m.id))
+    .map((m) => parseModelInfo(m.id, m.context_length))
     .sort((a, b) => {
       // Sort: put more capable/recent models first
       const aScore = getModelSortScore(a.id)
@@ -224,14 +224,17 @@ export async function fetchModelsForProvider(
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Parse a raw model ID string into a ModelInfo object
+ * Parse a raw model ID string into a ModelInfo object.
+ *
+ * When the API provides `context_length` (e.g. OpenRouter), it is used as the
+ * primary source. Otherwise, falls back to the static guess registry.
  */
-function parseModelInfo(modelId: string): ModelInfo {
+function parseModelInfo(modelId: string, apiContextLength?: number): ModelInfo {
   return {
     id: modelId,
     name: formatModelName(modelId),
     capabilities: guessCapabilities(modelId),
-    contextWindow: guessContextWindow(modelId),
+    contextWindow: apiContextLength ?? guessContextWindow(modelId),
   }
 }
 
@@ -419,7 +422,8 @@ const CONTEXT_WINDOW_MAP: Array<{ pattern: string; context: number }> = [
 
 /**
  * Look up context window size from the static registry.
- * Exact match first, then prefix match (first match wins).
+ * Longer (more specific) patterns are tried first to avoid shorter patterns
+ * matching prematurely (e.g. "deepseek-v4-pro" must match before "deepseek").
  */
 function guessContextWindow(id: string): number {
   const lower = id.toLowerCase()
@@ -429,8 +433,11 @@ function guessContextWindow(id: string): number {
   if (lower.includes('32k')) return 32000
   if (lower.includes('8k')) return 8000
 
-  // 2. Lookup from registry
-  for (const { pattern, context } of CONTEXT_WINDOW_MAP) {
+  // 2. Lookup from registry — sort by pattern length descending so
+  //    more specific patterns (e.g. "deepseek-v4-pro") take priority
+  //    over generic ones (e.g. "deepseek").
+  const sorted = [...CONTEXT_WINDOW_MAP].sort((a, b) => b.pattern.length - a.pattern.length)
+  for (const { pattern, context } of sorted) {
     if (lower.startsWith(pattern) || lower.includes(pattern)) {
       return context
     }

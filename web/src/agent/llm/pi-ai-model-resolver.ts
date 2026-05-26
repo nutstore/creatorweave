@@ -1,11 +1,11 @@
 import { getModel } from '@mariozechner/pi-ai'
 import type { Api, KnownProvider, Model } from '@mariozechner/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
-import { getModelsForProvider, isCustomProviderType } from '@/agent/providers/types'
+import { isCustomProviderType } from '@/agent/providers/types'
+import { getModelContextWindow } from '@/agent/providers/model-store'
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
-const DEFAULT_CONTEXT_WINDOW = 128000
 const DEFAULT_MAX_TOKENS = 8192
 
 const PROVIDER_MAP: Partial<Record<LLMProviderType, KnownProvider>> = {
@@ -78,8 +78,7 @@ function tryGetNativeModel(
 }
 
 function lookupContextWindow(providerType: LLMProviderType, modelName: string): number {
-  const models = getModelsForProvider(providerType)
-  return models.find((m) => m.id === modelName)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
+  return getModelContextWindow(providerType, modelName)
 }
 
 function createOpenAICompatibleFallback(

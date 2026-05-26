@@ -37,7 +37,7 @@ import type {
   ProviderCategory,
 } from '@/agent/providers/types'
 import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
-import { getCachedModels } from '@/agent/providers/model-store'
+import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
 
@@ -119,17 +119,39 @@ function ProviderCard({
 
   // Merge model lists: dynamic + static + custom provider models
   const allModels = useMemo<ModelInfo[]>(() => {
-    if (isCustom && customProvider) {
-      return customProvider.models.map((id) => ({
-        id,
-        name: id,
-        capabilities: ['code'] as const,
-        contextWindow: 128000,
-      }))
-    }
-
     const seen = new Set<string>()
     const result: ModelInfo[] = []
+
+    if (isCustom && customProvider) {
+      // Start with configured model IDs (bare bones — no contextWindow info)
+      for (const id of customProvider.models) {
+        if (!seen.has(id)) {
+          seen.add(id)
+          result.push({
+            id,
+            name: id,
+            capabilities: ['code'] as const,
+            contextWindow: getModelContextWindow(providerType, id),
+          })
+        }
+      }
+
+      // Overlay dynamic models on top — they carry API-provided context_length
+      // from the fetch (OpenRouter-style APIs). Preserve the model ID from the
+      // dynamic list but use the rich info (contextWindow) from the API.
+      for (const dm of dynamicModels) {
+        const existingIdx = result.findIndex((m) => m.id === dm.id)
+        if (existingIdx >= 0) {
+          // Enrich with API data (contextWindow, capabilities, name)
+          result[existingIdx] = dm
+        } else if (!seen.has(dm.id)) {
+          seen.add(dm.id)
+          result.push(dm)
+        }
+      }
+
+      return result
+    }
 
     // Static models first (have capability info)
     const staticModels = getModelsForProvider(providerType)
