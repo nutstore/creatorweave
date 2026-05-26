@@ -407,6 +407,9 @@ const CONTEXT_WINDOW_MAP: Array<{ pattern: string; context: number }> = [
   { pattern: 'qwen', context: 131072 },
 
   // ─── DeepSeek ──────────────────────────────────────────────────────────
+  { pattern: 'deepseek-v4-pro', context: 1048576 },
+  { pattern: 'deepseek-v4-flash', context: 1048576 },
+  { pattern: 'deepseek-v4', context: 1048576 },
   { pattern: 'deepseek-r1', context: 131072 },
   { pattern: 'deepseek-v3', context: 131072 },
   { pattern: 'deepseek-chat', context: 131072 },
