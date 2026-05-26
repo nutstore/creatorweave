@@ -638,6 +638,15 @@ export default defineBackground(() => {
   });
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // Ignore internal messages intended for offscreen document
+    // (tts_offscreen_*). These are sent via chrome.runtime.sendMessage
+    // from this service worker to the offscreen document, but this
+    // listener also receives them. Responding to them here causes
+    // "Could not establish connection. Receiving end does not exist."
+    if (typeof message?.type === 'string' && message.type.startsWith('tts_offscreen_')) {
+      return false; // Not handled — let the offscreen document respond
+    }
+
     (async () => {
       try {
         if (message.type === 'web_search') {
