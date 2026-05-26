@@ -2463,14 +2463,19 @@ export class WorkspaceRuntime {
       }
     }
 
-    // No root prefix match → route to first root
-    const firstEntry = rootMap.entries().next().value!
+    // No root prefix match
     if (rootMap.size > 1) {
-      console.warn(
-        `[resolvePath] Path "${normalized}" has no root prefix. ` +
-        `Defaulting to "${firstEntry[0]}". Consider using "${firstEntry[0]}/${normalized}" for clarity.`
+      // Multi-root: path MUST include a rootName prefix to avoid ambiguity.
+      const rootNames = Array.from(rootMap.keys())
+      throw new Error(
+        `Path "${normalized}" is missing a rootName prefix. ` +
+        `This workspace has multiple roots: ${rootNames.map(r => `"${r}"`).join(', ')}. ` +
+        `Use the format "{rootName}/${normalized}" — ` +
+        `e.g. "${rootNames[0]}/${normalized}" or "${rootNames[rootNames.length - 1]}/${normalized}".`
       )
     }
+    // Single root: no ambiguity, route to the only root silently
+    const firstEntry = rootMap.entries().next().value!
     return { rootName: firstEntry[0], relativePath: normalized, readOnly: firstEntry[1].readOnly }
   }
 
