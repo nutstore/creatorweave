@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
-import { readExecutor } from '../io.tool'
+import { readExecutor } from '../read.tool'
 
 const readFileMock =
   vi.fn<

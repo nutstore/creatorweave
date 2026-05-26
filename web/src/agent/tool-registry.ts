@@ -11,8 +11,10 @@ import { formatErrorForUser, withAutoRetry } from './error-handling'
 import { isToolAllowedInMode, type AgentMode } from './agent-mode'
 import { useSettingsStore } from '@/store/settings.store'
 
-// Import unified IO tools
-import { readDefinition, readExecutor, readPromptDoc, writeDefinition, writeExecutor, writePromptDoc } from './tools/io.tool'
+// Import read tool
+import { readDefinition, readExecutor, readPromptDoc } from './tools/read.tool'
+// Import write tool
+import { writeDefinition, writeExecutor, writePromptDoc } from './tools/write.tool'
 import { deleteDefinition, deleteExecutor, deletePromptDoc } from './tools/delete.tool'
 import { editDefinition, editExecutor, editPromptDoc } from './tools/file-edit.tool'
 import { searchDefinition, searchExecutor, searchPromptDoc } from './tools/search.tool'

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ToolContext } from '../tool-types'
-import { writeExecutor } from '../io.tool'
+import { writeExecutor } from '../write.tool'
 
 type PendingChangeMock = {
   id: string
