@@ -57,4 +57,6 @@ export const app = {
       "This may be due to database corruption or migration failure. Resetting the database will clear all data and recreate.",
     resetDatabase: "Reset Database",
     reloadPage: "Reload Page",
+    updateAvailable: "A new version is available, update for the latest features",
+    updateNow: "Update Now",
 } as const

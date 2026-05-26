@@ -54,7 +54,6 @@ describe('registerServiceWorker', () => {
     registerServiceWorker({
       buildId: 'build-123',
       windowTarget: windowMock,
-      reload: vi.fn(),
       updateIntervalMs: 60_000,
     })
 
@@ -66,15 +65,15 @@ describe('registerServiceWorker', () => {
     })
   })
 
-  it('asks waiting worker to skip waiting when update is installed', async () => {
-    const waitingPostMessage = vi.fn()
+  it('calls onUpdateAvailable when update is installed', async () => {
+    const onUpdateAvailable = vi.fn()
     const installingWorker = createEventTargetMock()
     ;(installingWorker as unknown as { state: string }).state = 'installed'
 
     let updateFoundHandler: EventHandler | undefined
 
     const registration = {
-      waiting: { postMessage: waitingPostMessage },
+      waiting: { postMessage: vi.fn() },
       installing: installingWorker,
       update: vi.fn(),
       addEventListener: vi.fn((type: string, handler: EventHandler) => {
@@ -96,7 +95,7 @@ describe('registerServiceWorker', () => {
     registerServiceWorker({
       buildId: 'build-123',
       windowTarget: windowMock,
-      reload: vi.fn(),
+      onUpdateAvailable,
       updateIntervalMs: 60_000,
     })
 
@@ -104,6 +103,39 @@ describe('registerServiceWorker', () => {
     updateFoundHandler?.()
     installingWorker.dispatch('statechange')
 
-    expect(waitingPostMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' })
+    expect(onUpdateAvailable).toHaveBeenCalled()
+  })
+
+  it('calls onUpdateAvailable immediately when a worker is already waiting', async () => {
+    const onUpdateAvailable = vi.fn()
+
+    const registration = {
+      waiting: { postMessage: vi.fn() },
+      installing: null,
+      update: vi.fn(),
+      addEventListener: vi.fn(),
+    }
+
+    const register = vi.fn(async () => registration)
+
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        controller: {},
+        register,
+        addEventListener: vi.fn(),
+      },
+    })
+
+    registerServiceWorker({
+      buildId: 'build-123',
+      windowTarget: windowMock,
+      onUpdateAvailable,
+      updateIntervalMs: 60_000,
+    })
+
+    await windowMock.dispatch('load')
+
+    expect(onUpdateAvailable).toHaveBeenCalled()
   })
 })

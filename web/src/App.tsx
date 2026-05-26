@@ -1,8 +1,9 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { HashRouter, Routes, Route, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { UnsupportedBrowser } from '@/components/UnsupportedBrowser'
 import { WorkspaceLayout } from '@/components/layout/WorkspaceLayout'
+import { applyServiceWorkerUpdate } from '@/pwa/register-service-worker'
 import { StorageLoading } from '@/components/StorageLoading'
 import { DatabaseRefreshDialog } from '@/components/DatabaseRefreshDialog'
 import { attemptReconnect } from '@/store/remote.store'
@@ -272,6 +273,36 @@ function AppReady() {
   const extensionCloseGuide = useExtensionStore((s) => s.closeInstallGuide)
 
   const [isClearingLocalData, setIsClearingLocalData] = useState(false)
+
+  // --- Service Worker update prompt ---
+  const swUpdateToastShownRef = useRef(false)
+
+  const handleSwUpdate = useCallback(() => {
+    // Avoid showing duplicate toasts if the event fires multiple times
+    if (swUpdateToastShownRef.current) return
+    swUpdateToastShownRef.current = true
+
+    toast.info(t('app.updateAvailable'), {
+      duration: Infinity,
+      action: {
+        label: t('app.updateNow'),
+        onClick: () => {
+          applyServiceWorkerUpdate()
+        },
+      },
+      onDismiss: () => {
+        // Allow re-showing if user dismissed and a new check finds update again
+        swUpdateToastShownRef.current = false
+      },
+    })
+  }, [t])
+
+  useEffect(() => {
+    window.addEventListener('sw-update-available', handleSwUpdate)
+    return () => {
+      window.removeEventListener('sw-update-available', handleSwUpdate)
+    }
+  }, [handleSwUpdate])
 
   const handleCreateProject = async (name: string) => {
     const project = await createProject(name)

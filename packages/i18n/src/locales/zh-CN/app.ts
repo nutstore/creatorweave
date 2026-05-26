@@ -50,4 +50,6 @@ export const app = {
       "这可能由于数据库损坏或迁移失败导致。重置数据库将清除所有数据并重新创建。",
     resetDatabase: "重置数据库",
     reloadPage: "重新加载页面",
+    updateAvailable: "发现新版本，建议更新以获取最新功能",
+    updateNow: "立即更新",
 } as const

@@ -39,7 +39,14 @@ if (import.meta.env.DEV) {
 
 const enableSwInDev = import.meta.env.VITE_ENABLE_SW_IN_DEV === 'true'
 if (import.meta.env.PROD || enableSwInDev) {
-  registerServiceWorker({ buildId: __APP_BUILD_ID__ })
+  registerServiceWorker({
+    buildId: __APP_BUILD_ID__,
+    onUpdateAvailable: () => {
+      // Dispatch a custom event so the React layer can show a toast prompt.
+      // This is safe to call before React mounts — the event is simply queued.
+      window.dispatchEvent(new CustomEvent('sw-update-available'))
+    },
+  })
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -59,4 +59,6 @@ export const app = {
       "이는 데이터베이스 손상 또는 마이그레이션 실패로 인해 발생할 수 있습니다. 데이터베이스를 재설정하면 모든 데이터가 지워지고 다시 생성됩니다.",
     resetDatabase: "데이터베이스 재설정",
     reloadPage: "페이지 새로고침",
+    updateAvailable: "새 버전을 사용할 수 있습니다. 최신 기능을 위해 업데이트하세요",
+    updateNow: "지금 업데이트",
 } as const
