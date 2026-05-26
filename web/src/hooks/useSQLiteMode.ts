@@ -24,23 +24,30 @@ export type SQLiteMode = 'opfs' | 'memory' | null
  * ```
  */
 export function useSQLiteMode() {
-  const [mode, setMode] = useState<SQLiteMode>(null)
+  const [mode, setMode] = useState<SQLiteMode>(() => getSQLiteDB().getMode())
 
   useEffect(() => {
-    // Check the current mode
-    const checkMode = () => {
-      const db = getSQLiteDB()
-      const currentMode = db.getMode()
-      setMode(currentMode)
-    }
+    const db = getSQLiteDB()
 
-    // Initial check
-    checkMode()
+    // Initial check (db may have been initialized before mount)
+    const currentMode = db.getMode()
+    setMode(prev => (prev === currentMode ? prev : currentMode))
 
-    // Poll for mode changes (in case it gets initialized later)
-    const interval = setInterval(checkMode, 500)
+    // If already resolved to a real mode, no polling needed
+    if (currentMode !== null) return
 
-    // Clean up
+    // DB not initialized yet — poll briefly until it resolves (max ~5s)
+    let count = 0
+    const maxChecks = 10
+    const interval = setInterval(() => {
+      const m = db.getMode()
+      setMode(prev => (prev === m ? prev : m))
+      count++
+      if (m !== null || count >= maxChecks) {
+        clearInterval(interval)
+      }
+    }, 500)
+
     return () => clearInterval(interval)
   }, [])
 
