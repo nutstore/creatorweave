@@ -309,6 +309,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
   let directoryHandle: FileSystemDirectoryHandle | null = null
   let vfsSubPath = '' // sub-path within the resolved VFS namespace
+  let resolvedRootName: string | undefined // root name for overlay prefix stripping
 
   // VFS path support: resolve vfs:// URIs to directory handles via backends
   if (searchPath.startsWith('vfs://')) {
@@ -341,6 +342,7 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
             const rootHandle = allHandles.get(maybeRoot)!
             directoryHandle = rootHandle
             vfsSubPath = segments.slice(1).join('/')
+            resolvedRootName = maybeRoot
             rootRouted = true
           }
         }
@@ -408,9 +410,10 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
     if (searchPath) {
       // Specific path provided — search single resolved root
-      // Use full searchPath as rootName so stripOverlayRootPrefix strips the entire prefix,
-      // leaving overlay keys that match the worker's relative paths (relative to resolved handle).
-      const rootName = searchPath || undefined
+      // Use resolvedRootName (the actual root handle name, e.g. "creatorweave")
+      // instead of searchPath, so stripOverlayRootPrefix strips only the root prefix,
+      // leaving overlay keys that match the worker's relative paths (relative to root handle).
+      const rootName = resolvedRootName || searchPath || undefined
       result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
     } else {
       // No path — search ALL roots and merge results

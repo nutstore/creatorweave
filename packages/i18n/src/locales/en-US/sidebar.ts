@@ -169,7 +169,8 @@ export const sidebar = {
       copyCommentsToAI: "Send to AI",
       commentsSummary: "{files} files with comments, {comments} total",
       close: "Close",
-      
+      download: "Download file",
+
       noWorkspace: "No active workspace",
       // Error messages
       loadFailedError: "Failed to load file",

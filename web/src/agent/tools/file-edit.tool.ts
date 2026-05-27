@@ -10,6 +10,10 @@ import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { getFormatHandler, buildFormatWriteContext } from './format-registry'
+
+// Ensure format handlers are registered before first use
+import './formats'
 
 // ── Fuzzy matching helpers ──────────────────────────────────────────
 
@@ -295,17 +299,39 @@ async function executeSingleEdit(
 
     let fileContent: string
 
+    // Check if a format handler exists for this file type (e.g. .nol → ZIP)
+    const formatHandler = getFormatHandler(path)
+
     // Read current content via backend (unified for all target kinds)
     try {
-      const backendResult = await target.backend.readFile(target.path)
-      if (typeof backendResult.content !== 'string') {
-        return toolErrorJson(
-          'edit',
-          'binary_not_supported',
-          `Cannot edit binary file: ${path}. Use write to replace the entire file.`
-        )
+      if (formatHandler?.read) {
+        // Binary format with a read handler — decode to text via format handler
+        const backendResult = await target.backend.readFile(target.path, { encoding: 'binary' })
+        const rawData = backendResult.content instanceof ArrayBuffer
+          ? new Uint8Array(backendResult.content)
+          : backendResult.content instanceof Uint8Array
+            ? backendResult.content
+            : null
+        if (!rawData) {
+          return toolErrorJson(
+            'edit',
+            'binary_not_supported',
+            `Cannot edit binary file: ${path}. Use write to replace the entire file.`
+          )
+        }
+        const readResult = await formatHandler.read(rawData, path)
+        fileContent = readResult.content
+      } else {
+        const backendResult = await target.backend.readFile(target.path)
+        if (typeof backendResult.content !== 'string') {
+          return toolErrorJson(
+            'edit',
+            'binary_not_supported',
+            `Cannot edit binary file: ${path}. Use write to replace the entire file.`
+          )
+        }
+        fileContent = backendResult.content
       }
-      fileContent = backendResult.content
     } catch (error) {
       if (error instanceof Error && error.message?.includes('not found')) {
         return toolErrorJson('edit', 'file_not_found', `File not found: ${path}`)
@@ -360,7 +386,14 @@ async function executeSingleEdit(
         : fileContent.replace(actualOldText, actualNewText)
 
     if (!isNoopEdit) {
-      await target.backend.writeFile(target.path, updatedFile)
+      if (formatHandler?.write) {
+        // Binary format with a write handler — encode text back to binary via format handler
+        const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
+        const binaryData = await formatHandler.write(updatedFile, path, writeContext)
+        await target.backend.writeFile(target.path, binaryData)
+      } else {
+        await target.backend.writeFile(target.path, updatedFile)
+      }
     }
 
     readFileState.set(readStateKey, {
@@ -404,6 +437,7 @@ async function executeSingleEdit(
           : isNoopEdit
             ? `File "${path}" already matched requested content.`
             : `File "${path}" edited.`,
+      ...(formatHandler?.formatHint ? { formatHint: formatHandler.formatHint } : {}),
     })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'NotFoundError') {

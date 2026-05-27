@@ -28,6 +28,8 @@ export interface TruncateLargeToolResultInput {
   maxContextTokens: number
   reserveTokens: number
   estimateTextTokens: (text: string) => number
+  /** Optional: write overflow content to assets and return the asset path. */
+  writeToAssets?: (content: string, toolName: string) => Promise<string | null>
 }
 
 export interface ExecuteToolWithTimeoutInput {
@@ -190,15 +192,15 @@ export function ensureLatestToolResultFitsContext(input: EnsureLatestToolResultF
   })
 }
 
-export function truncateLargeToolResult(input: TruncateLargeToolResultInput): string {
-  // 计算工具结果的最大可用预算（总预算 - 现有消息 - 预留）
-  // 额外留 10% 余量防止估算误差
+export async function truncateLargeToolResult(input: TruncateLargeToolResultInput): Promise<string> {
+  // Calculate the maximum token budget for the tool result (total budget - existing messages - reserve).
+  // Leave an extra 10% margin to account for estimation errors.
   const availableForTool = Math.max(
-    1000, // 最少给 1000 tokens
+    1000, // Minimum 1000 tokens
     (input.maxContextTokens - input.reserveTokens - input.existingTokens) * 0.9
   )
 
-  // 如果工具结果本身就在预算内，不需要截断
+  // If the result fits within the budget, no truncation needed.
   const estimatedResultTokens = input.estimateTextTokens(input.rawResult)
   if (estimatedResultTokens <= availableForTool) {
     return input.rawResult
@@ -208,12 +210,68 @@ export function truncateLargeToolResult(input: TruncateLargeToolResultInput): st
     `[AgentLoop] Tool result too large for context: result=${estimatedResultTokens}, available=${Math.floor(availableForTool)}, tool=${input.toolName}`
   )
 
-  // 尝试解析 JSON 以进行智能截断
+  // ── Overflow to assets: write oversized content to an assets file and return the path ──
+  if (input.writeToAssets) {
+    // Parse once, reuse for both content extraction and overflow envelope
+    let envelopeParsed: unknown = undefined
+    let envelopeData: Record<string, unknown> | undefined = undefined
+    try {
+      envelopeParsed = JSON.parse(input.rawResult.trim()) as unknown
+      if (isToolEnvelopeV2(envelopeParsed) && envelopeParsed.ok && envelopeParsed.data && typeof envelopeParsed.data === 'object') {
+        envelopeData = envelopeParsed.data as Record<string, unknown>
+      }
+    } catch { /* not JSON — will write raw result as-is */ }
+
+    // Extract plain-text content from the envelope (write content, not envelope JSON)
+    const contentToWrite = envelopeData && typeof envelopeData.content === 'string'
+      ? envelopeData.content
+      : input.rawResult
+
+    const assetPath = await input.writeToAssets(contentToWrite, input.toolName)
+    if (assetPath) {
+      // Build an overflow envelope that preserves the original metadata
+      const baseOverflow = {
+        overflow: true,
+        contentSavedTo: `vfs://assets/${assetPath}`,
+        estimatedTokens: estimatedResultTokens,
+        availableTokens: Math.floor(availableForTool),
+      }
+
+      const overflowData: Record<string, unknown> = envelopeData
+        ? {
+            // Preserve original metadata so the LLM knows file type, size, etc.
+            path: envelopeData.path,
+            kind: envelopeData.kind,
+            metadata: envelopeData.metadata,
+            ...(envelopeData.entries ? { entries: envelopeData.entries } : {}),
+            ...baseOverflow,
+          }
+        : baseOverflow
+
+      return JSON.stringify({
+        ok: true,
+        tool: input.toolName,
+        version: 2,
+        data: overflowData,
+        meta: {
+          hint: [
+            `Content is too large to fit in context (${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)}).`,
+            `The actual content has been saved as a plain text file at: vfs://assets/${assetPath}`,
+            `Use a subagent with the read tool to read vfs://assets/${assetPath}, summarize/extract key info, and return the result.`,
+          ].join('\n'),
+        },
+      })
+    }
+  }
+
+  // ── Fallback: writeToAssets unavailable or failed, fall back to truncation ──
+
+  // Try parsing as JSON for smart truncation
   const trimmed = input.rawResult.trim()
   try {
     const parsed = JSON.parse(trimmed) as unknown
 
-    // 特殊处理 search 工具的结果
+    // Special handling for search tool results
     const searchPayload =
       input.toolName === 'search' && isToolEnvelopeV2(parsed) && parsed.ok
         ? parsed.data
@@ -240,9 +298,9 @@ export function truncateLargeToolResult(input: TruncateLargeToolResultInput): st
         message?: string
       }
 
-      // 二分查找最大可容纳的结果数量（包含 0 条结果）
+      // Binary search for the maximum number of results that fit (including 0)
       let left = 0
-      let right = Math.min(searchResult.results.length, 200) // 最多 200 条
+      let right = Math.min(searchResult.results.length, 200) // Cap at 200 results
       let bestCount = 0
       const emptySearchSummary = {
         ...searchResult,
@@ -291,7 +349,7 @@ export function truncateLargeToolResult(input: TruncateLargeToolResultInput): st
         }
       }
 
-      // 如果一条都放不下，只返回摘要
+      // If not even one result fits, return summary only
       if (bestCount === 0) {
         return JSON.stringify(bestResult)
       }
@@ -299,7 +357,7 @@ export function truncateLargeToolResult(input: TruncateLargeToolResultInput): st
       return JSON.stringify(bestResult)
     }
 
-    // 其他 JSON 结果，简单截断
+    // Other JSON results: simple truncation
     const truncateRatio = availableForTool / estimatedResultTokens
     const truncateAt = Math.floor(input.rawResult.length * truncateRatio * 0.8)
     return (
@@ -307,7 +365,7 @@ export function truncateLargeToolResult(input: TruncateLargeToolResultInput): st
       `\n\n... [Result truncated due to size: ${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)} tokens. Use filters to reduce output.]`
     )
   } catch {
-    // 非 JSON 结果，直接截断
+    // Non-JSON results: direct truncation
     const truncateRatio = availableForTool / estimatedResultTokens
     const truncateAt = Math.floor(input.rawResult.length * truncateRatio * 0.8)
     return (

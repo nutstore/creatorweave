@@ -23,6 +23,7 @@ function inferMimeType(path: string): string {
     xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     xls: 'application/vnd.ms-excel',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    nol: 'application/zip',
     zip: 'application/zip',
   }
   return map[ext] ?? 'application/octet-stream'

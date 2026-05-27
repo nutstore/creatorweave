@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "rootNodeIds": ["node_root_1"],
+  "nodes": {
+    "node_root_1": {
+      "id": "node_root_1",
+      "content": "Meeting Notes - Q2 Planning",
+      "childrenIds": ["node_child_1", "node_child_2", "node_child_3"],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_child_1": {
+      "id": "node_child_1",
+      "content": "Review Q1 results",
+      "childrenIds": ["node_grandchild_1"],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_grandchild_1": {
+      "id": "node_grandchild_1",
+      "content": "Revenue exceeded target by 12%",
+      "childrenIds": [],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_child_2": {
+      "id": "node_child_2",
+      "content": "Set Q2 OKRs",
+      "childrenIds": ["node_grandchild_2a", "node_grandchild_2b"],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_grandchild_2a": {
+      "id": "node_grandchild_2a",
+      "content": "Launch new feature by end of April",
+      "childrenIds": [],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_grandchild_2b": {
+      "id": "node_grandchild_2b",
+      "content": "Improve user retention to 85%",
+      "childrenIds": [],
+      "expanded": 1,
+      "completed": 0
+    },
+    "node_child_3": {
+      "id": "node_child_3",
+      "content": "Team updates",
+      "childrenIds": [],
+      "expanded": 1,
+      "completed": 0
+    }
+  }
+}

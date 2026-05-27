@@ -44,12 +44,32 @@ registerRenderer({
   },
   Detail(ctx) {
     if (ctx.isError) {
-      const errMsg = typeof ctx.result?.error === 'string' ? ctx.result.error : 'Write failed'
+      // Try to extract structured error info from envelope
+      const envelope = ctx.result as Record<string, unknown> | undefined
+      const errorObj = envelope?.error as Record<string, unknown> | undefined
+      const metaObj = envelope?.meta as Record<string, unknown> | undefined
+      const errMsg = typeof errorObj?.message === 'string'
+        ? errorObj.message
+        : typeof ctx.result?.error === 'string'
+          ? ctx.result.error
+          : 'Write failed'
+      // hint can be in error.hint (from toolErrorJson) or meta.hint
+      const hint = typeof errorObj?.hint === 'string'
+        ? errorObj.hint
+        : typeof metaObj?.hint === 'string'
+          ? metaObj.hint
+          : undefined
+
       return (
         <div className="px-3 py-2">
           <div className="rounded-md bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 p-2 text-xs text-red-600 dark:text-red-400">
             {errMsg}
           </div>
+          {hint && (
+            <div className="mt-1.5 rounded-md bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-700 p-2 text-xs text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap font-mono">
+              {hint}
+            </div>
+          )}
         </div>
       )
     }

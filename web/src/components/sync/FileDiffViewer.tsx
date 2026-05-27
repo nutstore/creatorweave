@@ -17,7 +17,8 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFSMultiRoot,
 } from '@/opfs'
-import { Columns2, UnfoldVertical, X, Eye, FileText } from 'lucide-react'
+import { Columns2, UnfoldVertical, X, Eye, FileText, Download } from 'lucide-react'
+import { getFormatUIHandler } from '@/agent/tools/format-registry'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
 const OfficePreview = React.lazy(() => import('@/components/file-viewer/OfficePreview').then(m => ({ default: m.OfficePreview })))
@@ -34,6 +35,51 @@ function isOfficeFile(path: string): boolean {
 /** Check if a file path points to a docx file (rendered locally via docx-preview) */
 function isDocxFile(path: string): boolean {
   return path.toLowerCase().endsWith('.docx')
+}
+
+/** Download a workspace file from OPFS */
+async function downloadFile(filePath: string): Promise<void> {
+  try {
+    const activeConversation = await getActiveConversation()
+    if (!activeConversation) return
+    const { conversationId } = activeConversation
+    const fileName = filePath.split('/').pop() || 'file'
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+
+    const binaryExts = new Set(['nol', 'zip', 'docx', 'xlsx', 'xls', 'pptx', 'ppt', 'doc', 'pdf', 'wasm', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'])
+
+    if (binaryExts.has(ext)) {
+      const base64 = await readBinaryFileFromOPFS(conversationId, filePath)
+      if (!base64) return
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+      const mimeMap: Record<string, string> = {
+        nol: 'application/zip', zip: 'application/zip',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+      }
+      const blob = new Blob([bytes], { type: mimeMap[ext] || 'application/octet-stream' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const text = await readFileFromOPFS(conversationId, filePath)
+      if (text == null) return
+      const blob = new Blob([text], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+  } catch (err) {
+    console.warn('[FileDiffViewer] Download failed:', err)
+  }
 }
 
 /**
@@ -161,6 +207,10 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null)
   const [officeBlob, setOfficeBlob] = useState<Blob | null>(null)
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
+  // Generic format handler state (for .nol and future formats registered in format-registry)
+  const [formatBlob, setFormatBlob] = useState<Blob | null>(null)
+  const [formatTextContent, setFormatTextContent] = useState<string | null>(null)
+  const [formatViewMode, setFormatViewMode] = useState<string>('preview')
   const docxContainerRef = useRef<HTMLDivElement>(null)
   // HTML inline preview state
   const [showHtmlPreview, setShowHtmlPreview] = useState(false)
@@ -213,6 +263,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   // Reset HTML preview when file changes
   useEffect(() => {
     setShowHtmlPreview(false)
+    const ui = fileChange?.path ? getFormatUIHandler(fileChange.path) : null
+    setFormatViewMode(ui?.viewModes.find(m => m.default)?.id ?? 'preview')
   }, [fileChange?.path])
 
   useEffect(() => {
@@ -228,6 +280,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       })
       setOfficeBlob(null)
       setDocxBlob(null)
+      setFormatBlob(null)
+      setFormatTextContent(null)
       return
     }
 
@@ -258,6 +312,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         const isImage = isImageFile(filePath)
         const isOffice = isOfficeFile(filePath)
         const isDocx = isDocxFile(filePath)
+        const formatUI = getFormatUIHandler(filePath)
+        const isFormat = !!formatUI
         let showNativePanel = fileChange.type !== 'add'
 
         if (fileChange.type !== 'add') {
@@ -308,11 +364,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             try {
               const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
               if (opfsBase64) {
-                const binaryStr = atob(opfsBase64)
-                const bytes = new Uint8Array(binaryStr.length)
-                for (let i = 0; i < binaryStr.length; i++) {
-                  bytes[i] = binaryStr.charCodeAt(i)
-                }
+                const bytes = Uint8Array.from(atob(opfsBase64), c => c.charCodeAt(0))
                 const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
                 setDocxBlob(blob)
               }
@@ -335,11 +387,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             try {
               const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
               if (opfsBase64) {
-                const binaryStr = atob(opfsBase64)
-                const bytes = new Uint8Array(binaryStr.length)
-                for (let i = 0; i < binaryStr.length; i++) {
-                  bytes[i] = binaryStr.charCodeAt(i)
-                }
+                const bytes = Uint8Array.from(atob(opfsBase64), c => c.charCodeAt(0))
                 const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
                 const mimeTypes: Record<string, string> = {
                   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -362,6 +410,36 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             opfsImageUrl: null,
             nativeImageUrl: null,
             showNativePanel,
+            loading: false,
+            error: null,
+          })
+        } else if (isFormat) {
+          // Format-registered file: read binary blob for preview + render text via handler
+          let formatText: string | null = null
+          if (fileChange.type !== 'delete') {
+            try {
+              const opfsBase64 = await readBinaryFileFromOPFS(conversationId, filePath)
+              if (opfsBase64) {
+                const bytes = Uint8Array.from(atob(opfsBase64), c => c.charCodeAt(0))
+                const blob = new Blob([bytes], { type: 'application/zip' })
+                setFormatBlob(blob)
+                // Use format handler to render as text for text view mode
+                if (formatUI?.renderTextContent) {
+                  try {
+                    formatText = await formatUI.renderTextContent(bytes, filePath)
+                  } catch { /* ignore render error */ }
+                }
+              }
+            } catch (err) {
+              console.warn('[FileDiffViewer] Failed to read format file:', err)
+            }
+          }
+          setContent({
+            opfs: formatText,
+            native: null,
+            opfsImageUrl: null,
+            nativeImageUrl: null,
+            showNativePanel: false,
             loading: false,
             error: null,
           })
@@ -534,6 +612,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const isImage = !isSnapshotMode && isImageFile(fileChange.path)
   const isDocx = !isSnapshotMode && isDocxFile(fileChange.path) && fileChange.type !== 'delete'
   const isOffice = !isSnapshotMode && isOfficeFile(fileChange.path) && fileChange.type !== 'delete'
+  const formatUI = !isSnapshotMode ? getFormatUIHandler(fileChange.path) : null
+  const isFormat = !!formatUI && fileChange.type !== 'delete'
   const originalText = content.showNativePanel ? (content.native ?? '') : ''
   const modifiedText = content.opfs ?? ''
 
@@ -852,10 +932,56 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
 
         {/* Right: actions */}
         <div className="flex shrink-0 items-center gap-1">
+          {/* Download file button */}
+          {!isSnapshotMode && fileChange.type !== 'delete' && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => downloadFile(fileChange.path)}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{t('sidebar.fileDiffViewer.download') ?? 'Download file'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {isSnapshotMode && (
             <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
               {snapshotDiff?.snapshotTitle || t('sidebar.fileDiffViewer.binarySnapshot')} · {formatTime(snapshotDiff?.capturedAt)}
             </span>
+          )}
+          {/* Format view mode toggle: driven by format-registry */}
+          {isFormat && formatBlob && formatUI && formatUI.viewModes.length > 1 && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const modes = formatUI.viewModes
+                      const currentIdx = modes.findIndex(m => m.id === formatViewMode)
+                      const nextIdx = (currentIdx + 1) % modes.length
+                      setFormatViewMode(modes[nextIdx].id)
+                    }}
+                    className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+                      formatViewMode === 'text'
+                        ? 'bg-purple-100/80 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                        : 'text-purple-600 hover:bg-purple-100/60 hover:text-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:text-purple-300'
+                    }`}
+                  >
+                    <Eye className="h-3 w-3" />
+                    {formatViewMode === 'text'
+                      ? formatUI.viewModes.find(m => m.id !== 'text')?.label ?? 'Preview'
+                      : 'Text'}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{formatViewMode === 'text' ? 'Switch to preview view' : 'Switch to text view (supports comments)'}</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           {/* HTML preview toggle button */}
           {isHtml && htmlBlobUrl && (
@@ -879,7 +1005,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               </Tooltip>
             </TooltipProvider>
           )}
-          {!isImage && !isOffice && !isDocx && (
+          {!isImage && !isOffice && !isDocx && !(isFormat && formatViewMode !== 'text') && (
             <>
               {/* Switch between Lazy and Full editor */}
               <TooltipProvider delayDuration={200}>
@@ -1030,6 +1156,18 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               }
             >
               <OfficePreview blob={officeBlob} fileName={fileChange.path.split('/').pop() ?? fileChange.path} fileSize={fileChange.size ?? officeBlob.size} />
+            </Suspense>
+          </div>
+        ) : isFormat && formatBlob && formatViewMode !== 'text' && formatUI?.PreviewComponent ? (
+          <div className="flex-1 overflow-hidden bg-card dark:bg-card">
+            <Suspense
+              fallback={
+                <div className="flex h-full items-center justify-center text-sm text-tertiary dark:text-muted">
+                  Loading preview...
+                </div>
+              }
+            >
+              <formatUI.PreviewComponent blob={formatBlob} fileName={fileChange.path.split('/').pop() ?? fileChange.path} fileSize={fileChange.size ?? formatBlob.size} />
             </Suspense>
           </div>
         ) : (

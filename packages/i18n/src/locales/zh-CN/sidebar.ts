@@ -161,7 +161,8 @@ export const sidebar = {
       copyCommentsToAI: "发给 AI",
       commentsSummary: "{files} 个文件有评论，共 {comments} 条",
       close: "关闭",
-      
+      download: "下载文件",
+
       noWorkspace: "未激活的工作区",
       // Error messages
       loadFailedError: "加载文件失败",

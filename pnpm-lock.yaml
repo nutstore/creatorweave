@@ -409,6 +409,9 @@ importers:
       docx-preview:
         specifier: ^0.3.6
         version: 0.3.7
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.2
       file-saver:
         specifier: ^2.0.5
         version: 2.0.5
@@ -430,6 +433,9 @@ importers:
       lucide-react:
         specifier: ^0.460.0
         version: 0.460.0(react@18.3.1)
+      markdown-it:
+        specifier: ^14.1.1
+        version: 14.1.1
       micromatch:
         specifier: ^4.0.8
         version: 4.0.8

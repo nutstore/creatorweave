@@ -273,12 +273,12 @@ function ToolDetailModal({ tool, onClose }: ToolDetailModalProps) {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border px-6 py-4 dark:border-border">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-primary-50 p-2">
+          <div className="flex items-center justify-between gap-2 border-b border px-6 py-4 dark:border-border">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div className="shrink-0 rounded-lg bg-primary-50 p-2">
                 <Code className="h-4 w-4 text-primary-600" />
               </div>
-              <h3 className="font-mono font-semibold text-primary dark:text-primary-foreground">{tool.name}</h3>
+              <h3 className="truncate font-mono font-semibold text-primary dark:text-primary-foreground">{tool.name}</h3>
             </div>
             <button
               onClick={onClose}

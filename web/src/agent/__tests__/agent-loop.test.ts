@@ -179,7 +179,7 @@ describe('AgentLoop', () => {
         scannedFiles: 1,
       })
 
-      const truncated = truncateLargeToolResult({
+      const truncated = await truncateLargeToolResult({
         rawResult,
         toolName: 'search',
         existingTokens: 1800,

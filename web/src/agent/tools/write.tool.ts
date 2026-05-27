@@ -17,6 +17,10 @@ import { rewritePythonMountPathForNonPythonTool } from './path-guards'
 import { checkFileStaleness, refreshReadTimestamp } from './loop-guard'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
+import { getFormatHandler, buildFormatWriteContext } from './format-registry'
+
+// Ensure format handlers are registered before first use
+import './formats'
 
 //=============================================================================
 // Write Tool
@@ -138,7 +142,27 @@ async function executeSingleWrite(
     }
 
     // ── Unified backend write ──
-    await target.backend.writeFile(target.path, content)
+    // If a format handler with write support is registered for this file type,
+    // delegate content serialization to the handler (e.g. .nol → ZIP)
+    const formatHandler = getFormatHandler(path)
+    if (formatHandler?.write) {
+      const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
+      try {
+        const binaryData = await formatHandler.write(content, path, writeContext)
+        await target.backend.writeFile(target.path, binaryData)
+      } catch (formatError) {
+        // FormatWriteError: handler rejected the content with a progressive hint
+        if (formatError instanceof Error && formatError.name === 'FormatWriteError' && 'hint' in formatError) {
+          const fwe = formatError as { message: string; hint: string }
+          return toolErrorJson('write', 'invalid_format', fwe.message, {
+            hint: fwe.hint,
+          })
+        }
+        throw formatError
+      }
+    } else {
+      await target.backend.writeFile(target.path, content)
+    }
 
     // Collect asset metadata for assets backend (so UI shows AssetCard)
     if (source === 'assets') {
@@ -181,6 +205,7 @@ async function executeSingleWrite(
         status,
         pendingCount,
         message,
+        ...(formatHandler?.formatHint ? { formatHint: formatHandler.formatHint } : {}),
       },
       buildMeta()
     )

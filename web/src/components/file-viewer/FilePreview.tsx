@@ -8,7 +8,7 @@
  * - Send comments to AI conversation
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2 } from 'lucide-react'
 import { Editor, loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
@@ -23,6 +23,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { toast } from 'sonner'
 import { OfficePreview, OFFICE_EXTS } from './OfficePreview'
+import { getFormatUIHandler } from '@/agent/tools/format-registry'
 
 // Configure Monaco loader to use the locally bundled monaco-editor package
 // instead of loading from CDN. Without this, the Editor component will try
@@ -118,12 +119,14 @@ const TEXT_EXTS = new Set([
 /** HTML extensions for rendered preview */
 const HTML_EXTS = new Set(['html', 'htm'])
 
-function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html' | 'office' {
+function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html' | 'office' | 'format' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   if (IMAGE_EXTS.has(ext)) return 'image'
   if (DOCX_EXTS.has(ext)) return 'docx'
   if (HTML_EXTS.has(ext)) return 'html'
   if (OFFICE_EXTS.has(ext)) return 'office'
+  // Check format registry (e.g. .nol, future formats)
+  if (getFormatUIHandler(path)) return 'format'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
   // Unknown extension - try text
@@ -144,6 +147,10 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
   const [officeBlob, setOfficeBlob] = useState<Blob | null>(null)
+  // Generic format handler state (for .nol and future formats registered in format-registry)
+  const [formatBlob, setFormatBlob] = useState<Blob | null>(null)
+  const [formatTextContent, setFormatTextContent] = useState<string | null>(null)
+  const [formatViewMode, setFormatViewMode] = useState<string>('preview')
   const docxContainerRef = useRef<HTMLDivElement>(null)
   // HTML preview: toggle between rendered preview and source code
   const [previewMode, setPreviewMode] = useState<'preview' | 'source'>('source')
@@ -165,6 +172,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const decorationsRef = useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
 
   const fileType = useMemo(() => (filePath ? getFileType(filePath) : 'text'), [filePath])
+  const formatUI = useMemo(() => (filePath ? getFormatUIHandler(filePath) : null), [filePath])
 
   // Create blob URL for HTML preview
   const htmlBlobUrl = useMemo(() => {
@@ -420,6 +428,9 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       setImageUrl(null)
       setDocxBlob(null)
       setOfficeBlob(null)
+      setFormatBlob(null)
+      setFormatTextContent(null)
+      setFormatViewMode(formatUI?.viewModes.find(m => m.default)?.id ?? 'preview')
       setError(null)
       setDiskNewer(false)
       return
@@ -435,6 +446,9 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       setImageUrl(null)
       setDocxBlob(null)
       setOfficeBlob(null)
+      setFormatBlob(null)
+      setFormatTextContent(null)
+      setFormatViewMode(formatUI?.viewModes.find(m => m.default)?.id ?? 'preview')
       setDiskNewer(false)
 
       try {
@@ -447,7 +461,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         // Fast path: external blob provided (e.g. from OPFS assets/)
         if (externalBlob) {
           fileSize = externalBlob.size
-          if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+          if (fileType === 'image' || fileType === 'docx' || fileType === 'office' || fileType === 'format') {
             blob = externalBlob
           } else {
             text = await externalBlob.text()
@@ -467,7 +481,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               // ArrayBuffer - for docx/office, keep as Blob; for text, decode it
               const buffer = result.content as ArrayBuffer
               fileSize = buffer.byteLength
-              if (fileType === 'docx' || fileType === 'office') {
+              if (fileType === 'docx' || fileType === 'office' || fileType === 'format') {
                 blob = new Blob([buffer])
               } else {
                 const decoder = new TextDecoder()
@@ -486,7 +500,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
 
               if (opfsMtime !== null && diskMtime > opfsMtime) {
                 fileSize = diskFile.size
-                if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+                if (fileType === 'image' || fileType === 'docx' || fileType === 'office' || fileType === 'format') {
                   blob = diskFile
                 } else {
                   text = await diskFile.text()
@@ -494,7 +508,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
                 setDiskNewer(true)
               } else if (opfsMtime === null) {
                 fileSize = diskFile.size
-                if (fileType === 'image' || fileType === 'docx' || fileType === 'office') {
+                if (fileType === 'image' || fileType === 'docx' || fileType === 'office' || fileType === 'format') {
                   blob = diskFile
                 } else {
                   text = await diskFile.text()
@@ -533,6 +547,17 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           setDocxBlob(blob)
         } else if (fileType === 'office' && blob) {
           setOfficeBlob(blob)
+        } else if (fileType === 'format' && blob) {
+          setFormatBlob(blob)
+          // Also render as text for text view mode
+          if (formatUI?.renderTextContent) {
+            try {
+              const arrayBuffer = await blob.arrayBuffer()
+              const bytes = new Uint8Array(arrayBuffer)
+              const text = await formatUI.renderTextContent(bytes, filePath)
+              setFormatTextContent(text)
+            } catch { /* ignore render error */ }
+          }
         } else if (text !== undefined) {
           setContent(text)
         }
@@ -607,9 +632,10 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const fileName = filePath.split('/').pop() || filePath
   const language = getMonacoLanguage(filePath)
 
-  // Check if current file is commentable (text source view)
-  const isCommentable = content && !loading && !error && (
-    fileType === 'text' || (fileType === 'html' && previewMode === 'source')
+  // Check if current file is commentable (text source view or NOL text view)
+  const isCommentable = !loading && !error && (
+    (content && (fileType === 'text' || (fileType === 'html' && previewMode === 'source')))
+    || (fileType === 'format' && formatViewMode === 'text' && formatTextContent)
   )
 
   return (
@@ -667,6 +693,26 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               </button>
             </div>
           )}
+          {/* Format view mode toggle (driven by format-registry) */}
+          {fileType === 'format' && formatBlob && formatUI && formatUI.viewModes.length > 1 && !loading && !error && (
+            <div className="flex items-center rounded border border-neutral-200 dark:border-neutral-600">
+              {formatUI.viewModes.map((mode, i) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setFormatViewMode(mode.id)}
+                  className={`${i === 0 ? 'rounded-l' : 'rounded-r'} px-1.5 py-0.5 text-[10px] ${
+                    formatViewMode === mode.id
+                      ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
+                      : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                  }`}
+                  title={mode.id === 'text' ? 'Text view (supports comments)' : `${mode.label} view`}
+                >
+                  {mode.id === 'text' ? <Code className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                </button>
+              ))}
+            </div>
+          )}
           {/* Comment hint for text files */}
           {isCommentable && !composer && (
             <span className="hidden shrink-0 text-[10px] text-neutral-300 dark:text-neutral-600 sm:inline">
@@ -722,6 +768,13 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <OfficePreview blob={officeBlob} fileName={fileName} fileSize={fileSize} />
         )}
 
+        {/* Format preview (driven by format-registry) */}
+        {fileType === 'format' && formatBlob && formatViewMode === 'preview' && formatUI?.PreviewComponent && !loading && !error && (
+          <Suspense fallback={<div className="flex h-full items-center justify-center"><p className="text-xs text-neutral-400">Loading...</p></div>}>
+            <formatUI.PreviewComponent blob={formatBlob} fileName={fileName} fileSize={fileSize} />
+          </Suspense>
+        )}
+
         {/* Binary (non-image) file */}
         {fileType === 'binary' && !loading && !error && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-4">
@@ -743,12 +796,14 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           />
         )}
 
-        {/* Monaco Editor for text files and HTML source view */}
-        {content && ((fileType === 'text') || (fileType === 'html' && previewMode === 'source')) && !loading && !error && (
+        {/* Monaco Editor for text files, HTML source view, and NOL text view */}
+        {((content && (fileType === 'text' || (fileType === 'html' && previewMode === 'source')))
+          || (fileType === 'format' && formatViewMode === 'text' && formatTextContent)
+        ) && !loading && !error && (
           <Editor
             height="100%"
-            language={language}
-            value={content}
+            language={fileType === 'format' ? 'plaintext' : language}
+            value={fileType === 'format' ? formatTextContent! : content!}
             theme={isDark ? 'vs-dark' : 'vs'}
             onMount={handleEditorMount}
             options={{

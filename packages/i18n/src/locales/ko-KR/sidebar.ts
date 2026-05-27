@@ -158,7 +158,8 @@ export const sidebar = {
       copyCommentsToAI: "AI에 보내기",
       commentsSummary: "{files}개 파일에 댓글 있음, 총 {comments}개",
       close: "닫기",
-      
+      download: "파일 다운로드",
+
       noWorkspace: "활성 워크스페이스 없음",
       // Error messages
       loadFailedError: "파일 불러오기 실패",

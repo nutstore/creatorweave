@@ -158,7 +158,8 @@ export const sidebar = {
       copyCommentsToAI: "AIに送信",
       commentsSummary: "{files} ファイルにコメントあり、合計 {comments} 件",
       close: "閉じる",
-      
+      download: "ファイルをダウンロード",
+
       noWorkspace: "アクティブなワークスペースがありません",
       // Error messages
       loadFailedError: "ファイルの読み込みに失敗しました",

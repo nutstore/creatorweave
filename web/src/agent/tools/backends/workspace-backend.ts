@@ -25,7 +25,7 @@ function inferMimeType(path: string): string {
     py: 'text/x-python', rs: 'text/rust', go: 'text/go',
     toml: 'text/toml', yaml: 'text/yaml', yml: 'text/yaml',
     xml: 'text/xml', csv: 'text/csv', pdf: 'application/pdf',
-    wasm: 'application/wasm', zip: 'application/zip',
+    wasm: 'application/wasm', nol: 'application/zip', zip: 'application/zip',
   }
   return map[ext] ?? 'application/octet-stream'
 }

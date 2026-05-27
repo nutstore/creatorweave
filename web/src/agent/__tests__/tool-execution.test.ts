@@ -29,7 +29,7 @@ describe('tool-execution helpers', () => {
       scannedFiles: 1,
     })
 
-    const truncated = truncateLargeToolResult({
+    const truncated = await truncateLargeToolResult({
       rawResult: raw,
       toolName: 'search',
       existingTokens: 2000,

@@ -3,6 +3,9 @@
  *
  * Supports workspace relative paths and vfs:// URIs.
  * Integrated with read-state tracking, loop guards, and staleness checks.
+ *
+ * Binary files are handled through the format registry:
+ *   import './formats' to register built-in format handlers (nol, zip, etc.)
  */
 
 import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from './tool-types'
@@ -18,7 +21,11 @@ import {
   recordReadMtime,
   checkContentSizeLimit,
 } from './loop-guard'
+import { getFormatHandler } from './format-registry'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
+
+// Register built-in format handlers
+import './formats'
 
 //=============================================================================
 // Read Tool
@@ -130,6 +137,67 @@ function isOPFSWorkspaceMiss(error: unknown): boolean {
   )
 }
 
+/**
+ * Try to read a binary file through a registered format handler.
+ * Returns the tool response string, or null if no handler / handler failed.
+ */
+async function tryFormatHandlerRead(
+  binaryData: ArrayBuffer | Uint8Array,
+  path: string,
+  fileSize: number,
+  contentType: string,
+  options: ReadRangeOptions,
+  readStateKey: string,
+  readFileState: Map<string, import('./tool-types').ReadFileStateEntry>,
+  source: string,
+  meta: Record<string, unknown>,
+  loopDedupKey: string,
+  mtime: number | undefined,
+  context: ToolContext,
+): Promise<string | null> {
+  const handler = getFormatHandler(path)
+  if (!handler) return null
+
+  try {
+    const result = await handler.read(binaryData, path)
+
+    const totalLines = result.content.split('\n').length
+    const sizeLimitCheck = checkContentSizeLimit(result.content, fileSize, totalLines)
+    if (!sizeLimitCheck.ok) {
+      return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+        details: { totalLines: sizeLimitCheck.totalLines },
+        hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+      })
+    }
+
+    readFileState.set(
+      readStateKey,
+      buildReadStateEntry(result.content, options, normalizeReadStateSource(source, 'workspace'))
+    )
+    recordReadMtime(context, loopDedupKey, mtime ?? Date.now(), fileSize)
+
+    return toolOkJson(
+      'read',
+      {
+        path,
+        kind: result.kind,
+        content: result.content,
+        metadata: {
+          size: fileSize,
+          contentType,
+          ...result.metadata,
+        },
+        ...(result.entries ? { entries: result.entries } : {}),
+        ...(handler.formatHint ? { formatHint: handler.formatHint } : {}),
+      },
+      meta
+    )
+  } catch {
+    // Handler failed — fall through to generic binary rejection
+    return null
+  }
+}
+
 async function executeSingleRead(
   path: string,
   context: ToolContext,
@@ -173,8 +241,13 @@ async function executeSingleRead(
     })
 
     // ── Unified backend read ──
+    // Check if a format handler wants binary mode for this file
+    const formatHandler = getFormatHandler(path)
+    const needsBinary = formatHandler?.binaryMode ?? false
+
     const backendResult = await target.backend.readFile(target.path, {
       readPolicy: readPolicy as any,
+      ...(needsBinary ? { encoding: 'binary' as const } : {}),
     })
     const content = backendResult.content
     const metadata = { size: backendResult.size, contentType: backendResult.mimeType, mtime: backendResult.mtime }
@@ -223,6 +296,25 @@ async function executeSingleRead(
         },
         buildMeta({ source: backendResult.source || target.backend.label })
       )
+    }
+
+    // ── Binary content: try format handler ──
+    if (content instanceof ArrayBuffer || content instanceof Uint8Array) {
+      const formatResult = await tryFormatHandlerRead(
+        content,
+        path,
+        metadata.size,
+        metadata.contentType,
+        options,
+        readStateKey,
+        readFileState,
+        backendResult.source || target.backend.label,
+        buildMeta({ source: backendResult.source || target.backend.label }),
+        loopCheckResult!.dedupKey,
+        metadata.mtime,
+        context,
+      )
+      if (formatResult) return formatResult
     }
 
     return toolErrorJson(
@@ -295,6 +387,27 @@ async function executeSingleRead(
                 source: 'native_fallback',
               }
             )
+          }
+          // ── Native fallback: try format handler on binary content ──
+          if (metadata.contentType === 'binary' && content instanceof Uint8Array) {
+            const formatResult = await tryFormatHandlerRead(
+              content,
+              path,
+              metadata.size,
+              'application/octet-stream',
+              options,
+              readStateKey,
+              readFileState,
+              result.source,
+              {
+                ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
+                source: 'native_fallback',
+              },
+              loopCheckResult!.dedupKey,
+              metadata.mtime,
+              context,
+            )
+            if (formatResult) return formatResult
           }
           return toolErrorJson(
             'read',

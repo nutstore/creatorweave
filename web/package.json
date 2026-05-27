@@ -61,6 +61,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "diff": "^8.0.3",
+    "fflate": "^0.8.2",
     "docx-preview": "^0.3.6",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
@@ -88,7 +89,6 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^2.5.5",
     "tesseract.js": "^5.0.0",
-    "turndown": "^7.2.2",
     "xlsx": "^0.18.5",
     "zustand": "^4.5.5"
   },

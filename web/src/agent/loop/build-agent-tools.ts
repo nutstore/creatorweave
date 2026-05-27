@@ -127,8 +127,10 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
           }
         }
 
-        // 在 normalizeToolResult 之前就截断过大的结果
-        rawResult = truncateLargeToolResult({
+        // Truncate oversized results before normalizeToolResult.
+        // If the result exceeds the context budget, write it to an assets file
+        // and return the file path so the Agent can use a subagent to summarize it.
+        rawResult = await truncateLargeToolResult({
           rawResult,
           toolName: toolDef.function.name,
           existingTokens: usedTokens,
@@ -141,6 +143,22 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
                 content: text,
               },
             ]),
+          writeToAssets: originalToolContext.workspaceId
+            ? async (content, toolName) => {
+                try {
+                  const { AssetsBackend } = await import('../tools/backends/assets-backend')
+                  const backend = new AssetsBackend(originalToolContext.workspaceId)
+                  const timestamp = Date.now()
+                  const safeName = toolName.replace(/[^a-zA-Z0-9_-]/g, '_')
+                  const assetFileName = `overflow_${safeName}_${timestamp}.txt`
+                  await backend.writeFile(assetFileName, content)
+                  return assetFileName
+                } catch (err) {
+                  console.error('[AgentLoop] Failed to write overflow to assets:', err)
+                  return null
+                }
+              }
+            : undefined,
         })
 
         const normalized = normalizeToolResult(rawResult)
