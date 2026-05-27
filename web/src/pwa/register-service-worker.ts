@@ -10,6 +10,12 @@ interface RegisterServiceWorkerOptions {
 const DEFAULT_UPDATE_INTERVAL_MS = 5 * 60 * 1000
 
 /**
+ * sessionStorage key used to prevent showing duplicate update toasts
+ * after a page reload triggered by applyServiceWorkerUpdate().
+ */
+const SW_NOTIFIED_KEY = 'sw-last-notified-build'
+
+/**
  * Registers the app service worker with an explicit build version in script URL.
  * This guarantees each deployment triggers a SW update check and activation path.
  *
@@ -33,6 +39,25 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
   let registration: ServiceWorkerRegistration | null = null
   let updateIntervalId: ReturnType<typeof setInterval> | null = null
 
+  /**
+   * Notify the app that an update is available, but only if we haven't already
+   * notified about this buildId in the current browser session (tab).
+   * This prevents duplicate toasts after a reload triggered by applyServiceWorkerUpdate().
+   */
+  const notifyIfNew = () => {
+    try {
+      const lastNotified = sessionStorage.getItem(SW_NOTIFIED_KEY)
+      if (lastNotified === buildId) {
+        console.log('[SW] Already notified about build', buildId, '— skipping duplicate toast')
+        return
+      }
+      sessionStorage.setItem(SW_NOTIFIED_KEY, buildId)
+    } catch {
+      // sessionStorage may be unavailable in some environments — just proceed
+    }
+    onUpdateAvailable?.()
+  }
+
   const handleUpdateFound = () => {
     if (!registration?.installing) return
 
@@ -40,7 +65,7 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
     installingWorker.addEventListener('statechange', () => {
       if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
         // New version is ready — notify the app instead of auto-activating.
-        onUpdateAvailable?.()
+        notifyIfNew()
       }
     })
   }
@@ -56,7 +81,7 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
 
       // If a worker is already waiting from a previous session, notify immediately.
       if (registration.waiting && navigator.serviceWorker.controller) {
-        onUpdateAvailable?.()
+        notifyIfNew()
       }
 
       // Trigger an immediate update check on startup.
@@ -95,6 +120,14 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
 export function applyServiceWorkerUpdate(): void {
   navigator.serviceWorker.ready.then((reg) => {
     if (reg.waiting) {
+      // Mark the current buildId as notified *before* reload so that
+      // the refreshed page won't show a duplicate toast.
+      try {
+        sessionStorage.setItem(SW_NOTIFIED_KEY, __APP_BUILD_ID__)
+      } catch {
+        // ignore
+      }
+
       // Listen for controller change, then reload
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         window.location.reload()
