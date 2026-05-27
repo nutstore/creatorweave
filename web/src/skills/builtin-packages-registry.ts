@@ -64,6 +64,16 @@ registerSkill('cw:brainstorm', [
 ])
 
 // ============================================================================
+// cw:nol-editor — Guide for .nol (Outline Notes) file operations
+// ============================================================================
+
+import nolEditorSkillMd from './builtin-packages/nol-editor/SKILL.md?raw'
+
+registerSkill('cw:nol-editor', [
+  { path: 'SKILL.md', content: nolEditorSkillMd },
+])
+
+// ============================================================================
 // Manifest — the single source of truth for what's bundled
 // ============================================================================
 

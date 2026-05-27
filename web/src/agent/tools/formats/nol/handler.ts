@@ -110,7 +110,8 @@ function parseOutlineToNolData(text: string): NolData {
   const nodes: Record<string, NolNode> = {}
   const rootNodeIds: string[] = []
 
-  const lines = text.split('\n')
+  // Normalize indentation: tabs → 2 spaces, so both indent styles work
+  const lines = text.split('\n').map(l => l.replace(/\t/g, '  '))
   const stack: Array<{ id: string; depth: number }> = []
 
   for (const rawLine of lines) {
