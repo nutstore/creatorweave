@@ -10,6 +10,18 @@ type RouteEntry = {
 
 const recentRouteByToolName = new Map<string, RouteEntry>()
 
+const TAB_SCAN_TIMEOUT_MS = 5000
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Tab scan timed out after ${ms}ms`)), ms)
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) },
+    )
+  })
+}
+
 function parseHostname(url: string): string | null {
   try {
     const parsed = new URL(url)
@@ -56,84 +68,87 @@ async function discoverToolsInTab(tabId: number): Promise<{
   error?: string
 }> {
   try {
-    const results = await chrome.scripting.executeScript({
-      target: { tabId },
-      world: 'MAIN',
-      func: async () => {
-        const normalizeSchema = (inputSchema: unknown): Record<string, unknown> => {
-          if (typeof inputSchema === 'string') {
-            try {
-              const parsed = JSON.parse(inputSchema)
-              if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
-            } catch {
-              return { type: 'object', properties: {} }
+    const results = await withTimeout(
+      chrome.scripting.executeScript({
+        target: { tabId },
+        world: 'MAIN',
+        func: async () => {
+          const normalizeSchema = (inputSchema: unknown): Record<string, unknown> => {
+            if (typeof inputSchema === 'string') {
+              try {
+                const parsed = JSON.parse(inputSchema)
+                if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+              } catch {
+                return { type: 'object', properties: {} }
+              }
+            }
+            if (inputSchema && typeof inputSchema === 'object') {
+              return inputSchema as Record<string, unknown>
+            }
+            return { type: 'object', properties: {} }
+          }
+
+          try {
+            const modelContext = (navigator as any)?.modelContext
+            if (modelContext?.getTools && typeof modelContext.getTools === 'function') {
+              const tools = await modelContext.getTools()
+              const normalized = Array.isArray(tools)
+                ? tools
+                    .filter((tool: any) => typeof tool?.name === 'string' && tool.name.trim().length > 0)
+                    .map((tool: any) => ({
+                      name: String(tool.name),
+                      description: typeof tool.description === 'string' ? tool.description : '',
+                      inputSchema: normalizeSchema(tool.inputSchema),
+                      annotations:
+                        tool.annotations && typeof tool.annotations === 'object'
+                          ? {
+                              readOnlyHint: !!tool.annotations.readOnlyHint,
+                              untrustedContentHint: !!tool.annotations.untrustedContentHint,
+                            }
+                          : undefined,
+                    }))
+                : []
+
+              return { ok: true, mode: 'modelContext', tools: normalized }
+            }
+
+            const modelContextTesting = (navigator as any)?.modelContextTesting
+            if (
+              modelContextTesting?.listTools &&
+              typeof modelContextTesting.listTools === 'function'
+            ) {
+              const tools = await modelContextTesting.listTools()
+              const normalized = Array.isArray(tools)
+                ? tools
+                    .filter((tool: any) => typeof tool?.name === 'string' && tool.name.trim().length > 0)
+                    .map((tool: any) => ({
+                      name: String(tool.name),
+                      description: typeof tool.description === 'string' ? tool.description : '',
+                      inputSchema: normalizeSchema(tool.inputSchema),
+                      annotations:
+                        tool.annotations && typeof tool.annotations === 'object'
+                          ? {
+                              readOnlyHint: !!tool.annotations.readOnlyHint,
+                              untrustedContentHint: !!tool.annotations.untrustedContentHint,
+                            }
+                          : undefined,
+                    }))
+                : []
+
+              return { ok: true, mode: 'modelContextTesting', tools: normalized }
+            }
+
+            return { ok: true, tools: [] }
+          } catch (error: any) {
+            return {
+              ok: false,
+              error: typeof error?.message === 'string' ? error.message : String(error),
             }
           }
-          if (inputSchema && typeof inputSchema === 'object') {
-            return inputSchema as Record<string, unknown>
-          }
-          return { type: 'object', properties: {} }
-        }
-
-        try {
-          const modelContext = (navigator as any)?.modelContext
-          if (modelContext?.getTools && typeof modelContext.getTools === 'function') {
-            const tools = await modelContext.getTools()
-            const normalized = Array.isArray(tools)
-              ? tools
-                  .filter((tool: any) => typeof tool?.name === 'string' && tool.name.trim().length > 0)
-                  .map((tool: any) => ({
-                    name: String(tool.name),
-                    description: typeof tool.description === 'string' ? tool.description : '',
-                    inputSchema: normalizeSchema(tool.inputSchema),
-                    annotations:
-                      tool.annotations && typeof tool.annotations === 'object'
-                        ? {
-                            readOnlyHint: !!tool.annotations.readOnlyHint,
-                            untrustedContentHint: !!tool.annotations.untrustedContentHint,
-                          }
-                        : undefined,
-                  }))
-              : []
-
-            return { ok: true, mode: 'modelContext', tools: normalized }
-          }
-
-          const modelContextTesting = (navigator as any)?.modelContextTesting
-          if (
-            modelContextTesting?.listTools &&
-            typeof modelContextTesting.listTools === 'function'
-          ) {
-            const tools = await modelContextTesting.listTools()
-            const normalized = Array.isArray(tools)
-              ? tools
-                  .filter((tool: any) => typeof tool?.name === 'string' && tool.name.trim().length > 0)
-                  .map((tool: any) => ({
-                    name: String(tool.name),
-                    description: typeof tool.description === 'string' ? tool.description : '',
-                    inputSchema: normalizeSchema(tool.inputSchema),
-                    annotations:
-                      tool.annotations && typeof tool.annotations === 'object'
-                        ? {
-                            readOnlyHint: !!tool.annotations.readOnlyHint,
-                            untrustedContentHint: !!tool.annotations.untrustedContentHint,
-                          }
-                        : undefined,
-                  }))
-              : []
-
-            return { ok: true, mode: 'modelContextTesting', tools: normalized }
-          }
-
-          return { ok: true, tools: [] }
-        } catch (error: any) {
-          return {
-            ok: false,
-            error: typeof error?.message === 'string' ? error.message : String(error),
-          }
-        }
-      },
-    })
+        },
+      }),
+      TAB_SCAN_TIMEOUT_MS,
+    )
 
     return (results?.[0]?.result as any) || { ok: true, tools: [] }
   } catch (error: any) {
@@ -154,9 +169,12 @@ export function getRecentRouteForHostname(hostname: string): RouteEntry | null {
   return latest
 }
 
-export async function discoverWebMCPToolsInCurrentWindow(): Promise<WebMCPDiscoverResponse> {
+export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Promise<WebMCPDiscoverResponse> {
   try {
-    const tabs = await chrome.tabs.query({ currentWindow: true })
+    const queryOpts: chrome.tabs.QueryInfo = windowId
+      ? { windowId }
+      : { currentWindow: true };
+    const tabs = await chrome.tabs.query(queryOpts)
     const validTabs = tabs.filter(isSupportedTab)
     const discoveredAt = Date.now()
 
@@ -214,4 +232,3 @@ export async function discoverWebMCPToolsInCurrentWindow(): Promise<WebMCPDiscov
     }
   }
 }
-

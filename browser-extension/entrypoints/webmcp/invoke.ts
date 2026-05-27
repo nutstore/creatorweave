@@ -39,7 +39,8 @@ async function pickTargetTabId(hostname: string, request: WebMCPInvokeRequest): 
     return recentByHost.tabId
   }
 
-  const tabs = await chrome.tabs.query({ currentWindow: true })
+  // Fallback: query all tabs (avoid currentWindow which is unreliable in Service Worker)
+  const tabs = await chrome.tabs.query({})
   const matched = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number; url: string } => {
       return typeof tab.id === 'number' && typeof tab.url === 'string'

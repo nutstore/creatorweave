@@ -760,7 +760,8 @@ export default defineBackground(() => {
         }
 
         if (message.type === 'webmcp_discover_tools') {
-          sendResponse(await discoverWebMCPToolsInCurrentWindow());
+          const senderWindowId = _sender?.tab?.windowId;
+          sendResponse(await discoverWebMCPToolsInCurrentWindow(senderWindowId));
           return;
         }
 
