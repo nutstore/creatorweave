@@ -232,8 +232,13 @@ export async function buildFormatWriteContext(
             const { AssetsBackend } = await import('./backends/assets-backend')
             const ab = new AssetsBackend(workspaceId)
             const result = await ab.readFile(assetPath, { encoding: 'binary' })
-            return toUint8(result.content)
-          } catch {
+            const uint8 = toUint8(result.content)
+            if (!uint8) {
+              console.warn(`[buildFormatWriteContext] readAsset: unexpected content type for ${assetPath}:`, typeof result.content)
+            }
+            return uint8
+          } catch (err) {
+            console.warn(`[buildFormatWriteContext] readAsset failed for ${assetPath}:`, err)
             return null
           }
         }

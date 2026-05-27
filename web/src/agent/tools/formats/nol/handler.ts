@@ -115,7 +115,7 @@ function parseOutlineToNolData(text: string): NolData {
   const stack: Array<{ id: string; depth: number }> = []
 
   for (const rawLine of lines) {
-    const imgMatch = rawLine.match(/^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/)
+    const imgMatch = rawLine.match(/^\s*(- )?!\[([^\]]*)\]\(([^)]+)\)\s*$/)
     if (imgMatch && stack.length > 0) {
       const parentNodeId = stack[stack.length - 1].id
       const parentNode = nodes[parentNodeId]
@@ -123,7 +123,7 @@ function parseOutlineToNolData(text: string): NolData {
         if (!parentNode.images) parentNode.images = []
         parentNode.images.push({
           type: 'parasiticMedium',
-          data: { v: 1, type: 'image', src: imgMatch[2] },
+          data: { v: 1, type: 'image', src: imgMatch[3] },
         })
       }
       continue
