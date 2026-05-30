@@ -1511,7 +1511,15 @@ export class WorkspaceRuntime {
         restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
       }
       if (!restored) {
-        throw new Error(`无法拒绝删除 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
+        // If the delete record has no baseline and no native copy, the file
+        // never existed on disk (e.g. a ghost delete from a pure-OPFS create→delete
+        // cycle). "Rejecting" this delete is a no-op — just remove the pending entry
+        // instead of blocking the user with an error.
+        const hadBaseline = await this.hasBaselineFile(normalizedTargetPath)
+        if (hadBaseline) {
+          throw new Error(`无法拒绝删除 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
+        }
+        // No baseline → file never existed on disk → safe to just discard the record.
       }
       await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
     }
@@ -1541,6 +1549,26 @@ export class WorkspaceRuntime {
       const nativePath = resolved.relativePath || path
       const native = await this.readFromNativeFS(nativePath, nativeDir)
       await this.writeToFilesDir(path, native.content)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Check whether a .baseline copy exists for the given path.
+   * Used by discardPendingPath to distinguish "file never existed on disk"
+   * from "file existed but baseline capture failed / was lost".
+   */
+  private async hasBaselineFile(path: string): Promise<boolean> {
+    try {
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length === 0) return false
+      let current = await this.workspaceDir.getDirectoryHandle(BASELINE_DIR)
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = await current.getDirectoryHandle(parts[i])
+      }
+      await current.getFileHandle(parts[parts.length - 1])
       return true
     } catch {
       return false
@@ -2854,6 +2882,13 @@ export class WorkspaceRuntime {
         const normalizedPath = normalizeComparePath(pending.path)
         const stillInCache = this.hasCachedFile(pending.path) || this.hasCachedFile(normalizedPath)
         if (stillInCache) {
+          continue
+        }
+
+        // Re-check live pending state: if the entry was already removed
+        // (e.g. create→delete cancel-out happened after the snapshot), skip
+        // to avoid creating a ghost delete record for an already-cleaned path.
+        if (!this.pendingManager.hasPendingPath(pending.path)) {
           continue
         }
 
