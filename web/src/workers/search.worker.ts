@@ -150,20 +150,31 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
     let root = directoryHandle
     let searchSingleFile: string | null = null
 
+    let overlayOnlyDir: string | null = null
     if (normalizedPath) {
       try {
         root = await resolveSubdir(directoryHandle, normalizedPath)
       } catch (error) {
         if (isNotFoundError(error)) {
-          sendErrorIfActive({
-            code: 'path_not_found',
-            message: `Search path "${normalizedPath}" not found under current root "${directoryHandle.name}".`,
-            requestedPath: normalizedPath,
-            resolvedRootName: directoryHandle.name,
-          })
-          return
-        }
-        if (isTypeMismatchError(error)) {
+          // Directory not found on disk — check if it exists as an OPFS-only path
+          // (directory created by Python/write but not yet synced to native FS).
+          // If overlays have files under this path prefix, treat it as an overlay-only search.
+          const prefix = normalizedPath + '/'
+          const hasOverlayFiles = pendingOverlays && Object.keys(pendingOverlays).some(
+            p => (p.startsWith(prefix) || p === normalizedPath) && !pendingOverlays[p]?.deleted
+          )
+          if (hasOverlayFiles) {
+            overlayOnlyDir = normalizedPath
+          } else {
+            sendErrorIfActive({
+              code: 'path_not_found',
+              message: `Search path "${normalizedPath}" not found under current root "${directoryHandle.name}".`,
+              requestedPath: normalizedPath,
+              resolvedRootName: directoryHandle.name,
+            })
+            return
+          }
+        } else if (isTypeMismatchError(error)) {
           // Path is a file, not a directory - search in that file directly
           searchSingleFile = normalizedPath
         } else {
@@ -268,6 +279,8 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       }
     }
 
+    // Phase 1: Disk traversal — skip if the directory only exists in OPFS overlays
+    if (!overlayOnlyDir) {
     while (dirStack.length > 0) {
       if (signal.aborted) break
       if (Date.now() > deadlineAt) {
@@ -366,6 +379,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, 0))
       }
     }
+    } // end if (!overlayOnlyDir)
 
     // Phase 2: Search pending overlays for NEW files (not on disk).
     // These are files created in OPFS but not yet synced to disk.
