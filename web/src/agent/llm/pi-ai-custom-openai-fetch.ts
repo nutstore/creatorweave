@@ -260,7 +260,7 @@ function streamCwOpenAIChatCompletions(
             })
           }
         }
-      })
+      }, options?.signal)
 
       finishCurrentBlock(currentBlock)
 
@@ -483,29 +483,58 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
 
 async function readSSE(
   body: ReadableStream<Uint8Array>,
-  onData: (data: string) => void
+  onData: (data: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
 
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
+  try {
+    for (;;) {
+      if (signal?.aborted) break
 
-    buffer += decoder.decode(value, { stream: true })
-    let separator = findSSESeparator(buffer)
+      // Race reader.read() against signal abort so that a pending read
+      // (e.g. slow/keep-alive connection) can be interrupted.
+      const { done, value } = signal
+        ? await Promise.race([
+            reader.read(),
+            new Promise<ReadableStreamReadResult<Uint8Array>>((resolve) => {
+              if (signal.aborted) {
+                resolve({ done: true, value: undefined as any })
+                return
+              }
+              const onAbort = () => {
+                signal.removeEventListener('abort', onAbort)
+                resolve({ done: true, value: undefined as any })
+              }
+              signal.addEventListener('abort', onAbort, { once: true })
+            }),
+          ])
+        : await reader.read()
 
-    while (separator) {
-      const rawEvent = buffer.slice(0, separator.index)
-      buffer = buffer.slice(separator.index + separator.length)
-      const data = extractSSEData(rawEvent)
-      if (data !== null) {
-        onData(data)
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      let separator = findSSESeparator(buffer)
+
+      while (separator) {
+        const rawEvent = buffer.slice(0, separator.index)
+        buffer = buffer.slice(separator.index + separator.length)
+        const data = extractSSEData(rawEvent)
+        if (data !== null) {
+          onData(data)
+        }
+        separator = findSSESeparator(buffer)
       }
-      separator = findSSESeparator(buffer)
     }
+  } finally {
+    // Release the reader lock so the response body can be garbage-collected
+    // when the caller is no longer interested in the stream.
+    try { reader.releaseLock() } catch { /* already released */ }
   }
+
+  if (signal?.aborted) return
 
   buffer += decoder.decode()
   const trailingData = extractSSEData(buffer)

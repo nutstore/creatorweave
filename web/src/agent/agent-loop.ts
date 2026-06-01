@@ -182,6 +182,10 @@ export class AgentLoop {
       console.warn('[#LoopStop] stop_for_max_iterations', {
         maxIterations: this.maxIterations,
       })
+      // Abort the signal to stop any in-flight LLM requests inside the
+      // pi-agent-core generator (especially the push-based cw-openai-fetch
+      // stream whose async IIFE would otherwise keep running).
+      this.abortController?.abort()
       callbacks?.onIterationLimitReached?.(this.maxIterations)
     }
 
