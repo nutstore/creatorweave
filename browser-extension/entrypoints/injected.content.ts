@@ -45,7 +45,7 @@ export default defineContentScript({
 
     // ── Pending stream callbacks, keyed by id ──
     const _streaming = new Map<string, {
-      onChunk: (data: string) => void
+      onChunk: (data: unknown) => void
       onDone: () => void
       onError: (errorCode: string, message: string) => void
     }>();
@@ -108,7 +108,7 @@ export default defineContentScript({
         const stream = _streaming.get(data.id);
         if (!stream) return;
 
-        if (data.type === 'chunk' && typeof data.data === 'string') {
+        if (data.type === 'chunk') {
           stream.onChunk(data.data);
         } else if (data.type === 'done') {
           _streaming.delete(data.id);
@@ -151,18 +151,18 @@ export default defineContentScript({
      * Send a streaming request through the bridge.
      * Returns an async iterable of raw SSE text chunks.
      */
-    function sendToBridgeStream(type: string, payload: Record<string, any>): AsyncIterable<string> & { cancel: () => void } {
+    function sendToBridgeStream(type: string, payload: Record<string, any>): AsyncIterable<unknown> & { cancel: () => void } {
       const id = '__aw_' + (++_requestId) + '_' + Date.now();
       let cancelled = false;
 
       // The async iterable implementation
-      const chunkQueue: string[] = [];
-      let resolveChunk: ((result: IteratorResult<string>) => void) | null = null;
+      const chunkQueue: unknown[] = [];
+      let resolveChunk: ((result: IteratorResult<unknown>) => void) | null = null;
       let rejectChunk: ((err: Error) => void) | null = null;
       let streamFinished = false;
       let streamError: Error | null = null;
 
-      function enqueueChunk(data: string) {
+      function enqueueChunk(data: unknown) {
         if (cancelled) return;
         if (resolveChunk) {
           const r = resolveChunk;
@@ -219,17 +219,17 @@ export default defineContentScript({
         }
       }, 120000); // 2 min for streaming
 
-      const asyncIterator: AsyncIterable<string> & { cancel: () => void } = {
+      const asyncIterator: AsyncIterable<unknown> & { cancel: () => void } = {
         [Symbol.asyncIterator]() {
           return {
-            async next(): Promise<IteratorResult<string>> {
+            async next(): Promise<IteratorResult<unknown>> {
               if (streamError) throw streamError;
               if (cancelled || streamFinished) return { value: undefined, done: true };
               if (chunkQueue.length > 0) {
                 return { value: chunkQueue.shift()!, done: false };
               }
               // Wait for next chunk
-              return new Promise<IteratorResult<string>>((resolve, reject) => {
+              return new Promise<IteratorResult<unknown>>((resolve, reject) => {
                 resolveChunk = resolve;
                 rejectChunk = reject;
               });
@@ -429,7 +429,73 @@ export default defineContentScript({
        * The caller should parse SSE events from the yielded strings.
        */
       codexProxyFetchStream(body: Record<string, any>): AsyncIterable<string> & { cancel: () => void } {
-        return sendToBridgeStream('codex_proxy_fetch_stream', { body });
+        const source = sendToBridgeStream('codex_proxy_fetch_stream', { body })
+        const typed: AsyncIterable<string> & { cancel: () => void } = {
+          [Symbol.asyncIterator]() {
+            const it = source[Symbol.asyncIterator]()
+            return {
+              async next(): Promise<IteratorResult<string>> {
+                const value = await it.next()
+                if (value.done) return { value: undefined, done: true }
+                if (typeof value.value !== 'string') {
+                  throw new Error('Expected string stream chunk for codexProxyFetchStream')
+                }
+                return { value: value.value, done: false }
+              },
+              return() {
+                return it.return ? it.return() : Promise.resolve({ value: undefined, done: true })
+              },
+            }
+          },
+          cancel() {
+            source.cancel()
+          },
+        }
+        return typed
+      },
+
+      /**
+       * Stream plugin download frames from extension background.
+       */
+      webMCPPluginDownloadStream(payload: {
+        transferId: string
+        downloadUrl: string
+        savePath: string
+        fileName: string
+      }) {
+        const source = sendToBridgeStream('webmcp_plugin_download_stream', { plan: payload })
+        const typed: AsyncIterable<Record<string, unknown>> & { cancel: () => void } = {
+          [Symbol.asyncIterator]() {
+            const it = source[Symbol.asyncIterator]()
+            return {
+              async next(): Promise<IteratorResult<Record<string, unknown>>> {
+                const value = await it.next()
+                if (value.done) return { value: undefined, done: true }
+                if (!value.value || typeof value.value !== 'object') {
+                  throw new Error('Expected object frame for webMCPPluginDownloadStream')
+                }
+                return { value: value.value as Record<string, unknown>, done: false }
+              },
+              return() {
+                return it.return ? it.return() : Promise.resolve({ value: undefined, done: true })
+              },
+            }
+          },
+          cancel() {
+            source.cancel()
+          },
+        }
+        return typed
+      },
+
+      /**
+       * Finalize plugin download after main page persisted the file.
+       */
+      async webMCPPluginDownloadFinalize(payload: {
+        transferId: string
+        savedPath: string
+      }) {
+        return sendToBridge('webmcp_plugin_download_finalize', payload || {})
       },
 
       // ── Edge TTS (Text-to-Speech) ──

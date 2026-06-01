@@ -35,6 +35,49 @@ export interface WebMCPInvokeRequest {
   preferredTabId?: number
 }
 
+export interface WebMCPPluginDownloadPlan {
+  transferId: string
+  downloadUrl: string
+  savePath: string
+  fileName: string
+  originalResult: Record<string, unknown>
+}
+
+export interface WebMCPPluginDownloadStartFrame {
+  type: 'start'
+  transferId: string
+  fileName: string
+  mimeType: string
+  totalChunks: number
+  totalChars: number
+  savePath: string
+}
+
+export interface WebMCPPluginDownloadChunkFrame {
+  type: 'chunk'
+  transferId: string
+  index: number
+  data: string
+}
+
+export interface WebMCPPluginDownloadEndFrame {
+  type: 'end'
+  transferId: string
+}
+
+export interface WebMCPPluginDownloadErrorFrame {
+  type: 'error'
+  transferId: string
+  errorCode: string
+  message: string
+}
+
+export type WebMCPPluginDownloadFrame =
+  | WebMCPPluginDownloadStartFrame
+  | WebMCPPluginDownloadChunkFrame
+  | WebMCPPluginDownloadEndFrame
+  | WebMCPPluginDownloadErrorFrame
+
 export interface WebMCPInvokeResponse {
   ok: boolean
   hostname: string
@@ -43,7 +86,7 @@ export interface WebMCPInvokeResponse {
   tabId?: number
   apiMode?: WebMCPApiMode
   result?: unknown
+  pluginDownloadPlan?: WebMCPPluginDownloadPlan
   errorCode?: string
   error?: string
 }
-

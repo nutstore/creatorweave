@@ -33,7 +33,7 @@ export default defineContentScript({
       if (!id || !type) return;
 
       // ── Streaming request: use port-based messaging ──
-      if (type === 'codex_proxy_fetch_stream') {
+      if (type === 'codex_proxy_fetch_stream' || type === 'webmcp_plugin_download_stream') {
         try {
           const port = chrome.runtime.connect({ name: 'codex_stream' });
 

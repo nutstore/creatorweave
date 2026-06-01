@@ -6,10 +6,11 @@ export function getWebMCPBridge(): WebMCPBridge | null {
   if (!bridge?.ready) return null
   if (typeof bridge.webMCPDiscover !== 'function') return null
   if (typeof bridge.webMCPInvoke !== 'function') return null
+  if (typeof bridge.webMCPPluginDownloadStream !== 'function') return null
+  if (typeof bridge.webMCPPluginDownloadFinalize !== 'function') return null
   return bridge as WebMCPBridge
 }
 
 export function isWebMCPBridgeAvailable(): boolean {
   return getWebMCPBridge() !== null
 }
-

@@ -4,6 +4,8 @@
 
 import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
 import { invokeWebMCPTool } from './webmcp/invoke'
+import { streamPluginDownload } from './webmcp/plugin-download-transfer'
+import type { WebMCPPluginDownloadPlan } from './webmcp/types'
 import { listVoices as edgeTTSListVoices } from '../utils/tts'
 
 // Config
@@ -14,6 +16,12 @@ const CONFIG = {
   RENDER_TIMEOUT_MS: 30000,       // Hidden tab render timeout
   RENDER_SETTLE_MS: 2000,         // Wait after 'complete' for JS to settle
 };
+
+const completedPluginDownloads = new Map<string, { completedAt: number; savedPath?: string }>()
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 // ============================================================
 // Utility functions
@@ -770,6 +778,26 @@ export default defineBackground(() => {
           return;
         }
 
+        if (message.type === 'webmcp_plugin_download_finalize') {
+          const transferId = typeof message.transferId === 'string' ? message.transferId : ''
+          const savedPath = typeof message.savedPath === 'string' ? message.savedPath : ''
+          if (!transferId) {
+            sendResponse({ ok: false, error: 'Missing transferId for plugin download finalize' });
+            return;
+          }
+
+          const existing = completedPluginDownloads.get(transferId)
+          completedPluginDownloads.set(transferId, {
+            completedAt: existing?.completedAt || Date.now(),
+            savedPath: savedPath || existing?.savedPath,
+          })
+
+          await sleep(3000)
+          sendResponse({ ok: true, transferId, savedPath: savedPath || existing?.savedPath })
+          completedPluginDownloads.delete(transferId)
+          return;
+        }
+
         if (message.type === 'codex_auth_start') {
           const resp = await fetch(DEVICEAUTH_USERCODE_URL, {
             method: 'POST',
@@ -923,11 +951,54 @@ export default defineBackground(() => {
     return true;
   });
 
-  // ── Port-based streaming for codex_proxy_fetch_stream ──
+  // ── Port-based streaming for codex_proxy_fetch_stream & webmcp_plugin_download_stream ──
   chrome.runtime.onConnect.addListener((port) => {
     if (port.name !== 'codex_stream') return;
 
     port.onMessage.addListener((message) => {
+      if (message.type === 'webmcp_plugin_download_stream') {
+        (async () => {
+          const plan = message.plan as WebMCPPluginDownloadPlan | undefined
+          if (!plan?.transferId || !plan.downloadUrl || !plan.savePath || !plan.fileName) {
+            port.postMessage({
+              type: 'error',
+              errorCode: 'INVALID_PLUGIN_DOWNLOAD_PLAN',
+              message: 'Missing transferId/downloadUrl/savePath/fileName for plugin download stream',
+            })
+            port.disconnect()
+            return
+          }
+
+          let streamEndedWithError = false
+          const safePost = (payload: Record<string, unknown>) => {
+            try {
+              port.postMessage(payload)
+              return true
+            } catch {
+              return false
+            }
+          }
+          await streamPluginDownload(plan, (frame) => {
+            if (frame.type === 'end') {
+              completedPluginDownloads.set(plan.transferId, { completedAt: Date.now() })
+            }
+            const sent = safePost({ type: 'chunk', data: frame })
+            if (!sent) return
+            if (frame.type === 'error') {
+              streamEndedWithError = true
+              safePost({ type: 'done' })
+              try { port.disconnect() } catch {}
+            }
+          })
+
+          if (!streamEndedWithError) {
+            safePost({ type: 'done' })
+            try { port.disconnect() } catch {}
+          }
+        })()
+        return
+      }
+
       if (message.type !== 'codex_proxy_fetch_stream') return;
 
       (async () => {

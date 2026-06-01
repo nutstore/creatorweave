@@ -1,5 +1,64 @@
 import { getRecentRoute, getRecentRouteForHostname } from './discovery'
-import type { WebMCPInvokeRequest, WebMCPInvokeResponse } from './types'
+import type {
+  WebMCPInvokeRequest,
+  WebMCPInvokeResponse,
+  WebMCPPluginDownloadPlan,
+} from './types'
+
+function randomTransferId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `tr_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+function unwrapPluginDownloadPayload(result: unknown): Record<string, unknown> | null {
+  if (!result) return null
+
+  if (typeof result === 'string') {
+    try {
+      const parsed = JSON.parse(result) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+    } catch {
+      return null
+    }
+    return null
+  }
+
+  if (typeof result === 'object' && !Array.isArray(result)) {
+    return result as Record<string, unknown>
+  }
+
+  return null
+}
+
+function parsePluginDownloadPlan(result: unknown): WebMCPPluginDownloadPlan | null {
+  const obj = unwrapPluginDownloadPayload(result)
+  if (!obj) {
+    return null
+  }
+
+  const pluginDownload = obj.plugin_download
+  const downloadUrl = obj.download_url
+  const savePath = obj.save_path
+  const fileNameRaw = obj.fileName ?? obj.file_name
+  if (pluginDownload !== true) return null
+  if (typeof downloadUrl !== 'string' || downloadUrl.trim().length === 0) return null
+  if (typeof fileNameRaw !== 'string' || fileNameRaw.trim().length === 0) return null
+
+  const normalizedSavePath =
+    typeof savePath === 'string' && savePath.trim().length > 0 ? savePath.trim() : '/'
+
+  return {
+    transferId: randomTransferId(),
+    downloadUrl: downloadUrl.trim(),
+    savePath: normalizedSavePath,
+    fileName: fileNameRaw.trim(),
+    originalResult: { ...obj },
+  }
+}
 
 function parseHostname(url: string): string | null {
   try {
@@ -188,6 +247,7 @@ export async function invokeWebMCPTool(
       }
     }
 
+    const plan = parsePluginDownloadPlan(result.result)
     return {
       ok: true,
       hostname,
@@ -196,6 +256,7 @@ export async function invokeWebMCPTool(
       tabId,
       apiMode: result.apiMode,
       result: result.result,
+      ...(plan ? { pluginDownloadPlan: plan } : {}),
     }
   } catch (error: any) {
     return {
@@ -209,4 +270,3 @@ export async function invokeWebMCPTool(
     }
   }
 }
-

@@ -11,6 +11,8 @@ import { inferMimeType } from '@/types/asset'
 
 /** A single asset file discovered in the OPFS assets/ directory */
 export interface AssetInventoryItem {
+  /** Workspace-relative path under assets (example: "downloads/file.txt") */
+  path: string
   /** File name */
   name: string
   /** File size in bytes */
@@ -33,8 +35,55 @@ interface AssetInventoryState {
 
   /** Scan the OPFS assets/ directory and update items */
   refresh: () => Promise<void>
-  /** Delete an asset file by name */
-  deleteAsset: (name: string) => Promise<void>
+  /** Delete an asset file by relative path */
+  deleteAsset: (path: string) => Promise<void>
+}
+
+async function scanAssetsRecursively(
+  dir: FileSystemDirectoryHandle,
+  parentPath = ''
+): Promise<AssetInventoryItem[]> {
+  const items: AssetInventoryItem[] = []
+
+  for await (const entry of dir.values()) {
+    const fullPath = parentPath ? `${parentPath}/${entry.name}` : entry.name
+    if (entry.kind === 'file') {
+      const file = await entry.getFile()
+      items.push({
+        path: fullPath,
+        name: entry.name,
+        size: file.size,
+        lastModified: file.lastModified,
+        mimeType: inferMimeType(fullPath),
+      })
+      continue
+    }
+
+    if (entry.kind === 'directory') {
+      const nested = await scanAssetsRecursively(entry, fullPath)
+      items.push(...nested)
+    }
+  }
+
+  return items
+}
+
+async function deleteAssetByPath(
+  root: FileSystemDirectoryHandle,
+  path: string
+): Promise<void> {
+  const parts = path.split('/').filter(Boolean)
+  const fileName = parts.pop()
+  if (!fileName) {
+    throw new Error(`Invalid asset path: ${path}`)
+  }
+
+  let parent = root
+  for (const segment of parts) {
+    parent = await parent.getDirectoryHandle(segment)
+  }
+
+  await parent.removeEntry(fileName)
 }
 
 export const useAssetInventoryStore = create<AssetInventoryState>((set, _get) => ({
@@ -53,19 +102,7 @@ export const useAssetInventoryStore = create<AssetInventoryState>((set, _get) =>
       }
 
       const assetsDir = await active.conversation.getAssetsDir()
-      const items: AssetInventoryItem[] = []
-
-      for await (const entry of assetsDir.values()) {
-        if (entry.kind === 'file') {
-          const file = await entry.getFile()
-          items.push({
-            name: entry.name,
-            size: file.size,
-            lastModified: file.lastModified,
-            mimeType: inferMimeType(entry.name),
-          })
-        }
-      }
+      const items = await scanAssetsRecursively(assetsDir)
 
       // Sort by lastModified descending (newest first)
       items.sort((a, b) => b.lastModified - a.lastModified)
@@ -77,18 +114,18 @@ export const useAssetInventoryStore = create<AssetInventoryState>((set, _get) =>
     }
   },
 
-  deleteAsset: async (name: string) => {
+  deleteAsset: async (path: string) => {
     try {
       const active = await getActiveConversation()
       if (!active) return
 
       const assetsDir = await active.conversation.getAssetsDir()
-      await assetsDir.removeEntry(name)
+      await deleteAssetByPath(assetsDir, path)
 
-      // Remove from local state without re-scanning
-      set((state) => ({
-        items: state.items.filter((item) => item.name !== name),
-      }))
+      // Re-scan after deletion to avoid stale popover state.
+      const items = await scanAssetsRecursively(assetsDir)
+      items.sort((a, b) => b.lastModified - a.lastModified)
+      set({ items })
     } catch (err) {
       console.error('[AssetInventory] Failed to delete asset:', err)
     }

@@ -49,12 +49,21 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-async function readAssetBlob(assetName: string): Promise<Blob | null> {
+async function readAssetBlob(assetPath: string): Promise<Blob | null> {
   try {
     const active = await getActiveConversation()
     if (!active) return null
     const assetsDir = await active.conversation.getAssetsDir()
-    const fileHandle = await assetsDir.getFileHandle(assetName)
+    const parts = assetPath.split('/').filter(Boolean)
+    const fileName = parts.pop()
+    if (!fileName) return null
+
+    let currentDir = assetsDir
+    for (const segment of parts) {
+      currentDir = await currentDir.getDirectoryHandle(segment)
+    }
+
+    const fileHandle = await currentDir.getFileHandle(fileName)
     const file = await fileHandle.getFile()
     return file
   } catch {
@@ -63,7 +72,7 @@ async function readAssetBlob(assetName: string): Promise<Blob | null> {
 }
 
 async function downloadAsset(asset: AssetInventoryItem): Promise<void> {
-  const blob = await readAssetBlob(asset.name)
+  const blob = await readAssetBlob(asset.path)
   if (!blob) return
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -100,11 +109,11 @@ function AssetRow({
   onPreview,
 }: {
   asset: AssetInventoryItem
-  onDelete: (name: string) => void
+  onDelete: (path: string) => void
   onPreview: (name: string, blob: Blob) => void
 }) {
   const t = useT()
-  const mime = asset.mimeType || inferMimeType(asset.name)
+  const mime = asset.mimeType || inferMimeType(asset.path)
   const isImage = mime.startsWith('image/')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [previewing, setPreviewing] = useState(false)
@@ -114,11 +123,11 @@ function AssetRow({
   useEffect(() => {
     if (!isImage) return
     let cancelled = false
-    readAssetBlob(asset.name).then((blob) => {
+    readAssetBlob(asset.path).then((blob) => {
       if (blob && !cancelled) setThumbUrl(URL.createObjectURL(blob))
     })
     return () => { cancelled = true }
-  }, [isImage, asset.name])
+  }, [isImage, asset.path])
   useEffect(() => {
     return () => { if (thumbUrl) URL.revokeObjectURL(thumbUrl) }
   }, [thumbUrl])
@@ -127,12 +136,12 @@ function AssetRow({
     if (previewing) return
     setPreviewing(true)
     try {
-      const blob = await readAssetBlob(asset.name)
+      const blob = await readAssetBlob(asset.path)
       if (blob) onPreview(asset.name, blob)
     } finally {
       setPreviewing(false)
     }
-  }, [asset.name, onPreview, previewing])
+  }, [asset.name, asset.path, onPreview, previewing])
 
   return (
     <div className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-700/50 group/row rounded-md">
@@ -156,6 +165,11 @@ function AssetRow({
         <div className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200">
           {asset.name}
         </div>
+        {asset.path !== asset.name && (
+          <div className="truncate text-[10px] text-neutral-400">
+            {asset.path}
+          </div>
+        )}
         <div className="text-[10px] text-neutral-400">
           {formatFileSize(asset.size)} · {formatTime(asset.lastModified)}
         </div>
@@ -188,7 +202,7 @@ function AssetRow({
           type="button"
           onClick={() => {
             if (confirmDelete) {
-              onDelete(asset.name)
+              onDelete(asset.path)
               setConfirmDelete(false)
             } else {
               setConfirmDelete(true)
@@ -242,6 +256,12 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
     }
   }, [convId, loadedWorkspaceId, refresh])
 
+  // Always refresh on open so newly saved plugin assets appear without page reload.
+  useEffect(() => {
+    if (!open) return
+    refresh()
+  }, [open, refresh])
+
   // Close on click outside
   useEffect(() => {
     if (!open) return
@@ -275,8 +295,8 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
   }, [open])
 
   const handleDelete = useCallback(
-    async (name: string) => {
-      await deleteAsset(name)
+    async (path: string) => {
+      await deleteAsset(path)
     },
     [deleteAsset],
   )
@@ -364,7 +384,7 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
               </div>
             ) : (
               items.map((asset) => (
-                <AssetRow key={asset.name} asset={asset} onDelete={handleDelete} onPreview={handlePreview} />
+                <AssetRow key={asset.path} asset={asset} onDelete={handleDelete} onPreview={handlePreview} />
               ))
             )}
           </div>
