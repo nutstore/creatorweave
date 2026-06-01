@@ -134,6 +134,10 @@ export interface PlatformAdapter {
   getBundledManifest(): BuiltinSkillsManifest
   /** Read a bundled skill file content */
   readBundledFile(skillName: string, filePath: string): Promise<string>
+  /** Read a bundled binary file as ArrayBuffer (optional, for binary assets like .docx) */
+  readBundledBinaryFile?(skillName: string, filePath: string): Promise<ArrayBuffer>
+  /** Check if a bundled file is binary (optional) */
+  isBundledBinaryFile?(skillName: string, filePath: string): boolean
   /** Get the current app version */
   getAppVersion(): string
 }

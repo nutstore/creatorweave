@@ -53,7 +53,8 @@ export async function ensureMaterialized(
   const errors: MaterializeResult['errors'] = []
 
   // Ensure base directory exists
-  await adapter.writeFile('.skills/builtin/.gitkeep', '')
+  // NOTE: Paths are relative to the adapter root (already inside .skills/ for OPFS).
+  await adapter.writeFile('builtin/.gitkeep', '')
 
   for (const skill of toWrite) {
     try {
@@ -80,15 +81,23 @@ export async function ensureMaterialized(
 
 /**
  * Write all files for a single skill to the local filesystem.
+ * Supports both text files and binary files (via readBundledBinaryFile).
  */
 async function materializeSkill(
   adapter: PlatformAdapter,
   skill: BuiltinSkillManifest
 ): Promise<void> {
-  const skillDir = `.skills/builtin/${skill.name}`
+  // NOTE: skillDir is relative to adapter root (already inside .skills/ for OPFS).
+  const skillDir = `builtin/${skill.name}`
 
   for (const file of skill.files) {
-    const content = await adapter.readBundledFile(skill.name, file.path)
-    await adapter.writeFile(`${skillDir}/${file.path}`, content)
+    // Check if this file is a binary asset
+    if (adapter.readBundledBinaryFile && adapter.isBundledBinaryFile?.(skill.name, file.path)) {
+      const content = await adapter.readBundledBinaryFile(skill.name, file.path)
+      await adapter.writeFile(`${skillDir}/${file.path}`, content)
+    } else {
+      const content = await adapter.readBundledFile(skill.name, file.path)
+      await adapter.writeFile(`${skillDir}/${file.path}`, content)
+    }
   }
 }

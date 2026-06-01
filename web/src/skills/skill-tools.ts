@@ -9,6 +9,11 @@ import type { ToolDefinition, ToolExecutor, ToolContext, ToolPromptDoc } from '@
 import { toolOkJson, toolErrorJson } from '@/agent/tools/tool-envelope'
 import { formatResourceList } from './skill-resources'
 import { getSkillManager } from './skill-manager'
+import {
+  listSkillResourcesFromOPFS,
+  readSkillResourceFromOPFS,
+  readSkillMdFromOPFS,
+} from './skills-platform-adapter'
 
 //=============================================================================
 // read_skill Tool
@@ -38,7 +43,10 @@ export const readSkillDefinition: ToolDefinition = {
 
 /**
  * Executor for read_skill tool
- * Returns full skill content including instruction, examples, and resource list
+ * Returns full skill content including instruction, examples, and resource list.
+ *
+ * For builtin skills: resource list is scanned from OPFS directory.
+ * For project/user skills: resource list comes from SQLite storage.
  */
 export const readSkillExecutor: ToolExecutor = async (
   args: Record<string, unknown>,
@@ -57,25 +65,42 @@ export const readSkillExecutor: ToolExecutor = async (
     return toolErrorJson('read_skill', 'skill_not_found', `Skill '${skill_name}' not found. Available skills: ${availableSkills.join(', ')}`)
   }
 
-  // Get associated resources
-  const resources = await manager.getSkillResources(skill.id)
+  // Get associated resources — read directly from OPFS for builtin skills
+  const isBuiltin = skill.source === 'builtin'
+  let resources: Array<{ resourcePath: string; resourceType: string; size: number; id?: string; skillId?: string; content?: string; contentType?: string; createdAt?: number }> = []
 
-  // Format output
-  let output = `# ${skill.name}
+  // For builtin skills: read SKILL.md directly from OPFS to get latest content
+  // (SQLite only stores metadata for fast lookup; instruction/examples/templates come from files)
+  let liveInstruction = skill.instruction
+  let liveExamples = skill.examples
+  let liveTemplates = skill.templates
 
-**Version:** ${skill.version}
-**Author:** ${skill.author || 'Unknown'}
-**Category:** ${skill.category}
-**Tags:** ${skill.tags.join(', ') || 'None'}
+  if (isBuiltin) {
+    // Builtin skills: scan OPFS directory for resource files
+    resources = await listSkillResourcesFromOPFS(skill.name)
 
----
+    // Read and parse SKILL.md directly from OPFS (always up-to-date)
+    const skillMdContent = await readSkillMdFromOPFS(skill.name)
+    if (skillMdContent) {
+      const { parseSkillMd } = await import('./skill-parser')
+      const parsed = parseSkillMd(skillMdContent, 'builtin')
+      if (parsed.skill) {
+        liveInstruction = parsed.skill.instruction
+        liveExamples = parsed.skill.examples
+        liveTemplates = parsed.skill.templates
+      }
+    }
+  } else {
+    // Project/user skills: use SQLite storage
+    resources = await manager.getSkillResources(skill.id)
+  }
 
-${skill.instruction}
-`
+  // Format output using live content
+  let output = `# ${skill.name}\n\n**Version:** ${skill.version}\n**Author:** ${skill.author || 'Unknown'}\n**Category:** ${skill.category}\n**Tags:** ${skill.tags.join(', ') || 'None'}\n\n---\n\n${liveInstruction}\n`
 
-  if (skill.examples) {
+  if (liveExamples) {
     try {
-      const examples = JSON.parse(skill.examples)
+      const examples = JSON.parse(liveExamples)
       if (Array.isArray(examples) && examples.length > 0) {
         output += `\n## Examples\n\n`
         examples.forEach((ex: unknown, i: number) => {
@@ -84,13 +109,13 @@ ${skill.instruction}
       }
     } catch {
       // If examples is not valid JSON, include as-is
-      output += `\n## Examples\n\n${skill.examples}\n`
+      output += `\n## Examples\n\n${liveExamples}\n`
     }
   }
 
-  if (skill.templates) {
+  if (liveTemplates) {
     try {
-      const templates = JSON.parse(skill.templates)
+      const templates = JSON.parse(liveTemplates)
       if (Array.isArray(templates) && templates.length > 0) {
         output += `\n## Templates\n\n`
         templates.forEach((tmpl: unknown, i: number) => {
@@ -99,17 +124,16 @@ ${skill.instruction}
       }
     } catch {
       // If templates is not valid JSON, include as-is
-      output += `\n## Templates\n\n${skill.templates}\n`
+      output += `\n## Templates\n\n${liveTemplates}\n`
     }
   }
 
   // Append resource list
   if (resources.length > 0) {
-    output += formatResourceList(resources)
+    output += formatResourceList(resources as any)
   }
 
   // Append /mnt_skills path hint for Python execution
-  const isBuiltin = skill.source === 'builtin'
   if (isBuiltin) {
     output += `\n\n**Python execution path:** \`/mnt_skills/builtin/${skill.name.replace(/\s+/g, '-').toLowerCase()}/\``
   }
@@ -153,7 +177,10 @@ export const readSkillResourceDefinition: ToolDefinition = {
 
 /**
  * Executor for read_skill_resource tool
- * Returns the content of a specific resource file
+ * Returns the content of a specific resource file.
+ *
+ * For builtin skills: reads directly from OPFS (no SQLite involved).
+ * For project/user skills: reads from SQLite storage.
  */
 export const readSkillResourceExecutor: ToolExecutor = async (
   args: Record<string, unknown>,
@@ -171,7 +198,27 @@ export const readSkillResourceExecutor: ToolExecutor = async (
     return toolErrorJson('read_skill_resource', 'skill_not_found', `Skill '${skill_name}' not found. Please check the skill name and try again.`)
   }
 
-  // Get the resource
+  // For builtin skills: read directly from OPFS
+  if (skill.source === 'builtin') {
+    const resource = await readSkillResourceFromOPFS(skill.name, resource_path)
+
+    if (!resource) {
+      const available = await listSkillResourcesFromOPFS(skill.name)
+      const availablePaths = available.map((r) => `  - ${r.resourcePath}`).join('\n')
+      return toolErrorJson(
+        'read_skill_resource',
+        'resource_not_found',
+        `Resource '${resource_path}' not found in skill '${skill_name}'.\n\nAvailable resources in this skill:\n${availablePaths || '  (none)'}`
+      )
+    }
+
+    const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
+    const output = `# ${skill.id}/${resource.resourcePath}\n\n**Type:** ${typeLabel}\n**Size:** ${resource.size} bytes\n\n---\n\n${resource.content}`
+
+    return toolOkJson('read_skill_resource', output)
+  }
+
+  // For project/user skills: use SQLite storage
   const available = await manager.getSkillResources(skill.id)
   const resource = available.find((r) => r.resourcePath === resource_path)
 
@@ -186,15 +233,7 @@ export const readSkillResourceExecutor: ToolExecutor = async (
 
   // Format output with content type information
   const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
-  const output = `# ${resource.skillId}/${resource.resourcePath}
-
-**Type:** ${typeLabel}
-**Content-Type:** ${resource.contentType}
-**Size:** ${resource.size} bytes
-
----
-
-${resource.content}`
+  const output = `# ${resource.skillId}/${resource.resourcePath}\n\n**Type:** ${typeLabel}\n**Content-Type:** ${resource.contentType}\n**Size:** ${resource.size} bytes\n\n---\n\n${resource.content}`
 
   return toolOkJson('read_skill_resource', output)
 }

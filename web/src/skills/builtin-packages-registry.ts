@@ -21,6 +21,13 @@ import type { BuiltinSkillsManifest } from '@creatorweave/skills-system'
 
 export const BUNDLED_SKILL_FILES: Record<string, string> = {}
 
+/**
+ * Binary files stored as base64 strings.
+ * Key format: "skill-name/path.b64" (the .b64 suffix indicates base64 encoding).
+ * At materialize time, .b64 files are decoded and written without the .b64 suffix.
+ */
+export const BUNDLED_SKILL_BINARY_FILES: Record<string, string> = {}
+
 // ============================================================================
 // App Version (update on each release that changes builtin skills)
 // ============================================================================
@@ -32,21 +39,35 @@ const APP_VERSION = __APP_VERSION__ // injected by Vite define plugin
 // ============================================================================
 
 /**
- * Register a single file for a builtin skill.
+ * Register a single text file for a builtin skill.
  */
 function registerFile(skillName: string, relativePath: string, content: string): void {
   BUNDLED_SKILL_FILES[`${skillName}/${relativePath}`] = content
 }
 
 /**
+ * Register a single binary file for a builtin skill (stored as base64).
+ * The path should end with .b64 to indicate base64 encoding.
+ * At materialize time, the .b64 suffix is stripped and content is decoded.
+ */
+function registerBinaryFile(skillName: string, relativePath: string, base64Content: string): void {
+  BUNDLED_SKILL_BINARY_FILES[`${skillName}/${relativePath}`] = base64Content
+}
+
+/**
  * Register all files for a builtin skill at once.
+ * Supports both text files and binary files (base64).
  */
 function registerSkill(
   skillName: string,
-  files: Array<{ path: string; content: string }>
+  files: Array<{ path: string; content: string; binary?: boolean }>
 ): void {
-  for (const { path, content } of files) {
-    registerFile(skillName, path, content)
+  for (const { path, content, binary } of files) {
+    if (binary) {
+      registerBinaryFile(skillName, path, content)
+    } else {
+      registerFile(skillName, path, content)
+    }
   }
 }
 
@@ -74,6 +95,40 @@ registerSkill('cw:nol-editor', [
 ])
 
 // ============================================================================
+// word-editor — LLM Wiki mode docx editor (89 EditOps)
+// ============================================================================
+
+// Text files — imported as raw strings via Vite's ?raw query
+import wordEditorSkillMd from './builtin-packages/word-editor/SKILL.md?raw'
+import wordEditorInit from './builtin-packages/word-editor/scripts/__init__.py?raw'
+import wordEditorIngest from './builtin-packages/word-editor/scripts/ingest.py?raw'
+import wordEditorLint from './builtin-packages/word-editor/scripts/lint.py?raw'
+import wordEditorModel from './builtin-packages/word-editor/scripts/model.py?raw'
+import wordEditorView from './builtin-packages/word-editor/scripts/view.py?raw'
+import wordEditorWriteback from './builtin-packages/word-editor/scripts/writeback.py?raw'
+
+import wordEditorDesign from './builtin-packages/word-editor/references/DESIGN.md?raw'
+import wordEditorSchema from './builtin-packages/word-editor/references/SCHEMA.md?raw'
+
+// Binary file — blank.docx stored as base64 text
+import wordEditorBlankB64 from './builtin-packages/word-editor/blank.docx.b64?raw'
+
+registerSkill('cw:word-editor', [
+  { path: 'SKILL.md', content: wordEditorSkillMd },
+  { path: 'scripts/__init__.py', content: wordEditorInit },
+  { path: 'scripts/ingest.py', content: wordEditorIngest },
+  { path: 'scripts/lint.py', content: wordEditorLint },
+  { path: 'scripts/model.py', content: wordEditorModel },
+  { path: 'scripts/view.py', content: wordEditorView },
+  { path: 'scripts/writeback.py', content: wordEditorWriteback },
+
+  { path: 'references/DESIGN.md', content: wordEditorDesign },
+  { path: 'references/SCHEMA.md', content: wordEditorSchema },
+  // Binary: blank.docx stored as base64, materialized as blank.docx (decoded)
+  { path: 'blank.docx.b64', content: wordEditorBlankB64, binary: true },
+])
+
+// ============================================================================
 // Manifest — the single source of truth for what's bundled
 // ============================================================================
 
@@ -86,15 +141,33 @@ async function computeHash(content: string): Promise<string> {
 }
 
 /**
+ * Decode a base64 string to Uint8Array.
+ */
+function base64ToUint8Array(base64: string): Uint8Array {
+  const binaryString = atob(base64)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes
+}
+
+/**
  * Build the manifest dynamically from registered files.
  * Called once at startup.
  */
 export async function buildBundledManifest(): Promise<BuiltinSkillsManifest> {
   const skills: BuiltinSkillsManifest['skills'] = []
 
-  // Group files by skill name
+  // Group files by skill name (from both text and binary maps)
   const skillNames = new Set<string>()
   for (const key of Object.keys(BUNDLED_SKILL_FILES)) {
+    const slashIdx = key.indexOf('/')
+    if (slashIdx > 0) {
+      skillNames.add(key.substring(0, slashIdx))
+    }
+  }
+  for (const key of Object.keys(BUNDLED_SKILL_BINARY_FILES)) {
     const slashIdx = key.indexOf('/')
     if (slashIdx > 0) {
       skillNames.add(key.substring(0, slashIdx))
@@ -105,6 +178,7 @@ export async function buildBundledManifest(): Promise<BuiltinSkillsManifest> {
     const prefix = `${skillName}/`
     const files: BuiltinSkillsManifest['skills'][0]['files'] = []
 
+    // Text files
     for (const [key, content] of Object.entries(BUNDLED_SKILL_FILES)) {
       if (!key.startsWith(prefix)) continue
       const path = key.substring(prefix.length)
@@ -112,6 +186,21 @@ export async function buildBundledManifest(): Promise<BuiltinSkillsManifest> {
         path,
         hash: await computeHash(content),
         size: new TextEncoder().encode(content).length,
+      })
+    }
+
+    // Binary files — strip .b64 suffix for the manifest path
+    for (const [key, content] of Object.entries(BUNDLED_SKILL_BINARY_FILES)) {
+      if (!key.startsWith(prefix)) continue
+      const rawPath = key.substring(prefix.length)
+      // .b64 suffix is an encoding hint; the actual file path strips it
+      const path = rawPath.endsWith('.b64') ? rawPath.slice(0, -4) : rawPath
+      // Decode base64 to get actual binary size
+      const binaryData = base64ToUint8Array(content)
+      files.push({
+        path,
+        hash: await computeHash(content), // hash the base64 string for consistency
+        size: binaryData.length,
       })
     }
 

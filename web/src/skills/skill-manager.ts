@@ -104,6 +104,10 @@ export class SkillManager {
           if (!existing) {
             console.log('[SkillManager] Saving bundled skill:', skill.id)
             await storage.saveSkill(skill, skillMd)
+          } else if (existing.version !== skill.version) {
+            // Builtin skill version changed — update instruction in SQLite
+            console.log(`[SkillManager] Updating bundled skill: ${skill.id} (${existing.version} → ${skill.version})`)
+            await storage.saveSkill(skill, skillMd)
           }
         }
       } catch (error) {
