@@ -7,6 +7,9 @@ export const fileTree = {
     },
     copyPath: "경로 복사",
     inspectElement: "요소 검사",
+    deleteFile: "삭제",
+    deleteConfirm: "\"{name}\"을(를) 삭제하시겠습니까?",
+    deleteFileTitle: "삭제 확인",
     emptyStateHint: "로컬 디렉터리를 선택하지 않고도 계속할 수 있습니다",
     emptyStateDescription:
       "Pure OPFS 샌드박스 모드에서는 파일 변경 사항이 여기에 표시됩니다",

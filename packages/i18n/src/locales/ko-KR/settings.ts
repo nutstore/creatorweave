@@ -209,6 +209,7 @@ export const settings = {
       review: "검토",
       rejectAll: "모든 변경 거부",
       reject: "거부",
+      rejectSelectedCount: "거부 ({count})",
       approveSelected: "선택 항목 승인",
       approvingInProgress: "승인 중...",
       syncComplete: "완료!",
@@ -217,7 +218,7 @@ export const settings = {
       totalSize: "총: {size}",
       confirmRejectTitle: "거부 확인",
       confirmRejectMessage:
-        "모든 변경을 거부하시겠습니까? 이 작업은 취소할 수 없습니다.",
+        "선택한 변경을 거부하시겠습니까? 이 작업은 취소할 수 없습니다.",
       cancel: "취소",
       confirmReject: "거부 확인",
       reviewSuccess: "검토 성공!",

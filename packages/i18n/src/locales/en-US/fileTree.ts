@@ -7,6 +7,9 @@ export const fileTree = {
     },
     copyPath: "Copy Path",
     inspectElement: "Inspect Element",
+    deleteFile: "Delete",
+    deleteConfirm: "Are you sure you want to delete \"{name}\"?",
+    deleteFileTitle: "Confirm Delete",
     emptyStateHint: "You can continue without selecting a local directory",
     emptyStateDescription:
       "File changes will appear here in pure OPFS sandbox mode",

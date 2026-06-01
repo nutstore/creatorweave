@@ -210,6 +210,7 @@ export const settings = {
       review: "Review",
       rejectAll: "Reject All Changes",
       reject: "Reject",
+      rejectSelectedCount: "Reject ({count})",
       approveSelected: "Approve Selected",
       approvingInProgress: "Approving...",
       syncComplete: "Done!",
@@ -218,7 +219,7 @@ export const settings = {
       totalSize: "Total: {size}",
       confirmRejectTitle: "Confirm Rejection",
       confirmRejectMessage:
-        "Are you sure you want to reject all changes? This cannot be undone.",
+        "Are you sure you want to reject the selected changes? This cannot be undone.",
       cancel: "Cancel",
       confirmReject: "Confirm Rejection",
       reviewSuccess: "Review successful!",

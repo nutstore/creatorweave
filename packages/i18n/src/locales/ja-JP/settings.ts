@@ -212,6 +212,7 @@ export const settings = {
       review: "レビュー",
       rejectAll: "すべての変更を拒否",
       reject: "拒否",
+      rejectSelectedCount: "拒否 ({count})",
       approveSelected: "選択したものを承認",
       approvingInProgress: "承認中...",
       syncComplete: "完了!",
@@ -220,7 +221,7 @@ export const settings = {
       totalSize: "合計: {size}",
       confirmRejectTitle: "拒否の確認",
       confirmRejectMessage:
-        "すべての変更を拒否してもよろしいですか？この操作は元に戻せません。",
+        "選択した変更を拒否してもよろしいですか？この操作は元に戻せません。",
       cancel: "キャンセル",
       confirmReject: "拒否を確認",
       reviewSuccess: "レビュー成功！",
