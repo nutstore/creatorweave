@@ -1,9 +1,15 @@
 /**
- * delete tool - Soft delete file(s) through OPFS pending pipeline.
+ * delete tool - Soft delete file(s) / directory(ies) through OPFS pending pipeline.
  *
  * This tool does NOT delete files from native filesystem immediately.
  * It marks files as pending deletion in OPFS workspace. Actual deletion
  * happens when user triggers sync-to-disk.
+ *
+ * Supports:
+ * - Single file or directory deletion via `path`
+ * - Batch deletion via `paths`
+ * - Recursive directory deletion via `recursive: true`
+ * - Dry-run preview via `dry_run: true`
  */
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
@@ -26,12 +32,18 @@ export const deleteDefinition: ToolDefinition = {
       properties: {
         path: {
           type: 'string',
-          description: 'Single file path to delete (soft delete)',
+          description: 'Single file or directory path to delete (soft delete)',
         },
         paths: {
           type: 'array',
-          description: 'Multiple file paths to delete (batch soft delete)',
+          description: 'Multiple file/directory paths to delete (batch soft delete)',
           items: { type: 'string' },
+        },
+        recursive: {
+          type: 'boolean',
+          description:
+            'Delete directories recursively. When true, a directory path will delete all contained files and subdirectories. Default: false.',
+          default: false,
         },
         dry_run: {
           type: 'boolean',
@@ -72,10 +84,108 @@ function dedupePaths(rawPaths: string[]): string[] {
   return Array.from(unique)
 }
 
+/**
+ * Check if a path might be a directory (heuristic).
+ * Trailing slash is a strong signal; extensionless last segment is a weak signal.
+ * Always confirmed via backend.listDir before acting.
+ */
+function mightBeDirectory(path: string): boolean {
+  if (path.endsWith('/')) return true
+  const stripped = path.startsWith('vfs://') ? path.split('/').slice(2).join('/') : path
+  const lastSegment = stripped.split('/').pop() || ''
+  return lastSegment.length > 0 && !lastSegment.includes('.')
+}
+
+/**
+ * Resolve a target to either a file deletion or a directory deletion.
+ * Returns the list of individual file paths that were deleted.
+ */
+async function deleteTarget(
+  target: string,
+  context: Parameters<typeof resolveVfsTarget>[1],
+  recursive: boolean,
+): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {
+  const resolved = await resolveVfsTarget(target, context, 'delete')
+
+  if (resolved.kind === 'agent' && isProtectedAgentCoreFile(resolved.path)) {
+    throw new Error(`Protected agent file cannot be deleted: ${resolved.path}`)
+  }
+
+  // Always try listDir first for an authoritative directory check.
+  // Skip only when clearly a file path (has extension) and non-recursive.
+  const tryListDir = mightBeDirectory(target) || recursive
+  let isDirectory = false
+
+  if (tryListDir) {
+    try {
+      await resolved.backend.listDir(resolved.path)
+      isDirectory = true
+    } catch {
+      // listDir failed → not a directory (or multi-root routing issue)
+    }
+  }
+
+  if (!isDirectory) {
+    // Regular file deletion
+    await resolved.backend.deleteFile(resolved.path)
+    return { deletedFiles: [target], deletedDirs: [] }
+  }
+
+  // Directory deletion (non-recursive guard)
+  if (!recursive) {
+    throw new Error(
+      `"${target}" is a directory. Use recursive: true to delete directories.`,
+    )
+  }
+
+  // Recursive directory deletion
+  if (!resolved.backend.deleteDir) {
+    return manualDirDelete(resolved.backend, resolved.path)
+  }
+
+  const result = await resolved.backend.deleteDir(resolved.path)
+  return result
+}
+
+/**
+ * Fallback directory deletion for backends without deleteDir.
+ * Lists all files recursively and deletes them individually.
+ */
+async function manualDirDelete(
+  backend: { deleteFile: (p: string) => Promise<void>; listDir: (p: string, opts?: any) => Promise<Array<{ name: string; path: string; kind: string }>> },
+  dirPath: string,
+): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {
+  const deletedFiles: string[] = []
+  const deletedDirs: string[] = []
+
+  const entries = await backend.listDir(dirPath, { recursive: true, maxDepth: 100 })
+  const files = entries.filter((e) => e.kind === 'file').map((e) => e.path)
+  const dirs = entries
+    .filter((e) => e.kind === 'directory')
+    .sort((a, b) => b.path.split('/').length - a.path.split('/').length)
+
+  for (const filePath of files) {
+    try {
+      await backend.deleteFile(filePath)
+      deletedFiles.push(filePath)
+    } catch {
+      // Skip files that fail
+    }
+  }
+
+  for (const dir of dirs) {
+    deletedDirs.push(dir.path)
+  }
+  deletedDirs.push(dirPath)
+
+  return { deletedFiles, deletedDirs }
+}
+
 export const deleteExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const paths = args.paths as string[] | undefined
   const dryRun = args.dry_run === true
+  const recursive = args.recursive === true
 
   const requestedTargets = paths && Array.isArray(paths) && paths.length > 0 ? paths : path ? [path] : []
 
@@ -97,6 +207,32 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   }
 
   if (dryRun) {
+    // For dry run, also expand directories if recursive is set
+    if (recursive) {
+      const expandedTargets: string[] = []
+      for (const target of targets) {
+        try {
+          const resolved = await resolveVfsTarget(target, context, 'list')
+          // listDir will throw if path is not a directory — if it succeeds, it's a directory
+          const allEntries = await resolved.backend.listDir(resolved.path, { recursive: true, maxDepth: 100 })
+          // It's a directory — expand
+          const files = allEntries.filter((e) => e.kind === 'file').map((e) => e.path)
+          const dirs = allEntries.filter((e) => e.kind === 'directory').map((e) => e.path)
+          expandedTargets.push(...files, ...dirs, target)
+        } catch {
+          // Not a directory or doesn't exist — treat as single file
+          expandedTargets.push(target)
+        }
+      }
+      return JSON.stringify({
+        success: true,
+        dryRun: true,
+        total: expandedTargets.length,
+        targets: expandedTargets,
+        message: `Dry run: ${expandedTargets.length} item(s) would be deleted (recursive).`,
+      })
+    }
+
     return JSON.stringify({
       success: true,
       dryRun: true,
@@ -107,24 +243,27 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   }
 
   const deleted: string[] = []
+  const deletedDirs: string[] = []
   const failed: Array<{ path: string; error: string }> = []
 
   for (const target of targets) {
     try {
-      const resolved = await resolveVfsTarget(target, context, 'delete')
+      const result = await deleteTarget(target, context, recursive)
 
-      if (resolved.kind === 'agent' && isProtectedAgentCoreFile(resolved.path)) {
-        throw new Error(`Protected agent file cannot be deleted: ${resolved.path}`)
-      }
-
-      await resolved.backend.deleteFile(resolved.path)
+      deleted.push(...result.deletedFiles)
+      deletedDirs.push(...result.deletedDirs)
 
       const session = useRemoteStore.getState().session
       if (session) {
-        session.broadcastFileChange(target, 'delete', `Deleted: ${target}`)
+        // Broadcast each deleted file
+        for (const filePath of result.deletedFiles) {
+          session.broadcastFileChange(filePath, 'delete', `Deleted: ${filePath}`)
+        }
+        // Broadcast directory removal
+        if (result.deletedDirs.length > 0) {
+          session.broadcastFileChange(target, 'delete', `Deleted: ${target}`)
+        }
       }
-
-      deleted.push(target)
     } catch (error) {
       failed.push({
         path: target,
@@ -137,8 +276,9 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
 
   return JSON.stringify({
     success: failed.length === 0,
-    total: targets.length,
+    total: deleted.length + deletedDirs.length + failed.length,
     deleted,
+    deletedDirs,
     failed,
     status: 'pending',
     pendingCount: pendingChanges.length,
@@ -155,6 +295,7 @@ export const deletePromptDoc: ToolPromptDoc = {
   lines: [
     '- `delete(path)` - Soft delete single file (marks as pending deletion)',
     '- `delete(paths)` - Batch soft delete multiple files',
+    '- `delete(..., recursive=true)` - Delete directory and all contents recursively',
     '- `delete(..., dry_run=true)` - Preview deletion targets without making changes',
   ],
 }

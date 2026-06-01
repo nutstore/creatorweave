@@ -61,6 +61,53 @@ export class AgentBackend implements VfsBackend {
     await this.agentManager.deletePath(this.agentId, path)
   }
 
+  async deleteDir(path: string): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {
+    const deletedFiles: string[] = []
+    const deletedDirs: string[] = []
+
+    // Collect all file/dir paths recursively (for deletion, not reporting)
+    const filePaths: string[] = []
+    const collectEntries = async (dirPath: string) => {
+      const entries = await this.listDir(dirPath)
+      for (const entry of entries) {
+        if (entry.kind === 'file') {
+          filePaths.push(entry.path)
+        } else {
+          await collectEntries(entry.path)
+        }
+      }
+    }
+
+    await collectEntries(path)
+
+    // Delete files, only report successful deletions
+    for (const filePath of filePaths) {
+      try {
+        await this.agentManager.deletePath(this.agentId, filePath)
+        deletedFiles.push(filePath)
+      } catch {
+        // Skip files that fail to delete
+      }
+    }
+
+    // Remove the directory recursively via OPFS
+    const handle = await this.agentManager.getDirectoryHandle(this.agentId, path, { allowMissing: true })
+    if (handle.exists && handle.handle) {
+      // Get parent and remove
+      const parts = path.split('/').filter(Boolean)
+      if (parts.length > 0) {
+        const parentPath = parts.slice(0, -1).join('/')
+        const parentResult = await this.agentManager.getDirectoryHandle(this.agentId, parentPath, { allowMissing: true })
+        if (parentResult.handle) {
+          await parentResult.handle.removeEntry(parts[parts.length - 1], { recursive: true })
+        }
+      }
+    }
+    deletedDirs.push(path)
+
+    return { deletedFiles, deletedDirs }
+  }
+
   async listDir(path: string, _options?: VfsListOptions): Promise<VfsDirEntry[]> {
     const handle = await this.agentManager.getDirectoryHandle(this.agentId, path, { allowMissing: true })
     if (!handle.exists || !handle.handle) return []

@@ -115,6 +115,50 @@ export class AssetsBackend implements VfsBackend {
     await parentDir.removeEntry(fileName)
   }
 
+  async deleteDir(path: string): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {
+    const dir = await this.getDir()
+    const deletedFiles: string[] = []
+    const deletedDirs: string[] = []
+
+    const parts = path.split('/').filter(Boolean)
+    if (parts.length === 0) {
+      // Cannot delete the root assets directory
+      return { deletedFiles, deletedDirs }
+    }
+
+    // Navigate to the target directory
+    let targetDir = dir
+    for (const segment of parts) {
+      targetDir = await targetDir.getDirectoryHandle(segment)
+    }
+
+    // Collect all entries recursively
+    const collectEntries = async (currentDir: FileSystemDirectoryHandle, currentPath: string) => {
+      for await (const [name, entry] of (currentDir as any).entries()) {
+        const entryPath = currentPath ? `${currentPath}/${name}` : name
+        if (entry.kind === 'file') {
+          deletedFiles.push(entryPath)
+        } else {
+          await collectEntries(entry, entryPath)
+          deletedDirs.push(entryPath)
+        }
+      }
+    }
+
+    await collectEntries(targetDir, path)
+
+    // Remove the directory recursively
+    let parentDir = dir
+    for (let i = 0; i < parts.length - 1; i++) {
+      parentDir = await parentDir.getDirectoryHandle(parts[i])
+    }
+    const dirName = parts[parts.length - 1]
+    await parentDir.removeEntry(dirName, { recursive: true })
+    deletedDirs.push(path)
+
+    return { deletedFiles, deletedDirs }
+  }
+
   async listDir(path: string, _options?: VfsListOptions): Promise<VfsDirEntry[]> {
     const dir = await this.getDir()
     let targetDir = dir

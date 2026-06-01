@@ -97,6 +97,13 @@ export interface VfsBackend {
   deleteFile(path: string): Promise<void>
 
   /**
+   * Delete a directory and all its contents recursively.
+   * If the path points to a file, delegates to deleteFile.
+   * @param path directory path to delete
+   */
+  deleteDir?(path: string): Promise<{ deletedFiles: string[]; deletedDirs: string[] }>
+
+  /**
    * List directory contents.
    * @param path subdirectory path (empty string = root)
    */
