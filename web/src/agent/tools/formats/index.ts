@@ -10,10 +10,12 @@
  */
 
 import { registerFormatHandler } from '../format-registry'
+import { docxHandler } from './docx'
 import { nolHandler } from './nol'
 import { pdfHandler } from './pdf'
 import { zipHandler } from './zip'
 
+registerFormatHandler(docxHandler)
 registerFormatHandler(nolHandler)
 registerFormatHandler(pdfHandler)
 registerFormatHandler(zipHandler)
