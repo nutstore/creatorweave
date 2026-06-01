@@ -1419,8 +1419,12 @@ export class WorkspaceRuntime {
           restored = await this.restorePendingModifyFromBaseline(normalizedPath)
         }
         if (!restored) {
-          restoreFailures.push(change.path)
-          continue
+          // Ghost delete: file never existed on disk, just clean up the record.
+          const hadBaseline = await this.hasBaselineFile(normalizedPath)
+          if (hadBaseline) {
+            restoreFailures.push(change.path)
+            continue
+          }
         }
         await this.deleteFromBaselineDirIfExists(normalizedPath)
       }
@@ -1458,7 +1462,21 @@ export class WorkspaceRuntime {
         if (change.type === 'create') {
           await this.deleteFromFilesDirIfExists(normalizedPath)
           await this.deleteFromBaselineDirIfExists(normalizedPath)
-        } else if (change.type === 'modify' || change.type === 'delete') {
+        } else if (change.type === 'delete') {
+          // Fast-path for ghost deletes: check baseline first to skip expensive restore attempts.
+          const hadBaseline = await this.hasBaselineFile(normalizedPath)
+          if (hadBaseline) {
+            let restored = await this.restorePendingModifyFromNative(normalizedPath)
+            if (!restored) {
+              restored = await this.restorePendingModifyFromBaseline(normalizedPath)
+            }
+            if (!restored) {
+              failedPaths.push(change.path)
+              continue
+            }
+          }
+          await this.deleteFromBaselineDirIfExists(normalizedPath)
+        } else if (change.type === 'modify') {
           let restored = await this.restorePendingModifyFromNative(normalizedPath)
           if (!restored) {
             restored = await this.restorePendingModifyFromBaseline(normalizedPath)
@@ -1506,22 +1524,20 @@ export class WorkspaceRuntime {
       }
       await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
     } else if (existing?.type === 'delete') {
-      let restored = await this.restorePendingModifyFromNative(normalizedTargetPath)
-      if (!restored) {
-        restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
-      }
-      if (!restored) {
-        // If the delete record has no baseline and no native copy, the file
-        // never existed on disk (e.g. a ghost delete from a pure-OPFS create→delete
-        // cycle). "Rejecting" this delete is a no-op — just remove the pending entry
-        // instead of blocking the user with an error.
-        const hadBaseline = await this.hasBaselineFile(normalizedTargetPath)
-        if (hadBaseline) {
+      // Fast-path for ghost deletes: if there's no baseline file at all,
+      // the file never existed on native disk — skip expensive restore attempts.
+      const hadBaseline = await this.hasBaselineFile(normalizedTargetPath)
+      if (hadBaseline) {
+        let restored = await this.restorePendingModifyFromNative(normalizedTargetPath)
+        if (!restored) {
+          restored = await this.restorePendingModifyFromBaseline(normalizedTargetPath)
+        }
+        if (!restored) {
           throw new Error(`无法拒绝删除 "${path}"：缺少本地文件基线，请先恢复目录访问权限`)
         }
-        // No baseline → file never existed on disk → safe to just discard the record.
+        await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
       }
-      await this.deleteFromBaselineDirIfExists(normalizedTargetPath)
+      // No baseline → file never existed on disk → safe to just discard the record.
     }
     await this.pendingManager.removeByPath(existing?.path || normalizedTargetPath)
     this.metadata.lastAccessedAt = Date.now()

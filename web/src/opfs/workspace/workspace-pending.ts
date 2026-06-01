@@ -419,7 +419,7 @@ export class WorkspacePendingManager {
   }
 
   /**
-   * Delete file from filesystem
+   * Delete file from filesystem and clean up empty parent directories.
    */
   private async deleteFile(
     directoryHandle: FileSystemDirectoryHandle,
@@ -428,15 +428,42 @@ export class WorkspacePendingManager {
     const parts = path.split('/')
     let current = directoryHandle
 
-    // Navigate to parent directory
+    // Navigate to parent directory, recording the handle chain for cleanup
+    const handleChain: Array<{ handle: FileSystemDirectoryHandle; name: string }> = []
     for (let i = 0; i < parts.length - 1; i++) {
       if (!parts[i]) continue
+      handleChain.push({ handle: current, name: parts[i] })
       current = await current.getDirectoryHandle(parts[i])
     }
 
     // Remove file
     const fileName = parts[parts.length - 1]
     await current.removeEntry(fileName)
+
+    // Clean up empty parent directories (bottom-up)
+    // Walk back from deepest parent to the root handle
+    for (let i = handleChain.length - 1; i >= 0; i--) {
+      const { handle, name } = handleChain[i]
+      try {
+        const dir = await handle.getDirectoryHandle(name)
+        // Check if directory is empty
+        let isEmpty = true
+        // @ts-ignore — for await on directory entries
+        for await (const _ of dir.entries()) {
+          isEmpty = false
+          break
+        }
+        if (isEmpty) {
+          await handle.removeEntry(name, { recursive: false })
+        } else {
+          // Directory not empty — stop cleanup
+          break
+        }
+      } catch {
+        // Directory already gone or inaccessible — stop cleanup
+        break
+      }
+    }
   }
 
   /**
