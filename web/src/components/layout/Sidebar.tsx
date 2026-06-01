@@ -39,6 +39,7 @@ import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
+import { useOPFSStore } from '@/store/opfs.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
@@ -323,6 +324,7 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   rootsLength,
   onFileSelect,
   onInspect,
+  onFileDelete,
   onRevealComplete,
   collapsed,
   onToggleCollapse,
@@ -333,6 +335,7 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
   rootsLength: number
   onFileSelect: (fullPath: string, handle: FileSystemFileHandle | null) => void
   onInspect?: ((fullPath: string, handle: FileSystemFileHandle | null) => void) | undefined
+  onFileDelete?: (rootName: string, path: string, node: { kind: 'file' | 'directory'; handle: FileSystemFileHandle | FileSystemDirectoryHandle | null }, pos: { x: number; y: number }) => void
   onRevealComplete?: (() => void) | undefined
   collapsed: boolean
   onToggleCollapse: (rootName: string) => void
@@ -351,6 +354,13 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
         }
       : () => {},
     [onInspect, root.name]
+  )
+
+  const handleDelete = useCallback(
+    (path: string, node: { kind: 'file' | 'directory'; handle: FileSystemFileHandle | FileSystemDirectoryHandle | null }, pos: { x: number; y: number }) => {
+      onFileDelete?.(root.name, path, node, pos)
+    },
+    [onFileDelete, root.name]
   )
 
   const rootRevealTarget = useMemo(() => {
@@ -392,6 +402,7 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
           onFileSelect={handleFileSelect}
           selectedPath={rootSelectedPath}
           onInspect={handleInspect}
+          onDelete={handleDelete}
           revealTarget={rootRevealTarget}
           onRevealComplete={onRevealComplete}
           showHeader={rootsLength <= 1}
@@ -414,6 +425,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
   rootsLength,
   onFileSelect,
   onInspect,
+  onFileDelete,
   onRevealComplete,
   currentPendingCount,
   refreshPending,
@@ -427,6 +439,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
   rootsLength: number
   onFileSelect: (fullPath: string, handle: FileSystemFileHandle | null) => void
   onInspect?: ((fullPath: string, handle: FileSystemFileHandle | null) => void) | undefined
+  onFileDelete?: (rootName: string, path: string, node: { kind: 'file' | 'directory'; handle: FileSystemFileHandle | FileSystemDirectoryHandle | null }, pos: { x: number; y: number }) => void
   onRevealComplete?: (() => void) | undefined
   currentPendingCount: number
   refreshPending: () => Promise<void>
@@ -524,6 +537,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
                 rootsLength={rootsLength}
                 onFileSelect={onFileSelect}
                 onInspect={onInspect}
+                onFileDelete={onFileDelete}
                 onRevealComplete={onRevealComplete}
                 collapsed={collapsedRoots.has(root.name)}
                 onToggleCollapse={handleToggleCollapse}
@@ -676,6 +690,15 @@ export const Sidebar = memo(function Sidebar({
   const conversationRatio = panelSizes.conversationRatio
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
   const [clearingConversations, setClearingConversations] = useState(false)
+  const [deleteFileDialogOpen, setDeleteFileDialogOpen] = useState(false)
+  const [pendingDeleteTarget, setPendingDeleteTarget] = useState<{
+    rootName: string
+    path: string
+    fileName: string
+    handle: FileSystemFileHandle | FileSystemDirectoryHandle | null
+  } | null>(null)
+  const [deleteFilePos, setDeleteFilePos] = useState<{ x: number; y: number } | null>(null)
+  const deleteFileConfirmRef = useRef<HTMLDivElement>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [composing, setComposing] = useState(false)
@@ -776,6 +799,37 @@ export const Sidebar = memo(function Sidebar({
     }
   }, [confirmDeleteId])
 
+  // Close file delete confirmation when clicking outside or pressing Escape
+  useEffect(() => {
+    if (!deleteFileDialogOpen) return
+
+    const handleClick = (e: MouseEvent) => {
+      if (deleteFileConfirmRef.current && !deleteFileConfirmRef.current.contains(e.target as Node)) {
+        setDeleteFileDialogOpen(false)
+        setPendingDeleteTarget(null)
+        setDeleteFilePos(null)
+      }
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setDeleteFileDialogOpen(false)
+        setPendingDeleteTarget(null)
+        setDeleteFilePos(null)
+      }
+    }
+
+    // Delay to avoid the triggering click that opened the confirm
+    requestAnimationFrame(() => {
+      document.addEventListener('mousedown', handleClick)
+      document.addEventListener('keydown', handleKeyDown)
+    })
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [deleteFileDialogOpen])
+
   // Refresh pending changes when switching to pending tab
   const refreshPending = useCallback(async () => {
     const { refreshPendingChanges } = useConversationContextStore.getState()
@@ -788,6 +842,16 @@ export const Sidebar = memo(function Sidebar({
       closeMobileSidebar()
     },
     [onFileSelect, closeMobileSidebar]
+  )
+
+  const handleFileDelete = useCallback(
+    (rootName: string, path: string, node: { kind: 'file' | 'directory'; handle: FileSystemFileHandle | FileSystemDirectoryHandle | null }, pos: { x: number; y: number }) => {
+      const fileName = path.split('/').pop() || path
+      setPendingDeleteTarget({ rootName, path, fileName, handle: node.handle })
+      setDeleteFilePos(pos)
+      setDeleteFileDialogOpen(true)
+    },
+    []
   )
 
   // Horizontal drag (sidebar width)
@@ -1100,6 +1164,7 @@ export const Sidebar = memo(function Sidebar({
               rootsLength={roots.length}
               onFileSelect={handleFileSelect}
               onInspect={onInspect}
+              onFileDelete={handleFileDelete}
               onRevealComplete={onRevealComplete}
               currentPendingCount={currentPendingCount}
               refreshPending={refreshPending}
@@ -1153,6 +1218,53 @@ export const Sidebar = memo(function Sidebar({
           </BrandDialogFooter>
         </BrandDialogContent>
       </BrandDialog>
+
+      {/* Delete File Confirmation Portal */}
+      {deleteFileDialogOpen && deleteFilePos && pendingDeleteTarget && createPortal(
+        <div
+          ref={deleteFileConfirmRef}
+          className="fixed z-[9999] rounded-lg border border-danger/30 bg-card p-3 shadow-xl"
+          style={{
+            left: Math.max(8, deleteFilePos.x - 80),
+            top: Math.max(8, deleteFilePos.y - 60),
+          }}
+        >
+          <p className="mb-2 text-xs text-secondary">
+            {t('fileTree.deleteConfirm', { name: pendingDeleteTarget.fileName })}
+          </p>
+          <div className="flex gap-2">
+            <button
+              className="rounded border border-danger/30 bg-danger/10 px-3 py-1 text-xs text-danger hover:bg-danger/20"
+              onClick={async () => {
+                try {
+                  const { rootName, path, handle } = pendingDeleteTarget
+                  const fullPath = `${rootName}/${path}`
+                  const workspaceId = useConversationContextStore.getState().activeWorkspaceId
+                  await useOPFSStore.getState().deleteFile(fullPath, handle instanceof FileSystemDirectoryHandle ? handle : null, workspaceId, activeProjectId)
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : t('common.error'))
+                }
+                setDeleteFileDialogOpen(false)
+                setPendingDeleteTarget(null)
+                setDeleteFilePos(null)
+              }}
+            >
+              {t('fileTree.deleteFile')}
+            </button>
+            <button
+              className="rounded border border-neutral-200 bg-white px-3 py-1 text-xs text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
+              onClick={() => {
+                setDeleteFileDialogOpen(false)
+                setPendingDeleteTarget(null)
+                setDeleteFilePos(null)
+              }}
+            >
+              {t('common.cancel')}
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Horizontal drag divider (sidebar width) */}
       {!isMobile && (

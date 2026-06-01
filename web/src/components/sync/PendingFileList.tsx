@@ -39,8 +39,8 @@ interface PendingFileListProps {
   selectedPath?: string
   /** Callback when user requests sync */
   onSync?: (selectedPaths: string[]) => void
-  /** Callback when user requests clear all */
-  onClear?: () => void
+  /** Callback when user requests clear/reject selected */
+  onClear?: (selectedPaths: string[]) => void
   /** Callback when user removes a single file */
   onRemoveFile?: (path: string) => void
   /** Whether sync operation is in progress */
@@ -459,9 +459,9 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
-          <BrandButton variant="outline" onClick={onClear} disabled={isSyncing}>
+          <BrandButton variant="outline" onClick={() => onClear?.(Array.from(selectedItems))} disabled={isSyncing || !hasSelection}>
             <Trash2 className="h-4 w-4" />
-            {t('settings.pendingSyncPanel.reject')}
+            {t('settings.pendingSyncPanel.rejectSelectedCount', { count: selectedCount })}
           </BrandButton>
           <BrandButton
             variant="primary"

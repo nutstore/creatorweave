@@ -242,7 +242,7 @@ export function PendingSyncPanel() {
     }
   }, [discardPendingPath, t])
 
-  // Handle reject all (must be defined before condition returns)
+  // Handle reject selected (must be defined before condition returns)
   const handleClear = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0) {
       setSelectedItems(new Set())
@@ -252,7 +252,14 @@ export function PendingSyncPanel() {
       return
     }
 
-    const paths = pendingChanges.changes.map((c) => c.path)
+    // Only reject selected items (consistent with approve button behavior)
+    const paths = pendingChanges.changes
+      .filter((c) => selectedItems.has(c.path))
+      .map((c) => c.path)
+    if (paths.length === 0) {
+      setShowClearConfirm(false)
+      return
+    }
     const { discardPendingPaths } = useConversationContextStore.getState()
     const result = await discardPendingPaths(paths)
 
@@ -267,7 +274,7 @@ export function PendingSyncPanel() {
     }
 
     toast.success(t('settings.pendingSyncPanel.rejectedAllSuccess'))
-  }, [pendingChanges, t])
+  }, [pendingChanges, selectedItems, t])
 
   const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
     path: conflict.path,
@@ -774,10 +781,10 @@ export function PendingSyncPanel() {
             variant="outline"
             className="h-8 flex-1 text-xs"
             onClick={() => setShowClearConfirm(true)}
-            disabled={isSyncing}
+            disabled={isSyncing || selectedCount === 0}
             aria-label={t('settings.pendingSyncPanel.rejectAll')}
           >
-            {t('settings.pendingSyncPanel.reject')}
+            {t('settings.pendingSyncPanel.rejectSelectedCount', { count: selectedCount })}
           </BrandButton>
           <BrandButton
             variant="primary"

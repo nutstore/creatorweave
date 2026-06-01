@@ -120,7 +120,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   const pendingChanges = useConversationContextStore((state) => state.pendingChanges)
   const previewSelectedPath = useConversationContextStore((state) => state.previewSelectedPath)
   const clearPreviewSelectedPath = useConversationContextStore((state) => state.clearPreviewSelectedPath)
-  const clearChanges = useConversationContextStore((state) => state.clearChanges)
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
   const [selectedFile, setSelectedFile] = useState<FileChange | null>(null)
   const selectedPath = selectedFile?.path
@@ -574,14 +573,20 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   /**
    * Handle clear all pending changes (user decides not to sync)
    */
-  const handleClear = useCallback(async () => {
-    await clearChanges()
+  const handleClear = useCallback(async (selectedPaths: string[]) => {
+    if (selectedPaths.length === 0) return
+    const { discardPendingPaths } = useConversationContextStore.getState()
+    await discardPendingPaths(selectedPaths)
     setSelectedFile(null)
     setSyncError(null)
     setSelectedItems(new Set())
     setConflictPaths(new Set())
-    setCommentsByPath({})
-  }, [clearChanges])
+    setCommentsByPath((prev) => {
+      const next = { ...prev }
+      for (const p of selectedPaths) delete next[p]
+      return next
+    })
+  }, [])
 
   /**
    * Handle removing a single file from pending list

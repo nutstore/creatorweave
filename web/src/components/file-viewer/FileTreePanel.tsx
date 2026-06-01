@@ -20,7 +20,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef, memo } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2, Cloud } from 'lucide-react'
+import { ChevronRight, ChevronDown, Folder, FolderOpen, RefreshCw, Copy, MousePointer2, Cloud, Trash2 } from 'lucide-react'
 import { Icon } from '@iconify/react'
 import { BrandButton, BrandBadge } from '@creatorweave/ui'
 import { formatBytes } from '@/lib/utils'
@@ -70,6 +70,8 @@ interface FileTreePanelBaseProps {
   revealTarget?: string | null
   /** Called when revealTarget has been processed (tree expanded & file selected) */
   onRevealComplete?: () => void
+  /** Called when user requests to delete a file/directory from context menu */
+  onDelete?: (path: string, node: TreeNode, pos: { x: number; y: number }) => void
 }
 
 type FileTreePanelProps =
@@ -244,6 +246,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   rootName,
   onClick,
   onInspect,
+  onDelete,
 }: {
   node: TreeNode
   depth: number
@@ -254,6 +257,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
   rootName?: string | null
   onClick: () => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
+  onDelete?: (path: string, node: TreeNode, pos: { x: number; y: number }) => void
 }) {
   const t = useT()
   const [contextMenuOpen, setContextMenuOpen] = useState(false)
@@ -389,6 +393,21 @@ const TreeNodeRow = memo(function TreeNodeRow({
                 <span>{t('fileTree.inspectElement')}</span>
               </button>
             )}
+            {onDelete && (
+              <>
+                <div className="my-0.5 border-t border-border" />
+                <button
+                  className="flex w-full cursor-default items-center gap-1 px-2 py-1 text-xs outline-none text-danger hover:bg-danger/10"
+                  onClick={() => {
+                    onDelete(node.path, node, contextMenuPos)
+                    handleCloseMenu()
+                  }}
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>{t('fileTree.deleteFile')}</span>
+                </button>
+              </>
+            )}
           </div>,
           document.body
         )}
@@ -406,6 +425,7 @@ const TreeBranch = memo(function TreeBranch({
   onToggle,
   onNodeClick,
   onInspect,
+  onDelete,
   approvedNotSyncedPaths,
   rootName,
 }: {
@@ -419,6 +439,7 @@ const TreeBranch = memo(function TreeBranch({
   onToggle: (node: TreeNode) => void
   onNodeClick: (node: TreeNode) => void
   onInspect?: (path: string, handle: FileSystemFileHandle | null) => void
+  onDelete?: (path: string, node: TreeNode, pos: { x: number; y: number }) => void
 }) {
   // Sort: directories first, then alphabetically
   const sorted = [...nodes].sort((a, b) => {
@@ -446,6 +467,7 @@ const TreeBranch = memo(function TreeBranch({
               rootName={rootName}
               onClick={() => onNodeClick(node)}
               onInspect={onInspect ? (path, handle) => onInspect(path, handle) : undefined}
+              onDelete={onDelete}
             />
             {expanded && node.children && (
               <TreeBranch
@@ -459,6 +481,7 @@ const TreeBranch = memo(function TreeBranch({
                 onToggle={onToggle}
                 onNodeClick={onNodeClick}
                 onInspect={onInspect}
+                onDelete={onDelete}
               />
             )}
           </div>
@@ -475,6 +498,7 @@ export const FileTreePanel = memo(function FileTreePanel({
   onFileSelect,
   onDirectorySelect,
   onInspect,
+  onDelete,
   selectedPath,
   mode = 'all',
   showHeader = true,
@@ -1090,6 +1114,7 @@ export const FileTreePanel = memo(function FileTreePanel({
               onToggle={handleToggle}
               onNodeClick={handleFileSelect}
               onInspect={onInspect}
+              onDelete={onDelete}
             />
           )}
         </div>

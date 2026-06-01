@@ -17,7 +17,7 @@ import {
   readBinaryFileFromOPFS,
   readBinaryFileFromNativeFSMultiRoot,
 } from '@/opfs'
-import { Columns2, UnfoldVertical, X, Eye, FileText, Download } from 'lucide-react'
+import { Columns2, UnfoldVertical, X, Eye, FileText, Download, Copy, Check } from 'lucide-react'
 import { getFormatUIHandler } from '@/agent/tools/format-registry'
 
 const MonacoDiffEditor = React.lazy(() => import('./MonacoDiffEditor'))
@@ -223,6 +223,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const commentsByPath = externalCommentsByPath ?? internalCommentsByPath
   const setCommentsByPath: React.Dispatch<React.SetStateAction<Record<string, LineComment[]>>> =
     onCommentsChange ?? setInternalCommentsByPath
+  const [copiedPath, setCopiedPath] = useState(false)
   const [composer, setComposer] = useState<{
     side: CommentSide
     startLine: number
@@ -918,6 +919,19 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           <span className="min-w-0 truncate font-mono text-[13px] text-neutral-700 dark:text-neutral-300" title={fileChange.path}>
             {fileChange.path}
           </span>
+          {/* Copy file path button */}
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(fileChange.path).then(() => {
+                setCopiedPath(true)
+                setTimeout(() => setCopiedPath(false), 1500)
+              })
+            }}
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+          >
+            {copiedPath ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+          </button>
           {fileChange.size ? (
             <span className="shrink-0 text-xs tabular-nums text-neutral-400 dark:text-neutral-500">
               {(fileChange.size / 1024).toFixed(1)}k

@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
-import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2 } from 'lucide-react'
+import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download } from 'lucide-react'
 import { Editor, loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -134,6 +134,17 @@ function getFileType(path: string): 'text' | 'image' | 'binary' | 'docx' | 'html
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+/** Trigger browser download via a temporary <a> element */
+function triggerDownload(url: string, fileName: string) {
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  // Do NOT revoke — url may be a long-lived blob URL (e.g. imageUrl)
+}
 
 export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob }: FilePreviewProps) {
   const t = useT()
@@ -618,6 +629,63 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     setTimeout(() => setCopied(false), 2000)
   }, [content])
 
+  const handleDownload = useCallback(async () => {
+    if (!filePath) return
+    const name = filePath.split('/').pop() || 'file'
+    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
+
+    try {
+      // Prefer already-loaded blob data for binary types
+      if (fileType === 'docx' && docxBlob) {
+        const url = URL.createObjectURL(docxBlob)
+        triggerDownload(url, name)
+        return
+      }
+      if (fileType === 'office' && officeBlob) {
+        const url = URL.createObjectURL(officeBlob)
+        triggerDownload(url, name)
+        return
+      }
+      if (fileType === 'image' && imageUrl) {
+        // imageUrl is a blob URL we created — use it directly
+        triggerDownload(imageUrl, name)
+        return
+      }
+      if (fileType === 'format' && formatBlob) {
+        const url = URL.createObjectURL(formatBlob)
+        triggerDownload(url, name)
+        return
+      }
+
+      // Text content — create blob from string
+      if (content != null) {
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        triggerDownload(url, name)
+        return
+      }
+
+      // Fallback: try reading from OPFS
+      const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+      const result = await opfs.readFile(filePath)
+      if (result.content instanceof Blob) {
+        const url = URL.createObjectURL(result.content)
+        triggerDownload(url, name)
+      } else if (result.content instanceof ArrayBuffer) {
+        const blob = new Blob([result.content])
+        const url = URL.createObjectURL(blob)
+        triggerDownload(url, name)
+      } else if (typeof result.content === 'string') {
+        const blob = new Blob([result.content], { type: 'text/plain;charset=utf-8' })
+        const url = URL.createObjectURL(blob)
+        triggerDownload(url, name)
+      }
+    } catch (err) {
+      console.warn('[FilePreview] Download failed:', err)
+      toast.error(t('filePreview.downloadFailed') ?? 'Download failed')
+    }
+  }, [filePath, fileType, content, docxBlob, officeBlob, imageUrl, formatBlob, t])
+
   if (!filePath) {
     return (
       <div className="flex h-full items-center justify-center bg-white dark:bg-neutral-950">
@@ -727,6 +795,16 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               title={t('filePreview.copyContent')}
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+            </button>
+          )}
+          {!loading && !error && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title={t('filePreview.download') ?? 'Download file'}
+            >
+              <Download className="h-3 w-3" />
             </button>
           )}
           <button
