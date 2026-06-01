@@ -353,8 +353,7 @@ async function ensureAssetsMounted(dirHandle) {
         })
         console.log('[Pyodide Worker] /mnt_assets refreshed via syncfs')
         return
-      } catch {
-        console.warn('[Pyodide Worker] /mnt_assets syncfs failed, falling back to remount')
+      } catch (syncErr) {
       }
     }
 
@@ -505,9 +504,8 @@ async function ensureMounted(dirHandle) {
         // Calling the locked wrapper here causes lock re-entry deadlock.
         await syncFromOPFSRaw()
         return
-      } catch {
+      } catch (syncErr) {
         // syncfs failed, fall through to full remount
-        console.warn('[Pyodide Worker] syncfs failed, falling back to remount')
       }
     }
 
@@ -813,6 +811,7 @@ async function handleMessage(/** @type {any} */ data) {
   } catch (error) {
     const executionTime = performance.now() - startTime
     const errorMessage = error instanceof Error ? error.message : String(error)
+
 
     // Capture output before clearing (for error context)
     const output = captureOutput()

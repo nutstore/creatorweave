@@ -189,6 +189,8 @@ export class PythonExecutor {
     mountDir?: FileSystemDirectoryHandle
     /** Optional directory handle to mount at /mnt_assets (File System Access API) */
     assetsDir?: FileSystemDirectoryHandle
+    /** Optional directory handle to mount at /mnt_skills (global builtin skills) */
+    skillsDir?: FileSystemDirectoryHandle
     /** Whether to sync changes back to native filesystem after execution */
     syncFs?: boolean
   }): Promise<ExecuteResult> {
@@ -207,6 +209,7 @@ export class PythonExecutor {
       timeout: options.timeout || DEFAULT_TIMEOUT,
       mountDir: options.mountDir,
       assetsDir: options.assetsDir,
+      skillsDir: options.skillsDir,
       syncFs: options.syncFs,
     }
 

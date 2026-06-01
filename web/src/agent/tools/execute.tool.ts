@@ -124,6 +124,15 @@ async function executePython(
     // Mount OPFS assets/ directory to /mnt_assets for asset file I/O
     const assetsDirHandle = await active.conversation.getAssetsDir()
 
+    // Mount OPFS .skills/ directory to /mnt_skills for builtin skill scripts
+    let skillsDirHandle: FileSystemDirectoryHandle | undefined
+    try {
+      const { getSkillsDirectoryHandle } = await import('@/skills/skills-mount')
+      skillsDirHandle = await getSkillsDirectoryHandle()
+    } catch (error) {
+      console.warn('[execute.tool] Skills dir not available (non-fatal):', error)
+    }
+
     // Take assets snapshot BEFORE execution
     const beforeAssets = await snapshotAssetsDir(assetsDirHandle)
 
@@ -133,6 +142,7 @@ async function executePython(
       timeout,
       mountDir: filesDirHandle,
       assetsDir: assetsDirHandle,
+      skillsDir: skillsDirHandle,
     })
 
     // Register OPFS delta into overlay ledger for pending/review/sync.
