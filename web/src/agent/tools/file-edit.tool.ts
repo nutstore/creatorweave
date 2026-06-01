@@ -391,6 +391,11 @@ async function executeSingleEdit(
         const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
         const binaryData = await formatHandler.write(updatedFile, path, writeContext)
         await target.backend.writeFile(target.path, binaryData)
+      } else if (formatHandler && !formatHandler.write) {
+        // Format handler exists but is read-only (e.g. .pdf, .zip)
+        return toolErrorJson('edit', 'no_format_writer', `Cannot edit .${formatHandler.extension} files directly with the edit tool. Use the python tool instead if you need to modify this file.`, {
+          hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.`,
+        })
       } else {
         await target.backend.writeFile(target.path, updatedFile)
       }

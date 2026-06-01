@@ -11,11 +11,15 @@
 
 import { registerFormatHandler } from '../format-registry'
 import { docxHandler } from './docx'
+import { nbmxHandler } from './nbmx'
+import { ngmHandler } from './ngm'
 import { nolHandler } from './nol'
 import { pdfHandler } from './pdf'
 import { zipHandler } from './zip'
 
 registerFormatHandler(docxHandler)
+registerFormatHandler(nbmxHandler)
+registerFormatHandler(ngmHandler)
 registerFormatHandler(nolHandler)
 registerFormatHandler(pdfHandler)
 registerFormatHandler(zipHandler)

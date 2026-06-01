@@ -160,6 +160,11 @@ async function executeSingleWrite(
         }
         throw formatError
       }
+    } else if (formatHandler && !formatHandler.write) {
+      // Format handler exists but is read-only (e.g. .pdf, .zip)
+      return toolErrorJson('write', 'no_format_writer', `Cannot write .${formatHandler.extension} files directly with the write tool. Use the python tool instead if you need to modify this file.`, {
+        hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.`,
+      })
     } else {
       await target.backend.writeFile(target.path, content)
     }
