@@ -11,7 +11,9 @@
 
 import { registerFormatHandler } from '../format-registry'
 import { nolHandler } from './nol'
+import { pdfHandler } from './pdf'
 import { zipHandler } from './zip'
 
 registerFormatHandler(nolHandler)
+registerFormatHandler(pdfHandler)
 registerFormatHandler(zipHandler)

@@ -63,6 +63,7 @@
     "diff": "^8.0.3",
     "fflate": "^0.8.2",
     "docx-preview": "^0.3.6",
+    "pdfjs-dist": "^4.10.38",
     "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "idb": "^8.0.0",

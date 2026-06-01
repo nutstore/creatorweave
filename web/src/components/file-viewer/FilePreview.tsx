@@ -101,7 +101,7 @@ const DOCX_EXTS = new Set(['docx'])
 
 /** Binary (non-image, non-docx, non-office) extensions */
 const BINARY_EXTS = new Set([
-  'wasm', 'zip', 'gz', 'tar', 'br', 'zst', 'pdf',
+  'wasm', 'zip', 'gz', 'tar', 'br', 'zst',
   'mp3', 'mp4', 'webm', 'ogg', 'wav', 'avi', 'woff', 'woff2', 'ttf', 'eot', 'otf',
   'exe', 'dll', 'so', 'dylib',
 ])
