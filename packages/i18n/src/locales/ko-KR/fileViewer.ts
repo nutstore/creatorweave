@@ -42,6 +42,8 @@ export const filePreview = {
     // 새 탭에서 열기 (범용, 외부 미리보기가 있는 모든 형식에서 사용)
     openInNewTab: "새 탭에서 열기",
     openInNewTabFailed: "열기 실패: {error}",
+    download: "파일 다운로드",
+    downloadFailed: "다운로드 실패",
 } as const
 
 // Office 파일 미리보기

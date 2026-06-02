@@ -42,6 +42,8 @@ export const filePreview = {
     // 在新标签页打开（通用，适用于任何有外部预览的格式）
     openInNewTab: "在新标签页打开",
     openInNewTabFailed: "打开失败：{error}",
+    download: "下载文件",
+    downloadFailed: "下载失败",
 } as const
 
 // Office 文件预览

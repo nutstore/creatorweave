@@ -44,6 +44,8 @@ export const filePreview = {
     // 新しいタブで開く（汎用、外部プレビューを持つすべてのフォーマットで使用）
     openInNewTab: "新しいタブで開く",
     openInNewTabFailed: "開けませんでした: {error}",
+    download: "ファイルをダウンロード",
+    downloadFailed: "ダウンロードに失敗しました",
 } as const
 
 // Office ファイルプレビュー

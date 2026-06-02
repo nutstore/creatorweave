@@ -41,6 +41,8 @@ export const filePreview = {
     // Open in new tab (generic, used by any format with external preview)
     openInNewTab: "Open in new tab",
     openInNewTabFailed: "Failed to open: {error}",
+    download: "Download file",
+    downloadFailed: "Download failed",
 } as const
 
 // Office file preview
