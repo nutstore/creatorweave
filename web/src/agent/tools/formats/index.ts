@@ -10,6 +10,7 @@
  */
 
 import { registerFormatHandler } from '../format-registry'
+import { csvHandler } from './csv'
 import { docxHandler } from './docx'
 import { nbmxHandler } from './nbmx'
 import { ngmHandler } from './ngm'
@@ -18,6 +19,7 @@ import { pdfHandler } from './pdf'
 import { xlsxHandler } from './xlsx'
 import { zipHandler } from './zip'
 
+registerFormatHandler(csvHandler)
 registerFormatHandler(docxHandler)
 registerFormatHandler(nbmxHandler)
 registerFormatHandler(ngmHandler)

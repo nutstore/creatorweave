@@ -73,6 +73,7 @@ function getMonacoLanguage(path: string): string {
   if (lower.endsWith('.rs')) return 'rust'
   if (lower.endsWith('.java')) return 'java'
   if (lower.endsWith('.yml') || lower.endsWith('.yaml')) return 'yaml'
+  if (lower.endsWith('.csv')) return 'plaintext'
   if (lower.endsWith('.xml')) return 'xml'
   if (lower.endsWith('.sql')) return 'sql'
   if (lower.endsWith('.sh')) return 'shell'
