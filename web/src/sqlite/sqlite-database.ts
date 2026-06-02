@@ -28,6 +28,8 @@ export interface ConversationRow {
   title: string
   title_mode?: string
   context_usage_json?: string | null
+  compressed_context_summary?: string | null
+  compressed_context_cutoff_ts?: number | null
   created_at: number
   updated_at: number
 }

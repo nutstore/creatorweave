@@ -24,25 +24,91 @@ export interface ConversationMeta {
   title: string
   titleMode?: 'auto' | 'manual'
   lastContextWindowUsage?: ContextWindowUsage | null
+  compressedContextSummary?: string | null
+  compressedContextCutoffTimestamp?: number | null
   createdAt: number
   updatedAt: number
 }
+
+/** Base columns that always exist in the conversations table */
+type BaseMetaColumns = Pick<
+  ConversationRow,
+  'id' | 'title' | 'title_mode' | 'context_usage_json' | 'created_at' | 'updated_at'
+>
+
+/** Extended columns including compression baseline (added by migration v8) */
+type ExtendedMetaColumns = Pick<
+  ConversationRow,
+  'id' | 'title' | 'title_mode' | 'context_usage_json' |
+  'compressed_context_summary' | 'compressed_context_cutoff_ts' |
+  'created_at' | 'updated_at'
+>
+
+const BASE_SELECT = `SELECT id, title, title_mode, context_usage_json, created_at, updated_at FROM conversations`
+const EXTENDED_SELECT = `SELECT id, title, title_mode, context_usage_json, compressed_context_summary, compressed_context_cutoff_ts, created_at, updated_at FROM conversations`
 
 //=============================================================================
 // Conversation Repository
 //=============================================================================
 
 export class ConversationRepository {
+  private _hasCompressionColumns: boolean | null = null
+
+  /**
+   * Check whether the compression baseline columns exist in the conversations
+   * table.  Cached after first check.
+   */
+  private async hasCompressionColumns(): Promise<boolean> {
+    if (this._hasCompressionColumns !== null) return this._hasCompressionColumns
+    try {
+      const db = getSQLiteDB()
+      await db.queryFirst(
+        'SELECT compressed_context_summary, compressed_context_cutoff_ts FROM conversations LIMIT 0'
+      )
+      this._hasCompressionColumns = true
+    } catch {
+      this._hasCompressionColumns = false
+    }
+    return this._hasCompressionColumns
+  }
+
+  /**
+   * Execute a SELECT query, using extended columns if available, falling back
+   * to base columns if the migration hasn't been applied yet.
+   */
+  private async queryMetaAll(orderBy: string): Promise<ConversationMeta[]> {
+    const db = getSQLiteDB()
+    const useExtended = await this.hasCompressionColumns()
+    if (useExtended) {
+      const rows = await db.queryAll<ExtendedMetaColumns>(
+        `${EXTENDED_SELECT} ${orderBy}`
+      )
+      return rows.map((row) => this.extendedRowToMeta(row))
+    }
+    const rows = await db.queryAll<BaseMetaColumns>(`${BASE_SELECT} ${orderBy}`)
+    return rows.map((row) => this.baseRowToMeta(row))
+  }
+
+  private async queryMetaFirst(where: string, params: unknown[]): Promise<ConversationMeta | null> {
+    const db = getSQLiteDB()
+    const useExtended = await this.hasCompressionColumns()
+    if (useExtended) {
+      const row = await db.queryFirst<ExtendedMetaColumns>(
+        `${EXTENDED_SELECT} ${where}`, params
+      )
+      return row ? this.extendedRowToMeta(row) : null
+    }
+    const row = await db.queryFirst<BaseMetaColumns>(
+      `${BASE_SELECT} ${where}`, params
+    )
+    return row ? this.baseRowToMeta(row) : null
+  }
+
   /**
    * Get all conversations metadata (without messages) ordered by updated_at desc.
-   * Messages must be loaded separately via MessageRepository.findByConversation().
    */
   async findAll(): Promise<ConversationMeta[]> {
-    const db = getSQLiteDB()
-    const rows = await db.queryAll<Pick<ConversationRow, 'id' | 'title' | 'title_mode' | 'context_usage_json' | 'created_at' | 'updated_at'>>(
-      'SELECT id, title, title_mode, context_usage_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC'
-    )
-    return rows.map((row) => this.rowToMeta(row))
+    return this.queryMetaAll('ORDER BY updated_at DESC')
   }
 
   /**
@@ -56,12 +122,7 @@ export class ConversationRepository {
    * Find conversation metadata by ID (without messages).
    */
   async findById(id: string): Promise<ConversationMeta | null> {
-    const db = getSQLiteDB()
-    const row = await db.queryFirst<Pick<ConversationRow, 'id' | 'title' | 'title_mode' | 'context_usage_json' | 'created_at' | 'updated_at'>>(
-      'SELECT id, title, title_mode, context_usage_json, created_at, updated_at FROM conversations WHERE id = ?',
-      [id]
-    )
-    return row ? this.rowToMeta(row) : null
+    return this.queryMetaFirst('WHERE id = ?', [id])
   }
 
   /**
@@ -121,11 +182,7 @@ export class ConversationRepository {
    * Get most recently updated conversation metadata
    */
   async findMostRecent(): Promise<ConversationMeta | null> {
-    const db = getSQLiteDB()
-    const row = await db.queryFirst<Pick<ConversationRow, 'id' | 'title' | 'title_mode' | 'context_usage_json' | 'created_at' | 'updated_at'>>(
-      'SELECT id, title, title_mode, context_usage_json, created_at, updated_at FROM conversations ORDER BY updated_at DESC LIMIT 1'
-    )
-    return row ? this.rowToMeta(row) : null
+    return this.queryMetaFirst('ORDER BY updated_at DESC LIMIT 1', [])
   }
 
   /**
@@ -138,7 +195,6 @@ export class ConversationRepository {
 
   /**
    * Touch conversation's updated_at timestamp without changing other fields.
-   * Used after message-level operations via MessageRepository.
    */
   async touch(id: string): Promise<void> {
     const db = getSQLiteDB()
@@ -148,46 +204,87 @@ export class ConversationRepository {
   /**
    * Save only the metadata fields (no messages).
    * Used by persistConversationMeta().
+   *
+   * Gracefully handles the case where compression columns don't exist yet
+   * (migration v8 not applied) by falling back to the base SQL.
    */
   async saveMeta(meta: {
     id: string
     title: string
     titleMode?: 'auto' | 'manual'
     contextUsage?: ContextWindowUsage | null
+    compressedContextSummary?: string | null
+    compressedContextCutoffTimestamp?: number | null
     createdAt: number
     updatedAt: number
   }): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute(
-      `INSERT INTO conversations (id, title, title_mode, context_usage_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         title = excluded.title,
-         title_mode = excluded.title_mode,
-         context_usage_json = excluded.context_usage_json,
-         updated_at = excluded.updated_at`,
-      [
-        meta.id,
-        meta.title,
-        meta.titleMode || 'manual',
-        toJSON(meta.contextUsage || null),
-        meta.createdAt,
-        meta.updatedAt,
-      ]
-    )
+    const useExtended = await this.hasCompressionColumns()
+
+    if (useExtended) {
+      await db.execute(
+        `INSERT INTO conversations (id, title, title_mode, context_usage_json, compressed_context_summary, compressed_context_cutoff_ts, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           title_mode = excluded.title_mode,
+           context_usage_json = excluded.context_usage_json,
+           compressed_context_summary = excluded.compressed_context_summary,
+           compressed_context_cutoff_ts = excluded.compressed_context_cutoff_ts,
+           updated_at = excluded.updated_at`,
+        [
+          meta.id,
+          meta.title,
+          meta.titleMode || 'manual',
+          toJSON(meta.contextUsage || null),
+          meta.compressedContextSummary || null,
+          meta.compressedContextCutoffTimestamp ?? null,
+          meta.createdAt,
+          meta.updatedAt,
+        ]
+      )
+    } else {
+      await db.execute(
+        `INSERT INTO conversations (id, title, title_mode, context_usage_json, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           title_mode = excluded.title_mode,
+           context_usage_json = excluded.context_usage_json,
+           updated_at = excluded.updated_at`,
+        [
+          meta.id,
+          meta.title,
+          meta.titleMode || 'manual',
+          toJSON(meta.contextUsage || null),
+          meta.createdAt,
+          meta.updatedAt,
+        ]
+      )
+    }
   }
 
-  /**
-   * Convert database row to metadata (no messages)
-   */
-  private rowToMeta(
-    row: Pick<ConversationRow, 'id' | 'title' | 'title_mode' | 'context_usage_json' | 'created_at' | 'updated_at'>
-  ): ConversationMeta {
+  private baseRowToMeta(row: BaseMetaColumns): ConversationMeta {
     return {
       id: row.id,
       title: row.title,
       titleMode: row.title_mode === 'auto' ? 'auto' : 'manual',
       lastContextWindowUsage: parseJSON(row.context_usage_json || '', null),
+      compressedContextSummary: null,
+      compressedContextCutoffTimestamp: null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }
+  }
+
+  private extendedRowToMeta(row: ExtendedMetaColumns): ConversationMeta {
+    return {
+      id: row.id,
+      title: row.title,
+      titleMode: row.title_mode === 'auto' ? 'auto' : 'manual',
+      lastContextWindowUsage: parseJSON(row.context_usage_json || '', null),
+      compressedContextSummary: row.compressed_context_summary || null,
+      compressedContextCutoffTimestamp: row.compressed_context_cutoff_ts ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     }

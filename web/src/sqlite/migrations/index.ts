@@ -147,6 +147,16 @@ export const migrations: Migration[] = [
       PRAGMA user_version = 7;
     `,
   },
+  {
+    version: 8,
+    name: 'add_compression_baseline_to_conversations',
+    up: `
+      ALTER TABLE conversations ADD COLUMN compressed_context_summary TEXT;
+      ALTER TABLE conversations ADD COLUMN compressed_context_cutoff_ts INTEGER;
+
+      PRAGMA user_version = 8;
+    `,
+  },
 ]
 
 // ============================================================================

@@ -713,6 +713,8 @@ async function persistConversationMeta(conversation: Conversation): Promise<void
     title: conversation.title,
     titleMode: conversation.titleMode || 'manual',
     contextUsage: conversation.lastContextWindowUsage || null,
+    compressedContextSummary: conversation.compressedContextSummary || null,
+    compressedContextCutoffTimestamp: conversation.compressedContextCutoffTimestamp ?? null,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
   })
@@ -729,6 +731,8 @@ async function loadConversationsMeta(): Promise<Conversation[]> {
     titleMode: meta.titleMode || 'manual',
     messages: [] as Message[], // Messages loaded lazily when conversation is opened
     lastContextWindowUsage: meta.lastContextWindowUsage || null,
+    compressedContextSummary: meta.compressedContextSummary || null,
+    compressedContextCutoffTimestamp: meta.compressedContextCutoffTimestamp ?? null,
     createdAt: meta.createdAt,
     updatedAt: meta.updatedAt,
     status: 'idle' as const,
@@ -856,6 +860,27 @@ function deriveContextUsageFromAssistantUsage(
     usagePercent,
     modelMaxTokens,
   }
+}
+
+/**
+ * Auto-heal compression baseline for conversations created before the
+ * persistence fix.  When compressedContextSummary is missing but the message
+ * list contains a context_summary message, restore the baseline from it.
+ *
+ * Note: context_summary messages store `timestamp = cutoffTimestamp - 1`,
+ * so we add 1 to recover the original cutoff.
+ */
+function healCompressionBaseline(conv: Conversation): void {
+  if (conv.compressedContextSummary) return // already has baseline
+  const summaryMsg = [...conv.messages].reverse().find((m) => m.kind === 'context_summary')
+  if (!summaryMsg?.content || typeof summaryMsg.timestamp !== 'number') return
+  conv.compressedContextSummary = summaryMsg.content
+  conv.compressedContextCutoffTimestamp = summaryMsg.timestamp + 1
+  console.info('[conversation.store] Healed compression baseline from messages', {
+    conversationId: conv.id,
+    summaryChars: summaryMsg.content.length,
+    cutoffTimestamp: conv.compressedContextCutoffTimestamp,
+  })
 }
 
 interface WorkflowDryRunRequest {
@@ -1246,6 +1271,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               const conv = state.conversations.find((c) => c.id === activeId)
               if (conv) {
                 conv.messages = activeMessages as Message[]
+                // Auto-heal: restore compression baseline from context_summary messages
+                healCompressionBaseline(conv)
               }
             })
           } catch (error) {
@@ -1306,6 +1333,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               const c = state.conversations.find((c) => c.id === id)
               if (c && c.messages.length === 0) {
                 c.messages = messages as Message[]
+                // Auto-heal: restore compression baseline from context_summary messages
+                // for conversations created before the persistence fix.
+                healCompressionBaseline(c)
               }
             })
           } catch (error) {
