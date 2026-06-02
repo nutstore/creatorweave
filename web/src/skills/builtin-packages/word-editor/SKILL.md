@@ -1,7 +1,7 @@
 ---
 name: cw:word-editor
 description: "LLM Wiki-mode docx editor with 89 EditOps, zero third-party dependencies. Ingest compiles docx → DocumentModel, view provides outline/details/stats/issue detection, writeback applies precise edits."
-version: "1.0.1"
+version: "1.0.2"
 ---
 
 # word-editor Skill
@@ -584,6 +584,45 @@ EditOp.edit_smartart("smartart-000")
 EditOp.edit_textbox("txbx-000", text="New textbox content")
 EditOp.edit_shape("shape-000", alt_text="Description", width="500000", height="300000")
 EditOp.clone_element("p-005", position="after:p-010", count=2)
+```
+
+---
+
+## Reading Table Data
+
+After `ingest()`, each table in `model.tables` is a `TableNode` with:
+
+- **`tbl.rows`** / **`tbl.cols`** — dimensions (`int`, NOT lists)
+- **`tbl.cells`** — flat list of `TableCell` objects, each with `.row`, `.col`, `.text`
+- **`tbl.get_row(row_index)`** — get cells for one row, sorted by column
+- **`tbl.iter_rows()`** — iterate all rows as lists of cells
+- **`tbl.get_cell(row, col)`** — get a specific cell
+
+```python
+# ❌ WRONG — tbl.rows is an int (row count), NOT a list
+for row in tbl.rows:  # TypeError: 'int' object is not iterable
+    ...
+
+# ✅ CORRECT — use iter_rows()
+for row in tbl.iter_rows():
+    texts = [c.text for c in row]
+    print(" | ".join(texts))
+
+# ✅ CORRECT — use get_row(n)
+header = tbl.get_row(0)
+for cell in header:
+    print(f"col {cell.col}: {cell.text}")
+
+# ✅ CORRECT — use get_cell(r, c)
+cell = tbl.get_cell(1, 2)
+if cell:
+    print(cell.text)
+
+# ✅ CORRECT — manual iteration via range + cells
+for r in range(tbl.rows):
+    row_cells = sorted([c for c in tbl.cells if c.row == r], key=lambda c: c.col)
+    texts = [c.text for c in row_cells]
+    print(f"Row {r}: {' | '.join(texts)}")
 ```
 
 ---

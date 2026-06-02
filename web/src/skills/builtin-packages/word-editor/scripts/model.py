@@ -417,6 +417,64 @@ class TableNode(WikiNode):
     def build_references(self):
         self.references = list(self.paragraph_ids)
 
+    @property
+    def row_count(self) -> int:
+        """Number of rows in the table (same as .rows, but more explicit name)."""
+        return self.rows
+
+    @property
+    def col_count(self) -> int:
+        """Number of columns in the table (same as .cols, but more explicit name)."""
+        return self.cols
+
+    def get_row(self, row_index: int) -> list[TableCell]:
+        """Get all cells in a specific row, sorted by column index.
+
+        Args:
+            row_index: 0-based row index
+
+        Returns:
+            List of TableCell objects in the row, sorted by column.
+            Empty list if row has no cells.
+
+        Example:
+            header = tbl.get_row(0)  # first row
+            for cell in header:
+                print(cell.text)
+        """
+        return sorted([c for c in self.cells if c.row == row_index], key=lambda c: c.col)
+
+    def iter_rows(self) -> list[list[TableCell]]:
+        """Iterate over all rows as lists of cells.
+
+        Returns:
+            List of rows, each row is a list of TableCell objects sorted by column.
+
+        Example:
+            for row in tbl.iter_rows():
+                texts = [c.text for c in row]
+                print(" | ".join(texts))
+        """
+        rows_dict: dict[int, list[TableCell]] = {}
+        for c in self.cells:
+            rows_dict.setdefault(c.row, []).append(c)
+        return [sorted(rows_dict[r], key=lambda c: c.col) for r in sorted(rows_dict.keys())]
+
+    def get_cell(self, row: int, col: int) -> Optional[TableCell]:
+        """Get a specific cell by row and column index.
+
+        Args:
+            row: 0-based row index
+            col: 0-based column index
+
+        Returns:
+            TableCell if found, None otherwise.
+        """
+        for c in self.cells:
+            if c.row == row and c.col == col:
+                return c
+        return None
+
     def to_markdown(self) -> str:
         self.build_references()
         fm = {

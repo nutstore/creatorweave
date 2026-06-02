@@ -34,20 +34,8 @@ export async function ensureMaterialized(
   const localManifest = await adapter.readLocalManifest()
   const bundledManifest = adapter.getBundledManifest()
 
-  // Skip if app version unchanged and local manifest exists
-  if (
-    localManifest &&
-    localManifest.appVersion === bundledManifest.appVersion
-  ) {
-    return {
-      total: bundledManifest.skills.length,
-      written: 0,
-      skipped: bundledManifest.skills.length,
-      errors: [],
-      durationMs: performance.now() - startTime,
-    }
-  }
-
+  // Always compute diff — individual skill versions determine what needs updating.
+  // No appVersion short-circuit: skill-level versioning is the source of truth.
   const diff = computeDiff(localManifest, bundledManifest)
   const toWrite = [...diff.added, ...diff.updated]
   const errors: MaterializeResult['errors'] = []
