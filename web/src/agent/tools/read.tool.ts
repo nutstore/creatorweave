@@ -15,7 +15,7 @@ import { resolveVfsTarget } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
-import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import {
   checkReadLoop,
   recordReadMtime,
@@ -113,6 +113,11 @@ export const readExecutor: ToolExecutor = async (args, context) => {
   if (!path) {
     return toolErrorJson('read', 'invalid_arguments', 'path is required')
   }
+
+  // Validate root prefix before any path rewriting
+  const rootError = await validateRootPrefix('read', path, context)
+  if (rootError) return rootError
+
   const rewrittenReadPath = rewritePythonMountPathForNonPythonTool(path)
   const effectiveReadPath = rewrittenReadPath?.rewritten ? rewrittenReadPath.rewrittenPath : path
 

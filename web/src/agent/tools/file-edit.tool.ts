@@ -9,7 +9,7 @@ import type { ToolContext, ToolDefinition, ToolExecutor, ToolPromptDoc } from '.
 import { resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
-import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { getFormatHandler, buildFormatWriteContext } from './format-registry'
 
 // Ensure format handlers are registered before first use
@@ -256,6 +256,11 @@ export const editExecutor: ToolExecutor = async (args, context) => {
   if (!path || oldText === undefined || newText === undefined) {
     return toolErrorJson('edit', 'invalid_arguments', 'edit requires path + old_text + new_text')
   }
+
+  // Validate root prefix before any path rewriting
+  const rootError = await validateRootPrefix('edit', path, context)
+  if (rootError) return rootError
+
   const rewrittenPath = rewritePythonMountPathForNonPythonTool(path)
   const effectivePath = rewrittenPath?.rewritten ? rewrittenPath.rewrittenPath : path
   return executeSingleEdit(context, { path: effectivePath, oldText, newText, replaceAll })

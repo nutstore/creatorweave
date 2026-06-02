@@ -13,7 +13,7 @@ import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { resolveVfsTarget } from './vfs-resolver'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
-import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { checkFileStaleness, refreshReadTimestamp } from './loop-guard'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
@@ -76,6 +76,13 @@ function getPendingWriteTypeForPath(
   return null
 }
 
+/**
+ * Validate that a workspace-relative path includes a valid rootName prefix.
+ * Returns an error string if the path is missing the prefix, or null if OK.
+ * Skips vfs:// paths and non-workspace paths.
+ * (Imported from path-guards for shared use across write/edit/delete tools.)
+ */
+
 export const writeExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const content = args.content as string | undefined
@@ -87,6 +94,11 @@ export const writeExecutor: ToolExecutor = async (args, context) => {
       'path and content are required'
     )
   }
+
+  // Validate root prefix before any path rewriting
+  const rootError = await validateRootPrefix('write', path, context)
+  if (rootError) return rootError
+
   const rewrittenWritePath = rewritePythonMountPathForNonPythonTool(path)
   const effectiveWritePath = rewrittenWritePath?.rewritten ? rewrittenWritePath.rewrittenPath : path
   return executeSingleWrite(effectiveWritePath, content, context)

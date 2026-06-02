@@ -23,7 +23,7 @@ import {
   resolveDirectoryHandle,
   shouldSkipDirectory,
 } from './file-discovery.helpers'
-import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 
 const DIRECTORY_TOOL_PARAMETERS: ToolDefinition['function']['parameters'] = {
   type: 'object',
@@ -137,6 +137,13 @@ async function getOPFSFilesHandle(workspaceId?: string | null): Promise<FileSyst
 }
 
 export const lsExecutor: ToolExecutor = async (args, context) => {
+  // Validate root prefix before any path rewriting
+  const rawPath = typeof args.path === 'string' ? args.path : ''
+  if (rawPath) {
+    const rootError = await validateRootPrefix('ls', rawPath, context)
+    if (rootError) return rootError
+  }
+
   const rewrittenPath = rewritePythonMountPathForNonPythonTool(args.path)
   const effectiveArgs = rewrittenPath?.rewritten
     ? { ...args, path: rewrittenPath.rewrittenPath }

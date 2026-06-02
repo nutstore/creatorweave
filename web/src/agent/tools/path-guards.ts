@@ -1,4 +1,6 @@
 import { toolErrorJson } from './tool-envelope'
+import type { ToolContext } from './tool-types'
+import { isVfsPath } from './vfs-resolver'
 
 function isPythonMountPath(input: string): boolean {
   const normalized = input.trim().replace(/\\/g, '/')
@@ -83,4 +85,55 @@ export function rejectPythonMountPath(toolName: string, path: unknown): string |
       },
     }
   )
+}
+
+/**
+ * Validate that a workspace-relative path includes a valid rootName prefix.
+ * Returns an error JSON string if the path is missing the prefix, or null if OK.
+ * Skips vfs:// paths (they have their own namespace routing) and non-workspace paths.
+ */
+export async function validateRootPrefix(
+  toolName: string,
+  path: string,
+  context: ToolContext
+): Promise<string | null> {
+  // Skip vfs:// paths — they have their own namespace routing
+  if (isVfsPath(path)) return null
+
+  const projectId = context.projectId
+  if (!projectId) return null
+
+  try {
+    const { getProjectRootRepository } = await import(
+      '@/sqlite/repositories/project-root.repository'
+    )
+    const repo = getProjectRootRepository()
+    const roots = await repo.findByProject(projectId)
+    if (roots.length === 0) return null
+
+    const rootNames = roots.map((r: { name: string }) => r.name)
+    const firstSegment = path.replace(/\\/g, '/').split('/')[0]
+
+    if (!firstSegment) return null
+
+    // First segment matches a known root — valid
+    if (rootNames.includes(firstSegment)) return null
+
+    // No match — reject with helpful message
+    return toolErrorJson(
+      toolName,
+      'missing_root_prefix',
+      `Path "${path}" is missing a rootName prefix. All workspace paths must start with one of the mounted roots: ${rootNames.map((n: string) => `"${n}"`).join(', ')}.`,
+      {
+        hint: `Use the format "{rootName}/relative/path" — e.g. "${rootNames[0]}/${path}". Current mounted roots: ${rootNames.map((n: string) => `"${n}"`).join(', ')}.`,
+        details: {
+          invalid_path: path,
+          mounted_roots: rootNames,
+        },
+      }
+    )
+  } catch {
+    // If root lookup fails, don't block the operation
+    return null
+  }
 }

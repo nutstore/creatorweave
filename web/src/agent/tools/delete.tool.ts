@@ -16,7 +16,8 @@ import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
-import { rewritePythonMountPathForNonPythonTool } from './path-guards'
+import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
+import { toolErrorJson } from './tool-envelope'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -192,6 +193,13 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   if (requestedTargets.length === 0) {
     return JSON.stringify({ error: 'Either path or paths must be provided' })
   }
+
+  // Validate root prefix for each target before rewriting
+  for (const target of requestedTargets) {
+    const rootError = await validateRootPrefix('delete', target, context)
+    if (rootError) return rootError
+  }
+
   const rewrittenTargets = requestedTargets.map((target) => {
     const rewritten = rewritePythonMountPathForNonPythonTool(target)
     return rewritten?.rewritten ? rewritten.rewrittenPath : target
