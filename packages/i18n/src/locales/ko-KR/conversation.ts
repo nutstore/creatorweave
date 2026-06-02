@@ -58,6 +58,12 @@ export const conversation = {
     error: {
       requestFailed: "요청 실패:",
     },
+    // 반복 횟수 제한
+    iterationLimit: {
+      reached: "최대 반복 횟수에 도달했습니다 ({count}회)",
+      continue: "계속",
+      hint: "작업이 완료되지 않았을 수 있습니다. 메시지를 보내 에이전트가 계속 작업하도록 할 수 있습니다",
+    },
     codex: {
       error: {
         authRequired: "Codex 인증 필요",

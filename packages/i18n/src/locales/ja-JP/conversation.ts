@@ -58,6 +58,12 @@ export const conversation = {
     error: {
       requestFailed: "リクエスト失敗：",
     },
+    // 反復回数制限
+    iterationLimit: {
+      reached: "最大反復回数に達しました（{count} 回）",
+      continue: "続行",
+      hint: "タスクが未完了の可能性があります。メッセージを送信してエージェントの作業を継続できます",
+    },
     // Codex OAuth エラー
     codex: {
       error: {

@@ -93,6 +93,8 @@ export interface ConversationRuntime {
   compressionConvertCallCount: number
   /** Runtime marker for last summary convert call */
   compressionLastSummaryConvertCall: number
+  /** Set when agent loop stops due to maxIterations limit (null when not applicable) */
+  iterationLimitReached: number | null
 }
 
 /** Creates a fresh runtime state for a conversation */
@@ -118,6 +120,7 @@ export function createEmptyRuntime(): ConversationRuntime {
     collectedAssets: [],
     compressionConvertCallCount: 0,
     compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
+    iterationLimitReached: null,
   }
 }
 
@@ -288,6 +291,7 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
           rt.draftAssistant = null
           rt.contextWindowUsage = null
           rt.workflowExecution = null
+          rt.iterationLimitReached = null
         }
       })
     },

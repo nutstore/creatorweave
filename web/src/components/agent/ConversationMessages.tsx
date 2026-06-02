@@ -125,6 +125,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
         activeToolCalls: rt.activeToolCalls || [],
         streamingToolArgs: rt.streamingToolArgs,
         streamingToolArgsByCallId: rt.streamingToolArgsByCallId || {},
+        iterationLimitReached: rt.iterationLimitReached ?? null,
       }
     }),
   )
@@ -289,6 +290,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
                 runtimeSteps={runtime.runtimeSteps}
                 conversationId={conversationId}
                 onPreviewAsset={onPreviewAsset}
+                iterationLimitReached={idx === turns.length - 1 ? streamingData?.iterationLimitReached ?? null : null}
                 workflowProgress={
                   activeWorkflowExecution && idx === anchorIndex ? (
                     <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />

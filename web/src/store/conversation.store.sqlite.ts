@@ -3033,6 +3033,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           })
         }
 
+        // Clear iteration limit flag from any previous run
+        useConversationRuntimeStore.setState((state) => {
+          const r = state.runtimes.get(conversationId)
+          if (r) {
+            r.iterationLimitReached = null
+          }
+        })
+
         const resultMessages = await agentLoop.run(currentMessages, {
           onMessageStart: () => {
             if (!isCurrentRun()) return
@@ -3765,6 +3773,20 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               })
             }
             emitError(err.message)
+          },
+          onIterationLimitReached: (limit: number) => {
+            if (!isCurrentRun()) return
+            console.info('[#LoopStop] iteration_limit_reached', {
+              conversationId,
+              runId,
+              limit,
+            })
+            useConversationRuntimeStore.setState((state) => {
+              const r = state.runtimes.get(conversationId)
+              if (r) {
+                r.iterationLimitReached = limit
+              }
+            })
           },
         })
         latestMessages = resultMessages

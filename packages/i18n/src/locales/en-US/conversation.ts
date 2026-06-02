@@ -71,6 +71,12 @@ export const conversation = {
     error: {
       requestFailed: "Request failed:",
     },
+    // Iteration limit
+    iterationLimit: {
+      reached: "Max iterations reached ({count})",
+      continue: "Continue",
+      hint: "Task may be incomplete. Send a message to let the agent keep working",
+    },
     // Codex OAuth error
     codex: {
       error: {

@@ -71,6 +71,12 @@ export const conversation = {
     error: {
       requestFailed: "请求失败：",
     },
+    // 迭代次数限制
+    iterationLimit: {
+      reached: "已达到最大迭代次数（{count} 次）",
+      continue: "继续",
+      hint: "任务可能尚未完成，发送消息可让助手继续工作",
+    },
     // Codex OAuth 错误
     codex: {
       error: {

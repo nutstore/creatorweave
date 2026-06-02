@@ -24,9 +24,9 @@
  *   Only committed messages are rendered (no runtime steps).
  */
 
-import { Fragment, memo, type ReactNode, useRef, useState } from 'react'
+import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bot, Database, GitFork } from 'lucide-react'
+import { Bot, Database, GitFork, AlertTriangle } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -44,6 +44,7 @@ import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
+import { ConversationActionContext } from './ConversationActionContext'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -99,6 +100,8 @@ interface AssistantTurnBubbleProps {
   conversationId?: string | null
   /** Open the shared FilePreview drawer with a pre-loaded blob */
   onPreviewAsset?: (name: string, blob: Blob) => void
+  /** When set, shows an inline hint that the agent stopped due to max iterations */
+  iterationLimitReached?: number | null
 }
 
 // ─── Timeline builder ─────────────────────────────────────────────────
@@ -327,10 +330,12 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   workflowProgress,
   conversationId,
   onPreviewAsset,
+  iterationLimitReached,
 }: AssistantTurnBubbleProps) {
   const t = useT()
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
+  const conversationActions = useContext(ConversationActionContext)
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
 
@@ -425,6 +430,28 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
         )}
 
         {workflowProgress}
+
+        {/* Iteration limit reached hint (only when not processing) */}
+        {!isProcessing && !isWaiting && iterationLimitReached && (
+          <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-relaxed text-neutral-400 dark:text-neutral-500">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1">
+              {t('conversation.iterationLimit.reached', { count: iterationLimitReached })}
+              <span className="ml-1 text-neutral-350 dark:text-neutral-550">
+                {t('conversation.iterationLimit.hint')}
+              </span>
+            </span>
+            {conversationActions?.sendMessage && (
+              <button
+                type="button"
+                onClick={() => conversationActions.sendMessage!('继续')}
+                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/30 dark:hover:text-neutral-300"
+              >
+                {t('conversation.iterationLimit.continue')}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Summary footer (only when not processing) */}
         {!isProcessing && !isWaiting && (
