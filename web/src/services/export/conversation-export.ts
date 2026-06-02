@@ -314,7 +314,7 @@ function generateMarkdown(
           lines.push(`### 🔧 Tool: ${msg.name || 'unknown'} — ${time}`)
           lines.push('')
           lines.push('```')
-          lines.push(truncateContent(msg.content || '', 2000))
+          lines.push(msg.content || '')
           lines.push('```')
           lines.push('')
           lines.push('---')
@@ -390,7 +390,7 @@ function generateHTML(
 
     // Tool result
     if (options.includeToolCalls && msg.role === 'tool') {
-      body += `<pre class="tool-result"><code>${escapeHtml(truncateContent(msg.content || '', 2000))}</code></pre>`
+      body += `<pre class="tool-result"><code>${escapeHtml(msg.content || '')}</code></pre>`
     }
 
     return `
@@ -540,9 +540,4 @@ function formatToolArgs(args: string | undefined | unknown): string {
   }
   if (args != null) return JSON.stringify(args, null, 2)
   return ''
-}
-
-function truncateContent(content: string, maxLength: number): string {
-  if (content.length <= maxLength) return content
-  return content.slice(0, maxLength) + '\n... (truncated)'
 }
