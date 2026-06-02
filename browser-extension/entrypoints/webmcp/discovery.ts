@@ -181,11 +181,21 @@ export async function discoverWebMCPToolsInCurrentWindow(windowId?: number): Pro
     const tools: WebMCPDiscoveredTool[] = []
     const discoveredTabs = new Set<number>()
 
-    for (const tab of validTabs) {
-      const hostname = parseHostname(tab.url)
-      if (!hostname) continue
+    // Scan all tabs in parallel — each tab has its own 5s timeout
+    const scanResults = await Promise.allSettled(
+      validTabs.map(async (tab) => {
+        const hostname = parseHostname(tab.url)
+        if (!hostname) return null
+        const result = await discoverToolsInTab(tab.id)
+        return { tab, hostname, result }
+      })
+    )
 
-      const result = await discoverToolsInTab(tab.id)
+    for (const settled of scanResults) {
+      if (settled.status !== 'fulfilled') continue
+      const entry = settled.value
+      if (!entry) continue
+      const { tab, hostname, result } = entry
       if (!result.ok || !result.tools || result.tools.length === 0) continue
 
       discoveredTabs.add(tab.id)
