@@ -143,5 +143,5 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
 
 // ── Office file extensions ──────────────────────────────────────────────────
 
-/** Extensions handled by eo2suite (files not supported locally). xlsx is handled by format-registry. */
-export const OFFICE_EXTS = new Set(['xls', 'pptx', 'ppt', 'doc', 'docx'])
+/** Extensions handled by eo2suite (files not supported locally). xlsx and docx are handled by format-registry. */
+export const OFFICE_EXTS = new Set(['xls', 'pptx', 'ppt', 'doc'])

@@ -532,7 +532,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
 
         if (cancelled) return
 
-        if (fileSize > MAX_FILE_SIZE) {
+        if (fileSize > MAX_FILE_SIZE && fileType !== 'format') {
           setError(t('filePreview.fileTooLarge', { size: formatBytes(fileSize), maxSize: formatBytes(MAX_FILE_SIZE) }))
           setLoading(false)
           return
@@ -715,7 +715,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
             </div>
           )}
           {/* Format view mode toggle (driven by format-registry) */}
-          {fileType === 'format' && formatBlob && formatUI && formatUI.viewModes.length > 1 && !loading && !error && (
+          {fileType === 'format' && formatBlob && formatUI && formatUI.viewModes.length > 1 && !loading && (
             <div className="flex items-center rounded border border-neutral-200 dark:border-neutral-600">
               {formatUI.viewModes.map((mode, i) => (
                 <button
@@ -860,7 +860,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               minimap: { enabled: display.showMiniMap },
               lineNumbers: display.showLineNumbers ? 'on' : 'off',
               scrollBeyondLastLine: false,
-              wordWrap: display.wordWrap ? 'on' : 'off',
+              wordWrap: 'on',
               automaticLayout: true,
               fontSize: display.fontSize === 'small' ? 11 : display.fontSize === 'large' ? 14 : 12,
               padding: { top: 8, bottom: 8 },
