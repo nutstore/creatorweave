@@ -97,6 +97,9 @@ import {
   searchConversationsPromptDoc,
 } from './tools/search-conversations.tool'
 
+// OCR tool (on-demand image text recognition)
+import { ocrDefinition, ocrExecutor, ocrPromptDoc } from './tools/ocr.tool'
+
 // Web bridge tools (conditional — requires Browser Extension)
 import {
   isWebBridgeAvailable,
@@ -120,6 +123,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: pythonDefinition, executor: pythonToolExecutor },
   // Data
   { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
+  // OCR (image text recognition)
+  { definition: ocrDefinition, executor: ocrExecutor },
   // Workflow orchestration — DISABLED (workflows unused, saves tool definition tokens)
   // { definition: runWorkflowDefinition, executor: runWorkflowExecutor },
   // Git tools
@@ -160,6 +165,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   syncPromptDoc,
   pythonPromptDoc,
   analyzeDataPromptDoc,
+  ocrPromptDoc,
   gitPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,
