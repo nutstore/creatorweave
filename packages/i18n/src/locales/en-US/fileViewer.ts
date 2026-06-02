@@ -38,6 +38,9 @@ export const filePreview = {
     commentsCount: "{count} comments",
     sendToAI: "Send to AI",
     clearComments: "Clear all comments",
+    // Open in new tab (generic, used by any format with external preview)
+    openInNewTab: "Open in new tab",
+    openInNewTabFailed: "Failed to open: {error}",
 } as const
 
 // Office file preview

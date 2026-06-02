@@ -15,6 +15,7 @@ import { nbmxHandler } from './nbmx'
 import { ngmHandler } from './ngm'
 import { nolHandler } from './nol'
 import { pdfHandler } from './pdf'
+import { xlsxHandler } from './xlsx'
 import { zipHandler } from './zip'
 
 registerFormatHandler(docxHandler)
@@ -22,4 +23,5 @@ registerFormatHandler(nbmxHandler)
 registerFormatHandler(ngmHandler)
 registerFormatHandler(nolHandler)
 registerFormatHandler(pdfHandler)
+registerFormatHandler(xlsxHandler)
 registerFormatHandler(zipHandler)

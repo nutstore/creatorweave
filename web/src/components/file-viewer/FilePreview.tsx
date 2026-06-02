@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
-import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download } from 'lucide-react'
+import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download, ExternalLink } from 'lucide-react'
 import { Editor, loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -22,7 +22,7 @@ import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { toast } from 'sonner'
-import { OfficePreview, OFFICE_EXTS } from './OfficePreview'
+import { OfficePreview, OFFICE_EXTS, getEo2EditorUrl } from './OfficePreview'
 import { getFormatUIHandler } from '@/agent/tools/format-registry'
 
 // Configure Monaco loader to use the locally bundled monaco-editor package
@@ -734,6 +734,24 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               ))}
             </div>
           )}
+          {/* Open in new tab via external service (generic for any format that supports it) */}
+          {fileType === 'format' && formatBlob && filePath?.endsWith('.xlsx') && !loading && !error && (
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const url = await getEo2EditorUrl(formatBlob, fileName)
+                  window.open(url, '_blank', 'noopener')
+                } catch (err) {
+                  toast.error(t('filePreview.openInNewTabFailed', { error: err instanceof Error ? err.message : String(err) }))
+                }
+              }}
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title={t('filePreview.openInNewTab')}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </button>
+          )}
           {/* Comment hint for text files */}
           {isCommentable && !composer && (
             <span className="hidden shrink-0 text-[10px] text-neutral-300 dark:text-neutral-600 sm:inline">
@@ -794,11 +812,16 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <OfficePreview blob={officeBlob} fileName={fileName} fileSize={fileSize} />
         )}
 
-        {/* Format preview (driven by format-registry) */}
-        {fileType === 'format' && formatBlob && formatViewMode === 'preview' && formatUI?.PreviewComponent && !loading && !error && (
-          <Suspense fallback={<div className="flex h-full items-center justify-center"><p className="text-xs text-neutral-400">Loading...</p></div>}>
-            <formatUI.PreviewComponent blob={formatBlob} fileName={fileName} fileSize={fileSize} />
-          </Suspense>
+        {/* Format preview (driven by format-registry).
+            Always rendered when loaded (not conditionally unmounted) so that
+            heavy components (e.g. OfficePreview uploading to eo2suite) are not
+            re-mounted on every view-mode toggle. Hidden via CSS instead. */}
+        {fileType === 'format' && formatBlob && formatUI?.PreviewComponent && !loading && !error && (
+          <div className={formatViewMode === 'preview' ? 'h-full' : 'hidden'}>
+            <Suspense fallback={<div className="flex h-full items-center justify-center"><p className="text-xs text-neutral-400">Loading...</p></div>}>
+              <formatUI.PreviewComponent blob={formatBlob} fileName={fileName} fileSize={fileSize} />
+            </Suspense>
+          </div>
         )}
 
         {/* Binary (non-image) file */}

@@ -5,7 +5,7 @@
  * 1. Upload file blob to eo2suite → get file key
  * 2. Create JWT token via eo2suite API
  * 3. Get editor URL from openDocument API
- * 4. Embed in iframe for preview
+ * 4. Open editor URL in new tab for preview
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,10 +13,39 @@ import { FileText, AlertCircle, RefreshCw, ExternalLink } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { useT } from '@/i18n'
 
-// ── eo2suite API endpoints ──────────────────────────────────────────────────
+// ── eo2suite API helpers (exported for reuse) ─────────────────────────────
 
 const EO2_UPLOAD_URL = 'https://web.eo2suite.cn/api/file/upload'
 const EO2_CREATE_TOKEN_URL = 'https://web.eo2suite.cn/api/trpc/editor.createToken?batch=1'
+
+export async function uploadToEo2Suite(blob: Blob, fileName: string): Promise<string> {
+  const url = `${EO2_UPLOAD_URL}?name=${encodeURIComponent(fileName)}`
+  const res = await fetch(url, { method: 'PUT', body: blob })
+  if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
+  const data = await res.json()
+  return data.key as string
+}
+
+export async function getEo2EditorUrl(blob: Blob, fileName: string): Promise<string> {
+  const key = await uploadToEo2Suite(blob, fileName)
+  const res = await fetch(EO2_CREATE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ '0': { key } }),
+  })
+  if (!res.ok) throw new Error(`Create token failed: ${res.status}`)
+  const data = await res.json()
+  const result = data?.[0]?.result?.data
+  if (!result?.token || !result?.api) throw new Error('Invalid token response')
+  const editorRes = await fetch(result.api, {
+    method: 'GET',
+    headers: { Accept: 'application/json', Authorization: `Bearer ${result.token}` },
+  })
+  if (!editorRes.ok) throw new Error(`Open document failed: ${editorRes.status}`)
+  const editorData = await editorRes.json()
+  if (!editorData?.url) throw new Error('No editor URL in response')
+  return editorData.url as string
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,62 +57,8 @@ interface OfficePreviewProps {
 
 type PreviewState =
   | { status: 'uploading' }
-  | { status: 'creating-token' }
-  | { status: 'loading-editor' }
   | { status: 'ready'; url: string }
   | { status: 'error'; message: string }
-
-// ── API helpers ─────────────────────────────────────────────────────────────
-
-async function uploadFile(blob: Blob, fileName: string): Promise<string> {
-  const url = `${EO2_UPLOAD_URL}?name=${encodeURIComponent(fileName)}`
-  const res = await fetch(url, {
-    method: 'PUT',
-    body: blob,
-  })
-  if (!res.ok) {
-    throw new Error(`Upload failed: ${res.status} ${res.statusText}`)
-  }
-  const data = await res.json()
-  return data.key as string
-}
-
-async function createToken(key: string): Promise<{ token: string; api: string }> {
-  const res = await fetch(EO2_CREATE_TOKEN_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ '0': { key } }),
-  })
-  if (!res.ok) {
-    throw new Error(`Create token failed: ${res.status} ${res.statusText}`)
-  }
-  const data = await res.json()
-  const result = data?.[0]?.result?.data
-  if (!result?.token || !result?.api) {
-    throw new Error('Invalid token response')
-  }
-  return result as { token: string; api: string }
-}
-
-async function getEditorUrl(token: string, api: string): Promise<string> {
-  const res = await fetch(api, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  })
-  if (!res.ok) {
-    throw new Error(`Open document failed: ${res.status} ${res.statusText}`)
-  }
-  const data = await res.json()
-  if (!data?.url) {
-    throw new Error('No editor URL in response')
-  }
-  return data.url as string
-}
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -94,16 +69,7 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
   const loadPreview = useCallback(async () => {
     setState({ status: 'uploading' })
     try {
-      // Step 1: Upload file
-      const key = await uploadFile(blob, fileName)
-      setState({ status: 'creating-token' })
-
-      // Step 2: Create token
-      const { token, api } = await createToken(key)
-      setState({ status: 'loading-editor' })
-
-      // Step 3: Get editor URL
-      const url = await getEditorUrl(token, api)
+      const url = await getEo2EditorUrl(blob, fileName)
       setState({ status: 'ready', url })
     } catch (err) {
       setState({
@@ -117,22 +83,14 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
     loadPreview()
   }, [loadPreview])
 
-  // ── Status labels ────────────────────────────────────────────────────────
-
-  const statusLabel: Record<string, string> = {
-    uploading: t('officePreview.uploading', { defaultValue: '正在上传文件...' }),
-    'creating-token': t('officePreview.creatingToken', { defaultValue: '正在生成预览...' }),
-    'loading-editor': t('officePreview.loadingEditor', { defaultValue: '正在加载编辑器...' }),
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────
 
-  // Loading states
-  if (state.status === 'uploading' || state.status === 'creating-token' || state.status === 'loading-editor') {
+  // Loading state
+  if (state.status === 'uploading') {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-600 dark:border-neutral-600 dark:border-t-neutral-300" />
-        <p className="text-xs text-neutral-500">{statusLabel[state.status]}</p>
+        <p className="text-xs text-neutral-500">{t('officePreview.uploading', { defaultValue: '正在上传文件...' })}</p>
         <p className="text-[10px] text-neutral-400">
           {fileName} ({formatBytes(fileSize)})
         </p>
@@ -185,5 +143,5 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
 
 // ── Office file extensions ──────────────────────────────────────────────────
 
-/** Extensions handled by eo2suite (files not supported locally) */
-export const OFFICE_EXTS = new Set(['xlsx', 'xls', 'pptx', 'ppt', 'doc', 'docx'])
+/** Extensions handled by eo2suite (files not supported locally). xlsx is handled by format-registry. */
+export const OFFICE_EXTS = new Set(['xls', 'pptx', 'ppt', 'doc', 'docx'])

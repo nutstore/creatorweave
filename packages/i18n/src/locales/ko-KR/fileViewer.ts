@@ -39,6 +39,9 @@ export const filePreview = {
     commentsCount: "{count}개 댓글",
     sendToAI: "AI에게 보내기",
     clearComments: "모든 댓글 지우기",
+    // 새 탭에서 열기 (범용, 외부 미리보기가 있는 모든 형식에서 사용)
+    openInNewTab: "새 탭에서 열기",
+    openInNewTabFailed: "열기 실패: {error}",
 } as const
 
 // Office 파일 미리보기

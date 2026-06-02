@@ -39,6 +39,9 @@ export const filePreview = {
     commentsCount: "{count} 条评论",
     sendToAI: "发给 AI",
     clearComments: "清除所有评论",
+    // 在新标签页打开（通用，适用于任何有外部预览的格式）
+    openInNewTab: "在新标签页打开",
+    openInNewTabFailed: "打开失败：{error}",
 } as const
 
 // Office 文件预览

@@ -41,6 +41,9 @@ export const filePreview = {
     commentsCount: "{count} 件のコメント",
     sendToAI: "AIに送信",
     clearComments: "すべてのコメントをクリア",
+    // 新しいタブで開く（汎用、外部プレビューを持つすべてのフォーマットで使用）
+    openInNewTab: "新しいタブで開く",
+    openInNewTabFailed: "開けませんでした: {error}",
 } as const
 
 // Office ファイルプレビュー
