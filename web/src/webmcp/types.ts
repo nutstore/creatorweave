@@ -101,13 +101,13 @@ export interface WebMCPBridge {
   ready: boolean
   webMCPDiscover: (options?: { force?: boolean }) => Promise<WebMCPDiscoverResponse>
   webMCPInvoke: (payload: WebMCPInvokeRequest) => Promise<WebMCPInvokeResponse>
-  webMCPPluginDownloadStream: (payload: {
+  webMCPPluginDownloadStream?: (payload: {
     transferId: string
     downloadUrl: string
     savePath: string
     fileName: string
   }) => AsyncIterable<WebMCPPluginDownloadFrame> & { cancel: () => void }
-  webMCPPluginDownloadFinalize: (payload: {
+  webMCPPluginDownloadFinalize?: (payload: {
     transferId: string
     savedPath: string
   }) => Promise<{ ok: boolean; transferId?: string; error?: string }>

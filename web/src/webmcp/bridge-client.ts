@@ -6,8 +6,7 @@ export function getWebMCPBridge(): WebMCPBridge | null {
   if (!bridge?.ready) return null
   if (typeof bridge.webMCPDiscover !== 'function') return null
   if (typeof bridge.webMCPInvoke !== 'function') return null
-  if (typeof bridge.webMCPPluginDownloadStream !== 'function') return null
-  if (typeof bridge.webMCPPluginDownloadFinalize !== 'function') return null
+  // Plugin download methods are optional — old extensions won't have them
   return bridge as WebMCPBridge
 }
 

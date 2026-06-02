@@ -79,6 +79,14 @@ export function createWebMCPToolExecutor(fullToolName: string, hostname?: string
       }
 
       if (response.pluginDownloadPlan) {
+        if (!bridge.webMCPPluginDownloadStream || !bridge.webMCPPluginDownloadFinalize) {
+          return toolErrorJson(
+            fullToolName,
+            'WEBMCP_PLUGIN_DOWNLOAD_UNSUPPORTED',
+            'Plugin download is not supported by this version of the browser extension. Please update the extension.',
+            { retryable: false }
+          )
+        }
         try {
           const saveResult = await consumeAndSavePluginDownload(
             bridge,

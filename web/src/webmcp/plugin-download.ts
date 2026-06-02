@@ -192,6 +192,9 @@ export async function consumeAndSavePluginDownload(
     throw new Error('workspaceId is required for plugin download assets save')
   }
 
+  if (!bridge.webMCPPluginDownloadStream) {
+    throw new Error('Plugin download streaming is not supported by the browser extension')
+  }
   const stream = bridge.webMCPPluginDownloadStream({
     transferId: plan.transferId,
     downloadUrl: plan.downloadUrl,
