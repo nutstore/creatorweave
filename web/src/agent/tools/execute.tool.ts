@@ -2,6 +2,7 @@
  * python tool - Python code execution.
  */
 
+import { Mutex } from 'async-mutex'
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { pythonExecutor as runtimePythonExecutor } from '@/python'
 import { useConversationContextStore } from '@/store/conversation-context.store'
@@ -9,6 +10,23 @@ import { useConversationStore } from '@/store/conversation.store'
 import type { AssetMeta, FileSnapshot } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
+
+/**
+ * Mutex to serialize Python execution on the main thread.
+ *
+ * The Pyodide worker already serializes actual Python execution via its internal
+ * messageQueue, but the main-thread side (OPFS snapshot → execute → diff → register)
+ * has shared mutable state that can be corrupted if pi-agent-core dispatches
+ * multiple python tool_calls concurrently (e.g. Promise.all).
+ *
+ * This lock ensures the full snapshot→execute→diff→register cycle runs exclusively,
+ * preventing race conditions on:
+ *   - OPFS file snapshots (scanFilesWithCache / detectChanges)
+ *   - Asset directory snapshots (snapshotAssetsDir / diffAssets)
+ *   - Overlay ledger writes (registerDetectedChanges)
+ *   - Pending changes refresh (refreshPendingChanges)
+ */
+const pythonMutex = new Mutex()
 
 //=============================================================================
 // Tool Definition
@@ -82,7 +100,9 @@ export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const code = args.code as string
   const timeout = (args.timeout as number) || 60000
 
-  return executePython(code, timeout, context.workspaceId, context.directoryHandle)
+  return pythonMutex.runExclusive(() =>
+    executePython(code, timeout, context.workspaceId, context.directoryHandle)
+  )
 }
 
 //=============================================================================
@@ -95,6 +115,13 @@ interface PythonOutputData {
   executionTime?: number
 }
 
+/**
+ * Execute Python code with full OPFS change detection.
+ *
+ * IMPORTANT: Callers MUST wrap this in pythonMutex.runExclusive() to prevent
+ * concurrent snapshot/diff races. Do NOT call this function directly without
+ * holding the mutex.
+ */
 async function executePython(
   code: string,
   timeout: number,
