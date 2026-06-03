@@ -617,3 +617,44 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
   margin-bottom: 16px;
 }
+
+/* ── PDF Preview: text layer for selection/copy ── */
+
+/* Page slot layout: centers the page and provides positioning context */
+.cw-pdf-page-slot {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+/* Inner wrapper: positions canvas + text layer together */
+.cw-pdf-page-inner {
+  position: relative;
+}
+
+/* Transparent text layer sits exactly on top of the canvas */
+.cw-pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  opacity: 0.25;
+  line-height: 1;
+}
+
+/* Individual text spans must not intercept mouse events when not selecting */
+.cw-pdf-text-layer > br,
+.cw-pdf-text-layer > span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  transform-origin: 0% 0%;
+}
+
+/* When user is selecting text, make the layer interactive */
+.cw-pdf-text-layer ::selection {
+  background: rgba(93, 138, 142, 0.25); /* primary-500 with alpha */
+}
+
+.dark .cw-pdf-text-layer ::selection {
+  background: rgba(107, 153, 157, 0.35); /* primary-600 with alpha */
+}

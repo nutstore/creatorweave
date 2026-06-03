@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import type { PDFDocumentProxy } from 'pdfjs-dist'
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import { FileText, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Loader2 } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { getPdfjs } from './pdfjs'
@@ -40,6 +40,7 @@ function PageSlot({
   isVisible: boolean
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const textLayerRef = useRef<HTMLDivElement>(null)
   const renderTaskRef = useRef<any>(null)
   const lastRenderKey = useRef('')
 
@@ -59,6 +60,7 @@ function PageSlot({
     if (!isVisible) return
 
     const canvas = canvasRef.current
+    const textLayerDiv = textLayerRef.current
     const doc = _sharedDocRef
     if (!canvas || !doc) return
 
@@ -100,6 +102,8 @@ function PageSlot({
 
         if (!cancelled) {
           lastRenderKey.current = renderKey
+          // Build text layer for selection/copy
+          await renderTextLayer(page, viewport, textLayerDiv)
         }
       } catch (err: unknown) {
         const isCancel = err instanceof Error && 'name' in err
@@ -124,11 +128,11 @@ function PageSlot({
   return (
     <div
       data-page={pageNum}
-      className="flex shrink-0 justify-center"
+      className="cw-pdf-page-slot"
       style={{ height: displaySize.height }}
     >
-      <canvas
-        ref={canvasRef}
+      <div
+        className="cw-pdf-page-inner"
         style={{
           width: displaySize.width,
           height: displaySize.height,
@@ -137,10 +141,64 @@ function PageSlot({
           // require a re-render.
           visibility: isVisible ? 'visible' : 'hidden',
         }}
-        className="shadow-lg"
-      />
+      >
+        <canvas
+          ref={canvasRef}
+          className="shadow-lg"
+        />
+        <div
+          ref={textLayerRef}
+          className="cw-pdf-text-layer"
+        />
+      </div>
     </div>
   )
+}
+
+// ── Text Layer Rendering ──────────────────────────────────────────────────
+
+/**
+ * Render a transparent text layer on top of the canvas so users can
+ * select and copy text from the PDF. Uses pdfjs TextLayer API.
+ */
+async function renderTextLayer(
+  page: PDFPageProxy,
+  viewport: ReturnType<PDFPageProxy['getViewport']>,
+  container: HTMLDivElement | null,
+) {
+  if (!container) return
+
+  // Clear previous text layer content
+  container.innerHTML = ''
+
+  const pdfjsLib = await getPdfjs()
+
+  try {
+    const textContent = await page.getTextContent()
+
+    // pdfjs-dist v4+ exposes TextLayer as a class
+    if ('TextLayer' in pdfjsLib) {
+      const textLayer = new (pdfjsLib as any).TextLayer({
+        textContentSource: textContent,
+        container,
+        viewport,
+      })
+      await textLayer.render()
+    } else {
+      // Fallback for older versions using renderTextLayer function
+      const renderTextLayerFn = (pdfjsLib as any).renderTextLayer
+      if (renderTextLayerFn) {
+        await renderTextLayerFn({
+          textContentSource: textContent,
+          container,
+          viewport,
+        })
+      }
+    }
+  } catch (err) {
+    // Text layer is best-effort; don't break the viewer if it fails
+    console.warn(`PDF text layer error (page ${page.pageNumber}):`, err)
+  }
 }
 
 // ── Shared doc ref ─────────────────────────────────────────────────────────
@@ -244,6 +302,9 @@ export function PdfPreview({ blob, fileName, fileSize }: {
   }, [renderTick, totalPages])
 
   // ── Intersection Observer ───────────────────────────────────────────────
+  // Tracks which pages are within the extended render buffer zone.
+  // Page number detection is handled separately via scroll listener
+  // for robustness.
 
   useEffect(() => {
     const container = containerRef.current
@@ -269,11 +330,6 @@ export function PdfPreview({ blob, fileName, fileSize }: {
         }
 
         if (changed) {
-          // Update toolbar's current page to the topmost visible page
-          if (!isScrollingToPage.current && visiblePagesRef.current.size > 0) {
-            const sorted = Array.from(visiblePagesRef.current).sort((a, b) => a - b)
-            setCurrentPage(sorted[0])
-          }
           // Trigger re-render so renderBuffer recomputes
           setRenderTick(n => n + 1)
         }
@@ -294,6 +350,56 @@ export function PdfPreview({ blob, fileName, fileSize }: {
     }
 
     return () => observer.disconnect()
+  }, [loading, pageSizes, scale, rotation])
+
+  // ── Scroll-based page tracking ─────────────────────────────────────────
+  // Uses a scroll listener to detect which page is at the top of the
+  // viewport. This is more reliable than IntersectionObserver for
+  // determining the "current page" because it doesn't depend on the
+  // observer's rootMargin or callback timing.
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || loading || pageSizes.length === 0) return
+
+    function onScroll() {
+      if (isScrollingToPage.current) return
+
+      const containerTop = container.scrollTop
+      const containerHeight = container.clientHeight
+
+      // Find the page whose top edge is closest to (but not below)
+      // the middle of the visible viewport area.
+      let bestPage = 1
+      let bestDist = Infinity
+
+      const pageElements = container.querySelectorAll('[data-page]')
+      for (const el of pageElements) {
+        const pageNum = parseInt(el.getAttribute('data-page')!, 10)
+        // Use getBoundingClientRect relative to the container
+        const rect = (el as HTMLElement).getBoundingClientRect()
+        const containerRect = container.getBoundingClientRect()
+        // Distance from page top to container top
+        const dist = rect.top - containerRect.top
+        // Pick the page closest to the top, preferring pages that
+        // have started to enter the viewport (dist <= half height)
+        if (dist <= containerHeight / 2 && dist > -rect.height) {
+          const absDist = Math.abs(dist)
+          if (absDist < bestDist) {
+            bestDist = absDist
+            bestPage = pageNum
+          }
+        }
+      }
+
+      setCurrentPage(bestPage)
+    }
+
+    container.addEventListener('scroll', onScroll, { passive: true })
+    // Run once on mount to set initial page
+    onScroll()
+
+    return () => container.removeEventListener('scroll', onScroll)
   }, [loading, pageSizes, scale, rotation])
 
   // ── Auto-fit scale on first load ───────────────────────────────────────
@@ -366,12 +472,29 @@ export function PdfPreview({ blob, fileName, fileSize }: {
   const zoomOut = useCallback(() => setScale(s => Math.max(0.25, s - 0.25)), [])
   const rotate = useCallback(() => setRotation(r => (r + 90) % 360), [])
 
-  const handlePageInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseInt(e.target.value, 10)
+  const [pageInput, setPageInput] = useState<string | null>(null)
+
+  const handlePageInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setPageInput(e.target.value)
+  }, [])
+
+  const handlePageInputCommit = useCallback(() => {
+    if (pageInput === null) return
+    const val = parseInt(pageInput, 10)
+    setPageInput(null)
     if (!isNaN(val) && val >= 1 && val <= totalPages) {
       scrollToPage(val)
     }
-  }, [totalPages, scrollToPage])
+  }, [pageInput, totalPages, scrollToPage])
+
+  const handlePageInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handlePageInputCommit()
+    } else if (e.key === 'Escape') {
+      setPageInput(null)
+    }
+  }, [handlePageInputCommit])
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -429,8 +552,10 @@ export function PdfPreview({ blob, fileName, fileSize }: {
           <div className="flex items-center gap-0.5 text-[11px]">
             <input
               type="text"
-              value={currentPage}
-              onChange={handlePageInput}
+              value={pageInput ?? currentPage}
+              onChange={handlePageInputChange}
+              onKeyDown={handlePageInputKeyDown}
+              onBlur={handlePageInputCommit}
               className="w-8 rounded border border-neutral-200 bg-transparent text-center text-[11px] text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
               style={{ lineHeight: '18px' }}
             />
