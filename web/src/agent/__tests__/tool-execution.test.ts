@@ -22,7 +22,27 @@ describe('tool-execution helpers', () => {
     expect(result.content).toContain('boom')
   })
 
-  it('truncateLargeToolResult reduces oversized search payload to summary-only result', () => {
+  it('truncateLargeToolResult skips truncation when existingTokens is undefined', async () => {
+    const raw = JSON.stringify({
+      results: [{ path: 'a.ts', line: 1, match: 'x'.repeat(3000), preview: 'x'.repeat(3000) }],
+      totalMatches: 1,
+      scannedFiles: 1,
+    })
+
+    const result = await truncateLargeToolResult({
+      rawResult: raw,
+      toolName: 'search',
+      // existingTokens intentionally omitted — no real usage data available
+      maxContextTokens: 3000,
+      reserveTokens: 200,
+      estimateTextTokens: (text) => text.length,
+    })
+
+    // Should return raw result unchanged — no truncation without real usage data
+    expect(result).toBe(raw)
+  })
+
+  it('truncateLargeToolResult reduces oversized search payload to summary-only result', async () => {
     const raw = JSON.stringify({
       results: [{ path: 'a.ts', line: 1, match: 'x'.repeat(3000), preview: 'x'.repeat(3000) }],
       totalMatches: 1,

@@ -1,5 +1,8 @@
 /**
  * edit tool - Single-file text replacement with read-before-edit safety checks.
+ *
+ * Only accepts an `edits` array of {old_text, new_text} entries.
+ * All edits are applied atomically — if any fail, nothing is written.
  */
 
 import { structuredPatch } from 'diff'
@@ -197,11 +200,16 @@ export const editDefinition: ToolDefinition = {
       'WORKFLOW:',
       '1. Call read(path) to load file contents',
       '2. Identify the exact text to change from the read output',
-      '3. Call edit(path, old_text=<exact snippet from file>, new_text=<replacement>)',
+      '3. Call edit(path, edits=[{old_text=<exact snippet from file>, new_text=<replacement>}])',
+      '',
+      'The `edits` array supports one or more edits applied atomically to the same file.',
+      'Each edit is applied atomically — if any edit fails, the entire operation is rolled back.',
+      'Example single edit: edit(path, edits=[{old_text:"foo", new_text:"bar"}])',
+      'Example multi edit: edit(path, edits=[{old_text:"foo", new_text:"bar"}, {old_text:"baz", new_text:"qux"}])',
       '',
       'TIPS:',
       '- Copy old_text EXACTLY from the read() output — whitespace and line breaks must match',
-      '- old_text must be unique in the file unless replace_all=true',
+      '- old_text must be unique in the file (each occurrence must match exactly once)',
       '- For multi-line changes, include enough surrounding context to make old_text unique',
       '- new_text can be an empty string to delete text',
       '- Supports vfs://workspace/... and vfs://agents/{id}/... paths',
@@ -213,48 +221,86 @@ export const editDefinition: ToolDefinition = {
           type: 'string',
           description: 'File path to edit (e.g., "src/config.ts", "README.md", or "vfs://agents/default/SOUL.md")',
         },
-        old_text: {
-          type: 'string',
-          description: 'Exact text to find in the file. Must match exactly including whitespace and indentation. Copy directly from read() output.',
-        },
-        new_text: {
-          type: 'string',
-          description: 'Replacement text. Can be empty string to delete the matched text.',
-        },
-        replace_all: {
-          type: 'boolean',
-          description: 'Set true to replace ALL occurrences of old_text in the file. Default: false (only first occurrence).',
-          default: false,
+        edits: {
+          type: 'array',
+          description: 'Array of edits to apply atomically to the file. Even a single edit must be wrapped in the array. Edits are applied bottom-to-top to avoid offset drift. If any edit fails, all changes are rolled back.',
+          items: {
+            type: 'object',
+            properties: {
+              old_text: {
+                type: 'string',
+                description: 'Exact text to find in the file. Must match exactly including whitespace and indentation. Copy directly from read() output. Must be unique in the file.',
+              },
+              new_text: {
+                type: 'string',
+                description: 'Replacement text. Can be empty string to delete the matched text.',
+              },
+            },
+            required: ['old_text', 'new_text'],
+          },
         },
       },
-      required: ['path', 'old_text', 'new_text'],
+      required: ['path', 'edits'],
     },
   },
 }
 
+// ── Resolved edit item after parsing ────────────────────────────────
+interface ResolvedEdit {
+  oldText: string
+  newText: string
+}
+
 export const editExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
-  const oldText = args.old_text as string | undefined
-  const newText = args.new_text as string | undefined
-  const replaceAll = args.replace_all === true
+  const edits = args.edits as Array<{ old_text?: string; new_text?: string }> | undefined
 
+  // Reject legacy batch-edit args
   if (
     args.find !== undefined ||
     args.replace !== undefined ||
     args.use_regex !== undefined ||
     args.dry_run !== undefined ||
-    args.max_files !== undefined ||
-    looksLikeGlob(path)
+    args.max_files !== undefined
   ) {
     return toolErrorJson(
       'edit',
       'invalid_arguments',
-      'Batch edit capability has been removed. Use single-file edit with path + old_text + new_text.'
+      'Batch edit capability has been removed. Use edit with path + edits array.'
     )
   }
 
-  if (!path || oldText === undefined || newText === undefined) {
-    return toolErrorJson('edit', 'invalid_arguments', 'edit requires path + old_text + new_text')
+  // Reject removed old_text/new_text/replace_all parameters
+  if (args.old_text !== undefined || args.new_text !== undefined || args.replace_all !== undefined) {
+    return toolErrorJson(
+      'edit',
+      'invalid_arguments',
+      'The old_text, new_text, and replace_all parameters are no longer supported. Use the edits array instead: edit(path, edits=[{old_text, new_text}])'
+    )
+  }
+
+  if (!path) {
+    return toolErrorJson('edit', 'invalid_arguments', 'edit requires path')
+  }
+
+  if (!Array.isArray(edits) || edits.length === 0) {
+    return toolErrorJson(
+      'edit',
+      'invalid_arguments',
+      'edit requires an edits array with at least one entry: edit(path, edits=[{old_text, new_text}])'
+    )
+  }
+
+  // Validate edits array entries
+  for (let i = 0; i < edits.length; i++) {
+    const entry = edits[i]!
+    if (entry.old_text === undefined || entry.new_text === undefined) {
+      return toolErrorJson(
+        'edit',
+        'invalid_arguments',
+        `edits[${i}] is missing old_text or new_text. Each edit entry must have both.`
+      )
+    }
   }
 
   // Validate root prefix before any path rewriting
@@ -263,29 +309,44 @@ export const editExecutor: ToolExecutor = async (args, context) => {
 
   const rewrittenPath = rewritePythonMountPathForNonPythonTool(path)
   const effectivePath = rewrittenPath?.rewritten ? rewrittenPath.rewrittenPath : path
-  return executeSingleEdit(context, { path: effectivePath, oldText, newText, replaceAll })
+
+  const resolvedEdits: ResolvedEdit[] = edits.map((e) => ({
+    oldText: e.old_text!,
+    newText: e.new_text!,
+  }))
+
+  return executeEdits(context, { path: effectivePath, edits: resolvedEdits })
 }
 
-function looksLikeGlob(path: string | undefined): boolean {
-  if (!path) return false
-  return path.includes('*') || path.includes('?') || path.includes('[')
-}
+// ── Apply edits atomically ──────────────────────────────────────────
 
-async function executeSingleEdit(
+/**
+ * Apply one or more edits to a single file atomically.
+ *
+ * Strategy:
+ * 1. Load file content (with read-before-edit safety checks).
+ * 2. Find each old_text in the file and record its position.
+ * 3. Validate no ambiguous or overlapping matches.
+ * 4. Sort matches by position descending (bottom-to-top).
+ * 5. Apply replacements in that order — later edits don't shift earlier ones.
+ * 6. If any edit fails to match, return error without writing.
+ */
+async function executeEdits(
   context: ToolContext,
-  opts: { path: string; oldText: string; newText: string; replaceAll: boolean }
+  opts: { path: string; edits: ResolvedEdit[] }
 ): Promise<string> {
-  const { path, oldText, newText, replaceAll } = opts
+  const { path, edits } = opts
 
-  if (oldText.length === 0) {
-    return toolErrorJson(
-      'edit',
-      'invalid_arguments',
-      'old_text cannot be empty. Provide exact existing text to replace.'
-    )
+  // Validate no empty old_text
+  for (let i = 0; i < edits.length; i++) {
+    if (edits[i]!.oldText.length === 0) {
+      return toolErrorJson(
+        'edit',
+        'invalid_arguments',
+        `edits[${i}].old_text cannot be empty. Provide exact existing text to replace.`
+      )
+    }
   }
-
-  const isNoopEdit = oldText === newText
 
   try {
     const { getPendingChanges } = useOPFSStore.getState()
@@ -304,13 +365,11 @@ async function executeSingleEdit(
 
     let fileContent: string
 
-    // Check if a format handler exists for this file type (e.g. .nol → ZIP)
+    // Check if a format handler exists for this file type
     const formatHandler = getFormatHandler(path)
 
-    // Read current content via backend (unified for all target kinds)
     try {
       if (formatHandler?.read) {
-        // Binary format with a read handler — decode to text via format handler
         const backendResult = await target.backend.readFile(target.path, { encoding: 'binary' })
         const rawData = backendResult.content instanceof ArrayBuffer
           ? new Uint8Array(backendResult.content)
@@ -353,61 +412,125 @@ async function executeSingleEdit(
       )
     }
 
-    const normalizedEdit = normalizeEditInput(path, fileContent, oldText, newText)
-
-    // Use fuzzy matching (quote normalization)
-    const actualOldText = findActualString(fileContent, normalizedEdit.oldText)
-    if (!actualOldText) {
-      return toolErrorJson(
-        'edit',
-        'old_text_not_found',
-        'old_text not found in the file. ' +
-          'Verify the exact content with the read tool first. ' +
-          'Hint: Whitespace and line endings must match exactly. ' +
-          'Consider copying the text directly from the file rather than retyping it.'
-      )
+    // ── Phase 1: Resolve all matches ───────────────────────────────
+    interface ResolvedMatch {
+      index: number           // position in original fileContent
+      editIndex: number       // index into edits array
+      actualOldText: string   // the actual text from the file (with original quotes etc.)
+      actualNewText: string   // new_text adjusted for quote style
     }
 
-    // Preserve curly quote style from the file into new_text
-    const actualNewText = preserveQuoteStyle(
-      normalizedEdit.oldText,
-      actualOldText,
-      normalizedEdit.newText
-    )
+    const matches: ResolvedMatch[] = []
 
-    const matches = fileContent.split(actualOldText).length - 1
-    if (matches > 1 && !replaceAll && !isNoopEdit) {
-      return toolErrorJson(
-        'edit',
-        'ambiguous_match',
-        'old_text appears multiple times. Set replace_all=true to replace all occurrences, or provide a more unique snippet.'
+    for (let i = 0; i < edits.length; i++) {
+      const edit = edits[i]!
+      const normalizedEdit = normalizeEditInput(path, fileContent, edit.oldText, edit.newText)
+      const actualOldText = findActualString(fileContent, normalizedEdit.oldText)
+
+      if (!actualOldText) {
+        return toolErrorJson(
+          'edit',
+          'old_text_not_found',
+          `edits[${i}].old_text not found in the file. ` +
+            'Verify the exact content with the read tool first. ' +
+            'Hint: Whitespace and line endings must match exactly.'
+        )
+      }
+
+      const actualNewText = preserveQuoteStyle(
+        normalizedEdit.oldText,
+        actualOldText,
+        normalizedEdit.newText
       )
+
+      // Check for ambiguous match (multiple occurrences)
+      const matchCount = fileContent.split(actualOldText).length - 1
+      if (matchCount > 1) {
+        return toolErrorJson(
+          'edit',
+          'ambiguous_match',
+          `edits[${i}].old_text appears ${matchCount} times in the file. ` +
+            'Provide a more unique snippet for this edit.'
+        )
+      }
+
+      // Find the actual character offset using the actual old text
+      const charOffset = fileContent.indexOf(actualOldText)
+      if (charOffset === -1) {
+        // Should not happen since findActualString succeeded, but safety check
+        return toolErrorJson(
+          'edit',
+          'old_text_not_found',
+          `edits[${i}].old_text could not be located in the file.`
+        )
+      }
+
+      // Check for overlapping matches
+      const overlapWith = matches.find((m) => {
+        const mEnd = m.index + m.actualOldText.length
+        const thisEnd = charOffset + actualOldText.length
+        return charOffset < mEnd && m.index < thisEnd
+      })
+      if (overlapWith) {
+        return toolErrorJson(
+          'edit',
+          'overlapping_edits',
+          `edits[${i}] overlaps with edits[${overlapWith.editIndex}]. Ensure edit regions are non-overlapping.`
+        )
+      }
+
+      matches.push({
+        index: charOffset,
+        editIndex: i,
+        actualOldText,
+        actualNewText,
+      })
     }
 
-    const updatedFile = isNoopEdit
-      ? fileContent
-      : replaceAll
-        ? fileContent.split(actualOldText).join(actualNewText)
-        : fileContent.replace(actualOldText, actualNewText)
+    // ── Phase 2: Apply bottom-to-top ───────────────────────────────
+    // Sort by position descending so later-in-file edits are applied first
+    matches.sort((a, b) => b.index - a.index)
 
-    if (!isNoopEdit) {
+    let updatedContent = fileContent
+    let noopCount = 0
+    let appliedCount = 0
+
+    for (const match of matches) {
+      const isNoop = match.actualOldText === match.actualNewText
+      if (isNoop) {
+        noopCount++
+        continue
+      }
+
+      // Replace at exact position
+      updatedContent =
+        updatedContent.substring(0, match.index) +
+        match.actualNewText +
+        updatedContent.substring(match.index + match.actualOldText.length)
+      appliedCount++
+    }
+
+    // ── Phase 3: Write result ──────────────────────────────────────
+    if (appliedCount > 0) {
       if (formatHandler?.write) {
-        // Binary format with a write handler — encode text back to binary via format handler
         const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
-        const binaryData = await formatHandler.write(updatedFile, path, writeContext)
+        const binaryData = await formatHandler.write(updatedContent, path, writeContext)
         await target.backend.writeFile(target.path, binaryData)
       } else if (formatHandler && !formatHandler.write) {
-        // Format handler exists but is read-only (e.g. .pdf, .zip)
-        return toolErrorJson('edit', 'no_format_writer', `Cannot edit .${formatHandler.extension} files directly with the edit tool. Use the python tool instead if you need to modify this file.`, {
-          hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.`,
-        })
+        return toolErrorJson(
+          'edit',
+          'no_format_writer',
+          `Cannot edit .${formatHandler.extension} files directly with the edit tool. Use the python tool instead if you need to modify this file.`,
+          { hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.` }
+        )
       } else {
-        await target.backend.writeFile(target.path, updatedFile)
+        await target.backend.writeFile(target.path, updatedContent)
       }
     }
 
+    // Update read state
     readFileState.set(readStateKey, {
-      content: updatedFile,
+      content: updatedContent,
       timestamp: Date.now(),
       offset: undefined,
       limit: undefined,
@@ -418,35 +541,36 @@ async function executeSingleEdit(
     const pendingCount = getPendingChanges().length
     const status = target.backend.label === 'workspace' ? 'pending' : 'saved'
 
-    const patchResult = structuredPatch(path, path, fileContent, updatedFile, '', '', {
+    // Build diff
+    const patchResult = structuredPatch(path, path, fileContent, updatedContent, '', '', {
       context: 3,
     })
     const diffText = formatHunksToDiff(patchResult.hunks)
 
     const session = useRemoteStore.getState().session
     if (session) {
-      const preview = `Edited: ${path} (${newText.length} chars added, ${oldText.length} chars removed)`
+      const preview = `Edited: ${path} (${appliedCount} regions, ${edits.length - noopCount} edits applied)`
       session.broadcastFileChange(path, 'modify', preview)
     }
 
-    const replacedCount = isNoopEdit ? 0 : replaceAll ? matches : 1
     return toolOkJson('edit', {
-      noop: isNoopEdit,
+      noop: appliedCount === 0,
       path,
       action: 'modify',
-      replacedCount,
+      totalEdits: edits.length,
+      appliedCount,
+      noopCount,
       diff: diffText || undefined,
-      replaceAll,
       status,
       pendingCount,
       message:
         target.backend.label === 'workspace'
-          ? isNoopEdit
-            ? `File "${path}" already matched requested content. ${pendingCount} change(s) pending review.`
-            : `File "${path}" edited. ${pendingCount} change(s) pending review.`
-          : isNoopEdit
-            ? `File "${path}" already matched requested content.`
-            : `File "${path}" edited.`,
+          ? appliedCount === 0
+            ? `File "${path}" already matched all requested content. ${pendingCount} change(s) pending review.`
+            : `File "${path}" edited (${appliedCount} of ${edits.length} edits applied). ${pendingCount} change(s) pending review.`
+          : appliedCount === 0
+            ? `File "${path}" already matched all requested content.`
+            : `File "${path}" edited (${appliedCount} of ${edits.length} edits applied).`,
       ...(formatHandler?.formatHint ? { formatHint: formatHandler.formatHint } : {}),
     })
   } catch (error) {
@@ -466,6 +590,6 @@ export const editPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Operations',
   lines: [
-    '- `edit(path, old_text, new_text)` - Replace text in an existing file. REQUIRES prior read(). Use this for ALL modifications to existing files. (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
+    '- `edit(path, edits=[{old_text, new_text}])` - Apply one or more text replacements to an existing file. REQUIRES prior read(). All edits are applied atomically. (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
   ],
 }

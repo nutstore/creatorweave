@@ -95,7 +95,7 @@ function unwrapError(result: string) {
   return parsed.error
 }
 
-describe('file edit tool', () => {
+describe('file edit tool (edits-array-only)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resolveNativeDirectoryHandleMock.mockResolvedValue(null)
@@ -105,7 +105,7 @@ describe('file edit tool', () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: '1', new_text: '2' },
+      { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
       makeContext({ readFileState: new Map() })
     )
     const error = unwrapError(result)
@@ -113,6 +113,79 @@ describe('file edit tool', () => {
     expect(error.message).toContain('Read file before editing')
     expect(readFileMock).not.toHaveBeenCalled()
     expect(writeFileMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects old_text/new_text parameters with descriptive error', async () => {
+    const result = await editExecutor(
+      { path: 'src/a.ts', old_text: '1', new_text: '2' },
+      makeContext()
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('invalid_arguments')
+    expect(error.message).toContain('edits array')
+  })
+
+  it('rejects replace_all parameter with descriptive error', async () => {
+    const result = await editExecutor(
+      { path: 'src/a.ts', replace_all: true, edits: [{ old_text: '1', new_text: '2' }] },
+      makeContext()
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('invalid_arguments')
+    expect(error.message).toContain('edits array')
+  })
+
+  it('rejects missing edits array with descriptive error', async () => {
+    const result = await editExecutor(
+      { path: 'src/a.ts' },
+      makeContext()
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('invalid_arguments')
+    expect(error.message).toContain('edits array')
+  })
+
+  it('rejects empty edits array', async () => {
+    const result = await editExecutor(
+      { path: 'src/a.ts', edits: [] },
+      makeContext()
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('invalid_arguments')
+    expect(error.message).toContain('edits array')
+  })
+
+  it('applies single edit via edits array', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const a = 1\n',
+      metadata: { size: 12, contentType: 'text/plain' },
+    })
+    const readFileState = new Map<string, ReadFileStateEntry>([
+      [
+        'workspace:src/a.ts',
+        {
+          content: 'const a = 1\n',
+          timestamp: Date.now(),
+          isPartialView: false,
+        },
+      ],
+    ])
+
+    const result = await editExecutor(
+      { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
+      makeContext({ readFileState })
+    )
+    const data = unwrapOk(result)
+
+    expect(data.totalEdits).toBe(1)
+    expect(data.appliedCount).toBe(1)
+    expect(data.noopCount).toBe(0)
+    expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
   })
 
   it('reuses OPFS read source policy when snapshot came from OPFS', async () => {
@@ -135,7 +208,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: '1', new_text: '2' },
+      { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
       makeContext({ readFileState })
     )
 
@@ -166,7 +239,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: '1', new_text: '2' },
+      { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
       makeContext({ directoryHandle: null, readFileState })
     )
 
@@ -176,7 +249,7 @@ describe('file edit tool', () => {
     expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
   })
 
-  it('rejects multiple matches when replace_all is false', async () => {
+  it('rejects multiple matches (ambiguous) in edits array', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
     readFileMock.mockResolvedValueOnce({
       content: 'const x = old\nconst y = old\n',
@@ -190,45 +263,115 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'old', new_text: 'new' },
+      { path: 'src/a.ts', edits: [{ old_text: 'old', new_text: 'new' }] },
       makeContext({ readFileState })
     )
     const error = unwrapError(result)
 
     expect(error.code).toBe('ambiguous_match')
-    expect(error.message).toContain('replace_all')
+    expect(error.message).toContain('appears 2 times')
     expect(writeFileMock).not.toHaveBeenCalled()
   })
 
-  it('replaces all matches when replace_all is true and returns diff', async () => {
+  it('applies multiple edits atomically via edits array', async () => {
     resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
     readFileMock.mockResolvedValueOnce({
-      content: 'const x = old\nconst y = old\n',
-      metadata: { size: 30, contentType: 'text/plain' },
+      content: 'const x = foo\nconst y = bar\nconst z = baz\n',
+      metadata: { size: 42, contentType: 'text/plain' },
     })
     const readFileState = new Map([
       [
         'workspace:src/a.ts',
-        { content: 'const x = old\nconst y = old\n', timestamp: Date.now(), isPartialView: false },
+        { content: 'const x = foo\nconst y = bar\nconst z = baz\n', timestamp: Date.now(), isPartialView: false },
       ],
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'old', new_text: 'new', replace_all: true },
+      {
+        path: 'src/a.ts',
+        edits: [
+          { old_text: 'foo', new_text: 'qux' },
+          { old_text: 'bar', new_text: 'quux' },
+          { old_text: 'baz', new_text: 'corge' },
+        ],
+      },
       makeContext({ readFileState })
     )
     const data = unwrapOk(result)
 
-    expect(data.replaceAll).toBe(true)
+    expect(data.totalEdits).toBe(3)
+    expect(data.appliedCount).toBe(3)
+    expect(data.noopCount).toBe(0)
     expect(typeof data.diff).toBe('string')
-    expect(data.diff).toContain('-const x = old')
-    expect(data.diff).toContain('+const x = new')
+    expect(data.diff).toContain('-const x = foo')
+    expect(data.diff).toContain('+const x = qux')
+    expect(data.diff).toContain('-const y = bar')
+    expect(data.diff).toContain('+const y = quux')
     expect(writeFileMock).toHaveBeenCalledWith(
       'src/a.ts',
-      'const x = new\nconst y = new\n',
+      'const x = qux\nconst y = quux\nconst z = corge\n',
       null,
       'ws-1'
     )
+  })
+
+  it('rolls back all edits if one fails (none written)', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = foo\nconst y = bar\n',
+      metadata: { size: 26, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      [
+        'workspace:src/a.ts',
+        { content: 'const x = foo\nconst y = bar\n', timestamp: Date.now(), isPartialView: false },
+      ],
+    ])
+
+    const result = await editExecutor(
+      {
+        path: 'src/a.ts',
+        edits: [
+          { old_text: 'foo', new_text: 'qux' },
+          { old_text: 'nonexistent', new_text: 'fail' },
+        ],
+      },
+      makeContext({ readFileState })
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('old_text_not_found')
+    expect(error.message).toContain('edits[1]')
+    expect(writeFileMock).not.toHaveBeenCalled()
+  })
+
+  it('rejects overlapping edits', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = foobar\n',
+      metadata: { size: 16, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      [
+        'workspace:src/a.ts',
+        { content: 'const x = foobar\n', timestamp: Date.now(), isPartialView: false },
+      ],
+    ])
+
+    const result = await editExecutor(
+      {
+        path: 'src/a.ts',
+        edits: [
+          { old_text: 'foo', new_text: 'aaa' },
+          { old_text: 'foobar', new_text: 'bbb' },
+        ],
+      },
+      makeContext({ readFileState })
+    )
+    const error = unwrapError(result)
+
+    expect(error.code).toBe('overlapping_edits')
+    expect(writeFileMock).not.toHaveBeenCalled()
   })
 
   it('rejects legacy batch args because batch edit is removed', async () => {
@@ -265,8 +408,7 @@ describe('file edit tool', () => {
     const result = await editExecutor(
       {
         path: 'vfs://agents/novel-editor/SOUL.md',
-        old_text: 'old',
-        new_text: 'new',
+        edits: [{ old_text: 'old', new_text: 'new' }],
       },
       makeContext({ readFileState })
     )
@@ -286,7 +428,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'const x = old', new_text: 'const x = new' },
+      { path: 'src/a.ts', edits: [{ old_text: 'const x = old', new_text: 'const x = new' }] },
       makeContext({ readFileState })
     )
     unwrapOk(result)
@@ -301,7 +443,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'old', new_text: 'new' },
+      { path: 'src/a.ts', edits: [{ old_text: 'old', new_text: 'new' }] },
       makeContext({ readFileState })
     )
     const error = unwrapError(result)
@@ -323,13 +465,51 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'value', new_text: 'value' },
+      { path: 'src/a.ts', edits: [{ old_text: 'value', new_text: 'value' }] },
       makeContext({ readFileState })
     )
     const data = unwrapOk(result)
 
     expect(data.noop).toBe(true)
+    expect(data.appliedCount).toBe(0)
+    expect(data.noopCount).toBe(1)
     expect(writeFileMock).not.toHaveBeenCalled()
+  })
+
+  it('tracks noop and applied counts correctly with mixed edits', async () => {
+    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    readFileMock.mockResolvedValueOnce({
+      content: 'const x = foo\nconst y = bar\n',
+      metadata: { size: 26, contentType: 'text/plain' },
+    })
+    const readFileState = new Map([
+      [
+        'workspace:src/a.ts',
+        { content: 'const x = foo\nconst y = bar\n', timestamp: Date.now(), isPartialView: false },
+      ],
+    ])
+
+    const result = await editExecutor(
+      {
+        path: 'src/a.ts',
+        edits: [
+          { old_text: 'foo', new_text: 'foo' },       // noop
+          { old_text: 'bar', new_text: 'baz' },       // applied
+        ],
+      },
+      makeContext({ readFileState })
+    )
+    const data = unwrapOk(result)
+
+    expect(data.totalEdits).toBe(2)
+    expect(data.appliedCount).toBe(1)
+    expect(data.noopCount).toBe(1)
+    expect(writeFileMock).toHaveBeenCalledWith(
+      'src/a.ts',
+      'const x = foo\nconst y = baz\n',
+      null,
+      'ws-1'
+    )
   })
 
   it('normalizes sanitized old_text and mirrors replacement tokens into new_text', async () => {
@@ -350,7 +530,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: '<fnr>', new_text: '<fnr>_updated' },
+      { path: 'src/a.ts', edits: [{ old_text: '<fnr>', new_text: '<fnr>_updated' }] },
       makeContext({ readFileState })
     )
     unwrapOk(result)
@@ -377,7 +557,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: '"old"', new_text: '"new"   ' },
+      { path: 'src/a.ts', edits: [{ old_text: '"old"', new_text: '"new"   ' }] },
       makeContext({ readFileState })
     )
     unwrapOk(result)
@@ -399,7 +579,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'README.md', old_text: 'Title', new_text: 'Title  ' },
+      { path: 'README.md', edits: [{ old_text: 'Title', new_text: 'Title  ' }] },
       makeContext({ readFileState })
     )
     unwrapOk(result)
@@ -421,7 +601,7 @@ describe('file edit tool', () => {
     ])
 
     const result = await editExecutor(
-      { path: 'src/a.ts', old_text: 'abc\nnext', new_text: 'replaced' },
+      { path: 'src/a.ts', edits: [{ old_text: 'abc\nnext', new_text: 'replaced' }] },
       makeContext({ readFileState })
     )
     const error = unwrapError(result)

@@ -24,7 +24,8 @@ export interface EnsureLatestToolResultFitsContextInput {
 export interface TruncateLargeToolResultInput {
   rawResult: string
   toolName: string
-  existingTokens: number
+  /** Real token usage from the last API response. When absent (e.g. first turn), skip truncation entirely. */
+  existingTokens?: number
   maxContextTokens: number
   reserveTokens: number
   estimateTextTokens: (text: string) => number
@@ -193,6 +194,11 @@ export function ensureLatestToolResultFitsContext(input: EnsureLatestToolResultF
 }
 
 export async function truncateLargeToolResult(input: TruncateLargeToolResultInput): Promise<string> {
+  // No real usage data (e.g. first turn) — cannot calculate budget reliably, skip truncation.
+  if (input.existingTokens === undefined) {
+    return input.rawResult
+  }
+
   // Calculate the maximum token budget for the tool result (total budget - existing messages - reserve).
   // Leave an extra 10% margin to account for estimation errors.
   const availableForTool = Math.max(

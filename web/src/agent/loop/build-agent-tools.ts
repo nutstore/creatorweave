@@ -1,7 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { isToolAllowedInMode, type AgentMode } from '../agent-mode'
 import type { ContextManager } from '../context-manager'
-import { messagesToChatMessages } from '../llm/llm-provider'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 import type { Message, ToolCall } from '../message-types'
 import type { ToolRegistry } from '../tool-registry'
@@ -15,6 +14,17 @@ import {
   normalizeToolResult,
   truncateLargeToolResult,
 } from './tool-execution'
+
+/** Extract real token usage from the most recent assistant message's usage field. */
+function extractLastAssistantUsage(messages: Message[]): number | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]!
+    if (msg.role === 'assistant' && msg.usage) {
+      return msg.usage.totalTokens || undefined
+    }
+  }
+  return undefined
+}
 
 export interface BuildAgentToolsInput {
   toolRegistry: ToolRegistry
@@ -71,21 +81,21 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         }
 
         // 计算当前上下文使用情况，传递给工具用于自我调节
-        // 注意：必须用 contextManager.trimMessages 后的消息来估算，而非全量消息。
-        // 全量消息可能远大于实际发送给 LLM 的上下文，导致 truncateLargeToolResult 误判可用预算不足。
-        const existingMessages = messagesToChatMessages(input.getAllMessages())
         const contextConfig = input.contextManager.getConfig()
         const maxContextTokens = contextConfig.maxContextTokens || input.provider.maxContextTokens || 200000
         const reserveTokens = contextConfig.reserveTokens ?? 8192
-        const trimmedMessages = input.contextManager.trimMessages(existingMessages).messages
-        const usedTokens = input.provider.estimateTokens(trimmedMessages)
+
+        // Only pass real token usage from the last API response to truncateLargeToolResult.
+        // Heuristic estimates are intentionally low (see token-counter.ts) and unreliable
+        // for budget calculation — without real data, truncation is skipped entirely.
+        const realUsedTokens = extractLastAssistantUsage(input.getAllMessages())
 
         // 在调用工具前更新 toolContext 的 contextUsage
         const originalToolContext = input.getToolContext()
         const toolContextWithUsage: ToolContext = {
           ...originalToolContext,
           contextUsage: {
-            usedTokens,
+            usedTokens: realUsedTokens ?? 0,
             maxTokens: maxContextTokens - reserveTokens,
           },
         }
@@ -133,7 +143,7 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         rawResult = await truncateLargeToolResult({
           rawResult,
           toolName: toolDef.function.name,
-          existingTokens: usedTokens,
+          existingTokens: realUsedTokens,
           maxContextTokens,
           reserveTokens,
           estimateTextTokens: (text) =>
