@@ -250,7 +250,9 @@ export const settings = {
       approved: "Approved",
       rolledBack: "Rolled Back",
       reviewElements: "Review Elements",
-      copyPath: "Copy Path",
+      copyPath: "Copy File Path",
+      copyContent: "Copy File Content",
+      copyContentFailed: "Failed to copy file content",
       processing: "Processing...",
       draft: "Draft",
       // Error messages for review-request.ts

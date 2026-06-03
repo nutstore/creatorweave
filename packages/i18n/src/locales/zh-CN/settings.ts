@@ -243,7 +243,9 @@ export const settings = {
       approved: "已审批",
       rolledBack: "已回滚",
       reviewElements: "审查元素",
-      copyPath: "复制路径",
+      copyPath: "复制文件路径",
+      copyContent: "复制文件内容",
+      copyContentFailed: "复制文件内容失败",
       processing: "处理中...",
       draft: "草稿",
       // Error messages for review-request.ts

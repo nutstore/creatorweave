@@ -254,7 +254,9 @@ export const settings = {
       approved: "承認済み",
       rolledBack: "ロールバック済み",
       reviewElements: "要素をレビュー",
-      copyPath: "パスをコピー",
+      copyPath: "ファイルパスをコピー",
+      copyContent: "ファイル内容をコピー",
+      copyContentFailed: "ファイル内容のコピーに失敗しました",
       processing: "処理中...",
       draft: "下書き",
       // Error messages for review-request.ts

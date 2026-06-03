@@ -15,8 +15,8 @@ import { type ChangeDetectionResult, type FileChange } from '@/opfs/types/opfs-t
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { BrandButton, BrandCheckbox } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
-import { RefreshCw, Trash2, X, ChevronDown, ChevronRight, MousePointer2, Copy } from 'lucide-react'
-import { readFileFromOPFS } from '@/opfs'
+import { RefreshCw, Trash2, X, ChevronDown, ChevronRight, MousePointer2, Copy, FileText, ClipboardCopy } from 'lucide-react'
+import { readFileFromOPFS, getFileContentType } from '@/opfs'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { useT } from '@/i18n'
 
@@ -435,6 +435,29 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
             <Copy className="h-4 w-4 text-neutral-400" />
             {t('settings.pendingSyncPanel.copyPath')}
           </button>
+          {/* Copy File Content */}
+          {contextMenu.change.type !== 'delete' && getFileContentType(contextMenu.change.path) === 'text' && (
+            <button
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              onClick={async () => {
+                try {
+                  const activeConversation = await getActiveConversation()
+                  if (!activeConversation) return
+                  const { conversationId } = activeConversation
+                  const fileContent = await readFileFromOPFS(conversationId, contextMenu.change.path)
+                  if (fileContent) {
+                    await navigator.clipboard.writeText(fileContent)
+                  }
+                } catch {
+                  console.error('[PendingFileList] Failed to copy file content')
+                }
+                setContextMenu(null)
+              }}
+            >
+              <ClipboardCopy className="h-4 w-4 text-neutral-400" />
+              {t('settings.pendingSyncPanel.copyContent')}
+            </button>
+          )}
           {/* Remove from list */}
           <button
             className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"

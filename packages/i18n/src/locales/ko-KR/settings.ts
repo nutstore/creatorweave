@@ -248,7 +248,9 @@ export const settings = {
       approved: "승인됨",
       rolledBack: "롤백됨",
       reviewElements: "요소 검토",
-      copyPath: "경로 복사",
+      copyPath: "파일 경로 복사",
+      copyContent: "파일 내용 복사",
+      copyContentFailed: "파일 내용 복사 실패",
       processing: "처리 중...",
       draft: "드래프트",
       // Error messages for review-request.ts

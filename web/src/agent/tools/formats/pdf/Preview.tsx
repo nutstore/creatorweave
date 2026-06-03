@@ -1,15 +1,153 @@
 /**
- * PdfPreview - Render PDF pages using pdfjs-dist canvas rendering.
+ * PdfPreview - Continuous-scroll PDF viewer with virtualized rendering.
  *
- * Renders each page as a canvas element, with page navigation,
- * zoom controls, and keyboard shortcuts.
+ * All pages are laid out vertically. Only pages near the viewport
+ * are rendered to canvas; the rest use lightweight placeholder divs.
+ * Scrolling updates the current page indicator in the toolbar.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
-import type { PDFDocumentProxy, PDFRenderTask } from 'pdfjs-dist'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { FileText, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Loader2 } from 'lucide-react'
 import { formatBytes } from '@/lib/utils'
 import { getPdfjs } from './pdfjs'
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+interface PageSize {
+  width: number
+  height: number
+}
+
+// ── Virtualized Page Slot ──────────────────────────────────────────────────
+
+/**
+ * A single page slot: renders a canvas when visible, shows a placeholder
+ * div when off-screen. Accesses the PDF document through the module-level
+ * ref set by the parent PdfPreview component.
+ */
+function PageSlot({
+  pageNum,
+  scale,
+  rotation,
+  pageSize,
+  isVisible,
+}: {
+  pageNum: number
+  scale: number
+  rotation: number
+  pageSize: PageSize
+  isVisible: boolean
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const renderTaskRef = useRef<any>(null)
+  const lastRenderKey = useRef('')
+
+  // Compute display dimensions from natural page size + scale + rotation
+  const displaySize = useMemo(() => {
+    const isRotated = rotation % 180 !== 0
+    const naturalW = isRotated ? pageSize.height : pageSize.width
+    const naturalH = isRotated ? pageSize.width : pageSize.height
+    return {
+      width: Math.floor(naturalW * scale),
+      height: Math.floor(naturalH * scale),
+    }
+  }, [pageSize, scale, rotation])
+
+  // Render this page when it becomes visible
+  useEffect(() => {
+    if (!isVisible) return
+
+    const canvas = canvasRef.current
+    const doc = _sharedDocRef
+    if (!canvas || !doc) return
+
+    // Skip re-render if params haven't changed
+    const renderKey = `${pageNum}:${scale}:${rotation}`
+    if (lastRenderKey.current === renderKey) return
+
+    let cancelled = false
+
+    async function render() {
+      // Cancel any in-progress render for this slot
+      if (renderTaskRef.current) {
+        try { renderTaskRef.current.cancel() } catch { /* ignore */ }
+        renderTaskRef.current = null
+      }
+
+      try {
+        const page = await doc.getPage(pageNum)
+        if (cancelled) return
+
+        const viewport = page.getViewport({ scale, rotation })
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+
+        // Reset transform before resizing
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+        const dpr = window.devicePixelRatio || 1
+        canvas.width = Math.floor(viewport.width * dpr)
+        canvas.height = Math.floor(viewport.height * dpr)
+        canvas.style.width = `${Math.floor(viewport.width)}px`
+        canvas.style.height = `${Math.floor(viewport.height)}px`
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+        const renderTask = page.render({ canvasContext: ctx, viewport })
+        renderTaskRef.current = renderTask
+        await renderTask.promise
+        renderTaskRef.current = null
+
+        if (!cancelled) {
+          lastRenderKey.current = renderKey
+        }
+      } catch (err: unknown) {
+        const isCancel = err instanceof Error && 'name' in err
+          && (err as any).name === 'RenderingCancelledException'
+        if (!isCancel && !cancelled) {
+          console.error(`PDF render error (page ${pageNum}):`, err)
+        }
+      }
+    }
+
+    render()
+
+    return () => {
+      cancelled = true
+      if (renderTaskRef.current) {
+        try { renderTaskRef.current.cancel() } catch { /* ignore */ }
+        renderTaskRef.current = null
+      }
+    }
+  }, [isVisible, pageNum, scale, rotation])
+
+  return (
+    <div
+      data-page={pageNum}
+      className="flex shrink-0 justify-center"
+      style={{ height: displaySize.height }}
+    >
+      <canvas
+        ref={canvasRef}
+        style={{
+          width: displaySize.width,
+          height: displaySize.height,
+          // Hide unrendered/off-screen canvases without unmounting them.
+          // This preserves the canvas bitmap so scrolling back doesn't
+          // require a re-render.
+          visibility: isVisible ? 'visible' : 'hidden',
+        }}
+        className="shadow-lg"
+      />
+    </div>
+  )
+}
+
+// ── Shared doc ref ─────────────────────────────────────────────────────────
+// Module-level ref so PageSlot children can access the PDF document without
+// prop drilling through hundreds of components. Set by the PdfPreview parent.
+
+let _sharedDocRef: PDFDocumentProxy | null = null
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
@@ -24,12 +162,14 @@ export function PdfPreview({ blob, fileName, fileSize }: {
   const [currentPage, setCurrentPage] = useState(1)
   const [scale, setScale] = useState(1.0)
   const [rotation, setRotation] = useState(0)
-  const [rendering, setRendering] = useState(false)
+  const [pageSizes, setPageSizes] = useState<PageSize[]>([])
 
   const containerRef = useRef<HTMLDivElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const docRef = useRef<PDFDocumentProxy | null>(null)
-  const renderTaskRef = useRef<PDFRenderTask | null>(null)
+  const isScrollingToPage = useRef(false)
+  const visiblePagesRef = useRef<Set<number>>(new Set())
+  // forceUpdate counter to trigger re-renders when visible pages change
+  // (since visiblePagesRef is a ref, React won't re-render on its own)
+  const [renderTick, setRenderTick] = useState(0)
 
   // ── Load PDF document ──────────────────────────────────────────────────
 
@@ -44,8 +184,19 @@ export function PdfPreview({ blob, fileName, fileSize }: {
 
         if (cancelled) return
 
-        docRef.current = doc
+        _sharedDocRef = doc
         setTotalPages(doc.numPages)
+
+        // Pre-fetch all page sizes for correct layout heights
+        const sizes: PageSize[] = []
+        for (let i = 1; i <= doc.numPages; i++) {
+          const page = await doc.getPage(i)
+          const vp = page.getViewport({ scale: 1, rotation: 0 })
+          sizes.push({ width: vp.width, height: vp.height })
+        }
+
+        if (cancelled) return
+        setPageSizes(sizes)
         setLoading(false)
       } catch (err) {
         if (!cancelled) {
@@ -59,126 +210,113 @@ export function PdfPreview({ blob, fileName, fileSize }: {
 
     return () => {
       cancelled = true
-      if (docRef.current) {
-        docRef.current.destroy()
-        docRef.current = null
+      if (_sharedDocRef) {
+        _sharedDocRef.destroy()
+        _sharedDocRef = null
       }
     }
   }, [blob])
 
-  // ── Render current page ────────────────────────────────────────────────
+  // ── Compute render buffer (visible pages ± 2) ─────────────────────────
+  // This useMemo depends on renderTick so it re-computes when the
+  // IntersectionObserver detects visibility changes.
 
-  useEffect(() => {
-    const doc = docRef.current
-    const canvas = canvasRef.current
-    if (!doc || !canvas || loading) return
+  const renderBuffer = useMemo(() => {
+    // Suppress unused-var lint — renderTick is the reactivity trigger
+    void renderTick
 
-    let cancelled = false
-
-    async function render() {
-      // Cancel any in-progress render
-      if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel() } catch { /* ignore */ }
-        renderTaskRef.current = null
-      }
-
-      setRendering(true)
-      try {
-        const page = await doc.getPage(currentPage)
-        if (cancelled) return
-
-        const viewport = page.getViewport({ scale, rotation })
-
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-
-        // Reset transform before resizing to avoid scale accumulation
-        ctx.setTransform(1, 0, 0, 1, 0, 0)
-
-        const dpr = window.devicePixelRatio || 1
-        canvas.width = Math.floor(viewport.width * dpr)
-        canvas.height = Math.floor(viewport.height * dpr)
-        canvas.style.width = `${Math.floor(viewport.width)}px`
-        canvas.style.height = `${Math.floor(viewport.height)}px`
-
-        // Apply DPR scale after setting dimensions
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-
-        const renderTask = page.render({
-          canvasContext: ctx,
-          viewport,
-        })
-        renderTaskRef.current = renderTask
-
-        await renderTask.promise
-        renderTaskRef.current = null
-      } catch (err: unknown) {
-        // Ignore cancellation errors
-        const isCancel = err instanceof Error && 'name' in err
-          && (err as any).name === 'RenderingCancelledException'
-        if (!isCancel && !cancelled) {
-          console.error('PDF render error:', err)
-        }
-      } finally {
-        if (!cancelled) {
-          setRendering(false)
-        }
-      }
+    const visible = visiblePagesRef.current
+    if (visible.size === 0) {
+      // Before any intersection data, render first 3 pages as a seed
+      const initial = new Set<number>()
+      for (let i = 1; i <= Math.min(3, totalPages); i++) initial.add(i)
+      return initial
     }
 
-    render()
-
-    return () => {
-      cancelled = true
-      if (renderTaskRef.current) {
-        try { renderTaskRef.current.cancel() } catch { /* ignore */ }
-        renderTaskRef.current = null
+    const buffer = new Set(visible)
+    for (const p of visible) {
+      for (let d = 1; d <= 3; d++) {
+        if (p - d >= 1) buffer.add(p - d)
+        if (p + d <= totalPages) buffer.add(p + d)
       }
     }
-  }, [loading, currentPage, scale, rotation])
+    return buffer
+  }, [renderTick, totalPages])
 
-  // ── Fit to container on first load ─────────────────────────────────────
-  // NOTE: [loading] dependency means this only runs once when the PDF
-  // finishes loading. It intentionally does NOT re-fit when the user
-  // navigates pages — the user's zoom level is preserved.
+  // ── Intersection Observer ───────────────────────────────────────────────
 
   useEffect(() => {
-    if (loading || !containerRef.current || !canvasRef.current) return
-
-    // Auto-fit scale on first render
     const container = containerRef.current
-    const padding = 32 // 16px padding on each side
-    const availWidth = container.clientWidth - padding
-    const availHeight = container.clientHeight - padding
+    if (!container || loading || pageSizes.length === 0) return
 
-    // Get natural page size
-    const doc = docRef.current
-    if (!doc) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        let changed = false
 
-    doc.getPage(currentPage).then((page) => {
-      const viewport = page.getViewport({ scale: 1, rotation: 0 })
-      const fitScale = Math.min(
-        availWidth / viewport.width,
-        availHeight / viewport.height,
-        1.5, // Don't over-zoom
-      )
-      if (fitScale > 0 && isFinite(fitScale)) {
-        setScale(Math.round(fitScale * 100) / 100)
+        for (const entry of entries) {
+          const pageNum = parseInt(entry.target.getAttribute('data-page')!, 10)
+          if (entry.isIntersecting) {
+            if (!visiblePagesRef.current.has(pageNum)) {
+              visiblePagesRef.current.add(pageNum)
+              changed = true
+            }
+          } else {
+            if (visiblePagesRef.current.has(pageNum)) {
+              visiblePagesRef.current.delete(pageNum)
+              changed = true
+            }
+          }
+        }
+
+        if (changed) {
+          // Update toolbar's current page to the topmost visible page
+          if (!isScrollingToPage.current && visiblePagesRef.current.size > 0) {
+            const sorted = Array.from(visiblePagesRef.current).sort((a, b) => a - b)
+            setCurrentPage(sorted[0])
+          }
+          // Trigger re-render so renderBuffer recomputes
+          setRenderTick(n => n + 1)
+        }
+      },
+      {
+        root: container,
+        // Extend detection well above/below viewport so pages are
+        // rendered before the user scrolls them into view.
+        rootMargin: '100% 0px',
+        threshold: 0,
       }
-    })
-  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps -- intentional: only on first load, not on page change
+    )
 
-  // ── Keyboard navigation ────────────────────────────────────────────────
+    // Observe all page slot elements
+    const pageElements = container.querySelectorAll('[data-page]')
+    for (const el of pageElements) {
+      observer.observe(el)
+    }
+
+    return () => observer.disconnect()
+  }, [loading, pageSizes, scale, rotation])
+
+  // ── Auto-fit scale on first load ───────────────────────────────────────
+
+  useEffect(() => {
+    if (loading || !containerRef.current || pageSizes.length === 0) return
+
+    const container = containerRef.current
+    const padding = 48 // 24px padding each side
+    const availWidth = container.clientWidth - padding
+
+    const firstPage = pageSizes[0]
+    const fitScale = Math.min(availWidth / firstPage.width, 1.5)
+    if (fitScale > 0 && isFinite(fitScale)) {
+      setScale(Math.round(fitScale * 100) / 100)
+    }
+  }, [loading]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-        e.preventDefault()
-        setCurrentPage(p => Math.max(1, p - 1))
-      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-        e.preventDefault()
-        setCurrentPage(p => Math.min(totalPages, p + 1))
-      } else if (e.key === '+' || e.key === '=') {
+      if (e.key === '+' || e.key === '=') {
         e.preventDefault()
         setScale(s => Math.min(3, s + 0.25))
       } else if (e.key === '-') {
@@ -192,36 +330,48 @@ export function PdfPreview({ blob, fileName, fileSize }: {
 
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [totalPages])
+  }, [])
+
+  // ── Scroll to a specific page (toolbar navigation) ─────────────────────
+
+  const scrollToPage = useCallback((page: number) => {
+    const container = containerRef.current
+    if (!container) return
+
+    isScrollingToPage.current = true
+    setCurrentPage(page)
+
+    const target = container.querySelector(`[data-page="${page}"]`)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+
+    // Reset flag after scroll animation settles
+    setTimeout(() => {
+      isScrollingToPage.current = false
+    }, 600)
+  }, [])
 
   // ── Handlers ───────────────────────────────────────────────────────────
 
   const goToPrevPage = useCallback(() => {
-    setCurrentPage(p => Math.max(1, p - 1))
-  }, [])
+    scrollToPage(Math.max(1, currentPage - 1))
+  }, [currentPage, scrollToPage])
 
   const goToNextPage = useCallback(() => {
-    setCurrentPage(p => Math.min(totalPages, p + 1))
-  }, [totalPages])
+    scrollToPage(Math.min(totalPages, currentPage + 1))
+  }, [currentPage, totalPages, scrollToPage])
 
-  const zoomIn = useCallback(() => {
-    setScale(s => Math.min(3, s + 0.25))
-  }, [])
-
-  const zoomOut = useCallback(() => {
-    setScale(s => Math.max(0.25, s - 0.25))
-  }, [])
-
-  const rotate = useCallback(() => {
-    setRotation(r => (r + 90) % 360)
-  }, [])
+  const zoomIn = useCallback(() => setScale(s => Math.min(3, s + 0.25)), [])
+  const zoomOut = useCallback(() => setScale(s => Math.max(0.25, s - 0.25)), [])
+  const rotate = useCallback(() => setRotation(r => (r + 90) % 360), [])
 
   const handlePageInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseInt(e.target.value, 10)
     if (!isNaN(val) && val >= 1 && val <= totalPages) {
-      setCurrentPage(val)
+      scrollToPage(val)
     }
-  }, [totalPages])
+  }, [totalPages, scrollToPage])
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -333,23 +483,27 @@ export function PdfPreview({ blob, fileName, fileSize }: {
         </button>
 
         <div className="flex-1" />
-
-        {/* Rendering indicator */}
-        {rendering && (
-          <Loader2 className="h-3 w-3 animate-spin text-neutral-400" />
-        )}
       </div>
 
-      {/* PDF Canvas — scrollable container */}
+      {/* PDF Pages — continuous scroll container */}
       <div
         ref={containerRef}
         className="flex-1 overflow-auto"
       >
-        <div className="flex justify-center p-4">
-          <canvas
-            ref={canvasRef}
-            className="shadow-lg"
-          />
+        <div className="flex flex-col items-center gap-4 py-4 px-6">
+          {pageSizes.map((ps, i) => {
+            const pageNum = i + 1
+            return (
+              <PageSlot
+                key={pageNum}
+                pageNum={pageNum}
+                scale={scale}
+                rotation={rotation}
+                pageSize={ps}
+                isVisible={renderBuffer.has(pageNum)}
+              />
+            )
+          })}
         </div>
       </div>
     </div>
