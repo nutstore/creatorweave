@@ -361,7 +361,7 @@ export function useConversationLogic() {
     )
   }, [t])
 
-  const handleSlashCommand = useCallback(async (command: string) => {
+  const handleSlashCommand = useCallback(async (command: string, arg?: string) => {
     if (command === 'compact') {
       let targetConvId = convIdRef.current
       if (!targetConvId) {
@@ -371,6 +371,24 @@ export function useConversationLogic() {
         await setActive(targetConvId)
       }
       await useConversationStore.getState().compactConversation(targetConvId)
+    }
+    if (command === 'image') {
+      let targetConvId = convIdRef.current
+      if (!targetConvId) {
+        const { createNew, setActive } = useConversationStore.getState()
+        const conv = createNew('/image')
+        targetConvId = conv.id
+        await setActive(targetConvId)
+      }
+      // Parse --ar <ratio> from the argument (e.g. "/image --ar 16:9 熊猫")
+      let prompt = arg!
+      let aspectRatio: string | undefined
+      const arMatch = prompt.match(/--ar\s+(\S+)/)
+      if (arMatch) {
+        aspectRatio = arMatch[1]
+        prompt = prompt.replace(/--ar\s+\S+/, '').trim()
+      }
+      await useConversationStore.getState().runImageGeneration(targetConvId, prompt, { aspectRatio })
     }
   }, [])
 
@@ -387,6 +405,20 @@ export function useConversationLogic() {
       setMentionedAgentIds([])
       setInputResetToken((v) => v + 1)
       await handleSlashCommand('compact')
+      return
+    }
+
+    // /image <prompt> — AI image generation
+    if (inputTrimmed.startsWith('/image')) {
+      const prompt = inputTrimmed.slice(6).trim()
+      setInput('')
+      setMentionedAgentIds([])
+      setInputResetToken((v) => v + 1)
+      if (!prompt) {
+        toast.error(t('conversation.imageGen.emptyPrompt'))
+        return
+      }
+      await handleSlashCommand('image', prompt)
       return
     }
 

@@ -1,5 +1,5 @@
-import { getModel } from '@mariozechner/pi-ai'
-import type { Api, KnownProvider, Model } from '@mariozechner/pi-ai'
+import { getModel } from '@earendil-works/pi-ai'
+import type { Api, KnownProvider, Model } from '@earendil-works/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { isCustomProviderType } from '@/agent/providers/types'
 import { getModelContextWindow } from '@/agent/providers/model-store'

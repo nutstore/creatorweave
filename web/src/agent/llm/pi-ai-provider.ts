@@ -6,7 +6,7 @@ import type {
   LLMProvider,
   TokenUsage,
 } from './llm-provider'
-import { complete, stream, type Api, type Context, type Message, type Model, type Tool } from '@mariozechner/pi-ai'
+import { complete, stream, type Api, type Context, type Message, type Model, type Tool } from '@earendil-works/pi-ai'
 import { estimateMessagesTokens } from './token-counter'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { resolvePiAIModel } from './pi-ai-model-resolver'

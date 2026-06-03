@@ -1,4 +1,4 @@
-import type { AgentTool } from '@mariozechner/pi-agent-core'
+import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { isToolAllowedInMode, type AgentMode } from '../agent-mode'
 import type { ContextManager } from '../context-manager'
 import { messagesToChatMessages } from '../llm/llm-provider'

@@ -26,7 +26,7 @@
 
 import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bot, Database, GitFork, AlertTriangle } from 'lucide-react'
+import { Bot, Database, GitFork, AlertTriangle, Download, Maximize2 } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -45,6 +45,7 @@ import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { ConversationActionContext } from './ConversationActionContext'
+import { dataUriToBlob, downloadImage } from './image-utils'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -679,6 +680,7 @@ const AssistantStep = memo(function AssistantStep({
   const contentRef = useRef<HTMLDivElement>(null)
   const hasReasoning = !!message.reasoning
   const hasContent = !!message.content
+  const hasImages = !!(message.images && message.images.length > 0)
   const hasAssets = !!(message.assets && message.assets.length > 0)
   const visibleToolCalls =
     message.toolCalls?.filter((tc) => !suppressExecutingToolCallIds?.has(tc.id)) || []
@@ -691,7 +693,7 @@ const AssistantStep = memo(function AssistantStep({
     <>
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
-      {(hasReasoning || hasContent || hasToolCalls || hasAssets) && (
+      {(hasReasoning || hasContent || hasImages || hasToolCalls || hasAssets) && (
         <div className="space-y-2">
           {hasReasoning && <ReasoningSection reasoning={message.reasoning!} />}
 
@@ -737,6 +739,48 @@ const AssistantStep = memo(function AssistantStep({
                 <MarkdownContent content={message.content!} />
                 <TextSelectionToolbar containerRef={contentRef} />
               </div>
+            </div>
+          )}
+
+          {/* Generated images — inline display */}
+          {hasImages && (
+            <div className="space-y-3">
+              {message.images!.map((img, idx) => (
+                <div
+                  key={idx}
+                  className="group relative overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-neutral-700"
+                >
+                  <img
+                    src={`data:${img.mimeType};base64,${img.data}`}
+                    alt={`Generated image ${idx + 1}`}
+                    className="block max-w-full h-auto"
+                  />
+                  {/* Hover overlay with action buttons */}
+                  <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <button
+                      type="button"
+                      className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                      title={t('conversation.imageGen.previewFullscreen')}
+                      aria-label={t('conversation.imageGen.previewFullscreen')}
+                      onClick={() => {
+                        const blob = dataUriToBlob(`data:${img.mimeType};base64,${img.data}`, img.mimeType)
+                        onPreviewAsset?.(`image-${idx + 1}.png`, blob)
+                      }}
+                    >
+                      <Maximize2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                      title={t('conversation.imageGen.downloadImage')}
+                      aria-label={t('conversation.imageGen.downloadImage')}
+                      onClick={() => downloadImage(img.data, img.mimeType, `image-${idx + 1}`)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

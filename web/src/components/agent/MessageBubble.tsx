@@ -6,7 +6,7 @@
  */
 
 import { useState, memo } from 'react'
-import { User, Bot, Trash2, Pencil } from 'lucide-react'
+import { User, Bot, Trash2, Pencil, Download, Maximize2 } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
@@ -15,6 +15,7 @@ import { CopyButton } from './CopyButton'
 import { RegenerateButton } from './RegenerateButton'
 import { AssetList } from './AssetCard'
 import { InlineMessageEditor } from './InlineMessageEditor'
+import { dataUriToBlob, downloadImage } from './image-utils'
 import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
@@ -222,6 +223,48 @@ export const MessageBubble = memo(function MessageBubble({
             {isStreamingContent && (
               <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
             )}
+          </div>
+        )}
+
+        {/* Generated images — inline display */}
+        {message.images && message.images.length > 0 && (
+          <div className="space-y-3">
+            {message.images.map((img, idx) => (
+              <div
+                key={idx}
+                className="group relative overflow-hidden rounded-lg ring-1 ring-neutral-200 dark:ring-neutral-700"
+              >
+                <img
+                  src={`data:${img.mimeType};base64,${img.data}`}
+                  alt={`Generated image ${idx + 1}`}
+                  className="block max-w-full h-auto"
+                />
+                {/* Hover overlay with action buttons */}
+                <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                  <button
+                    type="button"
+                    className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                    title={t('conversation.imageGen.previewFullscreen')}
+                    aria-label={t('conversation.imageGen.previewFullscreen')}
+                    onClick={() => {
+                      const blob = dataUriToBlob(`data:${img.mimeType};base64,${img.data}`, img.mimeType)
+                      onPreviewAsset?.(`image-${idx + 1}.png`, blob)
+                    }}
+                  >
+                    <Maximize2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                    title={t('conversation.imageGen.downloadImage')}
+                    aria-label={t('conversation.imageGen.downloadImage')}
+                    onClick={() => downloadImage(img.data, img.mimeType, `image-${idx + 1}`)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 

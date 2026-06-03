@@ -64,6 +64,32 @@ export const conversation = {
       continue: "계속",
       hint: "작업이 완료되지 않았을 수 있습니다. 메시지를 보내 에이전트가 계속 작업하도록 할 수 있습니다",
     },
+    // 이미지 생성
+    imageGen: {
+      title: "이미지 생성",
+      model: "모델",
+      aspectRatio: "기본 화면 비율",
+      previewFullscreen: "전체 화면 미리보기",
+      downloadImage: "이미지 다운로드",
+      generating: "이미지 생성 중...",
+      generated: "이미지가 생성되었습니다",
+      noResult: "이미지 생성 완료 (결과 없음)",
+      failed: "이미지 생성 실패: {error}",
+      emptyPrompt: "이미지 설명을 입력하세요. 예: /image 주황색 고양이",
+      emptyPromptRegenerate: "이미지 설명이 비어 있어 재생성할 수 없습니다",
+      waitRunning: "현재 작업이 완료될 때까지 기다려 주세요",
+      configureProvider: "먼저 공급자를 구성해 주세요",
+      apiKeyMissing: "API Key가 설정되지 않았습니다. 설정에서 구성해 주세요",
+      aspectRatios: {
+        '1:1': "정사각형",
+        '16:9': "와이드",
+        '9:16': "세로",
+        '4:3': "가로",
+        '3:4': "세로형",
+        '3:2': "사진",
+        '2:3': "포스터",
+      },
+    },
     codex: {
       error: {
         authRequired: "Codex 인증 필요",

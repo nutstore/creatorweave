@@ -1,6 +1,6 @@
 import { produce } from 'immer'
-import type { AgentEvent as PiAgentEvent, AgentMessage as PiAgentMessage } from '@mariozechner/pi-agent-core'
-import type { AssistantMessageEvent as PiAssistantMessageEvent, ToolResultMessage as PiToolResultMessage } from '@mariozechner/pi-ai'
+import type { AgentEvent as PiAgentEvent, AgentMessage as PiAgentMessage } from '@earendil-works/pi-agent-core'
+import type { AssistantMessageEvent as PiAssistantMessageEvent, ToolResultMessage as PiToolResultMessage } from '@earendil-works/pi-ai'
 import type { AgentCallbacks } from './types'
 import type { Message, ToolCall } from '../message-types'
 

@@ -35,6 +35,7 @@ interface MessageMeta {
   name?: string
   usage?: MessageUsage
   assets?: AssetMeta[]
+  images?: Array<{ data: string; mimeType: string }>
 }
 
 interface AppSessionSerializedMessage {
@@ -255,6 +256,10 @@ export class MessageRepository {
       meta.assets = message.assets
       hasMeta = true
     }
+    if (message.images !== undefined) {
+      meta.images = message.images
+      hasMeta = true
+    }
 
     return {
       contentJson,
@@ -282,6 +287,7 @@ export class MessageRepository {
       timestamp: row.timestamp,
       usage: meta.usage,
       assets: meta.assets,
+      images: meta.images,
     }
   }
 

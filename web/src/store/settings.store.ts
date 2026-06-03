@@ -15,7 +15,7 @@ import {
   unregisterDynamicProvider,
   getProviderConfig,
 } from '@/agent/providers/types'
-import type { ThinkingLevel } from '@mariozechner/pi-ai'
+import type { ThinkingLevel } from '@earendil-works/pi-ai'
 
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
@@ -78,6 +78,11 @@ interface SettingsState {
   // Last used model per provider (for restoring on switch-back)
   lastUsedModelByProvider: Partial<Record<LLMProviderType, string>>
 
+  // Image generation model (persisted)
+  imageGenModel: string
+  // Image generation aspect ratio (persisted), e.g. "1:1", "16:9"
+  imageGenAspectRatio: string
+
   // Pinned (user-selected) models per provider — subset of full model list
   pinnedModelsByProvider: Record<string, string[]>
 
@@ -99,6 +104,8 @@ interface SettingsState {
   setMaxIterations: (iterations: number) => void
   setEnableThinking: (v: boolean) => void
   setThinkingLevel: (v: ThinkingLevel) => void
+  setImageGenModel: (v: string) => void
+  setImageGenAspectRatio: (v: string) => void
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
   setEnableTTS: (v: boolean) => void
@@ -199,6 +206,8 @@ export const useSettingsStore = create<SettingsState>()(
       hasApiKey: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
+      imageGenModel: 'google/gemini-2.5-flash-image',
+      imageGenAspectRatio: '1:1',
       pinnedModelsByProvider: {},
       _providerRefreshVersion: 0,
 
@@ -414,6 +423,8 @@ export const useSettingsStore = create<SettingsState>()(
         }),
       setEnableThinking: (enableThinking) => set({ enableThinking }),
       setThinkingLevel: (thinkingLevel) => set({ thinkingLevel }),
+      setImageGenModel: (imageGenModel) => set({ imageGenModel }),
+      setImageGenAspectRatio: (imageGenAspectRatio) => set({ imageGenAspectRatio }),
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
       setEnableTTS: (enableTTS) => set({ enableTTS }),
@@ -673,6 +684,8 @@ export const useSettingsStore = create<SettingsState>()(
         ttsVoice: state.ttsVoice,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
+        imageGenModel: state.imageGenModel,
+        imageGenAspectRatio: state.imageGenAspectRatio,
         pinnedModelsByProvider: state.pinnedModelsByProvider,
       }),
       // On rehydration, restore dynamic providers

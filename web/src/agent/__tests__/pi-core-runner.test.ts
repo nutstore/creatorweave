@@ -13,7 +13,7 @@ vi.mock('@/store/settings.store', () => ({
   },
 }))
 
-vi.mock('@mariozechner/pi-agent-core', () => ({
+vi.mock('@earendil-works/pi-agent-core', () => ({
   agentLoopContinue: (...args: unknown[]) => mockAgentLoopContinue(...args),
 }))
 

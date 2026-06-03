@@ -20,7 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
-import type { ThinkingLevel } from '@mariozechner/pi-ai'
+import type { ThinkingLevel } from '@earendil-works/pi-ai'
 import type { LLMProviderType, ModelCapability } from '@/agent/providers/types'
 import { useT } from '@/i18n'
 import { BrandInput } from '@creatorweave/ui'
@@ -170,6 +170,72 @@ function TokenStatsDisplay() {
 interface ModelSettingsProps {
   /** Whether the parent dialog is open (triggers key reload) */
   open?: boolean
+}
+
+// ─── Image Generation Sub-Components ──────────────────────────────────
+
+/** Image generation model selector */
+function ImageGenModelSelect({ container }: { container: HTMLElement | null }) {
+  const imageGenModel = useSettingsStore((s) => s.imageGenModel)
+  const setImageGenModel = useSettingsStore((s) => s.setImageGenModel)
+
+  const imageModels = [
+    { id: 'google/gemini-2.5-flash-image', name: 'Gemini 2.5 Flash Image' },
+    { id: 'openai/gpt-image-1', name: 'GPT Image 1' },
+    { id: 'openai/dall-e-3', name: 'DALL·E 3' },
+  ]
+
+  return (
+    <Select value={imageGenModel} onValueChange={setImageGenModel}>
+      <SelectTrigger className="h-9 w-full text-sm">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent container={container}>
+        {imageModels.map((m) => (
+          <SelectItem key={m.id} value={m.id}>
+            {m.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+/** Aspect ratio selector for image generation */
+function AspectRatioSelect() {
+  const imageGenAspectRatio = useSettingsStore((s) => s.imageGenAspectRatio)
+  const setImageGenAspectRatio = useSettingsStore((s) => s.setImageGenAspectRatio)
+  const t = useT()
+
+  const ratios = [
+    { value: '1:1', label: '1:1' },
+    { value: '16:9', label: '16:9' },
+    { value: '9:16', label: '9:16' },
+    { value: '4:3', label: '4:3' },
+    { value: '3:4', label: '3:4' },
+    { value: '3:2', label: '3:2' },
+    { value: '2:3', label: '2:3' },
+  ]
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {ratios.map(({ value, label }) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => setImageGenAspectRatio(value)}
+          className={`rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-all ${
+            imageGenAspectRatio === value
+              ? 'bg-primary-600 text-white shadow-sm dark:bg-primary-500'
+              : 'bg-neutral-50 text-tertiary hover:bg-neutral-100 hover:text-secondary dark:bg-neutral-800/60 dark:text-muted dark:hover:bg-neutral-700 dark:hover:text-secondary'
+          }`}
+        >
+          <span className="font-semibold">{label}</span>
+          <span className="ml-1 opacity-60">{t(`conversation.imageGen.aspectRatios.${value}`)}</span>
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function ModelSettings({ open }: ModelSettingsProps) {
@@ -428,6 +494,28 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Image Generation */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <ScanEye className="h-4 w-4 text-secondary" />
+                <label className="text-sm font-medium text-primary">{t('conversation.imageGen.title')}</label>
+              </div>
+
+              <div className="space-y-3 pl-6">
+                {/* Image Model */}
+                <div className="space-y-1">
+                  <label className="text-xs text-tertiary">{t('conversation.imageGen.model')}</label>
+                  <ImageGenModelSelect container={rootRef.current} />
+                </div>
+
+                {/* Aspect Ratio */}
+                <div className="space-y-1.5">
+                  <label className="text-xs text-tertiary">{t('conversation.imageGen.aspectRatio')}</label>
+                  <AspectRatioSelect />
+                </div>
+              </div>
             </div>
           </div>
         )}

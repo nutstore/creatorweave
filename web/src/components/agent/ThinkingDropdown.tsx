@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react'
 import { Brain, ChevronDown } from 'lucide-react'
 import { BrandSwitch } from '@creatorweave/ui'
 import { useT } from '@/i18n'
-import type { ThinkingLevel } from '@mariozechner/pi-ai'
+import type { ThinkingLevel } from '@earendil-works/pi-ai'
 
 interface ThinkingDropdownProps {
   enableThinking: boolean

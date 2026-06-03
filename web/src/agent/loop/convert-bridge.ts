@@ -1,5 +1,5 @@
-import type { AgentMessage as PiAgentMessage } from '@mariozechner/pi-agent-core'
-import type { Api, Message as PiMessage, Model } from '@mariozechner/pi-ai'
+import type { AgentMessage as PiAgentMessage } from '@earendil-works/pi-agent-core'
+import type { Api, Message as PiMessage, Model } from '@earendil-works/pi-ai'
 import {
   applyCompressionBaseline,
   getCompressionCutoffTimestamp,

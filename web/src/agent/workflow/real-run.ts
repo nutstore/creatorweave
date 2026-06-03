@@ -1,4 +1,4 @@
-import { stream, type Api, type Context, type Model } from '@mariozechner/pi-ai'
+import { stream, type Api, type Context, type Model } from '@earendil-works/pi-ai'
 import { resolvePiAIModel } from '@/agent/llm/pi-ai-model-resolver'
 import { ensurePiAICustomProvidersRegistered } from '@/agent/llm/pi-ai-custom-openai-fetch'
 import type { LLMProviderType } from '@/agent/providers/types'

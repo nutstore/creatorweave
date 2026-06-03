@@ -8,6 +8,14 @@ import { parseThinkTags } from './think-tags'
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
 
+/** AI-generated image, stored inline in the message */
+export interface GeneratedImage {
+  /** base64 encoded image data */
+  data: string
+  /** MIME type, e.g. "image/png" */
+  mimeType: string
+}
+
 export interface ToolCall {
   id: string
   type: 'function'
@@ -110,6 +118,8 @@ export interface Message {
   usage?: MessageUsage
   /** File assets attached to this message (user uploads or agent-generated) */
   assets?: AssetMeta[]
+  /** AI-generated images from /image command (base64, inline display) */
+  images?: GeneratedImage[]
 }
 
 export type DraftAssistantStep =

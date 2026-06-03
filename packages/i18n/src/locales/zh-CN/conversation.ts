@@ -77,6 +77,32 @@ export const conversation = {
       continue: "继续",
       hint: "任务可能尚未完成，发送消息可让助手继续工作",
     },
+    // 图片生成
+    imageGen: {
+      title: "图片生成",
+      model: "模型",
+      aspectRatio: "默认宽高比",
+      previewFullscreen: "全屏预览",
+      downloadImage: "下载图片",
+      generating: "正在生成图片...",
+      generated: "已生成图片",
+      noResult: "图片生成完成（无结果）",
+      failed: "图片生成失败: {error}",
+      emptyPrompt: "请输入图片描述，例如: /image 一只橘色的猫",
+      emptyPromptRegenerate: "图片描述为空，无法重新生成",
+      waitRunning: "请等待当前任务完成",
+      configureProvider: "请先配置服务商",
+      apiKeyMissing: "API Key 未设置，请先在设置中配置",
+      aspectRatios: {
+        '1:1': "正方形",
+        '16:9': "宽屏",
+        '9:16': "竖屏",
+        '4:3': "横版",
+        '3:4': "竖版",
+        '3:2': "照片",
+        '2:3': "海报",
+      },
+    },
     // Codex OAuth 错误
     codex: {
       error: {

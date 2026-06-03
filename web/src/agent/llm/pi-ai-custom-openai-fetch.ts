@@ -10,8 +10,8 @@ import {
   type StreamOptions,
   type ToolCall,
   type Usage,
-} from '@mariozechner/pi-ai'
-import '@mariozechner/pi-ai/openai-responses'
+} from '@earendil-works/pi-ai'
+import '@earendil-works/pi-ai/openai-responses'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
 export const CW_OPENAI_FETCH_API = 'cw-openai-fetch' as const
@@ -77,7 +77,7 @@ export function ensurePiAICustomProvidersRegistered(): void {
   )
 
   // Note: OpenAI Responses API is handled by the official pi-ai provider
-  // (imported above via '@mariozechner/pi-ai/openai-responses').
+  // (imported above via '@earendil-works/pi-ai/openai-responses').
   // When apiMode === 'responses', models use api = 'openai-responses' directly.
 
   customProviderRegistered = true

@@ -2,7 +2,7 @@
  * Codex Bridge Fetch — permanently wraps globalThis.fetch to route
  * Codex API requests through the browser extension bridge.
  *
- * The openai-responses handler (from @mariozechner/pi-ai) handles all SSE parsing,
+ * The openai-responses handler (from @earendil-works/pi-ai) handles all SSE parsing,
  * tool call streaming, and message assembly. It calls fetch() internally.
  * For codex-oauth, fetch() can't reach chatgpt.com directly (CORS + no token),
  * so this wrapper intercepts those requests and routes them through the extension's

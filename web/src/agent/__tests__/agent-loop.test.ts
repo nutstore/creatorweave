@@ -8,7 +8,7 @@ import type { Message } from '../message-types'
 import type { ToolContext } from '../tools/tool-types'
 import type { ChatMessage } from '../llm/llm-provider'
 import { PiAIProvider } from '../llm/pi-ai-provider'
-import { agentLoopContinue } from '@mariozechner/pi-agent-core'
+import { agentLoopContinue } from '@earendil-works/pi-agent-core'
 import { truncateLargeToolResult } from '../loop/tool-execution'
 
 vi.mock('@/skills/skill-manager', () => ({
@@ -34,7 +34,7 @@ vi.mock('../prefetch', () => ({
   triggerPrefetch: vi.fn(() => Promise.resolve()),
 }))
 
-vi.mock('@mariozechner/pi-agent-core', () => ({
+vi.mock('@earendil-works/pi-agent-core', () => ({
   agentLoopContinue: vi.fn(),
 }))
 

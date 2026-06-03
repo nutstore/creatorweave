@@ -77,6 +77,32 @@ export const conversation = {
       continue: "Continue",
       hint: "Task may be incomplete. Send a message to let the agent keep working",
     },
+    // Image generation
+    imageGen: {
+      title: "Image Generation",
+      model: "Model",
+      aspectRatio: "Default Aspect Ratio",
+      previewFullscreen: "Fullscreen preview",
+      downloadImage: "Download image",
+      generating: "Generating image...",
+      generated: "Image generated",
+      noResult: "Image generation complete (no result)",
+      failed: "Image generation failed: {error}",
+      emptyPrompt: "Enter a description, e.g.: /image an orange cat",
+      emptyPromptRegenerate: "Image description is empty, cannot regenerate",
+      waitRunning: "Please wait for the current task to finish",
+      configureProvider: "Please configure a provider first",
+      apiKeyMissing: "API Key not set. Please configure it in settings",
+      aspectRatios: {
+        '1:1': "Square",
+        '16:9': "Widescreen",
+        '9:16': "Portrait",
+        '4:3': "Landscape",
+        '3:4': "Tall",
+        '3:2': "Photo",
+        '2:3': "Poster",
+      },
+    },
     // Codex OAuth error
     codex: {
       error: {

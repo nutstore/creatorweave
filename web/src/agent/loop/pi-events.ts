@@ -1,4 +1,4 @@
-import type { AssistantMessageEvent as PiAssistantMessageEvent } from '@mariozechner/pi-ai'
+import type { AssistantMessageEvent as PiAssistantMessageEvent } from '@earendil-works/pi-ai'
 import type { ToolCall } from '../message-types'
 import type { AgentCallbacks } from './types'
 

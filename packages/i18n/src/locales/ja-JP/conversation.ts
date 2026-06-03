@@ -64,6 +64,32 @@ export const conversation = {
       continue: "続行",
       hint: "タスクが未完了の可能性があります。メッセージを送信してエージェントの作業を継続できます",
     },
+    // 画像生成
+    imageGen: {
+      title: "画像生成",
+      model: "モデル",
+      aspectRatio: "デフォルトのアスペクト比",
+      previewFullscreen: "フルスクリーンプレビュー",
+      downloadImage: "画像をダウンロード",
+      generating: "画像を生成中...",
+      generated: "画像が生成されました",
+      noResult: "画像生成完了（結果なし）",
+      failed: "画像生成に失敗しました: {error}",
+      emptyPrompt: "画像の説明を入力してください。例: /image オレンジ色の猫",
+      emptyPromptRegenerate: "画像の説明が空です。再生成できません",
+      waitRunning: "現在のタスクが完了するまでお待ちください",
+      configureProvider: "先にプロバイダーを設定してください",
+      apiKeyMissing: "API Keyが設定されていません。設定で構成してください",
+      aspectRatios: {
+        '1:1': "正方形",
+        '16:9': "ワイド",
+        '9:16': "縦長",
+        '4:3': "横長",
+        '3:4': "縦型",
+        '3:2': "写真",
+        '2:3': "ポスター",
+      },
+    },
     // Codex OAuth エラー
     codex: {
       error: {

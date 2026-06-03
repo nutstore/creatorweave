@@ -1,6 +1,6 @@
 import { produce } from 'immer'
-import { agentLoopContinue, type StreamFn } from '@mariozechner/pi-agent-core'
-import { streamSimple as piAiStreamSimple } from '@mariozechner/pi-ai'
+import { agentLoopContinue, type StreamFn } from '@earendil-works/pi-agent-core'
+import { streamSimple as piAiStreamSimple } from '@earendil-works/pi-ai'
 import { useSettingsStore } from '@/store/settings.store'
 import type { AgentMode } from '../agent-mode'
 import type { ContextManager } from '../context-manager'
