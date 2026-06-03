@@ -129,6 +129,42 @@ registerSkill('cw:word-editor', [
 ])
 
 // ============================================================================
+// cw:skill-creator — Create, evaluate, and improve workspace skills
+// ============================================================================
+
+import skillCreatorSkillMd from './builtin-packages/skill-creator/SKILL.md?raw'
+import skillCreatorUtils from './builtin-packages/skill-creator/scripts/utils.py?raw'
+import skillCreatorValidate from './builtin-packages/skill-creator/scripts/quick_validate.py?raw'
+import skillCreatorAggregate from './builtin-packages/skill-creator/scripts/aggregate_benchmark.py?raw'
+import skillCreatorReport from './builtin-packages/skill-creator/scripts/generate_report.py?raw'
+import skillCreatorPackage from './builtin-packages/skill-creator/scripts/package_skill.py?raw'
+import skillCreatorGrader from './builtin-packages/skill-creator/agents/grader.md?raw'
+import skillCreatorComparator from './builtin-packages/skill-creator/agents/comparator.md?raw'
+import skillCreatorAnalyzer from './builtin-packages/skill-creator/agents/analyzer.md?raw'
+import skillCreatorSchemas from './builtin-packages/skill-creator/references/schemas.md?raw'
+import skillCreatorGenReview from './builtin-packages/skill-creator/eval-viewer/generate_review.py?raw'
+import skillCreatorViewerHtml from './builtin-packages/skill-creator/eval-viewer/viewer.html?raw'
+
+registerSkill('cw:skill-creator', [
+  { path: 'SKILL.md', content: skillCreatorSkillMd },
+  // scripts/
+  { path: 'scripts/utils.py', content: skillCreatorUtils },
+  { path: 'scripts/quick_validate.py', content: skillCreatorValidate },
+  { path: 'scripts/aggregate_benchmark.py', content: skillCreatorAggregate },
+  { path: 'scripts/generate_report.py', content: skillCreatorReport },
+  { path: 'scripts/package_skill.py', content: skillCreatorPackage },
+  // agents/
+  { path: 'agents/grader.md', content: skillCreatorGrader },
+  { path: 'agents/comparator.md', content: skillCreatorComparator },
+  { path: 'agents/analyzer.md', content: skillCreatorAnalyzer },
+  // references/
+  { path: 'references/schemas.md', content: skillCreatorSchemas },
+  // eval-viewer/
+  { path: 'eval-viewer/generate_review.py', content: skillCreatorGenReview },
+  { path: 'eval-viewer/viewer.html', content: skillCreatorViewerHtml },
+])
+
+// ============================================================================
 // Manifest — the single source of truth for what's bundled
 // ============================================================================
 
