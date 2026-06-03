@@ -12,6 +12,8 @@ registerRenderer({
   icon: <Terminal className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const output = extractOutput(ctx)
+    const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
+    const codeLines = code ? code.split('\n').length : 0
 
     if (ctx.isExecuting && !ctx.isStreaming) {
       return (
@@ -24,8 +26,6 @@ registerRenderer({
 
     // Streaming — show code line count being composed
     if (ctx.isStreaming) {
-      const code = typeof ctx.args.code === 'string' ? ctx.args.code : ''
-      const codeLines = code ? code.split('\n').length : 0
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
@@ -36,16 +36,20 @@ registerRenderer({
       )
     }
 
-    const lines = output.stdout ? output.stdout.split('\n').length : 0
+    const stdoutLines = output.stdout ? output.stdout.split('\n').length : 0
     const hasError = output.isError || !!output.stderr
+
+    const parts: string[] = []
+    if (codeLines > 0) parts.push(`in ${codeLines}`)
+    if (stdoutLines > 0) parts.push(`out ${stdoutLines}`)
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
         {hasError ? (
           <span className="ml-auto text-xs text-red-400 shrink-0">error</span>
-        ) : lines > 0 ? (
-          <span className="ml-auto text-xs text-neutral-400 shrink-0">{lines} line{lines !== 1 ? 's' : ''}</span>
+        ) : parts.length > 0 ? (
+          <span className="ml-auto text-xs text-neutral-400 shrink-0">{parts.join(' / ')}</span>
         ) : null}
       </>
     )
