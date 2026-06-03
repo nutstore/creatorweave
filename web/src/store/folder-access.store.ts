@@ -277,6 +277,16 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
         toast.success(`Folder selected: ${handle.name}`)
 
+        // Ensure a ProjectRoot record exists so loadRoots() can find it
+        const rootRepo = getProjectRootRepository()
+        const existingRoots = await rootRepo.findByProject(projectId)
+        if (!existingRoots.some((r) => r.name === handle.name)) {
+          await rootRepo.createRoot({ projectId, name: handle.name })
+        }
+
+        // Reload roots so sidebar FileTreePanel picks up the new handle
+        await get().loadRoots()
+
         // Notify file tree to refresh + clear file path cache (lazy reload on next search)
         get().clearFilePaths()
         get().notifyFileTreeRefresh()
@@ -350,6 +360,16 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       })
 
       console.log('[FolderAccessStore] Handle set directly:', handle.name)
+
+      // Ensure a ProjectRoot record exists so loadRoots() can find it
+      const rootRepo = getProjectRootRepository()
+      const existingRoots = await rootRepo.findByProject(projectId)
+      if (!existingRoots.some((r) => r.name === handle.name)) {
+        await rootRepo.createRoot({ projectId, name: handle.name })
+      }
+
+      // Reload roots so sidebar FileTreePanel picks up the new handle
+      await get().loadRoots()
 
       // Notify file tree to refresh + clear file path cache
       get().clearFilePaths()
