@@ -79,9 +79,11 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
 
       registration.addEventListener('updatefound', handleUpdateFound)
 
-      // If a worker is already waiting from a previous session, notify immediately.
+      // If a worker is already waiting from a previous session, check its version.
       if (registration.waiting && navigator.serviceWorker.controller) {
-        notifyIfNew()
+        // The page has already loaded the new version (buildId matches) —
+        // just activate the waiting worker silently instead of showing a toast.
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' })
       }
 
       // Trigger an immediate update check on startup.
