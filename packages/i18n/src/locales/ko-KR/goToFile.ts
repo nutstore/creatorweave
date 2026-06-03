@@ -4,6 +4,7 @@ export const goToFile = {
     scanning: "파일 스캔 중...",
     noMatch: "일치하는 파일 없음",
     typeToSearch: "입력하여 파일 검색",
+    noAccess: "프로젝트 파일을 읽을 수 없습니다. 페이지를 새로고침한 후 다시 시도하세요",
     footer: {
       select: "↑↓ 선택",
       open: "Enter 열기",

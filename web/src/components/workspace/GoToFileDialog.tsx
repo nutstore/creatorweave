@@ -62,6 +62,7 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [isIndexing, setIsIndexing] = useState(false)
+  const [indexDone, setIndexDone] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   // Track latest selectedIndex via ref to avoid stale closure in key handler
@@ -98,13 +99,21 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
   // Trigger file path indexing when dialog opens
   useEffect(() => {
     if (!open) return
-    if (allFilePaths.length > 0) return // Already indexed
+    if (allFilePaths.length > 0) {
+      setIndexDone(true)
+      return // Already indexed
+    }
 
     let cancelled = false
     setIsIndexing(true)
-    ensureFilePaths().finally(() => {
-      if (!cancelled) setIsIndexing(false)
-    })
+    setIndexDone(false)
+    ensureFilePaths()
+      .finally(() => {
+        if (!cancelled) {
+          setIsIndexing(false)
+          setIndexDone(true)
+        }
+      })
     return () => { cancelled = true }
   }, [open, allFilePaths.length, ensureFilePaths])
 
@@ -233,6 +242,11 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
           {results.length === 0 && !query.trim() && allPaths.length > 0 && (
             <div className="px-4 py-8 text-center text-sm text-neutral-400">
               {t('goToFile.typeToSearch')}
+            </div>
+          )}
+          {allPaths.length === 0 && indexDone && !isIndexing && (
+            <div className="px-4 py-8 text-center text-sm text-neutral-400">
+              {t('goToFile.noAccess')}
             </div>
           )}
           {results.map((result, index) => {

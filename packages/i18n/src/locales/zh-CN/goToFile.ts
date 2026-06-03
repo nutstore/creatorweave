@@ -4,6 +4,7 @@ export const goToFile = {
     scanning: "正在扫描文件...",
     noMatch: "没有匹配的文件",
     typeToSearch: "输入关键词搜索文件",
+    noAccess: "无法读取项目文件，请刷新网页后重试",
     footer: {
       select: "↑↓ 选择",
       open: "Enter 打开",
