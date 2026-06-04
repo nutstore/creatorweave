@@ -9,6 +9,7 @@
  */
 
 import { getWorkspaceManager } from '@/opfs'
+import { getFileContentType } from '@/opfs/utils/opfs-utils'
 import type { VfsBackend, VfsReadResult, VfsReadOptions, VfsDirEntry, VfsListOptions } from '../vfs-backend'
 
 function inferMimeType(path: string): string {
@@ -83,7 +84,10 @@ export class AssetsBackend implements VfsBackend {
     const fileHandle = await navigateTo(dir, path)
     const file = await fileHandle.getFile()
 
-    const encoding = options?.encoding ?? 'text'
+    // Auto-detect encoding from file extension (same logic as WorkspaceBackend).
+    // Default to 'binary' to preserve binary files (docx/images/etc.).
+    const encoding = options?.encoding
+      ?? (getFileContentType(path) === 'text' ? 'text' : 'binary')
     const content = encoding === 'binary'
       ? await file.arrayBuffer()
       : await file.text()
