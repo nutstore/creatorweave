@@ -96,7 +96,8 @@
     "tailwind-merge": "^2.5.5",
     "tesseract.js": "^5.0.0",
     "xlsx": "^0.18.5",
-    "zustand": "^4.5.5"
+    "zustand": "^4.5.5",
+    "just-bash": "^3.0.1"
   },
   "devDependencies": {
     "@eslint/js": "8",

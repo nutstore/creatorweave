@@ -92,8 +92,17 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
 
         // 在调用工具前更新 toolContext 的 contextUsage
         const originalToolContext = input.getToolContext()
+
+        // Sync agentMode from the store so that switch_agent_mode takes effect
+        // immediately for subsequent tool calls (e.g. bash Plan-mode write protection).
+        const { getCurrentWorkspaceAgentMode } = await import(
+          '@/store/workspace-preferences.store'
+        )
+        const currentMode = getCurrentWorkspaceAgentMode()
+
         const toolContextWithUsage: ToolContext = {
           ...originalToolContext,
+          agentMode: currentMode,
           contextUsage: {
             usedTokens: realUsedTokens ?? 0,
             maxTokens: maxContextTokens - reserveTokens,

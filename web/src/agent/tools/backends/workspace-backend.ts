@@ -237,8 +237,27 @@ export class WorkspaceBackend implements VfsBackend {
       try {
         let dirHandle: FileSystemDirectoryHandle = nativeDirHandle
         if (nativeRelativePath) {
-          for (const segment of nativeRelativePath.split('/').filter(Boolean)) {
-            dirHandle = await dirHandle.getDirectoryHandle(segment)
+          const segments = nativeRelativePath.split('/').filter(Boolean)
+          for (let i = 0; i < segments.length; i++) {
+            try {
+              dirHandle = await dirHandle.getDirectoryHandle(segments[i]!)
+            } catch (dirErr) {
+              // Check if this segment is a file — if so, the path points to a file, not a directory
+              const isLast = i === segments.length - 1
+              if (isLast) {
+                try {
+                  await dirHandle.getFileHandle(segments[i]!)
+                  // It's a file — listDir on a file path is an error
+                  throw new Error(`ENOTDIR: not a directory, scandir '${path}'`)
+                } catch (fileErr) {
+                  // getFileHandle also failed — re-throw as ENOTDIR or let it propagate
+                  if (fileErr instanceof Error && fileErr.message.startsWith('ENOTDIR')) throw fileErr
+                  throw dirErr
+                }
+              }
+              // Not the last segment — a parent path component is not a directory
+              throw dirErr
+            }
           }
         }
 
@@ -347,7 +366,20 @@ export class WorkspaceBackend implements VfsBackend {
     }
 
     // Merge: native entries first, then OPFS-only extras
-    return [...nativeEntries, ...opfsExtraEntries]
+    const merged = [...nativeEntries, ...opfsExtraEntries]
+
+    // If nothing found, check if the path itself is an OPFS-only file
+    // (e.g. a file written by Python/Pyodide that never hit native disk)
+    if (merged.length === 0 && path) {
+      const isOpfsFile = allOpfsPaths.includes(path)
+        || cachedPaths.includes(path)
+        || pendingChanges.some(c => c.path === path && (c.type === 'create' || c.type === 'modify'))
+      if (isOpfsFile) {
+        throw new Error(`ENOTDIR: not a directory, scandir '${path}'`)
+      }
+    }
+
+    return merged
   }
 
   private async _listDirRecursive(

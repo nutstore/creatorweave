@@ -77,6 +77,8 @@ export class AgentLoop {
     this.onCompressionStateUpdate = config.onCompressionStateUpdate
     this.compressionBaseline = config.initialCompressionBaseline ?? null
     this.mode = config.mode || 'act'
+    // Keep toolContext.agentMode in sync so tools (e.g. bash) can read it
+    this.toolContext.agentMode = this.mode
     this.convertCallCount = config.initialConvertCallCount ?? 0
     this.lastSummaryConvertCall =
       config.initialLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY
@@ -91,6 +93,8 @@ export class AgentLoop {
   /** Set agent mode */
   setMode(mode: AgentMode): void {
     this.mode = mode
+    // Keep toolContext.agentMode in sync so tools (e.g. bash) can read it
+    this.toolContext.agentMode = mode
   }
 
   /** Update system prompt (e.g. when skills are injected) */

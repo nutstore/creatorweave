@@ -38,6 +38,11 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
     category: 'read',
     planModeDescription: 'Execute Python code in sandbox (read-only in plan mode - no file modifications persisted)'
   }],
+  ['bash', {
+    name: 'bash',
+    category: 'read',
+    planModeDescription: 'Execute read-only bash commands in sandbox (grep, cat, ls, etc. — writes blocked)'
+  }],
   ['analyze_data', { name: 'analyze_data', category: 'read' }],
   ['ocr', { name: 'ocr', category: 'read' }],
   // run_workflow disabled — workflows unused
