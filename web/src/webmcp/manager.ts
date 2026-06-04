@@ -1,5 +1,7 @@
 import { getWebMCPBridge } from './bridge-client'
-import { createWebMCPToolExecutor, webMCPToolToToolDefinition } from './tool-bridge'
+import {
+  ON_DEMAND_WEBMCP_TOOLS,
+} from './tool-bridge'
 import { useWebMCPStore } from './store'
 import type { WebMCPDiscoveredTool } from './types'
 import { useSettingsStore } from '@/store/settings.store'
@@ -10,8 +12,9 @@ type RegistryLike = {
 }
 
 const DISCOVERY_TTL_MS = 8000
+
+// Track which tools are registered (for cleanup)
 const registeredWebMCPToolNames = new Set<string>()
-const registeredWebMCPToolSignatures = new Map<string, string>()
 let lastDiscoveryAt = 0
 let discoveryInFlight: Promise<WebMCPDiscoveredTool[]> | null = null
 
@@ -36,34 +39,6 @@ function dedupeTools(tools: WebMCPDiscoveredTool[]): WebMCPDiscoveredTool[] {
   }
 
   return Array.from(deduped.values()).sort((a, b) => a.fullName.localeCompare(b.fullName))
-}
-
-function stableSerialize(value: unknown): string {
-  const normalize = (input: unknown): unknown => {
-    if (Array.isArray(input)) {
-      return input.map((item) => normalize(item))
-    }
-    if (!input || typeof input !== 'object') {
-      return input
-    }
-    const obj = input as Record<string, unknown>
-    const sortedKeys = Object.keys(obj).sort()
-    const next: Record<string, unknown> = {}
-    for (const key of sortedKeys) {
-      next[key] = normalize(obj[key])
-    }
-    return next
-  }
-  return JSON.stringify(normalize(value))
-}
-
-function buildToolSignature(tool: WebMCPDiscoveredTool): string {
-  return stableSerialize({
-    description: tool.description || '',
-    inputSchema: tool.inputSchema || {},
-    annotations: tool.annotations || {},
-    apiMode: tool.apiMode || 'modelContext',
-  })
 }
 
 async function resolveRegistry(registry?: RegistryLike): Promise<RegistryLike> {
@@ -112,42 +87,29 @@ async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredToo
   return discoveryInFlight
 }
 
-async function syncFromCatalog(registry: RegistryLike): Promise<number> {
-  const store = useWebMCPStore.getState()
-  const enabledTools = dedupeTools(store.getEnabledTools())
-  const enabledNames = new Set(enabledTools.map((tool) => tool.fullName))
-
-  for (const name of Array.from(registeredWebMCPToolNames)) {
-    if (enabledNames.has(name)) continue
-    registry.unregister(name)
-    registeredWebMCPToolNames.delete(name)
-    registeredWebMCPToolSignatures.delete(name)
-  }
-
-  for (const tool of enabledTools) {
-    const signature = buildToolSignature(tool)
-    const previousSignature = registeredWebMCPToolSignatures.get(tool.fullName)
-    const isAlreadyRegistered = registeredWebMCPToolNames.has(tool.fullName)
-
-    // No-op when tool already exists with the same schema/metadata.
-    if (isAlreadyRegistered && previousSignature === signature) {
-      continue
+/**
+ * On-demand mode: register only 2 persistent tools (webmcp_get_tool_schema + webmcp_call).
+ * The catalog data stays in the store for webmcp_get_tool_schema to query at runtime.
+ */
+function syncOnDemandTools(registry: RegistryLike): number {
+  for (const tool of ON_DEMAND_WEBMCP_TOOLS) {
+    const name = tool.definition.function.name
+    if (!registeredWebMCPToolNames.has(name)) {
+      // Idempotent: skip if already registered (e.g. by registerBuiltins)
+      if (registry.has(name)) {
+        registeredWebMCPToolNames.add(name)
+        continue
+      }
+      registry.register(tool.definition, tool.executor)
+      registeredWebMCPToolNames.add(name)
     }
-
-    // Re-register only when new or changed.
-    if (isAlreadyRegistered) {
-      registry.unregister(tool.fullName)
-    }
-
-    const definition = webMCPToolToToolDefinition(tool)
-    const executor = createWebMCPToolExecutor(tool.fullName, tool.hostname)
-    registry.register(definition, executor)
-    registeredWebMCPToolNames.add(tool.fullName)
-    registeredWebMCPToolSignatures.set(tool.fullName, signature)
   }
-
-  return enabledTools.length
+  return ON_DEMAND_WEBMCP_TOOLS.length
 }
+
+// Legacy: full-registration mode preserved for future fallback.
+// Uncomment syncFromCatalog and its imports when needed.
+// async function syncFromCatalog(registry: RegistryLike): Promise<number> { ... }
 
 export async function syncWebMCPTools(options: {
   registry?: RegistryLike
@@ -159,7 +121,10 @@ export async function syncWebMCPTools(options: {
     return 0
   }
   await discoverAndCacheTools(!!options.forceDiscovery)
-  return syncFromCatalog(registry)
+
+  // On-demand mode: register 2 persistent tools only
+  // Catalog data stays in store for webmcp_get_tool_schema to query
+  return syncOnDemandTools(registry)
 }
 
 export async function refreshWebMCPTools(registry?: RegistryLike): Promise<number> {
@@ -177,7 +142,11 @@ export async function applyWebMCPHostToggle(
     await unregisterAllWebMCPTools(resolvedRegistry)
     return 0
   }
-  return syncFromCatalog(resolvedRegistry)
+  // In on-demand mode, host toggle only affects the catalog (store).
+  // The 2 persistent tools stay registered regardless.
+  // Refresh catalog data only.
+  await discoverAndCacheTools(true)
+  return syncOnDemandTools(resolvedRegistry)
 }
 
 export async function applyWebMCPGlobalToggle(
@@ -201,7 +170,6 @@ export async function unregisterAllWebMCPTools(registry?: RegistryLike): Promise
       removed++
     }
     registeredWebMCPToolNames.delete(name)
-    registeredWebMCPToolSignatures.delete(name)
   }
   return removed
 }

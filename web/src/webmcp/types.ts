@@ -1,5 +1,3 @@
-import type { ToolDefinition } from '@/agent/tools/tool-types'
-
 export type WebMCPApiMode = 'modelContext' | 'modelContextTesting'
 
 export interface WebMCPDiscoveredTool {
@@ -111,10 +109,4 @@ export interface WebMCPBridge {
     transferId: string
     savedPath: string
   }) => Promise<{ ok: boolean; transferId?: string; error?: string }>
-}
-
-export interface WebMCPRegisteredTool {
-  definition: ToolDefinition
-  hostname: string
-  fullName: string
 }

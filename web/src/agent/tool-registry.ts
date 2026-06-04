@@ -112,6 +112,15 @@ import {
   webBridgePromptDoc,
 } from './tools/web-bridge.tool'
 
+// WebMCP on-demand tools (schema loading + execution)
+import {
+  webMCPGetToolSchemaDefinition,
+  webMCPGetToolSchemaExecutor,
+  webMCPToolCallDefinition,
+  webMCPToolCallExecutor,
+  webMCPPromptDoc,
+} from '@/webmcp/tool-bridge'
+
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
   { definition: readDefinition, executor: readExecutor },
@@ -180,6 +189,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   askUserQuestionPromptDoc,
   webBridgePromptDoc,
   skillPromptDoc,
+  webMCPPromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -239,6 +249,8 @@ export class ToolRegistry {
     for (const doc of ALL_PROMPT_DOCS) {
       // Skip web bridge tools if not available
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
+      // Skip WebMCP tools if globally disabled
+      if (doc.category === 'webmcp' && !useSettingsStore.getState().enableWebMCP) continue
 
       const section = doc.section ?? `### ${doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}`
       if (!sections.has(section)) {
@@ -328,6 +340,10 @@ export class ToolRegistry {
     for (const tool of BUILTIN_TOOLS) {
       this.register(tool.definition, tool.executor)
     }
+    // Register WebMCP on-demand tools as builtins — they are always available
+    // as gateway tools regardless of whether WebMCP pages are open.
+    this.register(webMCPGetToolSchemaDefinition, webMCPGetToolSchemaExecutor)
+    this.register(webMCPToolCallDefinition, webMCPToolCallExecutor)
   }
 
   /** Register a WASM plugin as an Agent tool */

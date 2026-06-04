@@ -134,6 +134,17 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     console.warn('[AgentLoop] Failed to inject skills block:', error)
   }
 
+  // ⑦.5: WebMCP catalog block (available WebMCP tools for on-demand loading)
+  try {
+    const { buildAvailableWebMCPBlock } = await import('@/webmcp/catalog-injection')
+    const webmcpBlock = buildAvailableWebMCPBlock()
+    if (webmcpBlock) {
+      enhancedPrompt += '\n\n' + webmcpBlock
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject WebMCP catalog block:', error)
+  }
+
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
