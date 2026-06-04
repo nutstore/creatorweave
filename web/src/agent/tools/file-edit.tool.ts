@@ -195,12 +195,10 @@ export const editDefinition: ToolDefinition = {
       'WHEN TO USE: When modifying part of an existing file — changing a function, fixing a bug, updating a value, renaming a variable, adjusting a config, etc.',
       'DO NOT use write() for targeted changes to existing files. Always prefer edit() for modifications.',
       '',
-      'PREREQUISITE: You MUST call read() on the file first. The edit will fail if the file has not been read.',
-      '',
       'WORKFLOW:',
-      '1. Call read(path) to load file contents',
-      '2. Identify the exact text to change from the read output',
-      '3. Call edit(path, edits=[{old_text=<exact snippet from file>, new_text=<replacement>}])',
+      '1. Call read(path) if you need to see current file contents (skip if you already know the content)',
+      '2. Identify the exact text to change',
+      '3. Call edit(path, edits=[{old_text=<exact snippet>, new_text=<replacement>}])',
       '',
       'The `edits` array supports one or more edits applied atomically to the same file.',
       'Each edit is applied atomically — if any edit fails, the entire operation is rolled back.',
@@ -208,7 +206,7 @@ export const editDefinition: ToolDefinition = {
       'Example multi edit: edit(path, edits=[{old_text:"foo", new_text:"bar"}, {old_text:"baz", new_text:"qux"}])',
       '',
       'TIPS:',
-      '- Copy old_text EXACTLY from the read() output — whitespace and line breaks must match',
+      '- Copy old_text EXACTLY — whitespace and line breaks must match',
       '- old_text must be unique in the file (each occurrence must match exactly once)',
       '- For multi-line changes, include enough surrounding context to make old_text unique',
       '- new_text can be an empty string to delete text',
@@ -355,11 +353,11 @@ async function executeEdits(
     const readStateKey = getReadStateKey(target)
     const snapshot = readFileState.get(readStateKey)
 
-    if (!snapshot || snapshot.isPartialView) {
+    if (snapshot?.isPartialView) {
       return toolErrorJson(
         'edit',
         'read_required',
-        'Read file before editing. Use read(path) first, then retry edit.'
+        'Cannot edit a partial file view. Read the full file first, then retry edit.'
       )
     }
 
@@ -403,7 +401,7 @@ async function executeEdits(
       throw error
     }
 
-    const isFullRead = snapshot.offset === undefined && snapshot.limit === undefined
+    const isFullRead = snapshot && snapshot.offset === undefined && snapshot.limit === undefined
     if (isFullRead && snapshot.content !== fileContent) {
       return toolErrorJson(
         'edit',
@@ -590,6 +588,6 @@ export const editPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Operations',
   lines: [
-    '- `edit(path, edits=[{old_text, new_text}])` - Apply one or more text replacements to an existing file. REQUIRES prior read(). All edits are applied atomically. (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
+    '- `edit(path, edits=[{old_text, new_text}])` - Apply one or more text replacements to an existing file. All edits are applied atomically. (supports `vfs://workspace/...`, `vfs://agents/{id}/...`)',
   ],
 }

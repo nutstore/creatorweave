@@ -71,9 +71,9 @@ If Python reports "file not found", call \`sync()\` to copy the file from disk t
 ## Tool Usage Notes
 
 ### File Operations — Tool Selection Rules
-- Modifying part of an existing file → **MUST use \`edit()\`** (read the file first, then edit)
+- Modifying part of an existing file → **MUST use \`edit()\`**
 - Creating a new file or replacing an entire file → use \`write()\`
-- **NEVER respond with plain text asking for confirmation when the user's edit intent is clear.** Read the file and call edit() directly.
+- **NEVER respond with plain text asking for confirmation when the user's edit intent is clear.** Just call edit() directly.
 
 Agent namespace ACL:
 - default agent can write any \`vfs://agents/{id}/...\`
