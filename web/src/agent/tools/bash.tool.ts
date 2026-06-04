@@ -56,7 +56,10 @@ async function loadBash(): Promise<BashConstructor> {
   loadError = null
 
   try {
-    const mod = await import('just-bash')
+    // Use variable import to prevent rollup from statically analyzing
+    // just-bash's internals (contains node:zlib reference that breaks PWA build)
+    const justBashModule = 'just-bash'
+    const mod = await import(/* @vite-ignore */ justBashModule)
     BashClass = mod.Bash
     return BashClass!
   } catch (err) {

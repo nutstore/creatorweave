@@ -236,12 +236,15 @@ export default defineConfig({
           if (id.includes('node_modules/xlsx/') || id.includes('node_modules/exceljs/')) {
             return 'xlsx'
           }
+          // just-bash: do NOT add to manualChunks — it uses dynamic import()
+          // and contains node:zlib references that break PWA buildEnd scanning.
+          // Leaving it as a dynamic-import chunk avoids rollup parsing its internals.
         },
       },
     },
   },
   optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm', 'pyodide'],
+    exclude: ['@sqlite.org/sqlite-wasm', 'pyodide', 'just-bash'],
   },
   test: {
     environment: 'happy-dom',
