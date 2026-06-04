@@ -92,10 +92,52 @@ function pyodideServePlugin(): Plugin {
   }
 }
 
+/**
+ * Vite plugin to shim `node:zlib` for browser builds.
+ *
+ * `just-bash` browser bundle imports `gunzipSync` from `node:zlib` for
+ * `rg --search-zip` decompression. Vite's default `__vite-browser-external`
+ * doesn't export it, causing rollup to error during build.
+ * This plugin provides a virtual module with throwing stubs — gzip support
+ * is NOT needed (bash tool lists tar/gzip as unavailable).
+ */
+function nodeZlibShimPlugin(): Plugin {
+  const virtualId = '\0virtual:node-zlib'
+  const shimCode = `
+const _err = (n) => () => { throw new Error('node:zlib.' + n + ' is not available in the browser') };
+export const gunzipSync = _err('gunzipSync');
+export const gzipSync = _err('gzipSync');
+export const deflateSync = _err('deflateSync');
+export const inflateSync = _err('inflateSync');
+export const deflateRawSync = _err('deflateRawSync');
+export const inflateRawSync = _err('inflateRawSync');
+export const unzipSync = _err('unzipSync');
+export const createGzip = _err('createGzip');
+export const createGunzip = _err('createGunzip');
+export const createDeflate = _err('createDeflate');
+export const createInflate = _err('createInflate');
+export const createDeflateRaw = _err('createDeflateRaw');
+export const createInflateRaw = _err('createInflateRaw');
+export const constants = {};
+export default { gunzipSync, gzipSync, deflateSync, inflateSync, constants };
+`
+  return {
+    name: 'node-zlib-shim',
+    enforce: 'pre',
+    resolveId(source) {
+      if (source === 'node:zlib' || source === 'zlib') return virtualId
+    },
+    load(id) {
+      if (id === virtualId) return shimCode
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/',
   plugins: [
+    nodeZlibShimPlugin(),
     react(),
     pyodideServePlugin(),
     syncGuardPlugin(),

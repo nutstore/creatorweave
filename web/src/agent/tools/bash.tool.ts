@@ -58,8 +58,7 @@ async function loadBash(): Promise<BashConstructor> {
   try {
     // Use variable import to prevent rollup from statically analyzing
     // just-bash's internals (contains node:zlib reference that breaks PWA build)
-    const justBashModule = 'just-bash'
-    const mod = await import(/* @vite-ignore */ justBashModule)
+    const mod = await import('just-bash')
     BashClass = mod.Bash
     return BashClass!
   } catch (err) {
@@ -232,10 +231,14 @@ export const bashToolExecutor: ToolExecutor = async (
   // Create agent backend (for /agents/<agentId>/... mount)
   let agentBackend: VfsBackend | undefined
   try {
-    if (context.currentAgentId) {
-      const { getAgentManager } = await import('@/opfs')
-      const agentManager = await getAgentManager()
-      agentBackend = new AgentBackend(agentManager, context.currentAgentId)
+    const projectId = context.projectId
+    if (context.currentAgentId && projectId) {
+      const { ProjectManager } = await import('@/opfs')
+      const projectManager = await ProjectManager.create()
+      const project = await projectManager.getProject(projectId)
+      if (project) {
+        agentBackend = new AgentBackend(project.agentManager, context.currentAgentId)
+      }
     }
   } catch {
     // Agent namespace not available — /agents will not be mounted
