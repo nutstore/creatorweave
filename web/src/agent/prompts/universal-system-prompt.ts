@@ -75,6 +75,17 @@ If Python reports "file not found", call \`sync()\` to copy the file from disk t
 - Creating a new file or replacing an entire file → use \`write()\`
 - **NEVER respond with plain text asking for confirmation when the user's edit intent is clear.** Just call edit() directly.
 
+### When to Use Bash
+Prefer \`bash\` over multiple read/edit/search calls when:
+- Batch text replacement across files (\`sed -i\`)
+- Quick file stats or summaries (\`wc -l\`, \`sort | uniq -c\`, \`du\`)
+- Multi-file search with complex patterns (\`rg + awk\` pipeline)
+- One-liner tasks that would otherwise need 3+ tool calls
+
+For example, replacing a function name across 20 files is one \`bash\` call, not 20 read+edit cycles.
+
+Known limitations: no process substitution \`<(...)\`, no \`xargs -I\`, \`echo -e\` does not interpret escapes (use \`printf\` instead), \`rg\` does not support \`--no-heading\` or \`-r\` (use \`sed -i\` for replacements).
+
 Agent namespace ACL:
 - default agent can write any \`vfs://agents/{id}/...\`
 - non-default agents can only write \`vfs://agents/{currentAgentId}/...\`
