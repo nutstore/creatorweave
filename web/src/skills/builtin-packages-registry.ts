@@ -106,6 +106,7 @@ import wordEditorLint from './builtin-packages/word-editor/scripts/lint.py?raw'
 import wordEditorModel from './builtin-packages/word-editor/scripts/model.py?raw'
 import wordEditorView from './builtin-packages/word-editor/scripts/view.py?raw'
 import wordEditorWriteback from './builtin-packages/word-editor/scripts/writeback.py?raw'
+import wordEditorValidateXml from './builtin-packages/word-editor/scripts/validate_xml.py?raw'
 
 import wordEditorDesign from './builtin-packages/word-editor/references/DESIGN.md?raw'
 import wordEditorSchema from './builtin-packages/word-editor/references/SCHEMA.md?raw'
@@ -121,6 +122,7 @@ registerSkill('cw:word-editor', [
   { path: 'scripts/model.py', content: wordEditorModel },
   { path: 'scripts/view.py', content: wordEditorView },
   { path: 'scripts/writeback.py', content: wordEditorWriteback },
+  { path: 'scripts/validate_xml.py', content: wordEditorValidateXml },
 
   { path: 'references/DESIGN.md', content: wordEditorDesign },
   { path: 'references/SCHEMA.md', content: wordEditorSchema },

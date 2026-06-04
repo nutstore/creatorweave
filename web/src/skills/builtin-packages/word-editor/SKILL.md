@@ -1,7 +1,7 @@
 ---
 name: cw:word-editor
 description: "LLM Wiki-mode docx editor with 89 EditOps, zero third-party dependencies. Ingest compiles docx → DocumentModel, view provides outline/details/stats/issue detection, writeback applies precise edits."
-version: "1.0.2"
+version: "1.0.4"
 ---
 
 # word-editor Skill

@@ -4758,7 +4758,12 @@ def _ensure_required_styles(files: dict):
 
 
 def _ensure_xml_declarations(files: dict):
-    """FIX-008: Add <?xml?> declarations to all XML files in ZIP"""
+    """FIX-008: Add <?xml?> declarations to all XML files in ZIP.
+
+    Also strips UTF-8 BOM (\ufeff) that WPS/Office may prepend to XML files
+    (e.g. fontTable.xml, webSettings.xml). BOM causes lstrip() to miss the
+    <?xml declaration, resulting in duplicate declarations.
+    """
     import re
     for name, data in list(files.items()):
         if not name.endswith(".xml") and not name.endswith(".rels"):
@@ -4767,9 +4772,14 @@ def _ensure_xml_declarations(files: dict):
             text = data.decode("utf-8", errors="replace")
         else:
             text = data
-        if not text.lstrip().startswith("<?xml"):
+        # Strip leading whitespace and BOM before checking
+        text = text.lstrip()
+        if text.startswith("\ufeff"):
+            text = text[1:]  # Remove BOM
+        if not text.startswith("<?xml"):
             text = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + text
-            files[name] = text.encode("utf-8")
+        # Always write back to ensure BOM is cleaned from all files
+        files[name] = text.encode("utf-8")
 
 
 def _apply_image_embed_edits(files: dict, edits: list, root: ET.Element):
@@ -5490,6 +5500,15 @@ def apply_edits(
     modified_xml_bytes = ET.tostring(root, encoding="UTF-8", xml_declaration=True)
     modified_xml_bytes = _inject_missing_namespaces(modified_xml_bytes, ns_map)
     files["word/document.xml"] = modified_xml_bytes
+
+    # ── XML Validation Gate ──
+    # Validate all XML parts for well-formedness and structural integrity
+    # before writing the ZIP. Catches stray characters, unclosed tags,
+    # broken bookmarks/comments, duplicate drawing IDs, etc.
+    from validate_xml import validate_and_report
+    xml_ok = validate_and_report(files, verbose=True)
+    if not xml_ok:
+        print("Warning: XML validation detected errors — docx may be corrupted")
 
     # Repackage as docx
     # Ensure output directory exists (OPFS lazy mount may not have parent dir)
