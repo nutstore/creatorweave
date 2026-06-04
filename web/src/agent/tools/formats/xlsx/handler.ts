@@ -169,12 +169,22 @@ export const xlsxHandler: FormatHandler = {
         parts.push('')
         const remaining = sheet.totalRows - FULL_ROWS_THRESHOLD
         parts.push(`... ${remaining} more row${remaining !== 1 ? 's' : ''} (showing first ${FULL_ROWS_THRESHOLD} of ${sheet.totalRows})`)
-        parts.push('')
-        parts.push(`💡 Use python (pandas) to analyze full data: pd.read_excel('/mnt/.../${path.split('/').pop()}', sheet_name='${sheet.name}')`)
       }
 
       parts.push('')
     }
+
+    // Add pandas analysis hint for all xlsx reads
+    const fileName = path.split('/').pop()!
+    if (sheets.length > 1) {
+      const sheetNames = sheets.map(s => `"${s.name}"`).join(', ')
+      parts.push(`📋 Sheets: [${sheetNames}]  — use sheet_name parameter to access specific sheet`)
+    }
+    const sheetHint = sheets.length === 1
+      ? `pd.read_excel('${fileName}')`
+      : `pd.read_excel('${fileName}', sheet_name='${sheets[0].name}')`
+    parts.push(`💡 Use Python (pandas) for deeper analysis: ${sheetHint}`)
+    parts.push('   Example: df = pd.read_excel(...); df.describe(); df.groupby(...).agg(...); df.plot(...)')
 
     return {
       content: parts.join('\n'),

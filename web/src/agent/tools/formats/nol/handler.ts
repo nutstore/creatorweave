@@ -233,6 +233,8 @@ export const nolHandler: FormatHandler = {
             if (i > 0) lines.push('')
             lines.push(...renderNodeTree(rootIds[i], nodes, 0))
           }
+          lines.push('')
+          lines.push('💡 This is an Outline Notes (.nol) file. To edit, provide the full outline in the same indented text format.')
           return {
             content: lines.join('\n'),
             kind: 'nol',

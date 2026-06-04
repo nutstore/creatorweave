@@ -96,6 +96,8 @@ export const pdfHandler: FormatHandler = {
         '--- Full Content ---',
         '',
         pages.join('\n\n'),
+        '',
+        `💡 Use Python (pypdf) for advanced PDF operations (merge, extract images, etc.).`,
       ].join('\n')
 
       return { content, kind: 'pdf', metadata: { totalPages } }
@@ -126,6 +128,8 @@ export const pdfHandler: FormatHandler = {
       }
     }
 
+    const fileName = path.split('/').pop()
+
     const content = [
       ...header,
       '',
@@ -137,10 +141,10 @@ export const pdfHandler: FormatHandler = {
       '',
       ...outlineEntries,
       '',
-      `To read a specific page in full, use python:`,
-      `  import pypdf`,
-      `  reader = pypdf.PdfReader("/mnt/<rootName>/${path}")`,
-      `  print(reader.pages[N].extract_text())  # N is 0-based page index`,
+      `💡 Use Python (pypdf) to read specific pages in full:`,
+      `   import pypdf`,
+      `   reader = pypdf.PdfReader('/mnt/<rootName>/${fileName}')`,
+      `   print(reader.pages[N].extract_text())  # N is 0-based page index`,
     ].join('\n')
 
     return {

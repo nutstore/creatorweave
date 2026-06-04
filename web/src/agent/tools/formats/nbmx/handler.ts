@@ -147,6 +147,8 @@ export const nbmxHandler: FormatHandler = {
       '--- Content ---',
       '',
       outline || '(empty mind map)',
+      '',
+      '💡 This is a Nutstore Brain Map (.nbmx). This is a read-only format — to edit, use the brain map editor.',
     ].filter(Boolean).join('\n')
 
     return {

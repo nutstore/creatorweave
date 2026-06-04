@@ -113,6 +113,8 @@ export const docxHandler: FormatHandler = {
       `Characters: ${totalChars.toLocaleString()}`,
     ]
 
+    const fileName = path.split('/').pop()
+
     if (totalChars <= FULL_TEXT_THRESHOLD) {
       // Small document: full content
       return {
@@ -122,6 +124,8 @@ export const docxHandler: FormatHandler = {
           '--- Full Content ---',
           '',
           text,
+          '',
+          `💡 Use the cw:word-editor skill to edit this document (styles, formatting, tables, images, 89 edit operations).`,
         ].join('\n'),
         kind: 'docx',
         metadata: { totalParagraphs, totalChars },
@@ -136,7 +140,6 @@ export const docxHandler: FormatHandler = {
       ? text.slice(0, lastNewline)
       : truncated
     const remainingChars = totalChars - previewText.length
-    const fileName = path.split('/').pop()
 
     return {
       content: [

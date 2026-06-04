@@ -270,9 +270,13 @@ export const csvHandler: FormatHandler = {
       parts.push('')
       const remaining = totalRows - FULL_ROWS_THRESHOLD
       parts.push(`... ${remaining} more row${remaining !== 1 ? 's' : ''} (showing first ${FULL_ROWS_THRESHOLD} of ${totalRows})`)
-      parts.push('')
-      parts.push(`💡 Use python (pandas) to analyze full data: pd.read_csv('/mnt/.../${path.split('/').pop()}')`)
     }
+
+    // Add pandas analysis hint for all csv reads
+    const csvFileName = path.split('/').pop()!
+    parts.push('')
+    parts.push(`💡 Use Python (pandas) for deeper analysis: pd.read_csv('${csvFileName}')`)
+    parts.push('   Example: df = pd.read_csv(...); df.describe(); df.groupby(...).agg(...); df.plot(...)')
 
     return {
       content: parts.join('\n'),

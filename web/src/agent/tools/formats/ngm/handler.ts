@@ -164,6 +164,8 @@ export const ngmHandler: FormatHandler = {
       '--- Content ---',
       '',
       text || '(No text content in diagram)',
+      '',
+      '💡 This is a draw.io diagram (.ngm). This is a read-only format — to edit, use draw.io or diagrams.net.',
     ].join('\n')
 
     return {

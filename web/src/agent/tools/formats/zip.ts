@@ -89,6 +89,21 @@ export const zipHandler: FormatHandler = {
       ...textParts,
     ].join('\n')
 
+    // Add hint for binary entries
+    if (binaryEntries.length > 0) {
+      const binNames = binaryEntries.map(e => e.name).join(', ')
+      return {
+        content: content + `\n\n💡 Binary files in archive: ${binNames}. Use Python to process them if needed.`,
+        kind: 'zip',
+        metadata: {
+          totalEntries: Object.keys(unzipped).length,
+          textEntries: textEntries.length,
+          binaryEntries: binaryEntries.length,
+        },
+        entries,
+      }
+    }
+
     return {
       content,
       kind: 'zip',
