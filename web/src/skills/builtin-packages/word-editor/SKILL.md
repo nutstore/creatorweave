@@ -179,6 +179,7 @@ ax.bar(['苹果', '香蕉', '橙子'], [3, 5, 2])
 - Only fetch when needed — no upfront download or OPFS storage
 - `addfont()` requires a file path (not BytesIO), so write to a temp file first
 - Subsequent calls in the same session skip the fetch (temp file already exists)
+- **Emoji NOT supported**: matplotlib uses FreeType which cannot render color emoji (COLRv1/CBDT). All emoji glyphs appear as empty boxes. Use plain text labels instead of emoji in charts.
 
 ### Full Example: Generate a Report with Chart from Scratch
 

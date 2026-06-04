@@ -74,6 +74,28 @@ Pyodide runs in the browser and does NOT have native socket access. This means:
 - Alternatively, use the browser's fetch API via \`from js import fetch; resp = await fetch(url)\`.
 - Do NOT attempt to install \`requests\` or \`urllib3\` via micropip — they cannot work without sockets.
 
+**CJK Font for Matplotlib Charts**:
+Pyodide has no CJK fonts. When chart labels/titles contain Chinese/Japanese/Korean characters, fetch and load the bundled font on demand:
+\`\`\`python
+import matplotlib; matplotlib.use('Agg')
+import matplotlib.font_manager as fm, matplotlib.pyplot as plt, tempfile, os
+async def load_cjk_font():
+    font_name = 'NotoSansSC-Regular.otf'
+    tmp_path = os.path.join(tempfile.gettempdir(), font_name)
+    if not os.path.exists(tmp_path):
+        from pyodide.http import pyfetch
+        resp = await pyfetch(f'/assets/fonts/{font_name}')
+        with open(tmp_path, 'wb') as f: f.write(await resp.bytes())
+    fm.fontManager.addfont(tmp_path)
+    plt.rcParams['font.sans-serif'] = ['Noto Sans SC'] + plt.rcParams['font.sans-serif']
+    plt.rcParams['axes.unicode_minus'] = False
+await load_cjk_font()
+\`\`\`
+Font file is at \`/assets/fonts/NotoSansSC-Regular.otf\` (bundled, SIL OFL). Only fetch when needed.
+
+**Emoji Limitation**:
+matplotlib uses FreeType which cannot render color emoji (COLRv1/CBDT/SBIX formats). All emoji glyphs (🎉🍎🍌 etc.) will appear as empty boxes (tofu). **Do NOT use emoji in chart labels/titles — use plain text labels instead.** This is a fundamental matplotlib limitation, not fixable by adding fonts.
+
 Examples:
 - python(code="print('hello')")
 - python(code="import micropip\\nawait micropip.install('beautifulsoup4')\\nfrom bs4 import BeautifulSoup\\nprint(BeautifulSoup('<h1>Hello</h1>', 'html.parser').h1.text)")`,
