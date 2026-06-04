@@ -219,7 +219,7 @@ export const editDefinition: ToolDefinition = {
       properties: {
         path: {
           type: 'string',
-          description: 'File path to edit (e.g., "src/config.ts", "README.md", or "vfs://agents/default/SOUL.md")',
+          description: 'File path to edit. MUST include rootName prefix (e.g., "myRoot/src/config.ts"). Also supports vfs://agents/{id}/... paths.',
         },
         edits: {
           type: 'array',

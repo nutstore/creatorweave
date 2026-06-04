@@ -198,9 +198,9 @@ export function getIntelligenceCoordinator(): IntelligenceCoordinator {
 //=============================================================================
 
 /**
- * Build multi-root context block for the system prompt.
- * When the project has multiple roots, injects the root names so the agent
- * knows to prefix paths correctly (e.g., "frontend/src/App.tsx").
+ * Build root context block for the system prompt.
+ * Always injects the root name(s) so the agent knows to prefix paths correctly.
+ * Even for single-root projects, the agent must use the rootName prefix in all tool calls.
  */
 async function buildMultiRootBlock(
   projectId?: string | null
@@ -217,7 +217,7 @@ async function buildMultiRootBlock(
     const repo = getProjectRootRepository()
     const roots = await repo.findByProject(projectId)
 
-    if (roots.length <= 1) return null // Single-root or no roots — no special instructions needed
+    if (roots.length === 0) return null
 
     const rootNames = roots.map((r) => `\`${r.name}\``).join(', ')
     const defaultRoot = roots.find((r) => r.isDefault)

@@ -37,7 +37,7 @@ export const writeDefinition: ToolDefinition = {
       properties: {
         path: {
           type: 'string',
-          description: 'File path to write',
+          description: 'File path to write. MUST include rootName prefix (e.g., "myRoot/src/file.ts").',
         },
         content: {
           type: 'string',

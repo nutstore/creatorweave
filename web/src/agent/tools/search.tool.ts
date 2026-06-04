@@ -208,7 +208,7 @@ export const searchDefinition: ToolDefinition = {
         },
         path: {
           type: 'string',
-          description: 'Optional subdirectory path to search within. In multi-root projects, use root prefix (e.g., "frontend/src").',
+          description: 'Optional subdirectory path to search within. MUST include rootName prefix (e.g., "frontend/src"). In multi-root projects, use root prefix to scope search.',
         },
         glob: {
           type: 'string',

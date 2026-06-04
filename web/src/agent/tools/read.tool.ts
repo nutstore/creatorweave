@@ -42,7 +42,7 @@ export const readDefinition: ToolDefinition = {
       properties: {
         path: {
           type: 'string',
-          description: 'File path to read',
+          description: 'File path to read. MUST include rootName prefix (e.g., "myRoot/src/file.ts"). Do NOT use bare relative paths like "src/file.ts".',
         },
         start_line: {
           type: 'number',
