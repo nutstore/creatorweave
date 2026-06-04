@@ -37,6 +37,7 @@ import './tool-renderers/GitStatusRenderer'
 import './tool-renderers/GitLogShowRenderer'
 import './tool-renderers/PythonRenderer'
 import './tool-renderers/WebRenderers'
+import './tool-renderers/BashRenderer'
 
 // ─── Subagent types (kept local) ──────────────────────────────
 
