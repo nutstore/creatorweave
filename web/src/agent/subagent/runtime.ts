@@ -197,9 +197,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       usage: latest.usage,
     }
 
-    // Cleanup completed task from memory — result already captured
-    this.removeTask(agentId)
-
+    // Keep completed task in store so get_subagent_status / resume_subagent / list_subagents can still find it
     return result
   }
 
@@ -574,11 +572,6 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     // Sort by task_index for deterministic output
     completed.sort((a, b) => a.task_index - b.task_index)
     failed.sort((a, b) => a.task_index - b.task_index)
-
-    // Cleanup completed tasks from memory
-    for (const item of completed) {
-      this.removeTask(item.agentId)
-    }
 
     return { completed, failed }
   }
