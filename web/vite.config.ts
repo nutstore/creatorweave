@@ -286,7 +286,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@sqlite.org/sqlite-wasm', 'pyodide', 'just-bash'],
+    exclude: ['@sqlite.org/sqlite-wasm', 'pyodide'],
   },
   test: {
     environment: 'happy-dom',
