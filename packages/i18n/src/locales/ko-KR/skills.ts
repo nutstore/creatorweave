@@ -82,7 +82,7 @@ export const skillEditor = {
     selectCategory: "카테고리 선택",
     skillNamePlaceholder: "예: code-reviewer",
     description: "설명",
-    descriptionPlaceholder: "이 스킬의 기능을简要히 설명",
+    descriptionPlaceholder: "이 스킬의 기능을 간단히 설명",
     tagsPlaceholder: "review, quality",
     triggerKeywords: "트리거 키워드",
     triggerKeywordsPlaceholder: "리뷰, 확인",
@@ -95,7 +95,7 @@ export const skillEditor = {
       "당신은 코드 리뷰 전문가입니다. 사용자가 코드 리뷰를 요청할 때：\n1. 타입 안전성 분석\n2. 성능 문제 확인\n3. 가독성 평가",
     exampleDialog: "예제 대화",
     exampleDialogPlaceholder:
-      '사용자: "이 컴포넌트 리뷰帮我"\nAI: "확인하겠습니다..."',
+      '사용자: "이 컴포넌트 리뷰해 주세요"\nAI: "확인하겠습니다..."',
     exampleDialogHelp: "선택 사항, AI 이해를 돕는 예제 제공",
     outputTemplate: "출력 템플릿",
     outputTemplatePlaceholder:
@@ -122,6 +122,27 @@ export const skillEditor = {
       architecture: "아키텍처",
       general: "일반",
     },
+} as const
+
+export const skillUpload = {
+    noSkillMd: "폴더에 SKILL.md 파일이 포함되어야 합니다",
+    noRoot: "사용 가능한 프로젝트 루트가 없습니다",
+    success: "{count}개 파일을 .skills/{name}/에 업로드했습니다",
+    failed: "업로드 실패",
+    dropFolderOnly: "개별 파일이 아닌 폴더를 드롭해 주세요",
+    browserNotSupported: "브라우저가 폴더 드래그 앤 드롭을 지원하지 않습니다. 찾아보기 버튼을 사용해 주세요.",
+    writePermissionRequired: "스킬 업로드에 쓰기 권한이 필요합니다",
+    dropHere: "스킬 폴더를 여기에 드롭하세요",
+    dropOrClick: "스킬 폴더를 드롭하거나 클릭하여 선택하세요",
+    requirement: "폴더에 SKILL.md 파일이 포함되어야 합니다",
+    uploading: "업로드 중...",
+    retryHint: "다시 시도하려면 클릭하세요",
+    targetRoot: "대상 루트",
+    confirmTarget: "업로드 대상",
+    overwriteWarning: "\"{name}\" 스킬 폴더가 이미 존재합니다. 교체됩니다.",
+    files: "파일",
+    confirmUpload: "업로드",
+    confirmOverwrite: "교체 후 업로드",
 } as const
 
 export const skillDetail = {

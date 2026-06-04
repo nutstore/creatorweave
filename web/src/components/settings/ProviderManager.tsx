@@ -654,7 +654,7 @@ function ProviderCard({
           {/* Add Model from API Dialog */}
           <BrandDialog open={showAddModelDialog} onOpenChange={setShowAddModelDialog}>
             <BrandDialogContent className="!max-w-[420px] !w-[420px] !max-h-[70vh] !flex !flex-col !p-0">
-              <BrandDialogHeader className="!h-auto !py-3 !px-4">
+              <BrandDialogHeader>
                 <BrandDialogTitle className="!text-[13px]">
                   {t('settings.pinnedModels.dialogTitle')}
                 </BrandDialogTitle>

@@ -78,7 +78,7 @@ const BrandDialogHeader = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-14 items-center justify-between border-b px-5",
+      "flex items-center justify-between border-b px-5 py-4",
       className
     )}
     {...props}

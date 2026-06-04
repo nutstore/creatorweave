@@ -19,6 +19,8 @@ export const skills = {
     enabled: "已启用",
     disabled: "已禁用",
     empty: "暂无技能",
+    importSkill: "导入技能",
+    importSkillDesc: "拖拽技能文件夹添加到项目中",
     // 技能分类
     categories: {
       codeReview: "代码审查",
@@ -124,6 +126,27 @@ export const skillEditor = {
       architecture: "架构",
       general: "通用",
     },
+} as const
+
+export const skillUpload = {
+    noSkillMd: "文件夹必须包含 SKILL.md 文件",
+    noRoot: "没有可用的项目根目录",
+    success: "已上传 {count} 个文件到 .skills/{name}/",
+    failed: "上传失败",
+    dropFolderOnly: "请拖拽文件夹，而不是单个文件",
+    browserNotSupported: "您的浏览器不支持文件夹拖拽上传，请使用浏览按钮。",
+    writePermissionRequired: "上传技能需要写入权限",
+    dropHere: "将技能文件夹拖放到这里",
+    dropOrClick: "拖拽技能文件夹到这里，或点击浏览",
+    requirement: "文件夹必须包含 SKILL.md 文件",
+    uploading: "上传中...",
+    retryHint: "点击重试",
+    targetRoot: "目标根目录",
+    confirmTarget: "上传目标",
+    overwriteWarning: "名为 \"{name}\" 的技能文件夹已存在，将被替换。",
+    files: "个文件",
+    confirmUpload: "上传",
+    confirmOverwrite: "替换并上传",
 } as const
 
 export const skillDetail = {

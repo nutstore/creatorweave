@@ -109,13 +109,10 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
     <>
       <BrandDialog open={open} onOpenChange={onOpenChange}>
         <BrandDialogContent className="max-w-3xl dark:border-border dark:bg-card overflow-hidden">
-          <BrandDialogHeader className="border-b border-subtle px-6 py-4 pb-3">
+          <BrandDialogHeader>
             <BrandDialogTitle className="text-base font-semibold">{t('workspaceSettings.title')}</BrandDialogTitle>
-            <BrandDialogClose asChild>
-              <button className="absolute right-4 top-4 rounded-lg opacity-70 ring-offset-background transition-all duration-200 hover:opacity-100 hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-                <X className="h-4 w-4" />
-                <span className="sr-only">{t('workspaceSettings.close')}</span>
-              </button>
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+              <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
 

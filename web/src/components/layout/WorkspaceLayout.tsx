@@ -808,6 +808,9 @@ export function WorkspaceLayout({
         open={skillsManagerOpen}
         onClose={() => setSkillsManagerOpen(false)}
         directoryHandle={directoryHandle}
+        roots={roots
+          .filter((r) => r.handle)
+          .map((r) => ({ name: r.name, handle: r.handle! }))}
       />
 
       {/* Tools Panel */}

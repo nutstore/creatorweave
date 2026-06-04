@@ -95,7 +95,7 @@ export const skillEditor = {
       "あなたはコードレビュー専門家です。ユーザーにコードレビューを求めた時：\n1. 型安全性を分析\n2. パフォーマンスの問題を確認\n3. 可読性を評価",
     exampleDialog: "例会話",
     exampleDialogPlaceholder:
-      "ユーザー：「このコンポーネントをレビュー帮我」\nAI：「確認します...」",
+      "ユーザー：「このコンポーネントをレビューしてください」\nAI：「確認します...」",
     exampleDialogHelp: "オプション、例を提供してAIの理解を助ける",
     outputTemplate: "出力テンプレート",
     outputTemplatePlaceholder:
@@ -122,6 +122,27 @@ export const skillEditor = {
       architecture: "アーキテクチャ",
       general: "汎用",
     },
+} as const
+
+export const skillUpload = {
+    noSkillMd: "フォルダにはSKILL.mdファイルが必要です",
+    noRoot: "利用可能なプロジェクトルートがありません",
+    success: "{count}ファイルを.skills/{name}/にアップロードしました",
+    failed: "アップロードに失敗しました",
+    dropFolderOnly: "個別ファイルではなくフォルダをドロップしてください",
+    browserNotSupported: "お使いのブラウザはフォルダのドラッグ＆ドロップに対応していません。参照ボタンをご利用ください。",
+    writePermissionRequired: "スキルのアップロードには書き込み権限が必要です",
+    dropHere: "スキルフォルダをここにドロップ",
+    dropOrClick: "スキルフォルダをドロップ、またはクリックして選択",
+    requirement: "フォルダにはSKILL.mdファイルが必要です",
+    uploading: "アップロード中...",
+    retryHint: "クリックして再試行",
+    targetRoot: "ターゲットルート",
+    confirmTarget: "アップロード先",
+    overwriteWarning: "「{name}」というスキルフォルダは既に存在します。置き換えられます。",
+    files: "ファイル",
+    confirmUpload: "アップロード",
+    confirmOverwrite: "置き換えてアップロード",
 } as const
 
 export const skillDetail = {

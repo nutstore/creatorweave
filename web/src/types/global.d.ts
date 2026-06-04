@@ -13,11 +13,17 @@ declare module 'remove-markdown' {
 }
 
 declare global {
-  interface Window {
-    showDirectoryPicker: () => Promise<FileSystemDirectoryHandle>
+  type FileSystemPermissionMode = 'read' | 'readwrite'
+
+  interface DirectoryPickerOptions {
+    id?: string
+    mode?: FileSystemPermissionMode
+    startIn?: FileSystemHandle | 'desktop' | 'documents' | 'downloads' | 'music' | 'pictures' | 'videos'
   }
 
-  type FileSystemPermissionMode = 'read' | 'readwrite'
+  interface Window {
+    showDirectoryPicker: (options?: DirectoryPickerOptions) => Promise<FileSystemDirectoryHandle>
+  }
 
   interface FileSystemHandlePermissionDescriptor {
     mode?: FileSystemPermissionMode
@@ -37,6 +43,10 @@ declare global {
     name: string
     queryPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
     requestPermission(descriptor?: FileSystemHandlePermissionDescriptor): Promise<PermissionState>
+  }
+
+  interface DataTransferItem {
+    getAsFileSystemHandle?: () => Promise<FileSystemHandle | null>
   }
 
   interface SymbolConstructor {

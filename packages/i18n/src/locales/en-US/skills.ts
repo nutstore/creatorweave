@@ -18,6 +18,8 @@ export const skills = {
     enabled: "Enabled",
     disabled: "Disabled",
     empty: "No skills",
+    importSkill: "Import Skill",
+    importSkillDesc: "Drop a skill folder to add it to the project",
     // Skill categories
     categories: {
       codeReview: "Code Review",
@@ -122,6 +124,27 @@ export const skillEditor = {
       architecture: "Architecture",
       general: "General",
     },
+} as const
+
+export const skillUpload = {
+    noSkillMd: "Folder must contain a SKILL.md file",
+    noRoot: "No project root available",
+    success: "Uploaded {count} file(s) to .skills/{name}/",
+    failed: "Upload failed",
+    dropFolderOnly: "Please drop a folder, not individual files",
+    browserNotSupported: "Your browser does not support folder drag-and-drop. Please use the browse button instead.",
+    writePermissionRequired: "Write permission is required to upload skills",
+    dropHere: "Drop skill folder here",
+    dropOrClick: "Drop a skill folder here, or click to browse",
+    requirement: "Folder must contain a SKILL.md file",
+    uploading: "Uploading...",
+    retryHint: "Click to try again",
+    targetRoot: "Target Root",
+    confirmTarget: "Upload Target",
+    overwriteWarning: 'A skill folder named "{name}" already exists. It will be replaced.',
+    files: "files",
+    confirmUpload: "Upload",
+    confirmOverwrite: "Replace & Upload",
 } as const
 
 export const skillDetail = {

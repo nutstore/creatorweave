@@ -4,7 +4,7 @@
  */
 
 import { Eye, Pencil, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { BrandButton } from '@creatorweave/ui'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -129,38 +129,35 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
         </div>
         <div className="flex items-center gap-0.5">
           {/* View - read-only preview */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400"
+          <BrandButton
+            iconButton
+            className="h-7 w-7 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400"
             onClick={() => onView(skill)}
             title={t('skillCard.viewDetails')}
           >
             <Eye className="h-3.5 w-3.5" />
-          </Button>
+          </BrandButton>
           {/* Edit - only for non-readOnly skills */}
           {!isReadOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200"
+            <BrandButton
+              iconButton
+              className="h-7 w-7 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200"
               onClick={() => onEdit(skill)}
               title={t('skillCard.edit')}
             >
               <Pencil className="h-3.5 w-3.5" />
-            </Button>
+            </BrandButton>
           )}
           {/* Delete - only for user skills */}
           {!isReadOnly && onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+            <BrandButton
+              iconButton
+              className="h-7 w-7 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
               onClick={() => onDelete(skill.id)}
               title={t('skillCard.delete')}
             >
               <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            </BrandButton>
           )}
         </div>
       </div>
