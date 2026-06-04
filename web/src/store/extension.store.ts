@@ -17,6 +17,7 @@ import {
 export type ExtensionStatus = 'checking' | 'installed' | 'not_installed' | 'error'
 
 const BANNER_DISMISS_DURATION_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+const OUTDATED_BANNER_DISMISS_DURATION_MS = 3 * 24 * 60 * 60 * 1000 // 3 days
 
 /** The provider ID used for Codex OAuth */
 const CODEX_OAUTH_PROVIDER_ID = 'codex-oauth'
@@ -31,6 +32,32 @@ const CODEX_OAUTH_FALLBACK_MODELS = [
   { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', capabilities: ['code', 'reasoning'] as const, contextWindow: 128000 },
   { id: 'gpt-5.5', name: 'GPT-5.5', capabilities: ['code', 'reasoning'] as const, contextWindow: 200000 },
 ]
+
+/** Compare two semver strings. Returns -1 if a < b, 0 if equal, 1 if a > b. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na < nb) return -1
+    if (na > nb) return 1
+  }
+  return 0
+}
+
+/** Fetch installed extension version via the bridge API. */
+async function fetchInstalledVersion(): Promise<string | null> {
+  try {
+    const bridge = (window as any).__agentWeb
+    if (!bridge?.getVersion) return null
+    const resp = await bridge.getVersion()
+    return resp?.ok && resp?.version ? resp.version : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * Register the codex-oauth provider into the dynamic provider registry.
@@ -79,11 +106,17 @@ interface ExtensionState {
   lastCheckAt: number | null
   /** Whether the codex-oauth provider is currently registered */
   codexOAuthRegistered: boolean
+  /** Installed extension version, or null if not installed/unknown */
+  extensionVersion: string | null
+  /** Whether the installed extension is older than the latest */
+  outdated: boolean
 
   // --- Persisted state ---
   bannerDismissedAt: number | null
   installGuideStep: number
   installGuideOpen: boolean
+  /** When the outdated banner was last dismissed */
+  outdatedBannerDismissedAt: number | null
 
   // --- Actions ---
   checkStatus: () => ExtensionStatus
@@ -96,6 +129,8 @@ interface ExtensionState {
   ensureCodexRegistered: () => Promise<void>
   dismissBanner: () => void
   shouldShowBanner: () => boolean
+  shouldShowOutdatedBanner: () => boolean
+  dismissOutdatedBanner: () => void
   openInstallGuide: () => void
   closeInstallGuide: () => void
   goToStep: (step: number) => void
@@ -107,14 +142,17 @@ export const useExtensionStore = create<ExtensionState>()(
   persist(
     (set, get) => ({
       // Runtime state
-      status: 'checking',
-      lastCheckAt: null,
+      status: 'checking' as ExtensionStatus,
+      lastCheckAt: null as number | null,
       codexOAuthRegistered: false,
+      extensionVersion: null as string | null,
+      outdated: false,
 
       // Persisted state
-      bannerDismissedAt: null,
+      bannerDismissedAt: null as number | null,
       installGuideStep: 1,
       installGuideOpen: false,
+      outdatedBannerDismissedAt: null as number | null,
 
       // Actions
       checkStatus: () => {
@@ -130,12 +168,19 @@ export const useExtensionStore = create<ExtensionState>()(
           set({ status: newStatus, lastCheckAt: Date.now() })
         }
 
-        // Fire-and-forget: register codex-oauth when extension is installed
+        // Fire-and-forget: register codex-oauth + check version when extension is installed
         if (newStatus === 'installed') {
           get().ensureCodexRegistered().catch(() => {})
+          // Fetch version and compare with latest
+          fetchInstalledVersion().then((version) => {
+            if (!version) return
+            const latestVersion = __EXTENSION_LATEST_VERSION__
+            const isOutdated = compareVersions(version, latestVersion) < 0
+            set({ extensionVersion: version, outdated: isOutdated })
+          }).catch(() => {})
         } else if (get().codexOAuthRegistered) {
           unregisterCodexOAuthProvider()
-          set({ codexOAuthRegistered: false })
+          set({ codexOAuthRegistered: false, extensionVersion: null, outdated: false })
         }
 
         return newStatus
@@ -216,6 +261,20 @@ export const useExtensionStore = create<ExtensionState>()(
         set({ installGuideStep: 1, installGuideOpen: false })
       },
 
+      shouldShowOutdatedBanner: () => {
+        const { status, outdated, outdatedBannerDismissedAt } = get()
+        if (status !== 'installed' || !outdated) return false
+        if (outdatedBannerDismissedAt) {
+          const elapsed = Date.now() - outdatedBannerDismissedAt
+          if (elapsed < OUTDATED_BANNER_DISMISS_DURATION_MS) return false
+        }
+        return true
+      },
+
+      dismissOutdatedBanner: () => {
+        set({ outdatedBannerDismissedAt: Date.now() })
+      },
+
       setStatus: (status: ExtensionStatus) => {
         set({ status })
       },
@@ -226,6 +285,7 @@ export const useExtensionStore = create<ExtensionState>()(
       partialize: (state) => ({
         bannerDismissedAt: state.bannerDismissedAt,
         installGuideStep: state.installGuideStep,
+        outdatedBannerDismissedAt: state.outdatedBannerDismissedAt,
       }),
     },
   ),

@@ -849,6 +849,9 @@ function ExtensionSettingsPanel() {
   // Refresh status when this panel renders
   const currentStatus = checkStatus()
   const isInstalled = currentStatus === 'installed'
+  const extensionVersion = useExtensionStore((s) => s.extensionVersion)
+  const outdated = useExtensionStore((s) => s.outdated)
+  const latestVersion = __EXTENSION_LATEST_VERSION__
 
   return (
     <div className="space-y-5 py-1">
@@ -871,6 +874,42 @@ function ExtensionSettingsPanel() {
             {isInstalled && (
               <p className="text-xs text-green-600 dark:text-green-400">● Connected</p>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* Version Info */}
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium text-secondary dark:text-neutral-200">
+          {t('extension.settingsVersionTitle')}
+        </h4>
+        <div className="space-y-1.5">
+          {/* Latest available version */}
+          <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
+            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.settingsLatestVersion')}</span>
+            <span className="font-mono text-sm font-medium text-secondary dark:text-neutral-200">{latestVersion}</span>
+          </div>
+          {/* Currently installed version */}
+          <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
+            isInstalled && outdated
+              ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
+              : 'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
+          }`}>
+            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.settingsCurrentVersion')}</span>
+            <div className="flex items-center gap-2">
+              {isInstalled && outdated && (
+                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                  {t('extension.settingsUpdateAvailable')}
+                </span>
+              )}
+              <span className={`font-mono text-sm font-medium ${
+                isInstalled && outdated
+                  ? 'text-amber-700 dark:text-amber-400'
+                  : 'text-secondary dark:text-neutral-200'
+              }`}>
+                {isInstalled && extensionVersion ? extensionVersion : '—'}
+              </span>
+            </div>
           </div>
         </div>
       </div>

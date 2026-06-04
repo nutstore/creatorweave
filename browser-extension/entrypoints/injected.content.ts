@@ -343,6 +343,13 @@ export default defineContentScript({
       ready: true,
 
       /**
+       * Get the installed extension version.
+       */
+      async getVersion() {
+        return sendToBridge('extension_get_version', {});
+      },
+
+      /**
        * Search the web via DuckDuckGo
        */
       async search(query: string, options?: { count?: number }) {

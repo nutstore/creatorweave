@@ -99,6 +99,17 @@ export const extension = {
   settingsDescription: "浏览器插件为 AI 助手提供网页搜索和内容读取能力",
   settingsCapabilities: "插件能力",
 
+  // Settings — 版本显示
+  settingsVersionTitle: "版本",
+  settingsLatestVersion: "最新版本",
+  settingsCurrentVersion: "当前安装",
+  settingsUpdateAvailable: "有更新",
+
+  // 过期提示横幅
+  outdatedBannerTitle: "插件有新版本",
+  outdatedBannerDescription: "你的插件版本 (v{current}) 已过期，最新版本为 v{latest}",
+  outdatedBannerAction: "下载更新",
+
   // Mobile notice
   mobileNotice: "浏览器插件仅支持桌面端，请在电脑上的 Chrome 或 Edge 浏览器中打开本页面进行安装。",
 }

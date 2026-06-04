@@ -99,6 +99,17 @@ export const extension = {
   settingsDescription: "The browser extension provides web search and content reading capabilities for the AI assistant",
   settingsCapabilities: "Extension Capabilities",
 
+  // Settings — Version display
+  settingsVersionTitle: "Version",
+  settingsLatestVersion: "Latest available",
+  settingsCurrentVersion: "Currently installed",
+  settingsUpdateAvailable: "Update available",
+
+  // Outdated banner
+  outdatedBannerTitle: "Extension Update Available",
+  outdatedBannerDescription: "Your extension (v{current}) is outdated. Latest: v{latest}",
+  outdatedBannerAction: "Download Update",
+
   // Mobile notice
   mobileNotice: "The browser extension is only available on desktop. Please open this page in Chrome or Edge on your computer to install.",
 }

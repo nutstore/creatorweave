@@ -657,6 +657,16 @@ export default defineBackground(() => {
 
     (async () => {
       try {
+        if (message.type === 'extension_get_version') {
+          try {
+            const manifest = chrome.runtime.getManifest()
+            sendResponse({ ok: true, version: manifest.version })
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) })
+          }
+          return
+        }
+
         if (message.type === 'web_search') {
           sendResponse(await handleSearch(message));
           return;

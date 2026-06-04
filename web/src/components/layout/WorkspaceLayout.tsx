@@ -54,7 +54,7 @@ import {
 import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
-import { ExtensionBanner } from '@/components/extension'
+import { ExtensionBanner, ExtensionOutdatedBanner } from '@/components/extension'
 import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { useLocale, useT } from '@/i18n'
@@ -705,6 +705,9 @@ export function WorkspaceLayout({
 
       {/* Extension install banner — opens guide dialog via store */}
       <ExtensionBanner onInstallClick={() => useExtensionStore.getState().openInstallGuide()} />
+
+      {/* Extension outdated banner — shown when installed version is behind latest */}
+      <ExtensionOutdatedBanner />
 
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {/* Mobile sidebar overlay */}
