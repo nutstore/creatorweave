@@ -265,6 +265,12 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
   // Cap to MAX_LINES_PER_FILE to avoid misleading count when worker truncates.
   const extraCount = Math.min(file.matchCount - 1, MAX_LINES_PER_FILE - 1)
 
+  // If the tool already gave us all hits (single-file search), show them directly
+  // instead of requiring a load-more click.
+  const preloadedHits = (!file.hasMoreHits && file.hits && file.hits.length > 1)
+    ? file.hits.filter(h => h.line !== file.bestLine)
+    : []
+
   return (
     <div>
       <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mb-1">
@@ -283,7 +289,17 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
           <span className="truncate">{highlightMatch(file.bestPreview, query)}</span>
         </div>
 
-        {/* Extra lines (loaded on demand, visible when expanded) */}
+        {/* Preloaded extra lines (single-file search: tool gave all hits) */}
+        {preloadedHits.map((m, i) => (
+          <div key={`pre-${i}`} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+            {m.line != null && (
+              <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
+            )}
+            <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
+          </div>
+        ))}
+
+        {/* Extra lines loaded on demand (multi-file: only best hit was kept) */}
         {expandState.loaded && expandState.expanded && expandState.extraHits.map((m, i) => (
           <div key={i} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
             {m.line != null && (
@@ -303,8 +319,8 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
           <span className="text-[10px] text-red-400">{expandState.error}</span>
         )}
 
-        {/* Expand button: load more lines on demand */}
-        {extraCount > 0 && !expandState.loaded && !expandState.loading && (
+        {/* Expand button: load more lines on demand (only when hits were compacted) */}
+        {file.hasMoreHits && extraCount > 0 && !expandState.loaded && !expandState.loading && (
           <button
             type="button"
             className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer"

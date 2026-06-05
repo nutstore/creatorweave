@@ -551,14 +551,24 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       files = files.slice(0, userMaxResults)
     }
 
-    // Cap hits per file to keep messages compact in SQLite.
-    // Each file keeps only its best hit for the LLM preview;
-    // the renderer loads additional hits on demand via the search worker.
-    const filesForLLM = files.map(f => ({
-      ...f,
-      hits: f.hits.slice(0, 1),
-      hasMoreHits: f.hits.length > 1,
-    }))
+    // Decide whether to compact hits (1 per file) or keep all.
+    // Compacting is for multi-file searches to keep messages small.
+    // Single-file results (e.g. searching a specific file) keep all hits
+    // so the LLM gets full context without extra read calls.
+    const isSingleFile = files.length === 1
+
+    let filesForLLM: typeof files
+    if (isSingleFile) {
+      // Keep all hits for single-file results — no compression needed
+      filesForLLM = files
+    } else {
+      // Multi-file: cap to 1 hit per file for compact LLM context
+      filesForLLM = files.map(f => ({
+        ...f,
+        hits: f.hits.slice(0, 1),
+        hasMoreHits: f.hits.length > 1,
+      }))
+    }
     result.files = filesForLLM
 
     // Clear raw hit-level results to keep the stored message small.
@@ -573,11 +583,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
     const fileCount = files.length
     const titleMatchCount = files.filter(f => f.titleMatch).length
-    // Hint for the LLM: results are compacted (1 hit per file, raw results[] cleared).
-    // The hasMoreHits flag on each file means more lines match in that file.
-    // Use the read tool on the file to see full context around all matches.
-    const compactHint = filesForLLM.some(f => f.hasMoreHits)
-      ? ' Each file shows only the best matching line (hasMoreHits=true means more lines match). Use the read tool to view full file content for complete context.'
+    // Hint for the LLM: only shown when results are actually compacted (multi-file).
+    const compactHint = !isSingleFile && filesForLLM.some(f => f.hasMoreHits)
+      ? ' Results are compacted to 1 line per file (hasMoreHits=true means more lines match). To see all hits in a file, search again with path set to that file.'
       : ''
 
     return toolOkJson(
