@@ -13,4 +13,8 @@ export const common = {
     success: "성공",
     copy: "복사",
     copied: "복사됨",
+    expanded: "펼쳐짐",
+    summary: "요약",
+    collapse: "접기",
+    expandToViewFull: "전체 내용 보기",
 } as const

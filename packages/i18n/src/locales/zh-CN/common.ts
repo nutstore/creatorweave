@@ -13,6 +13,10 @@ export const common = {
     success: "成功",
     copy: "复制",
     copied: "已复制",
+    expanded: "已展开",
+    summary: "摘要",
+    collapse: "点击收起",
+    expandToViewFull: "点击展开查看完整内容",
     seconds: "秒",
     minutes: "分钟",
 } as const

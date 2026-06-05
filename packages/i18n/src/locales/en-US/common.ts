@@ -12,6 +12,10 @@ export const common = {
     success: "Success",
     copy: "Copy",
     copied: "Copied",
+    expanded: "Expanded",
+    summary: "Summary",
+    collapse: "Click to collapse",
+    expandToViewFull: "Click to view full content",
     seconds: "s",
     minutes: "min",
 } as const

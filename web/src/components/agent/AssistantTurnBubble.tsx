@@ -38,6 +38,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { ContextSummaryCard } from './ContextSummaryCard'
 import { TTSButton } from './TTSButton'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 import { AssetCompactList } from './AssetCard'
@@ -709,11 +710,7 @@ const AssistantStep = memo(function AssistantStep({
                       : 'rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
               }
             >
-              {isContextSummary && (
-                <div className="mb-1 text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  {t('workflow.contextSummary')}
-                </div>
-              )}
+              {isContextSummary && <ContextSummaryCard content={message.content!} />}
               {isWorkflowDryRun && (
                 <div className="mb-2 space-y-1">
                   <div className="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
@@ -735,10 +732,12 @@ const AssistantStep = memo(function AssistantStep({
                 </div>
               )}
               {isWorkflowRealRun && <WorkflowRealRunHeader payload={message.workflowRealRun} />}
-              <div ref={contentRef} className="prose max-w-prose overflow-x-auto break-words select-text">
-                <MarkdownContent content={message.content!} />
-                <TextSelectionToolbar containerRef={contentRef} />
-              </div>
+              {!isContextSummary && (
+                <div ref={contentRef} className="prose max-w-prose overflow-x-auto break-words select-text">
+                  <MarkdownContent content={message.content!} />
+                  <TextSelectionToolbar containerRef={contentRef} />
+                </div>
+              )}
             </div>
           )}
 
