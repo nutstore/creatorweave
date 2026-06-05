@@ -178,9 +178,10 @@ export async function executePiCoreLoop(
         if (!payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
-        // Codex API does not support max_output_tokens
+        // Codex API does not support max_output_tokens or temperature
         if (model.provider === 'codex-oauth') {
           delete payload.max_output_tokens
+          delete payload.temperature
         }
         prevOnPayload?.(payload)
       },

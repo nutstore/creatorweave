@@ -57,9 +57,10 @@ export class PiAIProvider implements LLMProvider {
         if (!payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
-        // Codex API does not support max_output_tokens
+        // Codex API does not support max_output_tokens or temperature
         if (this.model.provider === 'codex-oauth') {
           delete payload.max_output_tokens
+          delete payload.temperature
         }
       },
     })
@@ -204,9 +205,10 @@ export class PiAIProvider implements LLMProvider {
         if (!payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
-        // Codex API does not support max_output_tokens
+        // Codex API does not support max_output_tokens or temperature
         if (this.model.provider === 'codex-oauth') {
           delete payload.max_output_tokens
+          delete payload.temperature
         }
         // Suppress reasoning when disableThinking is set (Codex API doesn't support these params)
         if (request.disableThinking && this.model.provider !== 'codex-oauth') {
