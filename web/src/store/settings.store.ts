@@ -90,7 +90,7 @@ interface SettingsState {
   setProviderType: (type: LLMProviderType) => void
   setModelName: (name: string) => void
   setCustomBaseUrl: (url: string) => void
-  createCustomProvider: (input: { name: string; baseUrl: string; model: string }) => boolean
+  createCustomProvider: (input: { name: string; baseUrl: string; model?: string }) => boolean
   updateCustomProvider: (
     providerId: string,
     patch: { name?: string; baseUrl?: string; model?: string }
@@ -241,7 +241,7 @@ export const useSettingsStore = create<SettingsState>()(
         const trimmedName = name.trim()
         const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
         const trimmedModel = model.trim()
-        if (!trimmedName || !trimmedBaseUrl || !trimmedModel) return false
+        if (!trimmedName || !trimmedBaseUrl) return false
 
         const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         const now = Date.now()
@@ -249,7 +249,7 @@ export const useSettingsStore = create<SettingsState>()(
           id,
           name: trimmedName,
           baseUrl: trimmedBaseUrl,
-          models: [trimmedModel],
+          models: trimmedModel ? [trimmedModel] : [],
           apiMode: 'chat-completions',
           createdAt: now,
           updatedAt: now,
@@ -275,7 +275,7 @@ export const useSettingsStore = create<SettingsState>()(
 
         if (patch.name !== undefined && !nextName) return false
         if (patch.baseUrl !== undefined && !nextBaseUrl) return false
-        if (patch.model !== undefined && !nextModel) return false
+        // model is optional — allow empty value to clear the default model
 
         set((state) => ({
           customProviders: state.customProviders.map((provider) => {

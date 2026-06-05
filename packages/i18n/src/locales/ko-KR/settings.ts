@@ -292,7 +292,7 @@ export const settings = {
     // Toast 메시지
     toast: {
       apiKeyCleared: "API Key가 삭제되었습니다",
-      providerNameRequired: "서비스 이름, Base URL, 모델 이름을 입력하세요",
+      providerNameRequired: "서비스 이름과 Base URL을 입력하세요",
       customProviderAdded: "커스텀 서비스가 추가되었습니다",
       invalidProviderInfo: "유효한 서비스 정보를 입력하세요",
       customProviderUpdated: "커스텀 서비스가 업데이트되었습니다",

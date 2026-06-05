@@ -295,7 +295,7 @@ export const settings = {
     toast: {
       apiKeyCleared: "API Key cleared",
       providerNameRequired:
-        "Please enter provider name, Base URL and model name",
+        "Please enter provider name and Base URL",
       customProviderAdded: "Custom provider added",
       invalidProviderInfo: "Please enter valid provider information",
       customProviderUpdated: "Custom provider updated",

@@ -774,17 +774,16 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
   const { createCustomProvider } = useSettingsStore()
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
-  const [model, setModel] = useState('')
 
   const handleCreate = useCallback(() => {
-    const ok = createCustomProvider({ name, baseUrl, model })
+    const ok = createCustomProvider({ name, baseUrl })
     if (!ok) {
       toast.error(t('settings.toast.providerNameRequired'))
       return
     }
     toast.success(t('settings.toast.customProviderAdded'))
     onClose()
-  }, [createCustomProvider, name, baseUrl, model, t, onClose])
+  }, [createCustomProvider, name, baseUrl, t, onClose])
 
   return (
     <div
@@ -813,15 +812,6 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
             onChange={(e) => setBaseUrl(e.target.value)}
             placeholder={t('settings.customBaseUrl.placeholder')}
             className="h-9 font-mono text-[12px]"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-[11px] font-medium text-secondary">{t('settings.modelManagement.defaultModel')}</label>
-          <BrandInput
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            placeholder={t('settings.modelManagement.defaultModelPlaceholder')}
-            className="h-9 text-[13px]"
           />
         </div>
       </div>

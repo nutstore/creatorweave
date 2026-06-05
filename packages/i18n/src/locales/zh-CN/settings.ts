@@ -286,7 +286,7 @@ export const settings = {
     // Toast 消息
     toast: {
       apiKeyCleared: "API Key 已清空",
-      providerNameRequired: "请填写服务商名称、Base URL 和模型名称",
+      providerNameRequired: "请填写服务商名称和 Base URL",
       customProviderAdded: "已添加自定义服务商",
       invalidProviderInfo: "请填写有效的服务商信息",
       customProviderUpdated: "自定义服务商已更新",

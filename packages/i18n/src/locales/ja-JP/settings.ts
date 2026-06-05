@@ -299,7 +299,7 @@ export const settings = {
     toast: {
       apiKeyCleared: "API Key がクリアされました",
       providerNameRequired:
-        "プロバイダー名、Base URL、モデル名を入力してください",
+        "プロバイダー名と Base URL を入力してください",
       customProviderAdded: "カスタムプロバイダーが追加されました",
       invalidProviderInfo: "有効なプロバイダー情報を入力してください",
       customProviderUpdated: "カスタムプロバイダーが更新されました",
