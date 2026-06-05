@@ -8,11 +8,17 @@
  *
  * Image support: `![alt](assets/images/...)` references are resolved
  * from OPFS and rendered as inline images with loading states.
+ *
+ * Math support: LaTeX formulas via remark-math + rehype-katex.
+ * Inline: $x_1$  Block: $$\varepsilon_l = x_l - \hat{x}_l$$
  */
 
 import { memo, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import 'katex/dist/katex.min.css'
 import { Loader2 } from 'lucide-react'
 import { readAssetBlob } from './asset-utils'
 
@@ -108,7 +114,10 @@ function AssetImage({ src, alt }: { src: string; alt: string }) {
 // Previously these were inline literals, causing new array/object refs on
 // every render → 76 unnecessary re-renders on cancel (react-scan profiled).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REMARK_PLUGINS: any = [remarkGfm]
+const REMARK_PLUGINS: any = [remarkGfm, remarkMath]
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const REHYPE_PLUGINS: any = [rehypeKatex]
 
 const MARKDOWN_COMPONENTS = {
   // Code blocks
@@ -210,17 +219,35 @@ const MARKDOWN_COMPONENTS = {
   },
 } as const
 
+/**
+ * Convert LaTeX-style delimiters to remark-math compatible syntax.
+ * \[...\] → $$...$$ (display math)
+ * \(...\) → $...$ (inline math)
+ *
+ * LLMs often output \[\] and \(\) which remark-math doesn't recognize
+ * by default (it only handles $$ and $).
+ */
+function normalizeMathDelimiters(content: string): string {
+  // Display math: \[ ... \] → $$ ... $$
+  let result = content.replace(/\\\[([\s\S]*?)\\\]/g, (_match, body) => `$$${body}$$`)
+  // Inline math: \( ... \) → $ ... $
+  result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_match, body) => `$${body}$`)
+  return result
+}
+
 interface MarkdownContentProps {
   content: string
 }
 
 export const MarkdownContent = memo(function MarkdownContent({ content }: MarkdownContentProps) {
+  const normalized = normalizeMathDelimiters(content)
   return (
     <ReactMarkdown
       remarkPlugins={REMARK_PLUGINS}
+      rehypePlugins={REHYPE_PLUGINS}
       components={MARKDOWN_COMPONENTS}
     >
-      {content}
+      {normalized}
     </ReactMarkdown>
   )
 })
