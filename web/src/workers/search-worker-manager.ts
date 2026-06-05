@@ -12,6 +12,22 @@ export interface SearchHit {
   preview: string
 }
 
+/** A single file's aggregated search result. */
+export interface FileSearchResult {
+  /** File path (relative to root) */
+  path: string
+  /** Total number of matches in this file */
+  matchCount: number
+  /** Whether the filename/title contains the query */
+  titleMatch: 'exact' | 'partial' | false
+  /** Best matching line preview */
+  bestPreview: string
+  /** Line number of the best preview */
+  bestLine: number
+  /** All individual hits (for expand/detail view) */
+  hits: SearchHit[]
+}
+
 /**
  * Overlay for a pending file change.
  * - content: the file content to use instead of disk (string for modify/create)
@@ -46,6 +62,8 @@ export interface SearchInDirectoryOptions {
 
 export interface SearchInDirectoryResult {
   results: SearchHit[]
+  /** File-level aggregated results (grouped, sorted, with title match info) */
+  files: FileSearchResult[]
   totalMatches: number
   scannedFiles: number
   skippedFiles: number

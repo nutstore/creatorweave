@@ -1,7 +1,9 @@
 /**
  * Renderer for `search` tool — grouped results by file with line numbers.
+ * Supports expand/collapse for both file-level and line-level results.
  */
 
+import { useState, useCallback } from 'react'
 import { Search } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import type { ToolEnvelopeError } from '@/agent/tools/tool-envelope'
@@ -18,13 +20,33 @@ interface SearchResult {
   [key: string]: unknown
 }
 
+/** Matches FileSearchResult from search-worker-manager.ts */
+interface FileResult {
+  path: string
+  matchCount: number
+  titleMatch: 'exact' | 'partial' | false
+  bestPreview: string
+  bestLine: number
+  hits?: SearchResult[]
+  [key: string]: unknown
+}
+
+/** Default number of preview lines per file before collapse */
+const INITIAL_LINES_PER_FILE = 3
+
+/** Default number of files shown before collapse */
+const INITIAL_FILES_SHOWN = 10
+
 registerRenderer({
   name: 'search',
   icon: <Search className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
+    const files = extractFileResults(ctx)
     const results = extractResults(ctx)
-    const fileCount = new Set(results.map(r => r.path)).size
+    const fileCount = files.length > 0 ? files.length : new Set(results.map(r => r.path)).size
+    const totalMatches = files.reduce((sum, f) => sum + f.matchCount, 0) || results.length
+    const titleMatchCount = files.filter(f => f.titleMatch).length
 
     return (
       <>
@@ -37,12 +59,16 @@ registerRenderer({
             &quot;{query}&quot;
           </span>
         )}
-        {!ctx.isExecuting && !ctx.isStreaming && results.length > 0 && (
+        {!ctx.isExecuting && !ctx.isStreaming && (files.length > 0 || results.length > 0) && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">
-            {results.length} match{results.length !== 1 ? 'es' : ''} in {fileCount} file{fileCount !== 1 ? 's' : ''}
+            {totalMatches} match{totalMatches !== 1 ? 'es' : ''} in {fileCount} file{fileCount !== 1 ? 's' : ''}
+            {titleMatchCount > 0 && (
+              <span className="text-yellow-600 dark:text-yellow-400 ml-1">· {titleMatchCount} title
+              </span>
+            )}
           </span>
         )}
-        {!ctx.isExecuting && !ctx.isStreaming && results.length === 0 && !ctx.isError && (
+        {!ctx.isExecuting && !ctx.isStreaming && files.length === 0 && results.length === 0 && !ctx.isError && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">no results</span>
         )}
         {ctx.isError && (
@@ -56,11 +82,13 @@ registerRenderer({
       return <ErrorDetail ctx={ctx} />
     }
 
+    const fileResults = extractFileResults(ctx)
     const results = extractResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const params = extractSearchParams(ctx)
 
-    if (results.length === 0) {
+    const hasNoResults = fileResults.length === 0 && results.length === 0
+    if (hasNoResults) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
       return (
         <div className="px-3 py-2 space-y-2">
@@ -72,53 +100,26 @@ registerRenderer({
       )
     }
 
-    // Group by file
-    const grouped = groupByFile(results)
-    const maxFiles = 10
-    const maxLinesPerFile = 5
-    const shownFiles = grouped.slice(0, maxFiles)
-    const hiddenFiles = grouped.length - maxFiles
     const rawText = results.map(r => `${r.path}${r.line ? `:${r.line}` : ''}${r.preview ? ` | ${r.preview}` : r.match ? ` | ${r.match}` : ''}`).join('\n')
 
+    // Use file-level results if available, otherwise fall back to hit-level grouping
+    if (fileResults.length > 0) {
+      return (
+        <div className="px-3 py-2 space-y-2">
+          {params.length > 0 && <SearchParamsBar params={params} />}
+          <FileResultList files={fileResults} query={query} />
+          <div className="flex justify-end">
+            <CopyIconButton content={rawText} />
+          </div>
+        </div>
+      )
+    }
+
+    // Fallback: legacy hit-level grouping (when files array is empty)
     return (
       <div className="px-3 py-2 space-y-2">
-        {/* Search parameters */}
         {params.length > 0 && <SearchParamsBar params={params} />}
-
-        {/* Results grouped by file */}
-        <div className="space-y-2">
-          {shownFiles.map(([filePath, matches]) => (
-            <div key={filePath}>
-              <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mb-1">
-                <FileIcon />
-                <span className="font-mono truncate">{filePath}</span>
-                <span className="text-neutral-300 dark:text-neutral-600">·</span>
-                <span className="text-neutral-400">{matches.length} match{matches.length !== 1 ? 'es' : ''}</span>
-              </div>
-              <div className="ml-5 space-y-0.5">
-                {matches.slice(0, maxLinesPerFile).map((m, i) => (
-                  <div key={i} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
-                    {m.line != null && (
-                      <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
-                    )}
-                    <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
-                  </div>
-                ))}
-                {matches.length > maxLinesPerFile && (
-                  <div className="text-[10px] text-neutral-400 dark:text-neutral-600">
-                    +{matches.length - maxLinesPerFile} more
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          {hiddenFiles > 0 && (
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-600 pl-5">
-              +{hiddenFiles} more file{hiddenFiles !== 1 ? 's' : ''}
-            </div>
-          )}
-        </div>
-
+        <LegacyFileResultList results={results} query={query} />
         <div className="flex justify-end">
           <CopyIconButton content={rawText} />
         </div>
@@ -126,6 +127,187 @@ registerRenderer({
     )
   },
 })
+
+// ---------------------------------------------------------------------------
+// Sub-components with state for expand/collapse
+// ---------------------------------------------------------------------------
+
+/** Renders the file-level aggregated result list with expand to show all files. */
+function FileResultList({ files, query }: { files: FileResult[]; query: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const showAll = expanded || files.length <= INITIAL_FILES_SHOWN
+  const shownFiles = showAll ? files : files.slice(0, INITIAL_FILES_SHOWN)
+  const hiddenCount = files.length - INITIAL_FILES_SHOWN
+
+  return (
+    <div className="space-y-2">
+      {shownFiles.map((file) => (
+        <FileResultItem key={file.path} file={file} query={query} />
+      ))}
+      {!showAll && hiddenCount > 0 && (
+        <button
+          type="button"
+          className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 pl-5 cursor-pointer"
+          onClick={() => setExpanded(true)}
+        >
+          +{hiddenCount} more file{hiddenCount !== 1 ? 's' : ''}
+        </button>
+      )}
+      {showAll && files.length > INITIAL_FILES_SHOWN && (
+        <button
+          type="button"
+          className="text-[10px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 pl-5 cursor-pointer"
+          onClick={() => setExpanded(false)}
+        >
+          Show less
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Renders a single file's search results with expand to show all matching lines. */
+function FileResultItem({ file, query }: { file: FileResult; query: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const fileHits = file.hits ?? []
+  // Hits excluding the best line (which is already shown)
+  const otherHits = fileHits.filter(h => h.line !== file.bestLine)
+
+  const showAllLines = expanded || otherHits.length <= INITIAL_LINES_PER_FILE - 1
+  const shownHits = showAllLines ? otherHits : otherHits.slice(0, INITIAL_LINES_PER_FILE - 1)
+  const hiddenLines = otherHits.length - (INITIAL_LINES_PER_FILE - 1)
+
+  const titleBadge = file.titleMatch === 'exact'
+    ? <span className="text-[10px] bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 px-1 rounded">exact title</span>
+    : file.titleMatch === 'partial'
+      ? <span className="text-[10px] bg-yellow-50 dark:bg-yellow-900/20 text-yellow-600 dark:text-yellow-500 px-1 rounded">title match</span>
+      : null
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+        <FileIcon />
+        <span className="font-mono truncate">{file.path}</span>
+        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <span className="text-neutral-400">{file.matchCount} match{file.matchCount !== 1 ? 'es' : ''}</span>
+        {titleBadge}
+      </div>
+      <div className="ml-5 space-y-0.5">
+        {/* Best preview line */}
+        <div className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+          {file.bestLine > 0 && (
+            <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{file.bestLine}</span>
+          )}
+          <span className="truncate">{highlightMatch(file.bestPreview, query)}</span>
+        </div>
+        {/* Additional matching lines */}
+        {shownHits.map((m, i) => (
+          <div key={i} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+            {m.line != null && (
+              <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
+            )}
+            <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
+          </div>
+        ))}
+        {/* Expand/collapse for more lines */}
+        {!showAllLines && hiddenLines > 0 && (
+          <button
+            type="button"
+            className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer"
+            onClick={() => setExpanded(true)}
+          >
+            +{hiddenLines} more line{hiddenLines !== 1 ? 's' : ''}
+          </button>
+        )}
+        {showAllLines && otherHits.length > INITIAL_LINES_PER_FILE - 1 && (
+          <button
+            type="button"
+            className="text-[10px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 cursor-pointer"
+            onClick={() => setExpanded(false)}
+          >
+            Show less
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Legacy renderer for hit-level results (fallback when files[] is empty). */
+function LegacyFileResultList({ results, query }: { results: SearchResult[]; query: string }) {
+  const [expandedFiles, setExpandedFiles] = useState(false)
+  const grouped = groupByFile(results)
+  const showAllFiles = expandedFiles || grouped.length <= INITIAL_FILES_SHOWN
+  const shownFiles = showAllFiles ? grouped : grouped.slice(0, INITIAL_FILES_SHOWN)
+  const hiddenFiles = grouped.length - INITIAL_FILES_SHOWN
+
+  return (
+    <div className="space-y-2">
+      {shownFiles.map(([filePath, matches]) => (
+        <LegacyFileItem key={filePath} filePath={filePath} matches={matches} query={query} />
+      ))}
+      {!showAllFiles && hiddenFiles > 0 && (
+        <button
+          type="button"
+          className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 pl-5 cursor-pointer"
+          onClick={() => setExpandedFiles(true)}
+        >
+          +{hiddenFiles} more file{hiddenFiles !== 1 ? 's' : ''}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function LegacyFileItem({ filePath, matches, query }: { filePath: string; matches: SearchResult[]; query: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const showAll = expanded || matches.length <= INITIAL_LINES_PER_FILE
+  const shown = showAll ? matches : matches.slice(0, INITIAL_LINES_PER_FILE)
+  const hidden = matches.length - INITIAL_LINES_PER_FILE
+
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+        <FileIcon />
+        <span className="font-mono truncate">{filePath}</span>
+        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <span className="text-neutral-400">{matches.length} match{matches.length !== 1 ? 'es' : ''}</span>
+      </div>
+      <div className="ml-5 space-y-0.5">
+        {shown.map((m, i) => (
+          <div key={i} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+            {m.line != null && (
+              <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
+            )}
+            <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
+          </div>
+        ))}
+        {!showAll && hidden > 0 && (
+          <button
+            type="button"
+            className="text-[10px] text-blue-500 dark:text-blue-400 hover:text-blue-600 dark:hover:text-blue-300 cursor-pointer"
+            onClick={() => setExpanded(true)}
+          >
+            +{hidden} more line{hidden !== 1 ? 's' : ''}
+          </button>
+        )}
+        {showAll && matches.length > INITIAL_LINES_PER_FILE && (
+          <button
+            type="button"
+            className="text-[10px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 cursor-pointer"
+            onClick={() => setExpanded(false)}
+          >
+            Show less
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
 
 /** Extract non-default search parameters for display. */
 interface SearchParam {
@@ -199,6 +381,15 @@ function extractResults(ctx: ToolRenderCtx): SearchResult[] {
   if (Array.isArray(data)) return data as SearchResult[]
   if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).results)) {
     return (data as Record<string, unknown>).results as SearchResult[]
+  }
+  return []
+}
+
+/** Extract file-level aggregated results from the response data. */
+function extractFileResults(ctx: ToolRenderCtx): FileResult[] {
+  const data = ctx.result?.data
+  if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).files)) {
+    return (data as Record<string, unknown>).files as FileResult[]
   }
   return []
 }

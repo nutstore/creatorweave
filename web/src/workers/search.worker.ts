@@ -41,8 +41,18 @@ interface SearchHit {
   preview: string
 }
 
+interface FileSearchResult {
+  path: string
+  matchCount: number
+  titleMatch: 'exact' | 'partial' | false
+  bestPreview: string
+  bestLine: number
+  hits: SearchHit[]
+}
+
 interface SearchResultPayload {
   results: SearchHit[]
+  files: FileSearchResult[]
   totalMatches: number
   scannedFiles: number
   skippedFiles: number
@@ -135,6 +145,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
     if (!query || !query.trim()) {
       sendResultIfActive({
         results: [],
+        files: [],
         totalMatches: 0,
         scannedFiles: 0,
         skippedFiles: 0,
@@ -198,6 +209,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       if (overlay?.deleted) {
         sendResultIfActive({
           results: [],
+        files: [],
           totalMatches: 0,
           scannedFiles,
           skippedFiles: 0,
@@ -236,6 +248,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
       if (isProbablyBinary(text)) {
         sendResultIfActive({
           results: [],
+        files: [],
           totalMatches: 0,
           scannedFiles,
           skippedFiles: 1,
@@ -253,6 +266,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
 
       sendResultIfActive({
         results: hits,
+        files: [],
         totalMatches: hits.length,
         scannedFiles,
         skippedFiles,
@@ -424,6 +438,7 @@ async function handleSearch(payload: SearchMessage['payload']): Promise<void> {
 
     sendResultIfActive({
       results: hits,
+      files: [],
       totalMatches: hits.length,
       scannedFiles,
       skippedFiles,

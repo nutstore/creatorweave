@@ -1,6 +1,6 @@
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import { getSearchWorkerManager } from '@/workers/search-worker-manager'
-import type { PendingFileOverlay, SearchInDirectoryResult } from '@/workers/search-worker-manager'
+import type { PendingFileOverlay, SearchInDirectoryResult, FileSearchResult, SearchHit } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
 import { getWorkspaceManager } from '@/opfs'
 import { resolveNativeDirectoryHandleForPath } from './tool-utils'
@@ -12,6 +12,99 @@ import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './pa
 function looksRegexLikeQuery(query: string): boolean {
   // Guard against common LLM misuse where regex operators are passed while regex=false.
   return query.includes('|') || query.includes('.*')
+}
+
+/**
+ * Aggregate raw hit-level results into file-level results.
+ *
+ * For each file:
+ * - Group all hits together
+ * - Detect whether the filename matches the query (exact or partial)
+ * - Pick the best preview line
+ * - Sort: title exact match > title partial match > body-only matches
+ *   (ties broken by match count descending)
+ */
+function aggregateResultsToFiles(
+  hits: SearchHit[],
+  query: string,
+  useRegex: boolean,
+  caseSensitive: boolean
+): FileSearchResult[] {
+  if (hits.length === 0) return []
+
+  // Build a regex to test filename match (same semantics as the search itself)
+  let testRegex: RegExp
+  try {
+    if (useRegex) {
+      testRegex = new RegExp(query, caseSensitive ? '' : 'i')
+    } else {
+      const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      testRegex = new RegExp(escaped, caseSensitive ? '' : 'i')
+    }
+  } catch {
+    // If regex construction fails, skip title matching
+    testRegex = /^$/ // never matches
+  }
+
+  // Group by file path
+  const fileMap = new Map<string, SearchHit[]>()
+  for (const hit of hits) {
+    const arr = fileMap.get(hit.path) ?? []
+    arr.push(hit)
+    fileMap.set(hit.path, arr)
+  }
+
+  const files: FileSearchResult[] = []
+
+  for (const [filePath, fileHits] of fileMap) {
+    // Extract filename from path (last segment)
+    const fileName = filePath.split('/').pop() ?? filePath
+
+    // Determine title match level
+    let titleMatch: FileSearchResult['titleMatch'] = false
+    if (testRegex.test(fileName)) {
+      // Check exact vs partial: exact = entire filename matches query (ignoring extension)
+      const nameWithoutExt = fileName.replace(/\.[^.]+$/, '')
+      if (
+        nameWithoutExt === query ||
+        (!useRegex && nameWithoutExt.toLowerCase() === query.toLowerCase())
+      ) {
+        titleMatch = 'exact'
+      } else {
+        titleMatch = 'partial'
+      }
+      // Reset regex lastIndex for safety
+      testRegex.lastIndex = 0
+    }
+
+    // Pick best preview: first hit's preview is usually the best match
+    // (or the first non-empty one)
+    const bestHit = fileHits.find(h => h.preview && h.preview.trim()) ?? fileHits[0]
+
+    files.push({
+      path: filePath,
+      matchCount: fileHits.length,
+      titleMatch,
+      bestPreview: bestHit?.preview ?? '',
+      bestLine: bestHit?.line ?? 0,
+      hits: fileHits,
+    })
+  }
+
+  // Sort: title exact > title partial > body-only, then by matchCount desc
+  const titlePriority = (t: FileSearchResult['titleMatch']): number => {
+    if (t === 'exact') return 2
+    if (t === 'partial') return 1
+    return 0
+  }
+  files.sort((a, b) => {
+    const pa = titlePriority(a.titleMatch)
+    const pb = titlePriority(b.titleMatch)
+    if (pa !== pb) return pb - pa // higher priority first
+    return b.matchCount - a.matchCount // more matches first
+  })
+
+  return files
 }
 
 function parseStructuredError(error: unknown): Record<string, unknown> | null {
@@ -147,6 +240,7 @@ async function searchAllRoots(
 ): Promise<SearchInDirectoryResult> {
   const merged: SearchInDirectoryResult = {
     results: [],
+    files: [],
     totalMatches: 0,
     scannedFiles: 0,
     skippedFiles: 0,
@@ -383,6 +477,13 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     // Collect pending overlays from OPFS to ensure search consistency with read tool
     const pendingOverlays = await collectPendingOverlays(context.workspaceId, context.projectId)
 
+    // Inflate maxResults for the worker to collect enough raw hits across many files.
+    // The user-facing limit is per-file (after aggregation), but the worker limit is
+    // per-hit. Without inflation, one high-frequency file could exhaust the budget
+    // before other files even appear. We use a generous fixed ceiling so that
+    // aggregation can discover as many distinct files as possible.
+    const internalMaxResults = 10000
+
     // Build search options; rootName is used to strip the root prefix from overlay keys
     // so they match the worker's relative file paths.
     const buildSearchOptions = (subPath?: string, rootName?: string) => {
@@ -400,9 +501,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
         regex: useRegex,
         caseSensitive: args.case_sensitive === true,
         wholeWord: args.whole_word === true,
-        maxResults: userMaxResults,
+        maxResults: internalMaxResults,
         contextLines,
-        deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : undefined,
+        deadlineMs: typeof args.deadline_ms === 'number' ? args.deadline_ms : 60000,
         maxFileSize: typeof args.max_file_size === 'number' ? args.max_file_size : undefined,
         includeIgnored: args.include_ignored === true,
         excludeDirs: Array.isArray(args.exclude_dirs)
@@ -431,22 +532,41 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
         result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(undefined, singleRootName))
       } else {
         // Multi-root: search each root and merge (searchAllRoots handles prefix stripping per root)
-        result = await searchAllRoots(manager, allHandles, buildSearchOptions(), userMaxResults)
+        result = await searchAllRoots(manager, allHandles, buildSearchOptions(), internalMaxResults)
       }
     }
 
+    // Aggregate raw hits into file-level results
+    let files = aggregateResultsToFiles(
+      result.results,
+      query,
+      useRegex,
+      args.case_sensitive === true
+    )
+
+    // Truncate file-level results to the user's requested limit
+    // (internalMaxResults was inflated to collect more hits for aggregation)
+    const truncatedFiles = files.length > userMaxResults
+    if (truncatedFiles) {
+      files = files.slice(0, userMaxResults)
+    }
+    result.files = files
+
     // Pagination hint when results are truncated
     const paginationHint =
-      result.truncated && userMaxResults > 0
+      (result.truncated || truncatedFiles) && userMaxResults > 0
         ? ` Hint: Results were truncated. Consider narrowing with path, glob, or more specific patterns, or increase max_results for broader results.`
         : ''
+
+    const fileCount = files.length
+    const titleMatchCount = files.filter(f => f.titleMatch).length
 
     return toolOkJson(
       'search',
       {
         query,
         ...result,
-        message: `Found ${result.totalMatches} matches in ${result.scannedFiles} files.`,
+        message: `Found ${result.totalMatches} matches across ${fileCount} files.${titleMatchCount > 0 ? ` (${titleMatchCount} title match${titleMatchCount !== 1 ? 'es' : ''})` : ''}`,
       },
       {
         ...(loopCheck.warning ? { _warning: loopCheck.warning } : {}),
