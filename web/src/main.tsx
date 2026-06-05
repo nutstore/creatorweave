@@ -1,15 +1,17 @@
 // ============================================================================
 // Early COOP/COEP Diagnostics
 // ============================================================================
-console.log('[Main Thread] Early diagnostics:')
-console.log('[Main Thread]  - typeof SharedArrayBuffer:', typeof SharedArrayBuffer)
-console.log(
-  '[Main Thread]  - SharedArrayBuffer available:',
-  typeof SharedArrayBuffer !== 'undefined'
-)
-console.log('[Main Thread]  - crossOriginIsolated:', self.crossOriginIsolated)
-console.log('[Main Thread]  - location:', window.location.href)
-console.log('[Main Thread]  - navigator.userAgent:', navigator.userAgent)
+if (import.meta.env.DEV) {
+  console.log('[Main Thread] Early diagnostics:')
+  console.log('[Main Thread]  - typeof SharedArrayBuffer:', typeof SharedArrayBuffer)
+  console.log(
+    '[Main Thread]  - SharedArrayBuffer available:',
+    typeof SharedArrayBuffer !== 'undefined'
+  )
+  console.log('[Main Thread]  - crossOriginIsolated:', self.crossOriginIsolated)
+  console.log('[Main Thread]  - location:', window.location.href)
+  console.log('[Main Thread]  - navigator.userAgent:', navigator.userAgent)
+}
 
 import React from 'react'
 import ReactDOM from 'react-dom/client'
