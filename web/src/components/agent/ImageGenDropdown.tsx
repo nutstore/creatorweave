@@ -1,14 +1,12 @@
 /**
- * ImageModelDropdown — compact popover for selecting image generation model.
+ * ImageGenDropdown — combined image model + aspect ratio selector.
  *
- * Shows the current model's short name as a small button.
- * Click to open a searchable popover with all available models,
- * grouped by provider.
+ * A single button in the top bar that opens a popover with:
+ *   - Top section: searchable model list (grouped by provider)
+ *   - Bottom section: aspect ratio grid
  *
- * Models are sourced from pi-ai's image model registry but **filtered** against
- * the provider's actual cached model list (from /models API). This ensures we
- * never show models that don't exist on the user's provider (e.g. seedream-4.5
- * on OpenRouter if it's not actually available there).
+ * Models are filtered against the provider's actual cached model list.
+ * Hides entirely when the provider has no image models.
  */
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
@@ -18,15 +16,25 @@ import { getImageModels } from '@earendil-works/pi-ai'
 import { getCachedModels, onModelsUpdated } from '@/agent/providers/model-store'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { Popover, PopoverContent, PopoverTrigger, BrandButton } from '@creatorweave/ui'
-import { useT } from '@/i18n'
 
-/** Shorten model display name for the button */
+// ─── Ratio options ──────────────────────────────────────────────────────────
+
+const RATIOS = [
+  { value: '1:1', label: '1:1' },
+  { value: '16:9', label: '16:9' },
+  { value: '9:16', label: '9:16' },
+  { value: '4:3', label: '4:3' },
+  { value: '3:4', label: '3:4' },
+  { value: '3:2', label: '3:2' },
+  { value: '2:3', label: '2:3' },
+] as const
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Shorten model display name for the button label */
 function shortName(modelId: string): string {
-  // "google/gemini-2.5-flash-image" → "Gemini 2.5 Flash"
-  // "openai/gpt-5-image" → "GPT-5 Image"
   const slashIdx = modelId.indexOf('/')
   const raw = slashIdx >= 0 ? modelId.slice(slashIdx + 1) : modelId
-  // Capitalize first letter of each segment
   return raw
     .split('-')
     .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
@@ -41,10 +49,8 @@ interface ModelEntry {
   provider: string
 }
 
-/**
- * Filter image models from pi-ai registry against the provider's actual cached models.
- * Returns the filtered list and a version counter that bumps when cache updates.
- */
+// ─── Hook: filtered model list ──────────────────────────────────────────────
+
 function useFilteredImageModels() {
   const providerType = useSettingsStore((s) => s.providerType) as LLMProviderType
   const [cacheVersion, setCacheVersion] = useState(0)
@@ -61,14 +67,11 @@ function useFilteredImageModels() {
 
     const cachedIds = new Set<string>()
     if (cached) {
-      for (const m of cached) {
-        cachedIds.add(m.id)
-      }
+      for (const m of cached) cachedIds.add(m.id)
     }
 
     return registryModels
       .filter((m) => {
-        // No cache yet → show all (better than empty)
         if (!cached || cachedIds.size === 0) return true
         if (cachedIds.has(m.id)) return true
         const slashIdx = m.id.indexOf('/')
@@ -93,13 +96,16 @@ export function useHasImageModels(): boolean {
   return useFilteredImageModels().length > 0
 }
 
-export function ImageModelDropdown() {
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export function ImageGenDropdown() {
   const imageGenModel = useSettingsStore((s) => s.imageGenModel)
   const setImageGenModel = useSettingsStore((s) => s.setImageGenModel)
+  const imageGenAspectRatio = useSettingsStore((s) => s.imageGenAspectRatio)
+  const setImageGenAspectRatio = useSettingsStore((s) => s.setImageGenAspectRatio)
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
-  const t = useT()
 
   const allModels = useFilteredImageModels()
 
@@ -137,26 +143,32 @@ export function ImageModelDropdown() {
     }
   }, [open])
 
-  const handleSelect = useCallback(
+  const handleSelectModel = useCallback(
     (id: string) => {
       setImageGenModel(id)
-      setOpen(false)
       setSearch('')
     },
     [setImageGenModel],
   )
 
-  // No image models available for this provider → hide
-  // IMPORTANT: must be after all hooks (Rules of Hooks)
+  const handleSelectRatio = useCallback(
+    (value: string) => {
+      setImageGenAspectRatio(value)
+    },
+    [setImageGenAspectRatio],
+  )
+
+  // Hide when no image models — after all hooks (Rules of Hooks)
   if (allModels.length === 0) return null
 
   return (
     <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch('') }}>
       <PopoverTrigger asChild>
-        <BrandButton variant="outline" className="h-8 max-w-[200px] justify-between gap-1.5 px-2.5 text-xs">
+        <BrandButton variant="outline" className="h-8 max-w-[220px] justify-between gap-1.5 px-2.5 text-xs">
           <span className="flex min-w-0 items-center gap-1.5">
             <ImageIcon className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{currentShortName}</span>
+            <span className="shrink-0 text-muted-foreground">{imageGenAspectRatio || '1:1'}</span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
         </BrandButton>
@@ -171,14 +183,14 @@ export function ImageModelDropdown() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('settings.imageGen.searchModel') || 'Search models...'}
+              placeholder="搜索模型..."
               className="w-full bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
             />
           </div>
         </div>
 
         {/* Model list */}
-        <div className="max-h-64 overflow-y-auto p-1.5">
+        <div className="max-h-52 overflow-y-auto p-1.5">
           {Array.from(filtered.entries()).map(([provider, models]) => (
             <div key={provider}>
               <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-tertiary">
@@ -188,7 +200,7 @@ export function ImageModelDropdown() {
                 <button
                   key={m.id}
                   type="button"
-                  onClick={() => handleSelect(m.id)}
+                  onClick={() => handleSelectModel(m.id)}
                   className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
                     imageGenModel === m.id
                       ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
@@ -202,9 +214,32 @@ export function ImageModelDropdown() {
           ))}
           {filtered.size === 0 && (
             <div className="px-2 py-3 text-center text-xs text-tertiary">
-              {t('settings.imageGen.noModelFound') || 'No matching models found'}
+              未找到匹配的模型
             </div>
           )}
+        </div>
+
+        {/* Aspect ratio */}
+        <div className="border-t border-border/60 p-2">
+          <div className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-tertiary">
+            宽高比
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {RATIOS.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => handleSelectRatio(value)}
+                className={`rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${
+                  imageGenAspectRatio === value
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : 'text-secondary hover:bg-muted'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </PopoverContent>
     </Popover>
