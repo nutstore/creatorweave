@@ -52,6 +52,16 @@ export class PiAIProvider implements LLMProvider {
       temperature: request.temperature,
       maxTokens: request.maxTokens,
       signal,
+      onPayload: (payload: Record<string, unknown>) => {
+        // Codex API (openai-responses): 'instructions' is required
+        if (!payload.instructions && context.systemPrompt) {
+          payload.instructions = context.systemPrompt
+        }
+        // Codex API does not support max_output_tokens
+        if (this.model.provider === 'codex-oauth') {
+          delete payload.max_output_tokens
+        }
+      },
     })
 
     const content = this.textFromContent(message.content)
