@@ -112,6 +112,15 @@ import {
   webBridgePromptDoc,
 } from './tools/web-bridge.tool'
 
+// Image generation tool (conditional — requires image gen model in provider cache)
+import {
+  isImageGenAvailable,
+  imageGenDefinition,
+  imageGenExecutor,
+  imageGenPromptDoc,
+} from './tools/image-gen.tool'
+import { onModelsUpdated } from './providers/model-store'
+
 // WebMCP on-demand tools (schema loading + execution)
 import {
   webMCPGetToolSchemaDefinition,
@@ -190,6 +199,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   webBridgePromptDoc,
   skillPromptDoc,
   webMCPPromptDoc,
+  imageGenPromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -251,6 +261,8 @@ export class ToolRegistry {
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
       // Skip WebMCP tools if globally disabled
       if (doc.category === 'webmcp' && !useSettingsStore.getState().enableWebMCP) continue
+      // Skip image gen tools if image gen model is not available
+      if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
 
       const section = doc.section ?? `### ${doc.category.charAt(0).toUpperCase() + doc.category.slice(1)}`
       if (!sections.has(section)) {
@@ -344,6 +356,8 @@ export class ToolRegistry {
     // as gateway tools regardless of whether WebMCP pages are open.
     this.register(webMCPGetToolSchemaDefinition, webMCPGetToolSchemaExecutor)
     this.register(webMCPToolCallDefinition, webMCPToolCallExecutor)
+    // Conditionally register image generation tool
+    this.registerImageGenTool()
   }
 
   /** Register a WASM plugin as an Agent tool */
@@ -470,6 +484,37 @@ export class ToolRegistry {
   }
 
   //=============================================================================
+  // Image Generation Tool (conditional — requires model in provider cache)
+  //=============================================================================
+
+  /**
+   * Register the generate_image tool if the image gen model is available
+   * in the current provider's model cache. Safe to call multiple times.
+   */
+  registerImageGenTool(): boolean {
+    if (!isImageGenAvailable()) {
+      // If previously registered, unregister it
+      if (this.has('generate_image')) {
+        this.unregister('generate_image')
+        console.log('[ToolRegistry] generate_image tool unregistered (model no longer available)')
+      }
+      return false
+    }
+    if (this.has('generate_image')) return true // Already registered
+
+    this.register(imageGenDefinition, imageGenExecutor)
+    console.log('[ToolRegistry] ✅ Image generation tool registered')
+    return true
+  }
+
+  /**
+   * Unregister the image generation tool.
+   */
+  unregisterImageGenTool(): void {
+    this.unregister('generate_image')
+  }
+
+  //=============================================================================
   // Skill Tools
   //=============================================================================
 
@@ -509,6 +554,22 @@ export class ToolRegistry {
 /** Singleton instance */
 let instance: ToolRegistry | null = null
 
+/** Whether we've set up the model-cache listener for image gen tool */
+let imageGenListenerSetup = false
+
+/** Ensure the model-cache listener is registered (called once). */
+function ensureImageGenListener(): void {
+  if (imageGenListenerSetup) return
+  imageGenListenerSetup = true
+
+  // Re-check image gen availability when models are cached/updated
+  onModelsUpdated(() => {
+    if (instance) {
+      instance.registerImageGenTool()
+    }
+  })
+}
+
 export function getToolRegistry(): ToolRegistry {
   if (!instance) {
     instance = new ToolRegistry()
@@ -516,11 +577,15 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerSkillTools()
     // Conditionally register web bridge tools (Browser Extension)
     instance.registerWebBridgeTools()
+    // Set up listener for model cache updates (triggers image gen tool re-registration)
+    ensureImageGenListener()
   } else {
     // Try to register web bridge tools on every access (extension may have been
     // installed after page load). registerWebBridgeTools() is idempotent — it
     // checks both availability and existing registration.
     instance.registerWebBridgeTools()
+    // Also re-check image gen tool on every access
+    instance.registerImageGenTool()
   }
   return instance
 }

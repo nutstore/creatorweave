@@ -37,7 +37,7 @@ export type {
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = getUniversalSystemPrompt()
 const DEFAULT_TOOL_TIMEOUT = 30000
-const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question'])
+const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image'])
 const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 
 export class AgentLoop {

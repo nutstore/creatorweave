@@ -10,7 +10,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { FileText, Image, Download, X, Eye, Loader2 } from 'lucide-react'
 import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
-import { getActiveConversation } from '@/store/conversation-context.store'
+import { readAssetBlob, downloadAssetBlob } from './asset-utils'
 import { useT } from '@/i18n'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -28,39 +28,10 @@ function formatFileSize(bytes: number): string {
 }
 
 /**
- * Read an asset file from OPFS and return a Blob.
- * Returns null if the file cannot be found or read.
- */
-async function readAssetBlob(assetName: string): Promise<Blob | null> {
-  try {
-    const active = await getActiveConversation()
-    if (!active) return null
-    const assetsDir = await active.conversation.getAssetsDir()
-    const fileHandle = await assetsDir.getFileHandle(assetName)
-    const file = await fileHandle.getFile()
-    return file
-  } catch {
-    return null
-  }
-}
-
-/**
  * Download an asset file by reading it from OPFS and triggering a browser download.
  */
 async function downloadAsset(asset: AssetMeta): Promise<void> {
-  const blob = await readAssetBlob(asset.name)
-  if (!blob) {
-    console.error(`[AssetCard] Failed to read asset: ${asset.name}`)
-    return
-  }
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = asset.name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  await downloadAssetBlob(asset.name, asset.name)
 }
 
 /** Icon to show based on MIME type */

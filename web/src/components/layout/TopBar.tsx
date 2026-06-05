@@ -25,6 +25,8 @@ import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { ConversationStorageBadge } from '@/components/conversation'
 import { FolderSelector } from './FolderSelector'
 import { ModelQuickSwitch } from './ModelQuickSwitch'
+import { ImageModelDropdown } from '@/components/agent/ImageModelDropdown'
+import { AspectRatioDropdown } from '@/components/agent/AspectRatioDropdown'
 import { useT } from '@/i18n'
 import {
   BrandButton,
@@ -228,6 +230,10 @@ export function TopBar({
             <div className="shrink-0">
               <ModelQuickSwitch />
             </div>
+
+            {/* Image generation model + aspect ratio */}
+            <ImageModelDropdown />
+            <AspectRatioDropdown />
 
             {/* Conversation Storage - OPFS conversation status with storage dropdown */}
             <div className="shrink-0">

@@ -29,7 +29,6 @@ import type { ConversationMessagesHandle } from './ConversationMessages'
 import { ConversationEmptyState } from './ConversationEmptyState'
 import { AgentDropdown } from './AgentDropdown'
 import { ThinkingDropdown } from './ThinkingDropdown'
-import { AspectRatioDropdown } from './AspectRatioDropdown'
 import { ContextUsageBar } from './ContextUsageBar'
 import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { MessageNavBar } from './MessageNavBar'
@@ -485,7 +484,6 @@ export function ConversationView({
                 setThinkingLevel={setThinkingLevel}
               />
               <AgentModeSwitchCompact mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
-              <AspectRatioDropdown />
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <ShortcutHint />

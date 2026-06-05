@@ -409,4 +409,11 @@ export const settings = {
       noMatch: "일치하는 모델이 없습니다",
       dialogHint: "{count}개의 모델을 선택할 수 있습니다. 클릭하여 추가",
     },
+
+    imageGen: {
+      aspectRatio: "가로세로 비율",
+      arHint: "--ar 16:9로 임시 지정 가능",
+      searchModel: "모델 검색...",
+      noModelFound: "일치하는 모델이 없습니다",
+    },
 } as const

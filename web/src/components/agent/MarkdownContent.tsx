@@ -5,11 +5,103 @@
  * Memoized: avoids re-parsing markdown when content hasn't changed.
  * This is critical during streaming — every delta triggers a parent
  * re-render, but already-committed text blocks stay stable.
+ *
+ * Image support: `![alt](assets/images/...)` references are resolved
+ * from OPFS and rendered as inline images with loading states.
  */
 
-import { memo } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { Loader2 } from 'lucide-react'
+import { readAssetBlob } from './asset-utils'
+
+/** Check if a path looks like an OPFS asset reference */
+function isAssetPath(src: string): boolean {
+  return src.startsWith('assets/') || src.startsWith('/assets/')
+}
+
+/** Strip leading "assets/" to get the relative OPFS path */
+function toRelativePath(src: string): string {
+  const p = src.startsWith('/') ? src.slice(1) : src
+  if (p.startsWith('assets/')) return p.slice('assets/'.length)
+  return p
+}
+
+/**
+ * MarkdownImage — custom `img` component for react-markdown.
+ * Detects OPFS asset paths and loads images from OPFS storage.
+ * Falls back to standard `<img>` for external URLs.
+ */
+function MarkdownImage({ src, alt, ...props }: React.ComponentPropsWithoutRef<'img'>) {
+  const srcStr = src || ''
+
+  // External URL or data URI → render as-is
+  if (!isAssetPath(srcStr)) {
+    return <img src={srcStr} alt={alt || ''} loading="lazy" {...props} />
+  }
+
+  return <AssetImage src={srcStr} alt={alt || ''} />
+}
+
+/**
+ * AssetImage — resolves an OPFS asset path into an inline image.
+ * Shows loading spinner while reading from OPFS, error state on failure.
+ */
+function AssetImage({ src, alt }: { src: string; alt: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [error, setError] = useState(false)
+  const urlRef = useRef<string | null>(null)
+  const relativePath = toRelativePath(src)
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current)
+    }
+  }, [])
+
+  // Load image from OPFS
+  useEffect(() => {
+    let cancelled = false
+    readAssetBlob(relativePath).then((blob) => {
+      if (blob && !cancelled) {
+        const objectUrl = URL.createObjectURL(blob)
+        urlRef.current = objectUrl
+        setUrl(objectUrl)
+      } else if (!cancelled) {
+        setError(true)
+      }
+    })
+    return () => { cancelled = true }
+  }, [relativePath])
+
+  if (error) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-xs text-red-500 dark:bg-red-900/20 dark:text-red-400">
+        ⚠ Image not found: {relativePath.split('/').pop()}
+      </span>
+    )
+  }
+
+  if (!url) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded bg-neutral-100 px-2 py-1 text-xs text-neutral-400 dark:bg-neutral-800">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Loading image…
+      </span>
+    )
+  }
+
+  return (
+    <img
+      src={url}
+      alt={alt}
+      className="max-w-full rounded-md"
+      loading="lazy"
+    />
+  )
+}
 
 // Stable module-level references — prevents ReactMarkdown from re-parsing
 // when the MarkdownContent parent re-renders with unchanged content.
@@ -111,6 +203,10 @@ const MARKDOWN_COMPONENTS = {
   // Horizontal rule
   hr() {
     return <hr className="my-3 border-neutral-200 dark:border-neutral-700" />
+  },
+  // Images — resolve OPFS asset paths (e.g. assets/images/...)
+  img(props: React.ComponentPropsWithoutRef<'img'>) {
+    return <MarkdownImage {...props} />
   },
 } as const
 

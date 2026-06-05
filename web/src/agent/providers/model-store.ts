@@ -63,6 +63,28 @@ function writeToDisk(cacheKey: string, data: CachedModels): void {
   }
 }
 
+// ─── Change Listeners ───────────────────────────────────────────────────────
+
+/** Listeners called when the model cache is updated */
+const listeners = new Set<() => void>()
+
+/** Register a listener to be called when models are updated */
+export function onModelsUpdated(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/** Notify all registered listeners */
+function notifyModelsUpdated(): void {
+  for (const listener of listeners) {
+    try {
+      listener()
+    } catch (err) {
+      console.error('[model-store] Listener error:', err)
+    }
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 /**
@@ -132,6 +154,10 @@ export function setCachedModels(
 
   memoryCache.set(key, entry)
   writeToDisk(key, entry)
+
+  // Notify listeners that models have been updated
+  // (e.g. image gen tool may need to register/unregister)
+  notifyModelsUpdated()
 }
 
 /**

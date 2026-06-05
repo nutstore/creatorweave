@@ -401,4 +401,11 @@ export const settings = {
       noMatch: "没有匹配的模型",
       dialogHint: "共 {count} 个模型可选，点击即可添加",
     },
+
+    imageGen: {
+      aspectRatio: "图片宽高比",
+      arHint: "也可用 --ar 16:9 临时指定",
+      searchModel: "搜索模型...",
+      noModelFound: "未找到匹配的模型",
+    },
 } as const

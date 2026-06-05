@@ -413,4 +413,11 @@ export const settings = {
       noMatch: "No matching models",
       dialogHint: "{count} models available. Click to add.",
     },
+
+    imageGen: {
+      aspectRatio: "Aspect Ratio",
+      arHint: 'Use --ar 16:9 to override',
+      searchModel: "Search models...",
+      noModelFound: "No matching models found",
+    },
 } as const

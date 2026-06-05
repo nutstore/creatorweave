@@ -84,6 +84,9 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
 
   // Sync tools (writes to OPFS)
   ['sync', { name: 'sync', category: 'write' }],
+
+  // Image generation (writes generated images to OPFS assets)
+  ['generate_image', { name: 'generate_image', category: 'write' }],
 ])
 
 /**

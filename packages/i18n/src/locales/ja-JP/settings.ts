@@ -416,4 +416,11 @@ export const settings = {
       noMatch: "一致するモデルがありません",
       dialogHint: "{count} 個のモデルが選択可能です。クリックで追加",
     },
+
+    imageGen: {
+      aspectRatio: "アスペクト比",
+      arHint: "--ar 16:9 で一時指定も可能",
+      searchModel: "モデルを検索...",
+      noModelFound: "一致するモデルがありません",
+    },
 } as const

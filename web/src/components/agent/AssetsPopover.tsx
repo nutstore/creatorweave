@@ -27,6 +27,7 @@ import { useAssetInventoryStore } from '@/store/asset-inventory.store'
 import type { AssetInventoryItem } from '@/store/asset-inventory.store'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { inferMimeType } from '@/types/asset'
+import { readAssetBlob, downloadAssetBlob } from './asset-utils'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -49,39 +50,8 @@ function formatTime(ts: number): string {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-async function readAssetBlob(assetPath: string): Promise<Blob | null> {
-  try {
-    const active = await getActiveConversation()
-    if (!active) return null
-    const assetsDir = await active.conversation.getAssetsDir()
-    const parts = assetPath.split('/').filter(Boolean)
-    const fileName = parts.pop()
-    if (!fileName) return null
-
-    let currentDir = assetsDir
-    for (const segment of parts) {
-      currentDir = await currentDir.getDirectoryHandle(segment)
-    }
-
-    const fileHandle = await currentDir.getFileHandle(fileName)
-    const file = await fileHandle.getFile()
-    return file
-  } catch {
-    return null
-  }
-}
-
 async function downloadAsset(asset: AssetInventoryItem): Promise<void> {
-  const blob = await readAssetBlob(asset.path)
-  if (!blob) return
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = asset.name
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  await downloadAssetBlob(asset.path, asset.name)
 }
 
 function getFileIcon(mime: string) {
