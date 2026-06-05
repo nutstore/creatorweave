@@ -287,7 +287,6 @@ const CODEX_AUTH_POLL_ALARM = 'codex_auth_poll_alarm';
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
 const CODEX_DEFAULT_MODELS = [
-  { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
   { id: 'gpt-5.4', name: 'GPT-5.4', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
   { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', contextWindow: 128000, capabilities: ['code', 'reasoning'] },
   { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 200000, capabilities: ['code', 'reasoning'] },

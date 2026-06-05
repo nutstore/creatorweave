@@ -82,7 +82,6 @@ The extension enables using OpenAI Codex models directly from CreatorWeave, with
 
 | Model ID | Name | Context Window |
 |----------|------|----------------|
-| `gpt-5.3-codex` | GPT-5.3 Codex | 200K |
 | `gpt-5.4` | GPT-5.4 | 200K |
 | `gpt-5.4-mini` | GPT-5.4 Mini | 128K |
 | `gpt-5.5` | GPT-5.5 | 200K |
@@ -133,7 +132,7 @@ Proxies a Codex Responses API request through the extension with SSE streaming:
 
 ```javascript
 const stream = window.__agentWeb.codexProxyFetchStream({
-  model: 'gpt-5.3-codex',
+  model: 'gpt-5.4',
   instructions: 'You are a helpful assistant.',
   stream: true,
   input: [...],

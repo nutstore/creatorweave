@@ -27,7 +27,6 @@ export const CODEX_OAUTH_API_KEY = '__codex_oauth_extension_bridge__'
 
 /** Default models for Codex OAuth (fallback if extension doesn't return models) */
 const CODEX_OAUTH_FALLBACK_MODELS = [
-  { id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex', capabilities: ['code', 'reasoning'] as const, contextWindow: 200000 },
   { id: 'gpt-5.4', name: 'GPT-5.4', capabilities: ['code', 'reasoning'] as const, contextWindow: 200000 },
   { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', capabilities: ['code', 'reasoning'] as const, contextWindow: 128000 },
   { id: 'gpt-5.5', name: 'GPT-5.5', capabilities: ['code', 'reasoning'] as const, contextWindow: 200000 },
