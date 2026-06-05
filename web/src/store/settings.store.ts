@@ -240,7 +240,7 @@ export const useSettingsStore = create<SettingsState>()(
       createCustomProvider: ({ name, baseUrl, model }) => {
         const trimmedName = name.trim()
         const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
-        const trimmedModel = model.trim()
+        const trimmedModel = model?.trim() ?? ''
         if (!trimmedName || !trimmedBaseUrl) return false
 
         const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
