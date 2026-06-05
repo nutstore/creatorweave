@@ -5,7 +5,7 @@
  * the stored message compact.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Search } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import type { ToolEnvelopeError } from '@/agent/tools/tool-envelope'
@@ -16,6 +16,7 @@ import type { SearchHit } from '@/workers/search-worker-manager'
 import { getRuntimeHandlesForProject } from '@/native-fs'
 import { useProjectStore } from '@/store/project.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
+import { readAssetBlob } from '../asset-utils'
 
 /** Matches SearchHit from search-worker-manager.ts */
 interface SearchResult {
@@ -51,7 +52,7 @@ registerRenderer({
   icon: <Search className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
-    const files = extractFileResults(ctx)
+    const { files, loading: overflowLoading } = useOverflowFiles(ctx)
     const fileCount = files.length
     const totalMatches = files.reduce((sum, f) => sum + f.matchCount, 0)
     const titleMatchCount = files.filter(f => f.titleMatch).length
@@ -79,8 +80,11 @@ registerRenderer({
             )}
           </span>
         )}
-        {!ctx.isExecuting && !ctx.isStreaming && fileCount === 0 && !ctx.isError && (
+        {!ctx.isExecuting && !ctx.isStreaming && fileCount === 0 && !ctx.isError && !overflowLoading && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">no results</span>
+        )}
+        {overflowLoading && (
+          <span className="ml-auto text-xs text-neutral-400 shrink-0 animate-pulse">loading...</span>
         )}
         {ctx.isError && (
           <ErrorSummary ctx={ctx} />
@@ -93,9 +97,31 @@ registerRenderer({
       return <ErrorDetail ctx={ctx} />
     }
 
-    const fileResults = extractFileResults(ctx)
+    const { files: fileResults, loading: overflowLoading, error: overflowError } = useOverflowFiles(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const params = extractSearchParams(ctx)
+
+    // Show loading state while overflow asset is being fetched
+    if (overflowLoading && fileResults.length === 0) {
+      return (
+        <div className="px-3 py-2 space-y-2">
+          <StreamingPlaceholder />
+          <div className="text-[10px] text-neutral-400 animate-pulse">Loading large result set...</div>
+        </div>
+      )
+    }
+
+    // Show overflow error if loading failed
+    if (overflowError && fileResults.length === 0) {
+      return (
+        <div className="px-3 py-2 space-y-2">
+          <div className="text-xs text-red-500">
+            Failed to load overflow results: {overflowError}
+          </div>
+          {params.length > 0 && <SearchParamsBar params={params} />}
+        </div>
+      )
+    }
 
     const hasNoResults = fileResults.length === 0
     if (hasNoResults) {
@@ -432,6 +458,98 @@ function extractFileResults(ctx: ToolRenderCtx): FileResult[] {
     return (data as Record<string, unknown>).files as FileResult[]
   }
   return []
+}
+
+/** Check if the result was overflowed to an asset file. Returns the relative asset path or null. */
+function extractOverflowAssetPath(ctx: ToolRenderCtx): string | null {
+  const data = ctx.result?.data
+  if (data && typeof data === 'object') {
+    const d = data as Record<string, unknown>
+    if (d.overflow === true && typeof d.contentSavedTo === 'string') {
+      // contentSavedTo looks like "vfs://assets/overflow_search_xxx.txt"
+      const path = d.contentSavedTo
+      const match = path.match(/^vfs:\/\/assets\/(.+)$/)
+      if (match) return match[1]
+    }
+  }
+  return null
+}
+
+function useOverflowFiles(ctx: ToolRenderCtx): {
+  files: FileResult[]
+  loading: boolean
+  error: string | null
+} {
+  const directFiles = extractFileResults(ctx)
+  const assetPath = extractOverflowAssetPath(ctx)
+
+  const [loadedFiles, setLoadedFiles] = useState<FileResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Direct results available — no need to load
+    if (directFiles.length > 0 || !assetPath) {
+      return
+    }
+
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+
+    ;(async () => {
+      try {
+        const blob = await readAssetBlob(assetPath)
+        if (cancelled) return
+        if (!blob) {
+          setError('Failed to load overflow data')
+          setLoading(false)
+          return
+        }
+        const text = await blob.text()
+        if (cancelled) return
+
+        // The asset file contains the raw JSON string of the original V2 envelope
+        // or just the data.content field. Try parsing as envelope first.
+        const parsed = JSON.parse(text) as unknown
+        let filesArray: unknown = undefined
+
+        if (
+          typeof parsed === 'object' && parsed !== null &&
+          'ok' in parsed && 'data' in parsed &&
+          typeof (parsed as Record<string, unknown>).data === 'object'
+        ) {
+          // Full V2 envelope
+          const data = (parsed as Record<string, unknown>).data as Record<string, unknown>
+          filesArray = data.files
+        } else if (typeof parsed === 'object' && parsed !== null && 'files' in parsed) {
+          // Just the data object
+          filesArray = (parsed as Record<string, unknown>).files
+        }
+
+        if (Array.isArray(filesArray)) {
+          setLoadedFiles(filesArray as FileResult[])
+        } else {
+          setError('No file results found in overflow data')
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to parse overflow data')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+
+    return () => { cancelled = true }
+  }, [assetPath, directFiles.length])
+
+  // If direct results exist, use those (they're always authoritative)
+  if (directFiles.length > 0) {
+    return { files: directFiles, loading: false, error: null }
+  }
+
+  return { files: loadedFiles, loading, error }
 }
 
 function FileIcon() {
