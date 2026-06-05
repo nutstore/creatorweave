@@ -48,6 +48,7 @@ interface FileSearchResult {
   bestPreview: string
   bestLine: number
   hits: SearchHit[]
+  hasMoreHits?: boolean
 }
 
 interface SearchResultPayload {

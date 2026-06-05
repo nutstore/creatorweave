@@ -24,8 +24,10 @@ export interface FileSearchResult {
   bestPreview: string
   /** Line number of the best preview */
   bestLine: number
-  /** All individual hits (for expand/detail view) */
+  /** Individual hits (capped per-file for LLM context; renderer uses full results[]) */
   hits: SearchHit[]
+  /** True when this file has more hits than included in hits[] */
+  hasMoreHits?: boolean
 }
 
 /**

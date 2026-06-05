@@ -550,7 +550,20 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     if (truncatedFiles) {
       files = files.slice(0, userMaxResults)
     }
-    result.files = files
+
+    // Cap hits per file to keep messages compact in SQLite.
+    // Each file keeps only its best hit for the LLM preview;
+    // the renderer loads additional hits on demand via the search worker.
+    const filesForLLM = files.map(f => ({
+      ...f,
+      hits: f.hits.slice(0, 1),
+      hasMoreHits: f.hits.length > 1,
+    }))
+    result.files = filesForLLM
+
+    // Clear raw hit-level results to keep the stored message small.
+    // The renderer reconstructs detail from files[] and on-demand search.
+    result.results = []
 
     // Pagination hint when results are truncated
     const paginationHint =
@@ -560,17 +573,23 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
 
     const fileCount = files.length
     const titleMatchCount = files.filter(f => f.titleMatch).length
+    // Hint for the LLM: results are compacted (1 hit per file, raw results[] cleared).
+    // The hasMoreHits flag on each file means more lines match in that file.
+    // Use the read tool on the file to see full context around all matches.
+    const compactHint = filesForLLM.some(f => f.hasMoreHits)
+      ? ' Each file shows only the best matching line (hasMoreHits=true means more lines match). Use the read tool to view full file content for complete context.'
+      : ''
 
     return toolOkJson(
       'search',
       {
         query,
         ...result,
-        message: `Found ${result.totalMatches} matches across ${fileCount} files.${titleMatchCount > 0 ? ` (${titleMatchCount} title match${titleMatchCount !== 1 ? 'es' : ''})` : ''}`,
+        message: `Found ${result.totalMatches} matches across ${fileCount} files.${titleMatchCount > 0 ? ` (${titleMatchCount} title match${titleMatchCount !== 1 ? 'es' : ''})` : ''}.${compactHint}`,
       },
       {
         ...(loopCheck.warning ? { _warning: loopCheck.warning } : {}),
-        ...(paginationHint ? { _hint: paginationHint } : {}),
+        ...((paginationHint || compactHint) ? { _hint: [paginationHint, compactHint].filter(Boolean).join('') } : {}),
       }
     )
   } catch (error) {
