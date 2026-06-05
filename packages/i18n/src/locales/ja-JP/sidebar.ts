@@ -6,7 +6,7 @@ export const sidebar = {
     workspace: "ワークスペース",
     clearWorkspace: "現在のプロジェクトワークスペースをクリア",
     clear: "クリア",
-    newWorkspace: "新しいワークスペース",
+    newWorkspace: "新しいセッション",
     workspaceLabel: "ワークスペース: {name}",
     pendingReviewCount: "{count}件の変更がレビュー待ち",
     workspaceDeleted: "ワークスペースが削除されました",

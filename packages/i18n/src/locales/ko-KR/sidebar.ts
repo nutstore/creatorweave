@@ -6,7 +6,7 @@ export const sidebar = {
     workspace: "워크스페이스",
     clearWorkspace: "현재 프로젝트 워크스페이스 지우기",
     clear: "지우기",
-    newWorkspace: "새 워크스페이스",
+    newWorkspace: "새 세션",
     workspaceLabel: "워크스페이스: {name}",
     pendingReviewCount: "{count}개 변경 검토 대기",
     workspaceDeleted: "워크스페이스가 삭제되었습니다",

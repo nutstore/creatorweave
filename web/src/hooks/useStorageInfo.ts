@@ -29,8 +29,8 @@ export interface WorkspaceStorageInfo {
   cacheSizeFormatted: string
   /** Pending changes count */
   pendingCount: number
-  /** Last active timestamp */
-  lastActiveAt: number
+  /** Last accessed timestamp */
+  lastAccessedAt: number
 }
 
 /** @deprecated Use WorkspaceStorageInfo */
@@ -109,7 +109,7 @@ function sqliteWorkspaceToWithStats(workspace: Workspace): WorkspaceWithStats {
     id: workspace.id,
     name: workspace.name,
     createdAt: workspace.createdAt,
-    lastActiveAt: workspace.lastAccessedAt,
+    lastAccessedAt: workspace.lastAccessedAt,
     cacheSize: workspace.cacheSize,
     pendingCount: workspace.pendingCount,
     modifiedFiles: workspace.modifiedFiles,
@@ -163,7 +163,7 @@ export function useStorageInfo(): UseStorageInfoResult {
         cacheSize: workspace.cacheSize || 0,
         cacheSizeFormatted: workspace.cacheSize ? formatBytes(workspace.cacheSize) : '计算中...',
         pendingCount: workspace.pendingCount,
-        lastActiveAt: workspace.lastActiveAt || 0,
+        lastAccessedAt: workspace.lastAccessedAt || 0,
       })
     }
 
@@ -197,7 +197,7 @@ export function useStorageInfo(): UseStorageInfoResult {
             cacheSize,
             cacheSizeFormatted: formatBytes(cacheSize),
             pendingCount: workspace.pendingCount,
-            lastActiveAt: workspace.lastActiveAt || 0,
+            lastAccessedAt: workspace.lastAccessedAt || 0,
           })
           setWorkspaceStorageList(Array.from(results.values()))
         } catch (e) {
@@ -208,7 +208,7 @@ export function useStorageInfo(): UseStorageInfoResult {
             cacheSize: 0,
             cacheSizeFormatted: '0 B',
             pendingCount: workspace.pendingCount,
-            lastActiveAt: workspace.lastActiveAt || 0,
+            lastAccessedAt: workspace.lastAccessedAt || 0,
           })
         }
 
@@ -266,7 +266,7 @@ export function useStorageInfo(): UseStorageInfoResult {
           cacheSize: workspace.cacheSize || 0,
           cacheSizeFormatted: workspace.cacheSize ? formatBytes(workspace.cacheSize) : '-',
           pendingCount: workspace.pendingCount,
-          lastActiveAt: workspace.lastActiveAt || 0,
+          lastAccessedAt: workspace.lastAccessedAt || 0,
         }))
       }
 

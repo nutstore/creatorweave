@@ -119,7 +119,7 @@ function sqliteWorkspaceToWorkspaceStats(workspace: Workspace): WorkspaceWithSta
     id: workspace.id,
     name: workspace.name,
     createdAt: workspace.createdAt,
-    lastActiveAt: workspace.lastAccessedAt,
+    lastAccessedAt: workspace.lastAccessedAt,
     cacheSize: workspace.cacheSize,
     pendingCount: workspace.pendingCount,
     modifiedFiles: workspace.modifiedFiles,
@@ -343,13 +343,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               if (pinnedIds.length > 0) {
                 const pinnedSet = new Set(pinnedIds)
                 set({ pinnedWorkspaceIds: pinnedIds })
-                // Sort: pinned first (in pinnedIds order), then remaining by lastActiveAt desc
+                // Sort: pinned first (in pinnedIds order), then remaining by lastAccessedAt desc
                 workspaces.sort((a, b) => {
                   const aPinned = pinnedSet.has(a.id)
                   const bPinned = pinnedSet.has(b.id)
                   if (aPinned && !bPinned) return -1
                   if (!aPinned && bPinned) return 1
-                  return (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)
+                  return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0)
                 })
               }
             } catch {
@@ -430,7 +430,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               id,
               name: name || rootDirectory.split('/').pop() || id,
               createdAt: Date.now(),
-              lastActiveAt: Date.now(),
+              lastAccessedAt: Date.now(),
               cacheSize: 0,
               pendingCount: workspace.pendingCount,
               modifiedFiles: 0,
@@ -561,7 +561,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 id,
                 name: convTitle || id,
                 createdAt: Date.now(),
-                lastActiveAt: Date.now(),
+                lastAccessedAt: Date.now(),
                 cacheSize: 0,
                 pendingCount: workspace.pendingCount,
                 modifiedFiles: 0,
@@ -629,7 +629,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                         id,
                         name: workspaceRecord.name,
                         createdAt: workspaceRecord.createdAt,
-                        lastActiveAt: Date.now(),
+                        lastAccessedAt: Date.now(),
                         cacheSize: 0,
                         pendingCount: newWorkspace.pendingCount,
                         modifiedFiles: 0,
@@ -662,7 +662,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             set({
               workspaces: get().workspaces.map((w) =>
-                w.id === id ? { ...w, lastActiveAt: Date.now() } : w
+                w.id === id ? { ...w, lastAccessedAt: Date.now() } : w
               ),
               activeWorkspaceId: id,
               currentPendingCount: workspace.pendingCount,
@@ -1205,7 +1205,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           set({ pinnedWorkspaceIds: next })
 
-          // Re-sort workspaces: pinned first, then by lastActiveAt desc
+          // Re-sort workspaces: pinned first, then by lastAccessedAt desc
           const workspaces = [...get().workspaces]
           const pinnedSet = new Set(next)
           workspaces.sort((a, b) => {
@@ -1213,7 +1213,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const bPinned = pinnedSet.has(b.id)
             if (aPinned && !bPinned) return -1
             if (!aPinned && bPinned) return 1
-            return (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)
+            return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0)
           })
           set({ workspaces })
 

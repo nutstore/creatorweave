@@ -8,7 +8,7 @@ export const sidebar = {
     clear: "清空",
     activeTab: "活跃",
     archivedTab: "已归档",
-    newWorkspace: "新工作区",
+    newWorkspace: "新会话",
     workspaceLabel: "工作区: {name}",
     pendingReviewCount: "{count} 个变更待审阅",
     workspaceDeleted: "工作区已删除",

@@ -29,12 +29,12 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
   const deleteWorkspace = useConversationContextStore((s) => s.deleteWorkspace)
   const isLoading = useConversationContextStore((s) => s.isLoading)
 
-  // Sort conversations: active first, then by lastActiveAt
+  // Sort conversations: active first, then by lastAccessedAt
   const sortedConversations = useMemo(() => {
     return [...conversations].sort((a, b) => {
       if (a.id === activeConversationId) return -1
       if (b.id === activeConversationId) return 1
-      return (b.lastActiveAt || 0) - (a.lastActiveAt || 0)
+      return (b.lastAccessedAt || 0) - (a.lastAccessedAt || 0)
     })
   }, [conversations, activeConversationId])
 

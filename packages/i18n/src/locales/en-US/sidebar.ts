@@ -8,7 +8,7 @@ export const sidebar = {
     clear: "Clear",
     activeTab: "Active",
     archivedTab: "Archived",
-    newWorkspace: "New Workspace",
+    newWorkspace: "New Session",
     workspaceLabel: "Workspace: {name}",
     pendingReviewCount: "{count} changes pending review",
     workspaceDeleted: "Workspace deleted",

@@ -622,6 +622,17 @@ export const Sidebar = memo(function Sidebar({
   // Multi-root: get all roots from folder-access store
   const roots = useFolderAccessStore((state) => state.roots)
   const workspaceStats = useConversationContextStore((state) => state.workspaces)
+  // Extract lastAccessedAt as a stable map — avoids re-sorting when other workspace fields
+  // (e.g. pendingCount) change frequently during parallel streaming.
+  const lastAccessedAtMap = useConversationContextStore(
+    useShallow((s) => {
+      const map = new Map<string, number>()
+      for (const w of s.workspaces) {
+        if (w.lastAccessedAt) map.set(w.id, w.lastAccessedAt)
+      }
+      return map
+    })
+  )
   const activeWorkspaceId = useConversationContextStore((state) => state.activeWorkspaceId)
   const switchWorkspace = useConversationContextStore((state) => state.switchWorkspace)
   const workspaceIds = workspaceStats.map((w) => w.id)
@@ -670,17 +681,17 @@ export const Sidebar = memo(function Sidebar({
         const status = workspaceStatusMap.get(conv.id) || 'active'
         return workspaceTab === 'active' ? status !== 'archived' : status === 'archived'
       })
-      // Sort: pinned first, then by original order (lastActiveAt desc)
+      // Sort: pinned first, then by lastAccessedAt desc (most recent first)
       const pinnedSet = new Set(pinnedIds)
       return [...filtered].sort((a, b) => {
         const aPinned = pinnedSet.has(a.id)
         const bPinned = pinnedSet.has(b.id)
         if (aPinned && !bPinned) return -1
         if (!aPinned && bPinned) return 1
-        return 0 // preserve original relative order
+        return (lastAccessedAtMap.get(b.id) ?? 0) - (lastAccessedAtMap.get(a.id) ?? 0)
       })
     },
-    [scopedConversations, workspaceTab, workspaceStatusMap, pinnedIds]
+    [scopedConversations, workspaceTab, workspaceStatusMap, pinnedIds, lastAccessedAtMap]
   )
   const archivedCount = useMemo(
     () => scopedConversations.filter((conv) => workspaceStatusMap.get(conv.id) === 'archived').length,
@@ -916,7 +927,7 @@ export const Sidebar = memo(function Sidebar({
     [conversationRatio, setConversationRatio]
   )
 
-  // Stable callback for "新工作区" button
+  // Stable callback for "新会话" button
   const handleCreateNewWorkspace = useCallback(() => {
     const conv = createNew()
     void setActive(conv.id)

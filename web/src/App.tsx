@@ -130,7 +130,7 @@ function WorkspaceRoute() {
         if (activeWorkspaceId && scopedWorkspaceIds.includes(activeWorkspaceId)) {
           targetWorkspaceId = activeWorkspaceId
         } else if (scopedWorkspaceIds.length > 0) {
-          const sorted = [...workspaces].sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))
+          const sorted = [...workspaces].sort((a, b) => (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0))
           targetWorkspaceId = sorted[0].id
         }
       }

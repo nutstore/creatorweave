@@ -35,8 +35,8 @@ export interface WorkspaceMetadata {
   name: string
   /** Creation time */
   createdAt: number
-  /** Last active time */
-  lastActiveAt: number
+  /** Last accessed time */
+  lastAccessedAt: number
   /** Cache size in bytes */
   cacheSize: number
   /** Pending sync count */
