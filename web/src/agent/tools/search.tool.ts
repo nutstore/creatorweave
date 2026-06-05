@@ -523,6 +523,14 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       // leaving overlay keys that match the worker's relative paths (relative to root handle).
       const rootName = resolvedRootName || searchPath || undefined
       result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
+
+      // Prepend root prefix to hit paths so they are fully qualified for the LLM
+      // (e.g. "prepared/WS-147951 ...md" instead of bare "WS-147951 ...md")
+      if (resolvedRootName) {
+        for (const hit of result.results) {
+          hit.path = `${resolvedRootName}/${hit.path}`
+        }
+      }
     } else {
       // No path — search ALL roots and merge results
       const allHandles = await getAllRootHandles(context)
