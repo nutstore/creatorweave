@@ -68,6 +68,7 @@ const t = (key: string) => {
     'projectHome.dialogs.creating': 'Creating',
     'projectHome.dialogs.startFreshConfirmPlaceholder': 'Start fresh',
     'projectHome.project.open': 'Open',
+    'projectHome.project.openProject': 'Open project {name}',
     'projectHome.accentColors.teal': 'Teal',
     'projectHome.accentColors.rose': 'Rose',
     'projectHome.accentColors.amber': 'Amber',
@@ -167,6 +168,42 @@ describe('ProjectHome docs entry', () => {
     await user.click(screen.getByRole('button', { name: 'Continue Work' }))
 
     expect(onOpenProject).toHaveBeenCalledWith('project-a')
+  })
+
+  it('opens the project directly when clicking its name', async () => {
+    const user = userEvent.setup()
+    const onOpenProject = vi.fn()
+
+    render(
+      <ProjectHome
+        projects={[
+          {
+            id: 'project-name-click',
+            name: 'Clickable Project',
+            status: 'active',
+            createdAt: Date.now() - 1000 * 60 * 60,
+            updatedAt: Date.now() - 1000 * 60 * 30,
+          },
+        ]}
+        projectStats={{
+          'project-name-click': {
+            projectId: 'project-name-click',
+            workspaceCount: 2,
+          },
+        }}
+        activeProjectId=""
+        onOpenProject={onOpenProject}
+        onCreateProject={vi.fn()}
+        onRenameProject={vi.fn()}
+        onArchiveProject={vi.fn()}
+        onDeleteProject={vi.fn()}
+        onClearLocalData={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Open project Clickable Project' }))
+
+    expect(onOpenProject).toHaveBeenCalledWith('project-name-click')
   })
 
   it('does not inject Google Fonts imports in inline styles', () => {

@@ -408,6 +408,13 @@ export function ProjectHome({
     [projectStats]
   )
 
+  const handleOpenProject = useCallback(
+    (projectId: string) => {
+      void onOpenProject(projectId)
+    },
+    [onOpenProject]
+  )
+
   // Time group labels
   const getTimeGroupLabels = (): Record<TimeGroup, string> => ({
     today: t('projectHome.timeline.today'),
@@ -656,30 +663,38 @@ export function ProjectHome({
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground truncate">
-                {project.name}
-              </h3>
-              {isArchived && (
-                <span className="home-mono text-[10px] uppercase tracking-wider text-tertiary dark:text-muted px-1.5 py-0.5 rounded bg-muted dark:bg-muted">
-                  {t('projectHome.project.archived')}
+            <button
+              type="button"
+              onClick={() => handleOpenProject(project.id)}
+              disabled={isLoading || isActionSubmitting}
+              className="group w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-lg"
+              aria-label={t('projectHome.project.openProject', { name: project.name })}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground truncate group-hover:text-primary/70 transition-colors">
+                  {project.name}
+                </h3>
+                {isArchived && (
+                  <span className="home-mono text-[10px] uppercase tracking-wider text-tertiary dark:text-muted px-1.5 py-0.5 rounded bg-muted dark:bg-muted">
+                    {t('projectHome.project.archived')}
+                  </span>
+                )}
+              </div>
+              <div className="home-body flex items-center gap-3 text-xs text-tertiary dark:text-muted">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatRelativeTime(activityAt)}
                 </span>
-              )}
-            </div>
-            <div className="home-body flex items-center gap-3 text-xs text-tertiary dark:text-muted">
-              <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                {formatRelativeTime(activityAt)}
-              </span>
-              <span className="flex items-center gap-1">
-                <FolderOpen className="w-3 h-3" />
-                {t('projectHome.project.workspaceCount', { count: stats?.workspaceCount || 0 })}
-              </span>
-            </div>
+                <span className="flex items-center gap-1">
+                  <FolderOpen className="w-3 h-3" />
+                  {t('projectHome.project.workspaceCount', { count: stats?.workspaceCount || 0 })}
+                </span>
+              </div>
+            </button>
           </div>
           <div className="flex items-center gap-1 shrink-0">
             <BrandButton
-              onClick={() => void onOpenProject(project.id)}
+              onClick={() => handleOpenProject(project.id)}
               variant="ghost"
               disabled={isLoading || isActionSubmitting}
               className="home-body text-xs"
@@ -831,7 +846,7 @@ export function ProjectHome({
                 {formatRelativeTime(getProjectActivityAt(recentProject))}
               </p>
               <BrandButton
-                onClick={() => void onOpenProject(recentProject.id)}
+                onClick={() => handleOpenProject(recentProject.id)}
                 variant="primary"
                 className="w-full"
                 disabled={isLoading}
@@ -862,7 +877,7 @@ export function ProjectHome({
                   {formatRelativeTime(getProjectActivityAt(recentProject))}
                 </p>
                 <BrandButton
-                  onClick={() => void onOpenProject(recentProject.id)}
+                  onClick={() => handleOpenProject(recentProject.id)}
                   variant="primary"
                   className="w-full"
                   disabled={isLoading}
