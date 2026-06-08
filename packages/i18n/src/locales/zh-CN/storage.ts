@@ -11,9 +11,9 @@ export const pendingSync = {
     modify: "修改",
     delete: "删除",
     noActiveConversations: "无活动对话",
-    allChangesSynced: "所有更改已同步",
+    allChangesSynced: "所有修改已保存到本地",
     pendingCount: "待同步 ({count})",
-    syncAllToDisk: "同步所有待同步更改到磁盘",
+    syncAllToDisk: "将所有待确认的修改保存到本地磁盘",
     selectProjectFolder: "请先选择项目文件夹",
     syncing: "同步中...",
     sync: "同步",
@@ -21,7 +21,7 @@ export const pendingSync = {
     failed: "失败",
     skipped: "跳过",
     pendingChangesWillBeWritten:
-      "待同步的更改将写入到真实文件系统。请确保已选择正确的项目文件夹。",
+      "确认后，这些修改将写入你的本地文件。请确保已选择正确的项目文件夹。",
 } as const
 
 export const conversationStorage = {

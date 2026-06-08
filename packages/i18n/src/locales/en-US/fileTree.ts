@@ -12,7 +12,7 @@ export const fileTree = {
     deleteFileTitle: "Confirm Delete",
     emptyStateHint: "You can continue without selecting a local directory",
     emptyStateDescription:
-      "File changes will appear here in pure OPFS sandbox mode",
-    draftFiles: "Draft Files",
-    approvedNotSynced: "Approved, pending disk sync",
+      "AI file changes are stored here temporarily. Confirm to save them to your local files",
+    draftFiles: "Unconfirmed Changes",
+    approvedNotSynced: "Confirmed, waiting to be written to disk",
 } as const

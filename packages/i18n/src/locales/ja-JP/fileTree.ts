@@ -12,7 +12,7 @@ export const fileTree = {
     deleteFileTitle: "削除の確認",
     emptyStateHint: "ローカルディレクトリを選択せずにも繼續できます",
     emptyStateDescription:
-      "Pure OPFS サンドボックスモードでは、ファイルの変更がここに表示されます",
-    draftFiles: "下書きファイル",
-    approvedNotSynced: "承認済み、ディスク同期待ち",
+      "AIが変更したファイルはここに一時保存されます。確認後にローカルファイルに保存されます",
+    draftFiles: "未確認の変更",
+    approvedNotSynced: "確認済み、ディスクへの書き込み待ち",
 } as const

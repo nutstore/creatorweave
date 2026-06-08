@@ -11,9 +11,9 @@ export const pendingSync = {
     modify: "変更",
     delete: "削除",
     noActiveConversations: "アクティブな会話がありません",
-    allChangesSynced: "すべての変更が同期済み",
+    allChangesSynced: "すべての変更をディスクに保存しました",
     pendingCount: "保留中 ({count})",
-    syncAllToDisk: "保留中のすべての変更をディスクに同期",
+    syncAllToDisk: "確認済みのすべての変更をローカルディスクに保存",
     selectProjectFolder: "先にプロジェクトフォルダを選択してください",
     syncing: "同期中...",
     sync: "同期",
@@ -21,7 +21,7 @@ export const pendingSync = {
     failed: "失敗",
     skipped: "スキップ",
     pendingChangesWillBeWritten:
-      "保留中の変更は実際のファイルシステムに書き込まれます。正しいプロジェクトフォルダが選択されていることを確認してください。",
+      "これらの変更はローカルファイルに書き込まれます。正しいプロジェクトフォルダが選択されていることを確認してください。",
 } as const
 
 export const conversationStorage = {

@@ -152,7 +152,7 @@ export const settings = {
 
       // Sync Preview Panel (Empty State)
       syncPreview: {
-        emptyStateTitle: "변경 검토 대기 중",
+        emptyStateTitle: "AI가 파일을 수정했습니다 — 확인 대기 중",
         emptyStateDescription:
           "Python 코드 실행 후 감지된 파일 시스템 변경 사항이 여기에 표시됩니다. 변경 세부 정보를 미리 보고 승인을 거부할 수 있습니다.",
         step1Title: "Python 코드 실행",
@@ -198,9 +198,9 @@ export const settings = {
 
     // Pending Sync Panel
     pendingSyncPanel: {
-      title: "변경된 파일",
-      noPendingChanges: "현재 검토할 변경 사항이 없습니다",
-      newChangesAppearHere: "새 변경 사항은 여기에 자동으로 표시됩니다",
+      title: "확인 대기 중인 변경",
+      noPendingChanges: "확인할 변경 사항이 없습니다",
+      newChangesAppearHere: "AI 파일 변경이 자동으로 여기에 표시됩니다",
       refreshTooltip: "목록 새로고침",
       viewDetailsTooltip: "세부 정보 보기",
       selectedCount: "{count}개 선택됨",
@@ -223,31 +223,31 @@ export const settings = {
         "선택한 변경을 거부하시겠습니까? 이 작업은 취소할 수 없습니다.",
       cancel: "취소",
       confirmReject: "거부 확인",
-      reviewSuccess: "검토 성공!",
-      rejectedAllSuccess: "모든 변경이 거부되었습니다",
+      reviewSuccess: "로컬 파일에 저장되었습니다!",
+      rejectedAllSuccess: "모든 변경이 삭제되었습니다",
       rejectedCountWithFailure:
         "{successCount}개 변경을 거부했고, {failedCount}개는 로컬 파일 베이스라인이 없어서 목록에 유지됩니다",
       rejectChangeFailed: "변경 거부 실패, 나중에 다시 시도하세요",
-      syncFailed: "승인 실패, 나중에 다시 시도하세요",
+      syncFailed: "저장 실패, 다시 시도하세요",
       keepNativeVersionFailed: "로컬 버전 유지 실패",
       noFilesToSyncAfterConflict: "충돌 처리 후 동기화할 파일이 없습니다",
       reviewRequestSent: "검토 요청이 전송되었습니다",
       sendReviewRequestFailed: "검토 요청 전송 실패",
       aiSummaryFailed: "AI 생성 실패, 수동으로 입력하세요",
-      createSnapshot: "승인 스냅샷 만들기",
-      onlySyncWithLocalDir: "로컬 디렉터리가 있을 때만 디스크로 동기화",
-      syncSuccessMarkSnapshot: "동기화成功后 스냅샷을 동기화됨으로 표시",
+      createSnapshot: "저장 기록 만들기",
+      onlySyncWithLocalDir: "로컬 디렉터리가 선택된 경우에만 디스크에 저장",
+      syncSuccessMarkSnapshot: "저장 성공 후 기록을 동기화됨으로 표시",
       syncFailedCount: "{failed}개 파일 승인 적용 실패{conflicts}",
       conflictCount: ", {count}개 충돌 있음",
       detectConflict: "충돌 감지",
       conflictDetectFailed: "충돌 감지 실패, 승인을 계속합니다",
       noConflictShowDialog: "충돌 없음, 승인 대화상자 표시",
-      pendingChanges: "보류 중인 변경",
+      pendingChanges: "확인 대기 중인 변경",
       skipConflict: "이 충돌 건너뛰기",
       currentDraft: "현재 드래프트",
-      snapshotLabel: "스냅샷 {id}",
+      snapshotLabel: "저장 기록 {id}",
       saved: "저장됨",
-      approved: "승인됨",
+      approved: "저장됨",
       rolledBack: "롤백됨",
       reviewElements: "요소 검토",
       copyPath: "파일 경로 복사",
@@ -261,7 +261,7 @@ export const settings = {
       pleaseConfigureApiKey: "먼저 API Key를 구성하세요",
       conversationRunningPleaseWait:
         "현재 대화가 실행 중입니다. 나중에 다시 시도하세요",
-      reviewConversationTitle: "변경 검토",
+      reviewConversationTitle: "변경 확인",
     },
 
     // 모델 설정 - 카테고리 라벨

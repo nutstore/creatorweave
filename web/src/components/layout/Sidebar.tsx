@@ -510,7 +510,8 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           <History className="h-3 w-3" />
           {t('sidebar.snapshots')}
         </BrandButton>
-        <BrandButton
+        {/* Plugins tab hidden for now */}
+        {/* <BrandButton
           variant="ghost"
           className={`h-7 gap-1 px-2 py-1 text-xs ${
             resourceTab === 'plugins'
@@ -521,7 +522,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
         >
           <Puzzle className="h-3 w-3" />
           {t('sidebar.plugins')}
-        </BrandButton>
+        </BrandButton> */}
       </div>
 
       {/* Tab content */}
@@ -546,7 +547,8 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           </div>
         )}
 
-        {resourceTab === 'plugins' && (
+        {/* Plugins tab content hidden for now */}
+        {/* resourceTab === 'plugins' && (
           <div className="flex h-full flex-col">
             <SidebarPanelHeader title={t('sidebar.pluginTitle')} />
             <div className="flex flex-1 items-center justify-center p-4">
@@ -555,7 +557,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
               </p>
             </div>
           </div>
-        )}
+        ) */}
 
         {resourceTab === 'pending' && (
           <div className="h-full overflow-hidden">

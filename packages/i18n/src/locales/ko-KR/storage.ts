@@ -11,9 +11,9 @@ export const pendingSync = {
     modify: "수정",
     delete: "삭제",
     noActiveConversations: "활성 대화 없음",
-    allChangesSynced: "모든 변경사항 동기화됨",
+    allChangesSynced: "모든 변경사항이 디스크에 저장됨",
     pendingCount: "대기 중 ({count})",
-    syncAllToDisk: "보류 중인 모든 변경사항을 디스크에 동기화",
+    syncAllToDisk: "확인된 모든 변경사항을 로컬 디스크에 저장",
     selectProjectFolder: "먼저 프로젝트 폴더를 선택하세요",
     syncing: "동기화 중...",
     sync: "동기화",
@@ -21,7 +21,7 @@ export const pendingSync = {
     failed: "실패",
     skipped: "건너뜀",
     pendingChangesWillBeWritten:
-      "보류 중인 변경사항은 실제 파일시스템에 기록됩니다. 올바른 프로젝트 폴더를 선택했는지 확인하세요.",
+      "이 변경사항은 로컬 파일에 기록됩니다. 올바른 프로젝트 폴더를 선택했는지 확인하세요.",
 } as const
 
 export const conversationStorage = {

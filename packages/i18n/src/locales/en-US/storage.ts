@@ -11,9 +11,9 @@ export const pendingSync = {
     modify: "Modify",
     delete: "Delete",
     noActiveConversations: "No active conversations",
-    allChangesSynced: "All changes synced",
+    allChangesSynced: "All changes saved to disk",
     pendingCount: "Pending ({count})",
-    syncAllToDisk: "Sync all pending changes to disk",
+    syncAllToDisk: "Save all confirmed changes to local disk",
     selectProjectFolder: "Please select a project folder first",
     syncing: "Syncing...",
     sync: "Sync",
@@ -21,7 +21,7 @@ export const pendingSync = {
     failed: "failed",
     skipped: "skipped",
     pendingChangesWillBeWritten:
-      "Pending changes will be written to the real filesystem. Please make sure you have selected the correct project folder.",
+      "These changes will be written to your local files. Make sure you've selected the correct project folder.",
 } as const
 
 export const conversationStorage = {

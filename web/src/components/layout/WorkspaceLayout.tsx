@@ -447,17 +447,6 @@ export function WorkspaceLayout({
         return
       }
 
-      // Cmd/Ctrl + 1/2/3 to switch resource tabs
-      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '3') {
-        e.preventDefault()
-        const tabs: Array<'files' | 'plugins' | 'changes'> = ['files', 'plugins', 'changes']
-        const tabIndex = Number.parseInt(e.key) - 1
-        if (tabIndex < tabs.length) {
-          setActiveResourceTab(tabs[tabIndex])
-        }
-        return
-      }
-
       // NOTE: removed Shift+? shortcut — too hidden and conflicts with '?' typing.
       // Shortcuts help is accessible via Command Palette (⌘K → "Keyboard Shortcuts")
 

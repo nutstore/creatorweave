@@ -155,7 +155,7 @@ export const settings = {
 
       // Sync Preview Panel (Empty State)
       syncPreview: {
-        emptyStateTitle: "変更のレビュー待ち",
+        emptyStateTitle: "AIがファイルを変更しました — 確認をお待ちしています",
         emptyStateDescription:
           "Pythonコード実行後に検出されたファイルシステム変更がここに表示されます。変更の詳細をプレビューし、承認または拒否を選択できます。",
         step1Title: "Pythonコードを実行",
@@ -201,9 +201,9 @@ export const settings = {
 
     // Pending Sync Panel
     pendingSyncPanel: {
-      title: "変更ファイル",
-      noPendingChanges: "現在レビューする変更はありません",
-      newChangesAppearHere: "新しい変更はここに自動的に表示されます",
+      title: "確認待ちの変更",
+      noPendingChanges: "確認する変更はありません",
+      newChangesAppearHere: "AIによるファイル変更が自動的にここに表示されます",
       refreshTooltip: "リストを更新",
       viewDetailsTooltip: "詳細を見る",
       selectedCount: "{count} 件選択済み",
@@ -226,34 +226,34 @@ export const settings = {
         "選択した変更を拒否してもよろしいですか？この操作は元に戻せません。",
       cancel: "キャンセル",
       confirmReject: "拒否を確認",
-      reviewSuccess: "レビュー成功！",
-      rejectedAllSuccess: "すべての変更が拒否されました",
+      reviewSuccess: "ローカルファイルに保存しました！",
+      rejectedAllSuccess: "すべての変更を破棄しました",
       rejectedCountWithFailure:
         "{successCount} 件の変更を拒否しました。{failedCount} 件はローカルファイルのベースラインが不足しているためリストに残っています",
       rejectChangeFailed:
         "変更の拒否に失敗しました。後でもう一度お試しください",
-      syncFailed: "承認に失敗しました。後でもう一度お試しください",
+      syncFailed: "保存に失敗しました。後でもう一度お試しください",
       keepNativeVersionFailed: "ローカルバージョンの保持に失敗しました",
       noFilesToSyncAfterConflict: "競合処理後に同期するファイルがありません",
       reviewRequestSent: "レビュー要求が送信されました",
       sendReviewRequestFailed: "レビュー要求の送信に失敗しました",
       aiSummaryFailed: "AI 生成に失敗しました。手動で入力してください",
-      createSnapshot: "承認スナップショットを作成",
+      createSnapshot: "保存記録を作成",
       onlySyncWithLocalDir:
-        "ローカルディレクトリがある場合にのみディスクに同期",
+        "ローカルディレクトリが選択されている場合のみディスクに保存",
       syncSuccessMarkSnapshot:
-        "同期成功后、スナップショットを同期済みとしてマーク",
+        "保存成功後、記録を同期済みとしてマーク",
       syncFailedCount: "{failed} ファイルの承認適用に失敗しました{conflicts}",
       conflictCount: "、{count} 件が競合あり",
       detectConflict: "競合を検出",
       conflictDetectFailed: "競合検出に失敗しました。承認を続行します",
       noConflictShowDialog: "競合なし、承認ダイアログを表示",
-      pendingChanges: "保留中の変更",
+      pendingChanges: "確認待ちの変更",
       skipConflict: "この競合をスキップ",
       currentDraft: "現在の下書き",
-      snapshotLabel: "スナップショット {id}",
+      snapshotLabel: "保存記録 {id}",
       saved: "保存済み",
-      approved: "承認済み",
+      approved: "保存済み",
       rolledBack: "ロールバック済み",
       reviewElements: "要素をレビュー",
       copyPath: "ファイルパスをコピー",
@@ -267,7 +267,7 @@ export const settings = {
       pleaseConfigureApiKey: "まずAPI Keyを設定してください",
       conversationRunningPleaseWait:
         "現在の会話は実行中です。しばらくしてから再試行してください",
-      reviewConversationTitle: "変更レビュー",
+      reviewConversationTitle: "変更を確認",
     },
 
     // モデル設定 - カテゴリーラベル
