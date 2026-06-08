@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM 服务商",
     apiKey: "API Key",
     apiKeyPlaceholder: "输入 API Key...",
+    showApiKey: "显示 API Key",
+    hideApiKey: "隐藏 API Key",
     save: "保存",
     saved: "已保存",
     apiKeyNote: "密钥使用 AES-256 加密存储在本地浏览器中",

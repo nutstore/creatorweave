@@ -4,6 +4,7 @@ export const common = {
     cancel: "キャンセル",
     confirm: "確認",
     delete: "削除",
+    clear: "クリア",
     close: "閉じる",
     search: "検索",
     refresh: "更新",

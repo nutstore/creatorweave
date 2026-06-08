@@ -3,6 +3,8 @@ export const settings = {
     llmProvider: "LLM Provider",
     apiKey: "API Key",
     apiKeyPlaceholder: "Enter API Key...",
+    showApiKey: "Show API Key",
+    hideApiKey: "Hide API Key",
     save: "Save",
     saved: "Saved",
     apiKeyNote: "Key is encrypted with AES-256 and stored locally",

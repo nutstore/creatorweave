@@ -213,19 +213,28 @@ function ProviderCard({
     }
   }, [isEditing, customProvider])
 
+  const clearApiKey = useCallback(async () => {
+    await deleteApiKey(providerKey)
+    setApiKey('')
+    setHasKey(false)
+    setSaved(false)
+    setShowKey(false)
+    invalidateApiKeyCache(providerKey)
+
+    // Update global hasApiKey state if this is the active provider
+    const activeConfig = useSettingsStore.getState().getEffectiveProviderConfig()
+    if (activeConfig && activeConfig.apiKeyProviderKey === providerKey) {
+      useSettingsStore.getState().setHasApiKey(false)
+    }
+
+    triggerProviderRefresh()
+    toast.success(t('settings.toast.apiKeyCleared'))
+  }, [invalidateApiKeyCache, providerKey, triggerProviderRefresh, t])
+
   const handleSaveKey = useCallback(async () => {
     const trimmedKey = apiKey.trim()
     if (!trimmedKey) {
-      await deleteApiKey(providerKey)
-      setHasKey(false)
-      invalidateApiKeyCache(providerKey)
-      // Update global hasApiKey state if this is the active provider
-      const activeConfig = useSettingsStore.getState().getEffectiveProviderConfig()
-      if (activeConfig && activeConfig.apiKeyProviderKey === providerKey) {
-        useSettingsStore.getState().setHasApiKey(false)
-      }
-      triggerProviderRefresh()
-      toast.success(t('settings.toast.apiKeyCleared'))
+      await clearApiKey()
       return
     }
     await saveApiKey(providerKey, trimmedKey)
@@ -262,6 +271,7 @@ function ProviderCard({
     setTimeout(() => setSaved(false), 2000)
   }, [
     apiKey,
+    clearApiKey,
     providerKey,
     invalidateApiKeyCache,
     isCustom,
@@ -504,19 +514,34 @@ function ProviderCard({
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   placeholder={t('settings.apiKeyPlaceholder')}
-                  className="flex w-full rounded-lg border border-neutral-200 bg-transparent px-3 py-2 pr-10 text-[12px] focus-visible:border-primary-600 focus-visible:outline-none dark:border-border"
+                  className="flex w-full rounded-lg border border-neutral-200 bg-transparent px-3 py-2 pr-16 text-[12px] focus-visible:border-primary-600 focus-visible:outline-none dark:border-border"
                   style={{ WebkitTextSecurity: showKey ? 'none' : 'disc' } as React.CSSProperties}
                   autoComplete="off"
                   data-form-type="other"
                   data-lpignore="true"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowKey(!showKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-tertiary hover:text-primary"
-                >
-                  {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                </button>
+                <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                  {(hasKey || apiKey.trim()) && (
+                    <button
+                      type="button"
+                      onClick={clearApiKey}
+                      className="text-tertiary hover:text-primary"
+                      aria-label={t('common.clear')}
+                      title={t('common.clear')}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowKey(!showKey)}
+                    className="text-tertiary hover:text-primary"
+                    aria-label={showKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                    title={showKey ? t('settings.hideApiKey') : t('settings.showApiKey')}
+                  >
+                    {showKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
               </div>
               <BrandButton variant="primary" className="h-9 text-[12px]" onClick={handleSaveKey}>
                 {saved ? <Check className="h-4 w-4" /> : t('settings.save')}

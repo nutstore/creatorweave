@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM プロバイダ",
     apiKey: "API Key",
     apiKeyPlaceholder: "API Keyを入力...",
+    showApiKey: "API Keyを表示",
+    hideApiKey: "API Keyを非表示",
     save: "保存",
     saved: "保存しました",
     apiKeyNote: "キーは AES-256 暗号化してローカルブラウザに保存されます",

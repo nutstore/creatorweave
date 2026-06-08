@@ -4,6 +4,8 @@ export const settings = {
     llmProvider: "LLM 공급자",
     apiKey: "API Key",
     apiKeyPlaceholder: "API Key를 입력하세요...",
+    showApiKey: "API Key 표시",
+    hideApiKey: "API Key 숨기기",
     save: "저장",
     saved: "저장됨",
     apiKeyNote: "키는 AES-256 암호화되어 로컬 브라우저에 저장됩니다",

@@ -3,6 +3,7 @@ export const common = {
     cancel: "Cancel",
     confirm: "Confirm",
     delete: "Delete",
+    clear: "Clear",
     close: "Close",
     search: "Search",
     refresh: "Refresh",

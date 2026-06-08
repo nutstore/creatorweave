@@ -4,6 +4,7 @@ export const common = {
     cancel: "取消",
     confirm: "确认",
     delete: "删除",
+    clear: "清空",
     close: "关闭",
     search: "搜索",
     refresh: "刷新",
