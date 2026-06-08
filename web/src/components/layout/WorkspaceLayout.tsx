@@ -256,7 +256,7 @@ export function WorkspaceLayout({
     // Conversations
     onNewConversation: () => {
       const newConv = createNew('New conversation')
-      setActive(newConv.id)
+      onSelectWorkspace?.(newConv.id)
     },
     onContinueLast: () => {
       const { conversations } = useConversationStore.getState()
@@ -286,12 +286,6 @@ export function WorkspaceLayout({
     // Settings & Help
     onOpenSettings: () => setShowWorkspaceSettings(true),
     onShowShortcuts: () => setShowShortcutsHelp(true),
-    // Messages
-    onSendMessage: (text: string) => {
-      const conv = createNew(text.slice(0, 30))
-      setActive(conv.id)
-      setPendingMessage(text)
-    },
   }, {
     t,
     enableLocalization: locale === 'zh-CN' || locale === 'en-US',
