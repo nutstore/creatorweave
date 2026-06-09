@@ -79,7 +79,14 @@ async function fetchOpenAICompatibleModels(
   const data = await response.json()
 
   // OpenAI format: { data: [{ id: "model-name", ... }, ...] }
-  const rawModels: Array<{ id: string; owned_by?: string; created?: number; context_length?: number }> = data.data || data
+  // OpenRouter extends with top_provider.context_length (actual usable context)
+  const rawModels: Array<{
+    id: string
+    owned_by?: string
+    created?: number
+    context_length?: number
+    top_provider?: { context_length?: number }
+  }> = data.data || data
 
   if (!Array.isArray(rawModels)) {
     throw new Error('Unexpected response format: expected array of models')
@@ -87,7 +94,13 @@ async function fetchOpenAICompatibleModels(
 
   return rawModels
     .filter((m) => m.id && typeof m.id === 'string')
-    .map((m) => parseModelInfo(m.id, m.context_length))
+    .map((m) => {
+      // OpenRouter provides top_provider.context_length which reflects the
+      // actual usable context (may be smaller than the model's theoretical
+      // context_length due to provider-side limits). Prefer it when available.
+      const effectiveContext = m.top_provider?.context_length ?? m.context_length
+      return parseModelInfo(m.id, effectiveContext)
+    })
     .sort((a, b) => {
       // Sort: put more capable/recent models first
       const aScore = getModelSortScore(a.id)
