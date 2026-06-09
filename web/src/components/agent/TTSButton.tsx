@@ -7,7 +7,7 @@
  * the browser extension is installed.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { Volume2, VolumeX, Loader2 } from 'lucide-react'
 import removeMarkdown from 'remove-markdown'
 
@@ -24,12 +24,25 @@ type PlaybackState = 'idle' | 'loading' | 'playing'
 
 export function TTSButton({ content, className, voice }: TTSButtonProps) {
   const [state, setState] = useState<PlaybackState>('idle')
+  // Track current audio element + listeners for cleanup
+  const audioCleanupRef = useRef<(() => void) | null>(null)
+
+  // Cleanup audio listeners on unmount
+  useEffect(() => {
+    return () => {
+      audioCleanupRef.current?.()
+      audioCleanupRef.current = null
+    }
+  }, [])
 
   const handleClick = useCallback(async () => {
     const bridge = (window as any).__agentWeb
     if (!bridge?.ttsPlay) return
 
     if (state === 'playing') {
+      // Clean up any existing listeners
+      audioCleanupRef.current?.()
+      audioCleanupRef.current = null
       bridge.ttsStop?.()
       setState('idle')
       return
@@ -51,10 +64,20 @@ export function TTSButton({ content, className, voice }: TTSButtonProps) {
         const audio = (window as any).__ttsAudio as HTMLAudioElement | undefined
         if (audio) {
           const onEnd = () => {
+            audioCleanupRef.current = null
             setState('idle')
+          }
+          const onError = () => {
+            audioCleanupRef.current = null
+            setState('idle')
+          }
+          const cleanup = () => {
             audio.removeEventListener('ended', onEnd)
+            audio.removeEventListener('error', onError)
           }
           audio.addEventListener('ended', onEnd)
+          audio.addEventListener('error', onError)
+          audioCleanupRef.current = cleanup
         }
       } else {
         setState('idle')

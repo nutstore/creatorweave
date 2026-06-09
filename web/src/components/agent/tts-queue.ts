@@ -61,6 +61,10 @@ class TTSAutoPlayQueue {
   private _onStateChange?: (state: QueueState, queueLength: number) => void
   /** Keys already enqueued (prevents duplicate enqueue of same message) */
   private seenKeys = new Set<string>()
+  /** Abort controller for cancelling in-flight playNext() */
+  private _abortController: AbortController | null = null
+  /** Resolve function for the audio-ended promise, so stopAudio can unblock it */
+  private _audioEndResolve: (() => void) | null = null
 
   // ── Public API ───────────────────────────────────────────────────
 
@@ -208,10 +212,15 @@ class TTSAutoPlayQueue {
     this.currentKey = item.key
     this.notifyStateChange()
 
+    // Create abort controller for this playback session
+    const abortController = new AbortController()
+    this._abortController = abortController
+
     try {
       const bridge = (window as any).__agentWeb
       if (!bridge?.ttsPlay) {
         // Bridge not available (extension not installed)
+        if (abortController.signal.aborted) return
         this.state = 'idle'
         this.currentKey = null
         this.notifyStateChange()
@@ -223,27 +232,40 @@ class TTSAutoPlayQueue {
         voice: item.voice || 'zh-CN-XiaoxiaoNeural',
       })
 
+      // Check if aborted during synthesis
+      if (abortController.signal.aborted) return
+
       if (result?.ok && result?.playing) {
         const audio = (window as any).__ttsAudio as HTMLAudioElement | undefined
         if (audio) {
           await new Promise<void>((resolve) => {
-            const onEnd = () => {
+            // Store resolver so stopAudio() can unblock us
+            this._audioEndResolve = resolve
+
+            const cleanup = () => {
               audio.removeEventListener('ended', onEnd)
               audio.removeEventListener('error', onError)
-              resolve()
+              abortController.signal.removeEventListener('abort', onAbort)
+              this._audioEndResolve = null
             }
-            const onError = () => {
-              audio.removeEventListener('ended', onEnd)
-              audio.removeEventListener('error', onError)
-              resolve()
-            }
+
+            const onEnd = () => { cleanup(); resolve() }
+            const onError = () => { cleanup(); resolve() }
+            const onAbort = () => { cleanup(); resolve() }
+
             audio.addEventListener('ended', onEnd)
             audio.addEventListener('error', onError)
+            abortController.signal.addEventListener('abort', onAbort)
           })
         }
       }
+
+      // Check again after audio finishes — don't advance if aborted
+      if (abortController.signal.aborted) return
+
     } catch (err) {
       console.error('[TTSQueue] Playback failed:', err)
+      if (abortController.signal.aborted) return
     }
 
     this.state = 'idle'
@@ -255,6 +277,18 @@ class TTSAutoPlayQueue {
   }
 
   private stopAudio(): void {
+    // Abort any in-flight playNext() — unblocks the synthesis await and the audio-ended promise
+    if (this._abortController) {
+      this._abortController.abort()
+      this._abortController = null
+    }
+
+    // Also resolve the audio-ended promise directly as a safety net
+    if (this._audioEndResolve) {
+      this._audioEndResolve()
+      this._audioEndResolve = null
+    }
+
     try {
       const bridge = (window as any).__agentWeb
       bridge?.ttsStop?.()

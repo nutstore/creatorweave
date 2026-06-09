@@ -682,6 +682,7 @@ export default defineContentScript({
       ttsStop(): void {
         const audio = (window as any).__ttsAudio as HTMLAudioElement | undefined;
         if (audio) { audio.pause(); audio.src = ''; }
+        (window as any).__ttsAudio = undefined;
       },
     };
 
