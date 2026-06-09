@@ -612,6 +612,31 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           // doesn't try to insert raw data or leave a blank line.
           return true
         }
+
+        // Large-text paste: if the pasted plain text exceeds the threshold,
+        // automatically convert it to a .txt file attachment instead of
+        // inserting it into the editor (which would be slow and hard to edit).
+        const PASTE_TEXT_THRESHOLD = 10_000 // characters
+        const pastedText = event.clipboardData?.getData('text/plain') ?? ''
+        if (pastedText.length > PASTE_TEXT_THRESHOLD) {
+          event.preventDefault()
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+          const fileName = `pasted-text-${timestamp}.txt`
+          const textFile = new File([pastedText], fileName, { type: 'text/plain' })
+          addFiles([textFile])
+          // Insert a brief note so the user and AI know text was auto-attached
+          const ed = editor // editor is in closure from useEditor
+          if (ed) {
+            const lineCount = pastedText.split('\n').length
+            const charCount = pastedText.length
+            ed.commands.insertContent(
+              `[Pasted text (${lineCount} lines, ${charCount.toLocaleString()} chars) attached as ${fileName}]`,
+            )
+            emitValue(ed)
+          }
+          return true
+        }
+
         // Let TipTap handle normal text/HTML paste
         return false
       },
