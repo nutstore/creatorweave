@@ -81,7 +81,7 @@ export class MCPManager {
 
   constructor(config: MCPManagerConfig = {}) {
     this.config = {
-      autoConnect: config.autoConnect ?? false,
+      autoConnect: config.autoConnect ?? true,
       healthCheckInterval: config.healthCheckInterval ?? 0,
       retryOnFailure: config.retryOnFailure ?? true,
     }
@@ -413,6 +413,38 @@ export class MCPManager {
     }
 
     return results
+  }
+
+  /**
+   * Auto-connect any enabled servers that are not yet connected.
+   *
+   * Safe to call repeatedly — skips servers that are already connected
+   * or currently connecting. Individual connection failures are caught
+   * and logged so one bad server does not block the rest.
+   */
+  async connectUnconnectedEnabled(): Promise<number> {
+    const enabled = this.getEnabledServers()
+    let connected = 0
+
+    for (const server of enabled) {
+      const cache = this.connectionCache.get(server.id)
+      if (cache?.state === 'connected' || cache?.state === 'connecting') {
+        continue
+      }
+
+      try {
+        await this.connect(server.id)
+        connected++
+      } catch (error) {
+        console.warn(`[MCPManager] Auto-connect failed for ${server.id}:`, error)
+      }
+    }
+
+    if (connected > 0) {
+      console.log(`[MCPManager] Auto-connected ${connected} server(s)`)
+    }
+
+    return connected
   }
 
   /**

@@ -33,7 +33,7 @@ export interface JSONRPCResponse<T = unknown> {
 
 export type MCPServerType = 'builtin' | 'user' | 'project'
 
-export type MCPTransportType = 'stdio' | 'streamable_http' | 'sse'
+export type MCPTransportType = 'streamable_http' | 'sse'
 
 export interface MCPServerConfig {
   /** Unique server ID (user-defined, memorable format like "excel-analyzer") */

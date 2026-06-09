@@ -19,6 +19,7 @@ describe('Preset Providers', () => {
       const providers = getPresetProviders()
 
       expect(providers.length).toBeGreaterThan(0)
+      expect(providers.some((p) => p.id === 'figma')).toBe(true)
       expect(providers.some((p) => p.id === 'github')).toBe(true)
       expect(providers.some((p) => p.id === 'gitlab')).toBe(true)
       expect(providers.some((p) => p.id === 'jira')).toBe(true)
@@ -68,6 +69,16 @@ describe('Preset Providers', () => {
       expect(provider!.category).toBe('development')
     })
 
+    it('should return Figma provider', () => {
+      const provider = getProviderById('figma')
+
+      expect(provider).toBeDefined()
+      expect(provider!.id).toBe('figma')
+      expect(provider!.name).toBe('Figma MCP Remote')
+      expect(provider!.config.url).toBe('https://mcp.figma.com/mcp')
+      expect(provider!.config.transport).toBe('streamable_http')
+    })
+
     it('should return undefined for unknown provider', () => {
       const provider = getProviderById('unknown-provider')
 
@@ -85,6 +96,18 @@ describe('Preset Providers', () => {
       expect(config.id).toBe('github')
       expect(config.name).toBe('GitHub')
       expect(config.type).toBe('user')
+      expect(config.enabled).toBe(false)
+    })
+
+    it('should preserve Figma preset transport when converting config', () => {
+      const provider = getProviderById('figma')
+      expect(provider).toBeDefined()
+
+      const config = providerToConfig(provider!)
+
+      expect(config.id).toBe('figma')
+      expect(config.url).toBe('https://mcp.figma.com/mcp')
+      expect(config.transport).toBe('streamable_http')
       expect(config.enabled).toBe(false)
     })
   })
@@ -111,6 +134,16 @@ describe('Preset Providers', () => {
       expect(result.valid).toBe(false)
     })
 
+    it('should validate Figma provider token requirement', () => {
+      const provider = getProviderById('figma')
+      expect(provider).toBeDefined()
+
+      const result = validateProviderConfig(provider!)
+
+      expect(result.missingVars).toContain('FIGMA_TOKEN')
+      expect(result.valid).toBe(false)
+    })
+
     it('should validate Slack provider', () => {
       const provider = getProviderById('slack')
       expect(provider).toBeDefined()
@@ -130,6 +163,16 @@ describe('Preset Providers', () => {
 
       expect(template).toContain('# Environment variables for GitHub')
       expect(template).toContain('GITHUB_TOKEN=')
+    })
+
+    it('should generate Figma token template', () => {
+      const provider = getProviderById('figma')
+      expect(provider).toBeDefined()
+
+      const template = getEnvVarTemplate(provider!)
+
+      expect(template).toContain('# Environment variables for Figma MCP Remote')
+      expect(template).toContain('FIGMA_TOKEN=')
     })
 
     it('should include all required env vars', () => {

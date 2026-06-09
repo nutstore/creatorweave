@@ -776,6 +776,27 @@ export default defineBackground(() => {
           return;
         }
 
+        if (message.type === 'mcp_proxy_fetch') {
+          const { url, method = 'POST', headers = {}, body = null, timeoutMs } = message;
+          try {
+            const resp = await fetchWithTimeout(url, {
+              method,
+              headers,
+              body,
+              timeout: typeof timeoutMs === 'number' ? timeoutMs : CONFIG.TIMEOUT_MS,
+            });
+            const text = await resp.text();
+            const responseHeaders = {};
+            resp.headers.forEach((value, key) => {
+              responseHeaders[key] = value;
+            });
+            sendResponse({ ok: resp.ok, status: resp.status, statusText: resp.statusText, headers: responseHeaders, text });
+          } catch (err: any) {
+            sendResponse({ ok: false, status: 0, error: err?.message || String(err) });
+          }
+          return;
+        }
+
         if (message.type === 'webmcp_discover_tools') {
           const senderWindowId = _sender?.tab?.windowId;
           sendResponse(await discoverWebMCPToolsInCurrentWindow(senderWindowId));
@@ -960,9 +981,9 @@ export default defineBackground(() => {
     return true;
   });
 
-  // ── Port-based streaming for codex_proxy_fetch_stream & webmcp_plugin_download_stream ──
+  // ── Port-based streaming bridge for Codex, page-outside MCP, and plugin download flows ──
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name !== 'codex_stream') return;
+    if (port.name !== 'agent_bridge_stream') return;
 
     port.onMessage.addListener((message) => {
       if (message.type === 'webmcp_plugin_download_stream') {
@@ -1006,6 +1027,79 @@ export default defineBackground(() => {
           }
         })()
         return
+      }
+
+      if (message.type === 'mcp_proxy_fetch_stream') {
+        (async () => {
+          const { url, method = 'POST', headers = {}, body = null, timeoutMs } = message;
+          const streamTimeoutMs = typeof timeoutMs === 'number' ? timeoutMs : 2 * 60 * 1000;
+          let timeoutId = setTimeout(() => {
+            port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: `MCP stream request timed out (${Math.round(streamTimeoutMs / 1000)}s)` });
+            try { port.disconnect(); } catch {}
+          }, streamTimeoutMs);
+
+          try {
+            const resp = await fetchWithTimeout(url, {
+              method,
+              headers,
+              body,
+              timeout: streamTimeoutMs,
+            });
+
+            const responseHeaders = {};
+            resp.headers.forEach((value, key) => {
+              responseHeaders[key] = value;
+            });
+
+            port.postMessage({
+              type: 'chunk',
+              data: {
+                type: 'response_start',
+                status: resp.status,
+                statusText: resp.statusText,
+                headers: responseHeaders,
+              },
+            });
+
+            if (!resp.ok) {
+              clearTimeout(timeoutId);
+              const errText = await resp.text();
+              port.postMessage({ type: 'error', errorCode: 'UPSTREAM_ERROR', status: resp.status, message: errText || resp.statusText });
+              port.disconnect();
+              return;
+            }
+
+            const reader = resp.body?.getReader();
+            if (!reader) {
+              clearTimeout(timeoutId);
+              port.postMessage({ type: 'error', errorCode: 'NO_RESPONSE_BODY', message: 'No response body for MCP stream' });
+              port.disconnect();
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              const chunk = decoder.decode(value, { stream: true });
+              port.postMessage({ type: 'chunk', data: { type: 'chunk', data: chunk } });
+            }
+
+            const remaining = decoder.decode();
+            if (remaining) {
+              port.postMessage({ type: 'chunk', data: { type: 'chunk', data: remaining } });
+            }
+
+            port.postMessage({ type: 'done' });
+            clearTimeout(timeoutId);
+            port.disconnect();
+          } catch (err: any) {
+            clearTimeout(timeoutId);
+            port.postMessage({ type: 'error', errorCode: 'NETWORK_ERROR', message: String(err?.message || err) });
+            port.disconnect();
+          }
+        })();
+        return;
       }
 
       if (message.type !== 'codex_proxy_fetch_stream') return;

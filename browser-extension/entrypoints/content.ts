@@ -4,10 +4,11 @@
 // forwards to background via chrome.runtime.sendMessage,
 // then sends the response back via window.postMessage.
 //
-// Also handles port-based streaming for codex_proxy_fetch_stream:
-// content.ts opens a chrome.runtime.Port, background streams
-// chunks through it, and content.ts relays each chunk via
-// window.postMessage to the MAIN-world script.
+// Also handles port-based streaming for bridge-backed streaming requests
+// such as codex streaming, page-outside MCP streaming, and plugin download
+// transfers. content.ts opens a chrome.runtime.Port, background streams
+// chunks through it, and content.ts relays each chunk via window.postMessage
+// to the MAIN-world script.
 // ============================================================
 
 export default defineContentScript({
@@ -33,9 +34,13 @@ export default defineContentScript({
       if (!id || !type) return;
 
       // ── Streaming request: use port-based messaging ──
-      if (type === 'codex_proxy_fetch_stream' || type === 'webmcp_plugin_download_stream') {
+      if (
+        type === 'codex_proxy_fetch_stream' ||
+        type === 'webmcp_plugin_download_stream' ||
+        type === 'mcp_proxy_fetch_stream'
+      ) {
         try {
-          const port = chrome.runtime.connect({ name: 'codex_stream' });
+          const port = chrome.runtime.connect({ name: 'agent_bridge_stream' });
 
           // Relay port messages back to page as window.postMessage chunks
           port.onMessage.addListener((msg) => {

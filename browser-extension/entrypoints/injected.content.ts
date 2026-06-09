@@ -413,6 +413,102 @@ export default defineContentScript({
       },
 
       /**
+       * Proxy an MCP HTTP request through the extension.
+       */
+      async mcpProxyFetch(payload: {
+        url: string
+        method?: string
+        headers?: Record<string, string>
+        body?: string | null
+        timeoutMs?: number
+      }) {
+        return sendToBridge('mcp_proxy_fetch', payload || {});
+      },
+
+      /**
+       * Proxy an MCP HTTP request through the extension with SSE streaming.
+       */
+      mcpProxyFetchStream(payload: {
+        url: string
+        method?: string
+        headers?: Record<string, string>
+        body?: string | null
+        timeoutMs?: number
+      }): AsyncIterable<
+        | {
+            type: 'response_start'
+            status?: number
+            statusText?: string
+            headers?: Record<string, string>
+          }
+        | {
+            type: 'chunk'
+            data: string
+          }
+      > & { cancel: () => void } {
+        const source = sendToBridgeStream('mcp_proxy_fetch_stream', payload || {})
+        const typed: AsyncIterable<
+          | {
+              type: 'response_start'
+              status?: number
+              statusText?: string
+              headers?: Record<string, string>
+            }
+          | {
+              type: 'chunk'
+              data: string
+            }
+        > & { cancel: () => void } = {
+          [Symbol.asyncIterator]() {
+            const it = source[Symbol.asyncIterator]()
+            return {
+              async next(): Promise<
+                IteratorResult<
+                  | {
+                      type: 'response_start'
+                      status?: number
+                      statusText?: string
+                      headers?: Record<string, string>
+                    }
+                  | {
+                      type: 'chunk'
+                      data: string
+                    }
+                >
+              > {
+                const value = await it.next()
+                if (value.done) return { value: undefined, done: true }
+                if (!value.value || typeof value.value !== 'object') {
+                  throw new Error('Expected MCP proxy stream frame object for mcpProxyFetchStream')
+                }
+                return {
+                  value: value.value as
+                    | {
+                        type: 'response_start'
+                        status?: number
+                        statusText?: string
+                        headers?: Record<string, string>
+                      }
+                    | {
+                        type: 'chunk'
+                        data: string
+                      },
+                  done: false,
+                }
+              },
+              return() {
+                return it.return ? it.return() : Promise.resolve({ value: undefined, done: true })
+              },
+            }
+          },
+          cancel() {
+            source.cancel()
+          },
+        }
+        return typed
+      },
+
+      /**
        * Discover WebMCP tools across tabs in current browser window.
        */
       async webMCPDiscover(options?: { force?: boolean }) {

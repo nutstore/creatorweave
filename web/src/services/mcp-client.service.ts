@@ -28,6 +28,31 @@ import type {
 
 import { MCPError, MCPConnectionError, MCPToolExecutionError } from '../mcp/mcp-types'
 
+interface MCPProxyBridge {
+  ready: boolean
+  mcpProxyFetch?: (payload: {
+    url: string
+    method?: string
+    headers?: Record<string, string>
+    body?: string | null
+    timeoutMs?: number
+  }) => Promise<{
+    ok: boolean
+    status?: number
+    statusText?: string
+    headers?: Record<string, string>
+    text?: string
+    error?: string
+  }>
+  mcpProxyFetchStream?: (payload: {
+    url: string
+    method?: string
+    headers?: Record<string, string>
+    body?: string | null
+    timeoutMs?: number
+  }) => AsyncIterable<MCPProxyStreamFrame> & { cancel: () => void }
+}
+
 //=============================================================================
 // Configuration
 //=============================================================================
@@ -47,6 +72,41 @@ type TaskResultLike = {
   status?: unknown
   statusMessage?: unknown
   content?: unknown
+}
+
+type ProxyFetchResponse = {
+  ok: boolean
+  status?: number
+  statusText?: string
+  headers?: Record<string, string>
+  text?: string
+  error?: string
+}
+
+type ProxyFetchRequest = {
+  url: string
+  method?: string
+  headers?: Record<string, string>
+  body?: string | null
+  timeoutMs?: number
+}
+
+type MCPProxyStreamFrame =
+  | {
+      type: 'response_start'
+      status?: number
+      statusText?: string
+      headers?: Record<string, string>
+    }
+  | {
+      type: 'chunk'
+      data: string
+    }
+
+function getMCPProxyBridge(): MCPProxyBridge | null {
+  if (typeof window === 'undefined') return null
+  const bridge = (window as unknown as { __agentWeb?: MCPProxyBridge }).__agentWeb
+  return bridge?.ready ? bridge : null
 }
 
 //=============================================================================
@@ -147,6 +207,14 @@ export class MCPClientService {
       throw new MCPConnectionError(serverId, `Server is disabled: ${serverId}`)
     }
 
+    // If already connected (or in a stale session), disconnect first
+    // so the server accepts a fresh initialize request.
+    // MCP protocol requires initialize only once per session.
+    const currentStatus = this.connections.get(serverId)
+    if (currentStatus?.state === 'connected' || currentStatus?.state === 'error') {
+      this.disconnect(serverId)
+    }
+
     this.updateConnectionState(serverId, 'connecting')
 
     try {
@@ -182,6 +250,11 @@ export class MCPClientService {
    * Disconnect from an MCP server
    */
   disconnect(serverId: string): void {
+    // Clear session state so next connect starts a fresh session
+    const server = this.servers.get(serverId)
+    if (server) {
+      server.sessionId = undefined
+    }
     this.updateConnectionState(serverId, 'disconnected')
     console.log(`[MCPClient] Disconnected from:`, serverId)
   }
@@ -399,7 +472,7 @@ export class MCPClientService {
   }> {
     const baseUrl = server.url.replace(/\/mcp?$/, '')
 
-    const response = await fetch(`${baseUrl}/tasks/get`, {
+    const response = await this.fetchViaBridgeUrl(`${baseUrl}/tasks/get`, server, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -438,7 +511,7 @@ export class MCPClientService {
 
     while (Date.now() - startTime < MAX_POLL_TIME) {
       // Poll /tasks/result - returns immediately with current status
-      const response = await fetch(`${baseUrl}/tasks/result`, {
+      const response = await this.fetchViaBridgeUrl(`${baseUrl}/tasks/result`, server, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -739,22 +812,30 @@ export class MCPClientService {
       headers['Mcp-Session-Id'] = server.sessionId
     }
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT)
+    const body = JSON.stringify(request)
 
     try {
-      const response = await fetch(server.url, {
+      if (this.shouldUseStreamingBridge(server)) {
+        return await this.sendStreamingBridgeRequest<T>(server, {
+          url: server.url,
+          method: 'POST',
+          headers,
+          body,
+          timeoutMs: server.timeout ?? DEFAULT_TIMEOUT,
+        })
+      }
+
+      const response = await this.fetchViaBridge(server, {
         method: 'POST',
         headers,
-        body: JSON.stringify(request),
-        signal: controller.signal,
+        body,
       })
-
-      clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
+
+      this.captureSessionId(server, response)
 
       const contentType = response.headers.get('Content-Type') || ''
 
@@ -779,12 +860,10 @@ export class MCPClientService {
 
       return data.result as T
     } catch (error) {
-      clearTimeout(timeoutId)
-
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
         throw new MCPConnectionError(
           server.id,
-          'Network error - check CORS and server availability'
+          'Network error - browser extension bridge request failed or server unavailable'
         )
       }
 
@@ -805,6 +884,112 @@ export class MCPClientService {
    *
    * Note: event field is optional, data field contains the JSON-RPC message
    */
+  private async fetchViaBridge(server: MCPServerConfig, init: RequestInit): Promise<Response> {
+    return this.fetchViaBridgeUrl(server.url, server, init)
+  }
+
+  private async fetchViaBridgeUrl(
+    url: string,
+    server: MCPServerConfig,
+    init: RequestInit
+  ): Promise<Response> {
+    const bridge = getMCPProxyBridge()
+    const request = this.toProxyFetchRequest(url, server, init)
+
+    if (!bridge?.mcpProxyFetch) {
+      throw new MCPConnectionError(
+        server.id,
+        'Browser extension MCP bridge unavailable'
+      )
+    }
+
+    const proxied = await bridge.mcpProxyFetch(request)
+
+    if (!proxied.ok) {
+      const status = typeof proxied.status === 'number' ? proxied.status : 0
+      const detail = proxied.error || proxied.statusText || 'Bridge request failed'
+      const prefix = status > 0 ? `HTTP ${status}: ` : ''
+      throw new MCPConnectionError(server.id, `${prefix}${detail}`)
+    }
+
+    return this.responseFromProxy(proxied)
+  }
+
+  private toProxyFetchRequest(url: string, server: MCPServerConfig, init: RequestInit): ProxyFetchRequest {
+    const headers = Object.fromEntries(
+      Object.entries((init.headers || {}) as Record<string, string>).map(([k, v]) => [k, String(v)])
+    )
+
+    return {
+      url,
+      method: init.method || 'POST',
+      headers,
+      body: typeof init.body === 'string' ? init.body : null,
+      timeoutMs: server.timeout ?? DEFAULT_TIMEOUT,
+    }
+  }
+
+  private shouldUseStreamingBridge(server: MCPServerConfig): boolean {
+    return server.transport === 'sse'
+  }
+
+  private async sendStreamingBridgeRequest<T>(
+    server: MCPServerConfig,
+    request: ProxyFetchRequest
+  ): Promise<T> {
+    const bridge = getMCPProxyBridge()
+    if (!bridge?.mcpProxyFetchStream) {
+      throw new MCPConnectionError(server.id, 'Browser extension MCP streaming bridge unavailable')
+    }
+
+    const stream = bridge.mcpProxyFetchStream(request)
+    return this.readSSEProxyStream<T>(server, stream)
+  }
+
+  private async readSSEProxyStream<T>(
+    server: MCPServerConfig,
+    stream: AsyncIterable<MCPProxyStreamFrame>
+  ): Promise<T> {
+    const chunks: AsyncIterable<string> = {
+      [Symbol.asyncIterator]: async function* () {
+        for await (const frame of stream) {
+          if (frame.type === 'response_start') {
+            const response = new Response(null, {
+              status: frame.status || 200,
+              statusText: frame.statusText || 'OK',
+              headers: frame.headers || {},
+            })
+            if ((frame.status || 200) >= 400) {
+              throw new Error(`HTTP ${frame.status}: ${frame.statusText || 'Error'}`)
+            }
+            server.sessionId =
+              response.headers.get('mcp-session-id') || response.headers.get('Mcp-Session-Id') || server.sessionId
+            continue
+          }
+
+          yield frame.data
+        }
+      },
+    }
+
+    return this.readSSEIterable<T>(chunks)
+  }
+
+  private captureSessionId(server: MCPServerConfig, response: Response): void {
+    const sessionId = response.headers.get('mcp-session-id') || response.headers.get('Mcp-Session-Id')
+    if (sessionId) {
+      server.sessionId = sessionId
+    }
+  }
+
+  private responseFromProxy(proxied: ProxyFetchResponse): Response {
+    return new Response(proxied.text || '', {
+      status: proxied.status || 200,
+      statusText: proxied.statusText || 'OK',
+      headers: proxied.headers || { 'Content-Type': 'application/json' },
+    })
+  }
+
   private async readSSEStream<T>(response: Response): Promise<T> {
     const reader = response.body?.getReader()
     if (!reader) {
@@ -812,72 +997,87 @@ export class MCPClientService {
     }
 
     const decoder = new TextDecoder()
-    let buffer = ''
-    let result: T | null = null
 
     try {
-      let doneReading = false
-      while (!doneReading) {
-        const { done, value } = await reader.read()
-        if (done) {
-          doneReading = true
-          break
-        }
-
-        buffer += decoder.decode(value, { stream: true })
-
-        // Normalize line endings and split by double newline
-        const normalized = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-        const events = normalized.split('\n\n')
-        buffer = events.pop() || '' // Keep incomplete part
-
-        for (const event of events) {
-          if (!event.trim()) continue // Skip empty events
-
-          // Parse event lines (format: "field: value")
-          const lines = event.trim().split('\n')
-          let eventData: string | null = null
-
-          for (const line of lines) {
-            if (line.startsWith('data:')) {
-              eventData = line.slice(5).trim() // Remove "data:" prefix
-            }
-          }
-
-          if (eventData) {
-            try {
-              const parsed = JSON.parse(eventData)
-
-              // JSON-RPC response
-              if ('result' in parsed) {
-                result = parsed.result as T
-              } else if ('error' in parsed) {
-                throw new MCPError(
-                  (parsed.error as { message: string }).message,
-                  (parsed.error as { code: number }).code
-                )
+      const iterable: AsyncIterable<string> = {
+        [Symbol.asyncIterator]() {
+          return {
+            async next(): Promise<IteratorResult<string>> {
+              const { done, value } = await reader.read()
+              if (done) {
+                return { value: undefined, done: true }
               }
-            } catch (e) {
-              if (e instanceof MCPError) throw e
-              console.warn('[MCPClient] Failed to parse SSE data:', eventData)
-            }
+              return {
+                value: decoder.decode(value, { stream: true }),
+                done: false,
+              }
+            },
           }
-        }
-
-        // If we got a result, we can stop reading
-        if (result) {
-          break
-        }
+        },
       }
 
-      if (!result) {
-        throw new Error('SSE stream ended without response')
-      }
-
-      return result
+      return await this.readSSEIterable<T>(iterable)
     } finally {
       reader.releaseLock()
     }
+  }
+
+  private async readSSEIterable<T>(chunks: AsyncIterable<string>): Promise<T> {
+    let buffer = ''
+    let result: T | null = null
+
+    for await (const chunk of chunks) {
+      buffer += chunk
+
+      // Normalize line endings and split by double newline
+      const normalized = buffer.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      const events = normalized.split('\n\n')
+      buffer = events.pop() || '' // Keep incomplete part
+
+      for (const event of events) {
+        if (!event.trim()) continue // Skip empty events
+
+        // Parse event lines (format: "field: value")
+        const lines = event.trim().split('\n')
+        let eventData: string | null = null
+
+        for (const line of lines) {
+          if (line.startsWith('data:')) {
+            eventData = line.slice(5).trim() // Remove "data:" prefix
+          }
+        }
+
+        if (eventData) {
+          try {
+            const parsed = JSON.parse(eventData)
+
+            // JSON-RPC response
+            if ('result' in parsed) {
+              result = parsed.result as T
+            } else if ('error' in parsed) {
+              throw new MCPError(
+                (parsed.error as { message: string }).message,
+                (parsed.error as { code: number }).code
+              )
+            }
+          } catch (e) {
+            if (e instanceof MCPError) throw e
+            console.warn('[MCPClient] Failed to parse SSE data:', eventData)
+          }
+        }
+      }
+
+      // If we got a result, we can stop reading
+      if (result) {
+        break
+      }
+    }
+
+    if (!result) {
+      throw new Error('SSE stream ended without response')
+    }
+
+    return result
   }
 
   //===========================================================================

@@ -70,6 +70,7 @@ export const conversation = {
     // Error
     error: {
       requestFailed: "Request failed:",
+      retry: "Retry",
     },
     // Iteration limit
     iterationLimit: {

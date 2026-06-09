@@ -43,7 +43,7 @@ export type { MCPManagerConfig, MCPManagerConnectionStatus } from './mcp-manager
 export { getMCPRepository, MCPRepository } from '../sqlite/repositories/mcp.repository'
 export type { StoredMCPServer } from '../sqlite/repositories/mcp.repository'
 
-// Tool Bridge
+// Tool Bridge (on-demand: 2 persistent tools only)
 export {
   mcpToolToToolDefinition,
   createMCPToolExecutor,
@@ -54,11 +54,21 @@ export {
   syncMCPTools,
 } from './mcp-tool-bridge'
 
-// Injection
+// On-Demand Bridge (the 2 persistent tools + prompt doc)
+export {
+  ON_DEMAND_MCP_TOOLS,
+  mcpOnDemandPromptDoc,
+  mcpGetToolSchemaDefinition,
+  mcpGetToolSchemaExecutor,
+  mcpToolCallDefinition,
+  mcpToolCallExecutor,
+} from './mcp-ondemand-bridge'
+
+// Injection (lightweight catalog for system prompt)
 export {
   buildAvailableMCPServicesBlock,
   getMCPServicesSummary,
   hasConnectedMCPServices,
   getAllMCPToolNames,
 } from './mcp-injection'
-export type { MCPInjectionContext, FormattedMCPService } from './mcp-injection'
+export type { MCPInjectionContext } from './mcp-injection'

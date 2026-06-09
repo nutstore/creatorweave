@@ -1,69 +1,38 @@
 /**
  * MCP Tool Bridge
  *
- * Bridges MCP tools to the ToolRegistry system.
- * Converts MCP tool definitions to ToolDefinition format and creates
- * ToolExecutor functions that delegate to MCPManager.
+ * Bridges page-outside MCP services to the ToolRegistry using on-demand mode.
+ *
+ * Only 2 persistent tools are registered:
+ *   1. mcp_get_tool_schema — get full parameter schema for MCP tools
+ *   2. mcp_call            — execute an MCP tool by serverId:toolName
+ *
+ * The lightweight tool catalog is injected into the system prompt via
+ * <available_mcp_services>. The LLM reads the catalog, fetches full
+ * schema on demand via mcp_get_tool_schema, then calls mcp_call.
+ *
+ * This is the same pattern as WebMCP's on-demand mode.
  */
 
-import type { ToolDefinition, ToolExecutor, ToolContext } from '../agent/tools/tool-types'
-import type { MCPToolDefinition, MCPServerConfig } from './mcp-types'
+import type { ToolDefinition, ToolExecutor } from '../agent/tools/tool-types'
 import { getMCPManager } from './mcp-manager'
-import { toolOkJson, toolErrorJson } from '../agent/tools/tool-envelope'
+import { ON_DEMAND_MCP_TOOLS } from './mcp-ondemand-bridge'
 
 //=============================================================================
-// Type Conversions
+// Types (preserved for backward compat)
 //=============================================================================
 
-/**
- * Convert MCP JSON Schema to ToolRegistry JSON Schema format
- */
-function convertMCPSchemaToToolSchema(mcpSchema: {
-  type: string
-  properties?: Record<string, unknown>
-  required?: string[]
-  [key: string]: unknown
-}): { type: 'object'; properties: Record<string, unknown>; required?: string[] } {
-  const properties: Record<string, unknown> = {}
+// MCPToolDefinition import kept for downstream consumers
+export type { MCPToolDefinition } from './mcp-types'
+import type { MCPToolDefinition, MCPServerConfig } from './mcp-types'
 
-  // Convert each property to JSONSchemaProperty format
-  if (mcpSchema.properties) {
-    for (const [key, value] of Object.entries(mcpSchema.properties)) {
-      // Keep the property as-is - ToolRegistry accepts this format
-      properties[key] = value
-    }
-  }
-
-  return {
-    type: 'object',
-    properties,
-    required: mcpSchema.required,
-  }
-}
-
-type WrappedResult = {
-  result?: unknown
-  _meta?: {
-    elicitation?: unknown
-  }
-}
-
-type BinaryElicitationMeta = {
-  mode: 'binary'
-  [key: string]: unknown
-}
-
-function unwrapResult(result: unknown): WrappedResult {
-  if (!result || typeof result !== 'object') {
-    return {}
-  }
-  const parsed = result as WrappedResult
-  const actual = parsed.result
-  return actual && typeof actual === 'object' ? (actual as WrappedResult) : parsed
-}
+//=============================================================================
+// Backward-compat conversions (used by tests / external consumers)
+//=============================================================================
 
 /**
  * Convert MCP tool definition to ToolRegistry ToolDefinition
+ * @deprecated Only kept for backward compatibility. On-demand mode does not need this.
  */
 export function mcpToolToToolDefinition(
   serverId: string,
@@ -72,7 +41,6 @@ export function mcpToolToToolDefinition(
 ): ToolDefinition {
   const toolName = `${serverId}:${mcpTool.name}`
 
-  // Build description with server context
   let description = mcpTool.description || `MCP tool from ${serverId}`
   if (serverConfig?.name) {
     description = `[${serverConfig.name}] ${description}`
@@ -83,363 +51,133 @@ export function mcpToolToToolDefinition(
     function: {
       name: toolName,
       description,
-      parameters: convertMCPSchemaToToolSchema(
-        mcpTool.inputSchema
-      ) as unknown as ToolDefinition['function']['parameters'],
+      parameters: mcpTool.inputSchema as unknown as ToolDefinition['function']['parameters'],
     },
   }
 }
 
-//=============================================================================
-// Tool Executor Creation
-//=============================================================================
-
-/**
- * SEP-1306: Check if a tool result contains binary elicitation
- */
-function hasBinaryElicitation(result: unknown): result is WrappedResult {
-  const actualResult = unwrapResult(result)
-  return (actualResult._meta?.elicitation as BinaryElicitationMeta | undefined)?.mode === 'binary'
-}
-
 /**
  * Create a ToolExecutor for an MCP tool
- *
- * Supports:
- * - MCP Tasks: automatically handles long-running operations
- * - SEP-1306: binary mode elicitation for file uploads
+ * @deprecated Only kept for backward compatibility. Use mcp_call instead.
  */
 export function createMCPToolExecutor(serverId: string, toolName: string): ToolExecutor {
-  return async (args: Record<string, unknown>, _context: ToolContext): Promise<string> => {
+  return async (args: Record<string, unknown>, _context): Promise<string> => {
     const manager = getMCPManager()
-
-    // Optional progress callback for MCP Tasks
-    const onProgress = (status: string, message?: string) => {
-      console.log(
-        `[MCPToolExecutor] ${serverId}:${toolName} - ${status}${message ? ': ' + message : ''}`
-      )
-    }
-
     try {
-      const result = await manager.executeTool(serverId, toolName, args, onProgress)
-      const fullToolName = `${serverId}:${toolName}`
-
-      // SEP-1306: Check for binary elicitation
-      if (hasBinaryElicitation(result)) {
-        const actualResult = unwrapResult(result)
-        const elicitation = actualResult._meta?.elicitation
-        const elicitationPayload =
-          elicitation && typeof elicitation === 'object'
-            ? (elicitation as Record<string, unknown>)
-            : {}
-
-        // Return special response that signals the UI to handle file upload
-        // Include full elicitation data for the handler
-        return JSON.stringify(
-          {
-            _elicitation: {
-              ...elicitationPayload, // Include requestedSchema, uploadEndpoints, etc.
-              toolName: fullToolName,
-              args,
-              serverId,
-            },
-          },
-          null,
-          2
-        )
-      }
-
-      // Format the result for the LLM
-      if (typeof result === 'string') {
-        return toolOkJson(fullToolName, { text: result })
-      }
-
-      // Handle MCP tool call result format
-      if (result && typeof result === 'object') {
-        const mcpResult = result as {
-          content?: Array<{ type: string; text?: string }>
-          isError?: boolean
-        }
-
-        if (mcpResult.isError) {
-          // Extract error details from content if available
-          const errorContent = Array.isArray(mcpResult.content)
-            ? mcpResult.content
-                .filter((item) => item.type === 'text' && item.text)
-                .map((item) => item.text)
-                .join('\n')
-            : undefined
-
-          const errorMessage = errorContent || 'Unknown MCP error'
-          return toolErrorJson(fullToolName, 'mcp_tool_error', errorMessage, {
-            retryable: true,
-            details: {
-              serverId,
-              toolName,
-              ...(errorContent ? {} : { result }),
-            },
-          })
-        }
-
-        if (Array.isArray(mcpResult.content)) {
-          // Extract text content from MCP result
-          const textParts = mcpResult.content
-            .filter((item) => item.type === 'text' && item.text)
-            .map((item) => item.text)
-
-          if (textParts.length === 1) {
-            return toolOkJson(fullToolName, { text: textParts[0] })
-          } else if (textParts.length > 1) {
-            return toolOkJson(fullToolName, { text: textParts.join('\n\n') })
-          }
-        }
-
-        // Default: wrap the raw result in envelope
-        return toolOkJson(fullToolName, result)
-      }
-
-      return toolOkJson(fullToolName, result)
+      const result = await manager.executeTool(serverId, toolName, args)
+      if (typeof result === 'string') return result
+      return JSON.stringify(result, null, 2)
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error)
-      return toolErrorJson(`${serverId}:${toolName}`, 'mcp_execution_failed', errorMessage, {
-        retryable: true,
-        details: { serverId, toolName },
-      })
+      return `Error: ${error instanceof Error ? error.message : String(error)}`
     }
   }
 }
 
 //=============================================================================
-// Batch Registration
-//=============================================================================
+// On-Demand Registration
+//==============================================================================
+
+// Track which on-demand tools are registered
+const registeredOnDemandToolNames = new Set<string>()
+
+type RegistryLike = {
+  register(definition: ToolDefinition, executor: ToolExecutor): void
+  unregister(name: string): boolean
+  has?(name: string): boolean
+}
+
+async function resolveRegistry(registry?: RegistryLike): Promise<RegistryLike> {
+  if (registry) return registry
+  const { getToolRegistry } = await import('../agent/tool-registry')
+  return getToolRegistry()
+}
 
 /**
- * Register all tools from an MCP server to the ToolRegistry
+ * Register the 2 on-demand MCP tools (mcp_get_tool_schema + mcp_call).
+ *
+ * This replaces the old registerAllMCPTools which used to register
+ * every MCP tool individually.
+ */
+export async function registerAllMCPTools(registry?: RegistryLike): Promise<number> {
+  const resolvedRegistry = await resolveRegistry(registry)
+
+  // Ensure MCP manager is initialized
+  const manager = getMCPManager()
+  try {
+    await manager.initialize()
+  } catch {
+    // May already be initialized
+  }
+
+  // Register the 2 persistent on-demand tools
+  let registered = 0
+  for (const tool of ON_DEMAND_MCP_TOOLS) {
+    const name = tool.definition.function.name
+    if (!registeredOnDemandToolNames.has(name)) {
+      // Idempotent: skip if already registered
+      if (resolvedRegistry.has?.(name)) {
+        registeredOnDemandToolNames.add(name)
+        continue
+      }
+      resolvedRegistry.register(tool.definition, tool.executor)
+      registeredOnDemandToolNames.add(name)
+    }
+    registered++
+  }
+
+  return registered
+}
+
+/**
+ * Unregister all MCP on-demand tools.
+ */
+export async function unregisterAllMCPTools(registry?: RegistryLike): Promise<number> {
+  const resolvedRegistry = await resolveRegistry(registry)
+  let removed = 0
+  for (const name of Array.from(registeredOnDemandToolNames)) {
+    if (resolvedRegistry.unregister(name)) {
+      removed++
+    }
+    registeredOnDemandToolNames.delete(name)
+  }
+  return removed
+}
+
+/**
+ * Sync MCP on-demand tools to the ToolRegistry.
+ *
+ * This is the main entry point for keeping MCP tools in sync.
+ * In on-demand mode, this always registers the same 2 tools.
+ */
+export async function syncMCPTools(registry?: RegistryLike): Promise<{
+  registered: number
+  unregistered: number
+}> {
+  const registered = await registerAllMCPTools(registry)
+  return { registered, unregistered: 0 }
+}
+
+/**
+ * Register all tools from a single MCP server to the ToolRegistry
+ * @deprecated Only kept for backward compatibility. On-demand mode does not register per-server tools.
  */
 export async function registerServerTools(
-  serverId: string,
-  tools: MCPToolDefinition[],
-  serverConfig?: MCPServerConfig,
-  registry?: { register(definition: ToolDefinition, executor: ToolExecutor): void }
+  _serverId: string,
+  _tools: MCPToolDefinition[],
+  _serverConfig?: MCPServerConfig,
+  _registry?: RegistryLike
 ): Promise<void> {
-  // Lazy import to avoid circular dependency
-  const reg =
-    registry ||
-    (async () => {
-      const { getToolRegistry } = await import('../agent/tool-registry')
-      return getToolRegistry()
-    })()
-
-  // Await the registry if it's a promise
-  const resolvedReg = await reg
-
-  for (const tool of tools) {
-    const definition = mcpToolToToolDefinition(serverId, tool, serverConfig)
-    const executor = createMCPToolExecutor(serverId, tool.name)
-    resolvedReg.register(definition, executor)
-
-    console.log(`[MCPToolBridge] Registered tool: ${definition.function.name}`)
-  }
+  // No-op in on-demand mode
 }
 
 /**
  * Unregister all tools from an MCP server
+ * @deprecated Only kept for backward compatibility. On-demand mode does not register per-server tools.
  */
 export async function unregisterServerTools(
-  serverId: string,
-  toolNames: string[],
-  registry?: { unregister(name: string): boolean }
+  _serverId: string,
+  _toolNames: string[],
+  _registry?: RegistryLike
 ): Promise<void> {
-  // Lazy import to avoid circular dependency
-  const reg =
-    registry ||
-    (async () => {
-      const { getToolRegistry } = await import('../agent/tool-registry')
-      return getToolRegistry()
-    })()
-
-  // Await the registry if it's a promise
-  const resolvedReg = await reg
-
-  for (const toolName of toolNames) {
-    const fullToolName = `${serverId}:${toolName}`
-    resolvedReg.unregister(fullToolName)
-    console.log(`[MCPToolBridge] Unregistered tool: ${fullToolName}`)
-  }
-}
-
-//=============================================================================
-// MCP Manager Integration
-//=============================================================================
-
-/**
- * Register all available MCP tools from the MCPManager to the ToolRegistry
- *
- * This function:
- * 1. Initializes MCP manager
- * 2. Connects to all enabled MCP servers
- * 3. Discovers tools from each server
- * 4. Registers each tool with the ToolRegistry
- */
-export async function registerAllMCPTools(registry?: {
-  register(definition: ToolDefinition, executor: ToolExecutor): void
-}): Promise<number> {
-  const manager = getMCPManager()
-
-  // Initialize manager (loads servers from storage)
-  await manager.initialize()
-
-  // Get all enabled servers
-  const enabledServers = manager.getEnabledServers()
-  console.log(
-    `[MCPToolBridge] Found ${enabledServers.length} enabled servers`,
-    enabledServers.map((s) => ({ id: s.id, name: s.name, url: s.url }))
-  )
-
-  let totalRegistered = 0
-
-  for (const server of enabledServers) {
-    try {
-      console.log(`[MCPToolBridge] Connecting to ${server.id} at ${server.url}...`)
-
-      // Connect to server (this also auto-discovers tools)
-      await manager.connect(server.id)
-
-      // Get the discovered tools
-      const status = manager.getConnectionStatus(server.id)
-      const tools = status?.tools
-
-      console.log(`[MCPToolBridge] Connection status for ${server.id}:`, {
-        state: status?.state,
-        toolsCount: tools?.length || 0,
-        toolNames: tools?.map((t) => t.name) || [],
-      })
-
-      if (!tools || tools.length === 0) {
-        console.warn(`[MCPToolBridge] No tools discovered for ${server.id}`)
-        continue
-      }
-
-      // Get the ToolRegistry instance
-      const { getToolRegistry } = await import('../agent/tool-registry')
-      const toolReg = registry || getToolRegistry()
-
-      // Register each tool
-      for (const tool of tools) {
-        const toolName = `${server.id}:${tool.name}`
-        const definition = mcpToolToToolDefinition(server.id, tool, server)
-        const executor = createMCPToolExecutor(server.id, tool.name)
-
-        toolReg.register(definition, executor)
-        totalRegistered++
-
-        console.log(`[MCPToolBridge] ✓ Registered tool: ${toolName}`)
-      }
-
-      console.log(`[MCPToolBridge] Registered ${tools.length} tools from ${server.id}`)
-    } catch (error) {
-      console.error(`[MCPToolBridge] Failed to register tools from ${server.id}:`, error)
-      // Continue with other servers even if one fails
-    }
-  }
-
-  console.log(`[MCPToolBridge] Registered ${totalRegistered} MCP tools total`)
-
-  // Verify registration
-  const { getToolRegistry } = await import('../agent/tool-registry')
-  const allTools = getToolRegistry().getToolDefinitions()
-  const mcpTools = allTools.filter((t) => t.function.name.includes(':'))
-  console.log(
-    `[MCPToolBridge] ToolRegistry now has ${mcpTools.length} MCP tools:`,
-    mcpTools.map((t) => t.function.name)
-  )
-
-  return totalRegistered
-}
-
-/**
- * Unregister all MCP tools from the ToolRegistry
- */
-export async function unregisterAllMCPTools(registry?: {
-  unregister(name: string): boolean
-}): Promise<number> {
-  const manager = getMCPManager()
-  const allTools = manager.getAllTools()
-
-  let totalUnregistered = 0
-
-  for (const [serverId, tools] of allTools) {
-    for (const tool of tools) {
-      const fullToolName = `${serverId}:${tool.name}`
-
-      if (registry) {
-        registry.unregister(fullToolName)
-      } else {
-        const { getToolRegistry } = await import('../agent/tool-registry')
-        getToolRegistry().unregister(fullToolName)
-      }
-
-      totalUnregistered++
-    }
-  }
-
-  console.log(`[MCPToolBridge] Unregistered ${totalUnregistered} MCP tools`)
-
-  return totalUnregistered
-}
-
-/**
- * Sync MCP tools to the ToolRegistry
- *
- * This is the main entry point for keeping MCP tools in sync.
- * Call this when:
- * - Application starts
- * - MCP servers are added/removed
- * - Server connection status changes
- */
-export async function syncMCPTools(registry?: {
-  register(definition: ToolDefinition, executor: ToolExecutor): void
-  unregister(name: string): boolean
-  getToolDefinitions?(): ToolDefinition[]
-}): Promise<{ registered: number; unregistered: number }> {
-  const manager = getMCPManager()
-
-  // Get all tool names that should be registered
-  const allTools = manager.getAllTools()
-  const expectedToolNames = new Set<string>()
-
-  for (const [serverId, tools] of allTools) {
-    for (const tool of tools) {
-      expectedToolNames.add(`${serverId}:${tool.name}`)
-    }
-  }
-
-  // Get current MCP tool names from registry
-  // We track this by checking for tools with the ":" separator (our naming convention)
-  const currentToolNames = new Set<string>()
-
-  const { getToolRegistry } = await import('../agent/tool-registry')
-  const reg = registry || getToolRegistry()
-
-  for (const definition of reg.getToolDefinitions?.() || []) {
-    const name = definition.function.name
-    if (name.includes(':')) {
-      currentToolNames.add(name)
-    }
-  }
-
-  // Unregister tools that are no longer expected
-  for (const name of currentToolNames) {
-    if (!expectedToolNames.has(name)) {
-      reg.unregister(name)
-    }
-  }
-
-  // Register all expected tools
-  const registered = await registerAllMCPTools(reg)
-
-  // Calculate unregistered
-  const unregistered = currentToolNames.size - expectedToolNames.size
-
-  return { registered, unregistered: Math.max(0, unregistered) }
+  // No-op in on-demand mode
 }

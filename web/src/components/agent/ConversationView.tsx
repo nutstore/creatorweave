@@ -146,11 +146,17 @@ export function ConversationView({
     staticSnapshot,
     hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
     agentMode, setAgentMode,
-    handleSend, handleCancel,
+    sendMessage, handleSend, handleCancel,
     handleDeleteAgentLoop, handleEditAndResend, handleRegenerate,
     runCustomWorkflowDryRun,
     queueDepth,
   } = logic
+
+  // ── Retry handler for error banner: send "继续" to start a new loop ──
+  const handleRetry = useCallback(() => {
+    if (!convId) return
+    sendMessage('继续')
+  }, [convId, sendMessage])
 
   // ── File search for # file mention ──
   // isComposing ref is toggled by AgentRichInput via onSetIsComposing callback
@@ -416,7 +422,7 @@ export function ConversationView({
       </div>
 
         {conversationError && (
-          <ConversationErrorBanner error={conversationError} />
+          <ConversationErrorBanner error={conversationError} onRetry={handleRetry} />
         )}
 
         {/* Input area */}
@@ -604,7 +610,13 @@ const colorClasses = {
  * is codex-oauth and the error matches a known code.  For all other providers
  * (or unrecognised errors), falls back to a generic red bar.
  */
-const ConversationErrorBanner = memo(function ConversationErrorBanner({ error }: { error: string }) {
+const ConversationErrorBanner = memo(function ConversationErrorBanner({
+  error,
+  onRetry,
+}: {
+  error: string
+  onRetry?: () => void
+}) {
   const t = useT()
   const providerType = useSettingsStore((s) => s.providerType)
   const isCodex = (providerType as string) === 'codex-oauth'
@@ -622,8 +634,23 @@ const ConversationErrorBanner = memo(function ConversationErrorBanner({ error }:
     return (
       <div className="border-t border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300">
         <div className="mx-auto max-w-3xl">
-          <span className="font-medium">{t('conversation.error.requestFailed')}</span>
-          <span>{error}</span>
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">{t('conversation.error.requestFailed')}</p>
+              <p className="mt-0.5 text-red-600 dark:text-red-400">{error}</p>
+              {onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-red-700"
+                >
+                  <RefreshCw className="h-3 w-3" />
+                  {t('conversation.error.retry')} →
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -657,6 +684,16 @@ const ConversationErrorBanner = memo(function ConversationErrorBanner({ error }:
                 }`}
               >
                 {t(pattern.action.labelKey)} →
+              </button>
+            )}
+            {!pattern.action && onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-neutral-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-neutral-800"
+              >
+                <RefreshCw className="h-3 w-3" />
+                {t('conversation.error.retry')} →
               </button>
             )}
           </div>

@@ -377,12 +377,13 @@ export class ToolRegistry {
   //=============================================================================
 
   /**
-   * Register MCP tools from all connected MCP servers
+   * Register MCP on-demand tools (2 persistent tools: mcp_get_tool_schema + mcp_call).
+   * The full tool catalog is injected via system prompt, not registered individually.
    */
   async registerMCPTools(): Promise<number> {
     try {
       const { registerAllMCPTools } = await import('@/mcp')
-      return await registerAllMCPTools(undefined)
+      return await registerAllMCPTools(this)
     } catch (error) {
       console.error('[ToolRegistry] Failed to register MCP tools:', error)
       return 0

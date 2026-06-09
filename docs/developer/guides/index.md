@@ -19,6 +19,7 @@ order: 100
 - [Pre-commit Hooks](pre-commit-hooks.md) - 代码检查
 - [CI/CD 配置](ci-cd.md) - 持续集成
 - [UI 包使用](ui-package-usage.md) - 组件库使用
+- [页面外 MCP 服务接入](mcp-page-outside-services.md) - Figma / OpenPencil / 插件 bridge 接入说明
 
 ## 技术栈
 

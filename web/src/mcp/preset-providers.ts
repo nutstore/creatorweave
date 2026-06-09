@@ -34,6 +34,36 @@ export interface MCPPresetProvider {
 export const PRESET_PROVIDERS: MCPPresetProvider[] = [
   // Development
   {
+    id: 'figma',
+    name: 'Figma MCP Remote',
+    description: 'Access Figma files, nodes, and design data through the official remote MCP service',
+    category: 'development',
+    icon: 'figma',
+    config: {
+      id: 'figma',
+      name: 'Figma MCP Remote',
+      description: 'Official Figma remote MCP service',
+      url: 'https://mcp.figma.com/mcp',
+      transport: 'streamable_http',
+      enabled: false,
+      type: 'user',
+    },
+    setupInstructions: `
+1. Create a Figma access token or follow the official Figma MCP auth flow
+2. Use the remote MCP endpoint:
+   https://mcp.figma.com/mcp
+3. Paste your token into the Auth Token field in CreatorWeave
+4. Recommended transport: Streamable HTTP
+    `.trim(),
+    requiredEnvVars: [
+      {
+        name: 'FIGMA_TOKEN',
+        description: 'Figma access token for MCP authentication',
+        where: 'token',
+      },
+    ],
+  },
+  {
     id: 'github',
     name: 'GitHub',
     description: 'Access PRs, issues, repositories, and code',

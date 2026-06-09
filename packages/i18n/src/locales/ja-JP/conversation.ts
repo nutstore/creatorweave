@@ -57,6 +57,7 @@ export const conversation = {
     },
     error: {
       requestFailed: "リクエスト失敗：",
+      retry: "再試行",
     },
     // 反復回数制限
     iterationLimit: {

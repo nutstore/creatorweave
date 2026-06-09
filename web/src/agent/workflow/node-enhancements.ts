@@ -64,7 +64,8 @@ export async function buildEnhancedWorkflowNodePrompt(
   try {
     const mcpManager = getMCPManager()
     await mcpManager.initialize()
-    const mcpBlock = mcpManager.getAvailableMCPServicesBlock()
+    const { buildAvailableMCPServicesBlock } = await import('@/mcp/mcp-injection')
+    const mcpBlock = buildAvailableMCPServicesBlock()
     if (mcpBlock) {
       enhanced += '\n\n' + mcpBlock
     }

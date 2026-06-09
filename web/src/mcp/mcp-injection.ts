@@ -1,12 +1,16 @@
 /**
  * MCP Injection - Builds the MCP services system prompt block
  *
- * This module generates the XML block that lists available MCP services
- * and their tools for use in the Agent system prompt.
+ * Generates a lightweight XML block listing connected page-outside MCP
+ * services and their tools (name + description only, no inputSchema).
+ *
+ * The LLM reads this catalog, calls mcp_get_tool_schema to get full
+ * parameter definitions on demand, then calls mcp_call to execute.
+ *
+ * This follows the same on-demand pattern as WebMCP's <available_webmcp>.
  */
 
 import { getMCPManager } from './mcp-manager'
-import type { MCPToolDefinition } from './mcp-types'
 
 //=============================================================================
 // Types
@@ -16,170 +20,78 @@ import type { MCPToolDefinition } from './mcp-types'
  * Context for MCP system prompt generation
  */
 export interface MCPInjectionContext {
-  /** Include tool details (default: true) */
-  includeTools?: boolean
-  /** Include resources (default: false) */
-  includeResources?: boolean
   /** Filter by server type */
   serverType?: 'builtin' | 'user' | 'project'
 }
 
-/**
- * Formatted MCP service for display
- */
-export interface FormattedMCPService {
-  id: string
-  name: string
-  description?: string
-  url: string
-  transport: string
-  status: 'connected' | 'disconnected' | 'error'
-  tools: MCPToolDefinition[]
-}
-
 //=============================================================================
-// MCP Services Block Generation
+// Catalog Block Generation
 //=============================================================================
 
 /**
- * Build the <mcp_system> XML block for system prompt
+ * Build the <available_mcp_services> XML block for system prompt injection.
  *
- * This generates a block similar to the skills_system block, listing
- * all available MCP services and their tools.
+ * Lists only connected MCP servers with their tool names and one-line
+ * descriptions. The LLM uses mcp_get_tool_schema to fetch full inputSchema
+ * on demand before calling mcp_call.
+ *
+ * Returns an empty string if no servers are connected.
  */
-export async function buildAvailableMCPServicesBlock(
+export function buildAvailableMCPServicesBlock(
   context?: MCPInjectionContext
-): Promise<string> {
+): string {
   const manager = getMCPManager()
 
   // Ensure manager is initialized
-  // (It should be initialized on app startup, but check just in case)
   try {
-    await manager.initialize()
+    manager.initialize()
   } catch {
     // May already be initialized
   }
 
-  // Get all server configurations
-  let servers = manager.getAllServers()
+  const connected = manager.getConnectedServers()
 
-  // Filter by enabled and type if specified
-  servers = servers.filter((s) => s.enabled)
-  if (context?.serverType) {
-    servers = servers.filter((s) => s.type === context.serverType)
-  }
-
-  if (servers.length === 0) {
+  if (connected.length === 0) {
     return ''
   }
 
-  // Get connection statuses and format services
-  const formattedServices: FormattedMCPService[] = []
+  let serversBlock = ''
 
-  for (const server of servers) {
+  for (const server of connected) {
+    if (context?.serverType && server.type !== context.serverType) continue
+
     const status = manager.getConnectionStatus(server.id)
     const tools = status?.tools || []
 
-    formattedServices.push({
-      id: server.id,
-      name: server.name,
-      description: server.description,
-      url: server.url,
-      transport: server.transport,
-      status:
-        status?.state === 'connected'
-          ? 'connected'
-          : status?.state === 'error'
-            ? 'error'
-            : 'disconnected',
-      tools: context?.includeTools !== false ? tools : [],
-    })
-  }
+    serversBlock += `<server id="${escapeXml(server.id)}" name="${escapeXml(server.name)}">\n`
 
-  // Only show connected services by default
-  const connectedServices = formattedServices.filter((s) => s.status === 'connected')
-
-  if (connectedServices.length === 0) {
-    // No connected services - return empty or show message
-    return ''
-  }
-
-  // Generate the XML block
-  return generateMCPServicesXML(connectedServices)
-}
-
-/**
- * Generate the MCP services XML block
- */
-function generateMCPServicesXML(services: FormattedMCPService[]): string {
-  let block = '<mcp_system priority="1">\n\n'
-  block += '## Available MCP Services\n\n'
-
-  block += '<usage>\n'
-  block += 'The following MCP services are available and their tools are registered for use.\n\n'
-  block += 'To call an MCP tool, simply invoke it by name. The tool name format is:\n'
-  block += '  `<serverId>:<toolName>`\n\n'
-
-  // Add examples from first few services
-  const examples: string[] = []
-  for (const service of services.slice(0, 2)) {
-    if (service.tools.length > 0) {
-      const tool = service.tools[0]
-      examples.push(
-        `- Call: \`${service.id}:${tool.name}\` to ${tool.description || 'use the tool'}`
-      )
+    if (server.description) {
+      serversBlock += `  <description>${escapeXml(server.description)}</description>\n`
     }
-  }
 
-  if (examples.length > 0) {
-    block += 'Example:\n'
-    block += examples.join('\n')
-    block += '\n'
-  }
-
-  block += '</usage>\n\n'
-  block += '<available_mcp_services>\n\n'
-
-  // List each service and its tools
-  for (const service of services) {
-    block += formatMCPService(service)
-  }
-
-  block += '</available_mcp_services>\n\n'
-  block += '</mcp_system>\n'
-
-  return block
-}
-
-/**
- * Format a single MCP service for display
- */
-function formatMCPService(service: FormattedMCPService): string {
-  let output = `#### ${service.name} (${service.id})\n`
-  output += `**Status**: Connected\n`
-
-  if (service.description) {
-    output += `**Description**: ${service.description}\n`
-  }
-
-  output += `**URL**: ${service.url}\n`
-  output += `**Transport**: ${service.transport}\n`
-
-  if (service.tools.length > 0) {
-    output += `**Tools**:\n`
-    for (const tool of service.tools) {
-      output += `- \`${service.id}:${tool.name}\``
-      if (tool.description) {
-        output += ` - ${tool.description}`
+    if (tools.length > 0) {
+      for (const tool of tools) {
+        const desc = tool.description?.trim() || 'No description available.'
+        serversBlock += `  <tool name="${escapeXml(server.id)}:${escapeXml(tool.name)}">${escapeXml(desc)}</tool>\n`
       }
-      output += '\n'
+    } else {
+      serversBlock += `  <!-- no tools discovered -->\n`
     }
-  } else {
-    output += '**Tools**: (no tools discovered)\n'
+
+    serversBlock += `</server>\n\n`
   }
 
-  output += '\n'
-  return output
+  if (!serversBlock) return ''
+
+  return (
+    `<available_mcp_services>\n` +
+    `\n` +
+    `## Page-Outside MCP Services\n\n` +
+    `These MCP services are connected via the browser extension bridge.\n` +
+    `To call a tool, first use mcp_get_tool_schema to get the full parameter schema, then use mcp_call.\n\n` +
+    serversBlock +
+    `</available_mcp_services>\n`
+  )
 }
 
 //=============================================================================
@@ -205,7 +117,6 @@ export function getMCPServicesSummary(): {
     byType: {} as Record<string, number>,
   }
 
-  // Count by type
   for (const server of servers) {
     const type = server.type || 'unknown'
     summary.byType[type] = (summary.byType[type] || 0) + 1
@@ -237,4 +148,12 @@ export function getAllMCPToolNames(): string[] {
   }
 
   return names.sort()
+}
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }

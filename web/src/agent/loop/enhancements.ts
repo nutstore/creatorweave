@@ -101,10 +101,15 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     const mcpManager = getMCPManager()
     await mcpManager.initialize()
 
-    // Register MCP tools to ToolRegistry (must happen before getToolDefinitions)
+    // Auto-connect any enabled servers that are not yet connected
+    await mcpManager.connectUnconnectedEnabled()
+
+    // Register on-demand MCP tools to ToolRegistry (2 persistent tools only)
     await input.toolRegistry.registerMCPTools()
 
-    const mcpBlock = mcpManager.getAvailableMCPServicesBlock()
+    // Inject lightweight tool catalog into system prompt
+    const { buildAvailableMCPServicesBlock } = await import('@/mcp/mcp-injection')
+    const mcpBlock = buildAvailableMCPServicesBlock()
     if (mcpBlock) {
       enhancedPrompt += '\n\n' + mcpBlock
     }

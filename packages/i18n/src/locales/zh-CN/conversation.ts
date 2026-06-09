@@ -70,6 +70,7 @@ export const conversation = {
     // 错误
     error: {
       requestFailed: "请求失败：",
+      retry: "继续",
     },
     // 迭代次数限制
     iterationLimit: {
