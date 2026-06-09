@@ -8,6 +8,7 @@ import {
   type Context,
   type Model,
   type StreamOptions,
+  type ThinkingLevel,
   type ToolCall,
   type Usage,
 } from '@earendil-works/pi-ai'
@@ -372,7 +373,127 @@ export function buildChatCompletionsPayload(
     }))
   }
 
+  // ── Thinking / reasoning controls ──
+  // The agent loop passes `reasoning` (ThinkingLevel | undefined) via spread options.
+  // When undefined (user disabled thinking), we must still send an explicit "off" signal
+  // because providers like OpenRouter enable thinking by default for capable models.
+  if (model.reasoning) {
+    const reasoning = (options as Record<string, unknown> & { reasoning?: ThinkingLevel }).reasoning
+    applyThinkingParams(payload, model.baseUrl, reasoning, model.thinkingLevelMap)
+  }
+
   return payload
+}
+
+// =============================================================================
+// Thinking / Reasoning Parameter Injection
+// =============================================================================
+
+/**
+ * Thinking format for a given provider, auto-detected from baseUrl.
+ * Mirrors the logic in pi-ai's openai-completions handler.
+ */
+type ThinkingFormat =
+  | 'openai'        // reasoning_effort
+  | 'openrouter'    // reasoning: { effort }
+  | 'deepseek'      // thinking: { type } + optional reasoning_effort
+  | 'together'      // reasoning: { enabled } + optional reasoning_effort
+  | 'qwen'          // enable_thinking: boolean
+  | 'auto'          // fallback: send reasoning_effort (most widely supported)
+
+/**
+ * Known baseUrl patterns → thinking format.
+ * Each entry is a substring matched (case-insensitive) against the full baseUrl.
+ * Order does not matter — the map is iterated and the first match wins.
+ */
+const BASE_URL_THINKING_FORMAT_MAP: Array<{ pattern: string; format: ThinkingFormat }> = [
+  // OpenRouter-compatible endpoints
+  { pattern: 'openrouter.ai', format: 'openrouter' },
+  { pattern: 'ai-assistant.jianguoyun.net.cn', format: 'openrouter' },
+  // DeepSeek
+  { pattern: 'deepseek.com', format: 'deepseek' },
+  // Together AI
+  { pattern: 'api.together.ai', format: 'together' },
+  { pattern: 'api.together.xyz', format: 'together' },
+  // Qwen (Alibaba DashScope)
+  { pattern: 'dashscope.aliyuncs.com', format: 'qwen' },
+]
+
+/**
+ * Auto-detect thinking format from the provider's baseUrl.
+ */
+function detectThinkingFormat(baseUrl: string): ThinkingFormat {
+  const url = baseUrl.toLowerCase()
+  for (const { pattern, format } of BASE_URL_THINKING_FORMAT_MAP) {
+    if (url.includes(pattern)) return format
+  }
+  return 'auto'
+}
+
+/**
+ * ThinkingLevel → OpenRouter effort value.
+ * OpenRouter also supports "none" (off) and "xhigh".
+ */
+function toEffortValue(
+  level: ThinkingLevel,
+  levelMap?: Partial<Record<string, string | null>>
+): string {
+  return levelMap?.[level] ?? level
+}
+
+/**
+ * Inject thinking/reasoning parameters into the Chat Completions payload
+ * based on the detected provider format.
+ *
+ * @param level - ThinkingLevel when enabled, undefined when user disabled thinking.
+ */
+function applyThinkingParams(
+  payload: Record<string, unknown>,
+  baseUrl: string,
+  level: ThinkingLevel | undefined,
+  thinkingLevelMap?: Partial<Record<string, string | null>>
+): void {
+  const format = detectThinkingFormat(baseUrl)
+  const enabled = !!level
+
+  switch (format) {
+    case 'openrouter': {
+      // OpenRouter unified: reasoning: { effort: "none" | "low" | ... }
+      // Must send effort:"none" explicitly — OpenRouter enables thinking by default.
+      ;(payload as Record<string, unknown>).reasoning = {
+        effort: enabled ? toEffortValue(level!, thinkingLevelMap) : 'none',
+      }
+      break
+    }
+    case 'deepseek': {
+      payload.thinking = { type: enabled ? 'enabled' : 'disabled' }
+      if (enabled) {
+        payload.reasoning_effort = toEffortValue(level!, thinkingLevelMap)
+      }
+      break
+    }
+    case 'together': {
+      ;(payload as Record<string, unknown>).reasoning = { enabled }
+      if (enabled) {
+        payload.reasoning_effort = toEffortValue(level!, thinkingLevelMap)
+      }
+      break
+    }
+    case 'qwen': {
+      payload.enable_thinking = enabled
+      break
+    }
+    case 'openai':
+    case 'auto':
+    default: {
+      // Most OpenAI-compatible APIs: reasoning_effort controls thinking level.
+      // When disabled, omit the field entirely (no standard "off" value).
+      if (enabled) {
+        payload.reasoning_effort = toEffortValue(level!, thinkingLevelMap)
+      }
+      break
+    }
+  }
 }
 
 // =============================================================================
