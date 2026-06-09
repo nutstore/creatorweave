@@ -50,6 +50,8 @@ export const settings = {
     webMCPNoHosts: "当前窗口标签页未发现 WebMCP 工具。",
     webMCPHostSummary: "{tools} 个工具 · {tabs} 个标签页",
     webMCPToggleFailed: "切换站点开关失败",
+    webMCPExtensionRequired: "需要安装浏览器扩展",
+    webMCPExtensionRequiredHint: "WebMCP 需要安装 CreatorWeave 浏览器扩展才能使用。请在设置的「扩展」标签页中安装。",
     language: "语言",
     languageDescription: "选择界面显示语言",
     theme: "主题",

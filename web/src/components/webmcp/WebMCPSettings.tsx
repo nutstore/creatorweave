@@ -9,6 +9,7 @@ import {
   refreshWebMCPTools,
 } from '@/webmcp'
 import { useSettingsStore } from '@/store/settings.store'
+import { useExtensionStore } from '@/store/extension.store'
 import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
 import { WebMCPHostList } from './WebMCPHostList'
 import { WebMCPSetupGuideCard } from './WebMCPSetupGuideCard'
@@ -19,6 +20,8 @@ export function WebMCPSettings() {
   const enabledByHost = useWebMCPStore((state) => state.enabledByHost)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
+  const extensionStatus = useExtensionStore((state) => state.status)
+  const extensionInstalled = extensionStatus === 'installed'
   const [refreshing, setRefreshing] = useState(false)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
   const [togglingHost, setTogglingHost] = useState<string | null>(null)
@@ -104,6 +107,7 @@ export function WebMCPSettings() {
         globalEnabled={globalEnabled}
         togglingGlobal={togglingGlobal}
         bridgeAvailable={bridgeAvailable}
+        extensionInstalled={extensionInstalled}
         lastScanAt={lastScanAt}
         refreshing={refreshing}
         onToggleGlobal={handleToggleGlobal}

@@ -49,6 +49,8 @@ export const settings = {
     webMCPNoHosts: "No WebMCP tools discovered in current window tabs.",
     webMCPHostSummary: "{tools} tools · {tabs} tabs",
     webMCPToggleFailed: "Failed to apply host switch",
+    webMCPExtensionRequired: "Browser extension required",
+    webMCPExtensionRequiredHint: "WebMCP requires the CreatorWeave browser extension to be installed and active. Go to the Extension tab in Settings to install it.",
     language: "Language",
     languageDescription: "Choose the interface language",
     theme: "Theme",

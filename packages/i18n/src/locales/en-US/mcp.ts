@@ -4,6 +4,8 @@ export const mcp = {
     },
     title: "MCP Servers",
     description: "Manage external MCP service connections",
+    extensionRequired: "Browser extension required",
+    extensionRequiredHint: "MCP service connections require the CreatorWeave browser extension. Go to the Extension tab in Settings to install it.",
     addServer: "Add MCP Server",
     editServer: "Edit Server",
     add: "Add",

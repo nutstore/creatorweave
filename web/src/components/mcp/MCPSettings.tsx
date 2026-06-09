@@ -31,6 +31,7 @@ import { toast } from 'sonner'
 import { getMCPManager } from '@/mcp'
 import type { MCPServerConfig, MCPConnectionState } from '@/mcp/mcp-types'
 import { useT } from '@/i18n'
+import { useExtensionStore } from '@/store/extension.store'
 
 type TransportType = 'sse' | 'streamable_http'
 
@@ -67,6 +68,8 @@ const EMPTY_FORM: ServerFormData = {
 export function MCPSettings() {
   const mcpManager = getMCPManager()
   const t = useT()
+  const extensionStatus = useExtensionStore((state) => state.status)
+  const extensionInstalled = extensionStatus === 'installed'
   const tf = useCallback(
     (key: string, fallback: string, params?: Record<string, string | number>) => {
       const value = t(key, params)
@@ -686,6 +689,21 @@ export function MCPSettings() {
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Extension Required Warning ────────────────────────────── */}
+      {!extensionInstalled && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              {tf('mcp.extensionRequired', 'Browser extension required')}
+            </p>
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400/80">
+              {tf('mcp.extensionRequiredHint', 'MCP service connections require the CreatorWeave browser extension. Go to the Extension tab in Settings to install it.')}
+            </p>
           </div>
         </div>
       )}

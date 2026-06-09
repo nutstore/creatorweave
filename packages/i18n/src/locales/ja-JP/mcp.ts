@@ -4,6 +4,8 @@ export const mcp = {
     },
     title: "MCP サーバー",
     description: "外部 MCP サービス接続を管理します",
+    extensionRequired: "ブラウザ拡張機能が必要です",
+    extensionRequiredHint: "MCP サービス接続には CreatorWeave ブラウザ拡張機能が必要です。設定の「拡張機能」タブからインストールしてください。",
     addServer: "MCP サーバーを追加",
     editServer: "サーバーを編集",
     add: "追加",

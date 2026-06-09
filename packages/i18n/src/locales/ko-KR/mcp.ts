@@ -4,6 +4,8 @@ export const mcp = {
     },
     title: "MCP 서버",
     description: "외부 MCP 서비스 연결을 관리합니다",
+    extensionRequired: "브라우저 확장 프로그램 필요",
+    extensionRequiredHint: "MCP 서비스 연결에는 CreatorWeave 브라우저 확장 프로그램이 필요합니다. 설정의 '확장 프로그램' 탭에서 설치하세요.",
     addServer: "MCP 서버 추가",
     editServer: "서버 편집",
     add: "추가",

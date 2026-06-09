@@ -1,13 +1,13 @@
-// 浏览器插件相关
+// 浏览器扩展相关
 export const extension = {
   // Banner
   bannerTitle: "解锁网页搜索能力！",
-  bannerDescription: "安装浏览器插件，让 AI 可以搜索和读取网页内容。",
+  bannerDescription: "安装浏览器扩展，让 AI 可以搜索和读取网页内容。",
   bannerAction: "了解并安装",
   bannerDismiss: "以后再说",
 
   // Install Guide Dialog
-  guideTitle: "安装 CreatorWeave 浏览器插件",
+  guideTitle: "安装 CreatorWeave 浏览器扩展",
   guideSubtitle: "让你的 AI 助手连接互联网",
   guideAlreadyInstalled: "已安装插件？",
   verifyInstallLink: "刷新页面",
@@ -83,20 +83,20 @@ export const extension = {
 
   // Error Card (in conversation)
   errorCardTitle: "网页搜索暂不可用",
-  errorCardDescription: "AI 当前无法搜索互联网，因为浏览器插件尚未安装。",
+  errorCardDescription: "AI 当前无法搜索互联网，因为浏览器扩展尚未安装。",
   errorCardFeature1: "搜索互联网（DuckDuckGo）",
   errorCardFeature2: "读取任意网页内容",
   errorCardFeature3: "渲染动态网页（如 Twitter、Reddit）",
-  errorCardAction: "立即安装浏览器插件",
+  errorCardAction: "立即安装浏览器扩展",
   errorCardDismiss: "暂时不用",
 
   // Settings tab
-  settingsTab: "浏览器插件",
+  settingsTab: "浏览器扩展",
   settingsInstalled: "插件已就绪",
   settingsNotInstalled: "未安装",
   settingsInstallButton: "安装插件",
   settingsVersion: "版本",
-  settingsDescription: "浏览器插件为 AI 助手提供网页搜索和内容读取能力",
+  settingsDescription: "浏览器扩展为 AI 助手提供网页搜索和内容读取能力",
   settingsCapabilities: "插件能力",
 
   // Settings — 版本显示
@@ -111,5 +111,5 @@ export const extension = {
   outdatedBannerAction: "下载更新",
 
   // Mobile notice
-  mobileNotice: "浏览器插件仅支持桌面端，请在电脑上的 Chrome 或 Edge 浏览器中打开本页面进行安装。",
+  mobileNotice: "浏览器扩展仅支持桌面端，请在电脑上的 Chrome 或 Edge 浏览器中打开本页面进行安装。",
 }

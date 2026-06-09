@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { BrandButton, BrandSwitch } from '@creatorweave/ui'
 
 interface WebMCPGlobalToggleCardProps {
@@ -6,6 +6,7 @@ interface WebMCPGlobalToggleCardProps {
   globalEnabled: boolean
   togglingGlobal: boolean
   bridgeAvailable: boolean
+  extensionInstalled: boolean
   lastScanAt: number | null
   refreshing: boolean
   onToggleGlobal: (enabled: boolean) => void
@@ -18,6 +19,7 @@ export function WebMCPGlobalToggleCard({
   globalEnabled,
   togglingGlobal,
   bridgeAvailable,
+  extensionInstalled,
   lastScanAt,
   refreshing,
   onToggleGlobal,
@@ -63,6 +65,20 @@ export function WebMCPGlobalToggleCard({
           {t('settings.webMCPRefresh')}
         </BrandButton>
       </div>
+
+      {!bridgeAvailable && !extensionInstalled && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              {t('settings.webMCPExtensionRequired')}
+            </p>
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400/80">
+              {t('settings.webMCPExtensionRequiredHint')}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

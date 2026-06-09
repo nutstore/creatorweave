@@ -50,6 +50,8 @@ export const settings = {
     webMCPNoHosts: "現在のウィンドウのタブで WebMCP ツールが見つかりませんでした。",
     webMCPHostSummary: "{tools} ツール · {tabs} タブ",
     webMCPToggleFailed: "ホスト切り替えの適用に失敗しました",
+    webMCPExtensionRequired: "ブラウザ拡張機能が必要です",
+    webMCPExtensionRequiredHint: "WebMCP を使用するには CreatorWeave ブラウザ拡張機能をインストールして有効にする必要があります。設定の「拡張機能」タブからインストールしてください。",
     language: "言語",
     languageDescription: "インターフェースの表示言語を選択",
     theme: "テーマ",
