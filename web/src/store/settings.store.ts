@@ -685,6 +685,7 @@ export const useSettingsStore = create<SettingsState>()(
         enableBatchSpawn: state.enableBatchSpawn,
         enableWebMCP: state.enableWebMCP,
         enableTTS: state.enableTTS,
+        autoPlayTTS: state.autoPlayTTS,
         ttsVoice: state.ttsVoice,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
