@@ -38,6 +38,10 @@ export interface MessageUsage {
   completionTokens: number
   totalTokens: number
   cacheReadTokens?: number
+  /** Accumulated input tokens across all assistant messages in this turn */
+  accumulatedPromptTokens?: number
+  /** Accumulated output tokens across all assistant messages in this turn */
+  accumulatedCompletionTokens?: number
 }
 
 export interface WorkflowDryRunPayload {

@@ -490,8 +490,8 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             </span>
             {turn.totalUsage && (
               <span className="inline-flex items-center gap-1.5">
-                <span>↑{formatTokens(turn.totalUsage.promptTokens)}</span>
-                <span>↓{formatTokens(turn.totalUsage.completionTokens)}</span>
+                <span>↑{formatTokens(turn.totalUsage.accumulatedPromptTokens ?? turn.totalUsage.promptTokens + (turn.totalUsage.cacheReadTokens || 0))}</span>
+                <span>↓{formatTokens(turn.totalUsage.accumulatedCompletionTokens ?? turn.totalUsage.completionTokens)}</span>
                 {turn.totalUsage.cacheReadTokens ? (
                   <span className="inline-flex items-center gap-0.5">
                     <Database className="h-3 w-3 text-neutral-400" />{formatTokens(turn.totalUsage.cacheReadTokens)}

@@ -63,15 +63,32 @@ export function groupMessagesIntoTurns(messages: Message[]): Turn[] {
 }
 
 function aggregateUsage(messages: Message[]): MessageUsage | null {
+  // Find the last assistant message with usage (for per-message display + cache)
+  let lastUsage: MessageUsage | null = null
+  // Accumulate all assistant messages' tokens for the whole turn
+  let accFullInput = 0   // promptTokens + cacheReadTokens per message (full input)
+  let accCompletion = 0
+
   for (let i = messages.length - 1; i >= 0; i--) {
     const usage = messages[i].usage
     if (!usage) continue
-    return {
-      promptTokens: usage.promptTokens,
-      completionTokens: usage.completionTokens,
-      totalTokens: usage.totalTokens,
-      cacheReadTokens: usage.cacheReadTokens || 0,
+    // Accumulate from every message that has usage
+    accFullInput += usage.promptTokens + (usage.cacheReadTokens || 0)
+    accCompletion += usage.completionTokens
+    // Keep the last (most recent) usage for per-message fields + cache
+    if (!lastUsage) {
+      lastUsage = usage
     }
   }
-  return null
+
+  if (!lastUsage) return null
+
+  return {
+    promptTokens: lastUsage.promptTokens,
+    completionTokens: lastUsage.completionTokens,
+    totalTokens: lastUsage.totalTokens,
+    cacheReadTokens: lastUsage.cacheReadTokens || 0,
+    accumulatedPromptTokens: accFullInput,
+    accumulatedCompletionTokens: accCompletion,
+  }
 }
