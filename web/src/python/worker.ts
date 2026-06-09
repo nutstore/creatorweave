@@ -505,12 +505,21 @@ async function ensureMounted(dirHandle) {
         await syncFromOPFSRaw()
         return
       } catch (syncErr) {
-        // syncfs failed, fall through to full remount
+        // syncfs failed — OPFS mount state is likely corrupted.
+        // Fall through to full remount to recover.
+        console.warn('[Pyodide Worker] syncfs refresh failed, forcing full remount:', syncErr instanceof Error ? syncErr.message : String(syncErr))
       }
     }
 
     if (nativefs && !sameHandle) {
       console.log('[Pyodide Worker] Different workspace detected, switching mount')
+    }
+
+    if (!nativefs && !sameHandle && mountedDirHandle) {
+      // nativefs is null but mountedDirHandle is set — previous mount was lost
+      // (e.g. OPFS DOMException corrupted the worker state). Force cleanup.
+      console.warn('[Pyodide Worker] Mount state lost (nativefs=null but handle set), forcing remount')
+      mountedDirHandle = null
     }
 
     console.log('[Pyodide Worker] Mounting directory:', dirHandle.name)

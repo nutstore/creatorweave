@@ -714,6 +714,21 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
   )
 }
 
+/** Batch spawn toggle — uses reactive zustand selector so the switch updates immediately */
+function BatchSpawnToggle() {
+  const t = useT()
+  const enableBatchSpawn = useSettingsStore((s) => s.enableBatchSpawn)
+  const setEnableBatchSpawn = useSettingsStore((s) => s.setEnableBatchSpawn)
+  return (
+    <ExperimentalToggle
+      title={t('settings.batchSpawn')}
+      description={t('settings.batchSpawnDesc')}
+      checked={enableBatchSpawn}
+      onChange={setEnableBatchSpawn}
+    />
+  )
+}
+
 // =============================================================================
 // TTS Settings Panel (within Experimental tab)
 // =============================================================================
@@ -1246,12 +1261,7 @@ const SettingsDialogContent = forwardRef<
               </div>
 
               {/* batch_spawn toggle */}
-              <ExperimentalToggle
-                title={t('settings.batchSpawn')}
-                description={t('settings.batchSpawnDesc')}
-                checked={useSettingsStore.getState().enableBatchSpawn}
-                onChange={(v) => useSettingsStore.getState().setEnableBatchSpawn(v)}
-              />
+              <BatchSpawnToggle />
 
               {/* TTS toggle + voice selection */}
               <TTSSettingsPanel />

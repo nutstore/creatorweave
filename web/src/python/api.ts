@@ -26,6 +26,35 @@ import { DEFAULT_TIMEOUT } from './constants'
 import { generateId, logger, formatTime, isExecutionSuccessful } from './utils'
 
 //=============================================================================
+// OPFS Error Detection
+//=============================================================================
+
+/**
+ * Detect OPFS PROXYFS mount corruption errors from Pyodide worker.
+ *
+ * When the OPFS → PROXYFS mount state is corrupted, the browser throws a
+ * DOMException NotFoundError with the message:
+ *   "A requested file or directory could not be found at the time an operation was processed."
+ *
+ * Once this happens, the Pyodide worker is permanently broken — all subsequent
+ * Python executions (even `print("hello")`) will fail with the same error.
+ * The only fix is to terminate and recreate the worker.
+ *
+ * @param errorMessage - The error string from the worker
+ * @returns true if this looks like an OPFS corruption error
+ */
+function isOPFSCorruptionError(errorMessage: string): boolean {
+  if (!errorMessage) return false
+  const lower = errorMessage.toLowerCase()
+  return (
+    lower.includes('notfounderror') ||
+    lower.includes('could not be found at the time an operation was processed') ||
+    // Also catch the common pattern when OPFS syncfs fails
+    (lower.includes('requested file or directory') && lower.includes('could not be found'))
+  )
+}
+
+//=============================================================================
 // Python Executor Class
 //=============================================================================
 
@@ -246,6 +275,17 @@ export class PythonExecutor {
 
     if (response.result.error) {
       logger(`  Error: ${response.result.error}`, 'error')
+
+      // Auto-recover from OPFS mount corruption.
+      // When the OPFS PROXYFS mount state is corrupted (e.g. DOMException NotFoundError
+      // "A requested file or directory could not be found at the time an operation was processed"),
+      // the Pyodide worker becomes permanently unusable — even `print("hello")` fails.
+      // The only reliable fix is to terminate the worker and recreate it on the next call.
+      // This mirrors the effect of manually refreshing the page.
+      if (isOPFSCorruptionError(response.result.error)) {
+        logger('OPFS mount corruption detected — terminating worker for auto-recovery', 'warn')
+        this.terminate()
+      }
     }
 
     return response.result
