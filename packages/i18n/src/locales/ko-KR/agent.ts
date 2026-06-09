@@ -26,4 +26,12 @@ export const agent = {
         planReadonly: "읽기 전용",
         actFullAccess: "전체 접근",
     },
+
+    ttsQueue: {
+        playing: "재생 중...",
+        playingWithQueue: "재생 중 ({count}개 대기)",
+        queued: "{count}개 대기",
+        stop: "정지하고 대기열 지우기",
+        clear: "대기열 지우기",
+    },
 } as const

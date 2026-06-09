@@ -28,4 +28,12 @@ export const agent = {
         planReadonly: "Read-only",
         actFullAccess: "Full access",
     },
+
+    ttsQueue: {
+        playing: "Playing...",
+        playingWithQueue: "Playing ({count} queued)",
+        queued: "{count} queued",
+        stop: "Stop and clear queue",
+        clear: "Clear queue",
+    },
 } as const

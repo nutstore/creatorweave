@@ -64,6 +64,13 @@ export const settings = {
     experimentalWarningDesc: "Enabling them may cause stability issues. Some features depend on your provider's concurrency capacity.",
     batchSpawn: "Parallel Subagents (batch_spawn)",
     batchSpawnDesc: "Allow AI to launch multiple subtasks in parallel. Requires provider support for high concurrency, otherwise rate limit errors may occur.",
+    ttsToggle: "Text-to-Speech (Edge TTS)",
+    ttsToggleDesc: "Enable high-quality neural text-to-speech powered by Edge TTS. Requires the browser extension.",
+    ttsVoice: "Voice",
+    ttsLoading: "Loading voices...",
+    ttsAutoPlay: "Auto-play",
+    ttsAutoPlayDesc: "Automatically read aloud AI responses when they complete. Only plays in the active workspace.",
+    ttsNoVoices: "Voices will load automatically once available.",
 
     // Sync panel
     syncPanel: {

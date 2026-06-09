@@ -28,4 +28,12 @@ export const agent = {
         planReadonly: "只读",
         actFullAccess: "完全访问",
     },
+
+    ttsQueue: {
+        playing: "正在朗读...",
+        playingWithQueue: "正在朗读 ({count} 个排队中)",
+        queued: "{count} 个排队中",
+        stop: "停止并清空队列",
+        clear: "清空队列",
+    },
 } as const

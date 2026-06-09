@@ -720,9 +720,12 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
 
 function TTSSettingsPanel() {
   const rootRef = useRef<HTMLDivElement>(null)
+  const t = useT()
   const enableTTS = useSettingsStore((s) => s.enableTTS)
+  const autoPlayTTS = useSettingsStore((s) => s.autoPlayTTS)
   const ttsVoice = useSettingsStore((s) => s.ttsVoice)
   const setEnableTTS = useSettingsStore((s) => s.setEnableTTS)
+  const setAutoPlayTTS = useSettingsStore((s) => s.setAutoPlayTTS)
   const setTTSVoice = useSettingsStore((s) => s.setTTSVoice)
 
   const [voices, setVoices] = useState<Array<{ ShortName: string; FriendlyName: string; Locale: string; Gender: string }>>([])
@@ -767,8 +770,8 @@ function TTSSettingsPanel() {
   return (
     <div ref={rootRef} className="space-y-3">
       <ExperimentalToggle
-        title="Text-to-Speech (Edge TTS)"
-        description="Enable high-quality neural text-to-speech powered by Edge TTS. Requires the browser extension."
+        title={t('settings.ttsToggle')}
+        description={t('settings.ttsToggleDesc')}
         checked={enableTTS}
         onChange={setEnableTTS}
       />
@@ -778,12 +781,12 @@ function TTSSettingsPanel() {
           <div className="flex items-center gap-2">
             <Volume2 className="h-4 w-4 text-tertiary" />
             <span className="text-sm font-medium text-secondary dark:text-neutral-200">
-              Voice
+              {t('settings.ttsVoice')}
             </span>
           </div>
 
           {voicesLoading && (
-            <p className="text-xs text-tertiary">Loading voices...</p>
+            <p className="text-xs text-tertiary">{t('settings.ttsLoading')}</p>
           )}
 
           {voicesError && (
@@ -829,9 +832,16 @@ function TTSSettingsPanel() {
 
           {!voicesLoading && voices.length === 0 && !voicesError && (
             <p className="text-xs text-tertiary">
-              Voices will load automatically once available.
+              {t('settings.ttsNoVoices')}
             </p>
           )}
+
+          <ExperimentalToggle
+            title={t('settings.ttsAutoPlay')}
+            description={t('settings.ttsAutoPlayDesc')}
+            checked={autoPlayTTS}
+            onChange={setAutoPlayTTS}
+          />
         </div>
       )}
     </div>

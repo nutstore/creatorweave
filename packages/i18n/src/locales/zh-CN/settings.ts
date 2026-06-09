@@ -65,6 +65,13 @@ export const settings = {
     experimentalWarningDesc: "开启后可能存在稳定性问题，且部分功能依赖服务商并发能力支持。",
     batchSpawn: "并行子代理 (batch_spawn)",
     batchSpawnDesc: "允许 AI 同时启动多个子任务并行处理。需要服务商支持高并发，否则可能导致速率限制错误。",
+    ttsToggle: "语音朗读 (Edge TTS)",
+    ttsToggleDesc: "启用由 Edge TTS 驱动的高质量神经网络语音朗读。需要安装浏览器扩展。",
+    ttsVoice: "语音",
+    ttsLoading: "加载语音中...",
+    ttsAutoPlay: "自动朗读",
+    ttsAutoPlayDesc: "AI 回复完成后自动朗读回复内容。仅在当前工作区播放。",
+    ttsNoVoices: "语音可用后将自动加载。",
 
     // Sync panel
     syncPanel: {

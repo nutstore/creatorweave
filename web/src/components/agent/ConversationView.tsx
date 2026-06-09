@@ -16,6 +16,7 @@ import { Send, StopCircle, AlertTriangle, RefreshCw, WifiOff, KeyRound } from 'l
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
+import { TTSQueueIndicator } from './TTSQueueIndicator'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSwitchCompact } from './AgentModeSwitch'
 import { useConversationLogic } from './useConversationLogic'
@@ -420,6 +421,7 @@ export function ConversationView({
 
         {/* Input area */}
         <div className="shrink-0 border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
+          <TTSQueueIndicator />
           <div className="mx-auto flex max-w-3xl flex-col">
             <div className="relative">
               <AgentRichInput

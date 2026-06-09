@@ -268,6 +268,11 @@ export function useConversationLogic() {
 
   const sendMessage = useCallback(async (text: string, options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }) => {
     if (!text.trim()) return
+
+    // ── Stop any auto-playing TTS when user sends a new message ──
+    const { ttsQueue } = await import('./tts-queue')
+    if (convIdRef.current) ttsQueue.interrupt(convIdRef.current)
+
     // Read latest from store to avoid stale closures
     const { hasApiKey: hasKey, providerType: pType, modelName: mName, maxTokens: mTokens } = useSettingsStore.getState()
     if (!hasKey) {

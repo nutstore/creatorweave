@@ -26,4 +26,12 @@ export const agent = {
         planReadonly: "読み取り専用",
         actFullAccess: "フルアクセス",
     },
+
+    ttsQueue: {
+        playing: "再生中...",
+        playingWithQueue: "再生中 ({count} 件待ち)",
+        queued: "{count} 件待ち",
+        stop: "停止してキューをクリア",
+        clear: "キューをクリア",
+    },
 } as const

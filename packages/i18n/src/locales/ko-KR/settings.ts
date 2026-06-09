@@ -65,6 +65,13 @@ export const settings = {
     experimentalWarningDesc: "활성화하면 안정성 문제가 발생할 수 있습니다. 일부 기능은 제공업체의 동시 처리 능력에 따라 달라집니다.",
     batchSpawn: "병렬 서브에이전트 (batch_spawn)",
     batchSpawnDesc: "AI가 여러 하위 작업을 병렬로 시작할 수 있도록 허용합니다. 높은 동시성을 지원하는 제공업체가 필요하며, 그렇지 않으면 속도 제한 오류가 발생할 수 있습니다.",
+    ttsToggle: "텍스트 음성 변환 (Edge TTS)",
+    ttsToggleDesc: "Edge TTS 기반의 고품질 뉴럴 음성 합성을 활성화합니다. 브라우저 확장 프로그램이 필요합니다.",
+    ttsVoice: "음성",
+    ttsLoading: "음성 로드 중...",
+    ttsAutoPlay: "자동 재생",
+    ttsAutoPlayDesc: "AI 응답이 완료되면 자동으로 음성으로 읽어줍니다. 활성 작업 공간에서만 재생됩니다.",
+    ttsNoVoices: "음성은 사용 가능해지면 자동으로 로드됩니다.",
 
     // Sync panel
     syncPanel: {

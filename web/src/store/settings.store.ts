@@ -66,6 +66,7 @@ interface SettingsState {
   enableBatchSpawn: boolean
   enableWebMCP: boolean
   enableTTS: boolean
+  autoPlayTTS: boolean
   ttsVoice: string
 
   // API key status - NOT persisted, derived from SQLite
@@ -109,6 +110,7 @@ interface SettingsState {
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
   setEnableTTS: (v: boolean) => void
+  setAutoPlayTTS: (v: boolean) => void
   setTTSVoice: (voice: string) => void
   setHasApiKey: (has: boolean) => void
   getEffectiveProviderConfig: () => EffectiveProviderConfig | null
@@ -202,6 +204,7 @@ export const useSettingsStore = create<SettingsState>()(
       enableBatchSpawn: false,
       enableWebMCP: true,
       enableTTS: false,
+      autoPlayTTS: true,
       ttsVoice: 'zh-CN-XiaoxiaoNeural',
       hasApiKey: false,
       modelOverridesByWorkspace: {},
@@ -428,6 +431,7 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
       setEnableTTS: (enableTTS) => set({ enableTTS }),
+      setAutoPlayTTS: (autoPlayTTS) => set({ autoPlayTTS }),
       setTTSVoice: (ttsVoice) => set({ ttsVoice }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
 
