@@ -12,6 +12,7 @@
 import { registerFormatHandler } from '../format-registry'
 import { csvHandler } from './csv'
 import { docxHandler } from './docx'
+import { imageHandler, IMAGE_EXTENSIONS } from './image'
 import { nbmxHandler } from './nbmx'
 import { ngmHandler } from './ngm'
 import { nolHandler } from './nol'
@@ -21,6 +22,10 @@ import { zipHandler } from './zip'
 
 registerFormatHandler(csvHandler)
 registerFormatHandler(docxHandler)
+// Register image handler for all supported image extensions
+for (const ext of IMAGE_EXTENSIONS) {
+  registerFormatHandler({ ...imageHandler, extension: ext })
+}
 registerFormatHandler(nbmxHandler)
 registerFormatHandler(ngmHandler)
 registerFormatHandler(nolHandler)

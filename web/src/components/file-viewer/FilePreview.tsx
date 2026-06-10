@@ -91,8 +91,10 @@ function getMonacoLanguage(path: string): string {
   return 'plaintext'
 }
 
-/** Image extensions for direct display */
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg'])
+/** Image extensions — handled by format registry (image/ directory).
+ * Kept for reference but removed from direct-render path so that
+ * enhanced ImagePreview (zoom, pan, rotate) is used instead. */
+// const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg'])
 
 /** Binary (non-image, non-office) extensions */
 const BINARY_EXTS = new Set([
@@ -116,10 +118,11 @@ const HTML_EXTS = new Set(['html', 'htm'])
 
 function getFileType(path: string): 'text' | 'image' | 'binary' | 'html' | 'office' | 'format' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
-  if (IMAGE_EXTS.has(ext)) return 'image'
+  // Images are now handled by format registry (image/ directory)
+  // which provides an enhanced preview with zoom/pan/rotate.
   if (HTML_EXTS.has(ext)) return 'html'
   if (OFFICE_EXTS.has(ext)) return 'office'
-  // Check format registry (e.g. .nol, .pdf, .docx, future formats)
+  // Check format registry (e.g. .nol, .pdf, .docx, .png, .jpg, etc.)
   if (getFormatUIHandler(path)) return 'format'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
@@ -479,10 +482,10 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               text = result.content
               fileSize = new Blob([result.content]).size
             } else {
-              // ArrayBuffer - for office/format, keep as Blob; for text, decode it
+              // ArrayBuffer - for image/office/format, keep as Blob; for text, decode it
               const buffer = result.content as ArrayBuffer
               fileSize = buffer.byteLength
-              if (fileType === 'office' || fileType === 'format') {
+              if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
                 blob = new Blob([buffer])
               } else {
                 const decoder = new TextDecoder()
