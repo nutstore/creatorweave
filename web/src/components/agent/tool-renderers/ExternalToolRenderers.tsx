@@ -10,6 +10,7 @@ import { Plug, Search } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
+import { useT } from '@/i18n'
 
 // ── search_tools ──
 
@@ -17,20 +18,36 @@ registerRenderer({
   name: 'search_tools',
   icon: <Search className="h-3.5 w-3.5 text-violet-400" />,
   Summary(ctx) {
+    const t = useT()
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractSearchResults(ctx)
+    const useSubagent = ctx.args.use_subagent === true
+    const data = ctx.result?.data as Record<string, unknown> | undefined
+    const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">search_tools</code>
+        {useSubagent && (ctx.isExecuting || ctx.isStreaming) && (
+          <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 shrink-0">
+            {t('agent.toolSearch.aiLabel')}
+          </span>
+        )}
         {query && (
           <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[280px]">
             "{query}"
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && !ctx.isError && (
-          <span className="ml-auto text-xs text-emerald-500 shrink-0">
-            {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
+          <span className="ml-auto text-xs shrink-0 flex items-center gap-1">
+            {searchMode === 'subagent' && (
+              <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+                {t('agent.toolSearch.aiLabel')}
+              </span>
+            )}
+            <span className="text-emerald-500">
+              {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
+            </span>
           </span>
         )}
         {ctx.isError && (
@@ -40,24 +57,40 @@ registerRenderer({
     )
   },
   Detail(ctx) {
+    const t = useT()
     const results = extractSearchResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
+    const useSubagent = ctx.args.use_subagent === true
+    const data = ctx.result?.data as Record<string, unknown> | undefined
+    const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
 
-    if (ctx.isExecuting) return <StreamingPlaceholder count={2} />
+    if (ctx.isExecuting) return <StreamingPlaceholder count={2} useSubagent={useSubagent} />
     if (ctx.isError) return <ErrorDetail ctx={ctx} />
 
     if (results.length === 0) {
       return (
         <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
-          No tools matched "{query}". Try different keywords.
+          No tools matched "{query}". {useSubagent ? 'Try different keywords or fall back to BM25.' : 'Try different keywords.'}
         </div>
       )
     }
 
     return (
       <div className="px-3 py-2 space-y-2">
-        <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
-          {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
+        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+          <span>
+            {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
+          </span>
+          {searchMode === 'subagent' && (
+            <span className="font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+              {t('agent.toolSearch.aiSearchBadge')}
+            </span>
+          )}
+          {useSubagent && searchMode !== 'subagent' && (
+            <span className="font-mono px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
+              {t('agent.toolSearch.bm25Fallback')}
+            </span>
+          )}
         </div>
         {results.map((tool, i) => (
           <div
@@ -273,9 +306,15 @@ function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
   )
 }
 
-function StreamingPlaceholder({ count = 3 }: { count?: number }) {
+function StreamingPlaceholder({ count = 3, useSubagent = false }: { count?: number; useSubagent?: boolean }) {
+  const t = useT()
   return (
     <div className="px-3 py-2 space-y-2">
+      {useSubagent && (
+        <div className="flex items-center gap-1.5 text-[10px] text-amber-500 dark:text-amber-400 mb-1">
+          <span className="animate-pulse">{t('agent.toolSearch.aiSearchInProgress')}</span>
+        </div>
+      )}
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="rounded-md border border-neutral-100 dark:border-neutral-800 p-2 animate-pulse">
           <div className="h-3 w-1/3 rounded bg-neutral-200 dark:bg-neutral-700 mb-1.5" />

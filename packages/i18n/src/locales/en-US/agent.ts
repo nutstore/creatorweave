@@ -29,6 +29,12 @@ export const agent = {
         actFullAccess: "Full access",
     },
 
+    toolSearch: {
+        aiLabel: "AI",
+        aiSearchInProgress: "AI semantic search in progress...",
+        aiSearchBadge: "AI semantic search",
+        bm25Fallback: "BM25 fallback",
+    },
     ttsQueue: {
         playing: "Playing...",
         playingWithQueue: "Playing ({count} queued)",

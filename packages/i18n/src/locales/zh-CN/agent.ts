@@ -29,6 +29,12 @@ export const agent = {
         actFullAccess: "完全访问",
     },
 
+    toolSearch: {
+        aiLabel: "AI",
+        aiSearchInProgress: "AI 语义搜索中...",
+        aiSearchBadge: "AI 语义搜索",
+        bm25Fallback: "BM25 回退",
+    },
     ttsQueue: {
         playing: "正在朗读...",
         playingWithQueue: "正在朗读 ({count} 个排队中)",

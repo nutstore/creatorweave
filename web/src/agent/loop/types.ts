@@ -114,6 +114,12 @@ export interface AgentLoopConfig {
   ) => Promise<AfterToolCallHookResult | undefined> | AfterToolCallHookResult | undefined
   /** Agent execution mode: 'plan' (read-only) or 'act' (full access). Defaults to 'act'. */
   mode?: AgentMode
+  /**
+   * When true, skip system prompt enhancements (skills injection, MCP summaries,
+   * tool docs, prefetch, etc.). Used by specialized subagents that provide
+   * their own self-contained system prompt.
+   */
+  skipEnhancements?: boolean
   /** Initial convert call counter for context compression cadence (cross-run continuity). */
   initialConvertCallCount?: number
   /** Initial summary convert-call marker for compression cadence (cross-run continuity). */

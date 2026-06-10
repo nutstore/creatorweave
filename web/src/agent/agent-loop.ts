@@ -37,7 +37,7 @@ export type {
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = getUniversalSystemPrompt()
 const DEFAULT_TOOL_TIMEOUT = 30000
-const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image'])
+const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image', 'search_tools'])
 const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 
 export class AgentLoop {
@@ -55,6 +55,7 @@ export class AgentLoop {
   private afterToolCall?: AgentLoopConfig['afterToolCall']
   private onCompressionStateUpdate?: AgentLoopConfig['onCompressionStateUpdate']
   private compressionBaseline: CompressionBaselineState | null
+  private skipEnhancements: boolean
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
   private mode: AgentMode
@@ -77,8 +78,11 @@ export class AgentLoop {
     this.onCompressionStateUpdate = config.onCompressionStateUpdate
     this.compressionBaseline = config.initialCompressionBaseline ?? null
     this.mode = config.mode || 'act'
+    this.skipEnhancements = config.skipEnhancements ?? false
     // Keep toolContext.agentMode in sync so tools (e.g. bash) can read it
     this.toolContext.agentMode = this.mode
+    // Expose provider to tool executors (e.g. search_tools subagent)
+    this.toolContext.provider = this.provider
     this.convertCallCount = config.initialConvertCallCount ?? 0
     this.lastSummaryConvertCall =
       config.initialLastSummaryConvertCall ?? Number.NEGATIVE_INFINITY
@@ -339,19 +343,24 @@ export class AgentLoop {
     this.abortController = new AbortController()
     const signal = this.abortController.signal
 
-    // Phase 2 P1: Trigger predictive file loading before processing
-    await triggerPrefetchForMessages(messages, this.toolContext, this.sessionId)
+    if (this.skipEnhancements) {
+      // Use the base system prompt as-is (no skills, MCP summaries, tool docs)
+      this.contextManager.setSystemPrompt(this.baseSystemPrompt)
+    } else {
+      // Phase 2 P1: Trigger predictive file loading before processing
+      await triggerPrefetchForMessages(messages, this.toolContext, this.sessionId)
 
-    // Inject matching skills and MCP services into system prompt
-    const enhancedPrompt = await buildRuntimeEnhancedPrompt({
-      baseSystemPrompt: this.baseSystemPrompt,
-      messages,
-      mode: this.mode,
-      toolRegistry: this.toolRegistry,
-      toolContext: this.toolContext,
-      sessionId: this.sessionId,
-    })
-    this.contextManager.setSystemPrompt(enhancedPrompt)
+      // Inject matching skills and MCP services into system prompt
+      const enhancedPrompt = await buildRuntimeEnhancedPrompt({
+        baseSystemPrompt: this.baseSystemPrompt,
+        messages,
+        mode: this.mode,
+        toolRegistry: this.toolRegistry,
+        toolContext: this.toolContext,
+        sessionId: this.sessionId,
+      })
+      this.contextManager.setSystemPrompt(enhancedPrompt)
+    }
 
     try {
       return await this.runWithPiAgentCore(messages, callbacks)

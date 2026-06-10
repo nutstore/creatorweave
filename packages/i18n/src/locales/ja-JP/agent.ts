@@ -27,6 +27,12 @@ export const agent = {
         actFullAccess: "フルアクセス",
     },
 
+    toolSearch: {
+        aiLabel: "AI",
+        aiSearchInProgress: "AI セマンティック検索中...",
+        aiSearchBadge: "AI セマンティック検索",
+        bm25Fallback: "BM25 フォールバック",
+    },
     ttsQueue: {
         playing: "再生中...",
         playingWithQueue: "再生中 ({count} 件待ち)",

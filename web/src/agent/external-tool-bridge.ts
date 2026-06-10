@@ -55,7 +55,7 @@ interface UnifiedToolEntry {
 /**
  * Collect all available external tools (MCP + WebMCP) into a unified list.
  */
-function collectAllExternalTools(): UnifiedToolEntry[] {
+export function collectAllExternalTools(): UnifiedToolEntry[] {
   const tools: UnifiedToolEntry[] = []
 
   // --- MCP tools ---
@@ -248,6 +248,13 @@ export const searchToolsDefinition: ToolDefinition = {
           description:
             'Filter by tool source. "mcp" = page-outside MCP servers, "webmcp" = page API tools. Default: "all".',
         },
+        use_subagent: {
+          type: 'boolean',
+          description:
+            'When true, use an LLM-powered subagent for semantic search instead of BM25 keyword matching. ' +
+            'Use this when BM25 results are poor or when the query is in a different language than the tool descriptions. ' +
+            'Default: false (BM25, faster).',
+        },
         limit: {
           type: 'number',
           description: 'Maximum number of results (max 10). Default: 5.',
@@ -258,10 +265,11 @@ export const searchToolsDefinition: ToolDefinition = {
   },
 }
 
-export const searchToolsExecutor: ToolExecutor = async (args) => {
-  const { query, source: sourceFilter = 'all', limit = 5 } = args as {
+export const searchToolsExecutor: ToolExecutor = async (args, context) => {
+  const { query, source: sourceFilter = 'all', use_subagent = false, limit = 5 } = args as {
     query: string
     source?: 'all' | 'mcp' | 'webmcp'
+    use_subagent?: boolean
     limit?: number
   }
 
@@ -274,6 +282,59 @@ export const searchToolsExecutor: ToolExecutor = async (args) => {
       message: 'No external tools available. Connect an MCP server or open a WebMCP-enabled page.',
     })
   }
+
+  // ── Subagent semantic search path ──
+  if (use_subagent) {
+    try {
+      const { runToolSearcher } = await import('./subagents/tool-searcher')
+
+      // Build the descriptions text for the subagent prompt
+      const descLines = allTools
+        .filter(t => sourceFilter === 'all' || t.source === sourceFilter)
+        .map(t => `## ${t.fullName}\n${t.description || '(no description)'}\nSource: ${t.source} (${t.sourceId})`)
+        .join('\n\n')
+
+      // Use the main agent's provider directly (passed via ToolContext)
+      const provider = context.provider
+
+      if (!provider) {
+        console.warn('[search_tools] use_subagent=true but no provider in ToolContext, falling back to BM25')
+      } else {
+
+        const result = await runToolSearcher(
+          { query, allToolDescriptionsText: descLines },
+          { provider }
+        )
+
+        if (result && result.tools.length > 0) {
+          // Look up source info from the tool catalog (not from subagent)
+          const toolCatalog = new Map(allTools.map(t => [t.fullName, t]))
+          return toolOkJson('search_tools', {
+            results: result.tools.slice(0, Math.min(limit, 10)).map(t => {
+              const catalogEntry = toolCatalog.get(t.full_tool_name)
+              return {
+                fullName: t.full_tool_name,
+                source: catalogEntry?.source || 'webmcp',
+                sourceId: catalogEntry?.sourceId || '',
+                description: t.description.slice(0, 300),
+                inputSchema: t.input_schema,
+                relevanceReason: t.relevance_reason,
+              }
+            }),
+            total: result.tools.length,
+            query,
+            searchMode: 'subagent',
+          })
+        }
+
+        // Subagent returned no results — fall through to BM25
+      }
+    } catch (error) {
+      console.error('[search_tools] Subagent search failed, falling back to BM25:', error)
+    }
+  }
+
+  // ── BM25 keyword search path (default) ──
 
   // Filter by source
   let filtered = allTools

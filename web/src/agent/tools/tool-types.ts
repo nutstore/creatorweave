@@ -3,6 +3,8 @@
  * Compatible with OpenAI function calling format.
  */
 
+import type { PiAIProvider } from '../llm/pi-ai-provider'
+
 /** JSON Schema subset for tool parameter definitions */
 export interface JSONSchemaProperty {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object'
@@ -245,6 +247,8 @@ export interface ToolContext {
   workflowProgress?: WorkflowProgressHooks
   /** Agent execution mode: 'plan' (read-only) or 'act' (full access) */
   agentMode?: 'plan' | 'act'
+  /** The LLM provider from the current agent loop — available to tool executors that need LLM access */
+  provider?: PiAIProvider
   /** Subagent runtime for delegated execution */
   subagentRuntime?: SubagentRuntime
   /** Per-run cache of file content that was read by tools, keyed by normalized target path */

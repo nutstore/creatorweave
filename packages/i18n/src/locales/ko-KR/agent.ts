@@ -27,6 +27,12 @@ export const agent = {
         actFullAccess: "전체 접근",
     },
 
+    toolSearch: {
+        aiLabel: "AI",
+        aiSearchInProgress: "AI 시맨틱 검색 중...",
+        aiSearchBadge: "AI 시맨틱 검색",
+        bm25Fallback: "BM25 대체",
+    },
     ttsQueue: {
         playing: "재생 중...",
         playingWithQueue: "재생 중 ({count}개 대기)",
