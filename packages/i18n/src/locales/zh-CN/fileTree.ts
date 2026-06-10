@@ -14,4 +14,5 @@ export const fileTree = {
     emptyStateDescription: "AI 修改的文件会暂存在这里，确认后才会写入本地",
     draftFiles: "未确认的修改",
     approvedNotSynced: "已确认，等待写入本地磁盘",
+    loadFailed: "目录无法访问",
 } as const

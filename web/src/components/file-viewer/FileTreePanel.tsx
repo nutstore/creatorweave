@@ -510,6 +510,7 @@ export const FileTreePanel = memo(function FileTreePanel({
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId)
   const bumpSkillsScanVersion = useSkillsStore((s) => s.bumpSkillsScanVersion)
 
@@ -797,6 +798,7 @@ export const FileTreePanel = memo(function FileTreePanel({
         const children = await loadChildren(directoryHandle ?? null, '')
         setRootNodes(children)
         setLoaded(true)
+        setLoadError(null)
 
         // If preserving expanded state, recursively reload all expanded directories
         if (preserveExpanded && expandedPaths.size > 0) {
@@ -823,6 +825,14 @@ export const FileTreePanel = memo(function FileTreePanel({
         }
       } catch (error) {
         console.error('[FileTree] Failed to load root:', error)
+        // Mark as loaded even on error to prevent infinite reload loop.
+        // When directoryHandle points to a deleted/inaccessible directory,
+        // loadChildren throws (e.g. NotFoundError). Without setLoaded(true),
+        // the auto-load effect would keep re-triggering because
+        // !loaded && !loading stays true, causing "加载中" to flash forever.
+        setRootNodes([])
+        setLoaded(true)
+        setLoadError(error instanceof Error ? error.message : String(error))
       } finally {
         setLoading(false)
       }
@@ -1012,6 +1022,7 @@ export const FileTreePanel = memo(function FileTreePanel({
     if (!directoryHandle || !activeWorkspaceId) {
       setLoaded(false)
       setLoading(false)
+      setLoadError(null)
       setExpandedPaths(new Set())
       setRootNodes([])
       return
@@ -1019,6 +1030,7 @@ export const FileTreePanel = memo(function FileTreePanel({
     // Reset all states to trigger fresh load
     setLoaded(false)
     setLoading(false)
+    setLoadError(null)
     setExpandedPaths(new Set())
     setRootNodes([])
   }, [directoryHandle, activeWorkspaceId])
@@ -1102,6 +1114,18 @@ export const FileTreePanel = memo(function FileTreePanel({
         <div className="px-1.5 py-1.5">
           {loading && rootNodes.length === 0 ? (
             <div className="text-tertiary p-4 text-center text-xs">{t('common.loading')}</div>
+          ) : loadError && rootNodes.length === 0 ? (
+            <div className="p-4 text-center">
+              <p className="text-danger text-xs">{t('fileTree.loadFailed')}</p>
+              <p className="text-tertiary mt-1 text-[11px]">{loadError}</p>
+              <button
+                type="button"
+                className="mt-2 text-xs text-primary underline hover:no-underline"
+                onClick={handleRefresh}
+              >
+                {t('common.refresh')}
+              </button>
+            </div>
           ) : (
             <TreeBranch
               nodes={rootNodes}

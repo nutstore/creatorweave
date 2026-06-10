@@ -15,4 +15,5 @@ export const fileTree = {
       "AI file changes are stored here temporarily. Confirm to save them to your local files",
     draftFiles: "Unconfirmed Changes",
     approvedNotSynced: "Confirmed, waiting to be written to disk",
+    loadFailed: "Directory inaccessible",
 } as const
