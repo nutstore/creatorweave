@@ -93,6 +93,19 @@ export function getFileContentType(path: string): 'text' | 'binary' {
     '.vue',
     '.svelte',
     '.astro',
+    // WeChat Mini Program
+    '.wxml',
+    '.wxss',
+    '.wxs',
+    // Alipay Mini Program
+    '.axml',
+    '.acss',
+    '.sjs',
+    // Baidu Smart Program
+    '.swan',
+    // DingTalk Mini Program
+    '.dxml',
+    '.dss',
     // Data & config
     '.json',
     '.jsonc',

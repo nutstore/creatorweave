@@ -124,6 +124,13 @@ describe('opfs-utils', () => {
       expect(getFileContentType('file.lua')).toBe('text')
       expect(getFileContentType('file.vue')).toBe('text')
       expect(getFileContentType('file.svelte')).toBe('text')
+      // Mini program files
+      expect(getFileContentType('page.wxml')).toBe('text')
+      expect(getFileContentType('style.wxss')).toBe('text')
+      expect(getFileContentType('filter.wxs')).toBe('text')
+      expect(getFileContentType('page.axml')).toBe('text')
+      expect(getFileContentType('style.acss')).toBe('text')
+      expect(getFileContentType('page.swan')).toBe('text')
     })
 
     it('should detect binary files', () => {
