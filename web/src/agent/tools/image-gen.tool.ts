@@ -37,27 +37,17 @@ export function isImageGenAvailable(): boolean {
   const effectiveConfig = useSettingsStore.getState().getEffectiveProviderConfig()
   if (!effectiveConfig) return false
 
-  // Extract short model ID from "google/gemini-2.5-flash-image"
-  const parts = imageGenModel.split('/')
-  const modelShortId = parts.length > 1 ? parts[1] : parts[0]
-
-  // Check the provider's model cache
-  // getCachedModels(providerType, providerKey?) — models are cached with key "${pt}:${pk}"
-  // because useDynamicModels stores with providerKey=providerType, we must query the same way.
-  // We try both (pt, pt) and (pt) to cover all cases (see getModelContextWindow for prior art).
+  // Check the provider's model cache — only exact match against the full
+  // imageGenModel ID (e.g. "openai/gpt-image-2"). We do NOT match by short ID
+  // because the same suffix can exist in non-OpenRouter providers
+  // (e.g. Codex returns "gpt-image-2" as a text model, not an image gen model).
   const providerType = effectiveConfig.apiKeyProviderKey as LLMProviderType
   const cached =
     getCachedModels(providerType, providerType) ||
     getCachedModels(providerType)
   if (!cached) return false
 
-  // Match strategy: exact > short id > contains
-  return cached.some(
-    (m) =>
-      m.id === imageGenModel || // "google/gemini-2.5-flash-image"
-      m.id === modelShortId || // "gemini-2.5-flash-image"
-      m.id.includes(modelShortId), // partial match
-  )
+  return cached.some((m) => m.id === imageGenModel)
 }
 
 //=============================================================================

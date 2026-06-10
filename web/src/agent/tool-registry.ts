@@ -121,14 +121,14 @@ import {
 } from './tools/image-gen.tool'
 import { onModelsUpdated } from './providers/model-store'
 
-// WebMCP on-demand tools (schema loading + execution)
+// Unified external tool bridge (replaces separate MCP + WebMCP tool pairs)
 import {
-  webMCPGetToolSchemaDefinition,
-  webMCPGetToolSchemaExecutor,
-  webMCPToolCallDefinition,
-  webMCPToolCallExecutor,
-  webMCPPromptDoc,
-} from '@/webmcp/tool-bridge'
+  searchToolsDefinition,
+  searchToolsExecutor,
+  callToolDefinition,
+  callToolExecutor,
+  unifiedExternalToolsPromptDoc,
+} from './external-tool-bridge'
 
 const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor }> = [
   // Unified IO tools (read, write, edit)
@@ -198,7 +198,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   askUserQuestionPromptDoc,
   webBridgePromptDoc,
   skillPromptDoc,
-  webMCPPromptDoc,
+  unifiedExternalToolsPromptDoc,
   imageGenPromptDoc,
 ]
 
@@ -259,8 +259,7 @@ export class ToolRegistry {
     for (const doc of ALL_PROMPT_DOCS) {
       // Skip web bridge tools if not available
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
-      // Skip WebMCP tools if globally disabled
-      if (doc.category === 'webmcp' && !useSettingsStore.getState().enableWebMCP) continue
+      // External tools doc always shown — search_tools is always useful even with 0 external tools connected
       // Skip image gen tools if image gen model is not available
       if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
 
@@ -352,10 +351,10 @@ export class ToolRegistry {
     for (const tool of BUILTIN_TOOLS) {
       this.register(tool.definition, tool.executor)
     }
-    // Register WebMCP on-demand tools as builtins — they are always available
-    // as gateway tools regardless of whether WebMCP pages are open.
-    this.register(webMCPGetToolSchemaDefinition, webMCPGetToolSchemaExecutor)
-    this.register(webMCPToolCallDefinition, webMCPToolCallExecutor)
+    // Register unified external tool bridge (search_tools + call_tool)
+    // Replaces the old separate MCP + WebMCP tool pairs
+    this.register(searchToolsDefinition, searchToolsExecutor)
+    this.register(callToolDefinition, callToolExecutor)
     // Conditionally register image generation tool
     this.registerImageGenTool()
   }
@@ -377,7 +376,9 @@ export class ToolRegistry {
   //=============================================================================
 
   /**
-   * Register MCP on-demand tools (2 persistent tools: mcp_get_tool_schema + mcp_call).
+   * Register MCP on-demand tools. The unified external tool bridge (search_tools,
+   * call_tool) is registered as builtins in registerBuiltins().
+   * This method handles MCP server lifecycle (connect, discover tools).
    * The full tool catalog is injected via system prompt, not registered individually.
    */
   async registerMCPTools(): Promise<number> {
@@ -558,6 +559,29 @@ let instance: ToolRegistry | null = null
 /** Whether we've set up the model-cache listener for image gen tool */
 let imageGenListenerSetup = false
 
+// ─── Tool change notification (for UI reactivity) ─────────────────────────────
+
+const toolChangeListeners = new Set<() => void>()
+let toolChangeVersion = 0
+
+/** Subscribe to tool registration/unregistration changes. Returns unsubscribe fn. */
+export function onToolsChanged(listener: () => void): () => void {
+  toolChangeListeners.add(listener)
+  return () => toolChangeListeners.delete(listener)
+}
+
+/** Get current tool change version (incremented on each change). Useful as React key/dep. */
+export function getToolChangeVersion(): number {
+  return toolChangeVersion
+}
+
+function notifyToolsChanged(): void {
+  toolChangeVersion++
+  for (const listener of toolChangeListeners) {
+    try { listener() } catch (err) { console.error('[ToolRegistry] Listener error:', err) }
+  }
+}
+
 /** Ensure the model-cache listener is registered (called once). */
 function ensureImageGenListener(): void {
   if (imageGenListenerSetup) return
@@ -566,7 +590,23 @@ function ensureImageGenListener(): void {
   // Re-check image gen availability when models are cached/updated
   onModelsUpdated(() => {
     if (instance) {
+      const had = instance.has('generate_image')
       instance.registerImageGenTool()
+      const has = instance.has('generate_image')
+      if (had !== has) notifyToolsChanged()
+    }
+  })
+
+  // Re-check image gen availability when provider changes
+  // (e.g. switching from OpenRouter to Codex OAuth should unregister generate_image)
+  useSettingsStore.subscribe((state, prev) => {
+    if (state.providerType !== prev.providerType) {
+      if (instance) {
+        const had = instance.has('generate_image')
+        instance.registerImageGenTool()
+        const has = instance.has('generate_image')
+        if (had !== has) notifyToolsChanged()
+      }
     }
   })
 }

@@ -96,7 +96,8 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   //   console.warn('[AgentLoop] Failed to inject workflow catalog:', error)
   // }
 
-  // ⑤: MCP services (changes per session)
+  // ⑤: MCP services — register on-demand tools + inject compact summary
+  // (full catalog replaced by search_tools; only summary + source list injected)
   try {
     const mcpManager = getMCPManager()
     await mcpManager.initialize()
@@ -107,14 +108,16 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     // Register on-demand MCP tools to ToolRegistry (2 persistent tools only)
     await input.toolRegistry.registerMCPTools()
 
-    // Inject lightweight tool catalog into system prompt
-    const { buildAvailableMCPServicesBlock } = await import('@/mcp/mcp-injection')
-    const mcpBlock = buildAvailableMCPServicesBlock()
-    if (mcpBlock) {
-      enhancedPrompt += '\n\n' + mcpBlock
+    // Inject compact external tools summary instead of full catalog
+    const { buildCompactExternalToolsSummary } = await import('../external-tool-bridge')
+    const summary = buildCompactExternalToolsSummary()
+    if (summary) {
+      enhancedPrompt += '\n\n<available_external_tools>\n\n## Available External Tools\n\n' +
+        'Use search_tools to discover tools and get their full schemas, then call_tool to execute.\n\n' +
+        summary + '\n\n</available_external_tools>'
     }
   } catch (error) {
-    console.warn('[AgentLoop] Failed to inject MCP services:', error)
+    console.warn('[AgentLoop] Failed to inject external tools summary:', error)
   }
 
   // ── DYNAMIC SECTION ─────────────────────────────────────────────────
@@ -139,16 +142,9 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     console.warn('[AgentLoop] Failed to inject skills block:', error)
   }
 
-  // ⑦.5: WebMCP catalog block (available WebMCP tools for on-demand loading)
-  try {
-    const { buildAvailableWebMCPBlock } = await import('@/webmcp/catalog-injection')
-    const webmcpBlock = buildAvailableWebMCPBlock()
-    if (webmcpBlock) {
-      enhancedPrompt += '\n\n' + webmcpBlock
-    }
-  } catch (error) {
-    console.warn('[AgentLoop] Failed to inject WebMCP catalog block:', error)
-  }
+  // ⑦.5: WebMCP catalog — NO LONGER injected as full catalog
+  // WebMCP tools are now discoverable via search_tools alongside MCP tools.
+  // The compact summary in step ⑤ already covers both MCP and WebMCP.
 
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()

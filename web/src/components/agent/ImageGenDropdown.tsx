@@ -31,16 +31,9 @@ const RATIOS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Shorten model display name for the button label */
-function shortName(modelId: string): string {
-  const slashIdx = modelId.indexOf('/')
-  const raw = slashIdx >= 0 ? modelId.slice(slashIdx + 1) : modelId
-  return raw
-    .split('-')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join(' ')
-    .replace(/Image$/i, '')
-    .trim() || raw
+/** Display model ID directly — no pretty-name transformation */
+function displayModelId(modelId: string): string {
+  return modelId
 }
 
 interface ModelEntry {
@@ -65,21 +58,25 @@ function useFilteredImageModels() {
       getCachedModels(providerType, providerType) ||
       getCachedModels(providerType)
 
+    // If no cached models exist for this provider, we cannot determine which
+    // image models are available. Return empty to avoid showing models from
+    // unrelated providers (e.g. showing OpenRouter image models for Codex OAuth).
+    // This is consistent with isImageGenAvailable() which also returns false
+    // when cached is null.
+    if (!cached || cached.length === 0) return [] as ModelEntry[]
+
     const cachedIds = new Set<string>()
-    if (cached) {
-      for (const m of cached) cachedIds.add(m.id)
-    }
+    for (const m of cached) cachedIds.add(m.id)
 
     return registryModels
       .filter((m) => {
-        if (!cached || cachedIds.size === 0) return true
+        // Only exact match against the full registry ID (e.g. "openai/gpt-5-image").
+        // We do NOT match by short ID or substring — the same model ID suffix
+        // can exist in non-OpenRouter providers (e.g. Codex returns "gpt-5-image"
+        // as a text model with vision, not an image generation model).
+        // A full match like cachedIds.has("openai/gpt-5-image") confirms the
+        // provider's backend is actually OpenRouter.
         if (cachedIds.has(m.id)) return true
-        const slashIdx = m.id.indexOf('/')
-        const shortId = slashIdx >= 0 ? m.id.slice(slashIdx + 1) : m.id
-        if (cachedIds.has(shortId)) return true
-        for (const cid of cachedIds) {
-          if (cid.includes(shortId) || shortId.includes(cid)) return true
-        }
         return false
       })
       .map((m) => ({
@@ -134,7 +131,7 @@ export function ImageGenDropdown() {
     return result
   }, [grouped, search])
 
-  const currentShortName = useMemo(() => shortName(imageGenModel), [imageGenModel])
+  const currentDisplay = useMemo(() => displayModelId(imageGenModel), [imageGenModel])
 
   // Focus search input on open
   useEffect(() => {
@@ -167,7 +164,7 @@ export function ImageGenDropdown() {
         <BrandButton variant="outline" className="h-8 max-w-[220px] justify-between gap-1.5 px-2.5 text-xs">
           <span className="flex min-w-0 items-center gap-1.5">
             <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{currentShortName}</span>
+            <span className="truncate">{currentDisplay}</span>
             <span className="shrink-0 text-muted-foreground">{imageGenAspectRatio || '1:1'}</span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
@@ -207,7 +204,7 @@ export function ImageGenDropdown() {
                       : 'text-secondary hover:bg-muted'
                   }`}
                 >
-                  <span className="truncate">{m.name}</span>
+                  <span className="truncate font-mono">{m.id}</span>
                 </button>
               ))}
             </div>

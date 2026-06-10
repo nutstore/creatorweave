@@ -6,7 +6,7 @@
  * Helps users discover what the AI can do.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   X,
   Search,
@@ -15,7 +15,8 @@ import {
   Info,
   Code,
 } from 'lucide-react'
-import { getToolRegistry, getToolCategoryMap } from '@/agent/tool-registry'
+import { getToolRegistry, getToolCategoryMap, onToolsChanged } from '@/agent/tool-registry'
+import { useSettingsStore } from '@/store/settings.store'
 
 //=============================================================================
 // Types
@@ -45,6 +46,13 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set([]))
   const [selectedTool, setSelectedTool] = useState<ToolInfo | null>(null)
+
+  // Re-evaluate tool list when provider changes or tools are registered/unregistered
+  const providerType = useSettingsStore((s) => s.providerType)
+  const [toolVersion, setToolVersion] = useState(0)
+  useEffect(() => {
+    return onToolsChanged(() => setToolVersion((v) => v + 1))
+  }, [])
 
   // Get tool definitions from registry — dynamically build categories
   const toolCategories = useMemo(() => {
@@ -95,7 +103,8 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
       name: section.replace(/^###\s*/, ''),
       tools: groupMap.get(section)!,
     }))
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerType, toolVersion])
 
   // Filter categories based on search
   const filteredCategories = useMemo(() => {
