@@ -7,4 +7,6 @@ export const assets = {
     empty: "아직 에셋이 없습니다",
     refresh: "새로고침",
     files: "개 파일",
+    clearAll: "전체 삭제",
+    confirmClearAll: "전체 삭제하시겠습니까?",
 } as const

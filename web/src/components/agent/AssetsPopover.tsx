@@ -21,6 +21,7 @@ import {
   FileArchive,
   Music,
   Video,
+  Trash,
 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetInventoryStore } from '@/store/asset-inventory.store'
@@ -217,6 +218,9 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
   const loadedWorkspaceId = useAssetInventoryStore((s) => s.loadedWorkspaceId)
   const refresh = useAssetInventoryStore((s) => s.refresh)
   const deleteAsset = useAssetInventoryStore((s) => s.deleteAsset)
+  const clearAll = useAssetInventoryStore((s) => s.clearAll)
+
+  const [confirmClear, setConfirmClear] = useState(false)
 
   // Refresh when convId changes (initial load & workspace switch)
   // Also refresh when popover opens if workspace changed since last load
@@ -285,6 +289,7 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
     await refresh()
   }, [refresh])
 
+
   return (
     <>
       {/* Trigger button */}
@@ -319,6 +324,36 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
               {t('assets.title', { defaultValue: 'Assets' })}
             </span>
             <div className="flex items-center gap-1">
+              {confirmClear ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-red-500 font-medium">
+                    {t('assets.confirmClearAll', { defaultValue: 'Clear all?' })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => { setConfirmClear(false); clearAll() }}
+                    className="rounded px-1 py-0.5 text-[10px] font-medium text-white bg-red-500 hover:bg-red-600"
+                  >
+                    {t('common.confirm', { defaultValue: 'Confirm' })}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClear(false)}
+                    className="rounded px-1 py-0.5 text-[10px] text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700"
+                  >
+                    {t('common.cancel', { defaultValue: 'Cancel' })}
+                  </button>
+                </div>
+              ) : items.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => { setConfirmClear(true); setTimeout(() => setConfirmClear(false), 4000) }}
+                  className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                  title={t('assets.clearAll', { defaultValue: 'Clear all' })}
+                >
+                  <Trash className="h-3 w-3" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={handleRefresh}

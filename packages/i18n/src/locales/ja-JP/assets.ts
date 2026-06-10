@@ -7,4 +7,6 @@ export const assets = {
     empty: "アセットはまだありません",
     refresh: "更新",
     files: "ファイル",
+    clearAll: "すべてクリア",
+    confirmClearAll: "すべてクリアしますか？",
 } as const

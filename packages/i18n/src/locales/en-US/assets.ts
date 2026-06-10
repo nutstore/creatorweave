@@ -7,4 +7,6 @@ export const assets = {
     empty: "No assets yet",
     refresh: "Refresh",
     files: "files",
+    clearAll: "Clear all",
+    confirmClearAll: "Clear all?",
 } as const

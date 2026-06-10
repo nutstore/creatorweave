@@ -8,4 +8,6 @@ export const assets = {
     empty: "暂无资产文件",
     refresh: "刷新",
     files: "个文件",
+    clearAll: "清空全部",
+    confirmClearAll: "确定清空全部？",
 } as const

@@ -37,6 +37,8 @@ interface AssetInventoryState {
   refresh: () => Promise<void>
   /** Delete an asset file by relative path */
   deleteAsset: (path: string) => Promise<void>
+  /** Delete all asset files */
+  clearAll: () => Promise<void>
 }
 
 async function scanAssetsRecursively(
@@ -128,6 +130,24 @@ export const useAssetInventoryStore = create<AssetInventoryState>((set, _get) =>
       set({ items })
     } catch (err) {
       console.error('[AssetInventory] Failed to delete asset:', err)
+    }
+  },
+
+  clearAll: async () => {
+    try {
+      const active = await getActiveConversation()
+      if (!active) return
+
+      const assetsDir = await active.conversation.getAssetsDir()
+
+      // Remove all entries in the root assets directory
+      for await (const entry of assetsDir.values()) {
+        await assetsDir.removeEntry(entry.name, { recursive: true })
+      }
+
+      set({ items: [] })
+    } catch (err) {
+      console.error('[AssetInventory] Failed to clear assets:', err)
     }
   },
 }))
