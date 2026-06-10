@@ -292,13 +292,15 @@ export const searchDefinition: ToolDefinition = {
     name: 'search',
     description:
       'Search keyword/pattern in file contents and return matched file/line locations. ' +
-      'Use this before read() when you need to locate relevant code or text quickly.',
+      'Use this before read() when you need to locate relevant code or text quickly. ' +
+      'TIP: Prefer English keywords for search queries (most source code and identifiers use English). ' +
+      'If English results are poor, retry with the user\'s language (e.g. Chinese comments).',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'Required search query (use mode="literal" for plain text or mode="regex" for patterns).',
+          description: 'Required search query (use mode="literal" for plain text or mode="regex" for patterns). Prefer English keywords since source code is typically in English. If no results, try the user\'s native language (e.g. Chinese for comments/docs).',
         },
         path: {
           type: 'string',
