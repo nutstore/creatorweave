@@ -1,7 +1,7 @@
 /**
  * Tool Searcher — a specialized agent for semantic tool search.
  *
- * Spawned by search_tools when use_subagent=true.
+ * Spawned by search_tools when semantic=true.
  * Uses an LLM to match user intent against all external tool descriptions,
  * then returns structured results with full parameter schemas.
  *

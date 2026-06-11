@@ -248,12 +248,12 @@ export const searchToolsDefinition: ToolDefinition = {
           description:
             'Filter by tool source. "mcp" = page-outside MCP servers, "webmcp" = page API tools. Default: "all".',
         },
-        use_subagent: {
+        semantic: {
           type: 'boolean',
           description:
-            'When true, use an LLM-powered subagent for semantic search instead of BM25 keyword matching. ' +
-            'Use this when BM25 results are poor or when the query is in a different language than the tool descriptions. ' +
-            'Default: false (BM25, faster).',
+            'When true, use semantic search (LLM-powered) instead of keyword matching. ' +
+            'Use this when keyword results are poor or when the query is in a different language than the tool descriptions. ' +
+            'Default: false (keyword matching, faster).',
         },
         limit: {
           type: 'number',
@@ -266,10 +266,10 @@ export const searchToolsDefinition: ToolDefinition = {
 }
 
 export const searchToolsExecutor: ToolExecutor = async (args, context) => {
-  const { query, source: sourceFilter = 'all', use_subagent = false, limit = 5 } = args as {
+  const { query, source: sourceFilter = 'all', semantic = false, limit = 5 } = args as {
     query: string
     source?: 'all' | 'mcp' | 'webmcp'
-    use_subagent?: boolean
+    semantic?: boolean
     limit?: number
   }
 
@@ -284,7 +284,7 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
   }
 
   // ── Subagent semantic search path ──
-  if (use_subagent) {
+  if (semantic) {
     try {
       const { runToolSearcher } = await import('./subagents/tool-searcher')
 
@@ -298,7 +298,7 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
       const provider = context.provider
 
       if (!provider) {
-        console.warn('[search_tools] use_subagent=true but no provider in ToolContext, falling back to BM25')
+        console.warn('[search_tools] semantic=true but no provider in ToolContext, falling back to BM25')
       } else {
 
         const result = await runToolSearcher(

@@ -21,14 +21,14 @@ registerRenderer({
     const t = useT()
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractSearchResults(ctx)
-    const useSubagent = ctx.args.use_subagent === true
+    const useSemantic = ctx.args.semantic === true
     const data = ctx.result?.data as Record<string, unknown> | undefined
     const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">search_tools</code>
-        {useSubagent && (ctx.isExecuting || ctx.isStreaming) && (
+        {useSemantic && (ctx.isExecuting || ctx.isStreaming) && (
           <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 shrink-0">
             {t('agent.toolSearch.aiLabel')}
           </span>
@@ -60,17 +60,17 @@ registerRenderer({
     const t = useT()
     const results = extractSearchResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
-    const useSubagent = ctx.args.use_subagent === true
+    const useSemantic = ctx.args.semantic === true
     const data = ctx.result?.data as Record<string, unknown> | undefined
     const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
 
-    if (ctx.isExecuting) return <StreamingPlaceholder count={2} useSubagent={useSubagent} />
+    if (ctx.isExecuting) return <StreamingPlaceholder count={2} useSemantic={useSemantic} />
     if (ctx.isError) return <ErrorDetail ctx={ctx} />
 
     if (results.length === 0) {
       return (
         <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
-          No tools matched "{query}". {useSubagent ? 'Try different keywords or fall back to BM25.' : 'Try different keywords.'}
+          No tools matched "{query}". {useSemantic ? 'Try different keywords or fall back to keyword matching.' : 'Try different keywords.'}
         </div>
       )
     }
@@ -86,7 +86,7 @@ registerRenderer({
               {t('agent.toolSearch.aiSearchBadge')}
             </span>
           )}
-          {useSubagent && searchMode !== 'subagent' && (
+          {useSemantic && searchMode !== 'subagent' && (
             <span className="font-mono px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
               {t('agent.toolSearch.bm25Fallback')}
             </span>
@@ -306,11 +306,11 @@ function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
   )
 }
 
-function StreamingPlaceholder({ count = 3, useSubagent = false }: { count?: number; useSubagent?: boolean }) {
+function StreamingPlaceholder({ count = 3, useSemantic = false }: { count?: number; useSemantic?: boolean }) {
   const t = useT()
   return (
     <div className="px-3 py-2 space-y-2">
-      {useSubagent && (
+      {useSemantic && (
         <div className="flex items-center gap-1.5 text-[10px] text-amber-500 dark:text-amber-400 mb-1">
           <span className="animate-pulse">{t('agent.toolSearch.aiSearchInProgress')}</span>
         </div>

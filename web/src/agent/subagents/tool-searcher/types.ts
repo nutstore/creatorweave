@@ -1,7 +1,7 @@
 /**
  * Types for the Tool Searcher specialized agent.
  *
- * This agent is spawned by search_tools (when use_subagent=true) to perform
+ * This agent is spawned by search_tools (when semantic=true) to perform
  * semantic tool matching across all external tool descriptions using an LLM.
  */
 
