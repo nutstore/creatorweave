@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
 import { getIntelligenceCoordinator } from '@/agent/intelligence-coordinator'
+import { useT } from '@/i18n'
 
 //=============================================================================
 // Types
@@ -60,6 +61,7 @@ const SUGGESTION_ICONS: Record<string, React.ElementType> = {
 //=============================================================================
 
 export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestionsProps) {
+  const t = useT()
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [isDragOver, setIsDragOver] = useState(false)
 
@@ -102,8 +104,8 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
     items.push({
       id: 'workflow-code-analysis',
       type: 'workflow',
-      title: 'Analyze Project Code',
-      description: 'Inspect structure, functions, types, and dependencies',
+      title: t('tools.analyzeProjectCode'),
+      description: t('tools.analyzeProjectCodeDesc'),
       icon: Lightbulb,
       action: () => {
         onExecutePrompt?.('Analyze the code structure in this project')
@@ -115,8 +117,8 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
       items.push({
         id: 'upload-directory',
         type: 'upload',
-        title: 'Select Project Folder',
-        description: 'Choose a folder to analyze',
+        title: t('tools.selectProjectFolderShort'),
+        description: t('tools.selectFolderToAnalyzeShort'),
         icon: Upload,
         action: () => {
           // This will be handled by the parent component
@@ -126,7 +128,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
     }
 
     setSuggestions(items.slice(0, 6))
-  }, [directoryHandle, onExecutePrompt])
+  }, [directoryHandle, onExecutePrompt, t])
 
   // Generate suggestions on mount and when directory changes
   useEffect(() => {
@@ -190,7 +192,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
         <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/70 transition-colors dark:border-primary-900/50 dark:bg-primary-950/10">
           <div className="text-center">
             <Upload className="mx-auto mb-2 h-8 w-8 text-primary-600" />
-            <p className="text-primary-900 text-sm font-medium dark:text-primary-200">Drop files to analyze</p>
+            <p className="text-sm font-medium text-primary-900 dark:text-primary-200">{t('tools.dropFilesToAnalyze')}</p>
           </div>
         </div>
       )}
@@ -199,12 +201,12 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary-600" />
-          <h3 className="text-sm font-medium text-secondary dark:text-muted">Smart Suggestions</h3>
+          <h3 className="text-sm font-medium text-secondary dark:text-muted">{t('tools.smartSuggestions')}</h3>
         </div>
         <button
           onClick={generateSuggestions}
           className="rounded-lg p-1 text-tertiary transition-colors hover:bg-muted hover:text-secondary dark:text-muted dark:bg-muted dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-          title="Refresh suggestions"
+          title={t('tools.refreshSuggestions')}
         >
           <TrendingUp className="h-3.5 w-3.5" />
         </button>
@@ -218,7 +220,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
             <button
               key={item.id}
               onClick={() => handleSuggestionClick(item)}
-              className="hover:border-primary-300 group flex w-full items-center gap-3 rounded-xl border border-border bg-white p-3 text-left transition-all hover:bg-primary-50/50 hover:shadow-sm dark:border-border dark:bg-card dark:hover:bg-neutral-800"
+              className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary-300 hover:bg-primary-50/50 hover:shadow-sm dark:border-border dark:bg-card dark:hover:bg-neutral-800"
             >
               <div
                 className={`rounded-lg p-2 ${
@@ -236,24 +238,24 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="group-hover:text-primary-900 text-sm font-medium text-primary dark:text-primary-foreground dark:group-hover:text-primary-200">
+                <p className="text-sm font-medium text-primary group-hover:text-primary-900 dark:text-primary-foreground dark:group-hover:text-primary-200">
                   {item.title}
                 </p>
                 <p className="mt-0.5 line-clamp-1 text-xs text-tertiary dark:text-muted">{item.description}</p>
               </div>
-              <ChevronRight className="h-4 w-4 text-tertiary dark:text-muted transition-colors group-hover:text-primary-600" />
+              <ChevronRight className="h-4 w-4 text-tertiary transition-colors group-hover:text-primary-600 dark:text-muted" />
             </button>
           )
         })}
 
         {/* Empty state */}
         {suggestions.length === 0 && (
-          <div className="rounded-xl border border-dashed border border-border dark:border-border bg-muted dark:bg-muted p-6 text-center dark:border-border dark:bg-card">
+          <div className="rounded-xl border border-dashed border-border bg-muted/50 p-6 text-center dark:border-border dark:bg-muted/50">
             <Lightbulb className="mx-auto mb-2 h-8 w-8 text-tertiary dark:text-muted" />
             <p className="text-sm text-secondary dark:text-muted">
               {directoryHandle
-                ? 'Select a folder to get personalized suggestions'
-                : 'No suggestions available'}
+                ? t('tools.selectFolderForSuggestions')
+                : t('tools.noSuggestionsAvailable')}
             </p>
           </div>
         )}
@@ -273,6 +275,7 @@ interface InlineSuggestionsProps {
 }
 
 export function InlineSuggestions({ userInput, onSelect, isVisible }: InlineSuggestionsProps) {
+  const t = useT()
   const [suggestions, setSuggestions] = useState<string[]>([])
 
   useEffect(() => {
@@ -294,35 +297,35 @@ export function InlineSuggestions({ userInput, onSelect, isVisible }: InlineSugg
     const lowerInput = userInput.toLowerCase()
 
     if (lowerInput.includes('help') || lowerInput.includes('what can')) {
-      prompts.push('Show me all available tools and capabilities')
+      prompts.push(t('tools.showAvailableTools'))
     }
 
     if (lowerInput.includes('find') || lowerInput.includes('search')) {
-      prompts.push('Find all files matching a pattern')
-      prompts.push('Search for text inside files')
+      prompts.push(t('tools.findFilesMatchingPattern'))
+      prompts.push(t('tools.searchTextInsideFiles'))
     }
 
     if (lowerInput.includes('analyze') || lowerInput.includes('understand')) {
-      prompts.push('Analyze the project structure')
-      prompts.push('Explain how the code works')
+      prompts.push(t('tools.analyzeProjectStructure'))
+      prompts.push(t('tools.explainHowCodeWorks'))
     }
 
     setSuggestions([...new Set(prompts)].slice(0, 4))
-  }, [userInput, isVisible])
+  }, [userInput, isVisible, t])
 
   if (!isVisible || suggestions.length === 0) {
     return null
   }
 
   return (
-    <div className="mb-2 rounded-xl border border-border bg-muted p-2 dark:border-border dark:bg-card">
-      <p className="mb-2 px-2 text-xs font-medium text-tertiary dark:text-muted">Suggestions</p>
+    <div className="mb-2 rounded-xl border border-border bg-muted/50 p-2 dark:border-border dark:bg-muted/50">
+      <p className="mb-2 px-2 text-xs font-medium text-tertiary dark:text-muted">{t('tools.suggestions')}</p>
       <div className="flex flex-wrap gap-2">
         {suggestions.map((suggestion, idx) => (
           <button
             key={idx}
             onClick={() => onSelect(suggestion)}
-            className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-secondary dark:text-muted transition-colors hover:bg-primary-50 hover:text-primary-700 dark:bg-muted dark:text-muted dark:hover:bg-primary-900/30 dark:hover:text-primary-200"
+            className="rounded-lg bg-card px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-primary-50 hover:text-primary-700 dark:bg-card dark:text-muted dark:hover:bg-primary-900/30 dark:hover:text-primary-200"
           >
             {suggestion}
           </button>

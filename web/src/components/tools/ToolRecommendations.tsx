@@ -13,6 +13,7 @@ import { useState, useEffect } from 'react'
 import { Lightbulb, Sparkles, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react'
 import { getIntelligenceCoordinator } from '@/agent/intelligence-coordinator'
 import type { ToolRecommendation } from '@/agent/tools/tool-recommendation'
+import { useT } from '@/i18n'
 
 //=============================================================================
 // Types
@@ -39,6 +40,7 @@ export function ToolRecommendations({
   maxResults = 3,
   className = '',
 }: ToolRecommendationsProps) {
+  const t = useT()
   const [recommendations, setRecommendations] = useState<ToolRecommendation[]>([])
   const [isExpanded, setIsExpanded] = useState(!compact)
   const [copiedTool, setCopiedTool] = useState<string | null>(null)
@@ -76,7 +78,9 @@ export function ToolRecommendations({
       >
         <Sparkles className="h-3.5 w-3.5" />
         <span>
-          {recommendations.length} tool suggestion{recommendations.length > 1 ? 's' : ''}
+          {recommendations.length === 1
+            ? t('tools.toolSuggestion', { count: recommendations.length })
+            : t('tools.toolSuggestions', { count: recommendations.length })}
         </span>
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
@@ -92,16 +96,16 @@ export function ToolRecommendations({
             <Lightbulb className="h-4 w-4 text-warning" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">Recommended Tools</h3>
+            <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">{t('tools.recommendedTools')}</h3>
             <p className="text-xs text-tertiary dark:text-muted">
-              Based on your message, these tools might help
+              {t('tools.basedOnMessage')}
             </p>
           </div>
         </div>
         {compact && (
           <button
             onClick={() => setIsExpanded(false)}
-            className="rounded-lg p-1.5 text-tertiary dark:text-muted transition-colors hover:bg-muted dark:hover:bg-muted hover:text-secondary dark:text-muted dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            className="rounded-lg p-1.5 text-tertiary transition-colors hover:bg-muted hover:text-secondary dark:text-muted dark:hover:bg-muted dark:hover:text-muted"
           >
             <ChevronUp className="h-4 w-4" />
           </button>
@@ -134,7 +138,7 @@ export function ToolRecommendations({
 
                 {/* Example */}
                 <div className="group relative">
-                  <div className="rounded-lg border border-border bg-white px-3 py-2 dark:border-border dark:bg-card">
+                  <div className="rounded-lg border border-border bg-card px-3 py-2 dark:border-border dark:bg-card">
                     <code className="block overflow-x-auto text-xs text-neutral-700 dark:text-muted">
                       {rec.example}
                     </code>
@@ -142,7 +146,7 @@ export function ToolRecommendations({
                   {/* Copy button */}
                   <button
                     onClick={() => copyExample(rec.example, rec.toolName)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-tertiary dark:text-muted opacity-0 transition-opacity hover:bg-muted dark:hover:bg-muted hover:text-secondary dark:text-muted group-hover:opacity-100 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-tertiary opacity-0 transition-opacity hover:bg-muted hover:text-secondary group-hover:opacity-100 dark:text-muted dark:hover:bg-muted dark:hover:text-muted"
                   >
                     {copiedTool === rec.toolName ? (
                       <Check className="h-4 w-4 text-green-500" />
@@ -154,7 +158,7 @@ export function ToolRecommendations({
               </div>
 
               {/* Category badge */}
-              <span className="flex-shrink-0 rounded-md border border-border bg-white px-2 py-1 text-xs font-medium text-secondary dark:border-border dark:bg-card dark:text-muted">
+              <span className="flex-shrink-0 rounded-md border border-border bg-card px-2 py-1 text-xs font-medium text-secondary dark:border-border dark:bg-card dark:text-muted">
                 {rec.category}
               </span>
             </div>
@@ -165,7 +169,7 @@ export function ToolRecommendations({
       {/* Footer hint */}
       <div className="border-t border-warning/50 bg-warning-bg/30 px-4 py-2">
         <p className="text-center text-xs text-tertiary dark:text-muted">
-          These tools are automatically suggested based on your intent
+          {t('tools.autoSuggestedHint')}
         </p>
       </div>
     </div>
@@ -182,6 +186,7 @@ interface InlineToolSuggestionProps {
 }
 
 export function InlineToolSuggestion({ userMessage, onSelectExample }: InlineToolSuggestionProps) {
+  const t = useT()
   const [suggestions, setSuggestions] = useState<ToolRecommendation[]>([])
 
   useEffect(() => {
@@ -199,12 +204,12 @@ export function InlineToolSuggestion({ userMessage, onSelectExample }: InlineToo
 
   return (
     <div className="flex items-center gap-2 px-2 py-1">
-      <span className="text-xs text-tertiary dark:text-muted dark:text-neutral-500">Try:</span>
+      <span className="text-xs text-tertiary dark:text-muted">{t('tools.tryLabel')}</span>
       {suggestions.map((rec) => (
         <button
           key={rec.toolName}
           onClick={() => onSelectExample(rec.example)}
-          className="inline-flex items-center gap-1 rounded-md bg-muted dark:bg-muted px-2 py-1 text-xs text-secondary dark:text-muted transition-colors hover:bg-muted dark:hover:bg-muted dark:bg-muted dark:text-muted dark:hover:bg-neutral-700"
+          className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs text-secondary transition-colors hover:bg-muted dark:bg-muted dark:text-muted dark:hover:bg-neutral-700"
         >
           <Sparkles className="h-3 w-3 text-amber-500" />
           <code className="text-xs">{rec.toolName}</code>
@@ -217,4 +222,3 @@ export function InlineToolSuggestion({ userMessage, onSelectExample }: InlineToo
 //=============================================================================
 // Project Type Badge Component
 //=============================================================================
-

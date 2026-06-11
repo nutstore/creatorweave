@@ -28,6 +28,7 @@ import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { assets } from './assets'
+import { tools } from './tools'
 
 export const koKR = {
   common,
@@ -78,4 +79,5 @@ export const koKR = {
   workflow,
   questionCard,
   assets,
+  tools,
 } as const

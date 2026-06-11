@@ -1,5 +1,6 @@
 export { ToolsPanel } from './ToolsPanel'
 export { QuickActionsPanel } from './QuickActionsPanel'
 export { SmartSuggestions, InlineSuggestions } from './SmartSuggestions'
+export { ToolRecommendations, InlineToolSuggestion } from './ToolRecommendations'
 export { DropZone, CompactDropZone } from './DropZone'
 export { ReasoningVisualization, InlineReasoning, ProgressBar } from './ReasoningVisualization'

@@ -30,6 +30,7 @@ import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { extension } from './extension'
 import { assets } from './assets'
+import { tools } from './tools'
 
 export const enUS = {
   common,
@@ -82,4 +83,5 @@ export const enUS = {
   questionCard,
   extension,
   assets,
+  tools,
 } as const

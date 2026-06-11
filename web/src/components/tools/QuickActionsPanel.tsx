@@ -29,16 +29,15 @@ import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { getIntelligenceCoordinator } from '@/agent/intelligence-coordinator'
+import { useT } from '@/i18n'
 
 //=============================================================================
 // Types
-//=============================================================================
+//==============================================================================
 
 interface QuickAction {
   id: string
-  label: string
   labelKey: string
-  description: string
   descriptionKey: string
   icon: React.ElementType
   prompt: string
@@ -55,20 +54,16 @@ const QUICK_ACTIONS: QuickAction[] = [
   // File Discovery
   {
     id: 'find-files',
-    label: 'Find Files',
-    labelKey: 'quickActions.findFiles',
-    description: 'Search for files by pattern',
-    descriptionKey: 'quickActions.findFiles.description',
+    labelKey: 'tools.quickActionsItems.findFiles',
+    descriptionKey: 'tools.quickActionsItems.findFilesDesc',
     icon: FileSearch,
     category: 'discovery',
     prompt: 'Find all TypeScript files in the src directory',
   },
   {
     id: 'search-code',
-    label: 'Search Code',
-    labelKey: 'quickActions.searchCode',
-    description: 'Search for text in files',
-    descriptionKey: 'quickActions.searchCode.description',
+    labelKey: 'tools.quickActionsItems.searchCode',
+    descriptionKey: 'tools.quickActionsItems.searchCodeDesc',
     icon: FileSearch,
     category: 'discovery',
     prompt: 'Search for "function" in all .ts files',
@@ -77,20 +72,16 @@ const QUICK_ACTIONS: QuickAction[] = [
   // Code Operations
   {
     id: 'explain-code',
-    label: 'Explain Code',
-    labelKey: 'quickActions.explainCode',
-    description: 'Get an explanation of code',
-    descriptionKey: 'quickActions.explainCode.description',
+    labelKey: 'tools.quickActionsItems.explainCode',
+    descriptionKey: 'tools.quickActionsItems.explainCodeDesc',
     icon: Code,
     category: 'code',
     prompt: 'Explain what this file does',
   },
   {
     id: 'run-python',
-    label: 'Run Python',
-    labelKey: 'quickActions.runPython',
-    description: 'Execute Python code',
-    descriptionKey: 'quickActions.runPython.description',
+    labelKey: 'tools.quickActionsItems.runPython',
+    descriptionKey: 'tools.quickActionsItems.runPythonDesc',
     icon: Terminal,
     category: 'code',
     prompt: 'I want to run some Python code',
@@ -99,20 +90,16 @@ const QUICK_ACTIONS: QuickAction[] = [
   // Data Analysis
   {
     id: 'analyze-csv',
-    label: 'Analyze CSV',
-    labelKey: 'quickActions.analyzeCSV',
-    description: 'Analyze CSV data',
-    descriptionKey: 'quickActions.analyzeCSV.description',
+    labelKey: 'tools.quickActionsItems.analyzeCSV',
+    descriptionKey: 'tools.quickActionsItems.analyzeCSVDesc',
     icon: BarChart3,
     category: 'analysis',
     prompt: 'Find CSV files and analyze them',
   },
   {
     id: 'create-chart',
-    label: 'Create Chart',
-    labelKey: 'quickActions.createChart',
-    description: 'Generate charts from data',
-    descriptionKey: 'quickActions.createChart.description',
+    labelKey: 'tools.quickActionsItems.createChart',
+    descriptionKey: 'tools.quickActionsItems.createChartDesc',
     icon: BarChart3,
     category: 'analysis',
     prompt: 'Create a chart from the data',
@@ -121,46 +108,19 @@ const QUICK_ACTIONS: QuickAction[] = [
   // Automation
   {
     id: 'batch-rename',
-    label: 'Batch Rename',
-    labelKey: 'quickActions.batchRename',
-    description: 'Rename multiple files',
-    descriptionKey: 'quickActions.batchRename.description',
+    labelKey: 'tools.quickActionsItems.batchRename',
+    descriptionKey: 'tools.quickActionsItems.batchRenameDesc',
     icon: Zap,
     category: 'automation',
     prompt: 'Help me rename multiple files at once',
   },
   {
     id: 'convert-files',
-    label: 'Convert Files',
-    labelKey: 'quickActions.convertFiles',
-    description: 'Convert file formats',
-    descriptionKey: 'quickActions.convertFiles.description',
+    labelKey: 'tools.quickActionsItems.convertFiles',
+    descriptionKey: 'tools.quickActionsItems.convertFilesDesc',
     icon: Zap,
     category: 'automation',
     prompt: 'Convert files from one format to another',
-  },
-]
-
-const CATEGORIES = [
-  { id: 'all', name: 'All', nameKey: 'quickActions.categories.all', icon: Zap },
-  {
-    id: 'discovery',
-    name: 'Discovery',
-    nameKey: 'quickActions.categories.discovery',
-    icon: FileSearch,
-  },
-  { id: 'code', name: 'Code', nameKey: 'quickActions.categories.code', icon: Code },
-  {
-    id: 'analysis',
-    name: 'Analysis',
-    nameKey: 'quickActions.categories.analysis',
-    icon: BarChart3,
-  },
-  {
-    id: 'automation',
-    name: 'Automation',
-    nameKey: 'quickActions.categories.automation',
-    icon: Zap,
   },
 ]
 
@@ -185,6 +145,7 @@ export function QuickActionsPanel({
   onStartConversation,
   activeTab: controlledTab,
 }: QuickActionsPanelProps) {
+  const t = useT()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<ActionCategory>('all')
   const [recentFiles, setRecentFiles] = useState<string[]>([])
@@ -261,10 +222,12 @@ export function QuickActionsPanel({
   // Filter actions by category and search
   const filteredActions = QUICK_ACTIONS.filter((action) => {
     const matchesCategory = selectedCategory === 'all' || action.category === selectedCategory
+    const label = t(action.labelKey)
+    const description = t(action.descriptionKey)
     const matchesSearch =
       !searchQuery.trim() ||
-      action.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      action.description.toLowerCase().includes(searchQuery.toLowerCase())
+      label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      description.toLowerCase().includes(searchQuery.toLowerCase())
     return matchesCategory && matchesSearch
   })
 
@@ -284,7 +247,7 @@ export function QuickActionsPanel({
         onStartConversation(action.prompt)
       } else {
         // Fallback: create new conversation
-        const conv = createNew(action.label)
+        const conv = createNew(t(action.labelKey))
         setActive(conv.id)
         setTimeout(() => {
           const userMsg = createUserMessage(action.prompt)
@@ -310,6 +273,7 @@ export function QuickActionsPanel({
       providerType,
       modelName,
       maxTokens,
+      t,
     ]
   )
 
@@ -324,20 +288,34 @@ export function QuickActionsPanel({
     }
   }
 
+  // Category definitions with i18n keys
+  const categories = [
+    { id: 'all', nameKey: 'tools.categories.all', icon: Zap },
+    { id: 'discovery', nameKey: 'tools.categories.discovery', icon: FileSearch },
+    { id: 'code', nameKey: 'tools.categories.code', icon: Code },
+    { id: 'analysis', nameKey: 'tools.categories.analysis', icon: BarChart3 },
+    { id: 'automation', nameKey: 'tools.categories.automation', icon: Zap },
+  ]
+
   if (!isOpen) return null
 
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black/20 transition-opacity" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity" onClick={onClose} />
 
       {/* Panel */}
-      <div className="fixed left-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-card shadow-xl dark:bg-card">
+      <div className="fixed left-0 top-0 z-50 flex h-full w-full max-w-sm flex-col bg-card shadow-2xl dark:bg-card">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border px-6 py-4 dark:border-border">
-          <div>
-            <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">Quick Actions</h2>
-            <p className="text-sm text-tertiary dark:text-muted">Common tasks and shortcuts</p>
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-900/30">
+              <Zap className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-primary dark:text-primary-foreground">{t('tools.quickActions')}</h2>
+              <p className="text-xs text-tertiary dark:text-muted">{t('tools.commonTasks')}</p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -348,39 +326,39 @@ export function QuickActionsPanel({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border px-2 dark:border-border">
+        <div className="flex border-b border-border px-2">
           <button
             onClick={() => setActiveTab('actions')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'actions'
-                ? 'border-b-2 border-primary-500 text-primary-600'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
             <Zap className="h-4 w-4" />
-            Actions
+            {t('tools.actions')}
           </button>
           <button
             onClick={() => setActiveTab('smart')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'smart'
-                ? 'border-b-2 border-primary-500 text-primary-600'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
             <Sparkles className="h-4 w-4" />
-            Smart
+            {t('tools.smart')}
           </button>
           <button
             onClick={() => setActiveTab('upload')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'upload'
-                ? 'border-b-2 border-primary-500 text-primary-600'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
             <FolderOpen className="h-4 w-4" />
-            Upload
+            {t('tools.upload')}
           </button>
         </div>
 
@@ -397,15 +375,15 @@ export function QuickActionsPanel({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search actions..."
-                    className="focus:border-primary-300 w-full rounded-lg border border bg-muted py-2 pl-10 pr-4 text-sm focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+                    placeholder={t('tools.searchActions')}
+                    className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary-foreground placeholder:text-tertiary focus:border-primary-300 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
                   />
                 </div>
               </div>
 
               {/* Category Tabs */}
               <div className="mb-4 flex gap-1 overflow-x-auto">
-                {CATEGORIES.map((cat) => {
+                {categories.map((cat) => {
                   const Icon = cat.icon
                   const isActive = selectedCategory === cat.id
                   return (
@@ -419,7 +397,7 @@ export function QuickActionsPanel({
                       }`}
                     >
                       <Icon className="h-3.5 w-3.5" />
-                      <span>{cat.name}</span>
+                      <span>{t(cat.nameKey)}</span>
                     </button>
                   )
                 })}
@@ -433,14 +411,14 @@ export function QuickActionsPanel({
                     <button
                       key={action.id}
                       onClick={() => handleActionClick(action)}
-                      className="hover:border-primary-300 flex w-full items-start gap-3 rounded-xl border border p-3 text-left transition-colors hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-900/20"
+                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-900/20"
                     >
                       <div className="mt-0.5 rounded-lg bg-primary-50 p-2 dark:bg-primary-900/20">
-                        <Icon className="h-4 w-4 text-primary-600" />
+                        <Icon className="h-4 w-4 text-primary-600 dark:text-primary-400" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-primary dark:text-primary-foreground">{action.label}</p>
-                        <p className="mt-0.5 text-xs text-tertiary dark:text-muted">{action.description}</p>
+                        <p className="text-sm font-medium text-primary dark:text-primary-foreground">{t(action.labelKey)}</p>
+                        <p className="mt-0.5 text-xs text-tertiary dark:text-muted">{t(action.descriptionKey)}</p>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 text-tertiary" />
                     </button>
@@ -451,8 +429,8 @@ export function QuickActionsPanel({
               {/* Recent Files */}
               {recentFiles.length > 0 && (
                 <div className="mt-6">
-                  <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary">
-                    Recent Files
+                  <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary dark:text-muted">
+                    {t('tools.recentFiles')}
                   </h3>
                   <div className="space-y-1">
                     {recentFiles.map((file, idx) => (
@@ -476,7 +454,7 @@ export function QuickActionsPanel({
               {/* Smart Suggestions */}
               <div className="mb-2">
                 <div className="mb-3 flex items-center justify-between">
-                  <h3 className="text-sm font-medium text-secondary dark:text-muted">Suggested for You</h3>
+                  <h3 className="text-sm font-medium text-secondary dark:text-muted">{t('tools.suggestedForYou')}</h3>
                   <button
                     onClick={() => {
                       // Refresh suggestions
@@ -498,7 +476,7 @@ export function QuickActionsPanel({
                       setSmartSuggestions(suggestions)
                     }}
                     className="rounded p-1 text-tertiary transition-colors hover:bg-muted hover:text-secondary dark:text-muted dark:hover:bg-muted dark:hover:text-muted"
-                    title="Refresh suggestions"
+                    title={t('tools.refreshSuggestions')}
                   >
                     <TrendingUp className="h-4 w-4" />
                   </button>
@@ -529,10 +507,10 @@ export function QuickActionsPanel({
                         }
                         onClose()
                       }}
-                      className="hover:border-primary-300 flex w-full items-start gap-3 rounded-xl border border p-3 text-left transition-colors hover:bg-primary-50/50"
+                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-900/20"
                     >
-                      <div className="mt-0.5 rounded-lg bg-primary-50/60 p-2">
-                        <Sparkles className="h-4 w-4 text-primary-600" />
+                      <div className="mt-0.5 rounded-lg bg-primary-50/60 p-2 dark:bg-primary-900/20">
+                        <Sparkles className="h-4 w-4 text-primary-600 dark:text-primary-400" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-primary dark:text-primary-foreground">{suggestion.title}</p>
@@ -546,8 +524,8 @@ export function QuickActionsPanel({
 
               {/* TypeScript Actions */}
               <div className="mt-6">
-                <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary">
-                  TypeScript Actions
+                <h3 className="mb-3 text-xs font-medium uppercase tracking-wide text-tertiary dark:text-muted">
+                  {t('tools.typeScriptActions')}
                 </h3>
                 <div className="space-y-2">
                   <button
@@ -560,7 +538,7 @@ export function QuickActionsPanel({
                     className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted dark:hover:bg-muted"
                   >
                     <Code className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm text-secondary dark:text-muted">Analyze Types & Interfaces</span>
+                    <span className="text-sm text-secondary dark:text-muted">{t('tools.analyzeTypes')}</span>
                   </button>
                   <button
                       onClick={() => {
@@ -571,7 +549,7 @@ export function QuickActionsPanel({
                       className="flex w-full items-center gap-3 rounded-lg p-3 text-left transition-colors hover:bg-muted dark:hover:bg-muted"
                     >
                       <Code className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-secondary dark:text-muted">Find React Components</span>
+                      <span className="text-sm text-secondary dark:text-muted">{t('tools.findReactComponents')}</span>
                     </button>
                   </div>
                 </div>
@@ -582,25 +560,25 @@ export function QuickActionsPanel({
           {activeTab === 'upload' && (
             <div className="p-4">
               {/* Folder Selection */}
-              <div className="mb-4 rounded-xl border-2 border-dashed border bg-muted p-6 text-center dark:border-border dark:bg-muted">
+              <div className="mb-4 rounded-xl border-2 border-dashed border-border bg-muted/50 p-6 text-center dark:bg-muted/50">
                 <FolderOpen className="mx-auto mb-3 h-10 w-10 text-tertiary dark:text-muted" />
-                <p className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">Select Project Folder</p>
+                <p className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">{t('tools.selectProjectFolder')}</p>
                 <p className="mb-4 text-xs text-tertiary dark:text-muted">
-                  Choose a folder to analyze its contents
+                  {t('tools.chooseFolderToAnalyze')}
                 </p>
                 <button
                   onClick={handleSelectFolder}
                   className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                 >
-                  Browse Folders
+                  {t('tools.browseFolders')}
                 </button>
               </div>
 
               {/* Current Folder Info */}
               {directoryHandle && (
-                <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-                  <p className="mb-1 text-sm font-medium text-green-900">Folder Selected</p>
-                  <p className="text-xs text-green-700">{directoryHandle.name}</p>
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900/30 dark:bg-green-900/20">
+                  <p className="mb-1 text-sm font-medium text-green-900 dark:text-green-300">{t('tools.folderSelected')}</p>
+                  <p className="text-xs text-green-700 dark:text-green-400">{directoryHandle.name}</p>
                 </div>
               )}
             </div>
@@ -608,10 +586,9 @@ export function QuickActionsPanel({
         </div>
 
         {/* Footer */}
-        <div className="border-t border bg-muted px-6 py-4 dark:border-border dark:bg-muted">
+        <div className="border-t border-border bg-muted/50 px-5 py-3 dark:bg-muted/50">
           <p className="text-center text-xs text-tertiary dark:text-muted">
-            Press <kbd className="rounded bg-muted px-1 py-0.5 font-mono dark:bg-muted">Cmd+K</kbd> to open
-            quick actions
+            {t('tools.openQuickActions', { shortcut: 'Cmd+K' })}
           </p>
         </div>
       </div>
