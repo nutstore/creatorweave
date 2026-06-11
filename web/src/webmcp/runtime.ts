@@ -1,5 +1,5 @@
 import { isWebMCPBridgeAvailable } from './bridge-client'
-import { refreshWebMCPTools, unregisterAllWebMCPTools } from './manager'
+import { refreshWebMCPCatalog } from './manager'
 import { useSettingsStore } from '@/store/settings.store'
 
 const DEFAULT_SYNC_INTERVAL_MS = 15000
@@ -14,7 +14,7 @@ export function startWebMCPSyncLoop(intervalMs = DEFAULT_SYNC_INTERVAL_MS): () =
     if (!isWebMCPBridgeAvailable()) return
 
     try {
-      await refreshWebMCPTools()
+      await refreshWebMCPCatalog()
     } catch (error) {
       if (force) {
         console.warn('[WebMCP] Initial sync failed:', error)
@@ -32,14 +32,9 @@ export function startWebMCPSyncLoop(intervalMs = DEFAULT_SYNC_INTERVAL_MS): () =
     if (stopped) return
     if (state.enableWebMCP === previousEnabled) return
     previousEnabled = state.enableWebMCP
-    if (!state.enableWebMCP) {
-      void unregisterAllWebMCPTools().catch((error) => {
-        console.warn('[WebMCP] Failed to unregister tools after global toggle off:', error)
-      })
-      return
-    }
+    if (!state.enableWebMCP) return
     if (!isWebMCPBridgeAvailable()) return
-    void refreshWebMCPTools().catch((error) => {
+    void refreshWebMCPCatalog().catch((error) => {
       console.warn('[WebMCP] Failed to refresh tools after global toggle on:', error)
     })
   })

@@ -37,11 +37,13 @@ export interface InjectEnhancementsInput {
  * └──────────────────────────────────────────┘
  */
 export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput): Promise<string> {
-  // Keep tab-discovered WebMCP tools in sync before generating tool docs.
+  // Keep tab-discovered WebMCP tools in sync (store only, no tool registration —
+  // the unified external-tool bridge handles search_tools/call_tool).
   try {
-    await input.toolRegistry.registerWebMCPTools()
+    const { discoverWebMCPCatalog } = await import('@/webmcp/manager')
+    await discoverWebMCPCatalog()
   } catch (error) {
-    console.warn('[AgentLoop] Failed to sync WebMCP tools:', error)
+    console.warn('[AgentLoop] Failed to sync WebMCP catalog:', error)
   }
 
   // ── STABLE SECTION ──────────────────────────────────────────────────

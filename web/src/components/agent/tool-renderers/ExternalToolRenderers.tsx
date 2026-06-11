@@ -1,9 +1,7 @@
 /**
  * Renderers for the unified external tool bridge:
- * - search_tools: BM25 search results with schema previews
+ * - search_tools: keyword / semantic search results with schema previews
  * - call_tool: unified tool execution (MCP + WebMCP) with result preview
- *
- * Replaces the old WebMCPRenderers.tsx which had webmcp_get_tool_schema + webmcp_call.
  */
 
 import { Plug, Search } from 'lucide-react'

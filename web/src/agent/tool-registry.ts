@@ -431,37 +431,6 @@ export class ToolRegistry {
   }
 
   //=============================================================================
-  // WebMCP Tools (Browser Extension + Page APIs)
-  //=============================================================================
-
-  /**
-   * Discover and register WebMCP tools from tabs in the current browser window.
-   * Tool names follow a provider-safe format (`<safeHostname>__<safeToolName>`).
-   */
-  async registerWebMCPTools(forceDiscovery = false): Promise<number> {
-    try {
-      const { syncWebMCPTools } = await import('@/webmcp')
-      return await syncWebMCPTools({ forceDiscovery })
-    } catch (error) {
-      console.error('[ToolRegistry] Failed to register WebMCP tools:', error)
-      return 0
-    }
-  }
-
-  /**
-   * Unregister all previously registered WebMCP tools.
-   */
-  async unregisterWebMCPTools(): Promise<number> {
-    try {
-      const { unregisterAllWebMCPTools } = await import('@/webmcp')
-      return await unregisterAllWebMCPTools()
-    } catch (error) {
-      console.error('[ToolRegistry] Failed to unregister WebMCP tools:', error)
-      return 0
-    }
-  }
-
-  //=============================================================================
   // Checkpoint Tools (require native directory handle)
   //=============================================================================
 

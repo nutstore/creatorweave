@@ -1,20 +1,10 @@
 import { getWebMCPBridge } from './bridge-client'
-import {
-  ON_DEMAND_WEBMCP_TOOLS,
-} from './tool-bridge'
 import { useWebMCPStore } from './store'
 import type { WebMCPDiscoveredTool } from './types'
 import { useSettingsStore } from '@/store/settings.store'
 
-type RegistryLike = {
-  register: (definition: import('@/agent/tools/tool-types').ToolDefinition, executor: import('@/agent/tools/tool-types').ToolExecutor) => void
-  unregister: (name: string) => boolean
-}
-
 const DISCOVERY_TTL_MS = 8000
 
-// Track which tools are registered (for cleanup)
-const registeredWebMCPToolNames = new Set<string>()
 let lastDiscoveryAt = 0
 let discoveryInFlight: Promise<WebMCPDiscoveredTool[]> | null = null
 
@@ -41,12 +31,11 @@ function dedupeTools(tools: WebMCPDiscoveredTool[]): WebMCPDiscoveredTool[] {
   return Array.from(deduped.values()).sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
-async function resolveRegistry(registry?: RegistryLike): Promise<RegistryLike> {
-  if (registry) return registry
-  const { getToolRegistry } = await import('@/agent/tool-registry')
-  return getToolRegistry()
-}
-
+/**
+ * Discover WebMCP tools from browser tabs and cache them in the store.
+ * This is called by the agent loop to keep the catalog fresh.
+ * Tool registration is handled by the unified external-tool bridge (search_tools/call_tool).
+ */
 async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredTool[]> {
   const now = Date.now()
   const store = useWebMCPStore.getState()
@@ -87,93 +76,35 @@ async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredToo
   return discoveryInFlight
 }
 
-/**
- * On-demand mode: register only 2 persistent tools (webmcp_get_tool_schema + webmcp_call).
- * The catalog data stays in the store for webmcp_get_tool_schema to query at runtime.
- */
-function syncOnDemandTools(registry: RegistryLike): number {
-  for (const tool of ON_DEMAND_WEBMCP_TOOLS) {
-    const name = tool.definition.function.name
-    if (!registeredWebMCPToolNames.has(name)) {
-      // Idempotent: skip if already registered (e.g. by registerBuiltins)
-      if (registry.has(name)) {
-        registeredWebMCPToolNames.add(name)
-        continue
-      }
-      registry.register(tool.definition, tool.executor)
-      registeredWebMCPToolNames.add(name)
-    }
-  }
-  return ON_DEMAND_WEBMCP_TOOLS.length
-}
-
-// Legacy: full-registration mode preserved for future fallback.
-// Uncomment syncFromCatalog and its imports when needed.
-// async function syncFromCatalog(registry: RegistryLike): Promise<number> { ... }
-
-export async function syncWebMCPTools(options: {
-  registry?: RegistryLike
-  forceDiscovery?: boolean
-} = {}): Promise<number> {
-  const registry = await resolveRegistry(options.registry)
+/** Discover and cache WebMCP tools without registering any tools. */
+export async function discoverWebMCPCatalog(force = false): Promise<WebMCPDiscoveredTool[]> {
   if (!useSettingsStore.getState().enableWebMCP) {
-    await unregisterAllWebMCPTools(registry)
-    return 0
+    useWebMCPStore.getState().clearCatalog()
+    return []
   }
-  await discoverAndCacheTools(!!options.forceDiscovery)
-
-  // On-demand mode: register 2 persistent tools only
-  // Catalog data stays in store for webmcp_get_tool_schema to query
-  return syncOnDemandTools(registry)
+  return discoverAndCacheTools(force)
 }
 
-export async function refreshWebMCPTools(registry?: RegistryLike): Promise<number> {
-  return syncWebMCPTools({ registry, forceDiscovery: true })
+/** Refresh WebMCP catalog (force re-discovery). */
+export async function refreshWebMCPCatalog(): Promise<WebMCPDiscoveredTool[]> {
+  return discoverWebMCPCatalog(true)
 }
 
 export async function applyWebMCPHostToggle(
   hostname: string,
-  enabled: boolean,
-  registry?: RegistryLike
-): Promise<number> {
-  useWebMCPStore.getState().setHostEnabled(hostname, enabled)
-  const resolvedRegistry = await resolveRegistry(registry)
-  if (!useSettingsStore.getState().enableWebMCP) {
-    await unregisterAllWebMCPTools(resolvedRegistry)
-    return 0
-  }
-  // In on-demand mode, host toggle only affects the catalog (store).
-  // The 2 persistent tools stay registered regardless.
-  // Refresh catalog data only.
+  _enabled: boolean,
+): Promise<void> {
+  useWebMCPStore.getState().setHostEnabled(hostname, _enabled)
   await discoverAndCacheTools(true)
-  return syncOnDemandTools(resolvedRegistry)
 }
 
 export async function applyWebMCPGlobalToggle(
   enabled: boolean,
-  registry?: RegistryLike
-): Promise<number> {
+): Promise<void> {
   useSettingsStore.getState().setEnableWebMCP(enabled)
-  const resolvedRegistry = await resolveRegistry(registry)
   if (!enabled) {
-    await unregisterAllWebMCPTools(resolvedRegistry)
-    return 0
+    useWebMCPStore.getState().clearCatalog()
+  } else {
+    await discoverAndCacheTools(true)
   }
-  return syncWebMCPTools({ registry: resolvedRegistry, forceDiscovery: true })
-}
-
-export async function unregisterAllWebMCPTools(registry?: RegistryLike): Promise<number> {
-  const resolvedRegistry = await resolveRegistry(registry)
-  let removed = 0
-  for (const name of Array.from(registeredWebMCPToolNames)) {
-    if (resolvedRegistry.unregister(name)) {
-      removed++
-    }
-    registeredWebMCPToolNames.delete(name)
-  }
-  return removed
-}
-
-export function getRegisteredWebMCPToolNames(): string[] {
-  return Array.from(registeredWebMCPToolNames)
 }

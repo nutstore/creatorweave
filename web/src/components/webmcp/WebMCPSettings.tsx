@@ -6,7 +6,7 @@ import {
   applyWebMCPGlobalToggle,
   applyWebMCPHostToggle,
   isWebMCPBridgeAvailable,
-  refreshWebMCPTools,
+  refreshWebMCPCatalog,
 } from '@/webmcp'
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
@@ -48,7 +48,8 @@ export function WebMCPSettings() {
 
     setRefreshing(true)
     try {
-      const count = await refreshWebMCPTools()
+      const tools = await refreshWebMCPCatalog()
+      const count = tools.length
       toast.success(
         t('settings.webMCPRefreshSuccess').replace('{count}', String(count))
       )

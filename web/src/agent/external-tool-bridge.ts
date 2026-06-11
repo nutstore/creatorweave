@@ -1,8 +1,8 @@
 /**
  * Unified External Tool Bridge
  *
- * 2 unified tools that replace the old 4 (mcp_get_tool_schema, mcp_call,
- * webmcp_get_tool_schema, webmcp_call):
+ * 2 unified tools that handle all external tool discovery and execution
+ * (MCP page-outside servers + WebMCP page API tools):
  *
  *   1. search_tools — discover tools + get their full schemas in one call
  *   2. call_tool    — execute any external tool (MCP or WebMCP)
