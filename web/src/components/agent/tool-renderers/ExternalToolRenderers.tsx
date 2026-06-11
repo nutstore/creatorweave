@@ -18,34 +18,21 @@ registerRenderer({
   Summary(ctx) {
     const t = useT()
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
+    const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
     const results = extractSearchResults(ctx)
-    const useSemantic = ctx.args.semantic === true
-    const data = ctx.result?.data as Record<string, unknown> | undefined
-    const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
+    const displayText = intent || query || 'search'
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">search_tools</code>
-        {useSemantic && (ctx.isExecuting || ctx.isStreaming) && (
-          <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 shrink-0">
-            {t('agent.toolSearch.aiLabel')}
-          </span>
-        )}
-        {query && (
+        {displayText && (
           <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[280px]">
-            "{query}"
+            "{displayText}"
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && !ctx.isError && (
-          <span className="ml-auto text-xs shrink-0 flex items-center gap-1">
-            {searchMode === 'subagent' && (
-              <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
-                {t('agent.toolSearch.aiLabel')}
-              </span>
-            )}
-            <span className="text-emerald-500">
-              {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
-            </span>
+          <span className="ml-auto text-xs shrink-0 text-emerald-500">
+            {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
           </span>
         )}
         {ctx.isError && (
@@ -58,17 +45,16 @@ registerRenderer({
     const t = useT()
     const results = extractSearchResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
-    const useSemantic = ctx.args.semantic === true
-    const data = ctx.result?.data as Record<string, unknown> | undefined
-    const searchMode = typeof data?.searchMode === 'string' ? data.searchMode : ''
+    const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
+    const displayText = intent || query || 'search'
 
-    if (ctx.isExecuting) return <StreamingPlaceholder count={2} useSemantic={useSemantic} />
+    if (ctx.isExecuting) return <StreamingPlaceholder count={2} />
     if (ctx.isError) return <ErrorDetail ctx={ctx} />
 
     if (results.length === 0) {
       return (
         <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
-          No tools matched "{query}". {useSemantic ? 'Try different keywords or fall back to keyword matching.' : 'Try different keywords.'}
+          No tools matched "{displayText}". Try different keywords or provide a more detailed intent.
         </div>
       )
     }
@@ -77,18 +63,8 @@ registerRenderer({
       <div className="px-3 py-2 space-y-2">
         <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
           <span>
-            {results.length} result{results.length !== 1 ? 's' : ''} for "{query}"
+            {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
           </span>
-          {searchMode === 'subagent' && (
-            <span className="font-mono px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
-              {t('agent.toolSearch.aiSearchBadge')}
-            </span>
-          )}
-          {useSemantic && searchMode !== 'subagent' && (
-            <span className="font-mono px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
-              {t('agent.toolSearch.bm25Fallback')}
-            </span>
-          )}
         </div>
         {results.map((tool, i) => (
           <div
@@ -304,15 +280,9 @@ function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
   )
 }
 
-function StreamingPlaceholder({ count = 3, useSemantic = false }: { count?: number; useSemantic?: boolean }) {
-  const t = useT()
+function StreamingPlaceholder({ count = 3 }: { count?: number }) {
   return (
     <div className="px-3 py-2 space-y-2">
-      {useSemantic && (
-        <div className="flex items-center gap-1.5 text-[10px] text-amber-500 dark:text-amber-400 mb-1">
-          <span className="animate-pulse">{t('agent.toolSearch.aiSearchInProgress')}</span>
-        </div>
-      )}
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="rounded-md border border-neutral-100 dark:border-neutral-800 p-2 animate-pulse">
           <div className="h-3 w-1/3 rounded bg-neutral-200 dark:bg-neutral-700 mb-1.5" />
