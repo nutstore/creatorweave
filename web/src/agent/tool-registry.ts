@@ -21,7 +21,6 @@ import { searchDefinition, searchExecutor, searchPromptDoc } from './tools/searc
 import { lsDefinition, lsExecutor, lsPromptDoc } from './tools/ls.tool'
 import { pythonDefinition, pythonToolExecutor, pythonPromptDoc } from './tools/execute.tool'
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
-import { analyzeDataDefinition, analyzeDataExecutor, analyzeDataPromptDoc } from './tools/data-analysis.tool'
 // Bash shell tool (just-bash sandbox)
 import { bashDefinition, bashToolExecutor, bashPromptDoc } from './tools/bash.tool'
 // import { runWorkflowDefinition, runWorkflowExecutor, workflowPromptDoc } from './tools/workflow.tool' -- disabled: workflows unused
@@ -143,8 +142,6 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: pythonDefinition, executor: pythonToolExecutor },
   // Bash shell (just-bash sandbox)
   { definition: bashDefinition, executor: bashToolExecutor },
-  // Data
-  { definition: analyzeDataDefinition, executor: analyzeDataExecutor },
   // OCR (image text recognition)
   { definition: ocrDefinition, executor: ocrExecutor },
   // Workflow orchestration — DISABLED (workflows unused, saves tool definition tokens)
@@ -187,7 +184,6 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   syncPromptDoc,
   pythonPromptDoc,
   bashPromptDoc,
-  analyzeDataPromptDoc,
   ocrPromptDoc,
   gitPromptDoc,
   changesetPromptDoc,
