@@ -229,8 +229,7 @@ export const searchToolsDefinition: ToolDefinition = {
   function: {
     name: 'search_tools',
     description:
-      'Search for external tools (MCP and WebMCP) by keyword. ' +
-      'Returns matching tools with their full parameter schemas, ready to call. ' +
+      'Search for external tools (MCP and WebMCP). Returns matching tools with their full parameter schemas, ready to call. ' +
       'No need to call a separate schema tool — just search, pick, and call.',
     parameters: {
       type: 'object',
@@ -238,39 +237,41 @@ export const searchToolsDefinition: ToolDefinition = {
         query: {
           type: 'string',
           description:
-            'Search query — keywords describing what you need ' +
-            '(e.g. "weather", "ticket message", "figma node", "send email"). ' +
-            'Supports multi-word queries for better results.',
+            'Space-separated keywords for fast BM25 search ' +
+            '(e.g. "figma node", "send email", "ticket message"). ' +
+            'Use this when you know the tool name or relevant keywords.',
         },
-        source: {
+        intent: {
           type: 'string',
-          enum: ['all', 'mcp', 'webmcp'],
           description:
-            'Filter by tool source. "mcp" = page-outside MCP servers, "webmcp" = page API tools. Default: "all".',
-        },
-        semantic: {
-          type: 'boolean',
-          description:
-            'When true, use semantic search (LLM-powered) instead of keyword matching. ' +
-            'Use this when keyword results are poor or when the query is in a different language than the tool descriptions. ' +
-            'Default: false (keyword matching, faster).',
+            'Natural language description of the task you want to accomplish, including relevant context from the conversation. ' +
+            '(e.g. "The user is working on a Figma design file and wants to export a specific layer as PNG"). ' +
+            'When provided, semantic search (LLM-powered) is used — slower but understands synonyms, paraphrases, and cross-language queries. ' +
+            'Prefer this when you are unsure which tool to use or when keyword search returned poor results.',
         },
         limit: {
           type: 'number',
           description: 'Maximum number of results (max 10). Default: 5.',
         },
       },
-      required: ['query'],
+      // At least one of query or intent must be provided
     },
   },
 }
 
 export const searchToolsExecutor: ToolExecutor = async (args, context) => {
-  const { query, source: sourceFilter = 'all', semantic = false, limit = 5 } = args as {
-    query: string
-    source?: 'all' | 'mcp' | 'webmcp'
-    semantic?: boolean
+  const { query = '', intent = '', limit = 5 } = args as {
+    query?: string
+    intent?: string
     limit?: number
+  }
+
+  if (!query.trim() && !intent.trim()) {
+    return toolOkJson('search_tools', {
+      results: [],
+      total: 0,
+      message: 'At least one of query or intent must be provided.',
+    })
   }
 
   const allTools = collectAllExternalTools()
@@ -283,14 +284,13 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
     })
   }
 
-  // ── Subagent semantic search path ──
-  if (semantic) {
+  // ── Subagent semantic search path (when intent is provided) ──
+  if (intent && intent.trim()) {
     try {
       const { runToolSearcher } = await import('./subagents/tool-searcher')
 
       // Build the descriptions text for the subagent prompt
       const descLines = allTools
-        .filter(t => sourceFilter === 'all' || t.source === sourceFilter)
         .map(t => `## ${t.fullName}\n${t.description || '(no description)'}\nSource: ${t.source} (${t.sourceId})`)
         .join('\n\n')
 
@@ -302,7 +302,7 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
       } else {
 
         const result = await runToolSearcher(
-          { query, allToolDescriptionsText: descLines },
+          { query: intent, allToolDescriptionsText: descLines },
           { provider }
         )
 
@@ -323,6 +323,7 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
             }),
             total: result.tools.length,
             query,
+            intent,
             searchMode: 'subagent',
           })
         }
@@ -336,11 +337,8 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
 
   // ── BM25 keyword search path (default) ──
 
-  // Filter by source
-  let filtered = allTools
-  if (sourceFilter !== 'all') {
-    filtered = allTools.filter(t => t.source === sourceFilter)
-  }
+  // No source filter — search across all tools
+  const filtered = allTools
 
   // Build search texts and BM25 index
   const searchItems = filtered.map(tool => ({
@@ -701,7 +699,7 @@ export const unifiedExternalToolsPromptDoc: ToolPromptDoc = {
   category: 'external-tools',
   section: '### External Tools (MCP + WebMCP)',
   lines: [
-    '- `search_tools(query, source?, limit?)` — Search external tools by keyword. Returns matching tools with full parameter schemas. Use this to discover and inspect tools.',
+    '- `search_tools(query?, intent?, limit?)` — Search external tools. query: keywords (BM25, fast). intent: task description (semantic, smarter). At least one required. Prefer intent when unsure which tool to use.',
     '- `call_tool(full_tool_name, args)` — Execute an external tool. Use the fullName and inputSchema from search_tools results.',
   ],
 }
