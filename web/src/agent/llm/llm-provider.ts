@@ -22,6 +22,8 @@ export interface ChatCompletionRequest {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string | null
+  /** Chain-of-thought reasoning from assistant thinking blocks */
+  reasoning?: string | null
   tool_calls?: Array<{
     id: string
     type: 'function'
@@ -110,6 +112,10 @@ export function messagesToChatMessages(messages: Message[]): ChatMessage[] {
     const chatMsg: ChatMessage = {
       role: msg.role,
       content: msg.content,
+    }
+
+    if (msg.reasoning) {
+      chatMsg.reasoning = msg.reasoning
     }
 
     if (msg.toolCalls && msg.toolCalls.length > 0) {

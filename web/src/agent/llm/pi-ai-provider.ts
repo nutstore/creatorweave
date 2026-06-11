@@ -53,8 +53,9 @@ export class PiAIProvider implements LLMProvider {
       maxTokens: request.maxTokens,
       signal,
       onPayload: (payload: Record<string, unknown>) => {
-        // Codex API (openai-responses): 'instructions' is required
-        if (!payload.instructions && context.systemPrompt) {
+        // openai-responses API: 'instructions' is required
+        // chat-completions API does NOT support 'instructions' — uses system message instead
+        if (this.model.api === 'openai-responses' && !payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
         // Codex API does not support max_output_tokens or temperature
@@ -201,8 +202,9 @@ export class PiAIProvider implements LLMProvider {
       temperature: request.temperature,
       maxTokens: request.maxTokens,
       onPayload: (payload: Record<string, unknown>) => {
-        // Codex API (openai-responses): 'instructions' is required
-        if (!payload.instructions && context.systemPrompt) {
+        // openai-responses API: 'instructions' is required
+        // chat-completions API does NOT support 'instructions' — uses system message instead
+        if (this.model.api === 'openai-responses' && !payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
         // Codex API does not support max_output_tokens or temperature

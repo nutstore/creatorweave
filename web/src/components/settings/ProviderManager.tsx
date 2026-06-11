@@ -20,6 +20,10 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
@@ -40,12 +44,15 @@ import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
+import { isLLMGatewayConfigured, LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels } from '@/agent/providers/llm-gateway-provider'
+import { performDeviceCodeFlow, logoutGateway as logoutGatewayAuth, getValidAccessToken, fetchGatewayModels } from '@/agent/providers/llm-gateway-auth'
+import type { AuthState } from '@/agent/providers/llm-gateway-auth'
 
 // =============================================================================
 // Constants
 // =============================================================================
 
-const CATEGORY_ORDER: ProviderCategory[] = ['international', 'chinese', 'custom']
+const CATEGORY_ORDER: ProviderCategory[] = ['custom', 'chinese', 'international']
 
 // =============================================================================
 // ProviderCard - 单个服务商卡片
@@ -859,6 +866,463 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
 }
 
 // =============================================================================
+// LLM Gateway Card - Special provider card for Device Code Flow
+// =============================================================================
+
+function LLMGatewayCard({
+  isExpanded,
+  onToggle,
+}: {
+  isExpanded: boolean
+  onToggle: () => void
+}) {
+  const t = useT()
+  const { triggerProviderRefresh, pinModel, unpinModel, pinnedModelsByProvider } = useSettingsStore()
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [allModels, setAllModels] = useState<Array<{ id: string; name: string }>>([])
+  const [showModelPicker, setShowModelPicker] = useState(false)
+  const [modelSearch, setModelSearch] = useState('')
+  const [addingManual, setAddingManual] = useState(false)
+  const [manualDraft, setManualDraft] = useState('')
+
+  // Inline auth flow state
+  const [authState, setAuthState] = useState<AuthState & { userCode?: string; verificationUri?: string }>({
+    status: 'idle',
+  })
+  const [copied, setCopied] = useState(false)
+
+  const isAuthRunning = authState.status === 'requesting' || authState.status === 'waiting' || authState.status === 'polling'
+
+  const pinnedIds = pinnedModelsByProvider[LLM_GATEWAY_PROVIDER_TYPE] || []
+  const pinned = pinnedIds.map((id) => {
+    const found = allModels.find((m) => m.id === id)
+    return found || { id, name: id }
+  })
+
+  const unpinned = allModels.filter((m) => !pinnedIds.includes(m.id))
+  const filteredUnpinned = !modelSearch.trim()
+    ? unpinned
+    : unpinned.filter((m) =>
+        m.id.toLowerCase().includes(modelSearch.toLowerCase()) ||
+        m.name.toLowerCase().includes(modelSearch.toLowerCase())
+      )
+
+  // Check login status
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      const { loadApiKey } = await import('@/security/api-key-store')
+      const key = await loadApiKey(getLLMGatewayApiKeyProviderKey())
+      if (!cancelled) setIsLoggedIn(!!key)
+    })()
+    return () => { cancelled = true }
+  }, [isExpanded])
+
+  // Fetch models when logged in
+  useEffect(() => {
+    if (!isLoggedIn || !isExpanded) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const baseURL = getLLMGatewayBaseURL()
+        const clientId = getLLMGatewayClientId()
+        const token = await getValidAccessToken(baseURL, clientId)
+        if (token && !cancelled) {
+          const models = await fetchGatewayModels(baseURL, token)
+          setAllModels(models)
+        }
+      } catch {
+        // ignore
+      }
+    })()
+    return () => { cancelled = true }
+  }, [isLoggedIn, isExpanded])
+
+  // Direct Device Code Flow — triggered by the login button, no extra dialog
+  const handleLogin = useCallback(async () => {
+    const baseURL = getLLMGatewayBaseURL()
+    const clientId = getLLMGatewayClientId()
+
+    if (!clientId) {
+      setAuthState({ status: 'error', error: 'Client ID 未配置，请设置 VITE_JIANGUOYUN_AI_CLIENT_ID 环境变量' })
+      return
+    }
+
+    try {
+      const tokens = await performDeviceCodeFlow(baseURL, clientId, (state) => {
+        setAuthState(state)
+      })
+
+      // Save access_token as the "API key" for this provider
+      const keyId = getLLMGatewayApiKeyProviderKey()
+      const { saveApiKey } = await import('@/security/api-key-store')
+      await saveApiKey(keyId, tokens.access_token)
+
+      // Fetch and register model list
+      await updateGatewayModels(tokens.access_token)
+
+      setIsLoggedIn(true)
+      triggerProviderRefresh()
+    } catch (e) {
+      setAuthState({
+        status: 'error',
+        error: (e as Error).message || '认证失败',
+      })
+    }
+  }, [triggerProviderRefresh])
+
+  const handleLogout = useCallback(async () => {
+    const { deleteApiKey } = await import('@/security/api-key-store')
+    logoutGatewayAuth()
+    await deleteApiKey(getLLMGatewayApiKeyProviderKey())
+    setIsLoggedIn(false)
+    setAllModels([])
+    setAuthState({ status: 'idle' })
+    triggerProviderRefresh()
+  }, [triggerProviderRefresh])
+
+  const handleCopyCode = useCallback(() => {
+    if (authState.userCode) {
+      navigator.clipboard.writeText(authState.userCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [authState.userCode])
+
+  const handleAddManual = useCallback(() => {
+    const trimmed = manualDraft.trim()
+    if (!trimmed) return
+    pinModel(LLM_GATEWAY_PROVIDER_TYPE, trimmed)
+    setManualDraft('')
+    setAddingManual(false)
+  }, [manualDraft, pinModel])
+
+  return (
+    <div className="rounded-lg border border-[var(--brand-border,rgba(13,148,136,0.25))] overflow-hidden"
+      style={{ background: isExpanded ? 'var(--brand-bg, rgba(13,148,136,0.04))' : undefined }}
+    >
+      {/* Header */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between px-3.5 py-2.5 text-left hover:bg-muted/30 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4 text-tertiary" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-tertiary" />
+          )}
+          <div
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{
+              background: isLoggedIn ? 'var(--brand,#0d9488)' : 'var(--border,#2a2a2a)',
+              boxShadow: isLoggedIn ? '0 0 6px var(--brand,#0d9488)' : 'none',
+            }}
+          />
+          <span className="text-[13px] font-semibold text-primary">坚果云 AI</span>
+
+        </div>
+        <div className="flex items-center gap-2">
+          {isLoggedIn ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--brand,#0d9488)]/10 px-2 py-0.5 text-[10px] font-medium text-[var(--brand,#0d9488)]">
+              已登录
+            </span>
+          ) : isAuthRunning ? (
+            <span className="inline-flex items-center gap-1 text-[10px] text-tertiary">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              登录中...
+            </span>
+          ) : (
+            <span className="text-[10px] text-tertiary/60">未登录</span>
+          )}
+        </div>
+      </button>
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-border/60 px-3.5 py-3 space-y-3">
+          <div>
+            <p className="text-[11px] font-medium text-secondary">服务地址</p>
+            <p className="mt-0.5 font-mono text-[11px] text-tertiary">
+              {import.meta.env.VITE_JIANGUOYUN_AI_BASE_URL || 'https://ai.jianguoyun.com'}
+            </p>
+          </div>
+
+          {isLoggedIn ? (
+            <>
+              {/* Pinned models (user's selected models) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-primary">
+                    {t('settings.pinnedModels.title')}
+                  </label>
+                  <span className="text-[10px] font-medium text-tertiary">
+                    {t('settings.pinnedModels.count', { count: pinned.length })}
+                  </span>
+                </div>
+
+                {pinned.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {pinned.map((m) => (
+                      <span
+                        key={m.id}
+                        className="group inline-flex items-center gap-1 rounded-full border border-[var(--brand-border,rgba(13,148,136,0.12))] bg-[var(--brand-bg,rgba(13,148,136,0.05))] px-2 py-[3px] text-[11px] text-[var(--brand-light,#14b8a6)]/80 transition-colors cursor-default"
+                      >
+                        {m.name}
+                        <button
+                          type="button"
+                          className="invisible text-tertiary hover:text-[#ef4444] group-hover:visible"
+                          onClick={() => unpinModel(LLM_GATEWAY_PROVIDER_TYPE, m.id)}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-tertiary/60">
+                    {t('settings.pinnedModels.empty')}
+                  </p>
+                )}
+
+                {/* Add model buttons */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {allModels.length > 0 && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border,#2a2a2a)] px-2 py-[3px] text-[11px] text-tertiary transition-colors hover:border-[var(--brand-border,rgba(13,148,136,0.25))] hover:bg-[var(--brand-bg,rgba(13,148,136,0.06))] hover:text-[var(--brand-light,#14b8a6)]"
+                      onClick={() => { setShowModelPicker(true); setModelSearch('') }}
+                    >
+                      <Plus className="h-3 w-3" />
+                      {t('settings.pinnedModels.addFromApi')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-dashed border-[var(--border,#2a2a2a)] px-2 py-[3px] text-[11px] text-tertiary transition-colors hover:border-[var(--brand-border,rgba(13,148,136,0.25))] hover:bg-[var(--brand-bg,rgba(13,148,136,0.06))] hover:text-[var(--brand-light,#14b8a6)]"
+                    onClick={() => { setAddingManual(!addingManual); setManualDraft('') }}
+                  >
+                    <Plus className="h-3 w-3" />
+                    {t('settings.pinnedModels.addManual')}
+                  </button>
+                </div>
+
+                {/* Manual model input */}
+                {addingManual && (
+                  <div className="flex gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <BrandInput
+                      value={manualDraft}
+                      onChange={(e) => setManualDraft(e.target.value)}
+                      placeholder={t('settings.modelManagement.newModelName')}
+                      className="h-8 flex-1 text-[12px]"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddManual()
+                        if (e.key === 'Escape') setAddingManual(false)
+                      }}
+                    />
+                    <BrandButton variant="outline" className="h-8 px-2 text-[11px]" onClick={() => setAddingManual(false)}>
+                      {t('settings.modelManagement.cancel')}
+                    </BrandButton>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md px-2.5 h-8 text-[11px] font-medium text-white"
+                      style={{ background: 'var(--brand, #0d9488)' }}
+                      onClick={handleAddManual}
+                    >
+                      {t('settings.modelManagement.addModel')}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Model Picker Dialog */}
+              <BrandDialog open={showModelPicker} onOpenChange={setShowModelPicker}>
+                <BrandDialogContent className="!max-w-[420px] !w-[420px] !max-h-[70vh] !flex !flex-col !p-0">
+                  <BrandDialogHeader>
+                    <BrandDialogTitle className="!text-[13px]">
+                      {t('settings.pinnedModels.dialogTitle')}
+                    </BrandDialogTitle>
+                    <BrandDialogClose className="text-tertiary hover:text-primary">
+                      <X className="h-4 w-4" />
+                    </BrandDialogClose>
+                  </BrandDialogHeader>
+
+                  <div className="px-4 py-2 border-b border-border">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-tertiary" />
+                      <input
+                        type="text"
+                        value={modelSearch}
+                        onChange={(e) => setModelSearch(e.target.value)}
+                        placeholder={t('settings.pinnedModels.searchPlaceholder')}
+                        className="flex w-full rounded-md border border-border bg-transparent py-1.5 pl-8 pr-3 text-[12px] focus-visible:outline-none focus-visible:border-[var(--brand-border,rgba(13,148,136,0.25))]"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-auto px-2 py-2">
+                    {filteredUnpinned.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-[12px] text-tertiary">
+                        {allModels.length === 0
+                          ? t('settings.pinnedModels.noApiModels')
+                          : t('settings.pinnedModels.noMatch')}
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {filteredUnpinned.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            className="flex w-full items-center justify-between rounded-md px-2.5 py-2 text-left hover:bg-muted transition-colors"
+                            onClick={() => {
+                              pinModel(LLM_GATEWAY_PROVIDER_TYPE, m.id)
+                              setModelSearch('')
+                            }}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-[12px] text-primary">{m.name}</div>
+                              <div className="truncate text-[10px] text-tertiary font-mono">{m.id}</div>
+                            </div>
+                            <Plus className="h-3.5 w-3.5 text-tertiary shrink-0 ml-2" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <BrandDialogFooter className="!min-h-0 !py-2 !px-4">
+                    <p className="text-[10px] text-tertiary">
+                      {t('settings.pinnedModels.dialogHint', { count: filteredUnpinned.length })}
+                    </p>
+                  </BrandDialogFooter>
+                </BrandDialogContent>
+              </BrandDialog>
+
+              <div className="flex gap-2 pt-1">
+                <BrandButton
+                  variant="outline"
+                  className="flex-1 h-8 text-[11px]"
+                  onClick={handleLogout}
+                >
+                  登出
+                </BrandButton>
+              </div>
+            </>
+          ) : (
+            /* ── Inline login flow (no dialog) ── */
+            <>
+              {/* idle: show the login button */}
+              {authState.status === 'idle' && (
+                <button
+                  type="button"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium text-white"
+                  style={{ background: 'var(--brand, #0d9488)' }}
+                  onClick={handleLogin}
+                >
+                  登录坚果云 AI
+                </button>
+              )}
+
+              {/* requesting: creating session */}
+              {authState.status === 'requesting' && (
+                <div className="flex items-center justify-center gap-2 py-2 text-[12px] text-secondary">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  正在创建授权会话...
+                </div>
+              )}
+
+              {/* waiting / polling: show user_code */}
+              {(authState.status === 'waiting' || authState.status === 'polling') && authState.userCode && (
+                <div className="space-y-3">
+                  {/* User code */}
+                  <div
+                    className="rounded-lg border border-[var(--brand-border,rgba(13,148,136,0.25))] p-3 text-center"
+                    style={{ background: 'var(--brand-bg, rgba(13,148,136,0.06))' }}
+                  >
+                    <p className="text-[10px] text-tertiary mb-1.5">请在授权页面输入以下代码</p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-xl font-mono font-bold tracking-[0.15em] text-primary">
+                        {authState.userCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleCopyCode}
+                        className="text-tertiary hover:text-primary transition-colors"
+                        title="复制"
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Verification link (re-open if user missed it) */}
+                  {authState.verificationUri && (
+                    <a
+                      href={`${authState.verificationUri}?user_code=${encodeURIComponent(authState.userCode)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium text-white"
+                      style={{ background: 'var(--brand, #0d9488)' }}
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      打开授权页面
+                    </a>
+                  )}
+
+                  {/* Polling status */}
+                  {authState.status === 'polling' && (
+                    <div className="flex items-center justify-center gap-1.5 text-[11px] text-tertiary">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      等待授权确认...
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* success */}
+              {authState.status === 'success' && (
+                <div className="flex items-center justify-center gap-2 py-2 text-[12px] font-medium text-green-500">
+                  <CheckCircle2 className="h-5 w-5" />
+                  登录成功！
+                </div>
+              )}
+
+              {/* error */}
+              {authState.status === 'error' && (
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 py-1">
+                    <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[12px] font-medium text-primary">登录失败</p>
+                      <p className="text-[11px] text-secondary">{authState.error}</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-[12px] font-medium text-white"
+                    style={{ background: 'var(--brand, #0d9488)' }}
+                    onClick={() => { setAuthState({ status: 'idle' }); handleLogin() }}
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+
+              <p className="text-[10px] text-tertiary">
+                通过 Device Code Flow 安全认证，无需手动管理 API Key。
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// =============================================================================
 // Main ProviderManager Component
 // =============================================================================
 
@@ -899,9 +1363,18 @@ export function ProviderManager() {
         <NewProviderForm onClose={() => setShowNewProvider(false)} />
       )}
 
+      {/* LLM Gateway Card (temporarily hidden) */}
+      {/* {isLLMGatewayConfigured() && (
+        <LLMGatewayCard
+          isExpanded={expandedProvider === LLM_GATEWAY_PROVIDER_TYPE}
+          onToggle={() => toggleProvider(LLM_GATEWAY_PROVIDER_TYPE)}
+        />
+      )} */}
+
       {/* Provider Cards by Category */}
       {CATEGORY_ORDER.map((category) => {
         const providers = groupedProviders[category]
+          .filter(({ type }) => type !== LLM_GATEWAY_PROVIDER_TYPE)
         if (providers.length === 0 && category !== 'custom') return null
         return (
           <div key={category} className="space-y-1">
@@ -927,6 +1400,7 @@ export function ProviderManager() {
           </div>
         )
       })}
+
     </div>
   )
 }

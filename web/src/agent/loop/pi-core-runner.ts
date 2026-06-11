@@ -174,8 +174,9 @@ export async function executePiCoreLoop(
         if (Array.isArray(payload.tools) && payload.tools.length > 0 && payload.tool_choice == null) {
           payload.tool_choice = 'auto'
         }
-        // Codex API requires 'instructions' field — ensure it's populated from systemPrompt
-        if (!payload.instructions && context.systemPrompt) {
+        // openai-responses API: 'instructions' is required
+        // chat-completions API does NOT support 'instructions' — uses system message instead
+        if (model.api === 'openai-responses' && !payload.instructions && context.systemPrompt) {
           payload.instructions = context.systemPrompt
         }
         // Codex API does not support max_output_tokens or temperature

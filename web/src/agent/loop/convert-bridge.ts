@@ -209,6 +209,7 @@ export async function convertAgentMessagesToLlm(
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         role: msg.role,
         content: msg.content,
+        reasoning: msg.reasoning,
         toolCalls: msg.tool_calls?.map((tc) => ({
           id: tc.id,
           type: 'function' as const,

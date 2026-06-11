@@ -440,8 +440,13 @@ export const useSettingsStore = create<SettingsState>()(
         const config = getProviderConfig(state.providerType)
         if (!config) return null
 
+        // llm-gateway uses a dedicated API key storage key
+        const apiKeyProviderKey = state.providerType === 'llm-gateway'
+          ? '__llm_gateway_token__'
+          : state.providerType
+
         return {
-          apiKeyProviderKey: state.providerType,
+          apiKeyProviderKey,
           baseUrl: config.baseURL,
           modelName: state.modelName || config.modelName,
         }
@@ -550,6 +555,13 @@ export const useSettingsStore = create<SettingsState>()(
       getAvailableProviders: async () => {
         const { loadApiKey } = await import('@/security/api-key-store')
         const { PROVIDER_META, getModelsForProvider } = await import('@/agent/providers/types')
+        let llmGatewayProviderKey: string | undefined
+        try {
+          const mod = await import('@/agent/providers/llm-gateway-provider')
+          if (mod.isLLMGatewayConfigured()) {
+            llmGatewayProviderKey = mod.LLM_GATEWAY_PROVIDER_TYPE
+          }
+        } catch { /* ignore */ }
         const state = get()
         const results: Array<{
           providerType: LLMProviderType
@@ -607,6 +619,8 @@ export const useSettingsStore = create<SettingsState>()(
         for (const id of getDynamicProviderIds()) {
           // Skip if already included via built-in or custom providers
           if (results.some((r) => r.providerType === id)) continue
+          // Skip llm-gateway — handled separately below
+          if (id === llmGatewayProviderKey) continue
           const key = await loadApiKey(id)
           if (key) {
             const meta = getDynamicMeta(id)
@@ -626,6 +640,31 @@ export const useSettingsStore = create<SettingsState>()(
               providerKey: id,
             })
           }
+        }
+
+        // Handle llm-gateway separately (uses different API key storage)
+        if (llmGatewayProviderKey) {
+          try {
+            const gwMod = await import('@/agent/providers/llm-gateway-provider')
+            const gwKey = await loadApiKey(gwMod.getLLMGatewayApiKeyProviderKey())
+            if (gwKey) {
+              const gwMeta = getDynamicMeta(llmGatewayProviderKey)
+              const pinned = state.pinnedModelsByProvider[llmGatewayProviderKey]
+              const allModels = getModelsForProvider(llmGatewayProviderKey)
+              const models = pinned
+                ? pinned.map((pid) => {
+                    const found = allModels.find((m) => m.id === pid)
+                    return found ? { id: found.id, name: found.name } : { id: pid, name: pid }
+                  })
+                : allModels.map((m) => ({ id: m.id, name: m.name }))
+              results.push({
+                providerType: llmGatewayProviderKey,
+                displayName: gwMeta?.displayName || '坚果云 AI',
+                models,
+                providerKey: llmGatewayProviderKey,
+              })
+            }
+          } catch { /* ignore */ }
         }
 
         return results

@@ -400,6 +400,7 @@ type ThinkingFormat =
   | 'deepseek'      // thinking: { type } + optional reasoning_effort
   | 'together'      // reasoning: { enabled } + optional reasoning_effort
   | 'qwen'          // enable_thinking: boolean
+  | 'tencent-tokenhub' // reasoning_effort with "off" to disable, requires reasoning_content
   | 'auto'          // fallback: send reasoning_effort (most widely supported)
 
 /**
@@ -410,7 +411,9 @@ type ThinkingFormat =
 const BASE_URL_THINKING_FORMAT_MAP: Array<{ pattern: string; format: ThinkingFormat }> = [
   // OpenRouter-compatible endpoints
   { pattern: 'openrouter.ai', format: 'openrouter' },
-  { pattern: 'ai-assistant.jianguoyun.net.cn', format: 'openrouter' },
+  { pattern: 'ai-assistant.jianguoyun.net.cn', format: 'openrouter' },  // 坚果云内部 OpenRouter 代理
+  // Tencent TokenHub (坚果云 AI Gateway 等基于 TokenHub 的服务)
+  { pattern: 'jianguoyun.com', format: 'tencent-tokenhub' },  // ai.jianguoyun.com 等
   // DeepSeek
   { pattern: 'deepseek.com', format: 'deepseek' },
   // Together AI
@@ -484,6 +487,13 @@ function applyThinkingParams(
       payload.enable_thinking = enabled
       break
     }
+    case 'tencent-tokenhub': {
+      // Tencent TokenHub: reasoning_effort with "off" to disable thinking
+      payload.reasoning_effort = enabled
+        ? toEffortValue(level!, thinkingLevelMap)
+        : 'off'
+      break
+    }
     case 'openai':
     case 'auto':
     default: {
@@ -553,6 +563,11 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
         .map((part) => part.text)
         .join('')
 
+      let thinkingContent = message.content
+        .filter((part): part is { type: 'thinking'; thinking: string } => part.type === 'thinking')
+        .map((part) => part.thinking)
+        .join('')
+
       const assistantMessage: Record<string, unknown> = {
         role: 'assistant',
         content: textContent.length > 0 ? textContent : null,
@@ -568,6 +583,14 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
             arguments: JSON.stringify(toolCall.arguments || {}),
           },
         }))
+      }
+
+      // Some upstream gateways (e.g. Tencent TokenHub) require reasoning_content
+      // on all assistant messages when thinking is enabled (Interleaved Thinking mode).
+      // pi-ai preserves thinking blocks in context.messages, so we can rely on
+      // the content blocks directly.
+      if (thinkingContent) {
+        assistantMessage.reasoning_content = thinkingContent
       }
 
       if (assistantMessage.content !== null || toolCalls.length > 0) {

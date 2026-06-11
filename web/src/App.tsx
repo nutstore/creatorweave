@@ -739,6 +739,25 @@ function App() {
         console.error('[App] Failed to check API key:', err)
       }
 
+      // Register LLM Gateway provider (temporarily disabled)
+      // try {
+      //   const { registerLLMGatewayProvider, updateGatewayModels, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId } = await import('@/agent/providers/llm-gateway-provider')
+      //   const { getValidAccessToken } = await import('@/agent/providers/llm-gateway-auth')
+      //   registerLLMGatewayProvider()
+      //   const clientId = getLLMGatewayClientId()
+      //   const baseURL = getLLMGatewayBaseURL()
+      //   if (clientIf) {
+      //     const token = await getValidAccessToken(baseURL, clientId)
+      //     if (token) {
+      //       const { saveApiKey } = await import('@/security/api-key-store')
+      //       await saveApiKey(getLLMGatewayApiKeyProviderKey(), token)
+      //       await updateGatewayModels(token)
+      //     }
+      //   }
+      // } catch (err) {
+      //   console.error('[App] Failed to register LLM Gateway provider:', err)
+      // }
+
       if (mounted) {
         console.log('[App Init] ✅ setting isStorageReady=true')
         initCompleteRef.current = true
