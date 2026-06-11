@@ -15,6 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
+import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
@@ -1006,31 +1007,32 @@ export const Sidebar = memo(function Sidebar({
     }
   }, [deleteConversation, t, onSelectWorkspace])
 
-  // collapsed sidebar view
-  if (collapsed) {
-    return (
-      <div className="border-subtle flex shrink-0 flex-col border-r bg-white dark:bg-card">
-        <BrandButton
-          iconButton
-          variant="ghost"
-          onClick={() => handleSetCollapsed(false)}
-          title={t('sidebar.expandSidebar')}
-        >
-          <PanelLeft className="h-4 w-4" />
-        </BrandButton>
-      </div>
-    )
-  }
-
+  // collapsed sidebar view — single container with animated width
   return (
     <>
-      <div
+      <motion.div
         ref={sidebarRef}
-        className={`border-subtle bg-background flex shrink-0 flex-col border-r dark:bg-card ${
-          isMobile ? 'h-full w-full max-w-full' : ''
+        animate={{ width: isMobile ? undefined : (collapsed ? 40 : (panelSizes.sidebarWidth || 280)) }}
+        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+        className={`border-subtle bg-background flex shrink-0 flex-col overflow-hidden border-r dark:bg-card ${
+          isMobile ? 'h-full max-w-full' : ''
         }`}
-        style={isMobile ? undefined : { width }}
       >
+        {/* Collapsed: expand button only */}
+        {collapsed && (
+          <div className="flex items-center justify-center py-1">
+            <BrandButton
+              iconButton
+              variant="ghost"
+              onClick={() => handleSetCollapsed(false)}
+              title={t('sidebar.expandSidebar')}
+            >
+              <PanelLeft className="h-4 w-4" />
+            </BrandButton>
+          </div>
+        )}
+
+        {!collapsed && <>
         {/* Collapse button */}
         <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1 dark:bg-card">
           <span className="text-xs font-semibold uppercase tracking-wider text-primary">{t('sidebar.workspace')}</span>
@@ -1111,7 +1113,7 @@ export const Sidebar = memo(function Sidebar({
             />
           )}
 
-          <div className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-2">
+          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-2">
             {displayedConversations.map((conv) => {
               const isRunning = runningSet.has(conv.id)
               const isActive = conv.id === activeWorkspaceId
@@ -1121,8 +1123,13 @@ export const Sidebar = memo(function Sidebar({
               const isPinned = pinnedIds.includes(conv.id)
 
               return (
-                <ConversationItem
+                <motion.div
                   key={conv.id}
+                  layout
+                  transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 0.8 }}
+                  className="mb-0.5"
+                >
+                <ConversationItem
                   id={conv.id}
                   title={conv.title}
                   isRunning={isRunning}
@@ -1149,6 +1156,7 @@ export const Sidebar = memo(function Sidebar({
                   workspaceLabel={t('sidebar.workspaceLabel', { name: conv.title })}
                   t={t}
                 />
+                </motion.div>
               )
             })}
           </div>
@@ -1185,7 +1193,8 @@ export const Sidebar = memo(function Sidebar({
             />
           </div>
         </div>
-      </div>
+        </>}
+      </motion.div>
 
       <BrandDialog
         open={clearConversationsDialogOpen}
