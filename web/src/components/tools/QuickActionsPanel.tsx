@@ -376,7 +376,7 @@ export function QuickActionsPanel({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('tools.searchActions')}
-                    className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary-foreground placeholder:text-tertiary focus:border-primary-300 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+                    className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary placeholder:text-tertiary focus:border-primary-300 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
                   />
                 </div>
               </div>
