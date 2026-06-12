@@ -8,15 +8,13 @@ import { Plug, Search } from 'lucide-react'
 import { CopyIconButton } from '../CopyIconButton'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
-import { useT } from '@/i18n'
 
 // ── search_tools ──
 
 registerRenderer({
   name: 'search_tools',
-  icon: <Search className="h-3.5 w-3.5 text-violet-400" />,
+  icon: <Search className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
-    const t = useT()
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
     const results = extractSearchResults(ctx)
@@ -24,14 +22,14 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">search_tools</code>
+        <code className="font-medium text-neutral-600 dark:text-neutral-300">search_tools</code>
         {displayText && (
           <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[280px]">
             "{displayText}"
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && !ctx.isError && (
-          <span className="ml-auto text-xs shrink-0 text-emerald-500">
+          <span className="ml-auto text-xs shrink-0 text-neutral-400">
             {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
           </span>
         )}
@@ -42,7 +40,6 @@ registerRenderer({
     )
   },
   Detail(ctx) {
-    const t = useT()
     const results = extractSearchResults(ctx)
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
@@ -53,42 +50,38 @@ registerRenderer({
 
     if (results.length === 0) {
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
-          No tools matched "{displayText}". Try different keywords or provide a more detailed intent.
+        <div className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
+          No tools matched "{displayText}".
         </div>
       )
     }
 
     return (
-      <div className="px-3 py-2 space-y-2">
-        <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
-          <span>
-            {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
-          </span>
+      <div className="px-3 py-2">
+        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2">
+          {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
         </div>
-        {results.map((tool, i) => (
-          <div
-            key={tool.fullName}
-            className="rounded-md border border-neutral-100 dark:border-neutral-800 p-2"
-            style={{ animation: `tool-row-in .2s ease-out ${i * 40}ms backwards` }}
-          >
-            {/* Header: source badge + tool name */}
-            <div className="flex items-center gap-1.5 mb-1">
-              <SourceBadge source={tool.source} sourceId={tool.sourceId} />
-              <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">
+        <div className="space-y-3">
+          {results.map((tool) => (
+            <div key={tool.fullName}>
+              {/* Tool name: server.tool format */}
+              <div className="text-[13px] font-medium text-neutral-700 dark:text-neutral-200 mb-1">
+                <span className="text-neutral-400 dark:text-neutral-500 font-normal">
+                  {tool.sourceId}.
+                </span>
                 {tool.name}
-              </span>
-            </div>
-            {/* Description */}
-            {tool.description && (
-              <div className="text-[11px] text-neutral-500 dark:text-neutral-400 mb-1.5 line-clamp-2">
-                {tool.description}
               </div>
-            )}
-            {/* Parameter schema preview */}
-            <SchemaParamsPreview inputSchema={tool.inputSchema} />
-          </div>
-        ))}
+              {/* Description */}
+              {tool.description && (
+                <div className="text-[12px] text-neutral-600 dark:text-neutral-300 mb-1.5 leading-relaxed">
+                  {tool.description}
+                </div>
+              )}
+              {/* Parameter schema */}
+              <SchemaParamsPreview inputSchema={tool.inputSchema} />
+            </div>
+          ))}
+        </div>
       </div>
     )
   },
@@ -215,17 +208,11 @@ registerRenderer({
 // ── Shared Components ──
 
 function SourceBadge({ source, sourceId }: { source: string; sourceId: string }) {
-  if (source === 'mcp') {
-    return (
-      <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-        {sourceId}
-      </span>
-    )
-  }
-  // webmcp
+  // Compact label: truncate long hostnames
+  const label = sourceId.length > 12 ? sourceId.slice(0, 12) + '…' : sourceId
   return (
-    <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
-      {sourceId}
+    <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+      {label}
     </span>
   )
 }
@@ -239,23 +226,29 @@ function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unkn
   const overflow = Object.keys(properties).length - entries.length
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {entries.map(([key, prop]) => (
-        <span
-          key={key}
-          className={`text-[10px] font-mono px-1 py-0.5 rounded ${
-            required.has(key)
-              ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400'
-              : 'bg-neutral-50 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400'
-          }`}
-        >
-          {key}
-          {typeof prop.type === 'string' && <span className="opacity-50">:{prop.type}</span>}
-          {required.has(key) && <span className="opacity-50">*</span>}
-        </span>
-      ))}
+    <div className="space-y-0.5">
+      {entries.map(([key, prop]) => {
+        const isRequired = required.has(key)
+        const type = typeof prop.type === 'string' ? prop.type : ''
+        return (
+          <div key={key} className="text-[11px] font-mono leading-relaxed">
+            <span className="text-neutral-600 dark:text-neutral-300">
+              {key}
+              {isRequired && <span className="text-neutral-500">*</span>}
+            </span>
+            {type && (
+              <span className="text-neutral-400 dark:text-neutral-500 ml-1.5">: {type}</span>
+            )}
+            {typeof prop.description === 'string' && prop.description && (
+              <span className="text-neutral-400 dark:text-neutral-500 ml-2 font-sans">
+                — {prop.description.length > 60 ? prop.description.slice(0, 60) + '…' : prop.description}
+              </span>
+            )}
+          </div>
+        )
+      })}
       {overflow > 0 && (
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-500">+{overflow} more</span>
+        <div className="text-[11px] text-neutral-400 dark:text-neutral-500">+ {overflow} more</div>
       )}
     </div>
   )
