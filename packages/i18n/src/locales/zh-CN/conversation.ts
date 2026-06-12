@@ -126,6 +126,19 @@ export const conversation = {
       comfortable: "宽裕",
       tokenUsage:
         "输入 {promptTokens} + 输出 {completionTokens} = {totalTokens} tokens",
+      input: "输入 token（不含缓存）",
+      output: "输出 token",
+      cache: "缓存命中 token",
+    },
+    // 会话级累计消耗条
+    usageBar: {
+      title: "本次对话消耗",
+      cost: "约 {amount}",
+      unknownPricing: "{model} 暂无定价表",
+      costBreakdown:
+        "模型 {model}：输入 {input} + 输出 {output} + 缓存 {cache}",
+      barTooltip:
+        "输入 {input} + 输出 {output} + 缓存 {cache}",
     },
 
     // 导航

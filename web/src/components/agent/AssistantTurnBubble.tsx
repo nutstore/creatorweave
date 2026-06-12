@@ -490,13 +490,20 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             </span>
             {turn.totalUsage && (
               <span className="inline-flex items-center gap-1.5">
-                <span>↑{formatTokens(turn.totalUsage.accumulatedPromptTokens ?? turn.totalUsage.promptTokens + (turn.totalUsage.cacheReadTokens || 0))}</span>
-                <span>↓{formatTokens(turn.totalUsage.accumulatedCompletionTokens ?? turn.totalUsage.completionTokens)}</span>
-                {turn.totalUsage.cacheReadTokens ? (
-                  <span className="inline-flex items-center gap-0.5">
-                    <Database className="h-3 w-3 text-neutral-400" />{formatTokens(turn.totalUsage.cacheReadTokens)}
-                  </span>
-                ) : null}
+                <span title={t('conversation.usage.input') || 'input (excl. cache)'}>
+                  ↑{formatTokens(turn.totalUsage.accumulatedPromptTokens ?? turn.totalUsage.promptTokens)}
+                </span>
+                <span title={t('conversation.usage.output') || 'output'}>
+                  ↓{formatTokens(turn.totalUsage.accumulatedCompletionTokens ?? turn.totalUsage.completionTokens)}
+                </span>
+                {(() => {
+                  const cache = turn.totalUsage.accumulatedCacheTokens ?? turn.totalUsage.cacheReadTokens
+                  return cache ? (
+                    <span className="inline-flex items-center gap-0.5" title={t('conversation.usage.cache') || 'cache hit'}>
+                      <Database className="h-3 w-3 text-neutral-400" />{formatTokens(cache)}
+                    </span>
+                  ) : null
+                })()}
               </span>
             )}
             {lastMessageWithContent?.content && (

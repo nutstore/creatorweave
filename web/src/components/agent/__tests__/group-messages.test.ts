@@ -3,22 +3,28 @@ import { groupMessagesIntoTurns } from '../group-messages'
 import { createAssistantMessage, createUserMessage } from '@/agent/message-types'
 
 describe('groupMessagesIntoTurns usage aggregation', () => {
-  it('uses latest assistant usage instead of summing all assistant usage in a turn', () => {
+  it('uses latest assistant usage for per-message fields and accumulates across the turn', () => {
     const user = createUserMessage('u1')
     const a1 = createAssistantMessage('a1')
-    a1.usage = { promptTokens: 1200, completionTokens: 300, totalTokens: 1500 }
+    a1.usage = { promptTokens: 1200, completionTokens: 300, totalTokens: 1500, cacheReadTokens: 400 }
     const a2 = createAssistantMessage('a2')
-    a2.usage = { promptTokens: 200, completionTokens: 100, totalTokens: 300 }
+    a2.usage = { promptTokens: 200, completionTokens: 100, totalTokens: 300, cacheReadTokens: 50 }
 
     const turns = groupMessagesIntoTurns([user, a1, a2])
     const assistantTurn = turns.find((t) => t.type === 'assistant')
     expect(assistantTurn?.type).toBe('assistant')
     if (!assistantTurn || assistantTurn.type !== 'assistant') return
+
+    // Per-message fields reflect the LATEST message only
     expect(assistantTurn.totalUsage).toEqual({
       promptTokens: 200,
       completionTokens: 100,
       totalTokens: 300,
-      cacheReadTokens: 0,
+      cacheReadTokens: 50,
+      // Accumulated fields sum across all messages in the turn
+      accumulatedPromptTokens: 1400,         // 1200 + 200 (non-cache input)
+      accumulatedCacheTokens: 450,            // 400 + 50
+      accumulatedCompletionTokens: 400,       // 300 + 100
     })
   })
 })

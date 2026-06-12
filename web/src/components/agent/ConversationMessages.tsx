@@ -13,6 +13,7 @@ import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useShallow } from 'zustand/react/shallow'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
+import { ConversationUsageBar } from './ConversationUsageBar'
 import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
 import { groupMessagesIntoTurns } from './group-messages'
 import { useWorkflowProgressAnchor } from './useWorkflowProgressAnchor'
@@ -252,6 +253,8 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   return (
     <div className="min-h-0 px-4 py-4">
       <div className="mx-auto w-full max-w-3xl space-y-4">
+        {/* Cumulative token usage across all turns in this conversation */}
+        <ConversationUsageBar messages={activeMessages} />
         {turns.map((turn, idx) => {
           const isLast = isProcessing && idx === turns.length - 1
           const runtime = getRuntimeProps(

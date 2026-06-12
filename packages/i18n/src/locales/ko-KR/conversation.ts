@@ -111,6 +111,18 @@ export const conversation = {
       comfortable: "여유 있음",
       tokenUsage:
         "입력 {promptTokens} + 출력 {completionTokens} = {totalTokens} tokens",
+      input: "입력 토큰 (캐시 제외)",
+      output: "출력 토큰",
+      cache: "캐시 적중 토큰",
+    },
+    usageBar: {
+      title: "대화 누적 사용량",
+      cost: "약 {amount}",
+      unknownPricing: "{model} 가격 정보 없음",
+      costBreakdown:
+        "{model}: 입력 {input} + 출력 {output} + 캐시 {cache}",
+      barTooltip:
+        "입력 {input} + 출력 {output} + 캐시 {cache}",
     },
 
     // 내비게이션

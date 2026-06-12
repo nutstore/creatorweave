@@ -126,6 +126,19 @@ export const conversation = {
       comfortable: "Comfortable",
       tokenUsage:
         "Input {promptTokens} + Output {completionTokens} = {totalTokens} tokens",
+      input: "Input tokens (excl. cache)",
+      output: "Output tokens",
+      cache: "Cache hit tokens",
+    },
+    // Conversation-level cumulative usage bar
+    usageBar: {
+      title: "Conversation total",
+      cost: "~{amount}",
+      unknownPricing: "No pricing data for {model}",
+      costBreakdown:
+        "{model}: input {input} + output {output} + cache {cache}",
+      barTooltip:
+        "Input {input} + output {output} + cache {cache}",
     },
 
     // Navigation

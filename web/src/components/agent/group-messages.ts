@@ -65,15 +65,16 @@ export function groupMessagesIntoTurns(messages: Message[]): Turn[] {
 function aggregateUsage(messages: Message[]): MessageUsage | null {
   // Find the last assistant message with usage (for per-message display + cache)
   let lastUsage: MessageUsage | null = null
-  // Accumulate all assistant messages' tokens for the whole turn
-  let accFullInput = 0   // promptTokens + cacheReadTokens per message (full input)
-  let accCompletion = 0
+  // Accumulate three independent counters across all LLM calls in this turn
+  let accInput = 0       // non-cache input (promptTokens, the "fresh" portion)
+  let accCache = 0       // cache-read input (cacheReadTokens, the discounted portion)
+  let accCompletion = 0  // output (completionTokens)
 
   for (let i = messages.length - 1; i >= 0; i--) {
     const usage = messages[i].usage
     if (!usage) continue
-    // Accumulate from every message that has usage
-    accFullInput += usage.promptTokens + (usage.cacheReadTokens || 0)
+    accInput += usage.promptTokens
+    accCache += usage.cacheReadTokens || 0
     accCompletion += usage.completionTokens
     // Keep the last (most recent) usage for per-message fields + cache
     if (!lastUsage) {
@@ -88,7 +89,8 @@ function aggregateUsage(messages: Message[]): MessageUsage | null {
     completionTokens: lastUsage.completionTokens,
     totalTokens: lastUsage.totalTokens,
     cacheReadTokens: lastUsage.cacheReadTokens || 0,
-    accumulatedPromptTokens: accFullInput,
+    accumulatedPromptTokens: accInput,
+    accumulatedCacheTokens: accCache,
     accumulatedCompletionTokens: accCompletion,
   }
 }

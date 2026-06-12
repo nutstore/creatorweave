@@ -38,8 +38,10 @@ export interface MessageUsage {
   completionTokens: number
   totalTokens: number
   cacheReadTokens?: number
-  /** Accumulated input tokens across all assistant messages in this turn */
+  /** Accumulated NON-CACHE input tokens across all assistant messages in this turn */
   accumulatedPromptTokens?: number
+  /** Accumulated cache-read tokens across all assistant messages in this turn */
+  accumulatedCacheTokens?: number
   /** Accumulated output tokens across all assistant messages in this turn */
   accumulatedCompletionTokens?: number
 }

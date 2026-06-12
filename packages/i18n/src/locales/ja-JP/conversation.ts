@@ -112,6 +112,18 @@ export const conversation = {
       comfortable: "余裕あり",
       tokenUsage:
         "入力 {promptTokens} + 出力 {completionTokens} = {totalTokens} tokens",
+      input: "入力トークン（キャッシュ除く）",
+      output: "出力トークン",
+      cache: "キャッシュヒットトークン",
+    },
+    usageBar: {
+      title: "会話の累計消費",
+      cost: "約 {amount}",
+      unknownPricing: "{model} の価格データなし",
+      costBreakdown:
+        "{model}: 入力 {input} + 出力 {output} + キャッシュ {cache}",
+      barTooltip:
+        "入力 {input} + 出力 {output} + キャッシュ {cache}",
     },
 
     // ナビゲーション
