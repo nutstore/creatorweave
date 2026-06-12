@@ -3,7 +3,6 @@
  */
 
 import { RotateCcw } from 'lucide-react'
-import { toast } from 'sonner'
 import { useT } from '@/i18n'
 
 interface RegenerateButtonProps {
@@ -38,17 +37,7 @@ export function RegenerateButton({
         onRegenerate(userMessageId)
       }, 100)
     } else {
-      toast.warning(t('conversation.regenerateConfirmMessage'), {
-        action: {
-          label: t('conversation.regenerateConfirmAction'),
-          onClick: () => onRegenerate(userMessageId),
-        },
-        cancel: {
-          label: t('conversation.regenerateCancelAction'),
-          onClick: () => {},
-        },
-        duration: 5000,
-      })
+      onRegenerate(userMessageId)
     }
   }
 
