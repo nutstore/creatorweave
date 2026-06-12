@@ -22,7 +22,7 @@ import {
   checkContentSizeLimit,
 } from './loop-guard'
 import { getFormatHandler } from './format-registry'
-import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
+import { getResolvedPathForLoopGuard, formatToolErrorMessage, isKnownBinaryExtension, tryDecodeAsText } from './io-shared'
 
 // Register built-in format handlers
 import './formats'
@@ -303,7 +303,7 @@ async function executeSingleRead(
       )
     }
 
-    // ── Binary content: try format handler ──
+    // ── Binary content: try format handler, then attempt text decode ──
     if (content instanceof ArrayBuffer || content instanceof Uint8Array) {
       const formatResult = await tryFormatHandlerRead(
         content,
@@ -320,16 +320,67 @@ async function executeSingleRead(
         context,
       )
       if (formatResult) return formatResult
-    }
 
-    return toolErrorJson(
-      'read',
-      'binary_file_rejected',
-      `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
-        'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
-        `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/{rootName}/${path}.`,
-      { details: { path, contentType: metadata.contentType, size: metadata.size } }
-    )
+      // No format handler matched. Check if extension is a known binary format.
+      if (isKnownBinaryExtension(path)) {
+        return toolErrorJson(
+          'read',
+          'binary_file_rejected',
+          `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
+            'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
+            `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
+          { details: { path, contentType: metadata.contentType, size: metadata.size } }
+        )
+      }
+
+      // Unknown extension — try decoding as UTF-8 text
+      const decoded = tryDecodeAsText(content)
+      if (decoded !== null) {
+        const totalLines = decoded.split('\n').length
+        const formatted = applyTextRange(decoded, options)
+        const sizeLimitCheck = checkContentSizeLimit(formatted, metadata.size, totalLines)
+        if (!sizeLimitCheck.ok) {
+          return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+            details: { totalLines: sizeLimitCheck.totalLines },
+            hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+          })
+        }
+        readFileState.set(
+          readStateKey,
+          buildReadStateEntry(
+            formatted,
+            options,
+            normalizeReadStateSource(backendResult.source, target.backend.label)
+          )
+        )
+        const effectiveMtime = backendResult.mtime ?? Date.now()
+        recordReadMtime(context, loopCheckResult!.dedupKey, effectiveMtime, metadata.size)
+        return toolOkJson(
+          'read',
+          {
+            path,
+            kind: 'text',
+            content: formatted,
+            metadata: { size: metadata.size, contentType: metadata.contentType },
+            range: {
+              start_line: options.startLine,
+              line_count: options.lineCount,
+            },
+          },
+          buildMeta({ source: backendResult.source || target.backend.label })
+        )
+      }
+
+      // Decoding failed — genuinely binary content with unknown extension
+      return toolErrorJson(
+        'read',
+        'binary_file_rejected',
+        `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
+          'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
+          `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
+        { details: { path, contentType: metadata.contentType, size: metadata.size } }
+      )
+    }
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
       try {
@@ -414,12 +465,56 @@ async function executeSingleRead(
             )
             if (formatResult) return formatResult
           }
+
+          // Native fallback binary: check known extension, then try text decode
+          const nativeBinary = content instanceof Uint8Array ? content
+            : content instanceof ArrayBuffer ? content : null
+          if (nativeBinary && !isKnownBinaryExtension(path)) {
+            const decoded = tryDecodeAsText(nativeBinary)
+            if (decoded !== null) {
+              const totalLines = decoded.split('\n').length
+              const formatted = applyTextRange(decoded, options)
+              const sizeLimitCheck = checkContentSizeLimit(formatted, metadata.size, totalLines)
+              if (!sizeLimitCheck.ok) {
+                return toolErrorJson('read', 'content_too_large', sizeLimitCheck.error, {
+                  details: { totalLines: sizeLimitCheck.totalLines },
+                  hint: buildMaxSizeHint(sizeLimitCheck.suggestedMaxSize),
+                })
+              }
+              readFileState.set(
+                readStateKey,
+                buildReadStateEntry(
+                  formatted,
+                  options,
+                  normalizeReadStateSource(result.source, 'workspace')
+                )
+              )
+              recordReadMtime(context, loopCheckResult!.dedupKey, metadata.mtime, metadata.size)
+              return toolOkJson(
+                'read',
+                {
+                  path,
+                  kind: 'text',
+                  content: formatted,
+                  metadata: { size: metadata.size, contentType: metadata.contentType },
+                  range: {
+                    start_line: options.startLine,
+                    line_count: options.lineCount,
+                  },
+                },
+                {
+                  ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
+                  source: 'native_fallback',
+                }
+              )
+            }
+          }
           return toolErrorJson(
             'read',
             'binary_file_rejected',
             `This is a binary file (${metadata.contentType || 'unknown type'}), which cannot be displayed as text. ` +
               'Please use the `python` tool to read binary files (e.g. images, PDFs, Excel, ZIP, etc.). ' +
-              `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/{rootName}/${path}.`,
+              `Example: use sync(paths=["${path}"]) first, then read it in Python via /mnt/${path}.`,
             { details: { path, contentType: metadata.contentType, size: metadata.size } }
           )
         }
@@ -429,6 +524,9 @@ async function executeSingleRead(
       }
     }
     if (error instanceof DOMException && error.name === 'NotFoundError') {
+      return toolErrorJson('read', 'file_not_found', `File not found: ${path}`)
+    }
+    if (isOPFSWorkspaceMiss(error)) {
       return toolErrorJson('read', 'file_not_found', `File not found: ${path}`)
     }
     return toolErrorJson(

@@ -243,7 +243,9 @@ async function executePython(
     return toolOkJson(TOOL_NAME, data)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    return toolErrorJson(TOOL_NAME, 'INTERNAL_ERROR', message, { retryable: false })
+    // Worker timeout/terminate errors are retryable — the worker will be recreated on next call.
+    const isTimeout = message.includes('timeout') || message.includes('terminated')
+    return toolErrorJson(TOOL_NAME, 'INTERNAL_ERROR', message, { retryable: isTimeout })
   }
 }
 

@@ -249,14 +249,31 @@ export class PythonExecutor {
     logger(`  Timeout: ${formatTime(options.timeout || DEFAULT_TIMEOUT)}`)
 
     // Create promise for response
+    const effectiveTimeout = options.timeout || DEFAULT_TIMEOUT
     const responsePromise = new Promise<WorkerResponse>((resolve, reject) => {
-      // Set timeout for worker response (add 5s buffer)
+      // Set timeout for worker response (add 5s buffer over the requested timeout).
+      // On timeout, terminate the Worker to kill the running Python code.
+      // Without terminate(), the WASM thread continues executing indefinitely
+      // (Promise.race only abandons the wait, it cannot stop Pyodide).
       const timeout = setTimeout(
         () => {
           this.pendingRequests.delete(id)
-          reject(new Error(`Worker response timeout after ${options.timeout || DEFAULT_TIMEOUT}ms`))
+          logger(`Execution timeout after ${effectiveTimeout}ms — terminating worker (id: ${id})`, 'warn')
+          // Kill the worker to stop the running Python code.
+          // The worker will be lazily recreated on the next execute() call.
+          try {
+            this.worker?.terminate()
+          } catch { /* ignore */ }
+          this.worker = null
+          // Reject all other pending requests since the worker is dead
+          for (const [, pending] of this.pendingRequests) {
+            clearTimeout(pending.timeout)
+            pending.reject(new Error('Worker terminated due to execution timeout'))
+          }
+          this.pendingRequests.clear()
+          reject(new Error(`Worker response timeout after ${effectiveTimeout}ms`))
         },
-        (options.timeout || DEFAULT_TIMEOUT) + 5000
+        effectiveTimeout + 5000
       ) as unknown as number // NodeJS.Timeout is number-like
 
       // Store pending request
