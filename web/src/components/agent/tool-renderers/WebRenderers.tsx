@@ -101,6 +101,7 @@ registerRenderer({
     const title = typeof readability?.title === 'string' ? readability.title : undefined
     const excerpt = typeof readability?.excerpt === 'string' ? readability.excerpt : undefined
     const status = typeof data?.status === 'number' ? data.status : undefined
+    const body = typeof data?.body === 'string' ? data.body : undefined
 
     return (
       <div className="px-3 py-2 space-y-2">
@@ -117,8 +118,8 @@ registerRenderer({
           <div className="text-[11px] text-neutral-500 dark:text-neutral-400 leading-relaxed line-clamp-4">{excerpt}</div>
         )}
 
-        {!title && !excerpt && ctx.rawResult && (
-          <pre className="max-h-40 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 dark:text-neutral-400">{ctx.rawResult.slice(0, 500)}</pre>
+        {body && (
+          <pre className="max-h-40 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 dark:text-neutral-400 whitespace-pre-wrap break-all">{body}</pre>
         )}
       </div>
     )

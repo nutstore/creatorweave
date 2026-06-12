@@ -109,7 +109,8 @@ export const spawnSubagentDefinition: ToolDefinition = {
         },
         prompt: {
           type: 'string',
-          description: 'Detailed instructions for the subagent.',
+          description:
+            'Detailed instructions for the subagent. For best results include: (1) which specific tools to use, (2) what to sample or probe FIRST before doing bulk work, (3) expected output format, and (4) what to do if the primary approach fails.',
         },
         name: {
           type: 'string',
@@ -301,10 +302,18 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
     // Health check: detect suspicious low output that likely indicates an API error
     const health = detectSubagentHealth(result)
 
+    // When subagent fails, inject recovery guidance for the main agent
+    const failureGuidance =
+      result.status === 'failed' && !health.ok
+        ? { health, _recovery_hint: 'Subagent failed. As the main agent, you should now attempt the task yourself: start by probing the data source with a single request, then design a working strategy before scaling up.' }
+        : health.ok
+          ? undefined
+          : { health }
+
     return toolOkJson(
       TOOL_NAME_SPAWN,
       result,
-      health.ok ? undefined : { health },
+      failureGuidance,
     )
   } catch (error) {
     return formatError(TOOL_NAME_SPAWN, error)

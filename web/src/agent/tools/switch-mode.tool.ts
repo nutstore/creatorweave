@@ -21,6 +21,8 @@ export const switchAgentModeDefinition: ToolDefinition = {
       'Use this tool when you determine that the current mode is not appropriate for the task at hand.',
       'For example, switch to Act mode when analysis is complete and you need to make file changes,',
       'or switch to Plan mode when you want to do a read-only review before making further changes.',
+      '',
+      'IMPORTANT: When switching from Plan to Act mode after analyzing a complex task, you should first present your plan to the user using ask_user_question (type=single_choice with plan details) and get their confirmation. Only switch to Act mode after the user approves the plan.',
     ].join(' '),
     parameters: {
       type: 'object',
