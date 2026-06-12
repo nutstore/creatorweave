@@ -114,7 +114,7 @@ export const conversation = {
         extensionRequiredDesc: "Codex 服务需要安装并启用 CreatorWeave 浏览器扩展。",
         installExtension: "安装扩展",
         rateLimited: "Codex 请求限流",
-        rateLimitedDesc: "请求过于频繁，请稍后再试。",
+        rateLimitedDesc: "可能是请求过于频繁，或 5 小时/周额度已用完，请稍后再试。",
         networkError: "网络连接错误",
         networkErrorDesc: "无法连接到 Codex 服务，请检查网络连接后重试。",
       },

@@ -100,7 +100,7 @@ export const conversation = {
         extensionRequiredDesc: "Codex 제공자는 CreatorWeave 브라우저 확장 프로그램이 설치되어 있고 활성화되어야 합니다.",
         installExtension: "확장 프로그램 설치",
         rateLimited: "Codex 요청 제한",
-        rateLimitedDesc: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+        rateLimitedDesc: "요청이 너무 많거나 5시간/주간 할당량이 모두 소진되었을 수 있습니다. 잠시 후 다시 시도해주세요.",
         networkError: "네트워크 연결 오류",
         networkErrorDesc: "Codex 서비스에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도해주세요.",
       },

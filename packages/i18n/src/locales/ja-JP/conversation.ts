@@ -101,7 +101,7 @@ export const conversation = {
         extensionRequiredDesc: "Codex プロバイダーを使用するには、CreatorWeave ブラウザ拡張機能がインストールされ有効になっている必要があります。",
         installExtension: "拡張機能をインストール",
         rateLimited: "Codex リクエスト制限",
-        rateLimitedDesc: "リクエストが多すぎます。しばらく待ってから再試行してください。",
+        rateLimitedDesc: "リクエストが多すぎるか、5時間/週の使用量上限に達した可能性があります。しばらく待ってから再試行してください。",
         networkError: "ネットワーク接続エラー",
         networkErrorDesc: "Codex サービスに接続できません。インターネット接続を確認して再試行してください。",
       },

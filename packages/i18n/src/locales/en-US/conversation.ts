@@ -114,7 +114,7 @@ export const conversation = {
         extensionRequiredDesc: "The Codex provider requires the CreatorWeave browser extension to be installed and active.",
         installExtension: "Install Extension",
         rateLimited: "Codex Rate Limit Reached",
-        rateLimitedDesc: "Too many requests. Please wait a moment and try again.",
+        rateLimitedDesc: "This may be due to too many requests, or your 5-hour/weekly quota has been exhausted. Please wait and try again later.",
         networkError: "Network Connection Error",
         networkErrorDesc: "Could not connect to the Codex service. Please check your internet connection and try again.",
       },
