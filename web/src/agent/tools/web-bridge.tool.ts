@@ -55,8 +55,6 @@ function getAgentWeb() {
       method?: string
       headers?: Record<string, string>
       body?: string | null
-      extract?: 'raw' | 'text' | 'readability'
-      render?: boolean
     }) => Promise<AgentWebFetchResponse>
   } : null
 }
@@ -134,16 +132,12 @@ export const webFetchDefinition: ToolDefinition = {
   function: {
     name: 'web_fetch',
     description: [
-      'Fetch the content of a web page by URL. Returns the response body, status code, and headers.',
+      'Fetch the content of a web page by URL and return clean Markdown.',
       '',
-      'Content extraction modes:',
-      '- "raw": full HTML as-is',
-      '- "text": strips all HTML tags, returns plain text',
-      '- "readability": uses Mozilla Readability to extract clean article content — removes ads, navigation, sidebars, footers. Best for blog posts, news articles, documentation pages. Returns readability metadata (title, excerpt, byline) alongside clean text.',
+      'Automatically extracts the main article content (removes ads, navigation, sidebars, footers) using Mozilla Readability, then converts to Markdown.',
+      'If the page is a JS-heavy SPA that returns an empty shell via HTTP, automatically falls back to a hidden browser tab for full rendering.',
       '',
-      'Rendering modes:',
-      '- render: false (default) — fast HTTP fetch, may return empty shell for SPA sites',
-      '- render: true — uses hidden browser tab to fully render JS, slower (~5-30s) but captures SPA content (Reddit, Twitter, etc.) and can bypass some Cloudflare challenges',
+      'Returns: Markdown body, HTTP status, headers, and readability metadata (title, excerpt, byline).',
       '',
       'This tool requires the Browser Extension to be installed and active.',
     ].join('\n'),
@@ -167,15 +161,6 @@ export const webFetchDefinition: ToolDefinition = {
         body: {
           type: 'string',
           description: 'Request body (for POST/PUT/PATCH)',
-        },
-        extract: {
-          type: 'string',
-          description: 'Content extraction mode (default: "raw")',
-          enum: ['raw', 'text', 'readability'],
-        },
-        render: {
-          type: 'boolean',
-          description: 'Use hidden tab to fully render JS before extraction. Slower (~5-30s) but captures SPA content (Reddit, Twitter, etc.) and bypasses some Cloudflare challenges. Default: false (fast HTTP fetch).',
         },
       },
       required: ['url'],
@@ -205,15 +190,11 @@ export const webFetchExecutor: ToolExecutor = async (args) => {
     method?: string
     headers?: Record<string, string>
     body?: string | null
-    extract?: 'raw' | 'text' | 'readability'
-    render?: boolean
   } = {}
 
   if (args.method && typeof args.method === 'string') options.method = args.method
   if (args.headers && typeof args.headers === 'object') options.headers = args.headers as Record<string, string>
   if (args.body !== undefined && args.body !== null) options.body = String(args.body)
-  if (args.extract === 'text' || args.extract === 'raw' || args.extract === 'readability') options.extract = args.extract
-  if (args.render === true) options.render = true
 
   try {
     const result = await bridge.fetch(url, options)

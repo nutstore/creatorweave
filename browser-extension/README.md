@@ -46,23 +46,16 @@ if (window.__agentWeb?.ready) {
   const results = await window.__agentWeb.search('svelte 5 runes');
   // { ok: true, results: [{ title, url, snippet }, ...] }
 
-  // Fetch a webpage (raw HTML)
-  const page = await window.__agentWeb.fetch('https://example.com');
-  // { ok: true, status: 200, headers: {...}, body: '<html>...' }
-
-  // Fetch with text extraction (strips all tags)
-  const text = await window.__agentWeb.fetch('https://example.com', {
-    extract: 'text'
-  });
-
-  // Fetch with Readability extraction (clean article content)
-  const article = await window.__agentWeb.fetch('https://example.com/blog-post', {
-    extract: 'readability'
-  });
+  // Fetch a webpage (returns clean Markdown via Readability + Turndown)
+  const article = await window.__agentWeb.fetch('https://example.com/blog-post');
   // {
-  //   ok: true, status: 200, body: 'Clean article text...',
+  //   ok: true, status: 200, body: '# Article title\n\nMarkdown content...',
   //   readability: { title, excerpt, byline, siteName, length }
   // }
+
+  // SPAs and JS-heavy sites are detected automatically: when the initial
+  // HTML body is too short, a second request is made with a document
+  // parser to extract the rendered content.
 }
 ```
 
@@ -101,21 +94,25 @@ The extension enables using OpenAI Codex models directly from CreatorWeave, with
 
 ### `window.__agentWeb.fetch(url, options?)`
 
+Returns the page rendered as **clean Markdown** (via [Mozilla Readability](https://github.com/mozilla/readability) + Turndown HTML-to-Markdown). SPA / JS-heavy pages are detected automatically and re-fetched with a DOM parser when the initial body is too short.
+
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | url | string | - | Target URL |
 | options.method | string | 'GET' | HTTP method |
 | options.headers | object | {} | Request headers |
 | options.body | string | null | Request body |
-| options.extract | 'raw' \| 'text' \| 'readability' | 'raw' | Content extraction mode |
 
-#### Extract Modes
+**Response shape:**
 
-| Mode | Description |
-|------|-------------|
-| `raw` | Returns full HTML as-is |
-| `text` | Strips all HTML tags, returns plain text |
-| `readability` | Uses [Mozilla Readability](https://github.com/mozilla/readability) to extract clean article content — removes ads, navigation, sidebars, footers. Returns `readability` metadata (title, excerpt, byline, siteName, length). |
+```javascript
+{
+  ok: true,
+  status: 200,
+  body: '# Article title\n\nMarkdown content...',
+  readability: { title, excerpt, byline, siteName, length }
+}
+```
 
 ### `window.__agentWeb.codexGetStatus()`
 

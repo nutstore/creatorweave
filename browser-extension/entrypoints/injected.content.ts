@@ -10,6 +10,7 @@
 // ============================================================
 
 import { Readability } from '@mozilla/readability'
+import TurndownService from 'turndown'
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -253,13 +254,19 @@ export default defineContentScript({
       return asyncIterator;
     }
 
+    // Shared Turndown instance with sensible defaults for AI consumption
+    const _turndown = new TurndownService({
+      headingStyle: 'atx',       // # style headings
+      codeBlockStyle: 'fenced',  // ```code blocks```
+      bulletListMarker: '-',     // - for lists
+    })
+
     /**
-     * Apply content extraction to a fetch response.
-     * 'raw'       — return HTML as-is
-     * 'text'      — strip all tags, return plain text
-     * 'readability' — use Mozilla Readability to extract clean article content
+     * Convert HTML to clean Markdown.
+     * Pipeline: Readability (extract main content) → Turndown (HTML→Markdown).
+     * Falls back to Turndown on the full page if Readability fails.
      */
-    function extractContent(body: string, mode: string): {
+    function htmlToMarkdown(body: string): {
       body: string;
       readability?: {
         title: string;
@@ -269,7 +276,37 @@ export default defineContentScript({
         length: number;
       };
     } {
-      if (mode === 'text') {
+      try {
+        const doc = new DOMParser().parseFromString(body, 'text/html');
+        // Set document URL so Readability can resolve relative links
+        const baseHref = doc.querySelector('base')?.href;
+        if (baseHref) {
+          try { doc.documentURI = baseHref; } catch {}
+        }
+        const reader = new Readability(doc);
+        const article = reader.parse();
+
+        if (article?.content) {
+          const markdown = _turndown.turndown(article.content);
+          const titlePrefix = article.title ? `# ${article.title}\n\n` : '';
+          return {
+            body: titlePrefix + markdown,
+            readability: {
+              title: article.title || '',
+              excerpt: article.excerpt || '',
+              byline: article.byline || '',
+              siteName: article.siteName || '',
+              length: markdown.length,
+            },
+          };
+        }
+
+        // Readability couldn't extract (probably not an article page)
+        // Fall back to converting the full page HTML to Markdown
+        const markdown = _turndown.turndown(body);
+        return { body: markdown };
+      } catch {
+        // Turndown/Readability failed — last resort: strip tags
         return {
           body: body
             .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -279,64 +316,6 @@ export default defineContentScript({
             .trim(),
         };
       }
-
-      if (mode === 'readability') {
-        try {
-          const doc = new DOMParser().parseFromString(body, 'text/html');
-          // Set document URL so Readability can resolve relative links
-          const baseHref = doc.querySelector('base')?.href;
-          if (baseHref) {
-            try { doc.documentURI = baseHref; } catch {}
-          }
-          const reader = new Readability(doc);
-          const article = reader.parse();
-
-          if (article) {
-            // Return both clean HTML content and metadata
-            return {
-              body: article.textContent || article.content?.replace(/<[^>]+>/g, ' ').trim() || '',
-              readability: {
-                title: article.title || '',
-                excerpt: article.excerpt || '',
-                byline: article.byline || '',
-                siteName: article.siteName || '',
-                length: article.length || 0,
-              },
-            };
-          }
-
-          // Readability couldn't parse (probably not an article page)
-          // Fall back to text extraction
-          return {
-            body: body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim(),
-            readability: {
-              title: '',
-              excerpt: '',
-              byline: '',
-              siteName: '',
-              length: 0,
-            },
-          };
-        } catch (err) {
-          // Readability failed, return raw text fallback
-          return {
-            body: body
-              .replace(/<script[\s\S]*?<\/script>/gi, '')
-              .replace(/<style[\s\S]*?<\/style>/gi, '')
-              .replace(/<[^>]+>/g, ' ')
-              .replace(/\s+/g, ' ')
-              .trim(),
-          };
-        }
-      }
-
-      // 'raw' — return as-is
-      return { body };
     }
 
     (window as any).__agentWeb = {
@@ -361,40 +340,42 @@ export default defineContentScript({
       },
 
       /**
-       * Fetch a URL with content extraction
+       * Fetch a URL and return clean Markdown.
+       * Pipeline: HTTP fetch → Readability (extract main content) → Turndown (HTML→Markdown).
+       * Falls back to full-page Turndown if Readability can't extract.
        */
       async fetch(url: string, options?: {
         method?: string;
         headers?: Record<string, string>;
         body?: string | null;
-        extract?: 'raw' | 'text' | 'readability';
-        render?: boolean;
       }) {
         const opts = options || {};
-        const extractMode = opts.extract || 'raw';
-        const useRender = opts.render === true;
 
-        const messageType = useRender ? 'web_fetch_render' : 'web_fetch';
-        const messagePayload = useRender
-          ? { url }
-          : {
-              url,
-              method: opts.method || 'GET',
-              headers: opts.headers || {},
-              body: opts.body || null,
-              extract: 'raw',
-            };
+        // Try fast HTTP fetch first; fall back to render tab if response looks like an SPA shell
+        let response = await sendToBridge('web_fetch', {
+          url,
+          method: opts.method || 'GET',
+          headers: opts.headers || {},
+          body: opts.body || null,
+          extract: 'raw',
+        });
 
-        const response = await sendToBridge(messageType, messagePayload);
+        // If fast fetch failed or returned very little content, try render mode
+        if (!response.ok || !response.body || response.body.length < 200) {
+          const renderResponse = await sendToBridge('web_fetch_render', { url });
+          if (renderResponse.ok && renderResponse.body && renderResponse.body.length > (response.body?.length || 0)) {
+            response = renderResponse;
+          }
+        }
 
         if (!response.ok) return response;
 
-        const extracted = extractContent(response.body, extractMode);
+        const result = htmlToMarkdown(response.body);
 
         return {
           ...response,
-          body: extracted.body,
-          ...(extracted.readability ? { readability: extracted.readability } : {}),
+          body: result.body,
+          ...(result.readability ? { readability: result.readability } : {}),
         };
       },
 

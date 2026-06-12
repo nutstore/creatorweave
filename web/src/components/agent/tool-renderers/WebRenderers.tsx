@@ -91,7 +91,6 @@ registerRenderer({
   },
   Detail(ctx) {
     const url = typeof ctx.args.url === 'string' ? ctx.args.url : ''
-    const extract = typeof ctx.args.extract === 'string' ? ctx.args.extract : undefined
     const data = ctx.result?.data as Record<string, unknown> | undefined
 
     if (ctx.isExecuting) return <StreamingPlaceholder />
@@ -108,7 +107,6 @@ registerRenderer({
         <div className="text-xs">
           <div className="text-neutral-400 dark:text-neutral-500 truncate font-mono">{url}</div>
           {status && <div className="text-[10px] text-neutral-400 mt-0.5">Status: {status}</div>}
-          {extract && <div className="text-[10px] text-neutral-400 mt-0.5">Mode: {extract}</div>}
         </div>
 
         {title && (
