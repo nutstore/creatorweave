@@ -135,4 +135,10 @@ export interface AgentLoopConfig {
    * and filter out messages older than the cutoff timestamp.
    */
   initialCompressionBaseline?: CompressionBaselineState | null
+  /**
+   * When true, force-disable thinking/reasoning for this loop instance
+   * regardless of the global settings store. Useful for lightweight
+   * subagents (e.g. tool-searcher) that don't need deep reasoning.
+   */
+  disableThinking?: boolean
 }

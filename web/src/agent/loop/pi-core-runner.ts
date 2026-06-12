@@ -96,6 +96,8 @@ export interface ExecutePiCoreLoopInput {
   onAbortRequested?: () => void
   /** Restored compression baseline from a previous run's persisted state. */
   initialCompressionBaseline?: CompressionBaselineState | null
+  /** When true, force-disable thinking/reasoning regardless of global settings. */
+  disableThinking?: boolean
 }
 
 export interface ExecutePiCoreLoopResult {
@@ -201,7 +203,11 @@ export async function executePiCoreLoop(
   }) as unknown as StreamFn
 
   const settingsState = useSettingsStore.getState()
-  const reasoning = settingsState.enableThinking ? settingsState.thinkingLevel : undefined
+  const reasoning = input.disableThinking
+    ? undefined
+    : settingsState.enableThinking
+      ? settingsState.thinkingLevel
+      : undefined
 
   const loop = agentLoopContinue(
     context,

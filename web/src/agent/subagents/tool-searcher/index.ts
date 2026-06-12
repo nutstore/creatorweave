@@ -87,6 +87,7 @@ export async function runToolSearcher(
     systemPrompt,
     maxIterations: MAX_TURNS,
     skipEnhancements: true,
+    disableThinking: true,
   })
 
   // Build initial user message

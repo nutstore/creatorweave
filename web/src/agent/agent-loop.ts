@@ -56,6 +56,7 @@ export class AgentLoop {
   private onCompressionStateUpdate?: AgentLoopConfig['onCompressionStateUpdate']
   private compressionBaseline: CompressionBaselineState | null
   private skipEnhancements: boolean
+  private disableThinking: boolean
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
   private mode: AgentMode
@@ -79,6 +80,7 @@ export class AgentLoop {
     this.compressionBaseline = config.initialCompressionBaseline ?? null
     this.mode = config.mode || 'act'
     this.skipEnhancements = config.skipEnhancements ?? false
+    this.disableThinking = config.disableThinking ?? false
     // Keep toolContext.agentMode in sync so tools (e.g. bash) can read it
     this.toolContext.agentMode = this.mode
     // Expose provider to tool executors (e.g. search_tools subagent)
@@ -153,6 +155,7 @@ export class AgentLoop {
           }),
         onAbortRequested: () => this.abortController?.abort(),
         initialCompressionBaseline: this.compressionBaseline,
+        disableThinking: this.disableThinking,
       })
       allMessages = result.allMessages
       shouldStopForElicitation = result.shouldStopForElicitation
