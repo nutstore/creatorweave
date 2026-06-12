@@ -150,6 +150,17 @@ export const toolCallDisplay = {
     executing: "실행 중...",
     arguments: "인수",
     result: "결과",
+    // Web renderers
+    fetching: "가져오는 중",
+    noResults: "결과 없음",
+    noContent: "콘텐츠 없음",
+    resultCount: "{count}개 결과",
+    moreCount: "+{count}개 더",
+    moreLines: "{count}줄 더 보기",
+    collapse: "접기",
+    lines: "{count}줄",
+    chars: "{count}자",
+    truncated: "잘림",
 } as const
 
 // Question Card (ask_user_question tool)

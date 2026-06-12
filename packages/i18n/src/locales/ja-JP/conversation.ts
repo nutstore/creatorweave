@@ -151,6 +151,17 @@ export const toolCallDisplay = {
     executing: "実行中...",
     arguments: "引数",
     result: "結果",
+    // Web renderers
+    fetching: "取得中",
+    noResults: "結果なし",
+    noContent: "コンテンツなし",
+    resultCount: "{count} 件の結果",
+    moreCount: "+{count} 件",
+    moreLines: "{count} 行を表示",
+    collapse: "折りたたむ",
+    lines: "{count} 行",
+    chars: "{count} 文字",
+    truncated: "切り詰め",
 } as const
 
 // Question Card (ask_user_question tool)

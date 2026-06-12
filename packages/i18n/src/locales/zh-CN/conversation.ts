@@ -164,6 +164,17 @@ export const toolCallDisplay = {
     executing: "执行中...",
     arguments: "参数",
     result: "结果",
+    // Web renderers
+    fetching: "获取中",
+    noResults: "无结果",
+    noContent: "无内容",
+    resultCount: "{count} 个结果",
+    moreCount: "+{count} 更多",
+    moreLines: "{count} 更多行",
+    collapse: "收起",
+    lines: "{count} 行",
+    chars: "{count} 字符",
+    truncated: "已截断",
 } as const
 
 // Question Card (ask_user_question tool)

@@ -165,6 +165,17 @@ export const toolCallDisplay = {
     executing: "Executing...",
     arguments: "Arguments",
     result: "Result",
+    // Web renderers
+    fetching: "fetching",
+    noResults: "No results",
+    noContent: "No content",
+    resultCount: "{count} result{s}",
+    moreCount: "+{count} more",
+    moreLines: "{count} more lines",
+    collapse: "collapse",
+    lines: "{count} lines",
+    chars: "{count} chars",
+    truncated: "truncated",
 } as const
 
 // Question Card (ask_user_question tool)
