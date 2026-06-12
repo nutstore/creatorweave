@@ -80,12 +80,21 @@ async function fetchOpenAICompatibleModels(
 
   // OpenAI format: { data: [{ id: "model-name", ... }, ...] }
   // OpenRouter extends with top_provider.context_length (actual usable context)
+  // and per-model pricing.prompt / pricing.completion / pricing.input_cache_read
   const rawModels: Array<{
     id: string
     owned_by?: string
     created?: number
     context_length?: number
     top_provider?: { context_length?: number }
+    pricing?: {
+      prompt?: string
+      completion?: string
+      request?: string
+      image?: string
+      input_cache_read?: string
+      input_cache_write?: string
+    }
   }> = data.data || data
 
   if (!Array.isArray(rawModels)) {
@@ -99,7 +108,7 @@ async function fetchOpenAICompatibleModels(
       // actual usable context (may be smaller than the model's theoretical
       // context_length due to provider-side limits). Prefer it when available.
       const effectiveContext = m.top_provider?.context_length ?? m.context_length
-      return parseModelInfo(m.id, effectiveContext)
+      return parseModelInfo(m.id, effectiveContext, m.pricing)
     })
     .sort((a, b) => {
       // Sort: put more capable/recent models first
@@ -241,14 +250,23 @@ export async function fetchModelsForProvider(
  *
  * When the API provides `context_length` (e.g. OpenRouter), it is used as the
  * primary source. Otherwise, falls back to the static guess registry.
+ * Pricing is also passed through when present.
  */
-function parseModelInfo(modelId: string, apiContextLength?: number): ModelInfo {
-  return {
+function parseModelInfo(
+  modelId: string,
+  apiContextLength?: number,
+  pricing?: ModelInfo['pricing']
+): ModelInfo {
+  const info: ModelInfo = {
     id: modelId,
     name: formatModelName(modelId),
     capabilities: guessCapabilities(modelId),
     contextWindow: apiContextLength ?? guessContextWindow(modelId),
   }
+  if (pricing && Object.keys(pricing).length > 0) {
+    info.pricing = pricing
+  }
+  return info
 }
 
 /**

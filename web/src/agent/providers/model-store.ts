@@ -211,3 +211,38 @@ export function getModelContextWindow(
   // 3. Default fallback
   return 128000
 }
+
+/**
+ * Look up per-token USD pricing for a single model ID from the dynamic cache.
+ * Returns null if the model has no pricing info published by the provider
+ * (e.g. OpenAI, Anthropic, or any provider whose /models endpoint omits it).
+ *
+ * Fields are per-token USD strings; multiply by 1_000_000 to get USD/1M.
+ */
+export function getModelPricing(
+  providerType: LLMProviderType,
+  modelId: string,
+  providerKey?: string
+): ModelInfo['pricing'] | null {
+  // Same multi-key lookup strategy as getModelContextWindow, so callers
+  // can pass just providerType (or providerKey) and find the entry.
+  const keysToTry: Array<{ pt: LLMProviderType; pk?: string }> = [
+    { pt: providerType, pk: providerKey },
+    { pt: providerType },
+  ]
+  if (providerKey !== providerType) {
+    keysToTry.push({ pt: providerType, pk: providerType })
+  }
+
+  const seenIds = new Set<string>()
+  for (const { pt, pk } of keysToTry) {
+    const models = getCachedModels(pt, pk)
+    if (!models) continue
+    for (const m of models) {
+      if (seenIds.has(m.id)) continue
+      seenIds.add(m.id)
+      if (m.id === modelId && m.pricing) return m.pricing
+    }
+  }
+  return null
+}

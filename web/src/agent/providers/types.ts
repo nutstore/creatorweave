@@ -27,6 +27,22 @@ export interface ModelInfo {
   capabilities: ModelCapability[]
   contextWindow: number
   description?: string
+  /**
+   * Per-token USD pricing as strings, sourced from the provider's
+   * `/models` endpoint (e.g. OpenRouter). Multiply by 1e6 to get
+   * USD per 1M tokens. Fields are absent when the provider doesn't
+   * publish them (OpenAI, Anthropic, etc.).
+   */
+  pricing?: {
+    prompt?: string
+    completion?: string
+    request?: string
+    image?: string
+    /** Cache read; per-token USD */
+    input_cache_read?: string
+    /** Cache write (e.g. Anthropic ephemeral); per-token USD */
+    input_cache_write?: string
+  }
 }
 
 /** Provider metadata for UI display */
