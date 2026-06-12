@@ -377,7 +377,17 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     }
 
     // Resolve native FS handle (disk files)
-    const { handle: nativeHandle } = await scope.resolveHandle(scope.subPath)
+    // Use allowMissing so we can distinguish "directory does not exist" from other errors
+    const nativeResult = await scope.resolveHandle(scope.subPath, { allowMissing: true })
+    if (!nativeResult.exists && scope.subPath) {
+      // Build the full display path (include rootName for multi-root)
+      const displayPath = scope.rootName ? `${scope.rootName}/${scope.subPath}` : scope.subPath
+      return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
+        hint: 'Check the path for typos, or use ls() without arguments to list available roots and directories.',
+        details: { requested_path: scope.subPath, rootName: scope.rootName },
+      })
+    }
+    const nativeHandle = nativeResult.handle
 
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs

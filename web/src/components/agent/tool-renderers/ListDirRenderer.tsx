@@ -24,13 +24,19 @@ registerRenderer({
     const fileCount = entries.filter(e => isFile(e)).length
     const dirCount = entries.filter(e => isDir(e)).length
 
+    // Show error message in summary when tool failed
+    const errMsg = ctx.isError ? getErrorMessage(ctx) : undefined
+
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">ls</code>
         {dirPath && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">{dirPath}</span>
         )}
-        {!ctx.isExecuting && !ctx.isStreaming && (
+        {errMsg && !ctx.isExecuting && !ctx.isStreaming && (
+          <span className="ml-auto text-xs text-red-400 dark:text-red-400/80 shrink-0 truncate max-w-[60%]">{errMsg}</span>
+        )}
+        {!ctx.isExecuting && !ctx.isStreaming && !errMsg && (
           <span className="ml-auto text-xs text-neutral-400 shrink-0">
             {fileCount + dirCount} item{fileCount + dirCount !== 1 ? 's' : ''}
           </span>
@@ -45,6 +51,15 @@ registerRenderer({
 
     if (entries.length === 0) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
+      // Check for error response (e.g. directory_not_found)
+      const errMsg = getErrorMessage(ctx)
+      if (errMsg) {
+        return (
+          <div className="px-3 py-2 text-xs text-red-400 dark:text-red-400/80">
+            {errMsg}
+          </div>
+        )
+      }
       return (
         <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
           {dirPath ? `${dirPath} is empty` : 'No entries'}
@@ -93,6 +108,17 @@ registerRenderer({
     )
   },
 })
+
+/** Extract a human-readable error message from the tool result envelope. */
+function getErrorMessage(ctx: ToolRenderCtx): string | undefined {
+  if (!ctx.isError) return undefined
+  const result = ctx.result as Record<string, unknown> | null
+  if (result?.error && typeof result.error === 'object') {
+    const err = result.error as Record<string, unknown>
+    return typeof err.message === 'string' ? err.message : undefined
+  }
+  return undefined
+}
 
 function extractEntries(ctx: ToolRenderCtx): LsEntry[] {
   const data = ctx.result?.data
