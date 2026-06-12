@@ -19,6 +19,7 @@ registerRenderer({
     const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
     const results = extractSearchResults(ctx)
     const displayText = intent || query || 'search'
+    const { searchMode, searchDurationMs } = extractSearchMeta(ctx)
 
     return (
       <>
@@ -29,9 +30,16 @@ registerRenderer({
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && !ctx.isError && (
-          <span className="ml-auto text-xs shrink-0 text-neutral-400">
-            {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
-          </span>
+          <>
+            <span className="ml-auto text-xs shrink-0 text-neutral-400">
+              {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
+            </span>
+            {searchMode && searchDurationMs !== undefined && (
+              <span className="ml-2 text-[10px] font-mono shrink-0 text-neutral-400 dark:text-neutral-500">
+                {formatSearchMode(searchMode)} · {formatDuration(searchDurationMs)}
+              </span>
+            )}
+          </>
         )}
         {ctx.isError && (
           <span className="ml-auto text-xs text-red-500 shrink-0">✗ failed</span>
@@ -44,6 +52,7 @@ registerRenderer({
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const intent = typeof ctx.args.intent === 'string' ? ctx.args.intent : ''
     const displayText = intent || query || 'search'
+    const { searchMode, searchDurationMs } = extractSearchMeta(ctx)
 
     if (ctx.isExecuting) return <StreamingPlaceholder count={2} />
     if (ctx.isError) return <ErrorDetail ctx={ctx} />
@@ -58,8 +67,15 @@ registerRenderer({
 
     return (
       <div className="px-3 py-2">
-        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2">
-          {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
+        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2 flex items-center gap-2">
+          <span>
+            {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
+          </span>
+          {searchMode && searchDurationMs !== undefined && (
+            <span className="font-mono text-neutral-400 dark:text-neutral-500">
+              · {formatSearchMode(searchMode)} · {formatDuration(searchDurationMs)}
+            </span>
+          )}
         </div>
         <div className="space-y-3">
           {results.map((tool) => (
@@ -312,6 +328,37 @@ function extractSearchResults(ctx: ToolRenderCtx): SearchResult[] {
       inputSchema: (t.inputSchema as Record<string, unknown>) || {},
     }))
     .filter(t => t.fullName)
+}
+
+/** Routing-internal searchMode values emitted by search_tools (see external-tool-bridge.ts). */
+type SearchMode = 'semantic' | 'keyword' | 'bm25_rerank' | 'fallback'
+
+const SEARCH_MODES: ReadonlyArray<SearchMode> = ['semantic', 'keyword', 'bm25_rerank', 'fallback']
+
+function extractSearchMeta(ctx: ToolRenderCtx): { searchMode?: SearchMode; searchDurationMs?: number } {
+  const data = ctx.result?.data as Record<string, unknown> | undefined
+  if (!data) return {}
+  const rawMode = data.searchMode
+  const searchMode = SEARCH_MODES.includes(rawMode as SearchMode) ? (rawMode as SearchMode) : undefined
+  const searchDurationMs = typeof data.searchDurationMs === 'number' ? data.searchDurationMs : undefined
+  return { searchMode, searchDurationMs }
+}
+
+/** Map a routing-internal searchMode to a short user-facing label. */
+function formatSearchMode(mode: SearchMode): string {
+  switch (mode) {
+    case 'semantic': return 'semantic'
+    case 'keyword': return 'BM25'
+    case 'bm25_rerank': return 'BM25+rerank'
+    case 'fallback': return 'fallback'
+  }
+}
+
+/** Format milliseconds as a short, readable duration. */
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 10000) return `${(ms / 1000).toFixed(2)}s`
+  return `${(ms / 1000).toFixed(1)}s`
 }
 
 /** workspace_jianguoyun_com__fetch_ticket_messages → fetch_ticket_messages */

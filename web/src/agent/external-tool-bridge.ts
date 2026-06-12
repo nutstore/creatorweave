@@ -221,6 +221,191 @@ class BM25Index {
 }
 
 //=============================================================================
+// Phase 1+ Adaptive Routing Helpers
+//=============================================================================
+
+/**
+ * Tuning knobs for the adaptive three-level routing:
+ *
+ * - Level 1 (pure BM25):  no rerank, no LLM call
+ * - Level 2 (BM25 + LLM rerank): requires English query AND ≥ MIN_RECALL candidates
+ * - Level 3 (full LLM semantic): fallback for CJK or BM25-poor queries
+ */
+const MIN_RECALL = 5             // Min BM25 candidates to attempt rerank path
+const RERANK_TOP_N = 20          // Candidates fed into LLM reranker
+const FALLBACK_TOP_K = 5         // Best-effort candidates when nothing matches
+const MAX_SEARCH_RESULTS = 10    // Cap on returned results (matches BM25 path)
+
+// Top-1 confidence short-circuit: skip LLM rerank when BM25 top-1 is
+// clearly dominant. Both conditions must hold:
+//   - top1Score >= TOP1_CONFIDENCE_SCORE (absolute confidence)
+//   - top1Score - top2Score >= TOP1_TOP2_GAP (relative dominance)
+//
+// Backed by observed BM25 score distribution (12-query test, 2026-06-12):
+//   - precise name match: top1=13-16, gap>5
+//   - fuzzy match:        top1=4-8,  gap<1
+//   - unrelated:          top1=0
+//
+// Tuning philosophy: prefer false negatives (let it rerank unnecessarily)
+// over false positives (skip rerank and return wrong tool).
+const TOP1_CONFIDENCE_SCORE = 8.0
+const TOP1_TOP2_GAP = 4.0
+
+/**
+ * Detect CJK (Chinese/Japanese/Korean) characters in a string.
+ *
+ * BM25's tokenize() splits on whitespace and lowercases; it has zero Chinese
+ * tokenization. We use this to detect when BM25 is guaranteed to fail and
+ * we should skip directly to full LLM semantic search.
+ *
+ * Range covers CJK Unified Ideographs + Compatibility Ideographs.
+ */
+function hasCJK(text: string): boolean {
+  if (!text) return false
+  // CJK Unified Ideographs (4E00-9FFF) + Extension A (3400-4DBF) + Compat (F900-FAFF)
+  return /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/.test(text)
+}
+
+/**
+ * Pure BM25 keyword search.
+ *
+ * Returns scored candidates sorted by BM25 score (descending). Empty array
+ * if query is empty or no candidates have score > 0.
+ *
+ * Used by:
+ * - Level 1 (no intent): returned directly
+ * - Level 2 rerank: as candidate set for LLM reranker
+ * - Fallback (status: no_match): as best-effort candidates
+ */
+function runBm25Search(
+  allTools: UnifiedToolEntry[],
+  query: string,
+  n: number
+): Array<{ tool: UnifiedToolEntry; score: number }> {
+  if (!query.trim()) return []
+
+  const searchItems = allTools.map(tool => ({
+    tool,
+    searchText: `${tool.fullName} ${tool.description} ${tool.sourceId}`,
+    nameText: tool.fullName,
+  }))
+
+  const index = new BM25Index()
+  index.build(searchItems.map(item => item.searchText))
+
+  const queryTokens = tokenize(query)
+  const scored = searchItems
+    .map((item, i) => ({
+      tool: item.tool,
+      score: index.score(i, queryTokens, item.nameText),
+    }))
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, n)
+
+  return scored
+}
+
+/**
+ * Format BM25 scored candidates into the standard search_tools response shape.
+ *
+ * Used by Path A (no intent) and Path A2 (short-circuit) — both are pure
+ * BM25 with no LLM step. The LLM-aware paths (Path B rerank, Path C semantic,
+ * Fallback) build their own response directly via toolOkJson because they
+ * need to merge LLM output with catalog lookups.
+ *
+ * Always returns status: 'ok'. The no_match / failure case lives in the
+ * Fallback path at the bottom of the executor.
+ */
+function formatBm25Results(
+  scored: Array<{ tool: UnifiedToolEntry; score: number }>,
+  limit: number,
+  searchDurationMs?: number,
+  extraFields: Record<string, unknown> = {}
+) {
+  const results = scored.slice(0, Math.min(limit, MAX_SEARCH_RESULTS)).map(s => ({
+    fullName: s.tool.fullName,
+    source: s.tool.source,
+    sourceId: s.tool.sourceId,
+    description: s.tool.description.slice(0, 300),
+    inputSchema: s.tool.inputSchema,
+    score: Math.round(s.score * 1000) / 1000,  // Round to 3 decimals for readability
+  }))
+
+  return toolOkJson('search_tools', {
+    status: 'ok',
+    results,
+    total: results.length,
+    searchMode: 'keyword',
+    searchDurationMs: searchDurationMs !== undefined ? Math.round(searchDurationMs) : undefined,
+    // Schema consistency: bm25Top1 == results[0].fullName for both Path A
+    // and Path A2 (no LLM step in either). Path B / Path C / Fallback set
+    // bm25Top1 explicitly in their own responses.
+    bm25Top1: scored[0]?.tool.fullName ?? null,
+    ...extraFields,
+  })
+}
+
+//=============================================================================
+// LLM-result enrichment
+//=============================================================================
+
+/** Shape that Path B (rerank) and Path C (semantic) expect from the LLM. */
+interface LlmToolPick {
+  full_tool_name: string
+  relevance_reason: string
+  /** Optional — Path C's searcher echoes it from the prompt; Path B's reranker does not. */
+  description?: string
+}
+
+/** Enriched tool row attached to the search_tools response. */
+interface EnrichedToolRow {
+  fullName: string
+  source: string
+  sourceId: string
+  description: string
+  inputSchema: Record<string, unknown>
+  relevanceReason: string
+}
+
+/**
+ * Enrich LLM-picked tool names with authoritative source / schema / description
+ * from the local tool catalog.
+ *
+ * Shared by Path B (rerank) and Path C (semantic). The LLM only picks
+ * names + reasons — schemas and source info come from us.
+ *
+ * `description` on the pick is optional and only used as a last-resort
+ * fallback when the catalog has no entry for the name.
+ */
+function enrichWithCatalog(
+  picks: LlmToolPick[],
+  allTools: UnifiedToolEntry[],
+  limit: number
+): { results: EnrichedToolRow[]; notFound: string[] } {
+  const toolCatalog = new Map(allTools.map(t => [t.fullName, t]))
+  const notFound: string[] = []
+  const results: EnrichedToolRow[] = picks
+    .slice(0, Math.min(limit, MAX_SEARCH_RESULTS))
+    .map(t => {
+      const catalogEntry = toolCatalog.get(t.full_tool_name)
+      if (!catalogEntry) {
+        // LLM invented a name we don't know about — flag for debugging
+        notFound.push(t.full_tool_name)
+      }
+      return {
+        fullName: t.full_tool_name,
+        source: catalogEntry?.source || 'unknown',
+        sourceId: catalogEntry?.sourceId || '',
+        description: (catalogEntry?.description || t.description || '').slice(0, 300),
+        inputSchema: catalogEntry?.inputSchema || {},
+        relevanceReason: t.relevance_reason,
+      }
+    })
+  return { results, notFound }
+}
+
+//=============================================================================
 // Tool 1: search_tools (search + schema in one call)
 //=============================================================================
 
@@ -284,96 +469,209 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
     })
   }
 
-  // ── Subagent semantic search path (when intent is provided) ──
-  if (intent && intent.trim()) {
+  // ===========================================================================
+  // Phase 1+ Adaptive Three-Level Routing
+  // ===========================================================================
+  //
+  //   Path A (no intent):       BM25 only                          (~3ms, no LLM)
+  //   Path B (intent, BM25 OK): BM25 top-N → LLM rerank            (~7-15s, small LLM call)
+  //   Path C (intent, CJK or):  full LLM semantic over all tools   (~30-44s, big LLM call)
+  //   Fallback (all failed):    BM25 best-effort + status:no_match (~3ms, no LLM)
+  //
+  // Path B is the new optimization: BM25 narrows 137 → ~20 candidates,
+  // LLM reranks the small set. Backed by Paper 2 "From BM25 to Corrective RAG"
+  // showing hybrid+rerank is the largest single-stage improvement for retrieval.
+  // ===========================================================================
+
+  // Step 1: BM25 retrieval is always run (~1-2ms). Used by Path A, Path B candidates,
+  // and the fallback best-effort list. Timing starts here so Path A and Path A2
+  // both report the actual BM25 cost in searchDurationMs.
+  const routeStart = performance.now()
+  const bm25Candidates = runBm25Search(allTools, query, RERANK_TOP_N)
+
+  // ── Path A: no intent → pure BM25, return immediately ──
+  if (!intent?.trim()) {
+    return formatBm25Results(bm25Candidates, limit, performance.now() - routeStart, {
+      query,
+    })
+  }
+
+  // ── Path A2: BM25 top-1 high-confidence short-circuit ──
+  //
+  // When BM25 top-1 is clearly dominant (high absolute score AND large gap
+  // to top-2), trust the lexical match and skip LLM rerank entirely.
+  // Avoids 8-33s LLM call when BM25 is already certain.
+  //
+  // Both conditions required:
+  //   - top1Score >= 8.0  (filters out fuzzy matches scoring 4-8)
+  //   - top1Score - top2Score >= 4.0  (filters out queries where top-2 is close)
+  //
+  // See TOP1_CONFIDENCE_SCORE / TOP1_TOP2_GAP for the empirical basis.
+  if (bm25Candidates.length >= 2) {
+    const top1Score = bm25Candidates[0].score
+    const top2Score = bm25Candidates[1].score
+    if (
+      top1Score >= TOP1_CONFIDENCE_SCORE &&
+      top1Score - top2Score >= TOP1_TOP2_GAP
+    ) {
+      return formatBm25Results(bm25Candidates, limit, performance.now() - routeStart, {
+        query,
+        intent,
+        shortCircuited: 'top1_confidence',
+        bm25Top1Score: Math.round(top1Score * 1000) / 1000,
+        // The gap that actually triggered A2. Logged for offline threshold
+        // tuning (TOP1_CONFIDENCE_SCORE / TOP1_TOP2_GAP).
+        // Note: we cannot know "would rerank have overridden?" without
+        // actually calling rerank — that's why this metric doesn't exist.
+        top1Top2Gap: Math.round((top1Score - top2Score) * 1000) / 1000,
+      })
+    }
+  }
+
+  // ── Path B & C require an LLM provider. If missing, skip directly to Fallback. ──
+  //
+  // Single hoisted check (vs checking inside each path) prevents the double
+  // "no provider" warn that the old per-path structure produced.
+  const provider = context.provider
+  if (!provider) {
+    console.warn('[search_tools] no provider in ToolContext, skipping rerank and semantic paths')
+  } else {
+    // ── Path B: BM25 sufficient AND no CJK → BM25 + LLM rerank ──
+    //
+    // Skip when:
+    //   - Query contains CJK chars (BM25 has no Chinese tokenization)
+    //   - BM25 returned fewer than MIN_RECALL candidates (lexical match is poor)
+    if (!hasCJK(query) && bm25Candidates.length >= MIN_RECALL) {
+      const rerankStart = performance.now()
+      try {
+        const { runReranker } = await import('./subagents/tool-searcher')
+
+        // Adapt BM25 candidates to RerankCandidate shape (include BM25 score for context)
+        const rerankCandidates = bm25Candidates.map(c => ({
+          fullName: c.tool.fullName,
+          description: c.tool.description,
+          source: c.tool.source,
+          sourceId: c.tool.sourceId,
+          bm25Score: c.score,
+        }))
+
+        const result = await runReranker(
+          { intent, candidates: rerankCandidates, topK: limit },
+          { provider, signal: context.abortSignal }
+        )
+
+        if (result && result.tools.length > 0) {
+          const { results: enriched, notFound } = enrichWithCatalog(result.tools, allTools, limit)
+
+          if (notFound.length > 0) {
+            console.warn('[search_tools] rerank results included unknown tool names:', notFound)
+          }
+
+          // Instrumentation: did the rerank change the top-1 from what BM25
+          // originally said? Useful for offline analysis of rerank accuracy.
+          //   - High override rate  → BM25 is missing signals, rerank adds value
+          //   - Zero override rate  → rerank is rubber-stamping, maybe redundant
+          // bm25Top1 is the BM25 top-1 full name (null if no candidates).
+          // The rerank top-1 is results[0].fullName in the response.
+          const bm25Top1 = bm25Candidates[0]?.tool.fullName ?? null
+          const rerankTop1 = enriched[0]?.fullName ?? null
+          const rerankOverrodeTop1 =
+            bm25Top1 !== null && rerankTop1 !== null && bm25Top1 !== rerankTop1
+
+          return toolOkJson('search_tools', {
+            status: 'ok',
+            results: enriched,
+            total: enriched.length,
+            query,
+            intent,
+            searchMode: 'bm25_rerank',
+            searchDurationMs: Math.round(performance.now() - rerankStart),
+            bm25Top1,
+            rerankOverrodeTop1,
+          })
+        }
+
+        // Rerank returned no results — fall through to Path C
+      } catch (error) {
+        console.error('[search_tools] Rerank failed, falling back to semantic:', error)
+      }
+    }
+
+    // ── Path C: full LLM semantic search (CJK query or BM25 insufficient) ──
+    const semanticStart = performance.now()
     try {
       const { runToolSearcher } = await import('./subagents/tool-searcher')
 
-      // Build the descriptions text for the subagent prompt
       const descLines = allTools
         .map(t => `## ${t.fullName}\n${t.description || '(no description)'}\nSource: ${t.source} (${t.sourceId})`)
         .join('\n\n')
 
-      // Use the main agent's provider directly (passed via ToolContext)
-      const provider = context.provider
+      const result = await runToolSearcher(
+        { query: intent, allToolDescriptionsText: descLines },
+        { provider, signal: context.abortSignal }
+      )
 
-      if (!provider) {
-        console.warn('[search_tools] semantic=true but no provider in ToolContext, falling back to BM25')
-      } else {
+      if (result && result.tools.length > 0) {
+        const { results: enriched, notFound } = enrichWithCatalog(result.tools, allTools, limit)
 
-        const result = await runToolSearcher(
-          { query: intent, allToolDescriptionsText: descLines },
-          { provider }
-        )
-
-        if (result && result.tools.length > 0) {
-          // Look up source info from the tool catalog (not from subagent)
-          const toolCatalog = new Map(allTools.map(t => [t.fullName, t]))
-          return toolOkJson('search_tools', {
-            results: result.tools.slice(0, Math.min(limit, 10)).map(t => {
-              const catalogEntry = toolCatalog.get(t.full_tool_name)
-              return {
-                fullName: t.full_tool_name,
-                source: catalogEntry?.source || 'webmcp',
-                sourceId: catalogEntry?.sourceId || '',
-                description: t.description.slice(0, 300),
-                inputSchema: t.input_schema,
-                relevanceReason: t.relevance_reason,
-              }
-            }),
-            total: result.tools.length,
-            query,
-            intent,
-            searchMode: 'subagent',
-          })
+        if (notFound.length > 0) {
+          console.warn('[search_tools] semantic results included unknown tool names:', notFound)
         }
 
-        // Subagent returned no results — fall through to BM25
+        // Mirror Path B instrumentation: did semantic pick something different
+        // from BM25's top-1? High override rate means BM25 recall is poor for
+        // CJK / low-recall queries — useful for tuning MIN_RECALL.
+        // Unlike Path B, semantic sees ALL tools (~137), not just BM25 top-20,
+        // so an override here can come from outside BM25's candidate set.
+        const cBm25Top1 = bm25Candidates[0]?.tool.fullName ?? null
+        const cSemanticTop1 = enriched[0]?.fullName ?? null
+        const semanticOverrodeBm25 =
+          cBm25Top1 !== null && cSemanticTop1 !== null && cBm25Top1 !== cSemanticTop1
+
+        return toolOkJson('search_tools', {
+          status: 'ok',
+          results: enriched,
+          total: enriched.length,
+          query,
+          intent,
+          searchMode: 'semantic',
+          searchDurationMs: Math.round(performance.now() - semanticStart),
+          bm25Top1: cBm25Top1,
+          semanticOverrodeBm25,
+        })
       }
+
+      // Semantic returned no results — fall through to Fallback
     } catch (error) {
-      console.error('[search_tools] Subagent search failed, falling back to BM25:', error)
+      console.error('[search_tools] Semantic search failed, falling back to BM25 best-effort:', error)
     }
   }
 
-  // ── BM25 keyword search path (default) ──
-
-  // No source filter — search across all tools
-  const filtered = allTools
-
-  // Build search texts and BM25 index
-  const searchItems = filtered.map(tool => ({
-    tool,
-    searchText: `${tool.fullName} ${tool.description} ${tool.sourceId}`,
-    nameText: tool.fullName,
-  }))
-
-  const index = new BM25Index()
-  index.build(searchItems.map(item => item.searchText))
-
-  // Score and rank
-  const queryTokens = tokenize(query)
-  const scored = searchItems
-    .map((item, i) => ({
-      tool: item.tool,
-      score: index.score(i, queryTokens, item.nameText),
-    }))
-    .filter(s => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, Math.min(limit, 10))
-
-  // Return full tool info including inputSchema — no second call needed
-  const results = scored.map(s => ({
-    fullName: s.tool.fullName,
-    source: s.tool.source,
-    sourceId: s.tool.sourceId,
-    description: s.tool.description.slice(0, 300),
-    inputSchema: s.tool.inputSchema,
-  }))
-
+  // ── Fallback: BM25 best-effort when all LLM paths failed ──
+  //
+  // Returns BM25 top-K with explicit `status: no_match` so the calling agent
+  // sees this is a failure (not a legitimate empty result) and avoids
+  // hallucinating tool names.
+  const fallback = bm25Candidates.slice(0, Math.min(FALLBACK_TOP_K, limit))
   return toolOkJson('search_tools', {
-    results,
-    total: results.length,
+    status: 'no_match',
+    results: fallback.map(c => ({
+      fullName: c.tool.fullName,
+      source: c.tool.source,
+      sourceId: c.tool.sourceId,
+      description: c.tool.description.slice(0, 300),
+      inputSchema: c.tool.inputSchema,
+      score: Math.round(c.score * 1000) / 1000,  // Round to 3 decimals for readability
+    })),
+    total: fallback.length,
     query,
+    intent,
+    searchMode: 'fallback',
+    // Schema consistency: every path reports bm25Top1.
+    // In Fallback this equals results[0].fullName (no LLM step happened).
+    bm25Top1: fallback[0]?.tool.fullName ?? null,
+    message: 'No tools matched after semantic search. Showing top lexical candidates as best-effort.',
+    suggestion: 'Try different keywords or check the tool documentation.',
   })
 }
 
