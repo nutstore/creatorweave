@@ -21,16 +21,43 @@ export interface EnsureLatestToolResultFitsContextInput {
   estimateTokens: (messages: ChatMessage[]) => number
 }
 
+/**
+ * Metadata recorded into the overflow file header so that the calling
+ * tool/args/trace can be recovered from the asset file alone (e.g. when
+ * debugging why a 60MB tool result was produced). The header is the only
+ * persistent record of "which tool, with which args, produced this overflow".
+ */
+export interface OverflowMetadata {
+  toolName: string
+  toolCallId?: string
+  args: Record<string, unknown>
+  /** Unix epoch milliseconds — also used as the asset filename suffix. */
+  timestamp: number
+  estimatedTokens: number
+  availableTokens: number
+  workspaceId?: string
+}
+
 export interface TruncateLargeToolResultInput {
   rawResult: string
   toolName: string
+  /** Tool call arguments — recorded into the overflow file header for debugging. */
+  args?: Record<string, unknown>
+  /** Tool call id (matches the LLM-side tool_call_id) — recorded into the overflow file header. */
+  toolCallId?: string
+  /** Workspace id — recorded into the overflow file header for debugging. */
+  workspaceId?: string
   /** Real token usage from the last API response. When absent (e.g. first turn), skip truncation entirely. */
   existingTokens?: number
   maxContextTokens: number
   reserveTokens: number
   estimateTextTokens: (text: string) => number
   /** Optional: write overflow content to assets and return the asset path. */
-  writeToAssets?: (content: string, toolName: string) => Promise<string | null>
+  writeToAssets?: (
+    content: string,
+    toolName: string,
+    metadata: OverflowMetadata
+  ) => Promise<string | null>
 }
 
 export interface ExecuteToolWithTimeoutInput {
@@ -194,16 +221,15 @@ export function ensureLatestToolResultFitsContext(input: EnsureLatestToolResultF
 }
 
 export async function truncateLargeToolResult(input: TruncateLargeToolResultInput): Promise<string> {
-  // No real usage data (e.g. first turn) — cannot calculate budget reliably, skip truncation.
-  if (input.existingTokens === undefined) {
-    return input.rawResult
-  }
+  // Use real token usage when available; otherwise assume 0 (first turn).
+  // We still need to truncate/write-to-assets oversized results to avoid context overflow.
+  const existingTokens = input.existingTokens ?? 0
 
   // Calculate the maximum token budget for the tool result (total budget - existing messages - reserve).
   // Leave an extra 10% margin to account for estimation errors.
   const availableForTool = Math.max(
     1000, // Minimum 1000 tokens
-    (input.maxContextTokens - input.reserveTokens - input.existingTokens) * 0.9
+    (input.maxContextTokens - input.reserveTokens - existingTokens) * 0.9
   )
 
   // If the result fits within the budget, no truncation needed.
@@ -233,7 +259,15 @@ export async function truncateLargeToolResult(input: TruncateLargeToolResultInpu
       ? envelopeData.content
       : input.rawResult
 
-    const assetPath = await input.writeToAssets(contentToWrite, input.toolName)
+    const assetPath = await input.writeToAssets(contentToWrite, input.toolName, {
+      toolName: input.toolName,
+      toolCallId: input.toolCallId,
+      args: input.args ?? {},
+      timestamp: Date.now(),
+      estimatedTokens: estimatedResultTokens,
+      availableTokens: Math.floor(availableForTool),
+      workspaceId: input.workspaceId,
+    })
     if (assetPath) {
       // Build an overflow envelope that preserves the original metadata
       const baseOverflow = {
@@ -363,15 +397,26 @@ export async function truncateLargeToolResult(input: TruncateLargeToolResultInpu
       return JSON.stringify(bestResult)
     }
 
-    // Other JSON results: simple truncation
+    // Other JSON results: return a valid JSON envelope with truncated content
     const truncateRatio = availableForTool / estimatedResultTokens
     const truncateAt = Math.floor(input.rawResult.length * truncateRatio * 0.8)
-    return (
-      input.rawResult.slice(0, truncateAt) +
-      `\n\n... [Result truncated due to size: ${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)} tokens. Use filters to reduce output.]`
-    )
+    const truncatedContent = input.rawResult.slice(0, truncateAt)
+    return JSON.stringify({
+      ok: true,
+      tool: input.toolName,
+      version: 2,
+      data: {
+        truncated: true,
+        content: truncatedContent,
+        estimatedTokens: estimatedResultTokens,
+        availableTokens: Math.floor(availableForTool),
+      },
+      meta: {
+        hint: `Result truncated: ${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)}. Use filters to reduce output.`,
+      },
+    })
   } catch {
-    // Non-JSON results: direct truncation
+    // Non-JSON results: direct truncation (plain text, no JSON envelope needed)
     const truncateRatio = availableForTool / estimatedResultTokens
     const truncateAt = Math.floor(input.rawResult.length * truncateRatio * 0.8)
     return (

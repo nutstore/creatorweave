@@ -152,6 +152,9 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         rawResult = await truncateLargeToolResult({
           rawResult,
           toolName: toolDef.function.name,
+          args,
+          toolCallId,
+          workspaceId: originalToolContext.workspaceId ?? undefined,
           existingTokens: realUsedTokens,
           maxContextTokens,
           reserveTokens,
@@ -163,14 +166,28 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
               },
             ]),
           writeToAssets: originalToolContext.workspaceId
-            ? async (content, toolName) => {
+            ? async (content, toolName, metadata) => {
                 try {
                   const { AssetsBackend } = await import('../tools/backends/assets-backend')
-                  const backend = new AssetsBackend(originalToolContext.workspaceId)
-                  const timestamp = Date.now()
-                  const safeName = toolName.replace(/[^a-zA-Z0-9_-]/g, '_')
-                  const assetFileName = `overflow_${safeName}_${timestamp}.txt`
+                  const backend = new AssetsBackend(originalToolContext.workspaceId!)
+                  const safeName = (metadata?.toolName ?? toolName).replace(/[^a-zA-Z0-9_-]/g, '_')
+                  const ts = metadata?.timestamp ?? Date.now()
+                  // Write raw data file (parseable JSON for front-end renderers)
+                  const assetFileName = `overflow_${safeName}_${ts}.txt`
                   await backend.writeFile(assetFileName, content)
+                  // Write companion metadata file for debugging (tool name, args, token budget)
+                  try {
+                    const metaFileName = `overflow_${safeName}_${ts}.meta.json`
+                    await backend.writeFile(metaFileName, JSON.stringify({
+                      toolName: metadata.toolName,
+                      toolCallId: metadata.toolCallId ?? null,
+                      timestamp: metadata.timestamp,
+                      estimatedTokens: metadata.estimatedTokens,
+                      availableTokens: metadata.availableTokens,
+                      workspaceId: metadata.workspaceId ?? null,
+                      args: metadata.args,
+                    }, null, 2))
+                  } catch { /* non-critical — metadata is best-effort */ }
                   return assetFileName
                 } catch (err) {
                   console.error('[AgentLoop] Failed to write overflow to assets:', err)
