@@ -10,6 +10,7 @@ import type {
   SpawnSubagentResult,
   SubagentRuntime,
   SubagentTaskNotification,
+  SubagentStepNotification,
   SubagentTaskStatus,
   SubagentTaskSummary,
   SubagentTaskUsage,
@@ -36,6 +37,8 @@ type SubagentTaskInternal = {
   usage?: SubagentTaskUsage
   error?: { code: string; message: string }
   loop?: AgentLoop
+  /** Cached id of the tool call currently receiving streaming arg deltas. */
+  currentToolCallId?: string
   processing: boolean
   processingPromise?: Promise<void>
   stopped: boolean
@@ -51,7 +54,7 @@ type RuntimeDeps = {
   toolRegistry: ToolRegistry
   contextManager: ContextManager
   baseToolContext: ToolContext
-  onNotification?: (event: SubagentTaskNotification) => void
+  onNotification?: (event: SubagentTaskNotification | SubagentStepNotification) => void
   /** Returns the OPFS workspace directory for transcript storage. Optional — transcript disabled if not provided. */
   getWorkspaceDir?: () => Promise<FileSystemDirectoryHandle>
 }
@@ -93,6 +96,11 @@ class SubagentRuntimeImpl implements SubagentRuntime {
   private nameToId = new Map<string, string>()
   private deps: RuntimeDeps
   private hydrationPromise: Promise<void>
+  // Streaming buffers for delta accumulation (reasoning, content, tool args)
+  // These accumulate partial deltas before emitting a full snapshot event.
+  private reasoningBuffers = new Map<string, string>()
+  private contentBuffers = new Map<string, string>()
+  private toolArgBuffers = new Map<string, string>()
 
   constructor(deps: RuntimeDeps) {
     this.deps = deps
@@ -699,7 +707,92 @@ class SubagentRuntimeImpl implements SubagentRuntime {
         task.messages.push(userMsg)
         await this.appendTranscript(task, userMsg)
         const startedAt = Date.now()
-        task.messages = await loop.run(task.messages)
+        task.messages = await loop.run(task.messages, {
+          onMessageStart: () => this.emitStep(task, { type: 'message_start' }),
+          onReasoningStart: () => this.emitStep(task, { type: 'reasoning_start' }),
+          onReasoningDelta: (delta) => {
+            this.reasoningBuffers.set(task.agentId, (this.reasoningBuffers.get(task.agentId) || '') + delta)
+            this.emitStep(task, {
+              type: 'reasoning_stream_sync',
+              reasoning: this.reasoningBuffers.get(task.agentId) || '',
+            })
+          },
+          onReasoningComplete: (reasoning) => {
+            this.reasoningBuffers.delete(task.agentId)
+            this.emitStep(task, { type: 'reasoning_complete', reasoning })
+          },
+          onContentStart: () => this.emitStep(task, { type: 'content_start' }),
+          onContentDelta: (delta) => {
+            this.contentBuffers.set(task.agentId, (this.contentBuffers.get(task.agentId) || '') + delta)
+            this.emitStep(task, {
+              type: 'content_stream_sync',
+              content: this.contentBuffers.get(task.agentId) || '',
+            })
+          },
+          onContentComplete: (content) => {
+            this.contentBuffers.delete(task.agentId)
+            this.emitStep(task, { type: 'content_complete', content })
+          },
+          onToolCallStart: (toolCall) => {
+            // Cache the active tool call id so delta callbacks (which may
+            // receive an undefined toolCallId) can find the buffer.
+            task.currentToolCallId = toolCall.id
+            this.emitStep(task, { type: 'tool_start', toolCall })
+          },
+          onToolCallDelta: (_index, argsDelta, toolCallId) => {
+            // Resolve the buffer key from either the explicit id (when the
+            // provider tracks it) or the cached one (when the provider passes
+            // undefined because there's only one active tool call).
+            const resolvedId = toolCallId || task.currentToolCallId
+            if (!resolvedId) {
+              // No active tool call to attribute deltas to — drop them.
+              this.emitStep(task, {
+                type: 'tool_delta',
+                argsDelta,
+                toolCallId: undefined,
+                isCurrentToolDelta: false,
+              })
+              return
+            }
+            const key = `${task.agentId}:${resolvedId}`
+            this.toolArgBuffers.set(key, (this.toolArgBuffers.get(key) || '') + argsDelta)
+            const isCurrentToolDelta = !toolCallId || toolCallId === task.currentToolCallId
+            this.emitStep(task, {
+              type: 'tool_delta',
+              argsDelta,
+              toolCallId: resolvedId,
+              isCurrentToolDelta,
+            })
+          },
+          onToolCallComplete: (toolCall, result) => {
+            const key = `${task.agentId}:${toolCall.id}`
+            const streamedArgs = this.toolArgBuffers.get(key) || ''
+            this.toolArgBuffers.delete(key)
+            // Build streamedArgsByCallId snapshot for the reducer
+            const streamedArgsByCallId: Record<string, string> = {}
+            for (const [k, v] of this.toolArgBuffers) {
+              if (k.startsWith(`${task.agentId}:`)) {
+                streamedArgsByCallId[k.slice(task.agentId.length + 1)] = v
+              }
+            }
+            if (streamedArgs) streamedArgsByCallId[toolCall.id] = streamedArgs
+            // Clear cached id once the tool call is complete so a subsequent
+            // onToolCallStart can re-populate it.
+            if (task.currentToolCallId === toolCall.id) {
+              task.currentToolCallId = undefined
+            }
+            this.emitStep(task, {
+              type: 'tool_complete',
+              toolCall,
+              result,
+              isCurrentTool: true,
+              nextToolCall: null,
+              streamedArgsByCallId,
+            })
+          },
+          onContextCompressionStart: () => this.emitStep(task, { type: 'compression_start' }),
+          onContextCompressionComplete: (payload) => this.emitStep(task, { type: 'compression_complete', mode: payload.mode === 'skip' ? 'skip' : 'compress' }),
+        })
         await this.flushTranscript(task)
         console.info('[SubagentRuntime] processQueue.loopDone', {
           agentId: task.agentId,
@@ -1167,6 +1260,29 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     }
   }
 
+  /** Emit a streaming step event from the subagent's internal AgentLoop. */
+  private emitStep(
+    task: SubagentTaskInternal,
+    step: import('@/store/draft-assistant').DraftAssistantEvent
+  ): void {
+    try {
+      const notification: SubagentStepNotification = {
+        event_type: 'step_notification',
+        agentId: task.agentId,
+        step,
+        timestamp: Date.now(),
+      }
+      this.deps.onNotification?.(notification)
+    } catch (error) {
+      // Step notification failures are non-fatal — don't break the subagent
+      console.debug('[SubagentRuntime] step notification delivery failed', {
+        agentId: task.agentId,
+        stepType: step.type,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   private async ensureHydrated(): Promise<void> {
     await this.hydrationPromise
   }
@@ -1334,6 +1450,16 @@ class SubagentRuntimeImpl implements SubagentRuntime {
   }
 
   private async closeTranscript(task: SubagentTaskInternal): Promise<void> {
+    // Clean up streaming buffers for this task
+    this.reasoningBuffers.delete(task.agentId)
+    this.contentBuffers.delete(task.agentId)
+    // Clean up tool arg buffers (keys are `${agentId}:${callId}`)
+    for (const key of this.toolArgBuffers.keys()) {
+      if (key.startsWith(`${task.agentId}:`)) {
+        this.toolArgBuffers.delete(key)
+      }
+    }
+    task.currentToolCallId = undefined
     if (!task.transcriptWriter) return
     try {
       await task.transcriptWriter.close()
@@ -1392,7 +1518,7 @@ export function getOrCreateSubagentRuntime(input: {
   toolRegistry: ToolRegistry
   contextManager: ContextManager
   baseToolContext: ToolContext
-  onNotification?: (event: SubagentTaskNotification) => void
+  onNotification?: (event: SubagentTaskNotification | SubagentStepNotification) => void
   /** Returns the OPFS workspace directory for transcript storage. Optional. */
   getWorkspaceDir?: () => Promise<FileSystemDirectoryHandle>
 }): SubagentRuntime {

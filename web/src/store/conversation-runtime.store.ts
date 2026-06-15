@@ -137,6 +137,14 @@ export interface ConversationRuntimeState {
   // `@/store/streaming-queue-registry` for the same reason — they are
   // RAF-batched writers, not serializable state.
 
+  // ─── Subagent draft assistants: per-agentId runtime state (not persisted) ───
+  // Each subagent gets its own DraftAssistantState, rendered identically
+  // to the main agent's draft steps (reasoning, content, tool calls, etc.)
+  // Note: subagent StreamingQueue pairs (if needed in the future) should
+  // also go into `@/store/streaming-queue-registry`, not here — they are
+  // RAF-batched writers, not serializable state.
+  subagentDrafts: Map<string, import('./draft-assistant').DraftAssistantState>
+
   // ─── Follow-up suggestions (not persisted) ───
   suggestedFollowUps: Map<string, string>
 
@@ -193,6 +201,8 @@ export interface ConversationRuntimeState {
 export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
   immer((set, get) => ({
     runtimes: new Map(),
+    subagentDrafts: new Map(),
+
     suggestedFollowUps: new Map(),
     cancelledRunIds: new Set(),
     mountedConversations: new Map(),

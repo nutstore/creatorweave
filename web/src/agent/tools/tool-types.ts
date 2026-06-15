@@ -118,6 +118,19 @@ export interface SubagentTaskNotification {
   timestamp: number
 }
 
+/**
+ * SubAgent Step Notification — real-time streaming events from subagent's
+ * internal AgentLoop. Each notification carries a DraftAssistantEvent
+ * (the same event type used by the main agent's draft pipeline) so the
+ * UI can render subagent steps identically to main agent steps.
+ */
+export interface SubagentStepNotification {
+  event_type: 'step_notification'
+  agentId: string
+  step: import('@/store/draft-assistant').DraftAssistantEvent
+  timestamp: number
+}
+
 export interface SpawnSubagentInput {
   description: string
   prompt: string

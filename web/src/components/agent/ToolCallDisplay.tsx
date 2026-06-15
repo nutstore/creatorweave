@@ -12,7 +12,7 @@
  * which calls registerRenderer() at module load time.
  */
 
-import { useState, memo } from 'react'
+import { useState, memo, lazy, Suspense } from 'react'
 import { ChevronDown, ChevronRight, Wrench, CheckCircle2, XCircle, Loader2, Bot } from 'lucide-react'
 import { parse as bestEffortParse } from 'best-effort-json-parser'
 import type { ToolCall } from '@/agent/message-types'
@@ -187,7 +187,10 @@ function StatusIcon({ ctx, executingText }: { ctx: ToolRenderCtx; executingText?
 export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisplayProps) {
   const t = useT()
   const { toolCall, result, subagentEvents, conversationId } = props
-  const [expanded, setExpanded] = useState(false)
+  // Auto-expand spawn_subagent / batch_spawn while executing so users can
+  // see the live subagent step details without manual interaction.
+  const isSubagentTool = toolCall.function.name === 'spawn_subagent' || toolCall.function.name === 'batch_spawn'
+  const [expanded, setExpanded] = useState(isSubagentTool && !result)
 
   const ctx = buildCtx(props)
   const toolName = toolCall.function.name
@@ -339,6 +342,12 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
 
 // ─── Subagent card (extracted from original, unchanged logic) ──
 
+// Lazy load SubagentDetailPanel to avoid circular dependency
+// (SubagentDetailPanel imports ToolCallDisplay, which imports SubagentDetailPanel)
+const SubagentDetailPanel = lazy(() =>
+  import('./SubagentDetailPanel').then((m) => ({ default: m.SubagentDetailPanel }))
+)
+
 function SubagentCard({
   ctx,
   expanded,
@@ -377,9 +386,48 @@ function SubagentCard({
         </span>
       </button>
 
-      {expanded && subagentEvents && subagentEvents.length > 0 && (
+      {expanded && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
-          <SubagentProgressSection events={subagentEvents} />
+          {subagentEvents && subagentEvents.length > 0 && (
+            <SubagentProgressSection events={subagentEvents} />
+          )}
+          {/* Render detailed step panels for each subagent.
+              During the run, agentIds come from subagentEvents (live status updates).
+              After the run completes, subagentEvents is gone (draftAssistant cleared),
+              so we fall back to parsing agentIds from the committed tool result. */}
+          {(() => {
+            const liveAgentIds = subagentEvents
+              ? Array.from(new Set(subagentEvents.map((e) => e.agentId)))
+              : []
+            // Fallback: extract agentId(s) from the spawn result JSON.
+            // spawn_subagent → { agentId: "..." }
+            // batch_spawn   → { completed: [{ agentId: "..." }, ...] }
+            const resultAgentIds: string[] = []
+            if (spawnResult?.agentId) {
+              resultAgentIds.push(spawnResult.agentId)
+            }
+            // Also check for batch_spawn completed array
+            if (ctx.rawResult) {
+              try {
+                const parsed = JSON.parse(ctx.rawResult) as Record<string, unknown>
+                const data = (parsed.data ?? parsed) as Record<string, unknown>
+                const completed = data.completed
+                if (Array.isArray(completed)) {
+                  for (const item of completed) {
+                    const aid = (item as Record<string, unknown>)?.agentId
+                    if (typeof aid === 'string') resultAgentIds.push(aid)
+                  }
+                }
+              } catch { /* non-JSON result, skip */ }
+            }
+            const allAgentIds = Array.from(new Set([...liveAgentIds, ...resultAgentIds]))
+            if (allAgentIds.length === 0) return null
+            return allAgentIds.map((agentId) => (
+              <Suspense key={agentId} fallback={<div className="py-2 text-xs text-neutral-400">Loading...</div>}>
+                <SubagentDetailPanel agentId={agentId} />
+              </Suspense>
+            ))
+          })()}
         </div>
       )}
 

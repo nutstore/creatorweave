@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '@/agent/message-types'
-import type { SubagentTaskNotification, SubagentRuntime } from '@/agent/tools/tool-types'
+import type {
+  SubagentStepNotification,
+  SubagentTaskNotification,
+  SubagentRuntime,
+} from '@/agent/tools/tool-types'
 import { __resetSubagentRuntimeRegistryForTests, getOrCreateSubagentRuntime } from '@/agent/subagent/runtime'
 
 const hoisted = vi.hoisted(() => {
@@ -90,7 +94,19 @@ function createStoredTask(input: {
   }
 }
 
-function createRuntime(workspaceId: string, notifications: SubagentTaskNotification[]): SubagentRuntime {
+/** Type guard: filter union array to SubagentTaskNotification entries only. */
+function taskNotifications(
+  events: (SubagentTaskNotification | SubagentStepNotification)[]
+): SubagentTaskNotification[] {
+  return events.filter(
+    (e): e is SubagentTaskNotification => e.event_type === 'task_notification'
+  )
+}
+
+function createRuntime(
+  workspaceId: string,
+  notifications: (SubagentTaskNotification | SubagentStepNotification)[]
+): SubagentRuntime {
   return getOrCreateSubagentRuntime({
     workspaceId,
     provider: {} as any,
@@ -138,7 +154,7 @@ describe('subagent runtime', () => {
   })
 
   it('spawn blocks until completion and returns result', async () => {
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-blocking-${Date.now()}`, notifications)
     const result = await runtime.spawn({
       description: 'blocking test',
@@ -148,11 +164,11 @@ describe('subagent runtime', () => {
     expect(result.content).toBe('ok')
     expect(result.agentId).toBeTruthy()
     expect(result.usage).toBeDefined()
-    expect(notifications.some((event) => event.status === 'completed')).toBe(true)
+    expect(taskNotifications(notifications).some((event) => event.status === 'completed')).toBe(true)
   })
 
   it('releases name after spawn completes so it can be reused', async () => {
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-name-reuse-${Date.now()}`, notifications)
 
     const first = await runtime.spawn({
@@ -196,7 +212,7 @@ describe('subagent runtime', () => {
         })
     )
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-timeout-${Date.now()}`, notifications)
 
     // Start spawn without awaiting — it blocks until subagent completes
@@ -221,7 +237,9 @@ describe('subagent runtime', () => {
     }
 
     expect(
-      notifications.some((event) => event.status === 'failed' && event.exit_reason === 'timeout')
+      taskNotifications(notifications).some(
+        (event) => event.status === 'failed' && event.exit_reason === 'timeout'
+      )
     ).toBe(true)
   })
 
@@ -230,7 +248,7 @@ describe('subagent runtime', () => {
       throw new Error('something went wrong')
     })
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-fail-${Date.now()}`, notifications)
 
     try {
@@ -243,13 +261,13 @@ describe('subagent runtime', () => {
       expect(e.message).toContain('failed')
     }
 
-    expect(notifications.some((event) => event.status === 'failed')).toBe(true)
+    expect(taskNotifications(notifications).some((event) => event.status === 'failed')).toBe(true)
   })
 
   it('rejects enqueue when queue is full', async () => {
     hoisted.setRunImpl(() => new Promise<Message[]>(() => {}))
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-queue-full-${Date.now()}`, notifications)
 
     // Start spawn without awaiting (it blocks until completion)
@@ -274,7 +292,7 @@ describe('subagent runtime', () => {
   it('waits for enqueue timeout before returning QUEUE_FULL', async () => {
     hoisted.setRunImpl(() => new Promise<Message[]>(() => {}))
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-enqueue-timeout-${Date.now()}`, notifications)
 
     runtime.spawn({
@@ -314,7 +332,7 @@ describe('subagent runtime', () => {
   it('drops expired queued messages before enqueueing new ones', async () => {
     hoisted.setRunImpl(() => new Promise<Message[]>(() => {}))
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-queue-timeout-${Date.now()}`, notifications)
 
     runtime.spawn({
@@ -346,7 +364,7 @@ describe('subagent runtime', () => {
         })
     )
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-race-${Date.now()}`, notifications)
 
     // Start spawn without awaiting
@@ -366,14 +384,15 @@ describe('subagent runtime', () => {
 
     const finalStatus = await runtime.getStatus({ agentId })
     expect(finalStatus.status).toBe('killed')
-    expect(notifications.some((event) => event.status === 'killed')).toBe(true)
-    expect(notifications.some((event) => event.status === 'completed')).toBe(false)
+    const taskNotifs = taskNotifications(notifications)
+    expect(taskNotifs.some((event) => event.status === 'killed')).toBe(true)
+    expect(taskNotifs.some((event) => event.status === 'completed')).toBe(false)
   })
 
   it('escalates soft stop to forced kill when cleanup timeout is reached', async () => {
     hoisted.setRunImpl(() => new Promise<Message[]>(() => {}))
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-stop-timeout-${Date.now()}`, notifications)
 
     runtime.spawn({
@@ -404,14 +423,14 @@ describe('subagent runtime', () => {
   it('sends running notification only when a tool call happens', async () => {
     hoisted.setRunImpl(async (messages) => [...messages, createAssistantMessage('no tools used')])
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-running-notify-${Date.now()}`, notifications)
     await runtime.spawn({
       description: 'no tool call',
       prompt: 'run',
     })
 
-    expect(notifications.some((event) => event.status === 'running')).toBe(false)
+    expect(taskNotifications(notifications).some((event) => event.status === 'running')).toBe(false)
   })
 
   it('hydrates running task as failed with SESSION_INTERRUPTED and supports alias lookup', async () => {
@@ -427,7 +446,7 @@ describe('subagent runtime', () => {
     ] as any)
     hoisted.setRunImpl(() => new Promise<Message[]>(() => {}))
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(workspaceId, notifications)
     const status = await runtime.getStatus({ agentId: 'persisted-alias' })
     expect(status.status).toBe('failed')
@@ -462,7 +481,7 @@ describe('subagent runtime', () => {
       }),
     ] as any)
 
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(workspaceId, notifications)
     const status = await runtime.getStatus({ agentId: 'subagent_persisted_2' })
     expect(status.status).toBe('failed')
@@ -477,7 +496,7 @@ describe('subagent runtime', () => {
   })
 
   it('rejects spawn when concurrency limit is reached', async () => {
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-concurrency-${Date.now()}`, notifications)
 
     // Block all runs so tasks stay in running/pending state
@@ -510,7 +529,7 @@ describe('subagent runtime', () => {
   })
 
   it('shutdown marks all active tasks as failed with SESSION_INTERRUPTED', async () => {
-    const notifications: SubagentTaskNotification[] = []
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-shutdown-${Date.now()}`, notifications)
 
     // Block runs
