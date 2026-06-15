@@ -71,26 +71,14 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
       }
       set({ loading: true })
       try {
-        console.log('[SkillsStore] loadSkills: starting')
         // Initialize and sync SkillManager first (this seeds builtin skills)
         const manager = getSkillManager()
         await manager.initialize()
-        console.log('[SkillsStore] manager.initialize() complete')
         await refreshSkillManagerCache()
 
         // Load metadata from SkillManager cache (persistent + active project runtime skills)
         const metadata = manager.getSkillMetadata()
-        console.log('[SkillsStore] getAllSkillMetadata() returned:', metadata.length, 'skills')
-        console.log(
-          '[SkillsStore] Skill IDs:',
-          metadata.map((s) => s.id)
-        )
         set({ skills: metadata, loaded: true, loading: false, error: null })
-        console.log(
-          '[SkillsStore] loadSkills: complete, store now has',
-          get().skills.length,
-          'skills'
-        )
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         console.error('[SkillsStore] loadSkills error:', error)
@@ -100,22 +88,13 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
     },
 
     addSkill: async (skill, rawContent) => {
-      console.log('[SkillsStore] addSkill called:', { id: skill.id, name: skill.name })
       const raw = rawContent || serializeSkillMd(skill)
       await storage.saveSkill(skill, raw)
       // Refresh metadata list
       const manager = getSkillManager()
       await refreshSkillManagerCache()
       const metadata = manager.getSkillMetadata()
-      console.log(
-        '[SkillsStore] Metadata after save:',
-        metadata.map((s) => ({ id: s.id, name: s.name }))
-      )
       set({ skills: metadata })
-      console.log(
-        '[SkillsStore] Store skills after update:',
-        get().skills.map((s) => ({ id: s.id, name: s.name }))
-      )
     },
 
     importSkillMd: async (content) => {

@@ -207,6 +207,10 @@ describe('useSkillsStore', () => {
 
       expect(result.success).toBe(true)
       expect(storage.saveSkill).toHaveBeenCalled()
+      // Imported skills must be tagged 'user' so they appear under the user
+      // skills group in SkillsManager (project / user / builtin). Using
+      // 'import' here would make the skill invisible after import.
+      expect(parser.parseSkillMd).toHaveBeenCalledWith(markdown, 'user')
     })
 
     it('should return error for invalid markdown', async () => {
