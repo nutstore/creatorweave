@@ -380,8 +380,6 @@ function AppReady() {
         conversations: [],
         activeConversationId: null,
         loaded: true,
-        agentLoops: new Map(),
-        streamingQueues: new Map(),
         suggestedFollowUps: new Map(),
         mountedConversations: new Map(),
       })
@@ -389,8 +387,6 @@ function AppReady() {
       const { useConversationRuntimeStore } = await import('@/store/conversation-runtime.store')
       useConversationRuntimeStore.setState({
         runtimes: new Map(),
-        agentLoops: new Map(),
-        streamingQueues: new Map(),
         suggestedFollowUps: new Map(),
         cancelledRunIds: new Set(),
         mountedConversations: new Map(),

@@ -201,6 +201,8 @@ vi.mock('@/agent/agent-loop', () => {
 })
 
 import { useConversationStore } from '../conversation.store'
+import { clearAgentLoops, setAgentLoop } from '../agent-loop-registry'
+import { clearStreamingQueues } from '../streaming-queue-registry'
 
 describe('conversation.store.sqlite tool-call routing', () => {
   beforeEach(() => {
@@ -212,12 +214,12 @@ describe('conversation.store.sqlite tool-call routing', () => {
     messageRepoInsertMock.mockResolvedValue(undefined)
     messageRepoReplaceAllMock.mockReset()
     messageRepoReplaceAllMock.mockResolvedValue(undefined)
+    clearAgentLoops()
+    clearStreamingQueues()
     useConversationStore.setState({
       conversations: [],
       activeConversationId: null,
       loaded: true,
-      agentLoops: new Map(),
-      streamingQueues: new Map(),
       suggestedFollowUps: new Map(),
       cancelledRunIds: new Set(),
       mountedConversations: new Map(),
@@ -1008,7 +1010,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
         activeToolStepId: `tool-${pendingToolCall.id}`,
         activeCompressionStepId: null,
       }
-      state.agentLoops.set(conv.id, { cancel: cancelSpy } as any)
+      setAgentLoop(conv.id, { cancel: cancelSpy } as any)
       return state
     })
 
@@ -1077,7 +1079,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
         activeToolStepId: `tool-${pendingToolCall.id}`,
         activeCompressionStepId: null,
       }
-      state.agentLoops.set(conv.id, { cancel: cancelSpy } as any)
+      setAgentLoop(conv.id, { cancel: cancelSpy } as any)
       return state
     })
 

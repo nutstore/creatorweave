@@ -128,14 +128,14 @@ export interface ConversationRuntimeState {
   // ─── Per-conversation runtime state ───
   runtimes: Map<string, ConversationRuntime>
 
-  // ─── AgentLoop instances (not persisted) ───
-  agentLoops: Map<string, import('@/agent/agent-loop').AgentLoop>
+  // Note: live AgentLoop instances are kept in
+  // `@/store/agent-loop-registry` rather than in this state. They are
+  // service objects (provider, toolRegistry, AbortController, …) with
+  // private fields, and putting them through immer breaks type-checking.
 
-  // ─── Streaming queues for RAF-batched updates (not persisted) ───
-  streamingQueues: Map<string, {
-    reasoning: import('../utils/streaming-queue').StreamingQueue
-    content: import('../utils/streaming-queue').StreamingQueue
-  }>
+  // Note: live StreamingQueue pairs are kept in
+  // `@/store/streaming-queue-registry` for the same reason — they are
+  // RAF-batched writers, not serializable state.
 
   // ─── Follow-up suggestions (not persisted) ───
   suggestedFollowUps: Map<string, string>
@@ -193,8 +193,6 @@ export interface ConversationRuntimeState {
 export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
   immer((set, get) => ({
     runtimes: new Map(),
-    agentLoops: new Map(),
-    streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
     cancelledRunIds: new Set(),
     mountedConversations: new Map(),

@@ -44,6 +44,12 @@ import {
 import { useConversationContextStore } from './conversation-context.store'
 import { useConversationRuntimeStore, createEmptyRuntime } from './conversation-runtime.store'
 import type { ConversationRuntime } from './conversation-runtime.store'
+import { deleteAgentLoop, getAgentLoop, setAgentLoop } from './agent-loop-registry'
+import {
+  deleteStreamingQueues,
+  getStreamingQueues,
+  setStreamingQueues,
+} from './streaming-queue-registry'
 import { useI18nStore } from '@/i18n/store'
 import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
 
@@ -963,11 +969,12 @@ interface ConversationState {
   activeConversationId: string | null
   loaded: boolean
 
-  // AgentLoop management (not persisted)
-  agentLoops: Map<string, AgentLoop>
+  // Live AgentLoop instances live in `@/store/agent-loop-registry` rather
+  // than in this state. They are service objects with private fields that
+  // cannot be immer-drafted (see registry file for the full rationale).
 
-  // Streaming queues for RAF-batched updates (not persisted)
-  streamingQueues: Map<string, { reasoning: StreamingQueue; content: StreamingQueue }>
+  // Live StreamingQueue pairs live in `@/store/streaming-queue-registry` for
+  // the same reason — they are RAF-batched writers, not serializable state.
 
   // Follow-up suggestions (not persisted) - per conversation
   suggestedFollowUps: Map<string, string>
@@ -1090,8 +1097,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     conversations: [],
     activeConversationId: null,
     loaded: false,
-    agentLoops: new Map(),
-    streamingQueues: new Map(),
     suggestedFollowUps: new Map(),
     cancelledRunIds: new Set(),
     mountedConversations: new Map(),
@@ -1810,19 +1815,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     deleteConversation: async (id) => {
-      const queues = get().streamingQueues.get(id)
+      const queues = getStreamingQueues(id)
       if (queues) {
         queues.reasoning.destroy()
         queues.content.destroy()
       }
 
       // Stop runtime work first to avoid continued writes while deleting persisted data.
+      const agentLoop = deleteAgentLoop(id)
+      if (agentLoop) {
+        agentLoop.cancel()
+      }
+      deleteStreamingQueues(id)
       set((state) => {
-        const agentLoop = state.agentLoops.get(id)
-        if (agentLoop) {
-          agentLoop.cancel()
-          state.agentLoops.delete(id)
-        }
         const workflowAbortController = state.workflowAbortControllers.get(id)
         if (workflowAbortController) {
           workflowAbortController.abort()
@@ -1834,7 +1839,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (convToDelete?.activeRunId) {
           state.cancelledRunIds.delete(convToDelete.activeRunId)
         }
-        state.streamingQueues.delete(id)
         state.mountedConversations.delete(id)
         state.pendingWorkflowDryRuns.delete(id)
         state.pendingWorkflowRealRuns.delete(id)
@@ -2169,6 +2173,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           })
 
           // Runtime: reset all runtime state
+          deleteAgentLoop(conversationId)
           useConversationRuntimeStore.setState((state) => {
             const r = ensureRuntime(state, conversationId)
             if (r.activeRunId !== runId) return
@@ -2186,8 +2191,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             r.isReasoningStreaming = false
             r.draftAssistant = null
             r.activeRunId = null
-            state.agentLoops.delete(conversationId)
-            state.streamingQueues.delete(conversationId)
           })
 
           emitComplete()
@@ -2198,6 +2201,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               toast.error('对话保存失败，部分内容可能丢失')
             })
           }
+          deleteStreamingQueues(conversationId)
 
           return
         }
@@ -2442,6 +2446,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               })
 
               // Runtime: reset all runtime state
+              deleteAgentLoop(conversationId)
               useConversationRuntimeStore.setState((state) => {
                 const r = ensureRuntime(state, conversationId)
                 if (r.activeRunId !== runId) return
@@ -2459,8 +2464,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 r.isReasoningStreaming = false
                 r.draftAssistant = null
                 r.activeRunId = null
-                state.agentLoops.delete(conversationId)
-                state.streamingQueues.delete(conversationId)
               })
 
               emitComplete()
@@ -2471,6 +2474,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   toast.error('对话保存失败，部分内容可能丢失')
                 })
               }
+              deleteStreamingQueues(conversationId)
             } else {
               failRunEarly(result.errors.join('; '))
               emitError(result.errors.join('; '))
@@ -2842,9 +2846,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           },
         })
 
-        set((state) => {
-          state.agentLoops.set(conversationId, agentLoop)
-        })
+        setAgentLoop(conversationId, agentLoop)
 
         const currentMessages = conv.messages
 
@@ -2855,6 +2857,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         ) => {
           // If already committed, nothing to do
           if (committed) return
+          // Unregister the live loop up front; the rest of finalize only
+          // touches persisted state.
+          deleteAgentLoop(conversationId)
 
           // Only the current run is allowed to commit message state.
           // Stale callbacks from prior runs (e.g. after project/workspace switch
@@ -2932,12 +2937,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             c.isReasoningStreaming = false
             c.draftAssistant = null
             c.activeRunId = null
-            inner.agentLoops.delete(conversationId)
-            inner.streamingQueues.delete(conversationId)
             if (status === 'idle') {
               inner.cancelledRunIds.delete(runId)
             }
           })
+          deleteStreamingQueues(conversationId)
 
           // Reset runtime store for this conversation
           useConversationRuntimeStore.setState((state) => {
@@ -3064,19 +3068,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           })
         })
 
-        set((state) => {
-          state.streamingQueues.set(conversationId, {
-            reasoning: reasoningQueue,
-            content: contentQueue,
-          })
+        setStreamingQueues(conversationId, {
+          reasoning: reasoningQueue,
+          content: contentQueue,
         })
 
         const cleanupQueues = () => {
           reasoningQueue.destroy()
           contentQueue.destroy()
-          set((state) => {
-            state.streamingQueues.delete(conversationId)
-          })
+          deleteStreamingQueues(conversationId)
         }
 
         // Clear iteration limit flag from any previous run
@@ -3592,6 +3592,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
               // Resume agent loop with the tool result
               // First, manually clean up the previous agentLoop state
+              deleteAgentLoop(conversationId)
               set((state) => {
                 const c = state.conversations.find((c) => c.id === conversationId)
                 if (c) {
@@ -3600,7 +3601,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   c.activeRunId = null
                   c.draftAssistant = null
                 }
-                state.agentLoops.delete(conversationId)
               })
 
               // Now start a new agent loop with the updated messages
@@ -3627,13 +3627,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               })
               get().addMessage(conversationId, errorResultMsg)
 
+              deleteAgentLoop(conversationId)
               set((state) => {
                 const c = state.conversations.find((c) => c.id === conversationId)
                 if (c) {
                   c.status = 'error'
                   c.error = errorMsg
                 }
-                state.agentLoops.delete(conversationId)
               })
               emitError(errorMsg)
             }
@@ -3788,6 +3788,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
+            deleteAgentLoop(conversationId)
+            deleteStreamingQueues(conversationId)
             set((inner) => {
               const c = inner.conversations.find((x) => x.id === conversationId)
               if (c && c.activeRunId === runId) {
@@ -3796,8 +3798,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 c.activeRunId = null
                 c.draftAssistant = null
               }
-              inner.agentLoops.delete(conversationId)
-              inner.streamingQueues.delete(conversationId)
             })
             // Reset runtime store on error
             useConversationRuntimeStore.setState((state) => {
@@ -3838,16 +3838,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         latestMessages = resultMessages
         await finalizeRun('idle', latestMessages)
       } catch (error) {
-        const queues = get().streamingQueues.get(conversationId)
+        const queues = getStreamingQueues(conversationId)
         if (queues) {
           queues.reasoning.destroy()
           queues.content.destroy()
-          set((state) => {
-            state.streamingQueues.delete(conversationId)
-          })
         }
+        deleteStreamingQueues(conversationId)
 
         if (error instanceof Error && error.name === 'AbortError') {
+          deleteAgentLoop(conversationId)
+          deleteStreamingQueues(conversationId)
           set((state) => {
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
@@ -3855,8 +3855,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               c.activeRunId = null
               c.draftAssistant = null
             }
-            state.agentLoops.delete(conversationId)
-            state.streamingQueues.delete(conversationId)
           })
           // Reset runtime store
           useConversationRuntimeStore.setState((state) => {
@@ -3870,6 +3868,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           // Do NOT return here — fall through to consume queued messages
           // so that messages enqueued during the cancelled run are processed.
         } else {
+          deleteAgentLoop(conversationId)
+          deleteStreamingQueues(conversationId)
           set((state) => {
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
@@ -3878,8 +3878,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               c.activeRunId = null
               c.draftAssistant = null
             }
-            state.agentLoops.delete(conversationId)
-            state.streamingQueues.delete(conversationId)
           })
           // Reset runtime store on generic error
           useConversationRuntimeStore.setState((state) => {
@@ -4041,23 +4039,23 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         workflowAbortController.abort()
       }
 
-      const agentLoop = get().agentLoops.get(conversationId)
+      const agentLoop = getAgentLoop(conversationId)
       if (agentLoop) {
         agentLoop.cancel()
-        const queues = get().streamingQueues.get(conversationId)
+        const queues = getStreamingQueues(conversationId)
         if (queues) {
           queues.reasoning.flushNow()
           queues.content.flushNow()
           queues.reasoning.destroy()
           queues.content.destroy()
         }
+        deleteStreamingQueues(conversationId)
 
         // Commit draft to conversation messages BEFORE aborting the agent loop.
         // This ensures the draft is in c.messages when finalizeRun runs.
         let committedPartial = false
+        deleteAgentLoop(conversationId)
         set((state) => {
-          state.agentLoops.delete(conversationId)
-          state.streamingQueues.delete(conversationId)
           state.workflowAbortControllers.delete(conversationId)
           state.pendingWorkflowRealRuns.delete(conversationId)
           state.pendingWorkflowDryRuns.delete(conversationId)
@@ -4137,16 +4135,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
       if (!isWorkflowRunActive) return
 
-      const queues = get().streamingQueues.get(conversationId)
+      const queues = getStreamingQueues(conversationId)
       if (queues) {
         queues.reasoning.flushNow()
         queues.content.flushNow()
         queues.reasoning.destroy()
         queues.content.destroy()
       }
+      deleteStreamingQueues(conversationId)
 
       set((state) => {
-        state.streamingQueues.delete(conversationId)
         state.workflowAbortControllers.delete(conversationId)
         state.pendingWorkflowRealRuns.delete(conversationId)
         state.pendingWorkflowDryRuns.delete(conversationId)
@@ -4348,8 +4346,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
 
       // Register the agentLoop so cancelAgent can find and abort it
+      setAgentLoop(conversationId, agentLoop)
       set((state) => {
-        state.agentLoops.set(conversationId, agentLoop)
         const c = state.conversations.find((c) => c.id === conversationId)
         if (c) {
           c.activeRunId = runId
@@ -4460,8 +4458,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           const finalMessages = summaryMsg
             ? [...messagesBeforeCompact, summaryMsg]
             : messagesBeforeCompact
+          deleteAgentLoop(conversationId)
           set((state) => {
-            state.agentLoops.delete(conversationId)
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
               c.messages = finalMessages
@@ -4489,8 +4487,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (!committed) {
           committed = true
           const errorMsg = error instanceof Error ? error.message : String(error)
+          deleteAgentLoop(conversationId)
           set((state) => {
-            state.agentLoops.delete(conversationId)
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
               c.status = 'error'
@@ -4882,7 +4880,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       // flushNow() is synchronous — it cancels pending RAF and invokes callbacks
       // which call useConversationRuntimeStore.setState() synchronously.
       for (const convRef of runningConvs) {
-        const queues = state.streamingQueues.get(convRef.id)
+        const queues = getStreamingQueues(convRef.id)
         if (queues) {
           queues.reasoning.flushNow()
           queues.content.flushNow()
