@@ -31,12 +31,22 @@ vi.mock('@/skills/skill-parser', () => ({
   serializeSkillMd: vi.fn(() => '# Test Skill\n'),
 }))
 
-// Mock the skill-manager module
-vi.mock('@/skills/skill-manager', () => ({
-  getSkillManager: vi.fn(() => ({
+// Mock the skill-manager module. The hoisted object is shared so each test
+// can override individual method return values (e.g. getSkillMetadata) via
+// mockManager.getSkillMetadata.mockReturnValue(...).
+const { mockManager } = vi.hoisted(() => ({
+  mockManager: {
     initialize: vi.fn(() => Promise.resolve()),
     refreshCache: vi.fn(() => Promise.resolve()),
-  })),
+    getSkillMetadata: vi.fn<[], SkillMetadata[]>(() => []),
+    getSkillById: vi.fn(() => null),
+    getSkills: vi.fn<[], Skill[]>(() => []),
+    setProjectSkillEnabled: vi.fn(),
+  },
+}))
+
+vi.mock('@/skills/skill-manager', () => ({
+  getSkillManager: vi.fn(() => mockManager),
 }))
 
 import * as storage from '@/skills/skill-storage'
@@ -89,7 +99,7 @@ describe('useSkillsStore', () => {
         createMockMetadata({ id: 'skill-2', name: 'Test Skill 2' }),
       ]
 
-      vi.mocked(storage.getAllSkillMetadata).mockResolvedValue(mockMetadata)
+      mockManager.getSkillMetadata.mockReturnValue(mockMetadata)
 
       const { loadSkills } = useSkillsStore.getState()
       await loadSkills()
@@ -100,18 +110,15 @@ describe('useSkillsStore', () => {
     })
 
     it('should set loading state during load', async () => {
-      vi.mocked(storage.getAllSkillMetadata).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            // Check loading state is set
-            expect(useSkillsStore.getState().loading).toBe(true)
-            resolve([])
-          })
-      )
-
+      // loadSkills() runs `set({ loading: true })` synchronously before the
+      // first await, so the flag is observable as soon as the call returns
+      // its promise — no mock interception needed.
       const { loadSkills } = useSkillsStore.getState()
-      await loadSkills()
+      const loadPromise = loadSkills()
 
+      expect(useSkillsStore.getState().loading).toBe(true)
+
+      await loadPromise
       expect(useSkillsStore.getState().loading).toBe(false)
     })
 
@@ -121,17 +128,18 @@ describe('useSkillsStore', () => {
       const { loadSkills } = useSkillsStore.getState()
       await loadSkills()
 
-      // Should not call getAllSkillMetadata if already loading
-      expect(storage.getAllSkillMetadata).not.toHaveBeenCalled()
+      // Should not call manager.initialize() if already loading
+      expect(mockManager.initialize).not.toHaveBeenCalled()
     })
 
     it('should handle load errors gracefully', async () => {
-      vi.mocked(storage.getAllSkillMetadata).mockRejectedValue(new Error('Storage error'))
+      mockManager.initialize.mockRejectedValueOnce(new Error('Storage error'))
 
       const { loadSkills } = useSkillsStore.getState()
       await loadSkills()
 
       expect(useSkillsStore.getState().loading).toBe(false)
+      expect(useSkillsStore.getState().error).toBe('Storage error')
     })
   })
 
@@ -159,7 +167,7 @@ describe('useSkillsStore', () => {
         createMockMetadata({ id: 'new-skill', name: 'New Skill' }),
       ]
 
-      vi.mocked(storage.getAllSkillMetadata).mockResolvedValue(updatedMetadata)
+      mockManager.getSkillMetadata.mockReturnValue(updatedMetadata)
 
       const { addSkill } = useSkillsStore.getState()
       await addSkill(mockSkill)
@@ -200,7 +208,7 @@ describe('useSkillsStore', () => {
         createMockMetadata({ id: 'test-skill', name: 'Test Skill' }),
       ]
 
-      vi.mocked(storage.getAllSkillMetadata).mockResolvedValue(updatedMetadata)
+      mockManager.getSkillMetadata.mockReturnValue(updatedMetadata)
 
       const { importSkillMd } = useSkillsStore.getState()
       const result = await importSkillMd(markdown)
