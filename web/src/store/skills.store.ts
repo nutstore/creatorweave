@@ -119,7 +119,7 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
     },
 
     importSkillMd: async (content) => {
-      const result = parseSkillMd(content, 'import')
+      const result = parseSkillMd(content, 'user')
       if (!result.skill) {
         return { success: false, error: result.error }
       }
