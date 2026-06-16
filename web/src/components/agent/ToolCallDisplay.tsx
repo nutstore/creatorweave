@@ -189,8 +189,18 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
   const { toolCall, result, subagentEvents, conversationId } = props
   // Auto-expand spawn_subagent / batch_spawn while executing so users can
   // see the live subagent step details without manual interaction.
+  // Also keep expanded after a cancel-induced synthetic [Interrupted] result
+  // because the subagent may still be running in the background.
   const isSubagentTool = toolCall.function.name === 'spawn_subagent' || toolCall.function.name === 'batch_spawn'
-  const [expanded, setExpanded] = useState(isSubagentTool && !result)
+  const isInterruptedResult = (() => {
+    if (!result) return false
+    try {
+      const parsed = JSON.parse(result) as Record<string, unknown>
+      const data = (parsed.data ?? parsed) as Record<string, unknown>
+      return data?.interrupted === true
+    } catch { return false }
+  })()
+  const [expanded, setExpanded] = useState(isSubagentTool && (!result || isInterruptedResult))
 
   const ctx = buildCtx(props)
   const toolName = toolCall.function.name
@@ -388,8 +398,17 @@ function SubagentCard({
 
       {expanded && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
-          {subagentEvents && subagentEvents.length > 0 && (
+          {subagentEvents && subagentEvents.length > 0 ? (
             <SubagentProgressSection events={subagentEvents} />
+          ) : (
+            /* When subagentEvents is missing (committed message after cancel),
+               show an interrupted status badge if the result indicates interruption. */
+            ctx.isError && spawnResult?.agentId && (
+              <div className="mb-2 flex items-center gap-2 text-xs text-neutral-500">
+                <SubagentStatusBadge status="killed" />
+                <span className="text-neutral-400">已中断（用户取消运行）</span>
+              </div>
+            )
           )}
           {/* Render detailed step panels for each subagent.
               During the run, agentIds come from subagentEvents (live status updates).

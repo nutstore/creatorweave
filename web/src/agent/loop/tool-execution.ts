@@ -254,10 +254,20 @@ export async function truncateLargeToolResult(input: TruncateLargeToolResultInpu
       }
     } catch { /* not JSON — will write raw result as-is */ }
 
-    // Extract plain-text content from the envelope (write content, not envelope JSON)
-    const contentToWrite = envelopeData && typeof envelopeData.content === 'string'
-      ? envelopeData.content
-      : input.rawResult
+    // Strip the envelope wrapper and write only the payload:
+    //   1. data.content (string) → write as-is (read/bash/ocr plain text)
+    //   2. data (object)         → pretty-print JSON without the ok/tool/version wrapper
+    //   3. valid non-envelope JSON → pretty-print the parsed JSON
+    //   4. non-JSON              → write raw result as-is
+    // This avoids wrapping the content in a redundant envelope that the LLM cannot paginate.
+    const contentToWrite =
+      envelopeData && typeof envelopeData.content === 'string'
+        ? envelopeData.content
+        : envelopeData
+          ? JSON.stringify(envelopeData, null, 2)
+          : envelopeParsed !== undefined
+            ? JSON.stringify(envelopeParsed, null, 2)
+            : input.rawResult
 
     const assetPath = await input.writeToAssets(contentToWrite, input.toolName, {
       toolName: input.toolName,
@@ -297,7 +307,8 @@ export async function truncateLargeToolResult(input: TruncateLargeToolResultInpu
           hint: [
             `Content is too large to fit in context (${estimatedResultTokens} tokens, available ${Math.floor(availableForTool)}).`,
             `The actual content has been saved as a plain text file at: vfs://assets/${assetPath}`,
-            `Use a subagent with the read tool to read vfs://assets/${assetPath}, summarize/extract key info, and return the result.`,
+            `To read it, use read(path="vfs://assets/${assetPath}", start_line=N, line_count=M) with pagination — do NOT read the entire file at once.`,
+            `Start with start_line=1, line_count=100 to see the first 100 lines, then increment start_line to page through the rest.`,
           ].join('\n'),
         },
       })

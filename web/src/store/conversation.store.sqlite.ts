@@ -102,18 +102,33 @@ function commitDraftToMessages(conv: {
   const completedToolCalls = draft.toolCalls.filter((tc) =>
     Object.prototype.hasOwnProperty.call(draft.toolResults, tc.id)
   )
-  const hasContent = draft.reasoning.trim() || draft.content.trim() || completedToolCalls.length > 0
+  // In-flight spawn_subagent / batch_spawn: started via onToolCallStart but
+  // no result yet (e.g. user cancels while subagents are still running).
+  // We preserve these so the UI can render them as interrupted, but we still
+  // discard in-flight calls for other tools (read, search, ...) — those are
+  // discarded on cancel by design.
+  // Exclude those already committed via onMessagesUpdated.
+  const committedToolCallIds = new Set(
+    conv.messages
+      .filter((m) => m.role === 'assistant' && m.toolCalls)
+      .flatMap((m) => m.toolCalls!.map((tc) => tc.id))
+  )
+  const inFlightSpawnCalls = draft.toolCalls.filter(
+    (tc) =>
+      !Object.prototype.hasOwnProperty.call(draft.toolResults, tc.id) &&
+      !committedToolCallIds.has(tc.id) &&
+      (tc.function.name === 'spawn_subagent' || tc.function.name === 'batch_spawn')
+  )
+  const hasContent =
+    draft.reasoning.trim() ||
+    draft.content.trim() ||
+    completedToolCalls.length > 0 ||
+    inFlightSpawnCalls.length > 0
 
   if (!hasContent) return false
 
   // Collect assets accumulated during this agent run
   const collectedAssets = conv.collectedAssets?.length ? conv.collectedAssets : undefined
-  console.log(
-    '[commitDraftToMessages] conv.collectedAssets:',
-    conv.collectedAssets?.length,
-    '→ passing:',
-    collectedAssets?.length
-  )
   // Clear the accumulator after collecting
   conv.collectedAssets = []
 
@@ -130,10 +145,16 @@ function commitDraftToMessages(conv: {
     }
   }
 
+  // Merge completed + in-flight spawn_subagent/batch_spawn calls into the
+  // assistant message. Other in-flight calls (read, search, ...) are
+  // discarded on cancel by design — only spawn-style tools are preserved
+  // so the UI can render them as interrupted.
+  const allToolCalls = [...completedToolCalls, ...inFlightSpawnCalls]
+
   conv.messages.push(
     createAssistantMessage(
       draft.content || null,
-      completedToolCalls.length > 0 ? completedToolCalls : undefined,
+      allToolCalls.length > 0 ? allToolCalls : undefined,
       fallbackUsage,
       draft.reasoning || null,
       undefined,
@@ -151,6 +172,52 @@ function commitDraftToMessages(conv: {
       })
     )
   }
+  // Push synthetic [Interrupted] results for in-flight spawn_subagent /
+  // batch_spawn calls. Embed agentId(s) from subagentEvents so SubagentCard
+  // can resolve and render the subagent detail panel even after the draft
+  // is cleared.
+  for (const tc of inFlightSpawnCalls) {
+    const toolName = tc.function.name
+    const step = draft.steps.find(
+      (s) => s.type === 'tool_call' && s.toolCall.id === tc.id
+    )
+    const agentIds =
+      step && step.type === 'tool_call' && step.subagentEvents
+        ? Array.from(new Set(step.subagentEvents.map((e) => e.agentId)))
+        : []
+    let syntheticContent: string
+    if (agentIds.length === 1) {
+      syntheticContent = JSON.stringify({
+        success: false,
+        error: '[Interrupted] 用户取消了运行。',
+        data: { agentId: agentIds[0], content: '', interrupted: true },
+      })
+    } else if (agentIds.length > 1) {
+      syntheticContent = JSON.stringify({
+        success: false,
+        error: '[Interrupted] 用户取消了运行。',
+        data: {
+          completed: agentIds.map((aid) => ({
+            agentId: aid,
+            content: '',
+            interrupted: true,
+          })),
+        },
+      })
+    } else {
+      syntheticContent = JSON.stringify({
+        success: false,
+        error: '[Interrupted] 用户取消了运行。',
+      })
+    }
+    conv.messages.push(
+      createToolMessage({
+        toolCallId: tc.id,
+        name: toolName,
+        content: syntheticContent,
+      })
+    )
+  }
   return true
 }
 
@@ -162,7 +229,7 @@ function commitDraftToMessages(conv: {
 // ---------------------------------------------------------------------------
 
 function handleSubagentStepNotification(
-  _conversationId: string,
+  conversationId: string,
   event: SubagentStepNotification
 ): void {
   const { agentId, step } = event
@@ -183,6 +250,65 @@ function handleSubagentStepNotification(
     // be added via streaming-queue-registry keyed by agentId.
     applyDraftAssistantEvent({ draftAssistant: draft }, step)
   })
+
+  // Also bridge the agentId into the parent spawn_subagent / batch_spawn step's
+  // subagentEvents. Task notifications are the primary source of these entries,
+  // but they can be delayed or missed — seeding from step notifications
+  // guarantees that commitDraftToMessages (cancel path) can always recover
+  // the agentId(s) to embed into the synthetic [Interrupted] result.
+  const subagentEvent = {
+    agentId,
+    status: 'running',
+    summary: '',
+    timestamp: event.timestamp,
+  }
+  useConversationStoreSQLite.setState((state) => {
+    const c = state.conversations.find((x: Conversation) => x.id === conversationId)
+    if (!c || !c.draftAssistant) return
+    const targetStep = findSpawnStepInDraft(c.draftAssistant)
+    if (!targetStep) return
+    if (!targetStep.subagentEvents) targetStep.subagentEvents = []
+    // Avoid duplicating the same agentId entry from step notifications
+    if (!targetStep.subagentEvents.some((e) => e.agentId === agentId)) {
+      targetStep.subagentEvents.push(subagentEvent)
+    }
+  })
+  useConversationRuntimeStore.setState((state) => {
+    const r = state.runtimes.get(conversationId)
+    if (!r || !r.draftAssistant) return
+    const targetStep = findSpawnStepInDraft(r.draftAssistant)
+    if (!targetStep) return
+    if (!targetStep.subagentEvents) targetStep.subagentEvents = []
+    if (!targetStep.subagentEvents.some((e) => e.agentId === agentId)) {
+      targetStep.subagentEvents.push(subagentEvent)
+    }
+  })
+}
+
+/** Find the active or most recent streaming spawn_subagent/batch_spawn step. */
+function findSpawnStepInDraft(draft: {
+  activeToolStepId?: string | null
+  steps: DraftAssistantStep[]
+}): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined {
+  if (draft.activeToolStepId) {
+    const activeStep = draft.steps.find((s) => s.id === draft.activeToolStepId)
+    if (activeStep && activeStep.type === 'tool_call') {
+      const name = activeStep.toolCall.function.name
+      if (name === 'spawn_subagent' || name === 'batch_spawn') return activeStep
+    }
+  }
+  for (let i = draft.steps.length - 1; i >= 0; i--) {
+    const step = draft.steps[i]
+    if (
+      step.type === 'tool_call' &&
+      step.streaming &&
+      (step.toolCall.function.name === 'spawn_subagent' ||
+        step.toolCall.function.name === 'batch_spawn')
+    ) {
+      return step
+    }
+  }
+  return undefined
 }
 import { StreamingQueue } from '../utils/streaming-queue'
 
@@ -3498,8 +3624,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         latestMessages = resultMessages
         await finalizeRun('idle', latestMessages)
       } catch (error) {
+        // Flush streaming queues BEFORE destroy so any buffered
+        // reasoning/content deltas are applied to the draft before we commit.
         const queues = getStreamingQueues(conversationId)
         if (queues) {
+          queues.reasoning.flushNow()
+          queues.content.flushNow()
           queues.reasoning.destroy()
           queues.content.destroy()
         }
@@ -3507,10 +3637,20 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         if (error instanceof Error && error.name === 'AbortError') {
           deleteAgentLoop(conversationId)
-          deleteStreamingQueues(conversationId)
+
+          let abortCommittedPartial = false
           set((state) => {
             const c = state.conversations.find((c) => c.id === conversationId)
             if (c) {
+              // Sync draft from runtime store before committing
+              const rtDraft = useConversationRuntimeStore.getState().runtimes.get(conversationId)?.draftAssistant
+              if (rtDraft && !c.draftAssistant) {
+                c.draftAssistant = rtDraft
+              }
+              abortCommittedPartial = commitDraftToMessages(c)
+              if (abortCommittedPartial) {
+                c.updatedAt = Date.now()
+              }
               c.status = 'idle'
               c.activeRunId = null
               c.draftAssistant = null
@@ -3525,6 +3665,15 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               r.draftAssistant = null
             }
           })
+          // Persist committed partial messages to prevent data loss
+          if (abortCommittedPartial) {
+            const abortConv = get().conversations.find((c) => c.id === conversationId)
+            if (abortConv) {
+              persistMessageReplace(conversationId, abortConv.messages).catch((persistErr) => {
+                console.error('[conversation.store] Failed to persist on AbortError partial commit:', persistErr)
+              })
+            }
+          }
           // Do NOT return here — fall through to consume queued messages
           // so that messages enqueued during the cancelled run are processed.
         } else {

@@ -544,11 +544,12 @@ function findMatchesInText(
     regex.lastIndex = 0
     let match: RegExpExecArray | null
     while ((match = regex.exec(line)) !== null) {
-      const preview = buildPreview(lines, i, contextLines)
+      const column = (match.index ?? 0) + 1
+      const preview = buildPreview(lines, i, contextLines, column)
       result.push({
         path,
         line: i + 1,
-        column: (match.index ?? 0) + 1,
+        column,
         match: match[0],
         preview,
       })
@@ -561,8 +562,23 @@ function findMatchesInText(
   return result
 }
 
-function buildPreview(lines: string[], lineIndex: number, contextLines: number): string {
-  if (contextLines <= 0) return lines[lineIndex] || ''
+const MAX_PREVIEW_LEN = 200
+
+function buildPreview(lines: string[], lineIndex: number, contextLines: number, column?: number): string {
+  if (contextLines <= 0) {
+    const line = lines[lineIndex] || ''
+    if (line.length <= MAX_PREVIEW_LEN) return line
+    // Truncate long lines (e.g. minified JS) around the match position.
+    // Reserve space for both leading and trailing ellipses.
+    const budget = MAX_PREVIEW_LEN - 6
+    if (column && column > 0 && column < line.length) {
+      const half = Math.floor(budget / 2)
+      const start = Math.max(0, column - 1 - half)
+      const end = start + budget
+      return (start > 0 ? '...' : '') + line.slice(start, end) + (end < line.length ? '...' : '')
+    }
+    return line.slice(0, budget) + '...'
+  }
   const start = Math.max(0, lineIndex - contextLines)
   const end = Math.min(lines.length, lineIndex + contextLines + 1)
   return lines.slice(start, end).join('\n')

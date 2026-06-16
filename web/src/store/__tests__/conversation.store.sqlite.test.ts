@@ -1098,6 +1098,85 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(toolMessages[0].content).toBe('README content')
   })
 
+  it('preserves in-flight spawn_subagent on cancel with synthetic interrupted result', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('cancel-spawn-subagent')
+    const user = createUserMessage('delegate work')
+    useConversationStore.getState().updateMessages(conv.id, [user])
+
+    const cancelSpy = vi.fn()
+    const spawnToolCall = {
+      id: 'tool-spawn-1',
+      type: 'function' as const,
+      function: {
+        name: 'spawn_subagent',
+        arguments: '{"description":"long task"}',
+      },
+    }
+
+    useConversationStore.setState((state) => {
+      const target = state.conversations.find((c) => c.id === conv.id)
+      if (!target) return state
+      target.status = 'tool_calling'
+      target.activeRunId = 'run-spawn'
+      target.currentToolCall = spawnToolCall
+      target.activeToolCalls = [spawnToolCall]
+      target.streamingContent = ''
+      target.streamingReasoning = 'delegating...'
+      target.draftAssistant = {
+        reasoning: 'delegating...',
+        content: '',
+        toolCalls: [spawnToolCall],
+        toolResults: {},
+        toolCall: spawnToolCall,
+        toolArgs: '{"description":"long task"}',
+        steps: [
+          {
+            id: `tool-${spawnToolCall.id}`,
+            timestamp: Date.now(),
+            type: 'tool_call',
+            toolCall: spawnToolCall,
+            args: '{"description":"long task"}',
+            streaming: true,
+            subagentEvents: [
+              {
+                agentId: 'subagent_cancel_demo',
+                status: 'running',
+                summary: 'executing',
+                timestamp: Date.now(),
+              },
+            ],
+          },
+        ],
+        activeReasoningStepId: null,
+        activeContentStepId: null,
+        activeToolStepId: `tool-${spawnToolCall.id}`,
+        activeCompressionStepId: null,
+      }
+      setAgentLoop(conv.id, { cancel: cancelSpy } as any)
+      return state
+    })
+
+    useConversationStore.getState().cancelAgent(conv.id)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(cancelSpy).toHaveBeenCalledTimes(1)
+
+    // Assistant message must include the in-flight spawn_subagent call
+    const assistantMessages = (updated?.messages || []).filter((m) => m.role === 'assistant')
+    const lastAssistant = assistantMessages[assistantMessages.length - 1]
+    expect(lastAssistant.toolCalls?.map((tc) => tc.id)).toContain(spawnToolCall.id)
+
+    // A synthetic tool result must be present and contain the agentId
+    const toolMessages = (updated?.messages || []).filter((m) => m.role === 'tool')
+    const spawnToolMsg = toolMessages.find((m) => m.toolCallId === spawnToolCall.id)
+    expect(spawnToolMsg).toBeDefined()
+    const parsed = JSON.parse(spawnToolMsg!.content ?? '') as Record<string, unknown>
+    const data = parsed.data as Record<string, unknown> | undefined
+    expect(data?.agentId).toBe('subagent_cancel_demo')
+    expect(data?.interrupted).toBe(true)
+  })
+
   it('should stream think-tag reasoning before content completes', async () => {
     const store = useConversationStore.getState()
     const conv = store.createNew('stream-think-tags')
