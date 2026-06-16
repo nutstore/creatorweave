@@ -285,10 +285,14 @@ function handleSubagentStepNotification(
   })
 }
 
-/** Find the active or most recent streaming spawn_subagent/batch_spawn step. */
+/** Find the active or most recent streaming spawn_subagent/batch_spawn step.
+ *  Accepts ReadonlyArray steps so the same helper works for plain objects,
+ *  immer drafts, and Readonly drafts. Callers that need to mutate the
+ *  returned step (e.g. to push into subagentEvents) should do so within an
+ *  immer producer where the draft is already mutable. */
 function findSpawnStepInDraft(draft: {
   activeToolStepId?: string | null
-  steps: DraftAssistantStep[]
+  steps: ReadonlyArray<DraftAssistantStep>
 }): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined {
   if (draft.activeToolStepId) {
     const activeStep = draft.steps.find((s) => s.id === draft.activeToolStepId)
@@ -2488,29 +2492,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             }
 
             // ── Handle task_notification (status updates) ──
-            // Helper: find the spawn_subagent/batch_spawn step in a draftAssistant
-            const findSpawnStep = (draft: { activeToolStepId?: string | null; steps: DraftAssistantStep[] } | null): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined => {
-              if (!draft) return undefined
-              // Primary: try activeToolStepId (fast path)
-              if (draft.activeToolStepId) {
-                const activeStep = draft.steps.find((s) => s.id === draft.activeToolStepId)
-                if (activeStep && activeStep.type === 'tool_call') {
-                  const name = activeStep.toolCall.function.name
-                  if (name === 'spawn_subagent' || name === 'batch_spawn') return activeStep
-                }
-              }
-              // Fallback: find most recent spawn step that is still streaming
-              for (let i = draft.steps.length - 1; i >= 0; i--) {
-                const step = draft.steps[i]
-                if (
-                  step.type === 'tool_call' &&
-                  step.streaming &&
-                  (step.toolCall.function.name === 'spawn_subagent' ||
-                    step.toolCall.function.name === 'batch_spawn')
-                ) return step
-              }
-              return undefined
-            }
             const subagentEvent = {
               agentId: event.agentId,
               status: event.status,
@@ -2520,8 +2501,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             // Update conversations store
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
-              if (!c) return
-              const targetStep = findSpawnStep(c.draftAssistant)
+              if (!c || !c.draftAssistant) return
+              const targetStep = findSpawnStepInDraft(c.draftAssistant)
               if (targetStep) {
                 if (!targetStep.subagentEvents) targetStep.subagentEvents = []
                 targetStep.subagentEvents.push(subagentEvent)
@@ -2531,8 +2512,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             // Mirror to runtime store (UI reads draftAssistant from runtime store)
             useConversationRuntimeStore.setState((state) => {
               const r = state.runtimes.get(conversationId)
-              if (!r) return
-              const targetStep = findSpawnStep(r.draftAssistant)
+              if (!r || !r.draftAssistant) return
+              const targetStep = findSpawnStepInDraft(r.draftAssistant)
               if (targetStep) {
                 if (!targetStep.subagentEvents) targetStep.subagentEvents = []
                 targetStep.subagentEvents.push(subagentEvent)
@@ -4419,7 +4400,6 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 ...newMessages[msgIdx],
                 content: contentText,
                 images: images.length > 0 ? images : undefined,
-                updatedAt: Date.now(),
               }
               c.messages = newMessages
             }
