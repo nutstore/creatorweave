@@ -11,6 +11,8 @@ export const topbar = {
       title: "Quick Model Switch",
       unavailable: "Model unavailable",
       noPinnedModels: "No models pinned yet. Add models in Settings.",
+      searchPlaceholder: "Search models…",
+      noResults: "No matching models",
     },
     tooltips: {
       backToProjects: "Back to Project List",

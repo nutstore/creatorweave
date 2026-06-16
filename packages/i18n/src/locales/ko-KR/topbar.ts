@@ -11,6 +11,9 @@ export const topbar = {
     modelSwitcher: {
       title: "빠른 모델 전환",
       unavailable: "모델을 사용할 수 없음",
+      noPinnedModels: "아직 고정된 모델이 없습니다. 설정에서 추가하세요.",
+      searchPlaceholder: "모델 검색…",
+      noResults: "일치하는 모델 없음",
     },
     tooltips: {
       backToProjects: "프로젝트 목록으로 돌아가기",

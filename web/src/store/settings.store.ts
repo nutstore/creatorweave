@@ -570,10 +570,14 @@ export const useSettingsStore = create<SettingsState>()(
           providerKey: string
         }> = []
 
-        // Check built-in providers
-        for (const [type, meta] of Object.entries(PROVIDER_META)) {
-          const providerType = type as LLMProviderType
-          const key = await loadApiKey(providerType)
+        // Check built-in providers (parallel loadApiKey for performance)
+        const builtInTypes = Object.keys(PROVIDER_META) as LLMProviderType[]
+        const builtInKeys = await Promise.all(
+          builtInTypes.map(async (type) => ({ type, key: await loadApiKey(type) }))
+        )
+        for (const { type, key } of builtInKeys) {
+          const meta = PROVIDER_META[type]
+          const providerType = type
           if (key) {
             // Use pinned models if available, otherwise fallback to all models
             const pinned = state.pinnedModelsByProvider[providerType]
@@ -595,9 +599,11 @@ export const useSettingsStore = create<SettingsState>()(
           }
         }
 
-        // Check custom providers
-        for (const cp of state.customProviders) {
-          const key = await loadApiKey(cp.id)
+        // Check custom providers (parallel)
+        const customKeys = await Promise.all(
+          state.customProviders.map(async (cp) => ({ cp, key: await loadApiKey(cp.id) }))
+        )
+        for (const { cp, key } of customKeys) {
           if (key) {
             // Use pinned models if available, otherwise fallback to custom provider models
             const pinned = state.pinnedModelsByProvider[cp.id]
@@ -614,14 +620,15 @@ export const useSettingsStore = create<SettingsState>()(
           }
         }
 
-        // Check dynamically registered providers (e.g. codex-oauth from extension bridge)
+        // Check dynamically registered providers (parallel)
         const { getDynamicProviderIds, getProviderMeta: getDynamicMeta } = await import('@/agent/providers/types')
-        for (const id of getDynamicProviderIds()) {
-          // Skip if already included via built-in or custom providers
-          if (results.some((r) => r.providerType === id)) continue
-          // Skip llm-gateway — handled separately below
-          if (id === llmGatewayProviderKey) continue
-          const key = await loadApiKey(id)
+        const dynamicIds = getDynamicProviderIds().filter(
+          (id) => !results.some((r) => r.providerType === id) && id !== llmGatewayProviderKey
+        )
+        const dynamicKeys = await Promise.all(
+          dynamicIds.map(async (id) => ({ id, key: await loadApiKey(id) }))
+        )
+        for (const { id, key } of dynamicKeys) {
           if (key) {
             const meta = getDynamicMeta(id)
             const pinned = state.pinnedModelsByProvider[id]

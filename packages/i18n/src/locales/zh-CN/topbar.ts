@@ -12,6 +12,8 @@ export const topbar = {
       title: "快速切换模型",
       unavailable: "模型不可用",
       noPinnedModels: "暂无常用模型，请在设置中添加",
+      searchPlaceholder: "搜索模型…",
+      noResults: "无匹配模型",
     },
     tooltips: {
       backToProjects: "返回项目列表",

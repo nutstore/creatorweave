@@ -57,35 +57,50 @@ async function createAndPersistEncryptionKey(
 }
 
 /**
+ * Cached encryption key — the key never changes during a session, so we load it
+ * from IndexedDB + importKey only ONCE.  Without this cache, every decrypt()
+ * call repeats the full (SQLite query → openKeyDB → IndexedDB get → importKey)
+ * chain, which is the dominant cost when loading many API keys (e.g.
+ * ModelQuickSwitch opening).
+ */
+let cachedEncryptionKey: Promise<CryptoKey> | null = null
+
+/**
  * Get or create device-specific encryption key
  * Key metadata stored in SQLite, actual key in IndexedDB (for non-exportability)
  */
 async function getEncryptionKey(): Promise<CryptoKey> {
-  // First, check if we have key metadata in SQLite
-  const db = getSQLiteDB()
-  const metadataRow = await db.queryFirst<{
-    key_name: string
-    key_algorithm: string
-    key_length: number
-  }>('SELECT * FROM encryption_metadata WHERE key_name = ?', [ENCRYPTION_KEY_NAME])
+  if (cachedEncryptionKey) return cachedEncryptionKey
 
-  if (!metadataRow) {
-    return createAndPersistEncryptionKey(db)
-  }
+  cachedEncryptionKey = (async () => {
+    // First, check if we have key metadata in SQLite
+    const db = getSQLiteDB()
+    const metadataRow = await db.queryFirst<{
+      key_name: string
+      key_algorithm: string
+      key_length: number
+    }>('SELECT * FROM encryption_metadata WHERE key_name = ?', [ENCRYPTION_KEY_NAME])
 
-  // Load raw key from IndexedDB and re-import
-  const rawKey = await loadRawKey()
-  if (!rawKey) {
-    console.warn(
-      '[ApiKeyRepo] Encryption key metadata exists but IndexedDB key is missing. Regenerating key and resetting stored API keys.'
-    )
-    return createAndPersistEncryptionKey(db, { resetApiKeys: true })
-  }
+    if (!metadataRow) {
+      return createAndPersistEncryptionKey(db)
+    }
 
-  return crypto.subtle.importKey('raw', rawKey, { name: KEY_ALGORITHM }, false, [
-    'encrypt',
-    'decrypt',
-  ])
+    // Load raw key from IndexedDB and re-import
+    const rawKey = await loadRawKey()
+    if (!rawKey) {
+      console.warn(
+        '[ApiKeyRepo] Encryption key metadata exists but IndexedDB key is missing. Regenerating key and resetting stored API keys.'
+      )
+      return createAndPersistEncryptionKey(db, { resetApiKeys: true })
+    }
+
+    return crypto.subtle.importKey('raw', rawKey, { name: KEY_ALGORITHM }, false, [
+      'encrypt',
+      'decrypt',
+    ])
+  })()
+
+  return cachedEncryptionKey
 }
 
 /**

@@ -8,6 +8,13 @@ export const topbar = {
     skillsManagement: "スキル管理",
     projectLabel: "プロジェクト: {name}",
     workspaceLabel: "ワークスペース: {name}",
+    modelSwitcher: {
+      title: "クイックモデル切替",
+      unavailable: "モデルは利用できません",
+      noPinnedModels: "まだピン留めされたモデルはありません。設定で追加してください。",
+      searchPlaceholder: "モデルを検索…",
+      noResults: "一致するモデルはありません",
+    },
     tooltips: {
       backToProjects: "プロジェクト一覧に戻る",
       menu: "メニュー",
