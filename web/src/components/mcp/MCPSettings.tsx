@@ -12,9 +12,6 @@ import {
   Edit,
   X,
   RefreshCw,
-  Circle,
-  CircleCheck,
-  CircleX,
   Globe,
   Eye,
   EyeOff,
@@ -425,15 +422,6 @@ export function MCPSettings() {
   }
 
   // ─── Status helpers ──────────────────────────────────────────────────
-
-  const statusColor = (s?: MCPConnectionState) => {
-    switch (s) {
-      case 'connected': return 'text-success'
-      case 'connecting': return 'text-muted'
-      case 'error': return 'text-danger'
-      default: return 'text-muted'
-    }
-  }
 
   const statusDot = (s?: MCPConnectionState) => {
     const base = 'inline-block h-2 w-2 rounded-full shrink-0'

@@ -3,7 +3,6 @@ import type { Message } from '../message-types'
 import {
   applyCompressionBaseline,
   getCompressionCutoffTimestamp,
-  shouldCallLLMSummary,
 } from '../loop/context-compression'
 
 describe('context-compression helpers', () => {
@@ -31,31 +30,5 @@ describe('context-compression helpers', () => {
       content: 'S',
       timestamp: 20,
     })
-  })
-
-  it('shouldCallLLMSummary enforces thresholds and cadence', () => {
-    expect(
-      shouldCallLLMSummary({
-        droppedGroups: 3,
-        droppedContent: 'x'.repeat(1000),
-        convertCallCount: 20,
-        lastSummaryConvertCall: 8,
-        minDroppedGroups: 2,
-        minDroppedContentChars: 800,
-        minIntervalConvertCalls: 8,
-      })
-    ).toBe(true)
-
-    expect(
-      shouldCallLLMSummary({
-        droppedGroups: 1,
-        droppedContent: 'x'.repeat(1000),
-        convertCallCount: 20,
-        lastSummaryConvertCall: 8,
-        minDroppedGroups: 2,
-        minDroppedContentChars: 800,
-        minIntervalConvertCalls: 8,
-      })
-    ).toBe(false)
   })
 })

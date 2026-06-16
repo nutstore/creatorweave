@@ -71,6 +71,13 @@ function PageSlot({
     let cancelled = false
 
     async function render() {
+      // Capture into local consts so TypeScript keeps the non-null narrowing
+      // inside this nested function (function declarations don't preserve
+      // narrowing of outer-scope bindings the way arrow assignments do).
+      const pdfDoc = doc
+      const canvasEl = canvas
+      if (!pdfDoc || !canvasEl) return
+
       // Cancel any in-progress render for this slot
       if (renderTaskRef.current) {
         try { renderTaskRef.current.cancel() } catch { /* ignore */ }
@@ -78,21 +85,21 @@ function PageSlot({
       }
 
       try {
-        const page = await doc.getPage(pageNum)
+        const page = await pdfDoc.getPage(pageNum)
         if (cancelled) return
 
         const viewport = page.getViewport({ scale, rotation })
-        const ctx = canvas.getContext('2d')
+        const ctx = canvasEl.getContext('2d')
         if (!ctx) return
 
         // Reset transform before resizing
         ctx.setTransform(1, 0, 0, 1, 0, 0)
 
         const dpr = window.devicePixelRatio || 1
-        canvas.width = Math.floor(viewport.width * dpr)
-        canvas.height = Math.floor(viewport.height * dpr)
-        canvas.style.width = `${Math.floor(viewport.width)}px`
-        canvas.style.height = `${Math.floor(viewport.height)}px`
+        canvasEl.width = Math.floor(viewport.width * dpr)
+        canvasEl.height = Math.floor(viewport.height * dpr)
+        canvasEl.style.width = `${Math.floor(viewport.width)}px`
+        canvasEl.style.height = `${Math.floor(viewport.height)}px`
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
         const renderTask = page.render({ canvasContext: ctx, viewport })
@@ -361,24 +368,26 @@ export function PdfPreview({ blob, fileName, fileSize }: {
   useEffect(() => {
     const container = containerRef.current
     if (!container || loading || pageSizes.length === 0) return
+    // Capture into a local const so the non-null narrowing is preserved
+    // inside the nested onScroll function below.
+    const containerEl: HTMLDivElement = container
 
     function onScroll() {
       if (isScrollingToPage.current) return
 
-      const containerTop = container.scrollTop
-      const containerHeight = container.clientHeight
+      const containerHeight = containerEl.clientHeight
 
       // Find the page whose top edge is closest to (but not below)
       // the middle of the visible viewport area.
       let bestPage = 1
       let bestDist = Infinity
 
-      const pageElements = container.querySelectorAll('[data-page]')
+      const pageElements = containerEl.querySelectorAll('[data-page]')
       for (const el of pageElements) {
         const pageNum = parseInt(el.getAttribute('data-page')!, 10)
         // Use getBoundingClientRect relative to the container
         const rect = (el as HTMLElement).getBoundingClientRect()
-        const containerRect = container.getBoundingClientRect()
+        const containerRect = containerEl.getBoundingClientRect()
         // Distance from page top to container top
         const dist = rect.top - containerRect.top
         // Pick the page closest to the top, preferring pages that

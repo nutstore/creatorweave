@@ -17,7 +17,6 @@ import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
-import { toolErrorJson } from './tool-envelope'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',

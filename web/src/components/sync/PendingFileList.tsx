@@ -15,7 +15,7 @@ import { type ChangeDetectionResult, type FileChange } from '@/opfs/types/opfs-t
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { BrandButton, BrandCheckbox } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
-import { RefreshCw, Trash2, X, ChevronDown, ChevronRight, MousePointer2, Copy, FileText, ClipboardCopy } from 'lucide-react'
+import { RefreshCw, Trash2, X, ChevronDown, ChevronRight, MousePointer2, Copy, ClipboardCopy } from 'lucide-react'
 import { readFileFromOPFS, getFileContentType } from '@/opfs'
 import { getActiveConversation } from '@/store/conversation-context.store'
 import { useT } from '@/i18n'

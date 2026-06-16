@@ -7,10 +7,8 @@
 
 import type {
   PlatformAdapter,
-  BuiltinSkillsManifest,
   BuiltinSkillManifest,
   MaterializeResult,
-  SkillDiff,
 } from './types'
 import { computeDiff } from './diff'
 

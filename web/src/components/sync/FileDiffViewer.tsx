@@ -210,7 +210,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const [docxBlob, setDocxBlob] = useState<Blob | null>(null)
   // Generic format handler state (for .nol and future formats registered in format-registry)
   const [formatBlob, setFormatBlob] = useState<Blob | null>(null)
-  const [formatTextContent, setFormatTextContent] = useState<string | null>(null)
   const [formatViewMode, setFormatViewMode] = useState<string>('preview')
   const docxContainerRef = useRef<HTMLDivElement>(null)
   // HTML inline preview state
@@ -284,7 +283,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       setOfficeBlob(null)
       setDocxBlob(null)
       setFormatBlob(null)
-      setFormatTextContent(null)
       return
     }
 

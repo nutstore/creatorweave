@@ -60,10 +60,6 @@ describe('pi-core-runner', () => {
       maxIterations: 20,
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
-      summaryMinDroppedGroups: 2,
-      summaryMinDroppedContentChars: 800,
-      summaryMinIntervalConvertCalls: 8,
-      compressionTargetRatio: 0.7,
       compressedMemoryPrefix: 'Earlier conversation summary:',
       generateContextSummaryWithLLM: async () => ({ summary: null, mode: 'skip' }),
     })
@@ -133,10 +129,6 @@ describe('pi-core-runner', () => {
       maxIterations: 20,
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
-      summaryMinDroppedGroups: 2,
-      summaryMinDroppedContentChars: 800,
-      summaryMinIntervalConvertCalls: 8,
-      compressionTargetRatio: 0.7,
       compressedMemoryPrefix: 'Earlier conversation summary:',
       generateContextSummaryWithLLM: async () => ({ summary: null, mode: 'skip' }),
     })

@@ -381,6 +381,15 @@ async function executeSingleRead(
         { details: { path, contentType: metadata.contentType, size: metadata.size } }
       )
     }
+
+    // Defensive fallback: backend returned a content shape we don't recognise
+    // (neither string nor binary). Treat as internal error.
+    return toolErrorJson(
+      'read',
+      'internal_error',
+      `Failed to read file: unsupported content shape from backend (${path}).`,
+      { retryable: true }
+    )
   } catch (error) {
     if (isOPFSWorkspaceMiss(error)) {
       try {
@@ -454,7 +463,7 @@ async function executeSingleRead(
               options,
               readStateKey,
               readFileState,
-              result.source,
+              result.source ?? '',
               {
                 ...(loopCheckResult!.warning ? { _warning: loopCheckResult!.warning } : {}),
                 source: 'native_fallback',

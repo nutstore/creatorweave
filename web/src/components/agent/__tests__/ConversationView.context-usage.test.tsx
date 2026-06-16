@@ -246,8 +246,8 @@ describe('ConversationView context usage source', () => {
         type: 'message',
       },
     ]
-    conversationState.conversations[0].lastContextWindowUsage = null
-    conversationState.conversations[0].contextWindowUsage = null
+    ;(conversationState.conversations[0] as { lastContextWindowUsage: unknown }).lastContextWindowUsage = null
+    ;(conversationState.conversations[0] as { contextWindowUsage: unknown }).contextWindowUsage = null
 
     render(<ConversationView />)
 
@@ -276,7 +276,7 @@ describe('ConversationView context usage source', () => {
           completionTokens: 163,
           totalTokens: 190,
           cacheReadTokens: 40,
-        },
+        } as never,
       },
     ]
     conversationState.conversations[0].lastContextWindowUsage = {

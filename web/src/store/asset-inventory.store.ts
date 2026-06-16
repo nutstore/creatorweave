@@ -62,7 +62,7 @@ async function scanAssetsRecursively(
     }
 
     if (entry.kind === 'directory') {
-      const nested = await scanAssetsRecursively(entry, fullPath)
+      const nested = await scanAssetsRecursively(entry as FileSystemDirectoryHandle, fullPath)
       items.push(...nested)
     }
   }

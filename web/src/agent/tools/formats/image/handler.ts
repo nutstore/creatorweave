@@ -172,7 +172,6 @@ export const imageHandler: FormatHandler = {
     // SVG is text-based — return content directly
     if (ext === 'svg') {
       const text = new TextDecoder().decode(bytes)
-      const lines = text.split('\n')
       // Try to extract width/height from SVG attributes
       const widthMatch = text.match(/\bwidth\s*=\s*["']?(\d+(?:\.\d+)?)(?:px)?["']?/i)
       const heightMatch = text.match(/\bheight\s*=\s*["']?(\d+(?:\.\d+)?)(?:px)?["']?/i)

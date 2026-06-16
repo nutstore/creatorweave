@@ -206,6 +206,13 @@ export class VfsBridgeFs {
     return new Uint8Array(buf)
   }
 
+  /** Convert VfsReadResult.content (string | ArrayBuffer | Blob) to writable form (string | Uint8Array) */
+  private async toWritableContent(content: string | ArrayBuffer | Blob): Promise<string | Uint8Array> {
+    if (content instanceof ArrayBuffer) return new Uint8Array(content)
+    if (content instanceof Blob) return new Uint8Array(await content.arrayBuffer())
+    return content
+  }
+
   async writeFile(path: string, content: string | Uint8Array, _options?: { encoding?: string } | string): Promise<void> {
     // /dev/null, /dev/zero — silently consume writes
     if (path === '/dev/null' || path === '/dev/zero') return
@@ -678,7 +685,7 @@ export class VfsBridgeFs {
       const srcRel = this.toAssetsRelative(srcNorm)
       try {
         const result = await this.assetsBackend.readFile(srcRel)
-        await this.writeFile(dest, result.content instanceof ArrayBuffer ? new Uint8Array(result.content) : result.content)
+        await this.writeFile(dest, await this.toWritableContent(result.content))
         return
       } catch { throw new Error(`cp: cannot stat '${src}': No such file or directory`) }
     }
@@ -689,7 +696,7 @@ export class VfsBridgeFs {
       const srcRel = this.toAgentsRelative(srcNorm)
       try {
         const result = await this.agentBackend.readFile(srcRel)
-        await this.writeFile(dest, result.content instanceof ArrayBuffer ? new Uint8Array(result.content) : result.content)
+        await this.writeFile(dest, await this.toWritableContent(result.content))
         return
       } catch { throw new Error(`cp: cannot stat '${src}': No such file or directory`) }
     }
@@ -822,7 +829,7 @@ export class VfsBridgeFs {
   /**
    * Synchronous mkdir — just-bash's initFilesystem and constructor use this.
    */
-  mkdirSync(path: string, options?: { recursive?: boolean }): void {
+  mkdirSync(path: string, _options?: { recursive?: boolean }): void {
     const normalized = this.normalizeAbsolutePath(path)
     this.ensureSysDir(normalized)
   }

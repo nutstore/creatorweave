@@ -217,7 +217,7 @@ export class WorkspaceBackend implements VfsBackend {
     let nativeDirHandle: FileSystemDirectoryHandle | null = null
     let nativeRelativePath = path
     try {
-      const { workspace, workspaceId } = await this.getWorkspaceForBackend()
+      const { workspace } = await this.getWorkspaceForBackend()
       if (workspace) {
         const resolved = await workspace.resolvePath(path)
         const rootHandle = await workspace.getNativeDirectoryHandleForPath(path)
@@ -426,7 +426,7 @@ export class WorkspaceBackend implements VfsBackend {
    * Get the WorkspaceRuntime instance for this backend.
    * Used by listDir and deleteDir for multi-root path resolution.
    */
-  private async getWorkspaceForBackend(): Promise<{ workspace: any; workspaceId: string }> {
+  private async getWorkspaceForBackend(): Promise<{ workspace: any; workspaceId: string | null }> {
     const { useWorkspaceStore } = await import('@/store/workspace.store')
     const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
     const targetWorkspaceId = this.workspaceId || activeWorkspaceId

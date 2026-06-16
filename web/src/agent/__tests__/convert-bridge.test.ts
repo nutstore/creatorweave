@@ -32,20 +32,13 @@ describe('convert-bridge', () => {
         maxContextTokens: 128000,
         estimateTokens: vi.fn(() => 1),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 128000, reserveTokens: 4096 }),
-        trimMessages: (msgs: unknown) => ({ messages: msgs as never[] }),
-        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
-      } as never,
+      maxContextTokens: 128000,
+      reserveTokens: 4096,
       callbacks: {},
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 2,
-      summaryMinDroppedContentChars: 800,
-      summaryMinIntervalConvertCalls: 8,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM: async () => ({ summary: null, mode: 'skip' }),
     })
 
@@ -58,8 +51,6 @@ describe('convert-bridge', () => {
     vi.mocked(ensureLatestToolResultFitsContext).mockImplementation(() => {
       throw new Error('tool result cannot fit')
     })
-
-    const trimMessagesToTarget = vi.fn((msgs: unknown) => msgs as never[])
 
     const result = await convertAgentMessagesToLlm({
       agentMessages: [
@@ -74,24 +65,16 @@ describe('convert-bridge', () => {
         maxContextTokens: 128000,
         estimateTokens: vi.fn(() => 1),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 128000, reserveTokens: 4096 }),
-        trimMessages: (msgs: unknown) => ({ messages: msgs as never[] }),
-        trimMessagesToTarget,
-      } as never,
+      maxContextTokens: 128000,
+      reserveTokens: 4096,
       callbacks: {},
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 2,
-      summaryMinDroppedContentChars: 800,
-      summaryMinIntervalConvertCalls: 8,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM: async () => ({ summary: null, mode: 'skip' }),
     })
 
-    expect(trimMessagesToTarget).toHaveBeenCalled()
     expect(result.convertCallCount).toBe(1)
     expect(result.piMessages.length).toBeGreaterThan(0)
   })
@@ -122,25 +105,13 @@ describe('convert-bridge', () => {
         maxContextTokens: 128000,
         estimateTokens: vi.fn(() => 1),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 128000, reserveTokens: 4096 }),
-        trimMessages: vi.fn((msgs: unknown) => ({
-          messages: msgs as never[],
-          droppedGroups: 2,
-          droppedContent: 'dropped old history that should be summarized',
-          wasTruncated: true,
-        })),
-        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
-      } as never,
+      maxContextTokens: 128000,
+      reserveTokens: 4096,
       callbacks: { onContextCompressionStart },
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 1,
-      summaryMinDroppedContentChars: 1,
-      summaryMinIntervalConvertCalls: 0,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM,
     })
 
@@ -174,25 +145,13 @@ describe('convert-bridge', () => {
         maxContextTokens: 1000,
         estimateTokens: vi.fn(() => 1),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 1000, reserveTokens: 100 }),
-        trimMessages: vi.fn((msgs: unknown, options?: { createSummary?: boolean }) => ({
-          messages: msgs as never[],
-          droppedGroups: options?.createSummary ? 2 : 0,
-          droppedContent: options?.createSummary ? 'dropped old history that should be summarized' : undefined,
-          wasTruncated: true,
-        })),
-        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
-      } as never,
+      maxContextTokens: 1000,
+      reserveTokens: 100,
       callbacks: { onContextCompressionStart },
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 1,
-      summaryMinDroppedContentChars: 1,
-      summaryMinIntervalConvertCalls: 0,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM,
     })
 
@@ -226,25 +185,13 @@ describe('convert-bridge', () => {
         maxContextTokens: 1000,
         estimateTokens: vi.fn(() => 900),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 1000, reserveTokens: 100 }),
-        trimMessages: vi.fn((msgs: unknown, options?: { createSummary?: boolean }) => ({
-          messages: msgs as never[],
-          droppedGroups: options?.createSummary ? 2 : 0,
-          droppedContent: options?.createSummary ? 'dropped old history that should be summarized' : undefined,
-          wasTruncated: true,
-        })),
-        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
-      } as never,
+      maxContextTokens: 1000,
+      reserveTokens: 100,
       callbacks: { onContextCompressionStart },
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 1,
-      summaryMinDroppedContentChars: 1,
-      summaryMinIntervalConvertCalls: 0,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM,
     })
 
@@ -278,25 +225,13 @@ describe('convert-bridge', () => {
         maxContextTokens: 1000,
         estimateTokens: vi.fn(() => 100),
       } as never,
-      contextManager: {
-        getConfig: () => ({ maxContextTokens: 1000, reserveTokens: 100 }),
-        trimMessages: vi.fn((msgs: unknown, options?: { createSummary?: boolean }) => ({
-          messages: msgs as never[],
-          droppedGroups: options?.createSummary ? 2 : 0,
-          droppedContent: options?.createSummary ? 'dropped old history that should be summarized' : undefined,
-          wasTruncated: true,
-        })),
-        trimMessagesToTarget: (msgs: unknown) => msgs as never[],
-      } as never,
+      maxContextTokens: 1000,
+      reserveTokens: 100,
       callbacks: { onContextCompressionStart },
       compressedMemoryPrefix: 'Earlier conversation summary:',
       convertCallCount: 0,
       lastSummaryConvertCall: Number.NEGATIVE_INFINITY,
       compressionBaseline: null,
-      summaryMinDroppedGroups: 1,
-      summaryMinDroppedContentChars: 1,
-      summaryMinIntervalConvertCalls: 0,
-      compressionTargetRatio: 0.7,
       generateContextSummaryWithLLM,
     })
 

@@ -209,7 +209,7 @@ export const nolHandler: FormatHandler = {
     + '![](media/xxx.jpg) to preserve existing images. '
     + 'Do NOT use JSON — only plain indented text.',
 
-  async read(data: ArrayBuffer | Uint8Array, path: string): Promise<FormatReadResult> {
+  async read(data: ArrayBuffer | Uint8Array, _path: string): Promise<FormatReadResult> {
     const input = data instanceof ArrayBuffer ? new Uint8Array(data) : data
     const unzipped = unzipSync(input)
 
@@ -251,7 +251,7 @@ export const nolHandler: FormatHandler = {
     return { content: '', kind: 'nol' }
   },
 
-  async write(content: string, path: string, context: FormatWriteContext): Promise<ArrayBuffer> {
+  async write(content: string, _path: string, context: FormatWriteContext): Promise<ArrayBuffer> {
     const trimmed = content.trim()
 
     if (trimmed.startsWith('{')) {

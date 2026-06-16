@@ -618,15 +618,6 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     task.loop?.cancel()
   }
 
-  /** Remove a completed/failed task from memory and release its name. */
-  private removeTask(agentId: string): void {
-    const task = this.tasks.get(agentId)
-    if (!task) return
-    if (task.name) this.nameToId.delete(task.name)
-    this.tasks.delete(agentId)
-    this.deleteTaskFromSQLite(agentId)
-  }
-
   private getByIdOrName(idOrName: string): SubagentTaskInternal | undefined {
     if (!idOrName) return undefined
     const direct = this.tasks.get(idOrName)
@@ -1305,22 +1296,6 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     } catch {
       // ignore persistence failures for runtime continuity
     }
-  }
-
-  private deleteTaskFromSQLite(agentId: string): void {
-    void (async () => {
-      try {
-        const { getSubagentRepository } = await import('@/sqlite')
-        const repo = getSubagentRepository() as {
-          deleteTask?: (workspaceId: string, agentId: string) => Promise<void>
-        }
-        if (typeof repo.deleteTask === 'function') {
-          await repo.deleteTask(this.deps.workspaceId, agentId)
-        }
-      } catch {
-        // ignore delete failures; runtime remains usable in-memory
-      }
-    })()
   }
 
   private async hydrateFromSQLite(): Promise<void> {

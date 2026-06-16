@@ -341,11 +341,10 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export function NolPreview({ blob, fileName, fileSize }: { blob: Blob; fileName: string; fileSize: number }) {
+export function NolPreview({ blob, fileSize }: { blob: Blob; fileName: string; fileSize: number }) {
   const [data, setData] = useState<NolData | null>(null)
   const [mediaFiles, setMediaFiles] = useState<string[]>([])
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({})
-  const [totalEntries, setTotalEntries] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandAll, setExpandAll] = useState(false)
@@ -364,7 +363,6 @@ export function NolPreview({ blob, fileName, fileSize }: { blob: Blob; fileName:
         if (cancelled) return
         setData(result.data)
         setMediaFiles(result.mediaFiles)
-        setTotalEntries(result.totalEntries)
 
         const urls: Record<string, string> = {}
         for (const [path, content] of Object.entries(result.mediaData)) {

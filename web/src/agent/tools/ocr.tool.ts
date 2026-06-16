@@ -11,9 +11,9 @@
  * - Auto-detects image MIME types and rejects non-image files
  */
 
-import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc, ToolContext } from './tool-types'
 import { resolveVfsTarget } from './vfs-resolver'
-import { performOcr, isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
+import { performOcr, isOcrCompatibleImage } from '@/services/ocr.service'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 
 //=============================================================================

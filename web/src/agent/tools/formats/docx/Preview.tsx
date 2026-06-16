@@ -19,7 +19,7 @@ type PreviewState =
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export function DocxPreview({ blob, fileName, fileSize }: {
+export function DocxPreview({ blob }: {
   blob: Blob
   fileName: string
   fileSize: number

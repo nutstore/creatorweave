@@ -302,13 +302,12 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
     // Health check: detect suspicious low output that likely indicates an API error
     const health = detectSubagentHealth(result)
 
-    // When subagent fails, inject recovery guidance for the main agent
-    const failureGuidance =
-      result.status === 'failed' && !health.ok
-        ? { health, _recovery_hint: 'Subagent failed. As the main agent, you should now attempt the task yourself: start by probing the data source with a single request, then design a working strategy before scaling up.' }
-        : health.ok
-          ? undefined
-          : { health }
+    // When subagent output looks like a failure, inject recovery guidance for the main agent.
+    // (spawn() already throws on hard failure / killed, so a non-throwing result with !health.ok
+    // means the subagent returned suspiciously low output — likely a soft error.)
+    const failureGuidance = !health.ok
+      ? { health, _recovery_hint: 'Subagent failed. As the main agent, you should now attempt the task yourself: start by probing the data source with a single request, then design a working strategy before scaling up.' }
+      : undefined
 
     return toolOkJson(
       TOOL_NAME_SPAWN,

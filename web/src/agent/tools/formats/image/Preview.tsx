@@ -137,7 +137,6 @@ export function ImagePreview({ blob, fileName, fileSize }: ImagePreviewProps) {
   }, [])
 
   // Compute transform
-  const isRotated90 = rotation === 90 || rotation === 270
   const transform = useMemo(() => {
     const parts: string[] = []
     if (rotation) parts.push(`rotate(${rotation}deg)`)

@@ -16,7 +16,7 @@
  */
 
 // React types for UI handler interfaces (type-only, no runtime dependency)
-import type { LazyExoticComponent } from 'react'
+import type { ComponentType, LazyExoticComponent } from 'react'
 import type { VfsBackend } from './vfs-backend'
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ export interface FormatUIHandler {
    * Preview component for 'preview' mode (React lazy component).
    * Only needed if viewModes includes a 'preview'-like mode.
    */
-  PreviewComponent?: LazyExoticComponent<FormatPreviewProps>
+  PreviewComponent?: LazyExoticComponent<ComponentType<FormatPreviewProps>>
 
   /**
    * Render binary data as text for 'text' mode (Monaco editor + comments).

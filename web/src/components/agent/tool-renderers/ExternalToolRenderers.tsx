@@ -223,16 +223,6 @@ registerRenderer({
 
 // ── Shared Components ──
 
-function SourceBadge({ source, sourceId }: { source: string; sourceId: string }) {
-  // Compact label: truncate long hostnames
-  const label = sourceId.length > 12 ? sourceId.slice(0, 12) + '…' : sourceId
-  return (
-    <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
-      {label}
-    </span>
-  )
-}
-
 function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unknown> }) {
   const properties = inputSchema.properties as Record<string, Record<string, unknown>> | undefined
   if (!properties || Object.keys(properties).length === 0) return null

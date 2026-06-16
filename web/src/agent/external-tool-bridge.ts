@@ -727,7 +727,7 @@ export const callToolExecutor: ToolExecutor = async (args, context) => {
   if (tool.source === 'mcp') {
     return executeMCPTool(tool, toolArgs || {})
   } else {
-    return executeWebMCPTool(tool, toolArgs || {}, context)
+    return executeWebMCPTool(tool, toolArgs || {}, context as unknown as Record<string, unknown>)
   }
 }
 

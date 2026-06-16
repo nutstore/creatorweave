@@ -218,7 +218,7 @@ async function listFilesRecursive(
   for await (const [name, handle] of dir.entries()) {
     const path = prefix ? `${prefix}/${name}` : name
     if (handle.kind === 'directory') {
-      results.push(...await listFilesRecursive(handle, path))
+      results.push(...await listFilesRecursive(handle as FileSystemDirectoryHandle, path))
     } else {
       results.push(path)
     }

@@ -52,16 +52,17 @@ export class PiAIProvider implements LLMProvider {
       temperature: request.temperature,
       maxTokens: request.maxTokens,
       signal,
-      onPayload: (payload: Record<string, unknown>) => {
+      onPayload: (payload: unknown) => {
+        const p = payload as Record<string, unknown>
         // openai-responses API: 'instructions' is required
         // chat-completions API does NOT support 'instructions' — uses system message instead
-        if (this.model.api === 'openai-responses' && !payload.instructions && context.systemPrompt) {
-          payload.instructions = context.systemPrompt
+        if (this.model.api === 'openai-responses' && !p.instructions && context.systemPrompt) {
+          p.instructions = context.systemPrompt
         }
         // Codex API does not support max_output_tokens or temperature
         if (this.model.provider === 'codex-oauth') {
-          delete payload.max_output_tokens
-          delete payload.temperature
+          delete p.max_output_tokens
+          delete p.temperature
         }
       },
     })
@@ -201,22 +202,23 @@ export class PiAIProvider implements LLMProvider {
       signal,
       temperature: request.temperature,
       maxTokens: request.maxTokens,
-      onPayload: (payload: Record<string, unknown>) => {
+      onPayload: (payload: unknown) => {
+        const p = payload as Record<string, unknown>
         // openai-responses API: 'instructions' is required
         // chat-completions API does NOT support 'instructions' — uses system message instead
-        if (this.model.api === 'openai-responses' && !payload.instructions && context.systemPrompt) {
-          payload.instructions = context.systemPrompt
+        if (this.model.api === 'openai-responses' && !p.instructions && context.systemPrompt) {
+          p.instructions = context.systemPrompt
         }
         // Codex API does not support max_output_tokens or temperature
         if (this.model.provider === 'codex-oauth') {
-          delete payload.max_output_tokens
-          delete payload.temperature
+          delete p.max_output_tokens
+          delete p.temperature
         }
         // Suppress reasoning when disableThinking is set (Codex API doesn't support these params)
         if (request.disableThinking && this.model.provider !== 'codex-oauth') {
-          payload.thinking = { type: 'disabled' }
-          payload.enable_thinking = false
-          payload.reasoning_effort = 'none'
+          p.thinking = { type: 'disabled' }
+          p.enable_thinking = false
+          p.reasoning_effort = 'none'
         }
       },
     }

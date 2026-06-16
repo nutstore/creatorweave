@@ -10,7 +10,7 @@
  *   2. The model can be matched in the current provider's model cache
  */
 
-import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
+import type { ToolDefinition, ToolExecutor, ToolPromptDoc, ToolContext } from './tool-types'
 import { resolveVfsTarget } from './vfs-resolver'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 import { generateImage } from '@/agent/llm/image-gen'

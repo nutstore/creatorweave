@@ -381,10 +381,11 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     const nativeResult = await scope.resolveHandle(scope.subPath, { allowMissing: true })
     if (!nativeResult.exists && scope.subPath) {
       // Build the full display path (include rootName for multi-root)
-      const displayPath = scope.rootName ? `${scope.rootName}/${scope.subPath}` : scope.subPath
+      const rootName = 'rootName' in scope ? scope.rootName : undefined
+      const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
       return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
         hint: 'Check the path for typos, or use ls() without arguments to list available roots and directories.',
-        details: { requested_path: scope.subPath, rootName: scope.rootName },
+        details: { requested_path: scope.subPath, rootName },
       })
     }
     const nativeHandle = nativeResult.handle

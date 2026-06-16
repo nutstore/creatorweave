@@ -164,7 +164,7 @@ describe('AgentLoop', () => {
   })
 
   describe('truncateLargeToolResult()', () => {
-    it('returns summary when even one search hit cannot fit token budget', () => {
+    it('returns summary when even one search hit cannot fit token budget', async () => {
       const rawResult = JSON.stringify({
         results: [
           {

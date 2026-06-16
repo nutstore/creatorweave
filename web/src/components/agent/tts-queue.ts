@@ -117,11 +117,6 @@ class TTSAutoPlayQueue {
    * Called when user sends a new message.
    */
   interrupt(conversationId: string): void {
-    // Only interrupt if the playing item belongs to this conversation
-    const currentIdx = this.queue.findIndex(
-      (item) => item.conversationId === conversationId
-    )
-
     // Stop audio
     this.stopAudio()
 

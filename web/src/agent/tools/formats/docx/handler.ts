@@ -21,7 +21,7 @@ const FULL_TEXT_THRESHOLD = 10000
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 /** Extract all text content from a docx XML element, recursively */
-function extractTextFromXml(doc: Document, nsResolver: (prefix: string) => string | null): string {
+function extractTextFromXml(doc: Document, nsResolver: (prefix: string | null) => string | null): string {
   const paragraphs: string[] = []
   const pNodes = doc.evaluate('//w:p', doc, nsResolver, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null)
 
@@ -91,12 +91,12 @@ export const docxHandler: FormatHandler = {
     }
 
     // Namespace resolver for Word ML
-    const nsResolver = (prefix: string): string | null => {
+    const nsResolver = (prefix: string | null): string | null => {
       const ns: Record<string, string> = {
         'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
         'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
       }
-      return ns[prefix] ?? null
+      return prefix ? (ns[prefix] ?? null) : null
     }
 
     const text = extractTextFromXml(doc, nsResolver)
@@ -112,8 +112,6 @@ export const docxHandler: FormatHandler = {
       `Paragraphs: ${totalParagraphs}`,
       `Characters: ${totalChars.toLocaleString()}`,
     ]
-
-    const fileName = path.split('/').pop()
 
     if (totalChars <= FULL_TEXT_THRESHOLD) {
       // Small document: full content

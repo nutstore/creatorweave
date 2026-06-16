@@ -46,7 +46,7 @@ function toMarkdownTable(headers: string[], rows: unknown[][]): string {
 }
 
 /** Extract all sheet data from a workbook */
-function extractSheets(XLSX: typeof import('xlsx').default, data: ArrayBuffer | Uint8Array): SheetInfo[] {
+function extractSheets(XLSX: typeof import('xlsx'), data: ArrayBuffer | Uint8Array): SheetInfo[] {
   const input = data instanceof ArrayBuffer ? new Uint8Array(data) : data
   const workbook = XLSX.read(input, { type: 'array' })
 
@@ -106,10 +106,10 @@ export const xlsxHandler: FormatHandler = {
 
   async read(data: ArrayBuffer | Uint8Array, path: string): Promise<FormatReadResult> {
     // Dynamic import — xlsx library is ~800KB, only load when needed
-    let XLSX: typeof import('xlsx').default
+    let XLSX: typeof import('xlsx')
     try {
       const mod = await import('xlsx')
-      XLSX = mod.default ?? mod
+      XLSX = (mod as { default?: typeof import('xlsx') }).default ?? mod
     } catch {
       return {
         content: `[Excel] ${path}\nFailed to load xlsx library. Ensure the 'xlsx' package is installed.`,

@@ -26,7 +26,6 @@ import {
 import { useT } from '@/i18n'
 import { useAssetInventoryStore } from '@/store/asset-inventory.store'
 import type { AssetInventoryItem } from '@/store/asset-inventory.store'
-import { getActiveConversation } from '@/store/conversation-context.store'
 import { inferMimeType } from '@/types/asset'
 import { readAssetBlob, downloadAssetBlob } from './asset-utils'
 

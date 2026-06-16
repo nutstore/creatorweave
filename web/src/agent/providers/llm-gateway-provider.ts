@@ -15,7 +15,7 @@
  */
 
 import type { LLMProviderConfig, LLMProviderType, ModelInfo, ProviderMeta } from './types'
-import { getProviderConfig, registerDynamicProvider, unregisterDynamicProvider } from './types'
+import { registerDynamicProvider, unregisterDynamicProvider } from './types'
 import { fetchGatewayModels } from './llm-gateway-auth'
 
 // ── Provider Identity ──

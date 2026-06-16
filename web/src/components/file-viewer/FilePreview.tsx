@@ -556,7 +556,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
             try {
               const arrayBuffer = await blob.arrayBuffer()
               const bytes = new Uint8Array(arrayBuffer)
-              const text = await formatUI.renderTextContent(bytes, filePath)
+              const text = await formatUI.renderTextContent(bytes, filePath ?? '')
               setFormatTextContent(text)
             } catch { /* ignore render error */ }
           }
@@ -594,7 +594,6 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const handleDownload = useCallback(async () => {
     if (!filePath) return
     const name = filePath.split('/').pop() || 'file'
-    const ext = filePath.split('.').pop()?.toLowerCase() ?? ''
 
     try {
       // Prefer already-loaded blob data for binary types
