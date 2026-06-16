@@ -31,6 +31,7 @@ const OPENAI_COMPATIBLE_PROVIDERS: LLMProviderType[] = [
   'openai',
   'groq',
   'mistral',
+  'openrouter',
   'glm',
   'glm-coding',
   'kimi',

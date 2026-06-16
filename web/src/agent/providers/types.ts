@@ -62,6 +62,7 @@ export type BuiltinLLMProviderType =
   | 'google'
   | 'groq'
   | 'mistral'
+  | 'openrouter'
   // Chinese
   | 'glm'
   | 'glm-coding'
@@ -99,6 +100,11 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
   mistral: {
     baseURL: 'https://api.mistral.ai/v1',
     modelName: 'mistral-large-latest',
+    headers: {},
+  },
+  openrouter: {
+    baseURL: 'https://openrouter.ai/api/v1',
+    modelName: '',
     headers: {},
   },
   // Chinese providers
@@ -316,6 +322,12 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
         contextWindow: 32000,
       },
     ],
+  },
+  openrouter: {
+    category: 'international',
+    displayName: 'OpenRouter',
+    website: 'https://openrouter.ai',
+    models: [],
   },
   glm: {
     category: 'chinese',
