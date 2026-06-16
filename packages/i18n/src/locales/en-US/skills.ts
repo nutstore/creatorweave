@@ -12,6 +12,8 @@ export const skills = {
     deleteConfirm: "Are you sure you want to delete this skill?",
     deleteTitle: "Delete Skill",
     deleteConfirmMessage: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+    deleteWarning: "This action cannot be undone.",
+    skillToDelete: "Skill to delete",
     noResults: "No skills match your search",
     edit: "Edit",
     delete: "Delete",

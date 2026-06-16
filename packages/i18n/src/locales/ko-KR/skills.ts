@@ -13,6 +13,8 @@ export const skills = {
     deleteConfirm: "이 스킬을 삭제하시겠습니까?",
     deleteTitle: "스킬 삭제",
     deleteConfirmMessage: "\"{name}\"을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+    deleteWarning: "이 작업은 되돌릴 수 없습니다.",
+    skillToDelete: "삭제할 스킬",
     noResults: "검색 조건과 일치하는 스킬이 없습니다",
     edit: "편집",
     delete: "삭제",

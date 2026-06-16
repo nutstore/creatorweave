@@ -13,6 +13,8 @@ export const skills = {
     deleteConfirm: "このスキルを削除してもよろしいですか？",
     deleteTitle: "スキルを削除",
     deleteConfirmMessage: "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+    deleteWarning: "この操作は元に戻せません。",
+    skillToDelete: "削除するスキル",
     noResults: "検索条件に一致するスキルがありません",
     edit: "編集",
     delete: "削除",

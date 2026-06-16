@@ -6,12 +6,14 @@
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, FolderOpen, User, Building, X, Inbox, AlertTriangle, Upload, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Search, RefreshCw, FolderOpen, User, Building, X, Inbox, Upload, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   BrandDialog,
   BrandDialogContent,
   BrandDialogHeader,
   BrandDialogTitle,
+  BrandDialogBody,
+  BrandDialogFooter,
   BrandDialogClose,
   BrandButton,
   BrandInput,
@@ -254,28 +256,25 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
 
       {/* Delete Confirmation */}
       <BrandDialog open={deleteTarget !== null} onOpenChange={(isOpen) => { if (!isOpen) setDeleteTarget(null) }}>
-        <BrandDialogContent className="max-w-sm p-0">
-          <div className="flex flex-col items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 dark:bg-red-950/30">
-              <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                {t('skills.deleteTitle') || 'Delete Skill'}
-              </h3>
-              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-                {(t('skills.deleteConfirmMessage') || 'Are you sure you want to delete "{name}"? This action cannot be undone.').replace('{name}', deleteTarget?.name || '')}
-              </p>
-            </div>
-            <div className="flex w-full gap-3">
-              <BrandButton variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
-                {t('common.cancel') || 'Cancel'}
-              </BrandButton>
-              <BrandButton variant="danger" className="flex-1" onClick={handleDeleteConfirm}>
-                {t('skills.deleteConfirm') || 'Delete'}
-              </BrandButton>
-            </div>
-          </div>
+        <BrandDialogContent className="max-w-sm">
+          <BrandDialogHeader>
+            <BrandDialogTitle>
+              {t('skills.deleteTitle') || 'Delete Skill'}
+            </BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            <p className="text-sm text-secondary">
+              {(t('skills.deleteConfirmMessage') || 'Are you sure you want to delete "{name}"? This action cannot be undone.').replace('{name}', deleteTarget?.name || '')}
+            </p>
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton variant="outline" onClick={() => setDeleteTarget(null)}>
+              {t('common.cancel') || 'Cancel'}
+            </BrandButton>
+            <BrandButton variant="danger" onClick={handleDeleteConfirm}>
+              {t('skills.deleteConfirm') || 'Delete'}
+            </BrandButton>
+          </BrandDialogFooter>
         </BrandDialogContent>
       </BrandDialog>
 

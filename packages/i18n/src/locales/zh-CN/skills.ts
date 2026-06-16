@@ -13,6 +13,8 @@ export const skills = {
     deleteConfirm: "确定要删除这个技能吗？",
     deleteTitle: "删除技能",
     deleteConfirmMessage: "确定要删除 \"{name}\" 吗？此操作不可撤销。",
+    deleteWarning: "此操作不可撤销。",
+    skillToDelete: "即将删除的技能",
     noResults: "没有找到匹配的技能",
     edit: "编辑",
     delete: "删除",
