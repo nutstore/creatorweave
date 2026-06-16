@@ -62,6 +62,7 @@ import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
 import { getWorkspaceManager } from '@/opfs'
 import { useFolderAccessStore } from '@/store/folder-access.store'
+import { getRuntimeHandlesForProject } from '@/native-fs/directory-handle-manager'
 
 interface WorkspaceLayoutProps {
   onBackToProjects?: () => void
@@ -301,13 +302,32 @@ export function WorkspaceLayout({
   // Scan project skills when roots change
   // Must wait for skillsLoaded to be true, otherwise cannot properly filter loaded skills
   useEffect(() => {
+    // Read current project ID from store directly to avoid stale closure value.
+    // The `activeProjectId` from the useProjectStore() selector is captured when
+    // this effect is SCHEDULED (not when it runs), so it can be stale if roots
+    // update asynchronously after setActiveProject().
+    const currentProjectId = useProjectStore.getState().activeProjectId || null
+
+    // Skip if the project has already switched away — this guards against the
+    // race where roots change (e.g. async permission grant) after setActiveProject
+    // but before the component re-renders with the new project ID.
+    if (currentProjectId !== activeProjectId) {
+      return
+    }
+
     const manager = getSkillManager()
 
-    // Collect handles from all roots
+    // Collect handles from all roots that belong to the current project.
+    // We filter by the runtime handle registry to avoid scanning roots from a
+    // previous project that might still be in the store's `roots` array while
+    // loadRoots() is asynchronously updating it after a project switch.
     const handlesToScan: Array<{ handle: FileSystemDirectoryHandle; rootName: string }> = []
-    for (const root of roots) {
-      if (root.handle) {
-        handlesToScan.push({ handle: root.handle, rootName: root.name })
+    if (currentProjectId) {
+      const projectHandles = getRuntimeHandlesForProject(currentProjectId)
+      for (const root of roots) {
+        if (root.handle && projectHandles.has(root.name)) {
+          handlesToScan.push({ handle: root.handle, rootName: root.name })
+        }
       }
     }
 
@@ -318,7 +338,7 @@ export function WorkspaceLayout({
     }
     if (!skillsLoaded) return
 
-    const scanKey = `${activeProjectId ?? 'null'}::${rootsKey}::${skillsScanVersion}`
+    const scanKey = `${currentProjectId ?? 'null'}::${rootsKey}::${skillsScanVersion}`
     // Skip scan when project+roots+manual-trigger key is unchanged
     if (prevScanKeyRef.current === scanKey) {
       return

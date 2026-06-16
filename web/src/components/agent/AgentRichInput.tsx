@@ -98,6 +98,7 @@ const SuggestionDropdown = forwardRef(
   ) {
     const [selectedIndex, setSelectedIndex] = useState(0)
     const selectedRef = useRef(0)
+    const scrollContainerRef = useRef<HTMLDivElement>(null)
 
     const selectItem = useCallback(
       (index: number) => {
@@ -111,6 +112,18 @@ const SuggestionDropdown = forwardRef(
       setSelectedIndex(0)
       selectedRef.current = 0
     }, [items])
+
+    // Scroll the selected item into view when navigating with arrow keys
+    useEffect(() => {
+      const container = scrollContainerRef.current
+      if (!container) return
+      const selectedEl = container.querySelector<HTMLElement>(
+        `[data-idx="${selectedIndex}"]`
+      )
+      if (selectedEl) {
+        selectedEl.scrollIntoView({ block: 'nearest' })
+      }
+    }, [selectedIndex])
 
     useImperativeHandle(ref, () => ({
       onKeyDown: (event: KeyboardEvent) => {
@@ -146,12 +159,13 @@ const SuggestionDropdown = forwardRef(
       <div
         className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
       >
-        <div className="max-h-56 overflow-y-auto py-1">
+        <div ref={scrollContainerRef} className="max-h-96 overflow-y-auto py-1">
           {items.map((item, idx) => {
             const selected = idx === selectedIndex
             return (
               <button
                 key={getItemKey(item)}
+                data-idx={idx}
                 type="button"
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   selected

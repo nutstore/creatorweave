@@ -80,23 +80,9 @@ export async function initializeSkillsSystem(): Promise<SkillsSystemInitResult> 
     console.warn('[Skills System] Health check failed — /mnt_skills may not work')
   }
 
-  // Step 4: Register builtin skills as slash commands.
-  // Skill name comes directly from SKILL.md's name field (e.g. "cw:brainstorm").
-  try {
-    const { registerSlashCommands } = await import('@/skills/slash-command-registry')
-    const manifest = opfsSkillsAdapter.getBundledManifest()
-    registerSlashCommands(
-      manifest.skills.map((skill) => ({
-        id: skill.name,
-        label: skill.name,
-        description: skill.description,
-        source: 'skill' as const,
-      }))
-    )
-    console.log('[Skills System] Registered', manifest.skills.length, 'slash commands')
-  } catch (error) {
-    console.warn('[Skills System] Slash command registration failed:', error)
-  }
+  // NOTE: Slash command registration for skills is now handled centrally by
+  // SkillManager.syncSlashCommands(), which covers builtin + user + project
+  // skills in one pass. Previously this file registered only builtin skills.
 
   return result
 }

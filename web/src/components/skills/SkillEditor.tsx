@@ -34,6 +34,15 @@ interface SkillEditorProps {
 
 // ============================================================================
 
+/** Escape a string for YAML double-quoted scalar. */
+const yamlEscape = (s: string): string =>
+  s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/\r/g, '\\r')
+
 export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEditorProps) {
   const t = useT()
   const skillsStore = useSkillsStore()
@@ -66,9 +75,9 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
   // Build SKILL.md content
   const buildSkillMd = useCallback(() => {
     const lines: string[] = ['---']
-    lines.push(`name: "${name}"`)
+    lines.push(`name: "${yamlEscape(name)}"`)
     lines.push(`version: "1.0.0"`)
-    lines.push(`description: "${description}"`)
+    lines.push(`description: "${yamlEscape(description)}"`)
     lines.push(`author: "User"`)
     lines.push(`category: general`)
     lines.push(`tags: []`)

@@ -39,6 +39,12 @@ const commands: SlashCommandItem[] = []
 /** 按 ID 索引（用于去重和快速查找） */
 const commandsById = new Map<string, SlashCommandItem>()
 
+/**
+ * 追踪所有 source='skill' 的命令 ID。
+ * 用 Set 而不是靠 source 字段过滤，避免迭代中修改数组的潜在问题。
+ */
+const _skillCommandIds = new Set<string>()
+
 // ============================================================================
 // Registration API
 // ============================================================================
@@ -63,6 +69,19 @@ export function registerSlashCommands(items: SlashCommandItem[]): void {
 }
 
 /**
+ * 注册技能来源的 slash 命令，同时记录 ID 以便后续清理。
+ * 如果 id 已存在，静默跳过（不覆盖）。
+ */
+export function registerSkillCommands(items: SlashCommandItem[]): void {
+  for (const item of items) {
+    if (commandsById.has(item.id)) continue
+    _skillCommandIds.add(item.id)
+    commands.push(item)
+    commandsById.set(item.id, item)
+  }
+}
+
+/**
  * 注销一个 slash 命令。
  */
 export function unregisterSlashCommand(id: string): boolean {
@@ -79,6 +98,7 @@ export function unregisterSlashCommand(id: string): boolean {
 export function clearSlashCommands(): void {
   commands.length = 0
   commandsById.clear()
+  _skillCommandIds.clear()
 }
 
 // ============================================================================
@@ -116,6 +136,23 @@ export function getSlashCommand(id: string): SlashCommandItem | undefined {
  */
 export function getSlashCommandsBySource(source: SlashCommandItem['source']): SlashCommandItem[] {
   return commands.filter((cmd) => cmd.source === source)
+}
+
+/**
+ * 清除所有 skill 来源的命令（source='skill'）。
+ * 由 SkillManager.syncSlashCommands() 调用，确保切换项目时旧项目的技能命令被移除。
+ */
+export function clearSkillCommands(): void {
+  for (const id of _skillCommandIds) {
+    commandsById.delete(id)
+  }
+  // 从数组末尾向前遍历，安全删除 skill 来源的命令
+  for (let i = commands.length - 1; i >= 0; i--) {
+    if (commands[i].source === 'skill') {
+      commands.splice(i, 1)
+    }
+  }
+  _skillCommandIds.clear()
 }
 
 /**

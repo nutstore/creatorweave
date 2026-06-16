@@ -18,6 +18,10 @@ import {
 } from './skill-injection'
 import { scanProjectSkills } from './skill-scanner'
 import { generateResourceId } from './skill-resources'
+import {
+  clearSkillCommands,
+  registerSkillCommands,
+} from './slash-command-registry'
 
 export class SkillManager {
   private _initialized = false
@@ -131,6 +135,9 @@ export class SkillManager {
       const { getToolRegistry } = await import('@/agent/tool-registry')
       const registry = getToolRegistry()
       await registry.registerSkillTools()
+
+      // Sync all skills (builtin + user + project) as slash commands
+      this.syncSlashCommands()
 
       console.log(
         '[SkillManager] _doInitialize: complete, cached',
@@ -294,6 +301,9 @@ export class SkillManager {
       }
     }
     this.projectResourcesBySkillId = bySkillId
+
+    // Project skills changed — update slash command registry synchronously
+    this.syncSlashCommands()
   }
 
   /**
@@ -303,6 +313,8 @@ export class SkillManager {
     this.cachedProjectSkills = []
     this.projectResourcesBySkillId = new Map<string, SkillResource[]>()
     this.activeProjectId = null
+    // Project skills cleared — update slash command registry synchronously
+    this.syncSlashCommands()
   }
 
   /**
@@ -332,6 +344,49 @@ export class SkillManager {
    */
   async refreshCache(): Promise<void> {
     this.cachedPersistentSkills = await storage.getAllSkills()
+    // Keep slash commands in sync after persistent skill changes (user added/removed)
+    this.syncSlashCommands()
+  }
+
+  /**
+   * Sync all skills (builtin + user + project) to the slash command registry.
+   *
+   * Strategy: unregister all skill-sourced commands, then re-register from
+   * the combined skill cache. This guarantees the menu always reflects the
+   * current set of skills regardless of source (builtin, user-created, or
+   * project-scoped).
+   *
+   * Synchronous so that setProjectSkills/clearProjectSkills callers see the
+   * updated registry immediately — no microtask delay, no race with the
+   * subsequent loadSkills() call in WorkspaceLayout.
+   *
+   * Idempotent and safe to call multiple times.
+   */
+  syncSlashCommands(): void {
+    try {
+      // Clear all existing skill-sourced commands (source='skill') and their IDs
+      clearSkillCommands()
+
+      // Re-register from combined cache (builtin + user + project)
+      const skills = this.getSkills()
+      const skillNames = skills.map((s) => s.name)
+      console.log(
+        `[SkillManager] syncSlashCommands: ${skills.length} skills → slash commands`,
+        skillNames
+      )
+      if (skills.length > 0) {
+        registerSkillCommands(
+          skills.map((skill) => ({
+            id: skill.name,
+            label: skill.name,
+            description: skill.description,
+            source: 'skill' as const,
+          }))
+        )
+      }
+    } catch (error) {
+      console.warn('[SkillManager] syncSlashCommands failed:', error)
+    }
   }
 
   private normalizeProjectResources(
