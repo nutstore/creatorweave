@@ -36,7 +36,9 @@ interface SkillsState {
   // Actions
   loadSkills: () => Promise<void>
   addSkill: (skill: Skill, rawContent?: string) => Promise<void>
-  importSkillMd: (content: string) => Promise<{ success: boolean; error?: string }>
+  importSkillMd: (
+    content: string
+  ) => Promise<{ success: boolean; error?: string; skillId?: string }>
   deleteSkill: (id: string) => Promise<void>
   toggleSkill: (id: string, enabled: boolean) => Promise<void>
   getFullSkill: (id: string) => Promise<Skill | null>
@@ -115,7 +117,7 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
       await refreshSkillManagerCache()
       const metadata = manager.getSkillMetadata()
       set({ skills: metadata })
-      return { success: true }
+      return { success: true, skillId: result.skill.id }
     },
 
     deleteSkill: async (id) => {

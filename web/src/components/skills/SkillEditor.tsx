@@ -91,8 +91,11 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
       const content = buildSkillMd()
       const result = await skillsStore.importSkillMd(content)
       if (result.success) {
-        // Delete old skill after successful import to avoid orphaned slug-based IDs
-        if (skill) {
+        // Only delete the old skill when its ID differs from the newly imported one
+        // (e.g. the user renamed the skill, producing a different slug).
+        // If IDs match, importSkillMd already performed an in-place update, so
+        // deleting would wipe the just-saved skill.
+        if (skill && result.skillId && skill.id !== result.skillId) {
           await skillsStore.deleteSkill(skill.id)
         }
         onClose()
