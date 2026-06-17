@@ -116,13 +116,13 @@ const TEXT_EXTS = new Set([
 /** HTML extensions for rendered preview */
 const HTML_EXTS = new Set(['html', 'htm'])
 
-function getFileType(path: string): 'text' | 'image' | 'binary' | 'html' | 'office' | 'format' {
+function getFileType(path: string): 'text' | 'image' | 'binary' | 'office' | 'format' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   // Images are now handled by format registry (image/ directory)
   // which provides an enhanced preview with zoom/pan/rotate.
-  if (HTML_EXTS.has(ext)) return 'html'
+  // HTML is also handled by format registry (html/ directory).
   if (OFFICE_EXTS.has(ext)) return 'office'
-  // Check format registry (e.g. .nol, .pdf, .docx, .png, .jpg, etc.)
+  // Check format registry (e.g. .nol, .pdf, .docx, .png, .jpg, .html, etc.)
   if (getFormatUIHandler(path)) return 'format'
   if (TEXT_EXTS.has(ext)) return 'text'
   if (BINARY_EXTS.has(ext)) return 'binary'
@@ -158,8 +158,6 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const [formatBlob, setFormatBlob] = useState<Blob | null>(null)
   const [formatTextContent, setFormatTextContent] = useState<string | null>(null)
   const [formatViewMode, setFormatViewMode] = useState<string>('preview')
-  // HTML preview: toggle between rendered preview and source code
-  const [previewMode, setPreviewMode] = useState<'preview' | 'source'>('source')
   const [isDark, setIsDark] = useState(
     typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   )
@@ -179,27 +177,6 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
 
   const fileType = useMemo(() => (filePath ? getFileType(filePath) : 'text'), [filePath])
   const formatUI = useMemo(() => (filePath ? getFormatUIHandler(filePath) : null), [filePath])
-
-  // Create blob URL for HTML preview
-  const htmlBlobUrl = useMemo(() => {
-    if (fileType !== 'html' || !content) return null
-    const blob = new Blob([content], { type: 'text/html' })
-    return URL.createObjectURL(blob)
-  }, [fileType, content])
-
-  // Clean up HTML blob URL
-  useEffect(() => {
-    return () => {
-      if (htmlBlobUrl) {
-        URL.revokeObjectURL(htmlBlobUrl)
-      }
-    }
-  }, [htmlBlobUrl])
-
-  // Reset preview mode when file changes
-  useEffect(() => {
-    setPreviewMode('preview')
-  }, [filePath])
 
   // Reset comments when file changes
   useEffect(() => {
@@ -656,9 +633,9 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const fileName = filePath.split('/').pop() || filePath
   const language = getMonacoLanguage(filePath)
 
-  // Check if current file is commentable (text source view or NOL text view)
+  // Check if current file is commentable (text source view or format text view)
   const isCommentable = !loading && !error && (
-    (content && (fileType === 'text' || (fileType === 'html' && previewMode === 'source')))
+    (content && fileType === 'text')
     || (fileType === 'format' && formatViewMode === 'text' && formatTextContent)
   )
 
@@ -688,35 +665,6 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           )}
         </div>
         <div className="flex items-center gap-1">
-          {/* HTML preview/source toggle */}
-          {fileType === 'html' && content && !loading && !error && (
-            <div className="flex items-center rounded border border-neutral-200 dark:border-neutral-600">
-              <button
-                type="button"
-                onClick={() => setPreviewMode('preview')}
-                className={`rounded-l px-1.5 py-0.5 text-[10px] ${
-                  previewMode === 'preview'
-                    ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
-                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
-                }`}
-                title={t('filePreview.preview')}
-              >
-                <Eye className="h-3 w-3" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode('source')}
-                className={`rounded-r px-1.5 py-0.5 text-[10px] ${
-                  previewMode === 'source'
-                    ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
-                    : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
-                }`}
-                title={t('filePreview.source')}
-              >
-                <Code className="h-3 w-3" />
-              </button>
-            </div>
-          )}
           {/* Format view mode toggle (driven by format-registry) */}
           {fileType === 'format' && formatBlob && formatUI && formatUI.viewModes.length > 1 && !loading && (
             <div className="flex items-center rounded border border-neutral-200 dark:border-neutral-600">
@@ -822,7 +770,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         {fileType === 'format' && formatBlob && formatUI?.PreviewComponent && !loading && !error && (
           <div className={formatViewMode === 'preview' ? 'h-full' : 'hidden'}>
             <Suspense fallback={<div className="flex h-full items-center justify-center"><p className="text-xs text-neutral-400">Loading...</p></div>}>
-              <formatUI.PreviewComponent blob={formatBlob} fileName={fileName} fileSize={fileSize} />
+              <formatUI.PreviewComponent blob={formatBlob} fileName={fileName} fileSize={fileSize} filePath={filePath ?? undefined} />
             </Suspense>
           </div>
         )}
@@ -838,18 +786,8 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           </div>
         )}
 
-        {/* HTML rendered preview */}
-        {fileType === 'html' && previewMode === 'preview' && htmlBlobUrl && !loading && !error && (
-          <iframe
-            src={htmlBlobUrl}
-            title="HTML Preview"
-            className="h-full w-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        )}
-
-        {/* Monaco Editor for text files, HTML source view, and NOL text view */}
-        {((content && (fileType === 'text' || (fileType === 'html' && previewMode === 'source')))
+        {/* Monaco Editor for text files and format text view */}
+        {((content && fileType === 'text')
           || (fileType === 'format' && formatViewMode === 'text' && formatTextContent)
         ) && !loading && !error && (
           <Editor

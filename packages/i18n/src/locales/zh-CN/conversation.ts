@@ -204,4 +204,5 @@ export const questionCard = {
     customInput: "自定义输入",
     customInputHint: "自己填写回答",
     userAnswer: "用户回答",
+    recommended: "推荐",
 } as const

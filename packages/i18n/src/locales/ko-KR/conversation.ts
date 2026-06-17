@@ -189,4 +189,5 @@ export const questionCard = {
     customInput: "직접 입력",
     customInputHint: "직접 답변 입력",
     userAnswer: "사용자 답변",
+    recommended: "추천",
 } as const

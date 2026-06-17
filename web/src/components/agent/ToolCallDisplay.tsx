@@ -18,7 +18,7 @@ import { parse as bestEffortParse } from 'best-effort-json-parser'
 import type { ToolCall } from '@/agent/message-types'
 import { CopyIconButton } from './CopyIconButton'
 import { MarkdownContent } from './MarkdownContent'
-import { QuestionCard } from './QuestionCard'
+import { QuestionCard, type RawOption } from './QuestionCard'
 import { ExtensionErrorCard } from '@/components/extension'
 import { useExtensionStore } from '@/store/extension.store'
 import { getPendingQuestion, removePendingQuestion } from '@/store/pending-question.store'
@@ -230,7 +230,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
       <QuestionCard
         question={typeof ctx.args.question === 'string' ? ctx.args.question : ''}
         type={(ctx.args.type as 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text') ?? 'yes_no'}
-        options={Array.isArray(ctx.args.options) ? ctx.args.options as string[] : undefined}
+        options={Array.isArray(ctx.args.options) ? ctx.args.options as RawOption[] : undefined}
         defaultAnswer={typeof ctx.args.default_answer === 'string' ? ctx.args.default_answer : undefined}
         context={ctx.args.context as { affected_files?: string[]; preview?: string } | undefined}
         answered={!!result}

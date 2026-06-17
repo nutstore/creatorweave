@@ -109,8 +109,16 @@ export interface FormatWriteContext {
 export interface FormatViewMode {
   /** Mode ID: 'preview' for visual rendering, 'text' for Monaco editor */
   id: 'preview' | 'text' | string
-  /** Button label shown in toolbar */
+  /**
+   * Button label shown in toolbar. Used as fallback when `labelKey` is not set
+   * or the translation is missing.
+   */
   label: string
+  /**
+   * i18n key (e.g. 'sidebar.fileDiffViewer.preview'). When set, the toolbar
+   * resolves it via `t(labelKey)` so labels follow the active locale.
+   */
+  labelKey?: string
   /** Whether this is the default mode */
   default?: boolean
 }
@@ -123,6 +131,12 @@ export interface FormatPreviewProps {
   fileName: string
   /** File size in bytes */
   fileSize: number
+  /**
+   * Full file path (optional).
+   * Some preview components need this for features like "open in new tab"
+   * that require a stable storage key.
+   */
+  filePath?: string
 }
 
 /**

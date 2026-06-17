@@ -190,4 +190,5 @@ export const questionCard = {
     customInput: "カスタム入力",
     customInputHint: "自分で回答を入力",
     userAnswer: "あなたの回答",
+    recommended: "推奨",
 } as const

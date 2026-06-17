@@ -57,15 +57,35 @@ export const askUserQuestionDefinition: ToolDefinition = {
         },
         options: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            oneOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  label: { type: 'string', description: '选项主标签' },
+                  description: { type: 'string', description: '选项补充说明（可选），会显示在 label 下方较小字号' },
+                  recommended: { type: 'boolean', description: '是否标记为推荐（可选，默认 false），标记后会在 label 前显示 ⭐ 推荐 徽章' },
+                },
+                required: ['label'],
+              },
+            ],
+          },
           description: [
             '选项列表（type 为 single_choice 或 multi_choice 时必填，至少 2 个选项）。',
             '',
+            '## 两种形式',
+            '**简洁形式**（字符串）：直接传选项文字。',
+            '- `"PostgreSQL"`',
+            '- `"⭐ PostgreSQL — 推荐：成熟稳定，适合生产环境"`（⭐ 前缀标记推荐；第一个 ` — ` 分隔 label 和 description）',
+            '',
+            '**丰富形式**（对象）：当字符串解析规则会冲突时使用，UI 会展示两行（label + description + ⭐ 推荐徽章）。',
+            '- `{label: "PostgreSQL", description: "成熟稳定，适合生产环境", recommended: true}`',
+            '',
             '## 标注推荐',
-            '当 agent 对某个选项有明确倾向时，应在选项文本中用 ⭐ 标记推荐项，并附上简短理由，方便用户快速决策。',
-            '例如：`"⭐ PostgreSQL — 推荐：成熟稳定，适合生产环境"`',
+            '当 agent 对某个选项有明确倾向时，应使用 ⭐ 标记推荐项，并附上简短理由，方便用户快速决策。',
             '如果各选项没有明显优劣，则不要标注推荐。',
-            '标注推荐时，`default_answer` 也应对齐到推荐项。',
+            '标注推荐时，`default_answer` 也应对齐到推荐项的 label。',
           ].join('\n'),
         },
         default_answer: {
@@ -120,7 +140,7 @@ export const askUserQuestionExecutor: ToolExecutor = async (
   } = args as {
     question: string
     type?: 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text'
-    options?: string[]
+    options?: Array<string | { label: string; description?: string; recommended?: boolean }>
     default_answer?: string
     context?: { affected_files?: string[]; preview?: string }
     timeout_ms?: number

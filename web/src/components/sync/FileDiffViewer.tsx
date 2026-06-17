@@ -3,7 +3,9 @@
  *
  * Displays side-by-side diff between OPFS and Native FS versions.
  * Uses Monaco DiffEditor for text comparison.
- * For HTML files, provides inline preview with iframe.
+ * For format-registered files (HTML, NOL, etc.), delegates rendering to
+ * the format-registry preview component; user toggles between preview
+ * and source/diff view via the format view mode button.
  */
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
@@ -149,11 +151,6 @@ type FileContentState = {
   error: string | null
 }
 
-/** Check if a file path points to an HTML file */
-function isHtmlFile(path: string): boolean {
-  return path.toLowerCase().endsWith('.html') || path.toLowerCase().endsWith('.htm')
-}
-
 function getImageMimeType(path: string): string {
   const lower = path.toLowerCase()
   if (lower.endsWith('.png')) return 'image/png'
@@ -212,8 +209,6 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   const [formatBlob, setFormatBlob] = useState<Blob | null>(null)
   const [formatViewMode, setFormatViewMode] = useState<string>('preview')
   const docxContainerRef = useRef<HTMLDivElement>(null)
-  // HTML inline preview state
-  const [showHtmlPreview, setShowHtmlPreview] = useState(false)
   const [snapshotImageUrls, setSnapshotImageUrls] = useState<{ before: string | null; after: string | null }>({
     before: null,
     after: null,
@@ -238,33 +233,8 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
   )
   const currentFileComments = activePath ? commentsByPath[activePath] ?? [] : []
 
-  const isHtml = !isSnapshotMode && fileChange ? isHtmlFile(fileChange.path) && fileChange.type !== 'delete' : false
-
-  /**
-   * HTML inline preview: create blob URL from OPFS (modified) content.
-   */
-  const htmlBlobUrl = useMemo(() => {
-    if (!isHtml || !content.opfs) return null
-    const noContextScript = '<script>document.addEventListener("contextmenu",function(e){e.preventDefault()})<\/script>'
-    let html = content.opfs
-    const bodyClose = html.lastIndexOf('</body>')
-    if (bodyClose !== -1) {
-      html = html.slice(0, bodyClose) + noContextScript + html.slice(bodyClose)
-    } else {
-      html += noContextScript
-    }
-    const blob = new Blob([html], { type: 'text/html' })
-    return URL.createObjectURL(blob)
-  }, [isHtml, content.opfs])
-  // Clean up blob URL
+  // Reset format view mode to default when file changes
   useEffect(() => {
-    return () => {
-      if (htmlBlobUrl) URL.revokeObjectURL(htmlBlobUrl)
-    }
-  }, [htmlBlobUrl])
-  // Reset HTML preview when file changes
-  useEffect(() => {
-    setShowHtmlPreview(false)
     const ui = fileChange?.path ? getFormatUIHandler(fileChange.path) : null
     setFormatViewMode(ui?.viewModes.find(m => m.default)?.id ?? 'preview')
   }, [fileChange?.path])
@@ -989,56 +959,40 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             </span>
           )}
           {/* Format view mode toggle: driven by format-registry */}
-          {isFormat && formatBlob && formatUI && formatUI.viewModes.length > 1 && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const modes = formatUI.viewModes
-                      const currentIdx = modes.findIndex(m => m.id === formatViewMode)
-                      const nextIdx = (currentIdx + 1) % modes.length
-                      setFormatViewMode(modes[nextIdx].id)
-                    }}
-                    className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
-                      formatViewMode === 'text'
-                        ? 'bg-purple-100/80 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                        : 'text-purple-600 hover:bg-purple-100/60 hover:text-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:text-purple-300'
-                    }`}
-                  >
-                    <Eye className="h-3 w-3" />
-                    {formatViewMode === 'text'
-                      ? formatUI.viewModes.find(m => m.id !== 'text')?.label ?? 'Preview'
-                      : 'Text'}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{formatViewMode === 'text' ? 'Switch to preview view' : 'Switch to text view (supports comments)'}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          {/* HTML preview toggle button */}
-          {isHtml && htmlBlobUrl && (
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setShowHtmlPreview((v) => !v)}
-                    className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
-                      showHtmlPreview
-                        ? 'bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                        : 'text-emerald-600 hover:bg-emerald-100/60 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-300'
-                    }`}
-                  >
-                    <Eye className="h-3 w-3" />
-                    {showHtmlPreview ? t('sidebar.fileDiffViewer.changesOnly') : t('sidebar.fileDiffViewer.reviewElements')}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{showHtmlPreview ? t('sidebar.fileDiffViewer.switchToChangesOnly') : t('sidebar.fileDiffViewer.previewHTMLNewTab')}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
+          {isFormat && formatBlob && formatUI && formatUI.viewModes.length > 1 && (() => {
+            const targetMode = formatUI.viewModes.find(m => m.id !== formatViewMode)
+            if (!targetMode) return null
+            const targetLabel = targetMode.labelKey ? t(targetMode.labelKey) : targetMode.label
+            const isTargetText = targetMode.id === 'text'
+            return (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const modes = formatUI.viewModes
+                        const currentIdx = modes.findIndex(m => m.id === formatViewMode)
+                        const nextIdx = (currentIdx + 1) % modes.length
+                        setFormatViewMode(modes[nextIdx].id)
+                      }}
+                      className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
+                        isTargetText
+                          ? 'bg-purple-100/80 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                          : 'text-purple-600 hover:bg-purple-100/60 hover:text-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/30 dark:hover:text-purple-300'
+                      }`}
+                    >
+                      <Eye className="h-3 w-3" />
+                      {targetLabel}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isTargetText ? t('sidebar.fileDiffViewer.switchToText') : t('sidebar.fileDiffViewer.switchToPreview')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          })()}
           {!isImage && !isOffice && !isDocx && !(isFormat && formatViewMode !== 'text') && (
             <>
               {/* Switch between Lazy and Full editor */}
@@ -1086,15 +1040,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* HTML inline preview mode */}
-        {showHtmlPreview && htmlBlobUrl ? (
-          <iframe
-            src={htmlBlobUrl}
-            title="HTML Preview"
-            className="flex-1 w-full border-0 bg-white"
-            sandbox="allow-scripts allow-same-origin"
-          />
-        ) : isImage ? (
+        {isImage ? (
           <>
             <div className={`flex flex-1 flex-col ${content.showNativePanel ? 'border-r border dark:border-border' : ''}`}>
               <div className="border-b border bg-muted px-4 py-2 dark:border-border dark:bg-muted">

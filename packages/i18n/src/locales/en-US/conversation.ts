@@ -205,4 +205,5 @@ export const questionCard = {
     customInput: "Custom input",
     customInputHint: "Type your own answer",
     userAnswer: "Your answer",
+    recommended: "Recommended",
 } as const
