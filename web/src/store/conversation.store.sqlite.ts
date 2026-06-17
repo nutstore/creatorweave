@@ -59,6 +59,38 @@ import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
 /** Default conversation name when title is not available */
 const DEFAULT_CONVERSATION_NAME = 'New Chat'
 
+/** Tool calls preserved in committed messages even when in-flight (no result) on cancel/refresh. */
+const PRESERVED_IN_FLIGHT_TOOLS = new Set([
+  'spawn_subagent',
+  'batch_spawn',
+  'ask_user_question',
+])
+
+/**
+ * Build a synthetic ask_user_question tool result for interrupted questions.
+ * Used when the user refreshes/closes the page while a question is pending —
+ * the in-memory Promise is gone, so we inject a result using default_answer
+ * (or 'cancelled' fallback) so QuestionCard renders in answered state.
+ */
+function makeSyntheticAskUserResult(argsJson: string): string {
+  let defaultAnswer = 'cancelled'
+  try {
+    const parsed = JSON.parse(argsJson || '{}') as { default_answer?: unknown }
+    if (typeof parsed.default_answer === 'string' && parsed.default_answer.trim()) {
+      defaultAnswer = parsed.default_answer.trim()
+    }
+  } catch {
+    // Malformed args — keep the fallback.
+  }
+  return JSON.stringify({
+    ok: true,
+    tool: 'ask_user_question',
+    version: 2,
+    data: { answer: defaultAnswer, confirmed: false, timed_out: false },
+    warning: '[Interrupted] 页面刷新或关闭，未提交答案。已自动使用 default_answer。',
+  })
+}
+
 /** Helper to get or create a runtime in the runtime store (Immer draft) */
 function ensureRuntime(state: import('./conversation-runtime.store').ConversationRuntimeState, convId: string): ConversationRuntime {
   let rt = state.runtimes.get(convId)
@@ -102,28 +134,33 @@ function commitDraftToMessages(conv: {
   const completedToolCalls = draft.toolCalls.filter((tc) =>
     Object.prototype.hasOwnProperty.call(draft.toolResults, tc.id)
   )
-  // In-flight spawn_subagent / batch_spawn: started via onToolCallStart but
-  // no result yet (e.g. user cancels while subagents are still running).
-  // We preserve these so the UI can render them as interrupted, but we still
-  // discard in-flight calls for other tools (read, search, ...) — those are
-  // discarded on cancel by design.
+  // In-flight calls that started via onToolCallStart but have no result yet.
+  // We preserve these (instead of discarding) when:
+  //   - spawn_subagent / batch_spawn: subagent still running in background, UI
+  //     renders it as interrupted and keeps agentId for detail panel.
+  //   - ask_user_question: the user might have refreshed the page or the
+  //     browser closed. The in-memory Promise for the user's answer is gone,
+  //     but we must still keep the tool_call in committed messages so the
+  //     QuestionCard renders the question (in answered state) and the user
+  //     can see what was asked and decide how to continue.
+  // Other in-flight calls (read, search, ...) are discarded on cancel by design.
   // Exclude those already committed via onMessagesUpdated.
   const committedToolCallIds = new Set(
     conv.messages
       .filter((m) => m.role === 'assistant' && m.toolCalls)
       .flatMap((m) => m.toolCalls!.map((tc) => tc.id))
   )
-  const inFlightSpawnCalls = draft.toolCalls.filter(
+  const inFlightPreservedCalls = draft.toolCalls.filter(
     (tc) =>
       !Object.prototype.hasOwnProperty.call(draft.toolResults, tc.id) &&
       !committedToolCallIds.has(tc.id) &&
-      (tc.function.name === 'spawn_subagent' || tc.function.name === 'batch_spawn')
+      PRESERVED_IN_FLIGHT_TOOLS.has(tc.function.name)
   )
   const hasContent =
     draft.reasoning.trim() ||
     draft.content.trim() ||
     completedToolCalls.length > 0 ||
-    inFlightSpawnCalls.length > 0
+    inFlightPreservedCalls.length > 0
 
   if (!hasContent) return false
 
@@ -145,11 +182,10 @@ function commitDraftToMessages(conv: {
     }
   }
 
-  // Merge completed + in-flight spawn_subagent/batch_spawn calls into the
-  // assistant message. Other in-flight calls (read, search, ...) are
-  // discarded on cancel by design — only spawn-style tools are preserved
-  // so the UI can render them as interrupted.
-  const allToolCalls = [...completedToolCalls, ...inFlightSpawnCalls]
+  // Merge completed + in-flight preserved calls (spawn_subagent / batch_spawn /
+  // ask_user_question) into the assistant message. Other in-flight calls
+  // (read, search, ...) are discarded on cancel by design.
+  const allToolCalls = [...completedToolCalls, ...inFlightPreservedCalls]
 
   conv.messages.push(
     createAssistantMessage(
@@ -175,8 +211,22 @@ function commitDraftToMessages(conv: {
   // Push synthetic [Interrupted] results for in-flight spawn_subagent /
   // batch_spawn calls. Embed agentId(s) from subagentEvents so SubagentCard
   // can resolve and render the subagent detail panel even after the draft
-  // is cleared.
-  for (const tc of inFlightSpawnCalls) {
+  // is cleared. Also push synthetic results for orphaned ask_user_question
+  // calls so the QuestionCard renders them in "answered" state with the
+  // default_answer (or "cancelled") so the user can see what was asked
+  // after a page refresh or browser close.
+  for (const tc of inFlightPreservedCalls) {
+    if (tc.function.name === 'ask_user_question') {
+      conv.messages.push(
+        createToolMessage({
+          toolCallId: tc.id,
+          name: tc.function.name,
+          content: makeSyntheticAskUserResult(tc.function.arguments),
+        })
+      )
+      continue
+    }
+    // spawn_subagent / batch_spawn path — unchanged.
     const toolName = tc.function.name
     const step = draft.steps.find(
       (s) => s.type === 'tool_call' && s.toolCall.id === tc.id
@@ -978,6 +1028,71 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
 
         const conversations = await loadConversationsMeta()
+
+        // Orphan recovery: find ask_user_question tool_calls in committed messages
+        // that have no matching tool result. This happens when the user refreshed
+        // the page (or the browser closed) while a question was waiting for input —
+        // the in-memory Promise is lost, but the committed draft is restored from
+        // SQLite without a tool result. Without this pass, the user sees nothing
+        // for that question and has no way to continue. We inject a synthetic
+        // tool result using the tool_call's default_answer so QuestionCard shows
+        // the question in "answered" state with a clear interrupted warning.
+        try {
+          let recoveredCount = 0
+          for (const conv of conversations) {
+            if (!conv.messages || conv.messages.length === 0) continue
+            // Build set of answered toolCallIds for fast lookup
+            const answeredIds = new Set<string>()
+            for (const m of conv.messages) {
+              if (m.role === 'tool' && typeof m.toolCallId === 'string') {
+                answeredIds.add(m.toolCallId)
+              }
+            }
+            // Walk messages, find orphaned ask_user_question tool_calls,
+            // inject synthetic tool result right after the assistant message.
+            // Use a single pass + index-based insertion to avoid mutating during iteration.
+            const newMessages: typeof conv.messages = []
+            let mutated = false
+            for (const m of conv.messages) {
+              newMessages.push(m)
+              if (m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0) {
+                for (const tc of m.toolCalls) {
+                  if (tc.function.name !== 'ask_user_question') continue
+                  if (answeredIds.has(tc.id)) continue
+                  // Orphaned ask_user_question — synthesize a tool result.
+                  newMessages.push(
+                    createToolMessage({
+                      toolCallId: tc.id,
+                      name: tc.function.name,
+                      content: makeSyntheticAskUserResult(tc.function.arguments),
+                    }),
+                  )
+                  // Avoid double-injection if another message somehow already references it.
+                  answeredIds.add(tc.id)
+                  recoveredCount++
+                  mutated = true
+                }
+              }
+            }
+            if (mutated) {
+              conv.messages = newMessages
+              // Persist the recovered messages so the next load doesn't re-run the same work.
+              await persistMessageReplace(conv.id, newMessages).catch((err) => {
+                console.warn(
+                  `[conversation.store] Failed to persist recovered orphan for ${conv.id}:`,
+                  err,
+                )
+              })
+            }
+          }
+          if (recoveredCount > 0) {
+            console.info(
+              `[conversation.store] Recovered ${recoveredCount} orphaned ask_user_question call(s) from a previous session (page refresh / browser close).`,
+            )
+          }
+        } catch (orphanRecoveryError) {
+          console.warn('[conversation.store] Orphan ask_user_question recovery pass failed:', orphanRecoveryError)
+        }
 
         // Ensure OPFS conversations exist for all loaded conversations
         const { getWorkspaceManager } = await import('@/opfs')

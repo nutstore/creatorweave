@@ -21,7 +21,7 @@ export interface PendingQuestion {
   /** Question type */
   type: 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text'
   /** Options for choice types */
-  options?: string[]
+  options?: Array<string | { label: string; description?: string; recommended?: boolean }>
   /** Default answer */
   defaultAnswer?: string
   /** Additional context */

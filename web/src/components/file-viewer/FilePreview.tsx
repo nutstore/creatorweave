@@ -113,9 +113,6 @@ const TEXT_EXTS = new Set([
   'lock', 'gitignore', 'editorconfig', 'dockerfile', 'makefile',
 ])
 
-/** HTML extensions for rendered preview */
-const HTML_EXTS = new Set(['html', 'htm'])
-
 function getFileType(path: string): 'text' | 'image' | 'binary' | 'office' | 'format' {
   const ext = path.split('.').pop()?.toLowerCase() || ''
   // Images are now handled by format registry (image/ directory)

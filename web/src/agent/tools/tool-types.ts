@@ -7,13 +7,14 @@ import type { PiAIProvider } from '../llm/pi-ai-provider'
 
 /** JSON Schema subset for tool parameter definitions */
 export interface JSONSchemaProperty {
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
+  type?: 'string' | 'number' | 'boolean' | 'array' | 'object'
   description?: string
   enum?: string[]
   items?: JSONSchemaProperty
   properties?: Record<string, JSONSchemaProperty>
   required?: string[]
   default?: unknown
+  oneOf?: JSONSchemaProperty[]
 }
 
 export interface JSONSchema {
@@ -274,7 +275,7 @@ export interface ToolContext {
   askUserQuestion?: (params: {
     question: string
     type: AskQuestionType
-    options?: string[]
+    options?: Array<string | { label: string; description?: string; recommended?: boolean }>
     defaultAnswer?: string
     context?: {
       affected_files?: string[]

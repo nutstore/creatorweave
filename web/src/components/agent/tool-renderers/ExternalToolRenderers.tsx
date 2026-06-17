@@ -138,7 +138,6 @@ registerRenderer({
     const toolArgs = ctx.args.args as Record<string, unknown> | undefined
     const data = ctx.result?.data as Record<string, unknown> | undefined
 
-    if (ctx.isExecuting) return <StreamingPlaceholder count={2} />
     if (ctx.isError) return <ErrorDetail ctx={ctx} />
 
     const hostname = typeof data?.hostname === 'string' ? data.hostname : ''
@@ -148,73 +147,102 @@ registerRenderer({
 
     // Determine source from fullName
     const isMCP = fullName.includes(':') && !fullName.includes('__')
+    // Prefer hostname from result; fall back to source derived from fullName so the
+    // badge is visible during streaming / executing (before the result is in).
+    const sourceForBadge = isMCP ? 'MCP' : (hostname || getSourceLabel(fullName))
+    const isDone = !ctx.isExecuting && !ctx.isStreaming
 
     return (
       <div className="px-3 py-2 space-y-2">
-        {/* Header: source + tool name */}
-        <div className="flex items-center gap-1.5">
-          {isMCP ? (
-            <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-              MCP
-            </span>
-          ) : hostname ? (
-            <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
-              {hostname}
-            </span>
-          ) : null}
-          <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-            {shortToolName(fullName)}
-          </span>
-        </div>
-
-        {/* Args preview (non-trivial calls) */}
-        {toolArgs && Object.keys(toolArgs).length > 0 && (
-          <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Arguments</div>
-            <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all">
-              {JSON.stringify(toolArgs, null, 2).slice(0, 500)}
-            </pre>
-          </div>
-        )}
-
-        {/* Plugin download info */}
-        {pluginDownload && (
-          <div className="rounded border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 p-2">
-            <div className="text-[10px] text-blue-500 dark:text-blue-400 mb-0.5">File Downloaded</div>
-            <div className="text-xs text-neutral-700 dark:text-neutral-300">
-              {typeof pluginDownload.fileName === 'string' ? pluginDownload.fileName : 'file'}
-            </div>
-            {typeof pluginDownload.size === 'number' && (
-              <div className="text-[10px] text-neutral-400">{formatBytes(pluginDownload.size)}</div>
+        {/* Header: source + tool name (shown as soon as fullName is available) */}
+        {fullName && (
+          <div className="flex items-center gap-1.5">
+            {sourceForBadge && (
+              <span
+                className={`text-[10px] font-mono px-1 py-0.5 rounded ${
+                  isMCP
+                    ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                    : 'bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400'
+                }`}
+              >
+                {sourceForBadge}
+              </span>
             )}
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+              {shortToolName(fullName)}
+            </span>
           </div>
         )}
 
-        {/* Result preview */}
-        {result !== undefined && result !== null && !pluginDownload && (
-          <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
-            <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
-              {typeof result === 'string' ? result.slice(0, 800) : JSON.stringify(result, null, 2).slice(0, 800)}
-            </pre>
+        {/* Args preview — visible during streaming + executing + done so the
+            user can see parameters as the LLM composes them and while the
+            tool runs. */}
+        {toolArgs && Object.keys(toolArgs).length > 0 && (
+          <ArgsBlock toolArgs={toolArgs} />
+        )}
+
+        {/* Streaming: LLM is still composing the tool call */}
+        {ctx.isStreaming && (
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block h-2 w-0.5 bg-blue-500 animate-pulse" />
+            <span className="text-[11px] text-neutral-400">编写中…</span>
           </div>
         )}
 
-        {/* Text result (MCP tools often return { text }) */}
-        {text && !result && !pluginDownload && (
-          <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
-            <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
-              {text.slice(0, 800)}
-            </pre>
+        {/* Executing: tool is running, no result yet */}
+        {ctx.isExecuting && (
+          <div className="flex items-center gap-2 text-xs text-blue-500">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+            </span>
+            <span>Running...</span>
           </div>
         )}
 
-        {/* Copy button */}
-        {ctx.rawResult && (
-          <div className="flex justify-end">
-            <CopyIconButton content={ctx.rawResult} />
-          </div>
+        {/* Result sections — only when the tool has finished */}
+        {isDone && (
+          <>
+            {/* Plugin download info */}
+            {pluginDownload && (
+              <div className="rounded border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 p-2">
+                <div className="text-[10px] text-blue-500 dark:text-blue-400 mb-0.5">File Downloaded</div>
+                <div className="text-xs text-neutral-700 dark:text-neutral-300">
+                  {typeof pluginDownload.fileName === 'string' ? pluginDownload.fileName : 'file'}
+                </div>
+                {typeof pluginDownload.size === 'number' && (
+                  <div className="text-[10px] text-neutral-400">{formatBytes(pluginDownload.size)}</div>
+                )}
+              </div>
+            )}
+
+            {/* Result preview */}
+            {result !== undefined && result !== null && !pluginDownload && (
+              <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
+                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
+                <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+                  {typeof result === 'string' ? result.slice(0, 800) : JSON.stringify(result, null, 2).slice(0, 800)}
+                </pre>
+              </div>
+            )}
+
+            {/* Text result (MCP tools often return { text }) */}
+            {text && !result && !pluginDownload && (
+              <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
+                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
+                <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+                  {text.slice(0, 800)}
+                </pre>
+              </div>
+            )}
+
+            {/* Copy button */}
+            {ctx.rawResult && (
+              <div className="flex justify-end">
+                <CopyIconButton content={ctx.rawResult} />
+              </div>
+            )}
+          </>
         )}
       </div>
     )
@@ -222,6 +250,19 @@ registerRenderer({
 })
 
 // ── Shared Components ──
+
+/** Renders a tool call's arguments as pretty-printed JSON, capped to 500 chars
+ *  to avoid layout blow-up on large payloads. */
+function ArgsBlock({ toolArgs }: { toolArgs: Record<string, unknown> }) {
+  return (
+    <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
+      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Arguments</div>
+      <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all">
+        {JSON.stringify(toolArgs, null, 2).slice(0, 500)}
+      </pre>
+    </div>
+  )
+}
 
 function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unknown> }) {
   const properties = inputSchema.properties as Record<string, Record<string, unknown>> | undefined

@@ -208,11 +208,13 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
   // ── 1. ask_user_question → interactive QuestionCard ──
   if (toolName === 'ask_user_question') {
     let resultAnswer: string | undefined
+    let resultWarning: string | undefined
     if (result) {
       try {
         const parsed = JSON.parse(result) as Record<string, unknown>
         const data = parsed.data as Record<string, unknown> | undefined
         if (data && typeof data.answer === 'string') resultAnswer = data.answer
+        if (typeof parsed.warning === 'string') resultWarning = parsed.warning
       } catch { /* ignore */ }
     }
     const toolCallId = toolCall.id
@@ -235,6 +237,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
         context={ctx.args.context as { affected_files?: string[]; preview?: string } | undefined}
         answered={!!result}
         resultAnswer={resultAnswer}
+        resultWarning={resultWarning}
         onAnswer={handleAnswer}
       />
     )

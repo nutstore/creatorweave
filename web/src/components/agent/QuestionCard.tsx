@@ -93,6 +93,8 @@ export interface QuestionCardProps {
   answered?: boolean
   /** The answer that was given (for answered state) */
   resultAnswer?: string
+  /** Optional warning (e.g. "[Interrupted] 页面刷新" — explains why the answer was synthetic) */
+  resultWarning?: string
   /** Callback when user submits an answer */
   onAnswer?: (answer: string) => void
 }
@@ -109,6 +111,7 @@ export function QuestionCard({
   context,
   answered,
   resultAnswer,
+  resultWarning,
   onAnswer,
 }: QuestionCardProps) {
   const t = useT()
@@ -172,6 +175,11 @@ export function QuestionCard({
             <div className="mt-1 break-words rounded bg-green-100 px-2 py-1.5 text-sm text-green-900 dark:bg-green-900/40 dark:text-green-100">
               {resultAnswer}
             </div>
+            {resultWarning && (
+              <div className="mt-1.5 break-words rounded bg-amber-100 px-2 py-1.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                ⚠ {resultWarning}
+              </div>
+            )}
           </div>
         )}
       </div>
