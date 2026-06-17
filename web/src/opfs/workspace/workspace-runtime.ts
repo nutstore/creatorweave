@@ -2977,10 +2977,24 @@ export class WorkspaceRuntime {
       let nativeFsMtime: number | undefined
       let effectiveType: FileChange['type'] = change.type
 
+      const normalizedPath = this.normalizeWorkspacePath(change.path)
+
       if (directoryHandle) {
+        // Multi-root: resolve the per-path native handle and strip the rootName
+        // prefix before reading the native file. Without this, getFileHandle()
+        // treats the rootName as a real subdirectory and throws — falling through
+        // to the catch branch that uses OPFS mtime as nativeFsMtime. That makes
+        // pending.fsMtime diverge from the actual disk mtime and triggers false
+        // "mtime_or_marker" conflicts in detect_conflicts after every
+        // sync → python write cycle.
+        const fallbackDir = directoryHandle // narrow for TS
+        const nativeHandle =
+          (await this.getNativeDirectoryHandleForPath(normalizedPath)) ?? fallbackDir
+        const resolved = await this.resolvePath(normalizedPath).catch(() => null)
+        const nativePath = resolved?.relativePath || normalizedPath
+
         try {
-          const normalizedPath = this.normalizeWorkspacePath(change.path)
-          const fileHandle = await this.getFileHandle(directoryHandle, normalizedPath)
+          const fileHandle = await this.getFileHandle(nativeHandle, nativePath)
           const file = await fileHandle.getFile()
           nativeFsMtime = file.lastModified
 
