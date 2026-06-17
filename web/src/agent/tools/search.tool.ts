@@ -10,8 +10,16 @@ import { resolveVfsTarget } from './vfs-resolver'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 
 function looksRegexLikeQuery(query: string): boolean {
-  // Guard against common LLM misuse where regex operators are passed while regex=false.
-  return query.includes('|') || query.includes('.*')
+  // Detect high-confidence regex signals that strongly suggest the caller intended
+  // a regex search but left mode at the default ("literal"). We only flag signals
+  // that almost never appear in plain search terms, to avoid false upgrades.
+  return (
+    query.includes('|') || // OR alternation
+    query.includes('.*') || // wildcard (zero or more)
+    query.includes('.+') || // wildcard (one or more)
+    /\\[dwsDWS]/.test(query) || // character class shorthands: \d \w \s + negated forms
+    query.includes('(?') // lookahead / non-capturing group
+  )
 }
 
 /**
@@ -313,7 +321,7 @@ export const searchDefinition: ToolDefinition = {
         mode: {
           type: 'string',
           enum: ['literal', 'regex'],
-          description: 'Search mode: "literal" for plain text, "regex" for regular expressions.',
+          description: 'Search mode: "literal" for plain text (default), "regex" for regular expressions. Optional — if omitted, defaults to "literal", and the engine auto-upgrades to regex if the query looks like one.',
         },
         case_sensitive: {
           type: 'boolean',
@@ -349,7 +357,7 @@ export const searchDefinition: ToolDefinition = {
           items: { type: 'string' },
         },
       },
-      required: ['query', 'mode'],
+      required: ['query'],
     },
   },
 }
@@ -359,18 +367,25 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
   if (!query) {
     return toolErrorJson('search', 'invalid_arguments', 'query is required')
   }
-  const mode = typeof args.mode === 'string' ? args.mode : ''
-  if (mode !== 'literal' && mode !== 'regex') {
-    return toolErrorJson('search', 'invalid_arguments', 'mode is required and must be one of: literal, regex')
+  // mode is optional — default to "literal" to reduce parameter burden on the LLM.
+  const mode = typeof args.mode === 'string' ? args.mode : 'literal'
+  if (args.mode !== undefined && mode !== 'literal' && mode !== 'regex') {
+    return toolErrorJson('search', 'invalid_arguments', 'mode must be one of: literal, regex (default: literal)')
   }
-  const useRegex = mode === 'regex'
+  let useRegex = mode === 'regex'
+  let autoUpgradedToRegex = false
   if (!useRegex && looksRegexLikeQuery(query)) {
-    return toolErrorJson(
-      'search',
-      'invalid_arguments',
-      'query looks like regex but mode="literal". Use mode="regex" for patterns like "|" or ".*".',
-      { hint: 'If you intend a regex OR/pattern search, set mode="regex".' }
-    )
+    // Tolerant (Do-What-I-Mean) handling: instead of erroring out and wasting an
+    // agent loop turn on a pedantic rejection, auto-upgrade to regex mode when the
+    // query compiles as a valid regex. If compilation fails, fall back to literal
+    // mode (the worker will escape special chars and search for the exact text).
+    try {
+      new RegExp(query)
+      useRegex = true
+      autoUpgradedToRegex = true
+    } catch {
+      useRegex = false // invalid regex — keep literal mode
+    }
   }
 
   // 根据 contextUsage 智能调整 max_results
@@ -597,13 +612,20 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     const compactHint = !isSingleFile && filesForLLM.some(f => f.hasMoreHits)
       ? ' Results are compacted to 1 line per file (hasMoreHits=true means more lines match). To see all hits in a file, search again with path set to that file.'
       : ''
+    // When we auto-upgraded literal → regex, tell the LLM so it can learn the
+    // convention (pass mode="regex" explicitly next time). This is informational,
+    // not an error — the search already ran successfully.
+    const upgradeHint = autoUpgradedToRegex
+      ? ` Note: query looked like a regex, so it was auto-run in regex mode. Next time you can pass mode="regex" explicitly.`
+      : ''
 
     return toolOkJson(
       'search',
       {
         query,
+        mode: useRegex ? 'regex' : 'literal',
         ...result,
-        message: `Found ${result.totalMatches} matches across ${fileCount} files.${titleMatchCount > 0 ? ` (${titleMatchCount} title match${titleMatchCount !== 1 ? 'es' : ''})` : ''}.${compactHint}`,
+        message: `Found ${result.totalMatches} matches across ${fileCount} files.${titleMatchCount > 0 ? ` (${titleMatchCount} title match${titleMatchCount !== 1 ? 'es' : ''})` : ''}.${compactHint}${upgradeHint}`,
       },
       {
         ...(loopCheck.warning ? { _warning: loopCheck.warning } : {}),
