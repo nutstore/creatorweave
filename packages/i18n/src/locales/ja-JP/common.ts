@@ -8,6 +8,7 @@ export const common = {
     close: "閉じる",
     search: "検索",
     refresh: "更新",
+    saving: "保存中...",
     loading: "読み込み中...",
     processing: "処理中...",
     error: "エラー",

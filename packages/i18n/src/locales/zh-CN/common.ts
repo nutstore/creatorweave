@@ -8,6 +8,7 @@ export const common = {
     close: "关闭",
     search: "搜索",
     refresh: "刷新",
+    saving: "保存中...",
     loading: "加载中...",
     processing: "处理中...",
     error: "出错了",

@@ -5,7 +5,7 @@ import { folderSelector } from './folderSelector'
 import { settings } from './settings'
 import { workspaceSettings } from './workspaceSettings'
 import { welcome } from './welcome'
-import { skills, skillCard, skillEditor, skillUpload, skillDetail } from './skills'
+import { skills, skillCard, skillEditor, skillUpload, skillDetail, skillFileEditor } from './skills'
 import { webContainer } from './webContainer'
 import { workflowEditor, customWorkflowManager, workflowEditorDialog, workflow } from './workflow'
 import { remote, session } from './remote'
@@ -43,6 +43,7 @@ export const jaJP = {
   skillEditor,
   skillUpload,
   skillDetail,
+  skillFileEditor,
   webContainer,
   workflowEditor,
   customWorkflowManager,

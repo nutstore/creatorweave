@@ -23,6 +23,7 @@ import {
 } from '@creatorweave/ui'
 import { SkillCard } from './SkillCard'
 import { SkillEditor } from './SkillEditor'
+import { SkillFileEditor } from './SkillFileEditor'
 import { ProjectSkillDropZone } from './ProjectSkillDropZone'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
@@ -64,7 +65,8 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     return () => { if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current) }
   }, [])
 
-  const [editorOpen, setEditorOpen] = useState(false)
+  const [fileEditorOpen, setFileEditorOpen] = useState(false)
+  const [formEditorOpen, setFormEditorOpen] = useState(false)
   const [editingSkill, setEditingSkill] = useState<SkillMetadata | undefined>()
   const [editorMode, setEditorMode] = useState<EditorMode>()
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
@@ -114,13 +116,27 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   const handleDeleteConfirm = useCallback(async () => {
     if (deleteTarget) { await skillsStore.deleteSkill(deleteTarget.id); setDeleteTarget(null) }
   }, [skillsStore, deleteTarget])
-  const handleView = useCallback((skill: SkillMetadata) => { setEditingSkill(skill); setEditorMode('view'); setEditorOpen(true) }, [])
-  const handleEdit = useCallback((skill: SkillMetadata) => { setEditingSkill(skill); setEditorMode('edit'); setEditorOpen(true) }, [])
-  const handleCreateNew = useCallback(() => { setEditingSkill(undefined); setEditorMode('edit'); setEditorOpen(true) }, [])
+  // Determine which editor to use based on skill source.
+  // user/builtin → SkillFileEditor (VSCode-style file tree + Monaco)
+  // project/import → SkillEditor (form-based, since files are on native FS not OPFS)
+  const useFileEditor = (skill: SkillMetadata) => skill.source === 'user' || skill.source === 'builtin'
+
+  const handleView = useCallback((skill: SkillMetadata) => {
+    setEditingSkill(skill); setEditorMode('view')
+    if (useFileEditor(skill)) setFileEditorOpen(true)
+    else setFormEditorOpen(true)
+  }, [])
+  const handleEdit = useCallback((skill: SkillMetadata) => {
+    setEditingSkill(skill); setEditorMode('edit')
+    if (useFileEditor(skill)) setFileEditorOpen(true)
+    else setFormEditorOpen(true)
+  }, [])
+  const handleCreateNew = useCallback(() => { setEditingSkill(undefined); setEditorMode('edit'); setFormEditorOpen(true) }, [])
   const handleUploadDone = useCallback(() => {
     setUploadOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
   }, [skillsStore])
-  const handleEditorClose = useCallback(() => { setEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
+  const handleEditorClose = useCallback(() => { setFileEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
+  const handleFormEditorClose = useCallback(() => { setFormEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
 
   const toggleCollapse = useCallback((key: string) => {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -258,8 +274,14 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
         </BrandDialogContent>
       </BrandDialog>
 
-      {/* Skill Editor */}
-      <SkillEditor skill={editingSkill} open={editorOpen} onClose={handleEditorClose} readOnly={editorMode === 'view'} />
+      {/* Skill File Editor — VSCode-style file tree + Monaco editor.
+          Used for user and builtin skills (stored in OPFS .skills/). */}
+      {editingSkill && useFileEditor(editingSkill) && (
+        <SkillFileEditor skill={editingSkill} open={fileEditorOpen} onClose={handleEditorClose} />
+      )}
+
+      {/* Skill Form Editor — for creating new skills and viewing project/import skills */}
+      <SkillEditor skill={editingSkill} open={formEditorOpen} onClose={handleFormEditorClose} readOnly={editorMode === 'view'} />
 
       {/* Delete Confirmation */}
       <BrandDialog open={deleteTarget !== null} onOpenChange={(isOpen) => { if (!isOpen) setDeleteTarget(null) }}>

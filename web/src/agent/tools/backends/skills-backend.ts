@@ -193,6 +193,78 @@ export class SkillsBackend implements VfsBackend {
     return entries
   }
 
+  /**
+   * Rename / move a file or directory.
+   *
+   * OPFS doesn't have a standard `move()` across all browsers, so we use
+   * copy-then-delete. For skill files (typically small) this is fast enough.
+   *
+   * - File: read content → write to newPath → delete oldPath
+   * - Directory: recursively copy all entries → delete old dir
+   */
+  async rename(oldPath: string, newPath: string): Promise<void> {
+    if (oldPath === newPath) return
+
+    // Determine if oldPath is a file or directory
+    const parts = oldPath.split('/').filter(Boolean)
+    if (parts.length === 0) throw new Error('Cannot rename skills root')
+
+    const root = await getSkillsRoot()
+    const lastName = parts.pop()!
+    let parentDir = root
+    for (const part of parts) {
+      parentDir = await parentDir.getDirectoryHandle(part)
+    }
+
+    // Check if it's a file or directory
+    let isDir = false
+    try {
+      await parentDir.getFileHandle(lastName)
+    } catch {
+      isDir = true // Not a file → must be a directory
+    }
+
+    if (!isDir) {
+      // File rename: read → write new → delete old
+      const { dir: oldDir, fileName } = await resolveFilePath(oldPath)
+      const fileHandle = await oldDir.getFileHandle(fileName)
+      const file = await fileHandle.getFile()
+      const content = await file.text()
+      await this.writeFile(newPath, content)
+      await this.deleteFile(oldPath)
+    } else {
+      // Directory rename: recursive copy → delete old
+      await this._copyDirRecursive(oldPath, newPath)
+      await this.deleteDir(oldPath)
+    }
+  }
+
+  /** Helper: recursively copy a directory's contents to a new path */
+  private async _copyDirRecursive(srcPath: string, destPath: string): Promise<void> {
+    const srcDir = await resolveDirPath(srcPath)
+    // Create destination directory chain
+    const destParts = destPath.split('/').filter(Boolean)
+    let destDir = await getSkillsRoot()
+    for (const part of destParts) {
+      destDir = await destDir.getDirectoryHandle(part, { create: true })
+    }
+
+    for await (const [name, handle] of srcDir.entries()) {
+      if (handle.kind === 'file') {
+        const fileHandle = await srcDir.getFileHandle(name)
+        const file = await fileHandle.getFile()
+        const content = await file.text()
+        const newFileHandle = await destDir.getFileHandle(name, { create: true })
+        const writable = await newFileHandle.createWritable()
+        await writable.write(content)
+        await writable.close()
+      } else {
+        // Recursively copy subdirectory
+        await this._copyDirRecursive(`${srcPath}/${name}`, `${destPath}/${name}`)
+      }
+    }
+  }
+
   async getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
     try {
       return await getSkillsRoot()

@@ -7,6 +7,7 @@ export const common = {
     close: "Close",
     search: "Search",
     refresh: "Refresh",
+    saving: "Saving...",
     loading: "Loading...",
     processing: "Processing...",
     error: "Error",

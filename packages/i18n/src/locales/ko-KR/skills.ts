@@ -160,3 +160,25 @@ export const skillDetail = {
     triggerKeywords: "트리거 키워드",
     fileExtensions: "파일 확장자",
 } as const
+
+export const skillFileEditor = {
+    fileEditor: "파일 에디터",
+    readonly: "읽기 전용",
+    unsaved: "저장 안 됨",
+    unsavedChanges: "저장하지 않은 변경 사항이 있습니다. 전환하기 전에 저장하시겠습니까?",
+    saveFailed: "저장에 실패했습니다. 다시 시도해 주세요.",
+    createFailed: "생성에 실패했습니다. 다시 시도해 주세요.",
+    deleteFailed: "삭제에 실패했습니다. 다시 시도해 주세요.",
+    confirmDelete: "삭제",
+    files: "파일",
+    newFile: "새 파일",
+    newFolder: "새 폴더",
+    newFileSibling: "같은 위치에 새 파일",
+    empty: "파일이 없습니다",
+    selectFile: "편집할 파일 선택",
+    selectFilePrompt: "트리에서 파일을 선택하여 편집을 시작하세요",
+    fileNamePlaceholder: "파일명.ext",
+    folderNamePlaceholder: "폴더 이름",
+    rename: "이름 변경",
+    renameFailed: "이름 변경에 실패했습니다. 다시 시도해 주세요.",
+} as const

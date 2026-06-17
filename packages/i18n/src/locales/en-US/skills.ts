@@ -162,3 +162,25 @@ export const skillDetail = {
     triggerKeywords: "Trigger Keywords",
     fileExtensions: "File Extensions",
 } as const
+
+export const skillFileEditor = {
+    fileEditor: "File Editor",
+    readonly: "Read-only",
+    unsaved: "Unsaved",
+    unsavedChanges: "You have unsaved changes. Save before switching?",
+    saveFailed: "Save failed. Please try again.",
+    createFailed: "Failed to create. Please try again.",
+    deleteFailed: "Failed to delete. Please try again.",
+    confirmDelete: "Delete",
+    files: "Files",
+    newFile: "New File",
+    newFolder: "New Folder",
+    newFileSibling: "New File (sibling)",
+    empty: "No files",
+    selectFile: "Select a file to edit",
+    selectFilePrompt: "Select a file from the tree to start editing",
+    fileNamePlaceholder: "filename.ext",
+    folderNamePlaceholder: "folder name",
+    rename: "Rename",
+    renameFailed: "Rename failed, please try again.",
+} as const

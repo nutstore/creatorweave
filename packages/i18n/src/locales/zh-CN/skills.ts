@@ -164,3 +164,25 @@ export const skillDetail = {
     triggerKeywords: "触发关键词",
     fileExtensions: "文件扩展名",
 } as const
+
+export const skillFileEditor = {
+    fileEditor: "文件编辑器",
+    readonly: "只读",
+    unsaved: "未保存",
+    unsavedChanges: "有未保存的更改，是否先保存？",
+    saveFailed: "保存失败，请重试。",
+    createFailed: "创建失败，请重试。",
+    deleteFailed: "删除失败，请重试。",
+    confirmDelete: "删除",
+    files: "文件",
+    newFile: "新建文件",
+    newFolder: "新建文件夹",
+    newFileSibling: "同级新建文件",
+    empty: "暂无文件",
+    selectFile: "选择一个文件进行编辑",
+    selectFilePrompt: "从左侧文件树选择一个文件开始编辑",
+    fileNamePlaceholder: "文件名.ext",
+    folderNamePlaceholder: "文件夹名称",
+    rename: "重命名",
+    renameFailed: "重命名失败，请重试。",
+} as const
