@@ -72,25 +72,25 @@ function registerSkill(
 }
 
 // ============================================================================
-// cw:brainstorm — Socratic brainstorming mode
+// cw-brainstorm — Socratic brainstorming mode
 // ============================================================================
 
 // Import skill files using Vite's ?raw query (inline as string at build time)
 // Directory name (socratic-brainstorm) is just the filesystem location;
-// the skill identity is set by registerSkill('cw:brainstorm', ...).
+// the skill identity is set by registerSkill('cw-brainstorm', ...).
 import brainstormSkillMd from './builtin-packages/socratic-brainstorm/SKILL.md?raw'
 
-registerSkill('cw:brainstorm', [
+registerSkill('cw-brainstorm', [
   { path: 'SKILL.md', content: brainstormSkillMd },
 ])
 
 // ============================================================================
-// cw:nol-editor — Guide for .nol (Outline Notes) file operations
+// cw-nol-editor — Guide for .nol (Outline Notes) file operations
 // ============================================================================
 
 import nolEditorSkillMd from './builtin-packages/nol-editor/SKILL.md?raw'
 
-registerSkill('cw:nol-editor', [
+registerSkill('cw-nol-editor', [
   { path: 'SKILL.md', content: nolEditorSkillMd },
 ])
 
@@ -114,7 +114,7 @@ import wordEditorSchema from './builtin-packages/word-editor/references/SCHEMA.m
 // Binary file — blank.docx stored as base64 text
 import wordEditorBlankB64 from './builtin-packages/word-editor/blank.docx.b64?raw'
 
-registerSkill('cw:word-editor', [
+registerSkill('cw-word-editor', [
   { path: 'SKILL.md', content: wordEditorSkillMd },
   { path: 'scripts/__init__.py', content: wordEditorInit },
   { path: 'scripts/ingest.py', content: wordEditorIngest },
@@ -131,7 +131,7 @@ registerSkill('cw:word-editor', [
 ])
 
 // ============================================================================
-// cw:skill-creator — Create, evaluate, and improve workspace skills
+// cw-skill-creator — Create, evaluate, and improve workspace skills
 // ============================================================================
 
 import skillCreatorSkillMd from './builtin-packages/skill-creator/SKILL.md?raw'
@@ -147,7 +147,7 @@ import skillCreatorSchemas from './builtin-packages/skill-creator/references/sch
 import skillCreatorGenReview from './builtin-packages/skill-creator/eval-viewer/generate_review.py?raw'
 import skillCreatorViewerHtml from './builtin-packages/skill-creator/eval-viewer/viewer.html?raw'
 
-registerSkill('cw:skill-creator', [
+registerSkill('cw-skill-creator', [
   { path: 'SKILL.md', content: skillCreatorSkillMd },
   // scripts/
   { path: 'scripts/utils.py', content: skillCreatorUtils },

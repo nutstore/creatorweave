@@ -1,5 +1,6 @@
 ---
-name: cw:skill-creator
+name: cw-skill-creator
+version: "1.0.1"
 description: Create new skills, modify and improve existing skills, and measure skill performance. Use when users want to create a skill from scratch, edit or optimize an existing skill, run evals to test a skill, benchmark skill performance, or optimize a skill's description for better triggering accuracy.
 category: general
 tags: [skill, creator, create, eval, benchmark, lint, validate]
@@ -50,13 +51,39 @@ Proactively ask about edge cases, input/output formats, example files, success c
 
 #### Step 3: Write the SKILL.md
 
-Based on the user interview, generate the skill files. The skill is written to the project's `.skills/{skill-name}/` directory.
+Based on the user interview, generate the skill files.
+
+**IMPORTANT — Two storage locations:**
+
+1. **User skills** (personal, cross-project, persistent globally) — write to `vfs://skills/user/{skill-name}/SKILL.md`. These skills are available in ALL conversations/projects. Use this when the user says "create a skill I can reuse" or wants a personal skill that's not tied to a specific project.
+
+2. **Project skills** (scoped to the current project workspace) — write to the project's `.skills/{skill-name}/SKILL.md` directory (normal workspace path with rootName prefix). These skills are only available in the current project.
+
+**Default choice:** If the user doesn't specify, ask them: "Should this be a personal skill (available everywhere) or a project-specific skill?" If they say "personal" or "global", use `vfs://skills/user/`. If they say "project" or the skill is clearly tied to this codebase, use project `.skills/`.
+
+**Creating a user skill (example):**
+
+```
+write(path="vfs://skills/user/my-report-generator/SKILL.md", content="...")
+write(path="vfs://skills/user/my-report-generator/scripts/analyze.py", content="...")
+write(path="vfs://skills/user/my-report-generator/references/format.md", content="...")
+```
+
+The `vfs://skills/user/` path maps to OPFS `.skills/user/` — a global directory not tied to any workspace. The skill will be loaded automatically on the next conversation.
+
+**Creating a project skill (example):**
+
+```
+write(path="{rootName}/.skills/report-generator/SKILL.md", content="...")
+```
+
+**After creating a user skill**, the LLM should inform the user that the skill will be available in the next conversation (or after skill system refresh). The skill appears in the available skills list automatically.
 
 **CreatorWeave SKILL.md frontmatter format:**
 
 ```yaml
 ---
-name: cw:{skill-name}
+name: cw-{skill-name}
 description: When to trigger and what the skill does. Be specific about contexts.
 category: general
 tags: [tag1, tag2, tag3]
@@ -66,7 +93,7 @@ triggers:
 ```
 
 **Key frontmatter fields:**
-- `name` (required): Skill identifier with `cw:` prefix, kebab-case. Max 64 chars.
+- `name` (required): Skill identifier with `cw-` prefix, kebab-case (e.g. `cw-my-skill`). Max 64 chars.
 - `description` (required): When to trigger + what it does. Max 1024 chars. Be "pushy" — include contexts where the skill should be used even if the user doesn't explicitly ask for it.
 - `category` (optional): `general`, `coding`, `data`, etc.
 - `tags` (optional): Array of tag strings.
@@ -131,7 +158,7 @@ The script checks:
 - SKILL.md exists
 - Valid YAML frontmatter
 - Required fields (name, description) present
-- Name follows kebab-case with `cw:` prefix
+- Name follows kebab-case with `cw-` prefix
 - Description is under 1024 characters
 - No angle brackets in description
 

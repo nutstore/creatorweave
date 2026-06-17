@@ -8,6 +8,7 @@
 import type {
   PlatformAdapter,
   BuiltinSkillManifest,
+  BuiltinSkillsManifest,
   MaterializeResult,
 } from './types'
 import { computeDiff } from './diff'
@@ -19,7 +20,8 @@ import { computeDiff } from './diff'
  * 1. Read local manifest & bundled manifest
  * 2. Compute diff
  * 3. Write added/updated skill files
- * 4. Persist updated local manifest
+ * 4. Prune stale skill directories no longer in the bundled manifest
+ * 5. Persist updated local manifest
  *
  * @param adapter - Platform-specific filesystem adapter
  * @returns Materialize result with stats
@@ -53,6 +55,12 @@ export async function ensureMaterialized(
     }
   }
 
+  // Prune stale builtin skill directories that are no longer bundled.
+  // This handles renamed skills (e.g. `cw:word-editor` → `cw-word-editor`):
+  // the old directory remains on disk after a rename. We compare the actual
+  // `builtin/` entries against the bundled skill names and remove orphans.
+  const pruned = await pruneStaleBuiltinDirs(adapter, bundledManifest)
+
   // Persist updated manifest
   await adapter.writeLocalManifest(bundledManifest)
 
@@ -60,9 +68,49 @@ export async function ensureMaterialized(
     total: bundledManifest.skills.length,
     written: toWrite.length,
     skipped: diff.unchanged.length,
+    pruned,
     errors,
     durationMs: performance.now() - startTime,
   }
+}
+
+/**
+ * Remove builtin skill directories that no longer exist in the bundled manifest.
+ *
+ * Lists entries under `builtin/` and deletes any directory whose name is not
+ * a current bundled skill name. Dotfiles (e.g. `.gitkeep`) are preserved.
+ *
+ * @returns Number of directories pruned.
+ */
+async function pruneStaleBuiltinDirs(
+  adapter: PlatformAdapter,
+  bundledManifest: BuiltinSkillsManifest
+): Promise<number> {
+  const validNames = new Set(bundledManifest.skills.map((s) => s.name))
+  let entries: string[]
+  try {
+    entries = await adapter.readdir('builtin')
+  } catch {
+    return 0
+  }
+
+  let pruned = 0
+  for (const entry of entries) {
+    // Skip dotfiles (e.g. .gitkeep) and known valid skill dirs
+    if (entry.startsWith('.')) continue
+    if (validNames.has(entry)) continue
+
+    // This entry is not in the bundled manifest — remove it.
+    try {
+      await adapter.remove(`builtin/${entry}`)
+      pruned++
+      console.log(`[Skills System] Pruned stale builtin dir: builtin/${entry}`)
+    } catch (err) {
+      // Non-fatal — log and continue
+      console.warn(`[Skills System] Failed to prune builtin/${entry}:`, err)
+    }
+  }
+  return pruned
 }
 
 /**

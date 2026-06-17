@@ -83,6 +83,9 @@ export function getResolvedPathForLoopGuard(target: Awaited<ReturnType<typeof im
   if (target.backend.label === 'workspace') {
     return target.path
   }
+  if (target.backend.label === 'skills') {
+    return `vfs://skills/${target.path}`
+  }
   // For agent targets, construct a synthetic path
   return `vfs://agents/${(target as any).agentId}/${target.path}`
 }

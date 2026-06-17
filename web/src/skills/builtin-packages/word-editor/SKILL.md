@@ -1,7 +1,7 @@
 ---
-name: cw:word-editor
+name: cw-word-editor
 description: "LLM Wiki-mode docx editor with 89 EditOps, zero third-party dependencies. Ingest compiles docx → DocumentModel, view provides outline/details/stats/issue detection, writeback applies precise edits."
-version: "1.0.4"
+version: "1.0.5"
 ---
 
 # word-editor Skill
@@ -24,9 +24,9 @@ Compile docx documents into a DocumentModel, let the Agent **deeply understand**
 
 - Python 3.8+ (Pyodide compatible)
 - **Zero third-party dependencies** (zipfile + ElementTree only)
-- **Built-in skill** — 自动挂载到 `/mnt_skills/builtin/cw:word-editor/`，无需 sync
-- Script path: `/mnt_skills/builtin/cw:word-editor/scripts/`
-- Includes a blank template: `/mnt_skills/builtin/cw:word-editor/blank.docx` (WPS-generated, with full styles/fonts/themes)
+- **Built-in skill** — 自动挂载到 `/mnt_skills/builtin/cw-word-editor/`，无需 sync
+- Script path: `/mnt_skills/builtin/cw-word-editor/scripts/`
+- Includes a blank template: `/mnt_skills/builtin/cw-word-editor/blank.docx` (WPS-generated, with full styles/fonts/themes)
 
 ---
 
@@ -36,7 +36,7 @@ Compile docx documents into a DocumentModel, let the Agent **deeply understand**
 
 ```python
 import sys
-sys.path.insert(0, '/mnt_skills/builtin/cw:word-editor/scripts')
+sys.path.insert(0, '/mnt_skills/builtin/cw-word-editor/scripts')
 from ingest import ingest
 from model import EditOp, EditAction, DocumentModel, ParagraphNode
 from writeback import apply_edits
@@ -88,14 +88,14 @@ Use the bundled `blank.docx` template (with full styles) and build with EditOps:
 
 ```python
 import sys, shutil
-sys.path.insert(0, '/mnt_skills/builtin/cw:word-editor/scripts')
+sys.path.insert(0, '/mnt_skills/builtin/cw-word-editor/scripts')
 from model import EditOp, EditAction, DocumentModel, ParagraphNode
 from writeback import apply_edits
 import base64
 
 # 1. Copy blank template
 output = '/mnt/{rootName}/output.docx'
-shutil.copy2('/mnt_skills/builtin/cw:word-editor/blank.docx', output)
+shutil.copy2('/mnt_skills/builtin/cw-word-editor/blank.docx', output)
 
 # 2. Build model manually (blank template has only 1 empty paragraph p-000)
 model = DocumentModel()
@@ -185,7 +185,7 @@ ax.bar(['苹果', '香蕉', '橙子'], [3, 5, 2])
 
 ```python
 import sys, shutil, base64, io
-sys.path.insert(0, '/mnt_skills/builtin/cw:word-editor/scripts')
+sys.path.insert(0, '/mnt_skills/builtin/cw-word-editor/scripts')
 from model import EditOp, DocumentModel, ParagraphNode
 from writeback import apply_edits
 import matplotlib
@@ -205,7 +205,7 @@ ax.set_title('Quarterly Revenue ($M)'); chart_b64 = fig_b64(fig)
 
 # ── 2. Prepare template + model ──
 output = '/mnt/{rootName}/report.docx'
-shutil.copy2('/mnt_skills/builtin/cw:word-editor/blank.docx', output)
+shutil.copy2('/mnt_skills/builtin/cw-word-editor/blank.docx', output)
 model = DocumentModel()
 model.paragraphs = [ParagraphNode(id="p-000", index=0, text="")]
 
@@ -716,7 +716,7 @@ Subagents are dispatched via `spawn_subagent` tool, with prompt content passed d
 
 ```python
 import sys, os
-sys.path.insert(0, '/mnt_skills/builtin/cw:word-editor/scripts')
+sys.path.insert(0, '/mnt_skills/builtin/cw-word-editor/scripts')
 from ingest import ingest
 from view import scan, chunk
 

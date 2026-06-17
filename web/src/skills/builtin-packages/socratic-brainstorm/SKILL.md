@@ -1,5 +1,6 @@
 ---
-name: cw:brainstorm
+name: cw-brainstorm
+version: "1.0.1"
 description: Activate brainstorming mode for collaborative discovery and creative problem-solving. Use Socratic dialogue to explore ideas, challenge assumptions, and converge on actionable plans.
 category: general
 tags: [brainstorm, socratic, thinking, decision]

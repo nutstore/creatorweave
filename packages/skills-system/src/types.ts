@@ -67,6 +67,8 @@ export interface MaterializeResult {
   written: number
   /** Number of skills skipped (unchanged) */
   skipped: number
+  /** Number of stale directories pruned (no longer bundled) */
+  pruned: number
   /** Per-skill errors */
   errors: Array<{ skill: string; error: string }>
   /** Time taken in ms */

@@ -7,15 +7,23 @@ import { create } from 'zustand'
 import { immer } from 'zustand/middleware/immer'
 import type { Skill, SkillMetadata, SkillCategory } from '@/skills/skill-types'
 import * as storage from '@/skills/skill-storage'
-import { parseSkillMd, serializeSkillMd } from '@/skills/skill-parser'
+import { parseSkillMd, serializeSkillMd, slugify } from '@/skills/skill-parser'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useProjectStore } from '@/store/project.store'
+import {
+  writeUserSkillMd,
+  deleteUserSkillDir,
+  userSkillDirExists,
+} from '@/skills/user-skills-scanner'
 
 /** Refresh SkillManager cache to keep it in sync with store */
 async function refreshSkillManagerCache() {
   try {
     const manager = getSkillManager()
+    // Refresh both persistent (SQLite) and user (OPFS) skill caches so the
+    // UI reflects OPFS writes immediately.
     await manager.refreshCache()
+    await manager.refreshUserSkills()
   } catch (error) {
     console.error('[SkillsStore] Failed to refresh SkillManager cache:', error)
   }
@@ -63,15 +71,11 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
 
     loadSkills: async () => {
       const state = get()
-      // Prevent retry if already loading or if there was a previous error
+      // Prevent concurrent loadSkills calls — but allow retry after errors
+      // (previous versions permanently locked out retry, causing the entire
+      // skills system to be unusable until a full page refresh).
       if (state.loading) return
-      if (state.error) {
-        console.warn(
-          '[SkillsStore] Not loading skills - previous error exists. Call clearError() to retry.'
-        )
-        return
-      }
-      set({ loading: true })
+      set({ loading: true, error: null })
       try {
         // Initialize and sync SkillManager first (this seeds builtin skills)
         const manager = getSkillManager()
@@ -105,23 +109,56 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
         return { success: false, error: result.error }
       }
 
-      // Check for duplicate ID
-      const existing = await storage.getSkillById(result.skill.id)
-      if (existing) {
-        // Update existing skill
-        result.skill.createdAt = existing.createdAt
+      // User skills are stored in OPFS `.skills/user/<dirName>/SKILL.md`.
+      // Derive the directory name from the skill **name** (not id) using the
+      // shared slugify function. This matches what migration uses and ensures
+      // that re-importing an already-migrated skill updates the same dir
+      // instead of creating a duplicate.
+      const dirName = slugify(result.skill.name)
+
+      try {
+        await writeUserSkillMd(dirName, content)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        return { success: false, error: `Failed to write user skill: ${msg}` }
       }
 
-      await storage.saveSkill(result.skill, content)
+      // Refresh both caches (OPFS scan + SQLite) so the new skill appears
+      // immediately in the UI.
       const manager = getSkillManager()
       await refreshSkillManagerCache()
       const metadata = manager.getSkillMetadata()
       set({ skills: metadata })
-      return { success: true, skillId: result.skill.id }
+      // Return the user-prefixed skillId so callers (e.g. SkillEditor) can
+      // correctly compare it with the existing skill's id (which is also
+      // `user:<dirName>` after scanning). Without the prefix, the comparison
+      // would always differ and the caller would delete the just-saved skill.
+      return { success: true, skillId: `user:${dirName}` }
     },
 
     deleteSkill: async (id) => {
-      await storage.deleteSkill(id)
+      // User skills (source='user', id prefix 'user:') live in OPFS.
+      // Project skills (id prefix 'project:') are handled by the project scanner.
+      // Persistent skills (builtin) live in SQLite.
+      try {
+        if (id.startsWith('user:')) {
+          const dirName = id.replace(/^user:/, '')
+          // Check if the directory exists before attempting deletion.
+          // If it doesn't exist, it may be a legacy SQLite-only skill that
+          // wasn't migrated yet — fall through to SQLite deletion.
+          const existsInOpfs = await userSkillDirExists(dirName).catch(() => false)
+          if (existsInOpfs) {
+            await deleteUserSkillDir(dirName)
+          } else {
+            await storage.deleteSkill(id)
+          }
+        } else {
+          await storage.deleteSkill(id)
+        }
+      } catch (error) {
+        console.error('[SkillsStore] deleteSkill failed for', id, error)
+        // Still remove from store so UI reflects intent even if storage fails
+      }
       set((state) => {
         state.skills = state.skills.filter((s) => s.id !== id)
       })
@@ -135,6 +172,19 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
       if (skill?.source === 'project') {
         const activeProjectId = useProjectStore.getState().activeProjectId || null
         manager.setProjectSkillEnabled(id, enabled, activeProjectId)
+        set((state) => {
+          const target = state.skills.find((s) => s.id === id)
+          if (target) {
+            target.enabled = enabled
+          }
+        })
+        return
+      }
+
+      if (skill?.source === 'user') {
+        // User skills live in OPFS; there is no SQLite record to update.
+        // Update the in-memory cache directly so the UI reflects the change.
+        manager.setUserSkillEnabled(id, enabled)
         set((state) => {
           const target = state.skills.find((s) => s.id === id)
           if (target) {

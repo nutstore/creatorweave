@@ -281,6 +281,15 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
 
   const pendingChanges = useOPFSStore.getState().getPendingChanges()
 
+  // If any target was in the skills namespace, refresh user skills cache
+  const hasSkillsTarget = targets.some((t) => t.startsWith('vfs://skills/') || t.startsWith('vfs://skill/'))
+  if (hasSkillsTarget && deleted.length + deletedDirs.length > 0) {
+    try {
+      const { getSkillManager } = await import('@/skills/skill-manager')
+      await getSkillManager().refreshUserSkills()
+    } catch { /* non-fatal */ }
+  }
+
   return JSON.stringify({
     success: failed.length === 0,
     total: deleted.length + deletedDirs.length + failed.length,

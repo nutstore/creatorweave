@@ -43,6 +43,9 @@ type EditorMode = 'view' | 'edit' | undefined
 
 export function SkillsManager({ open, onClose, directoryHandle = null, roots = [] }: SkillsManagerProps) {
   const skillsStore = useSkillsStore()
+  // Subscribe to loadSkills directly — Zustand action references are stable
+  // (they don't change on state updates), so this won't cause infinite loops.
+  const loadSkills = useSkillsStore((s) => s.loadSkills)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -70,9 +73,13 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   // Collapsed state for each section
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
 
+  // Reload skills every time the dialog opens, not just the first time.
+  // Agent (or external code) may have written/deleted skill files in OPFS
+  // since the last open — we need to re-scan to reflect those changes.
+  // loadSkills() has its own `loading` guard to prevent concurrent runs.
   useEffect(() => {
-    if (open && !skillsStore.loaded) skillsStore.loadSkills()
-  }, [open, skillsStore])
+    if (open) loadSkills()
+  }, [open, loadSkills])
 
   const { projectSkills, userSkills, builtinSkills, totalFiltered } = useMemo(() => {
     let filtered = skillsStore.skills

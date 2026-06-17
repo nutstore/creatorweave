@@ -214,6 +214,14 @@ type DiscoveryScope =
         options?: { allowMissing?: boolean }
       ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
     }
+  | {
+      kind: 'skills'
+      subPath: string
+      resolveHandle: (
+        path: string,
+        options?: { allowMissing?: boolean }
+      ) => Promise<{ handle: FileSystemDirectoryHandle; exists: boolean }>
+    }
 
 async function resolveDiscoveryScope(
   rawPath: unknown,
@@ -243,6 +251,18 @@ async function resolveDiscoveryScope(
         kind: 'assets',
         subPath: resolved.path,
         resolveHandle: (path, options) => resolveDirectoryHandle(assetsHandle, path, options),
+      }
+    }
+
+    if (resolved.kind === 'skills') {
+      const skillsHandle = await resolved.backend.getDirectoryHandle?.()
+      if (!skillsHandle) {
+        throw new Error('Skills directory not available.')
+      }
+      return {
+        kind: 'skills',
+        subPath: resolved.path,
+        resolveHandle: (path, options) => resolveDirectoryHandle(skillsHandle, path, options),
       }
     }
 

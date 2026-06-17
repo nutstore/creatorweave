@@ -53,7 +53,16 @@ export function parseSkillMd(content: string, source: SkillSource = 'import'): P
   const body = trimmed.substring(endIndex + 3).trim()
 
   // Parse YAML frontmatter
-  const meta = yaml.load(yamlBlock) as Record<string, unknown>
+  let meta: Record<string, unknown>
+  try {
+    meta = yaml.load(yamlBlock) as Record<string, unknown>
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e)
+    return { skill: null, error: `YAML frontmatter parse error: ${detail}` }
+  }
+  if (!meta || typeof meta !== 'object') {
+    return { skill: null, error: 'Invalid YAML frontmatter (not a mapping)' }
+  }
   if (!meta.name) {
     return { skill: null, error: 'Missing required field: name' }
   }
@@ -176,8 +185,18 @@ function parseMarkdownSections(body: string): Record<string, string> {
   return sections
 }
 
-/** Convert name to URL-safe slug */
-function slugify(name: string): string {
+/**
+ * Convert a skill name to a filesystem-safe directory slug.
+ *
+ * Skill names use a `cw-` prefix with kebab-case (e.g. `cw-word-editor`).
+ * Since the name is already filesystem-safe (no colons or special chars),
+ * this function primarily handles edge cases: trimming, lowercasing, and
+ * collapsing non-alphanumeric runs (excluding CJK) into dashes.
+ *
+ * Exported so that migration, import, and scan all derive the same directory
+ * name from a given skill name — preventing duplicate directories.
+ */
+export function slugify(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
@@ -222,7 +241,14 @@ function parseTriggers(value: unknown): SkillTrigger {
   }
 }
 
-/** Escape special characters for YAML string output */
+/** Escape special characters for YAML double-quoted string output.
+ *  Handles backslash, double-quote, and control chars (\n, \t, \r) to
+ *  keep the writer and the SkillEditor's yamlEscape in sync. */
 function escapeYamlString(str: string): string {
-  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/\r/g, '\\r')
 }

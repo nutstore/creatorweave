@@ -17,6 +17,7 @@ import {
   type SessionSkillState,
 } from './skill-injection'
 import { scanProjectSkills } from './skill-scanner'
+import { scanUserSkills, migrateUserSkillsFromSQLite } from './user-skills-scanner'
 import { generateResourceId } from './skill-resources'
 import {
   clearSkillCommands,
@@ -27,6 +28,8 @@ export class SkillManager {
   private _initialized = false
   private cachedPersistentSkills: Skill[] = []
   private cachedProjectSkills: Skill[] = []
+  private cachedUserSkills: Skill[] = []
+  private userResourcesBySkillId = new Map<string, SkillResource[]>()
   private projectResourcesBySkillId = new Map<string, SkillResource[]>()
   private activeProjectId: string | null = null
   private initPromise: Promise<void> | null = null
@@ -83,7 +86,7 @@ export class SkillManager {
       // Project skills are now runtime-scoped and must not persist in SQLite.
       await storage.purgeProjectSkillsFromStorage()
 
-      // Step 1: Seed materialized builtin skills from OPFS (cw:brainstorm etc.)
+      // Step 1: Seed materialized builtin skills from OPFS (cw-brainstorm etc.)
       // These are skills defined in builtin-packages/ with SKILL.md files.
       const bundledSkillIds: string[] = []
       try {
@@ -130,6 +133,27 @@ export class SkillManager {
         }
       }
       await this.refreshCache()
+
+      // Step 2b: Migrate legacy user skills from SQLite to OPFS.
+      // Older app versions stored source='user' skills in SQLite. The current
+      // architecture uses OPFS `.skills/user/` as the single source of truth.
+      // This must run BEFORE refreshUserSkills() so the migrated files are
+      // picked up by the OPFS scan.
+      try {
+        const result = await migrateUserSkillsFromSQLite()
+        if (result.migrated.length > 0 || result.pruned.length > 0) {
+          // Re-sync cachedPersistentSkills — migrated skills are now removed
+          // from SQLite and should not linger in the persistent cache.
+          await this.refreshCache()
+        }
+      } catch (error) {
+        console.warn('[SkillManager] User skill migration failed:', error)
+      }
+
+      // Step 3: Scan user skills from OPFS `.skills/user/` directory.
+      // These are runtime-loaded (not persisted to SQLite) — OPFS files
+      // are the single source of truth for user skills.
+      await this.refreshUserSkills()
 
       // Update tool registry with skill tools
       const { getToolRegistry } = await import('@/agent/tool-registry')
@@ -223,7 +247,7 @@ export class SkillManager {
    * Get all cached skills (for UI display).
    */
   getSkills(): Skill[] {
-    return [...this.cachedPersistentSkills, ...this.cachedProjectSkills]
+    return [...this.cachedPersistentSkills, ...this.cachedUserSkills, ...this.cachedProjectSkills]
   }
 
   /**
@@ -278,6 +302,9 @@ export class SkillManager {
     if (skillId.startsWith('project:')) {
       return this.projectResourcesBySkillId.get(skillId) || []
     }
+    if (skillId.startsWith('user:')) {
+      return this.userResourcesBySkillId.get(skillId) || []
+    }
     return storage.getSkillResources(skillId)
   }
 
@@ -318,6 +345,26 @@ export class SkillManager {
   }
 
   /**
+   * Update enabled status for a user-scoped skill (OPFS-based).
+   *
+   * User skills do not have a SQLite record. The enabled state is persisted
+   * to localStorage (keyed globally, not per-project) so that it survives
+   * page refreshes. On load, `refreshUserSkills()` reads this state and
+   * applies it to the freshly-scanned skills.
+   */
+  setUserSkillEnabled(skillId: string, enabled: boolean): void {
+    // Persist to localStorage
+    const state = this.loadUserSkillState()
+    state[skillId] = enabled
+    this.saveUserSkillState(state)
+
+    // Update in-memory cache
+    this.cachedUserSkills = this.cachedUserSkills.map((skill) =>
+      skill.id === skillId ? { ...skill, enabled } : skill
+    )
+  }
+
+  /**
    * Persist and update enabled status for a project-scoped skill.
    */
   setProjectSkillEnabled(skillId: string, enabled: boolean, projectId?: string | null): void {
@@ -337,6 +384,56 @@ export class SkillManager {
     this.cachedProjectSkills = this.cachedProjectSkills.map((skill) =>
       skill.id === skillId ? { ...skill, enabled } : skill
     )
+  }
+
+  /**
+   * Scan OPFS `.skills/user/` for user skills and populate runtime cache.
+   *
+   * User skills are NOT persisted to SQLite — OPFS files are the single source
+   * of truth. Call this after user skills are created/edited/deleted via
+   * `vfs://skills/user/` file operations.
+   */
+  async refreshUserSkills(): Promise<void> {
+    try {
+      const result = await scanUserSkills()
+      // Apply persisted enabled state from localStorage so that user-skill
+      // toggle choices survive page refreshes.
+      const savedState = this.loadUserSkillState()
+      this.cachedUserSkills = result.skills.map((skill) => ({
+        ...skill,
+        enabled: Object.prototype.hasOwnProperty.call(savedState, skill.id)
+          ? savedState[skill.id]
+          : skill.enabled,
+      }))
+      const bySkillId = new Map<string, SkillResource[]>()
+      for (const resource of result.resources) {
+        const list = bySkillId.get(resource.skillId)
+        if (list) {
+          list.push(resource)
+        } else {
+          bySkillId.set(resource.skillId, [resource])
+        }
+      }
+      this.userResourcesBySkillId = bySkillId
+
+      if (result.errors.length > 0) {
+        console.warn('[SkillManager] User skills scan errors:', result.errors)
+      }
+      if (result.skills.length > 0) {
+        console.log(
+          '[SkillManager] Loaded',
+          result.skills.length,
+          'user skill(s):',
+          result.skills.map((s) => s.name)
+        )
+      }
+      // Keep slash commands in sync
+      this.syncSlashCommands()
+    } catch (error) {
+      console.warn('[SkillManager] User skills scan failed:', error)
+      this.cachedUserSkills = []
+      this.userResourcesBySkillId = new Map()
+    }
   }
 
   /**
@@ -464,6 +561,46 @@ export class SkillManager {
       storage.setItem(this.getProjectSkillStateKey(projectId), JSON.stringify(state))
     } catch (error) {
       console.warn('[SkillManager] Failed to persist project skill state:', error)
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // User skill enabled-state persistence (localStorage, global scope)
+  // ------------------------------------------------------------------
+
+  private getUserSkillStateKey(): string {
+    return 'creatorweave:user-skill-enabled'
+  }
+
+  private loadUserSkillState(): Record<string, boolean> {
+    const storage = this.getLocalStorage()
+    if (!storage) return {}
+
+    try {
+      const raw = storage.getItem(this.getUserSkillStateKey())
+      if (!raw) return {}
+      const parsed = JSON.parse(raw) as unknown
+      if (!parsed || typeof parsed !== 'object') return {}
+      const result: Record<string, boolean> = {}
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'boolean') {
+          result[key] = value
+        }
+      }
+      return result
+    } catch {
+      return {}
+    }
+  }
+
+  private saveUserSkillState(state: Record<string, boolean>): void {
+    const storage = this.getLocalStorage()
+    if (!storage) return
+
+    try {
+      storage.setItem(this.getUserSkillStateKey(), JSON.stringify(state))
+    } catch (error) {
+      console.warn('[SkillManager] Failed to persist user skill state:', error)
     }
   }
 

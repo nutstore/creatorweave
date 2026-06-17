@@ -4,7 +4,7 @@ Quick validation script for CreatorWeave skills.
 
 Adapted from Anthropic's skill-creator for the CreatorWeave platform.
 Validates SKILL.md frontmatter format including CreatorWeave-specific fields
-(cw: prefix, category, tags, triggers).
+(cw- prefix, category, tags, triggers).
 """
 
 import json
@@ -19,7 +19,7 @@ def validate_skill(skill_path: str) -> tuple[bool, str]:
     Checks:
     - SKILL.md exists
     - Valid YAML frontmatter
-    - Required fields: name (with cw: prefix), description
+    - Required fields: name (with cw- prefix), description
     - Name is kebab-case, max 64 chars
     - Description under 1024 chars, no angle brackets
     - Optional fields: category, tags, triggers
@@ -85,12 +85,12 @@ def validate_skill(skill_path: str) -> tuple[bool, str]:
     if not name:
         return False, "Name cannot be empty"
 
-    # Check cw: prefix (recommended for CreatorWeave skills)
-    if not name.startswith("cw:"):
-        return False, f"Name '{name}' should have 'cw:' prefix (e.g., 'cw:my-skill')"
+    # Check cw- prefix (recommended for CreatorWeave skills)
+    if not name.startswith("cw-"):
+        return False, f"Name '{name}' should have 'cw-' prefix (e.g., 'cw-my-skill')"
 
     # Check name part after prefix (kebab-case)
-    name_part = name[3:]  # strip "cw:"
+    name_part = name[3:]  # strip "cw-"
     if not re.match(r"^[a-z0-9-]+$", name_part):
         return False, (
             f"Name part '{name_part}' should be kebab-case "

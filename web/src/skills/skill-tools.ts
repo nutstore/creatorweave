@@ -15,6 +15,99 @@ import {
   readSkillMdFromOPFS,
 } from './skills-platform-adapter'
 
+/**
+ * Read SKILL.md from OPFS for a user skill.
+ * User skills live at `.skills/user/<skill-dir>/SKILL.md`.
+ * Returns the raw text content, or null if not found.
+ */
+async function readUserSkillMdFromOPFS(skillDirName: string): Promise<string | null> {
+  try {
+    const opfsRoot = await navigator.storage.getDirectory()
+    const skillsDir = await opfsRoot.getDirectoryHandle('.skills')
+    const userDir = await skillsDir.getDirectoryHandle('user')
+    const skillDir = await userDir.getDirectoryHandle(skillDirName)
+    const fileHandle = await skillDir.getFileHandle('SKILL.md')
+    const file = await fileHandle.getFile()
+    return await file.text()
+  } catch {
+    return null
+  }
+}
+
+/**
+ * List resource files for a user skill from OPFS.
+ */
+async function listUserSkillResourcesFromOPFS(
+  skillDirName: string
+): Promise<Array<{ resourcePath: string; resourceType: string; size: number }>> {
+  const resources: Array<{ resourcePath: string; resourceType: string; size: number }> = []
+  const ignored = new Set(['SKILL.md'])
+  try {
+    const opfsRoot = await navigator.storage.getDirectory()
+    const skillsDir = await opfsRoot.getDirectoryHandle('.skills')
+    const userDir = await skillsDir.getDirectoryHandle('user')
+    const skillDir = await userDir.getDirectoryHandle(skillDirName)
+
+    const scanRecursive = async (
+      dir: FileSystemDirectoryHandle,
+      prefix: string
+    ): Promise<void> => {
+      for await (const [name, handle] of dir.entries()) {
+        const relPath = prefix ? `${prefix}/${name}` : name
+        if (handle.kind === 'directory') {
+          await scanRecursive(handle as FileSystemDirectoryHandle, relPath)
+        } else {
+          if (ignored.has(name)) continue
+          let size = 0
+          try {
+            const file = await (handle as FileSystemFileHandle).getFile()
+            size = file.size
+          } catch { /* skip */ }
+          const topDir = relPath.split('/')[0]
+          const type = topDir === 'references' ? 'reference' : topDir === 'scripts' ? 'script' : 'asset'
+          resources.push({ resourcePath: relPath, resourceType: type, size })
+        }
+      }
+    }
+
+    await scanRecursive(skillDir, '')
+  } catch {
+    // directory not found
+  }
+  return resources
+}
+
+/**
+ * Read a specific resource file for a user skill from OPFS.
+ */
+async function readUserSkillResourceFromOPFS(
+  skillDirName: string,
+  resourcePath: string
+): Promise<{ content: string; resourceType: string; size: number } | null> {
+  try {
+    const opfsRoot = await navigator.storage.getDirectory()
+    const skillsDir = await opfsRoot.getDirectoryHandle('.skills')
+    const userDir = await skillsDir.getDirectoryHandle('user')
+    const skillDir = await userDir.getDirectoryHandle(skillDirName)
+
+    // Navigate to the file via path segments
+    const parts = resourcePath.split('/').filter(Boolean)
+    const fileName = parts.pop()!
+    let dir = skillDir
+    for (const part of parts) {
+      dir = await dir.getDirectoryHandle(part)
+    }
+    const fileHandle = await dir.getFileHandle(fileName)
+    const file = await fileHandle.getFile()
+    const content = await file.text()
+    const topDir = resourcePath.split('/')[0]
+    const type = topDir === 'references' ? 'reference' : topDir === 'scripts' ? 'script' : 'asset'
+    return { content, resourceType: type, size: file.size }
+  } catch {
+    return null
+  }
+}
+
 //=============================================================================
 // read_skill Tool
 //=============================================================================
@@ -67,6 +160,7 @@ export const readSkillExecutor: ToolExecutor = async (
 
   // Get associated resources — read directly from OPFS for builtin skills
   const isBuiltin = skill.source === 'builtin'
+  const isUser = skill.source === 'user'
   let resources: Array<{ resourcePath: string; resourceType: string; size: number; id?: string; skillId?: string; content?: string; contentType?: string; createdAt?: number }> = []
 
   // For builtin skills: read SKILL.md directly from OPFS to get latest content
@@ -74,6 +168,9 @@ export const readSkillExecutor: ToolExecutor = async (
   let liveInstruction = skill.instruction
   let liveExamples = skill.examples
   let liveTemplates = skill.templates
+
+  // For user skills: the skill directory name is the part after 'user:'
+  const userDirName = isUser ? skill.id.replace(/^user:/, '') : ''
 
   if (isBuiltin) {
     // Builtin skills: scan OPFS directory for resource files
@@ -90,8 +187,23 @@ export const readSkillExecutor: ToolExecutor = async (
         liveTemplates = parsed.skill.templates
       }
     }
+  } else if (isUser) {
+    // User skills: scan OPFS `.skills/user/<dirName>/` for resource files
+    resources = await listUserSkillResourcesFromOPFS(userDirName)
+
+    // Read and parse SKILL.md directly from OPFS
+    const skillMdContent = await readUserSkillMdFromOPFS(userDirName)
+    if (skillMdContent) {
+      const { parseSkillMd } = await import('./skill-parser')
+      const parsed = parseSkillMd(skillMdContent, 'user')
+      if (parsed.skill) {
+        liveInstruction = parsed.skill.instruction
+        liveExamples = parsed.skill.examples
+        liveTemplates = parsed.skill.templates
+      }
+    }
   } else {
-    // Project/user skills: use SQLite storage
+    // Project skills: use SQLite storage
     resources = await manager.getSkillResources(skill.id)
   }
 
@@ -135,7 +247,9 @@ export const readSkillExecutor: ToolExecutor = async (
 
   // Append /mnt_skills path hint for Python execution
   if (isBuiltin) {
-    output += `\n\n**Python execution path:** \`/mnt_skills/builtin/${skill.name.replace(/\s+/g, '-').toLowerCase()}/\``
+    output += `\n\n**Python execution path:** \`/mnt_skills/builtin/${skill.name}/\``
+  } else if (isUser) {
+    output += `\n\n**Python execution path:** \`/mnt_skills/user/${userDirName}/\``
   }
 
   output += `\n---\n*Skill: ${skill.name}*`
@@ -214,6 +328,27 @@ export const readSkillResourceExecutor: ToolExecutor = async (
 
     const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
     const output = `# ${skill.id}/${resource.resourcePath}\n\n**Type:** ${typeLabel}\n**Size:** ${resource.size} bytes\n\n---\n\n${resource.content}`
+
+    return toolOkJson('read_skill_resource', output)
+  }
+
+  // For user skills: read directly from OPFS `.skills/user/<dirName>/`
+  if (skill.source === 'user') {
+    const userDirName = skill.id.replace(/^user:/, '')
+    const resource = await readUserSkillResourceFromOPFS(userDirName, resource_path)
+
+    if (!resource) {
+      const available = await listUserSkillResourcesFromOPFS(userDirName)
+      const availablePaths = available.map((r) => `  - ${r.resourcePath}`).join('\n')
+      return toolErrorJson(
+        'read_skill_resource',
+        'resource_not_found',
+        `Resource '${resource_path}' not found in skill '${skill_name}'.\n\nAvailable resources in this skill:\n${availablePaths || '  (none)'}`
+      )
+    }
+
+    const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
+    const output = `# ${skill.id}/${resource_path}\n\n**Type:** ${typeLabel}\n**Size:** ${resource.size} bytes\n\n---\n\n${resource.content}`
 
     return toolOkJson('read_skill_resource', output)
   }

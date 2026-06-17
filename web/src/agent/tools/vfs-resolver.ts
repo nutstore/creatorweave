@@ -5,6 +5,7 @@ import type { VfsBackend } from './vfs-backend'
 import { WorkspaceBackend } from './backends/workspace-backend'
 import { AgentBackend } from './backends/agent-backend'
 import { AssetsBackend } from './backends/assets-backend'
+import { SkillsBackend } from './backends/skills-backend'
 
 export type VfsAction = 'read' | 'write' | 'delete' | 'list'
 
@@ -29,10 +30,16 @@ export interface AssetsTarget {
   backend: VfsBackend
 }
 
-export type ResolvedVfsTarget = WorkspaceTarget | AgentTarget | AssetsTarget
+export interface SkillsTarget {
+  kind: 'skills'
+  path: string
+  backend: VfsBackend
+}
+
+export type ResolvedVfsTarget = WorkspaceTarget | AgentTarget | AssetsTarget | SkillsTarget
 
 interface ParsedPath {
-  namespace: 'workspace' | 'agents' | 'assets'
+  namespace: 'workspace' | 'agents' | 'assets' | 'skills'
   path: string
   agentId?: string
 }
@@ -132,6 +139,13 @@ function parseVfsPath(
     }
   }
 
+  if (namespace === 'skills' || namespace === 'skill') {
+    return {
+      namespace: 'skills',
+      path: normalizeRelativePath(parts.slice(1).join('/'), { allowEmpty: allowEmptyPath }),
+    }
+  }
+
   throw new Error(`Unsupported vfs namespace: ${namespace || '(empty)'}`)
 }
 
@@ -188,6 +202,14 @@ export async function resolveVfsTarget(
       kind: 'assets',
       path: parsed.path,
       backend: new AssetsBackend(context.workspaceId),
+    }
+  }
+
+  if (parsed.namespace === 'skills') {
+    return {
+      kind: 'skills',
+      path: parsed.path,
+      backend: new SkillsBackend(),
     }
   }
 

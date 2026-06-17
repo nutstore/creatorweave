@@ -213,6 +213,15 @@ async function executeSingleWrite(
     // Refresh timestamp after successful write to avoid false staleness on consecutive edits
     refreshReadTimestamp(context, resolvedPath, Date.now())
 
+    // If writing to the skills namespace, refresh the user skills cache so
+    // the new/updated skill appears in the available skills list immediately.
+    if (target.backend.label === 'skills') {
+      try {
+        const { getSkillManager } = await import('@/skills/skill-manager')
+        await getSkillManager().refreshUserSkills()
+      } catch { /* non-fatal */ }
+    }
+
     return toolOkJson(
       'write',
       {

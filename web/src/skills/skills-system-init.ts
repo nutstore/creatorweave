@@ -23,6 +23,7 @@ export interface SkillsSystemInitResult {
     total: number
     written: number
     skipped: number
+    pruned: number
     errors: Array<{ skill: string; error: string }>
     durationMs: number
   } | null
@@ -61,12 +62,14 @@ export async function initializeSkillsSystem(): Promise<SkillsSystemInitResult> 
       total: materializeResult.total,
       written: materializeResult.written,
       skipped: materializeResult.skipped,
+      pruned: materializeResult.pruned,
       errors: materializeResult.errors,
       durationMs: materializeResult.durationMs,
     }
     console.log(
       `[Skills System] Materialized: ${materializeResult.written} written, ` +
         `${materializeResult.skipped} skipped, ` +
+        `${materializeResult.pruned} pruned, ` +
         `${materializeResult.errors.length} errors, ` +
         `${materializeResult.durationMs.toFixed(0)}ms`
     )

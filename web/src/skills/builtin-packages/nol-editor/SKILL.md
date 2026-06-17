@@ -1,6 +1,6 @@
 ---
-name: cw:nol-editor
-version: 1.0.0
+name: cw-nol-editor
+version: 1.0.1
 description: Guide for reading, writing, and editing .nol (Outline Notes) files. Covers correct outline format, indentation rules, HTML content, and common pitfalls.
 category: general
 tags: [nol, outline, format, file-ops]

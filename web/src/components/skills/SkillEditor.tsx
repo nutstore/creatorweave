@@ -54,13 +54,18 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
   const [description, setDescription] = useState(skill?.description || '')
   const [instruction, setInstruction] = useState('')
 
-  // Load full skill content
+  // Load full skill content (with race-condition guard for rapid switching)
   useEffect(() => {
+    let cancelled = false
     if (skill) {
       setName(skill.name || '')
       setDescription(skill.description || '')
 
       skillsStore.getFullSkill(skill.id).then((fullSkill) => {
+        // Guard: if the user switched to a different skill before this
+        // async resolution landed, discard the result to avoid
+        // overwriting the textarea with stale content.
+        if (cancelled) return
         if (fullSkill) {
           setInstruction(fullSkill.instruction || '')
         }
@@ -70,26 +75,47 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
       setDescription('')
       setInstruction('')
     }
+    return () => {
+      cancelled = true
+    }
   }, [skill, skillsStore])
 
-  // Build SKILL.md content
+  // Build SKILL.md content.
+  // Preserves existing metadata (version/author/category/tags/triggers) when
+  // editing — only name/description/instruction are user-editable fields.
   const buildSkillMd = useCallback(() => {
     const lines: string[] = ['---']
     lines.push(`name: "${yamlEscape(name)}"`)
-    lines.push(`version: "1.0.0"`)
+    lines.push(`version: "${skill?.version || '1.0.0'}"`)
     lines.push(`description: "${yamlEscape(description)}"`)
-    lines.push(`author: "User"`)
-    lines.push(`category: general`)
-    lines.push(`tags: []`)
+    lines.push(`author: "${skill?.author || 'User'}"`)
+    lines.push(`category: ${skill?.category || 'general'}`)
+    // Preserve existing tags/triggers (UI doesn't edit them)
+    if (skill?.tags && skill.tags.length > 0) {
+      lines.push(`tags: [${skill.tags.map((tag) => `"${yamlEscape(tag)}"`).join(', ')}]`)
+    } else {
+      lines.push(`tags: []`)
+    }
     lines.push('triggers:')
-    lines.push('  keywords: []')
+    if (skill?.triggers?.keywords && skill.triggers.keywords.length > 0) {
+      lines.push(
+        `  keywords: [${skill.triggers.keywords.map((k) => `"${yamlEscape(k)}"`).join(', ')}]`
+      )
+    } else {
+      lines.push('  keywords: []')
+    }
+    if (skill?.triggers?.fileExtensions && skill.triggers.fileExtensions.length > 0) {
+      lines.push(
+        `  fileExtensions: [${skill.triggers.fileExtensions.map((e) => `"${e}"`).join(', ')}]`
+      )
+    }
     lines.push('---')
     lines.push('')
     if (instruction) {
       lines.push(instruction)
     }
     return lines.join('\n')
-  }, [name, description, instruction])
+  }, [name, description, instruction, skill])
 
   const handleSave = async () => {
     if (!name.trim()) { setError(t('skillEditor.nameRequired')); return }

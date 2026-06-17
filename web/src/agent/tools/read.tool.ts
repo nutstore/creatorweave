@@ -578,6 +578,7 @@ function normalizeReadStateSource(
     value === 'opfs' ||
     value === 'agent' ||
     value === 'assets' ||
+    value === 'skills' ||
     value === 'native_fallback'
   ) {
     return value
