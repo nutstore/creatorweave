@@ -13,6 +13,7 @@
 import type { Skill, SkillResource } from './skill-types'
 import { parseSkillMd, slugify } from './skill-parser'
 import { copyDirectoryRecursive } from './skill-folder-utils'
+import { unzipSync } from 'fflate'
 import {
   getResourceType,
   getMimeType,
@@ -418,6 +419,273 @@ export async function importUserSkillFolder(
   // Create fresh skill directory and copy files recursively
   const skillDir = await userDir.getDirectoryHandle(dirName, { create: true })
   return copyDirectoryRecursive(srcDirHandle, skillDir)
+}
+
+/**
+ * Result of inspecting a single skill inside a zip — used for preview UI.
+ */
+export interface ZipSkillEntry {
+  /** Skill directory name (inferred from zip filename or root folder) */
+  dirName: string
+  /** File tree for preview */
+  entries: import('./skill-folder-utils').FileEntry[]
+  /** File count for this skill */
+  fileCount: number
+  /** The common root prefix in the zip (e.g. "skills/my-skill/") */
+  _commonRoot: string
+}
+
+/**
+ * Result of inspecting a zip before import — used for preview UI.
+ * Supports both single-skill and multi-skill (bundle) zips.
+ */
+export interface ZipSkillPreview {
+  /** Whether this zip contains multiple skills (bundle mode) */
+  isBundle: boolean
+  /** Single skill preview (when isBundle=false) */
+  skill?: ZipSkillEntry
+  /** Multiple skill previews (when isBundle=true) */
+  skills?: ZipSkillEntry[]
+  /** The raw unzipped entries (path → data), kept for the actual write */
+  _raw: Record<string, Uint8Array>
+}
+
+/** Find all SKILL.md paths in the unzipped data (case-insensitive). */
+function findAllSkillMdPaths(paths: string[]): string[] {
+  return paths.filter((p) => p.split('/').pop()?.toLowerCase() === 'skill.md')
+}
+
+/**
+ * Build a single ZipSkillEntry from a SKILL.md path within the zip.
+ * Derives dirName and collects all files under the same root.
+ */
+function buildSkillEntry(
+  allPaths: string[],
+  skillMdPath: string,
+  _raw: Record<string, Uint8Array>,
+  fallbackDirName: string,
+): ZipSkillEntry {
+  // Determine the common root prefix for this skill (everything before SKILL.md).
+  const segments = skillMdPath.split('/')
+  const commonRoot = segments.length > 1 ? segments.slice(0, -1).join('/') + '/' : ''
+
+  // Infer dirName: prefer the top-level folder name, otherwise use fallback.
+  let dirName: string
+  if (commonRoot) {
+    dirName = commonRoot.replace(/\/$/, '')
+    // For bundle mode, dirName might be nested (e.g. "skills/my-skill").
+    // Take only the last segment as the actual skill directory name.
+    if (dirName.includes('/')) {
+      dirName = dirName.split('/').pop()!
+    }
+  } else {
+    dirName = fallbackDirName
+  }
+
+  // Collect paths that belong to this skill (under commonRoot).
+  const skillPaths = commonRoot
+    ? allPaths.filter((p) => p.startsWith(commonRoot))
+    : allPaths
+
+  // Strip common root for preview
+  const relativePaths = skillPaths.map((p) =>
+    commonRoot && p.startsWith(commonRoot) ? p.slice(commonRoot.length) : p,
+  )
+
+  return {
+    dirName,
+    entries: buildFileTreeFromPaths(relativePaths),
+    fileCount: skillPaths.length,
+    _commonRoot: commonRoot,
+  }
+}
+
+/**
+ * Inspect a zip file for skill import (stage 1 — validation + preview).
+ *
+ * Unzips in memory, finds SKILL.md file(s), and builds preview data.
+ * Supports both single-skill zips and multi-skill bundle zips.
+ *
+ * @param zipFile  The .zip File object (from drag-drop or file picker)
+ * @returns preview data, or throws if the zip is invalid.
+ */
+export async function previewUserSkillZip(zipFile: File): Promise<ZipSkillPreview> {
+  const buffer = await zipFile.arrayBuffer()
+  const unzipped = unzipSync(new Uint8Array(buffer))
+
+  // Build a list of file paths (skip directory entries ending with '/')
+  const allPaths = Object.keys(unzipped).filter((p) => !p.endsWith('/'))
+  if (allPaths.length === 0) {
+    throw new Error('ZIP archive is empty')
+  }
+
+  // Find all SKILL.md files (case-insensitive)
+  const skillMdPaths = findAllSkillMdPaths(allPaths)
+  if (skillMdPaths.length === 0) {
+    throw new Error('No SKILL.md found in ZIP archive')
+  }
+
+  const fallbackDirName = zipFile.name.replace(/\.zip$/i, '')
+
+  // Build skill entries for each SKILL.md found
+  const skills = skillMdPaths.map((mdPath) =>
+    buildSkillEntry(allPaths, mdPath, unzipped, fallbackDirName),
+  )
+
+  // Validate dirNames — they must be safe identifiers.
+  for (const skill of skills) {
+    if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(skill.dirName)) {
+      throw new Error(
+        `Invalid skill name "${skill.dirName}". Skill folder names must start with a letter and contain only letters, digits, and hyphens (e.g. "my-skill").`,
+      )
+    }
+  }
+
+  if (skills.length === 1) {
+    return {
+      isBundle: false,
+      skill: skills[0],
+      _raw: unzipped,
+    }
+  }
+
+  return {
+    isBundle: true,
+    skills,
+    _raw: unzipped,
+  }
+}
+
+/**
+ * Import a single skill from unzipped data into OPFS `.skills/user/<dirName>/`.
+ *
+ * @param raw       The raw unzipped entries (path → data)
+ * @param dirName   Target skill directory name
+ * @param commonRoot  The common root prefix to strip from each path
+ * @returns the number of files written.
+ */
+async function writeZipSkillToOpfs(
+  raw: Record<string, Uint8Array>,
+  dirName: string,
+  commonRoot: string,
+): Promise<number> {
+  const opfsRoot = await navigator.storage.getDirectory()
+  const skillsDir = await opfsRoot.getDirectoryHandle(SKILLS_ROOT, { create: true })
+  const userDir = await skillsDir.getDirectoryHandle(USER_SKILLS_DIR, { create: true })
+
+  // Remove existing skill directory to avoid stale files
+  try {
+    await userDir.removeEntry(dirName, { recursive: true })
+  } catch {
+    // Directory doesn't exist yet — fine
+  }
+
+  const skillDir = await userDir.getDirectoryHandle(dirName, { create: true })
+  let fileCount = 0
+
+  for (const [path, data] of Object.entries(raw)) {
+    if (path.endsWith('/')) continue
+
+    // Only process files under this skill's common root
+    if (commonRoot && !path.startsWith(commonRoot)) continue
+
+    // Strip common root prefix
+    const relPath = commonRoot && path.startsWith(commonRoot)
+      ? path.slice(commonRoot.length)
+      : path
+
+    // Split into path segments and navigate/create intermediate dirs
+    const parts = relPath.split('/').filter(Boolean)
+    if (parts.length === 0) continue
+
+    let currentDir = skillDir
+    for (let i = 0; i < parts.length - 1; i++) {
+      currentDir = await currentDir.getDirectoryHandle(parts[i], { create: true })
+    }
+
+    const fileHandle = await currentDir.getFileHandle(parts[parts.length - 1], { create: true })
+    const writable = await fileHandle.createWritable()
+    await writable.write(data)
+    await writable.close()
+    fileCount++
+  }
+
+  return fileCount
+}
+
+/**
+ * Import a previewed zip skill into OPFS `.skills/user/<dirName>/` (stage 2).
+ *
+ * For single-skill zips, imports the one skill.
+ * For bundle zips, imports all skills.
+ *
+ * @param preview  The preview returned by previewUserSkillZip
+ * @returns the total number of files written across all skills.
+ */
+export async function importUserSkillZip(
+  preview: ZipSkillPreview,
+): Promise<number> {
+  const { _raw } = preview
+
+  if (!preview.isBundle && preview.skill) {
+    const s = preview.skill
+    return writeZipSkillToOpfs(_raw, s.dirName, s._commonRoot)
+  }
+
+  if (preview.isBundle && preview.skills) {
+    let total = 0
+    for (const s of preview.skills) {
+      total += await writeZipSkillToOpfs(_raw, s.dirName, s._commonRoot)
+    }
+    return total
+  }
+
+  return 0
+}
+
+/**
+ * Build a FileEntry tree from a flat list of slash-separated paths.
+ * Used for zip preview (zip entries are flat, not hierarchical).
+ */
+function buildFileTreeFromPaths(
+  paths: string[],
+): import('./skill-folder-utils').FileEntry[] {
+  const root: import('./skill-folder-utils').FileEntry[] = []
+
+  for (const path of paths) {
+    const parts = path.split('/').filter(Boolean)
+    let level = root
+
+    for (let i = 0; i < parts.length; i++) {
+      const name = parts[i]
+      const isFile = i === parts.length - 1
+
+      if (isFile) {
+        level.push({ name, kind: 'file' })
+      } else {
+        let dir = level.find((e) => e.kind === 'directory' && e.name === name)
+        if (!dir) {
+          dir = { name, kind: 'directory', children: [] }
+          level.push(dir)
+        }
+        level = dir.children!
+      }
+    }
+  }
+
+  // Sort: directories first, then files, alphabetically
+  const sortEntries = (entries: import('./skill-folder-utils').FileEntry[]) => {
+    entries.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1
+      return a.name.localeCompare(b.name)
+    })
+    entries.forEach((e) => {
+      if (e.children) sortEntries(e.children)
+    })
+  }
+  sortEntries(root)
+
+  return root
 }
 
 /**

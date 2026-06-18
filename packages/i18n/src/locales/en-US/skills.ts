@@ -138,6 +138,7 @@ export const skillUpload = {
     success: "Uploaded {count} file(s) to .skills/{name}/",
     failed: "Upload failed",
     dropFolderOnly: "Please drop a folder, not individual files",
+    dropFolderOrZipOnly: "Please drop a skill folder or a .zip file",
     browserNotSupported: "Your browser does not support folder drag-and-drop. Please use the browse button instead.",
     writePermissionRequired: "Write permission is required to upload skills",
     dropHere: "Drop skill folder here",
@@ -152,6 +153,10 @@ export const skillUpload = {
     confirmUpload: "Upload",
     confirmOverwrite: "Replace & Upload",
     importUserSkill: "Import My Skill",
+    bundleDetected: "{count} skills detected — all will be imported to .skills/user/",
+    bundleOverwriteWarning: "Some skills already exist and will be replaced.",
+    skillsLabel: "skills",
+   bundleSuccess: "Imported {count} file(s) across {n} skills",
 } as const
 
 export const skillDetail = {

@@ -140,6 +140,7 @@ export const skillUpload = {
     success: "已上传 {count} 个文件到 .skills/{name}/",
     failed: "上传失败",
     dropFolderOnly: "请拖拽文件夹，而不是单个文件",
+    dropFolderOrZipOnly: "请拖拽技能文件夹或 .zip 压缩包",
     browserNotSupported: "您的浏览器不支持文件夹拖拽上传，请使用浏览按钮。",
     writePermissionRequired: "上传技能需要写入权限",
     dropHere: "将技能文件夹拖放到这里",
@@ -154,6 +155,10 @@ export const skillUpload = {
     confirmUpload: "上传",
     confirmOverwrite: "替换并上传",
     importUserSkill: "导入我的技能",
+    bundleDetected: "检测到 {count} 个技能 — 将全部导入到 .skills/user/",
+    bundleOverwriteWarning: "部分技能已存在，将被替换。",
+    skillsLabel: "个技能",
+   bundleSuccess: "导入 {count} 个文件，共 {n} 个技能",
 } as const
 
 export const skillDetail = {

@@ -160,15 +160,6 @@ export async function triggerPrefetchForMessages(
   toolContext: ToolContext,
   sessionId?: string
 ): Promise<void> {
-  // Find the last user message
-  const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user')
-  if (!lastUserMsg) return
-
-  // Extract user message content for potential future use in prefetch prediction
-  // Currently using recentMessages pattern, but individual message may be used for more targeted prediction
-  // Void to avoid unused variable warning
-  void (lastUserMsg.content || '')
-
   // Extract recent messages for context
   const recentMessages: string[] = []
   const recentFiles: string[] = []

@@ -138,6 +138,7 @@ export const skillUpload = {
     success: "{count}개 파일을 .skills/{name}/에 업로드했습니다",
     failed: "업로드 실패",
     dropFolderOnly: "개별 파일이 아닌 폴더를 드롭해 주세요",
+    dropFolderOrZipOnly: "스킬 폴더 또는 .zip 파일을 드롭해 주세요",
     browserNotSupported: "브라우저가 폴더 드래그 앤 드롭을 지원하지 않습니다. 찾아보기 버튼을 사용해 주세요.",
     writePermissionRequired: "스킬 업로드에 쓰기 권한이 필요합니다",
     dropHere: "스킬 폴더를 여기에 드롭하세요",
@@ -152,6 +153,10 @@ export const skillUpload = {
     confirmUpload: "업로드",
     confirmOverwrite: "교체 후 업로드",
     importUserSkill: "내 스킬 가져오기",
+    bundleDetected: "{count}개 스킬 감지 — 모두 .skills/user/로 가져옵니다",
+    bundleOverwriteWarning: "일부 스킬이 이미 존재하여 교체됩니다.",
+    skillsLabel: "스킬",
+   bundleSuccess: "{count}개 파일 가져오기 ({n} 스킬)",
 } as const
 
 export const skillDetail = {

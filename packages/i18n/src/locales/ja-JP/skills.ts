@@ -138,6 +138,7 @@ export const skillUpload = {
     success: "{count}ファイルを.skills/{name}/にアップロードしました",
     failed: "アップロードに失敗しました",
     dropFolderOnly: "個別ファイルではなくフォルダをドロップしてください",
+    dropFolderOrZipOnly: "スキルフォルダまたは .zip ファイルをドロップしてください",
     browserNotSupported: "お使いのブラウザはフォルダのドラッグ＆ドロップに対応していません。参照ボタンをご利用ください。",
     writePermissionRequired: "スキルのアップロードには書き込み権限が必要です",
     dropHere: "スキルフォルダをここにドロップ",
@@ -152,6 +153,10 @@ export const skillUpload = {
     confirmUpload: "アップロード",
     confirmOverwrite: "置き換えてアップロード",
     importUserSkill: "マイスキルをインポート",
+    bundleDetected: "{count} 個のスキルを検出 — すべて .skills/user/ にインポートします",
+    bundleOverwriteWarning: "一部のスキルは既に存在し、置き換えられます。",
+    skillsLabel: "スキル",
+   bundleSuccess: "{count} ファイルをインポート（{n} スキル）",
 } as const
 
 export const skillDetail = {
