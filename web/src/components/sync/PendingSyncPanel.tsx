@@ -7,10 +7,10 @@
  * - No extra scrolling, integrated in sidebar
  */
 
-import React, { useState, useCallback, useMemo, useEffect as useReactEffect, useRef } from 'react'
+import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
 import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
-import type { ChangeDetectionResult } from '@/opfs/types/opfs-types'
+import type { ChangeDetectionResult, FileChange } from '@/opfs/types/opfs-types'
 import { useSettingsStore } from '@/store/settings.store'
 import { getApiKeyRepository } from '@/sqlite'
 import { createLLMProvider } from '@/agent/llm/provider-factory'
@@ -28,12 +28,15 @@ import {
 import { RefreshCw, ChevronRight, X, Check, AlertTriangle } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
-import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
-import { ConflictResolutionDialog } from './ConflictResolutionDialog'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
+import {
+  useSyncDialogStore,
+  type SyncExecutor,
+  type NotifyFn,
+} from '@/store/sync-dialog.store'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
-import type { ConflictInfo, ConflictDetail, SyncResult } from '@/opfs/types/opfs-types'
+import type { SyncResult } from '@/opfs/types/opfs-types'
 
 /**
  * Custom equality function for pendingChanges selector.
@@ -53,28 +56,6 @@ function arePendingChangesEqual(
   )
 }
 
-/** Throttle a callback to at most once per animation frame */
-function useThrottledCallback<T extends (...args: any[]) => void>(
-  callback: T,
-): T {
-  const rafRef = useRef<number | null>(null)
-  const latestArgsRef = useRef<Parameters<T> | null>(null)
-
-  return useCallback(
-    (...args: Parameters<T>) => {
-      latestArgsRef.current = args
-      if (rafRef.current !== null) return // already scheduled
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null
-        if (latestArgsRef.current) {
-          callback(...latestArgsRef.current)
-        }
-      })
-    },
-    [callback],
-  ) as T
-}
-
 export function PendingSyncPanel() {
   const t = useT()
 
@@ -92,23 +73,22 @@ export function PendingSyncPanel() {
   const [showSyncSuccess, setShowSyncSuccess] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
-  const [pendingApprovePaths, setPendingApprovePaths] = useState<string[]>([])
-  const [snapshotSummary, setSnapshotSummary] = useState('')
-  const [generatingSummary, setGeneratingSummary] = useState(false)
-  const [summaryError, setSummaryError] = useState<string | null>(null)
-  const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
-  const [conflictQueue, setConflictQueue] = useState<ConflictDetail[]>([])
-  const [conflictIndex, setConflictIndex] = useState(0)
-  const [forceOverwritePaths, setForceOverwritePaths] = useState<Set<string>>(new Set())
-  const [skippedConflictPaths, setSkippedConflictPaths] = useState<Set<string>>(new Set())
-  const summaryAbortRef = React.useRef<AbortController | null>(null)
+  // conflictPaths lives in the shared store so both the badge renderer and
+  // the (singleton) conflict dialog stay in sync. Local proxy preserves the
+  // existing `setConflictPaths(prev => ...)` call sites unchanged.
+  const conflictPaths = useSyncDialogStore((s) => s.conflictPaths)
+  const setConflictPaths = useCallback(
+    (
+      updater: Set<string> | ((prev: Set<string>) => Set<string>),
+    ) => {
+      const store = useSyncDialogStore.getState()
+      const prev = store.conflictPaths
+      const next = typeof updater === 'function' ? (updater as (p: Set<string>) => Set<string>)(prev) : updater
+      store.setConflictPaths(next)
+    },
+    [],
+  )
   const listRef = React.useRef<HTMLDivElement>(null)
-  const activeConflict = conflictQueue[conflictIndex] ?? null
-
-  // Throttle streaming summary updates to once per animation frame
-  // to avoid re-rendering the entire panel on every LLM token
-  const throttledSetSnapshotSummary = useThrottledCallback(setSnapshotSummary)
 
   // Handle keyboard shortcuts
   useReactEffect(() => {
@@ -276,18 +256,6 @@ export function PendingSyncPanel() {
     toast.success(t('settings.pendingSyncPanel.rejectedAllSuccess'))
   }, [pendingChanges, selectedItems, t])
 
-  const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
-    path: conflict.path,
-    opfsVersion: {
-      workspaceId: conflict.workspaceId,
-      mtime: conflict.opfsMtime,
-    },
-    nativeVersion: {
-      exists: conflict.currentFsMtime > 0,
-      mtime: conflict.currentFsMtime > 0 ? conflict.currentFsMtime : undefined,
-    },
-  }), [])
-
   const mergeSyncResult = useCallback((a: SyncResult, b: SyncResult): SyncResult => ({
     success: a.success + b.success,
     failed: a.failed + b.failed,
@@ -296,7 +264,7 @@ export function PendingSyncPanel() {
   }), [])
 
   const generateSummaryWithLLM = useCallback(async (
-    paths: string[],
+    files: FileChange[],
     onChunk: (text: string) => void,
     signal?: AbortSignal,
   ): Promise<string | null> => {
@@ -326,7 +294,7 @@ export function PendingSyncPanel() {
           : undefined,
       })
 
-      const selectedChanges = (pendingChanges?.changes || []).filter((c) => paths.includes(c.path))
+      const selectedChanges = files
       const changesText = selectedChanges
         .slice(0, 20)
         .map((c) => `- ${c.type}: ${c.path}`)
@@ -408,7 +376,12 @@ export function PendingSyncPanel() {
     }
   }, [pendingChanges])
 
-  const runSync = useCallback(async (pathsToSync: string[], summary: string, overwritePaths: Set<string>) => {
+  /** Sync executor injected into the shared sync-dialog store. */
+  const syncExecutor = useCallback<SyncExecutor>(async (
+    filesToSync: FileChange[],
+    summary: string,
+    overwritePaths: Set<string>,
+  ) => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isSyncing) return false
 
     setIsSyncing(true)
@@ -424,7 +397,6 @@ export function PendingSyncPanel() {
       const { conversation } = activeConversation
       const nativeDir = await conversation.getNativeDirectoryHandle()
 
-      const filesToSync = pendingChanges.changes.filter((c) => pathsToSync.includes(c.path))
       if (filesToSync.length === 0) return false
 
       // Create approval snapshot (can do regardless of local directory)
@@ -473,11 +445,11 @@ export function PendingSyncPanel() {
 
       // Refresh list after sync (supports partial sync)
       await useConversationContextStore.getState().refreshPendingChanges(true)
+      const syncedPaths = new Set(filesToSync.map((c) => c.path))
       setConflictPaths((prev) => {
-        const synced = new Set(pathsToSync)
         const next = new Set<string>()
         for (const path of prev) {
-          if (!synced.has(path)) next.add(path)
+          if (!syncedPaths.has(path)) next.add(path)
         }
         return next
       })
@@ -499,115 +471,51 @@ export function PendingSyncPanel() {
     }
   }, [pendingChanges, isSyncing, mergeSyncResult, t])
 
-  // Handle approve button click: show dialog first
+  // Notify callback injected into the shared sync-dialog store.
+  // Surfaces localized messages for conflict/summary outcomes.
+  const notify = useCallback<NotifyFn>((kind, detail) => {
+    if (kind === 'noFilesAfterConflict') {
+      toast.info(t('settings.pendingSyncPanel.noFilesToSyncAfterConflict'))
+    } else if (kind === 'keepNativeFailed') {
+      const err = (detail as { error?: unknown })?.error
+      const message = err instanceof Error ? err.message : t('settings.pendingSyncPanel.keepNativeVersionFailed')
+      toast.error(message)
+    } else if (kind === 'summaryFailed') {
+      useSyncDialogStore.setState({ summaryError: t('settings.pendingSyncPanel.aiSummaryFailed') })
+    }
+  }, [t])
+
+  // Handle approve button click: kick off the shared approval flow.
+  // Conflict detection + dialog state is delegated to the store.
   const handleSync = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isSyncing) return
     if (selectedItems.size === 0) return
     const filesToSync = pendingChanges.changes.filter((c) => selectedItems.has(c.path))
-    const paths = filesToSync.map((c) => c.path)
-    if (paths.length === 0) return
+    if (filesToSync.length === 0) return
 
-    // Detect conflicts first
-    try {
-      const activeConversation = await getActiveConversation()
-      if (activeConversation) {
-        const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-        if (nativeDir) {
-          const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
-
-          if (conflicts.length > 0) {
-            setConflictPaths(new Set(conflicts.map((c) => c.path)))
-            setPendingApprovePaths(paths)
-            setForceOverwritePaths(new Set())
-            setSkippedConflictPaths(new Set())
-            setConflictQueue(conflicts.map(toConflictDetail))
-            setConflictIndex(0)
-            return
-          }
-          setConflictPaths(new Set())
-        }
-      }
-    } catch {
-      // Conflict detection failed, continue with approval
-    }
-
-    // No conflicts, show approval dialog
-    setPendingApprovePaths(paths)
-    setSnapshotSummary('')
-    setGeneratingSummary(false)
-    setSummaryError(null)
-    setApproveDialogOpen(true)
-  }, [pendingChanges, isSyncing, selectedItems, toConflictDetail])
-
-  const handleConflictResolve = useCallback(async (resolution: 'opfs' | 'native' | 'skip') => {
-    const current = activeConflict
-    if (!current) return
-
-    const nextForce = new Set(forceOverwritePaths)
-    const nextSkipped = new Set(skippedConflictPaths)
-
-    if (resolution === 'opfs') {
-      nextForce.add(current.path)
-    } else {
-      nextSkipped.add(current.path)
-      if (resolution === 'native') {
+    // Delegate the approval flow (conflict detection + dialog state) to the
+    // shared sync-dialog store. Dialogs are rendered once at WorkspaceLayout.
+    await useSyncDialogStore.getState().beginApprovalFlow(filesToSync, {
+      ctx: {
+        syncExecutor,
+        discardPending: discardPendingPath,
+        generateSummary: generateSummaryWithLLM,
+        notify,
+      },
+      detect: async () => {
         try {
-          await discardPendingPath(current.path)
-          await useConversationContextStore.getState().refreshPendingChanges(true)
-        } catch (error) {
-          const message = error instanceof Error ? error.message : t('settings.pendingSyncPanel.keepNativeVersionFailed')
-          toast.error(message)
-          return
+          const activeConversation = await getActiveConversation()
+          if (!activeConversation) return []
+          const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
+          if (!nativeDir) return []
+          const paths = filesToSync.map((c) => c.path)
+          return await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
+        } catch {
+          return []
         }
-      }
-      setConflictPaths((prev) => {
-        const next = new Set(prev)
-        next.delete(current.path)
-        return next
-      })
-    }
-
-    setForceOverwritePaths(nextForce)
-    setSkippedConflictPaths(nextSkipped)
-
-    const nextIndex = conflictIndex + 1
-    if (nextIndex < conflictQueue.length) {
-      setConflictIndex(nextIndex)
-      return
-    }
-
-    setConflictQueue([])
-    setConflictIndex(0)
-
-    const nextPaths = pendingApprovePaths.filter((path) => !nextSkipped.has(path))
-    if (nextPaths.length === 0) {
-      setPendingApprovePaths([])
-      toast.info(t('settings.pendingSyncPanel.noFilesToSyncAfterConflict'))
-      return
-    }
-
-    setPendingApprovePaths(nextPaths)
-    setSnapshotSummary('')
-    setGeneratingSummary(false)
-    setSummaryError(null)
-    setApproveDialogOpen(true)
-  }, [
-    activeConflict,
-    conflictIndex,
-    conflictQueue.length,
-    discardPendingPath,
-    forceOverwritePaths,
-    pendingApprovePaths,
-    skippedConflictPaths,
-    t,
-  ])
-
-  const handleConflictCancel = useCallback(() => {
-    setConflictQueue([])
-    setConflictIndex(0)
-    setForceOverwritePaths(new Set())
-    setSkippedConflictPaths(new Set())
-  }, [])
+      },
+    })
+  }, [pendingChanges, isSyncing, selectedItems, syncExecutor, discardPendingPath, generateSummaryWithLLM, notify])
 
   // Show empty state when no pending changes
   if (isEmpty) {
@@ -838,60 +746,6 @@ export function PendingSyncPanel() {
           </BrandDialogFooter>
         </BrandDialogContent>
       </BrandDialog>
-
-      <SnapshotApprovalDialog
-        open={approveDialogOpen}
-        pendingCount={pendingApprovePaths.length}
-        summary={snapshotSummary}
-        summaryError={summaryError}
-        generatingSummary={generatingSummary}
-        isSyncing={isSyncing}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen && generatingSummary) {
-            summaryAbortRef.current?.abort()
-            summaryAbortRef.current = null
-          }
-          setApproveDialogOpen(nextOpen)
-        }}
-        onSummaryChange={setSnapshotSummary}
-        onGenerateSummary={async () => {
-          summaryAbortRef.current?.abort()
-          const controller = new AbortController()
-          summaryAbortRef.current = controller
-          setGeneratingSummary(true)
-          setSnapshotSummary('')
-          const aiSummary = await generateSummaryWithLLM(
-            pendingApprovePaths,
-            (chunk) => throttledSetSnapshotSummary(chunk),
-            controller.signal,
-          )
-          // Only update state if this controller is still the active one
-          // (prevents a cancelled first call from resetting spinner during a second call)
-          if (summaryAbortRef.current !== controller) return
-          if (controller.signal.aborted) {
-            // Cancelled — don't update summary/error
-          } else if (aiSummary && aiSummary.trim().length > 0) {
-            setSnapshotSummary(aiSummary.trim())
-            setSummaryError(null)
-          } else {
-            setSummaryError(t('settings.pendingSyncPanel.aiSummaryFailed'))
-          }
-          setGeneratingSummary(false)
-          summaryAbortRef.current = null
-        }}
-        onConfirm={async () => {
-          const ok = await runSync(pendingApprovePaths, snapshotSummary, forceOverwritePaths)
-          if (ok) setApproveDialogOpen(false)
-        }}
-      />
-
-      {activeConflict && (
-        <ConflictResolutionDialog
-          conflict={activeConflict}
-          onResolve={handleConflictResolve}
-          onCancel={handleConflictCancel}
-        />
-      )}
     </div>
   )
 }

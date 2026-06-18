@@ -95,16 +95,8 @@ vi.mock('./snapshot-summary-prompt', () => ({
   buildSnapshotSummaryPrompt: vi.fn(() => ''),
 }))
 
-vi.mock('./SnapshotApprovalDialog', () => ({
-  SnapshotApprovalDialog: () => null,
-}))
-
 vi.mock('./review-request', () => ({
   sendChangeReviewToConversation: vi.fn(async () => {}),
-}))
-
-vi.mock('./ConflictResolutionDialog', () => ({
-  ConflictResolutionDialog: () => null,
 }))
 
 vi.mock('@/components/layout/SidebarPanelHeader', () => ({

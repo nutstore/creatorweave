@@ -10,7 +10,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Settings,
-  SlidersHorizontal,
   Wrench,
   KeyRound,
   List,
@@ -54,8 +53,6 @@ interface TopBarProps {
   onSkillsManagerOpen?: () => void
   onToolsPanelOpen?: () => void
   onCommandPaletteOpen?: () => void
-  /** @deprecated Workspace settings are now merged into the main SettingsDialog. Kept for compatibility. */
-  onWorkspaceSettingsOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
   activeConversationName?: string
@@ -83,7 +80,6 @@ export function TopBar({
   onSkillsManagerOpen,
   onToolsPanelOpen,
   onCommandPaletteOpen,
-  onWorkspaceSettingsOpen,
   onBackToProjects,
   activeProjectName,
   activeConversationName,
@@ -249,13 +245,6 @@ export function TopBar({
 
             <div className="h-5 w-px bg-muted" />
 
-            {/* Workspace Settings — now opens the unified Settings dialog at the layout tab */}
-            <ActionTooltip label={t('topbar.tooltips.workspaceSettings')}>
-              <BrandButton iconButton className="shrink-0" onClick={() => openSettings('workspace-layout')}>
-                <SlidersHorizontal className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
-
             {/* Tools Panel */}
             <ActionTooltip label={t('topbar.tooltips.toolsPanel')}>
               <BrandButton iconButton className="shrink-0" onClick={onToolsPanelOpen} data-tour="tools">
@@ -306,18 +295,6 @@ export function TopBar({
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                onWorkspaceSettingsOpen?.()
-                openSettings('workspace-layout')
-                closeMobileMorePanel()
-              }}
-            >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              {t('topbar.mobile.workspaceSettings')}
-            </BrandButton>
             <BrandButton
               variant="ghost"
               className="h-9 justify-start gap-2 text-xs"

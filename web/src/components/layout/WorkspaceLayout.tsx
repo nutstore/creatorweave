@@ -33,6 +33,7 @@ import { ConversationView } from '@/components/agent/ConversationView'
 import { FilePreview } from '@/components/file-viewer/FilePreview'
 import { WelcomeScreenV2 } from '@/components/WelcomeScreenV2'
 import { SyncPreviewPanel } from '@/components/sync'
+import { SharedSyncDialogs } from '@/components/sync/SharedSyncDialogs'
 import { Drawer } from '@/components/ui/drawer'
 import { SkillsManager } from '@/components/skills/SkillsManager'
 import { ToolsPanel, QuickActionsPanel } from '@/components/tools'
@@ -692,7 +693,6 @@ export function WorkspaceLayout({
         onSkillsManagerOpen={handleSkillsManagerOpen}
         onToolsPanelOpen={() => setToolsPanelOpen(true)}
         onCommandPaletteOpen={() => setShowCommandPalette(true)}
-        onWorkspaceSettingsOpen={() => setShowWorkspaceSettings(true)}
         onBackToProjects={onBackToProjects}
         activeProjectName={projectName}
         activeConversationName={activeConversationName}
@@ -803,6 +803,11 @@ export function WorkspaceLayout({
           >
             <SyncPreviewPanel onCancel={handleClosePreview} />
           </Drawer>
+
+          {/* Shared sync dialogs (approval + conflict) — rendered ONCE here.
+              Both PendingSyncPanel (sidebar) and SyncPreviewPanel (drawer)
+              trigger the flow via the shared sync-dialog store. */}
+          <SharedSyncDialogs />
         </div>
       </div>
 

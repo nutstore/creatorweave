@@ -9,7 +9,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
-import { type FileChange, type ConflictInfo, type ConflictDetail, type SyncResult } from '@/opfs/types/opfs-types'
+import { type FileChange, type SyncResult } from '@/opfs/types/opfs-types'
 import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -23,9 +23,12 @@ import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
 import { ArrowLeft, AlertCircle, Sparkles, MessageSquare, ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
-import { SnapshotApprovalDialog } from './SnapshotApprovalDialog'
 import { sendChangeReviewToConversation } from './review-request'
-import { ConflictResolutionDialog } from './ConflictResolutionDialog'
+import {
+  useSyncDialogStore,
+  type SyncExecutor,
+  type NotifyFn,
+} from '@/store/sync-dialog.store'
 import { toast } from 'sonner'
 import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
 import { useT } from '@/i18n'
@@ -125,18 +128,21 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
   const selectedPath = selectedFile?.path
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
-  const [pendingApproveFiles, setPendingApproveFiles] = useState<FileChange[]>([])
-  const [snapshotSummary, setSnapshotSummary] = useState('')
-  const [generatingSummary, setGeneratingSummary] = useState(false)
-  const [summaryError, setSummaryError] = useState<string | null>(null)
   const [isReviewing, setIsReviewing] = useState(false)
-  const [conflictPaths, setConflictPaths] = useState<Set<string>>(new Set())
-  const [conflictQueue, setConflictQueue] = useState<ConflictDetail[]>([])
-  const [conflictIndex, setConflictIndex] = useState(0)
-  const [forceOverwritePaths, setForceOverwritePaths] = useState<Set<string>>(new Set())
-  const [skippedConflictPaths, setSkippedConflictPaths] = useState<Set<string>>(new Set())
-  const activeConflict = conflictQueue[conflictIndex] ?? null
+  // conflictPaths lives in the shared store so both the badge renderer and
+  // the (singleton) conflict dialog stay in sync.
+  const conflictPaths = useSyncDialogStore((s) => s.conflictPaths)
+  const setConflictPaths = useCallback(
+    (
+      updater: Set<string> | ((prev: Set<string>) => Set<string>),
+    ) => {
+      const store = useSyncDialogStore.getState()
+      const prev = store.conflictPaths
+      const next = typeof updater === 'function' ? (updater as (p: Set<string>) => Set<string>)(prev) : updater
+      store.setConflictPaths(next)
+    },
+    [],
+  )
 
   // Selection state for selective sync
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
@@ -149,18 +155,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     [commentsByPath]
   )
   const commentedFileCount = Object.keys(commentsByPath).filter(k => commentsByPath[k].length > 0).length
-
-  const toConflictDetail = useCallback((conflict: ConflictInfo): ConflictDetail => ({
-    path: conflict.path,
-    opfsVersion: {
-      workspaceId: conflict.workspaceId,
-      mtime: conflict.opfsMtime,
-    },
-    nativeVersion: {
-      exists: conflict.currentFsMtime > 0,
-      mtime: conflict.currentFsMtime > 0 ? conflict.currentFsMtime : undefined,
-    },
-  }), [])
 
   const mergeSyncResult = useCallback((a: SyncResult, b: SyncResult): SyncResult => ({
     success: a.success + b.success,
@@ -330,7 +324,8 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [])
 
-  const doSync = useCallback(async (
+  /** Sync executor injected into the shared sync-dialog store. */
+  const syncExecutor = useCallback<SyncExecutor>(async (
     filesToSync: FileChange[],
     summary: string,
     overwritePathSet: Set<string>
@@ -436,6 +431,19 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [pendingChanges, isSyncing, mergeSyncResult, onSync, selectedPath, t])
 
+  // Notify callback injected into the shared sync-dialog store.
+  const notify = useCallback<NotifyFn>((kind, detail) => {
+    if (kind === 'noFilesAfterConflict') {
+      toast.info(t('settings.syncPanel.syncPreview.noFilesAfterConflict'))
+    } else if (kind === 'keepNativeFailed') {
+      const err = (detail as { error?: unknown })?.error
+      const message = err instanceof Error ? err.message : t('settings.syncPanel.syncPreview.keepNativeFailed')
+      toast.error(message)
+    } else if (kind === 'summaryFailed') {
+      useSyncDialogStore.setState({ summaryError: t('settings.syncPanel.syncPreview.aiSummaryFailed') })
+    }
+  }, [t])
+
   const handleSync = useCallback(async (selectedPaths: string[] = []) => {
     if (!pendingChanges || isSyncing) return
 
@@ -444,110 +452,31 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       : pendingChanges.changes
     if (filesToSync.length === 0) return
 
-    // First, detect conflicts before showing approval dialog
-    try {
-      const activeConversation = await getActiveConversation()
-      if (activeConversation) {
-        const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-        if (nativeDir) {
-          const filePaths = filesToSync.map((c) => c.path)
-
-          const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, filePaths)
-
-          if (conflicts.length > 0) {
-            setConflictPaths(new Set(conflicts.map((c) => c.path)))
-            setPendingApproveFiles(filesToSync)
-            setForceOverwritePaths(new Set())
-            setSkippedConflictPaths(new Set())
-            setConflictQueue(conflicts.map(toConflictDetail))
-            setConflictIndex(0)
-            return
-          }
-          setConflictPaths(new Set())
-        }
-      }
-    } catch {
-      // Continue with sync even if conflict detection fails
-    }
-
-    // No conflicts, show approval dialog
-    setPendingApproveFiles(filesToSync)
     setSyncError(null)
-    setSummaryError(null)
-    setSnapshotSummary('')
-    setGeneratingSummary(false)
-    setApproveDialogOpen(true)
-  }, [pendingChanges, isSyncing, toConflictDetail])
 
-  const handleConflictResolve = useCallback(async (resolution: 'opfs' | 'native' | 'skip') => {
-    const current = activeConflict
-    if (!current) return
-
-    const nextForce = new Set(forceOverwritePaths)
-    const nextSkipped = new Set(skippedConflictPaths)
-
-    if (resolution === 'opfs') {
-      nextForce.add(current.path)
-    } else {
-      nextSkipped.add(current.path)
-      if (resolution === 'native') {
+    // Delegate the approval flow (conflict detection + dialog state) to the
+    // shared sync-dialog store. Dialogs are rendered once at WorkspaceLayout.
+    await useSyncDialogStore.getState().beginApprovalFlow(filesToSync, {
+      ctx: {
+        syncExecutor,
+        discardPending: discardPendingPath,
+        generateSummary: generateSummaryWithLLM,
+        notify,
+      },
+      detect: async () => {
         try {
-          await discardPendingPath(current.path)
-          await useConversationContextStore.getState().refreshPendingChanges(true)
-        } catch (error) {
-          const message = error instanceof Error ? error.message : t('settings.syncPanel.syncPreview.keepNativeFailed')
-          toast.error(message)
-          return
+          const activeConversation = await getActiveConversation()
+          if (!activeConversation) return []
+          const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
+          if (!nativeDir) return []
+          const filePaths = filesToSync.map((c) => c.path)
+          return await activeConversation.conversation.detectSyncConflicts(nativeDir, filePaths)
+        } catch {
+          return []
         }
-      }
-      setConflictPaths((prev) => {
-        const next = new Set(prev)
-        next.delete(current.path)
-        return next
-      })
-    }
-
-    setForceOverwritePaths(nextForce)
-    setSkippedConflictPaths(nextSkipped)
-
-    const nextIndex = conflictIndex + 1
-    if (nextIndex < conflictQueue.length) {
-      setConflictIndex(nextIndex)
-      return
-    }
-
-    setConflictQueue([])
-    setConflictIndex(0)
-
-    const nextFiles = pendingApproveFiles.filter((file) => !nextSkipped.has(file.path))
-    if (nextFiles.length === 0) {
-      setPendingApproveFiles([])
-      toast.info(t('settings.syncPanel.syncPreview.noFilesAfterConflict'))
-      return
-    }
-
-    setPendingApproveFiles(nextFiles)
-    setSnapshotSummary('')
-    setGeneratingSummary(false)
-    setSummaryError(null)
-    setApproveDialogOpen(true)
-  }, [
-    activeConflict,
-    conflictIndex,
-    conflictQueue.length,
-    discardPendingPath,
-    forceOverwritePaths,
-    pendingApproveFiles,
-    skippedConflictPaths,
-    t,
-  ])
-
-  const handleConflictCancel = useCallback(() => {
-    setConflictQueue([])
-    setConflictIndex(0)
-    setForceOverwritePaths(new Set())
-    setSkippedConflictPaths(new Set())
-  }, [])
+      },
+    })
+  }, [pendingChanges, isSyncing, syncExecutor, discardPendingPath, generateSummaryWithLLM, notify])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return
@@ -859,44 +788,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         </div>
         )}
       </div>
-
-      <SnapshotApprovalDialog
-        open={approveDialogOpen}
-        pendingCount={pendingApproveFiles.length}
-        summary={snapshotSummary}
-        summaryError={summaryError}
-        generatingSummary={generatingSummary}
-        isSyncing={isSyncing}
-        onOpenChange={setApproveDialogOpen}
-        onSummaryChange={setSnapshotSummary}
-        onGenerateSummary={async () => {
-          setGeneratingSummary(true)
-          setSnapshotSummary('')
-          const aiSummary = await generateSummaryWithLLM(
-            pendingApproveFiles,
-            (chunk) => setSnapshotSummary(chunk),
-          )
-          if (aiSummary && aiSummary.trim().length > 0) {
-            setSnapshotSummary(aiSummary.trim())
-            setSummaryError(null)
-          } else {
-            setSummaryError(t('settings.syncPanel.syncPreview.aiSummaryFailed'))
-          }
-          setGeneratingSummary(false)
-        }}
-        onConfirm={async () => {
-          const ok = await doSync(pendingApproveFiles, snapshotSummary, forceOverwritePaths)
-          if (ok) setApproveDialogOpen(false)
-        }}
-      />
-
-      {activeConflict && (
-        <ConflictResolutionDialog
-          conflict={activeConflict}
-          onResolve={handleConflictResolve}
-          onCancel={handleConflictCancel}
-        />
-      )}
     </>
   )
 }
