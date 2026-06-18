@@ -185,15 +185,50 @@ export class WorkspaceManager {
 
     this.workspaces.set(id, workspace)
 
-    const now = Date.now()
-    this.upsertIndexRecord({
-      workspaceId: id,
-      projectId,
-      rootDirectory,
-      name: name || rootDirectory.split('/').pop() || id,
-      createdAt: now,
-      lastAccessedAt: now,
-    })
+    // FIX: preserve original createdAt/lastAccessedAt when the workspace already
+    // exists (idempotent "ensure" path used by loadFromDB). Overwriting with
+    // Date.now() on every page load scrambles the conversation list order —
+    // the last-processed conversation gets the newest timestamp and jumps to
+    // the top, surfacing as "old conversations moved to the front".
+    const existingRecord = this.index.find((item) => item.workspaceId === id)
+    const isExisting = !!existingRecord || !!existingProjectId
+
+    if (isExisting) {
+      // Idempotent ensure: keep original timestamps, only refresh
+      // rootDirectory/name in case they drifted. If the record isn't in the
+      // in-memory index yet, re-read the authoritative timestamps from SQLite
+      // instead of falling back to Date.now() (which would scramble order).
+      let createdAt = existingRecord?.createdAt
+      let lastAccessedAt = existingRecord?.lastAccessedAt
+      if (createdAt === undefined || lastAccessedAt === undefined) {
+        try {
+          const row = await getWorkspaceRepository().findWorkspaceById(id)
+          createdAt = row?.createdAt ?? Date.now()
+          lastAccessedAt = row?.lastAccessedAt ?? Date.now()
+        } catch {
+          createdAt = createdAt ?? Date.now()
+          lastAccessedAt = lastAccessedAt ?? Date.now()
+        }
+      }
+      this.upsertIndexRecord({
+        workspaceId: id,
+        projectId,
+        rootDirectory,
+        name: name || existingRecord?.name || rootDirectory.split('/').pop() || id,
+        createdAt,
+        lastAccessedAt,
+      })
+    } else {
+      const now = Date.now()
+      this.upsertIndexRecord({
+        workspaceId: id,
+        projectId,
+        rootDirectory,
+        name: name || rootDirectory.split('/').pop() || id,
+        createdAt: now,
+        lastAccessedAt: now,
+      })
+    }
 
     return workspace
   }
