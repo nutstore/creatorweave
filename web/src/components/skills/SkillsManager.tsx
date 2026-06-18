@@ -24,6 +24,7 @@ import {
 import { SkillCard } from './SkillCard'
 import { SkillEditor } from './SkillEditor'
 import { SkillFileEditor } from './SkillFileEditor'
+import { CreateSkillDialog } from './CreateSkillDialog'
 import { ProjectSkillDropZone } from './ProjectSkillDropZone'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
@@ -67,6 +68,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
 
   const [fileEditorOpen, setFileEditorOpen] = useState(false)
   const [formEditorOpen, setFormEditorOpen] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [editingSkill, setEditingSkill] = useState<SkillMetadata | undefined>()
   const [editorMode, setEditorMode] = useState<EditorMode>()
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
@@ -131,7 +133,19 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     if (useFileEditor(skill)) setFileEditorOpen(true)
     else setFormEditorOpen(true)
   }, [])
-  const handleCreateNew = useCallback(() => { setEditingSkill(undefined); setEditorMode('edit'); setFormEditorOpen(true) }, [])
+  const handleCreateNew = useCallback(() => { setCreateDialogOpen(true) }, [])
+  // After the CreateSkillDialog generates a skeleton, look up the freshly
+  // scanned skill metadata and open the file editor on it — unifying the
+  // create and edit experience through the same SkillFileEditor.
+  const handleCreated = useCallback((skillId: string) => {
+    setCreateDialogOpen(false)
+    const created = skillsStore.skills.find((s) => s.id === skillId)
+    if (created) {
+      setEditingSkill(created)
+      setEditorMode('edit')
+      setFileEditorOpen(true)
+    }
+  }, [skillsStore.skills])
   const handleUploadDone = useCallback(() => {
     setUploadOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
   }, [skillsStore])
@@ -279,6 +293,14 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       {editingSkill && useFileEditor(editingSkill) && (
         <SkillFileEditor skill={editingSkill} open={fileEditorOpen} onClose={handleEditorClose} />
       )}
+
+      {/* Create Skill Dialog — collects dir name + name + description,
+          then hands off to SkillFileEditor for the unified editing experience. */}
+      <CreateSkillDialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        onCreated={handleCreated}
+      />
 
       {/* Skill Form Editor — for creating new skills and viewing project/import skills */}
       <SkillEditor skill={editingSkill} open={formEditorOpen} onClose={handleFormEditorClose} readOnly={editorMode === 'view'} />

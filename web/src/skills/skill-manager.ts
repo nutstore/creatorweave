@@ -4,17 +4,14 @@
  * Responsibilities:
  * - Initialize skills system (load from SQLite + seed builtins)
  * - Scan project directory for skills
- * - Match skills to conversation context
+ * - Scan user skills directory
  * - Build skills block for system prompt (metadata-only, on-demand loading)
  */
 
-import type { Skill, SkillMetadata, SkillMatchContext, SkillResource } from './skill-types'
+import type { Skill, SkillMetadata, SkillResource } from './skill-types'
 import * as storage from './skill-storage'
 import {
   buildAvailableSkillsBlock,
-  buildAvailableSkillsBlockWithRecommendations,
-  matchSkillsForRecommendation,
-  type SessionSkillState,
 } from './skill-injection'
 import { scanProjectSkills } from './skill-scanner'
 import { scanUserSkills, migrateUserSkillsFromSQLite } from './user-skills-scanner'
@@ -200,36 +197,11 @@ export class SkillManager {
 
   /**
    * Get the skills block for system prompt.
-   * Uses the new on-demand loading approach - only metadata is injected.
-   *
-   * @param sessionState - Optional session state for tracking recommendations
-   * @param context - The current conversation context
-   * @returns The skills system block to append to the system prompt
+   * Uses the on-demand loading approach - only metadata is injected.
    */
-  getSkillsBlock(sessionState: SessionSkillState | undefined, context: SkillMatchContext): string {
-    const metadata = this.getSkills().map((s) => ({
-      id: s.id,
-      name: s.name,
-      version: s.version,
-      description: s.description,
-      author: s.author,
-      category: s.category,
-      tags: s.tags,
-      source: s.source,
-      triggers: s.triggers,
-      enabled: s.enabled,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-    })) as SkillMetadata[]
-
-    // Match skills for recommendations
-    const matches = matchSkillsForRecommendation(metadata, context)
-
-    if (sessionState) {
-      return buildAvailableSkillsBlockWithRecommendations(metadata, sessionState, matches)
-    }
-
-    return buildAvailableSkillsBlock(metadata, context)
+  getSkillsBlock(): string {
+    const metadata = this.getSkillMetadata()
+    return buildAvailableSkillsBlock(metadata)
   }
 
   /**
@@ -238,8 +210,8 @@ export class SkillManager {
    *
    * @deprecated Use getSkillsBlock directly instead for more control
    */
-  getEnhancedSystemPrompt(basePrompt: string, context: SkillMatchContext): string {
-    const skillsBlock = this.getSkillsBlock(undefined, context)
+  getEnhancedSystemPrompt(basePrompt: string): string {
+    const skillsBlock = this.getSkillsBlock()
     return basePrompt + skillsBlock
   }
 

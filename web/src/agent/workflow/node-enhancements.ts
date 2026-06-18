@@ -2,7 +2,7 @@
  * Workflow Node Enhancement Pipeline
  *
  * Reuses AgentLoop's enhancement capabilities for workflow node execution:
- * - Skills injection (matching skills based on node input)
+ * - Skills injection (available skills metadata)
  * - MCP services discovery (available MCP tools)
  * - Intelligence coordinator (agent personality, tool recommendations)
  *
@@ -13,7 +13,6 @@
 import { getIntelligenceCoordinator } from '../intelligence-coordinator'
 import { getMCPManager } from '@/mcp'
 import { getSkillManager } from '@/skills/skill-manager'
-import type { SkillMatchContext } from '@/skills/skill-types'
 
 export interface NodeEnhancementOptions {
   /** Explicit project id for this workflow execution */
@@ -73,11 +72,10 @@ export async function buildEnhancedWorkflowNodePrompt(
     console.warn('[workflow-node-enhance] MCP injection failed:', error)
   }
 
-  // 4. Skills matching
+  // 4. Skills block
   try {
     const skillManager = getSkillManager()
-    const context: SkillMatchContext = { userMessage }
-    const skillsBlock = skillManager.getEnhancedSystemPrompt('', context)
+    const skillsBlock = skillManager.getEnhancedSystemPrompt('')
     if (skillsBlock) {
       enhanced += '\n\n' + skillsBlock
     }

@@ -20,7 +20,7 @@ import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { Loader2 } from 'lucide-react'
-import { readAssetBlob } from './asset-utils'
+import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
 
 /** Check if a path looks like an OPFS asset reference */
 function isAssetPath(src: string): boolean {
@@ -35,15 +35,35 @@ function toRelativePath(src: string): string {
 }
 
 /**
+ * Check whether a string looks like a local/relative file reference
+ * rather than a remote URL or data URI. Bare filenames such as
+ * `byd_2026_05_sales.png` or `sub/dir/img.png` qualify; `http(s)://`,
+ * `data:`, `blob:` and protocol-relative URLs do not.
+ */
+function isLocalFilePath(src: string): boolean {
+  return (
+    !/^[a-z][a-z0-9+.-]*:/i.test(src) && // not a URL scheme (http:, data:, blob: ...)
+    !src.startsWith('//') && // not protocol-relative
+    !src.startsWith('#') // not an anchor
+  )
+}
+
+/**
  * MarkdownImage — custom `img` component for react-markdown.
- * Detects OPFS asset paths and loads images from OPFS storage.
- * Falls back to standard `<img>` for external URLs.
+ *
+ * Resolution order for local images:
+ * 1. `assets/...` paths → conversation assets directory (OPFS)
+ * 2. Any other local/relative path →
+ *    a. try conversation assets directory (stripped of any rootName prefix)
+ *    b. try the workspace OPFS store (rootName/path or bare path)
+ *
+ * External URLs and data URIs are rendered as-is.
  */
 function MarkdownImage({ src, alt, ...props }: React.ComponentPropsWithoutRef<'img'>) {
   const srcStr = src || ''
 
   // External URL or data URI → render as-is
-  if (!isAssetPath(srcStr)) {
+  if (!isAssetPath(srcStr) && !isLocalFilePath(srcStr)) {
     return <img src={srcStr} alt={alt || ''} loading="lazy" {...props} />
   }
 
@@ -51,14 +71,22 @@ function MarkdownImage({ src, alt, ...props }: React.ComponentPropsWithoutRef<'i
 }
 
 /**
- * AssetImage — resolves an OPFS asset path into an inline image.
- * Shows loading spinner while reading from OPFS, error state on failure.
+ * AssetImage — resolves a local image reference into an inline image.
+ *
+ * Resolution order:
+ * 1. If `src` is an `assets/...` path → read from conversation assets dir.
+ * 2. Otherwise (bare/workspace-relative path) →
+ *    a. try the conversation assets dir (last segment as filename)
+ *    b. fall back to the workspace OPFS store (handles `rootName/path`
+ *       and bare paths across all roots)
+ *
+ * Shows loading spinner while reading, error state on failure.
  */
 function AssetImage({ src, alt }: { src: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const urlRef = useRef<string | null>(null)
-  const relativePath = toRelativePath(src)
+  const assetPath = isAssetPath(src) ? toRelativePath(src) : src.replace(/^\/+/, '')
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -67,25 +95,38 @@ function AssetImage({ src, alt }: { src: string; alt: string }) {
     }
   }, [])
 
-  // Load image from OPFS
+  // Load image (assets dir first, then workspace fallback)
   useEffect(() => {
     let cancelled = false
-    readAssetBlob(relativePath).then((blob) => {
-      if (blob && !cancelled) {
+
+    async function load() {
+      // 1. Try the conversation assets directory
+      const blob = await readAssetBlob(assetPath)
+      if (blob) return blob
+
+      // 2. Fall back to the workspace OPFS store. `readWorkspaceFileBlob`
+      //    accepts both `rootName/path` and bare paths; the runtime resolves
+      //    bare paths against the configured roots.
+      return await readWorkspaceFileBlob(assetPath)
+    }
+
+    load().then((blob) => {
+      if (cancelled) return
+      if (blob) {
         const objectUrl = URL.createObjectURL(blob)
         urlRef.current = objectUrl
         setUrl(objectUrl)
-      } else if (!cancelled) {
+      } else {
         setError(true)
       }
     })
     return () => { cancelled = true }
-  }, [relativePath])
+  }, [assetPath])
 
   if (error) {
     return (
       <span className="inline-flex items-center gap-1.5 rounded bg-red-50 px-2 py-1 text-xs text-red-500 dark:bg-red-900/20 dark:text-red-400">
-        ⚠ Image not found: {relativePath.split('/').pop()}
+        ⚠ Image not found: {assetPath.split('/').pop()}
       </span>
     )
   }

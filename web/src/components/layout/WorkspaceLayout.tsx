@@ -46,7 +46,6 @@ import {
   OnboardingTour,
   KeyboardShortcutsHelp,
   RecentFilesPanel,
-  WorkspaceSettingsDialog,
   GoToFileDialog,
   buildEnhancedCommands,
   type Command,
@@ -57,6 +56,7 @@ import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner, ExtensionOutdatedBanner } from '@/components/extension'
 import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
+import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
@@ -846,10 +846,12 @@ export function WorkspaceLayout({
         onOpenChange={() => setShowShortcutsHelp(false)}
       />
 
-      {/* Phase 4: Workspace Settings Dialog */}
-      <WorkspaceSettingsDialog
+      {/* Unified Settings Dialog — replaces the old WorkspaceSettingsDialog.
+          Workspace settings (layout/editor/shortcuts/data) are now tabs inside. */}
+      <SettingsDialog
         open={showWorkspaceSettings}
         onOpenChange={() => setShowWorkspaceSettings(false)}
+        initialTab="workspace-layout"
       />
 
       {/* Phase 4: Recent Files Panel */}

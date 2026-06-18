@@ -131,11 +131,9 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     const { getSkillManager } = await import('@/skills/skill-manager')
     const skillManager = getSkillManager()
     if (skillManager.initialized) {
-      const lastUserMsg = [...input.messages].reverse().find((m) => m.role === 'user')
-      const userMessage = lastUserMsg?.content || ''
       const { buildAvailableSkillsBlock } = await import('@/skills/skill-injection')
       const metadata = skillManager.getSkillMetadata()
-      const skillsBlock = buildAvailableSkillsBlock(metadata, { userMessage })
+      const skillsBlock = buildAvailableSkillsBlock(metadata)
       if (skillsBlock) {
         enhancedPrompt += '\n\n' + skillsBlock
       }

@@ -47,6 +47,19 @@ interface SkillsState {
   importSkillMd: (
     content: string
   ) => Promise<{ success: boolean; error?: string; skillId?: string }>
+  /**
+   * Create a new user skill skeleton in OPFS and return the skill id.
+   *
+   * Generates a SKILL.md template (frontmatter + instruction placeholder)
+   * under `.skills/user/<dirName>/`. Unlike `importSkillMd`, the directory
+   * name is provided directly (not derived from the skill name) so the user
+   * controls the technical identifier.
+   */
+  createSkillSkeleton: (
+    dirName: string,
+    name: string,
+    description: string
+  ) => Promise<{ success: boolean; error?: string; skillId?: string }>
   deleteSkill: (id: string) => Promise<void>
   toggleSkill: (id: string, enabled: boolean) => Promise<void>
   getFullSkill: (id: string) => Promise<Skill | null>
@@ -133,6 +146,61 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
       // correctly compare it with the existing skill's id (which is also
       // `user:<dirName>` after scanning). Without the prefix, the comparison
       // would always differ and the caller would delete the just-saved skill.
+      return { success: true, skillId: `user:${dirName}` }
+    },
+
+    createSkillSkeleton: async (dirName, name, description) => {
+      // Guard: a directory with this name already exists.
+      const exists = await userSkillDirExists(dirName).catch(() => false)
+      if (exists) {
+        return { success: false, error: 'A skill with this directory name already exists' }
+      }
+
+      // Build a SKILL.md template. Frontmatter aligns with the builtin
+      // skill style (see socratic-brainstorm/SKILL.md). The instruction
+      // body is an HTML comment guide + a placeholder line so the user has
+      // immediate orientation when the file opens in the editor.
+      const escapedName = name.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const escapedDesc = description.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const content = [
+        '---',
+        `name: "${escapedName}"`,
+        'version: "1.0.0"',
+        `description: "${escapedDesc}"`,
+        'author: "User"',
+        'category: general',
+        'tags: []',
+        'triggers:',
+        '  keywords: []',
+        '---',
+        '',
+        `# ${name}`,
+        '',
+        '<!-- 在这里写下技能的指令（instruction）。',
+        '     这段内容会被注入到对话的 system prompt 中，告诉 AI 这个技能怎么用。',
+        '',
+        '     常见写法：',
+        '     - 一句话说明这个技能做什么',
+        '     - 触发条件（什么情况下应该激活这个技能）',
+        '     - 具体的工作流程 / 步骤',
+        '     - 输出格式要求',
+        '-->',
+        '',
+        '在此输入指令内容...',
+        '',
+      ].join('\n')
+
+      try {
+        await writeUserSkillMd(dirName, content)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        return { success: false, error: `Failed to create skill: ${msg}` }
+      }
+
+      const manager = getSkillManager()
+      await refreshSkillManagerCache()
+      const metadata = manager.getSkillMetadata()
+      set({ skills: metadata })
       return { success: true, skillId: `user:${dirName}` }
     },
 

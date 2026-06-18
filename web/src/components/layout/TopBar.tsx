@@ -22,6 +22,7 @@ import {
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import type { SettingsTab } from '@/components/settings/SettingsDialog'
 import { ConversationStorageBadge } from '@/components/conversation'
 import { FolderSelector } from './FolderSelector'
 import { ModelQuickSwitch } from './ModelQuickSwitch'
@@ -53,6 +54,7 @@ interface TopBarProps {
   onSkillsManagerOpen?: () => void
   onToolsPanelOpen?: () => void
   onCommandPaletteOpen?: () => void
+  /** @deprecated Workspace settings are now merged into the main SettingsDialog. Kept for compatibility. */
   onWorkspaceSettingsOpen?: () => void
   onBackToProjects?: () => void
   activeProjectName?: string
@@ -96,6 +98,7 @@ export function TopBar({
   onSelectWorkspace,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
@@ -122,6 +125,12 @@ export function TopBar({
 
   const closeMobileMorePanel = () => {
     setMobileMoreOpen(false)
+  }
+
+  /** Open settings dialog, optionally jumping to a specific tab */
+  const openSettings = (tab?: SettingsTab) => {
+    setSettingsInitialTab(tab)
+    setSettingsOpen(true)
   }
 
   return (
@@ -181,7 +190,7 @@ export function TopBar({
           <div className="ml-2 flex shrink-0 items-center gap-1">
             {!hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
-                <BrandButton iconButton onClick={() => setSettingsOpen(true)}>
+                <BrandButton iconButton onClick={() => openSettings()}>
                   <KeyRound className="h-[14px] w-[14px]" />
                 </BrandButton>
               </ActionTooltip>
@@ -194,7 +203,7 @@ export function TopBar({
             </ActionTooltip>
 
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>
-              <BrandButton iconButton onClick={() => setSettingsOpen(true)}>
+              <BrandButton iconButton onClick={() => openSettings()}>
                 <Settings className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
@@ -217,7 +226,7 @@ export function TopBar({
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
                 <button
                   type="button"
-                  onClick={() => setSettingsOpen(true)}
+                  onClick={() => openSettings()}
                   className="hover:bg-warning-100 focus:ring-warning-500 inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
                 >
                   <KeyRound className="h-4 w-4" />
@@ -240,9 +249,9 @@ export function TopBar({
 
             <div className="h-5 w-px bg-muted" />
 
-            {/* Workspace Settings */}
+            {/* Workspace Settings — now opens the unified Settings dialog at the layout tab */}
             <ActionTooltip label={t('topbar.tooltips.workspaceSettings')}>
-              <BrandButton iconButton className="shrink-0" onClick={onWorkspaceSettingsOpen}>
+              <BrandButton iconButton className="shrink-0" onClick={() => openSettings('workspace-layout')}>
                 <SlidersHorizontal className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
@@ -272,7 +281,7 @@ export function TopBar({
 
             {/* Settings */}
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>
-              <BrandButton iconButton className="shrink-0" onClick={() => setSettingsOpen(true)}>
+              <BrandButton iconButton className="shrink-0" onClick={() => openSettings()}>
                 <Settings className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
@@ -302,6 +311,7 @@ export function TopBar({
               className="h-9 justify-start gap-2 text-xs"
               onClick={() => {
                 onWorkspaceSettingsOpen?.()
+                openSettings('workspace-layout')
                 closeMobileMorePanel()
               }}
             >
@@ -342,7 +352,7 @@ export function TopBar({
       )}
       </TooltipProvider>
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} initialTab={settingsInitialTab} />
     </>
   )
 }

@@ -67,29 +67,6 @@ export interface StoredSkill extends Skill {
   rawContent: string
 }
 
-/** Skill match result from the matcher */
-export interface SkillMatch {
-  skill: Skill
-  /** Match score (0-1) */
-  score: number
-  /** Which factors contributed to the match */
-  matchFactors: {
-    keywordScore: number
-    tagScore: number
-    categoryScore: number
-  }
-}
-
-/** Context for skill matching */
-export interface SkillMatchContext {
-  /** User's current message text */
-  userMessage: string
-  /** Currently open file extensions */
-  activeFileExtensions?: string[]
-  /** Recent conversation topics (extracted keywords) */
-  recentTopics?: string[]
-}
-
 /** SQLite schema version for skills table ( incremented when schema changes ) */
 export const SKILLS_SCHEMA_VERSION = 2
 
@@ -110,17 +87,6 @@ export interface SkillResource {
   contentType: string // MIME type
   size: number // Byte size
   createdAt: number
-}
-
-/** Skill match metadata only (for available_skills block) */
-export interface SkillMatchMetadata {
-  skill: SkillMetadata
-  score: number
-  matchFactors: {
-    keywordScore: number
-    tagScore: number
-    categoryScore: number
-  }
 }
 
 /** Tool execution context for skill tools */

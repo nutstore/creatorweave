@@ -37,6 +37,12 @@ import {
   Terminal,
   Radio,
   Volume2,
+  LayoutDashboard,
+  RotateCcw,
+  AlertTriangle,
+  Info,
+  Keyboard,
+  Database,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
@@ -70,6 +76,11 @@ import { getSessionStateManager } from '@/remote/session-state-serialization'
 import { RemoteBadge } from '@/components/remote/RemoteBadge'
 import { RemoteBadgeErrorBoundary } from '@/components/remote/RemoteBadgeErrorBoundary'
 import { useWebContainerStore } from '@/store/webcontainer.store'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
+import {
+  BrandSlider,
+} from '@creatorweave/ui'
+import { KeyboardShortcutsHelp } from '@/components/workspace/KeyboardShortcutsHelp'
 
 // =============================================================================
 // Types
@@ -77,6 +88,10 @@ import { useWebContainerStore } from '@/store/webcontainer.store'
 
 type SettingsTab =
   | 'general'
+  | 'workspace-layout'
+  | 'workspace-editor'
+  | 'workspace-shortcuts'
+  | 'workspace-data'
   | 'llm'
   | 'mcp'
   | 'webmcp'
@@ -103,6 +118,8 @@ interface SessionSyncMetadata {
 interface SettingsDialogProps {
   open: boolean
   onOpenChange?: (open: boolean) => void
+  /** Open the dialog with a specific tab pre-selected */
+  initialTab?: SettingsTab
 }
 
 // =============================================================================
@@ -1033,14 +1050,288 @@ function WebContainerSettingsPanel() {
 }
 
 // =============================================================================
+// Workspace Settings Panels (merged from WorkspaceSettingsDialog)
+// =============================================================================
+
+/** Layout panel — sidebar/conversation/preview panel size sliders */
+function WorkspaceLayoutPanel() {
+  const t = useT()
+  const {
+    panelSizes,
+    resetPanelSizes,
+    setSidebarWidth,
+    setConversationRatio,
+    setPreviewRatio,
+  } = useWorkspacePreferencesStore()
+
+  const handleResetLayout = () => {
+    if (confirm(t('workspaceSettings.layout.resetLayoutConfirm'))) {
+      resetPanelSizes()
+    }
+  }
+
+  return (
+    <div className="space-y-6 py-1">
+      <div>
+        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+          {t('workspaceSettings.layout.title')}
+        </h3>
+        <p className="mt-1 text-sm text-tertiary dark:text-muted">
+          {t('workspaceSettings.layout.description')}
+        </p>
+      </div>
+
+      <div className="space-y-6">
+        <div>
+          <label htmlFor="sidebar-width-slider" className="mb-2 block text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.layout.sidebarWidth', { value: panelSizes.sidebarWidth })}
+          </label>
+          <BrandSlider
+            id="sidebar-width-slider"
+            min={200}
+            max={400}
+            step={1}
+            value={[panelSizes.sidebarWidth]}
+            onValueChange={(value) => setSidebarWidth(value[0])}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="conversation-ratio-slider" className="mb-2 block text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.layout.conversationArea', { value: panelSizes.conversationRatio })}
+          </label>
+          <BrandSlider
+            id="conversation-ratio-slider"
+            min={20}
+            max={80}
+            step={1}
+            value={[panelSizes.conversationRatio]}
+            onValueChange={(value) => setConversationRatio(value[0])}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="preview-ratio-slider" className="mb-2 block text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.layout.previewPanel', { value: panelSizes.previewRatio })}
+          </label>
+          <BrandSlider
+            id="preview-ratio-slider"
+            min={30}
+            max={80}
+            step={1}
+            value={[panelSizes.previewRatio]}
+            onValueChange={(value) => setPreviewRatio(value[0])}
+          />
+        </div>
+      </div>
+
+      <div className="flex gap-2 border-subtle border-t pt-4">
+        <BrandButton variant="outline" onClick={handleResetLayout}>
+          <RotateCcw className="mr-2 h-4 w-4" />
+          {t('workspaceSettings.layout.resetLayout')}
+        </BrandButton>
+      </div>
+    </div>
+  )
+}
+
+/** Editor display panel — font size, line numbers, word wrap, minimap */
+function WorkspaceEditorPanel() {
+  const t = useT()
+  const {
+    display,
+    setFontSize,
+    setShowLineNumbers,
+    setWordWrap,
+    setShowMiniMap,
+  } = useWorkspacePreferencesStore()
+
+  return (
+    <div className="space-y-6 py-1">
+      <div>
+        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+          {t('workspaceSettings.display.editorTitle')}
+        </h3>
+        <p className="mt-1 text-sm text-tertiary dark:text-muted">
+          {t('workspaceSettings.display.editorDescription')}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div>
+          <label className="mb-2 block text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.display.fontSize')}
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            {(['small', 'medium', 'large'] as const).map((size) => (
+              <button
+                key={size}
+                onClick={() => setFontSize(size)}
+                className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                  display.fontSize === size
+                    ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    : 'border-neutral-200 text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
+                }`}
+              >
+                {t(`workspaceSettings.display.font.${size}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label htmlFor="show-line-numbers" className="cursor-pointer text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.display.showLineNumbers')}
+          </label>
+          <BrandSwitch id="show-line-numbers" checked={display.showLineNumbers} onCheckedChange={setShowLineNumbers} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label htmlFor="word-wrap" className="cursor-pointer text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.display.wordWrap')}
+          </label>
+          <BrandSwitch id="word-wrap" checked={display.wordWrap} onCheckedChange={setWordWrap} />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <label htmlFor="show-minimap" className="cursor-pointer text-sm font-medium text-secondary dark:text-muted">
+            {t('workspaceSettings.display.showMiniMap')}
+          </label>
+          <BrandSwitch id="show-minimap" checked={display.showMiniMap} onCheckedChange={setShowMiniMap} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Keyboard shortcuts panel — launch the shortcuts help dialog */
+function WorkspaceShortcutsPanel({ onShowHelp }: { onShowHelp: () => void }) {
+  const t = useT()
+  return (
+    <div className="space-y-6 py-1">
+      <div>
+        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+          {t('workspaceSettings.shortcuts.title')}
+        </h3>
+        <p className="mt-1 text-sm text-tertiary dark:text-muted">
+          {t('workspaceSettings.shortcuts.description')}
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
+          <div>
+            <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+              {t('workspaceSettings.shortcuts.showAllTitle')}
+            </div>
+            <div className="text-xs text-tertiary dark:text-muted">
+              {t('workspaceSettings.shortcuts.showAllDescription')}
+            </div>
+          </div>
+          <BrandButton variant="outline" onClick={onShowHelp}>
+            <Keyboard className="mr-2 h-4 w-4" />
+            {t('workspaceSettings.shortcuts.view')}
+          </BrandButton>
+        </div>
+      </div>
+
+      <div className="border-subtle flex items-start gap-3 rounded-md border bg-muted p-4 dark:bg-muted">
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-500 dark:text-primary-400" />
+        <p className="text-sm text-secondary dark:text-muted">
+          <strong>{t('workspaceSettings.shortcuts.tipLabel')}</strong>{' '}
+          <kbd className="border-subtle rounded border bg-card px-1.5 py-0.5 font-mono text-xs dark:bg-card">
+            {t('workspaceSettings.shortcuts.tipCommand')}
+          </kbd>{' '}
+          {t('workspaceSettings.shortcuts.tipSuffix')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/** Data management panel — recent files, reset */
+function WorkspaceDataPanel() {
+  const t = useT()
+  const { resetToDefaults, clearRecentFiles, recentFiles } = useWorkspacePreferencesStore()
+
+  const handleResetAll = () => {
+    if (confirm(t('workspaceSettings.data.resetAllConfirm'))) {
+      resetToDefaults()
+    }
+  }
+
+  const handleClearRecentFiles = () => {
+    if (confirm(t('workspaceSettings.data.clearRecentConfirm'))) {
+      clearRecentFiles()
+    }
+  }
+
+  return (
+    <div className="space-y-6 py-1">
+      <div>
+        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+          {t('workspaceSettings.data.title')}
+        </h3>
+        <p className="mt-1 text-sm text-tertiary dark:text-muted">
+          {t('workspaceSettings.data.description')}
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
+          <div>
+            <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+              {t('workspaceSettings.data.recentFilesTitle')}
+            </div>
+            <div className="text-xs text-tertiary dark:text-muted">
+              {t('workspaceSettings.data.recentFilesCount', { count: recentFiles.length })}
+            </div>
+          </div>
+          <BrandButton variant="outline" onClick={handleClearRecentFiles} disabled={recentFiles.length === 0}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t('workspaceSettings.data.clear')}
+          </BrandButton>
+        </div>
+
+        <div className="flex items-start gap-3 rounded-md border border-warning bg-warning-50 p-4 dark:border-warning dark:bg-warning-bg">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning dark:text-warning-200" />
+          <div>
+            <p className="text-sm font-medium text-warning dark:text-warning-200">
+              {t('workspaceSettings.data.warningTitle')}
+            </p>
+            <p className="mt-1 text-xs text-warning dark:text-warning-200">
+              {t('workspaceSettings.data.warningDescription')}
+            </p>
+          </div>
+        </div>
+
+        <div className="border-subtle border-t pt-4">
+          <h4 className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">
+            {t('workspaceSettings.data.resetAllTitle')}
+          </h4>
+          <p className="mb-3 text-xs text-tertiary dark:text-muted">
+            {t('workspaceSettings.data.resetAllDescription')}
+          </p>
+          <BrandButton variant="outline" onClick={handleResetAll}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            {t('workspaceSettings.data.resetAll')}
+          </BrandButton>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
 // Settings Dialog Content
 // =============================================================================
 
 const SettingsDialogContent = forwardRef<
   HTMLDivElement,
-  React.ComponentPropsWithoutRef<typeof BrandDialogContent> & { open?: boolean }
->(({ className: _className, open, ...props }, ref) => {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+  React.ComponentPropsWithoutRef<typeof BrandDialogContent> & { open?: boolean; initialTab?: SettingsTab }
+>(({ className: _className, open, initialTab, ...props }, ref) => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'general')
+  const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const t = useT()
   const [locale, setLocale] = useLocale()
   const { mode: themeMode, setTheme } = useTheme()
@@ -1055,6 +1346,13 @@ const SettingsDialogContent = forwardRef<
   }, [])
 
   const browserInfo = useMemo(() => navigator.userAgent, [])
+
+  // Jump to initialTab when the dialog opens
+  useEffect(() => {
+    if (open && initialTab) {
+      setActiveTab(initialTab)
+    }
+  }, [open, initialTab])
 
   useEffect(() => {
     if (!open) {
@@ -1072,6 +1370,10 @@ const SettingsDialogContent = forwardRef<
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'general', label: t('settings.general'), icon: <Globe className="h-4 w-4" /> },
+    { id: 'workspace-layout', label: t('workspaceSettings.tabs.layout'), icon: <LayoutDashboard className="h-4 w-4" /> },
+    { id: 'workspace-editor', label: t('workspaceSettings.tabs.display'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'workspace-shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
+    { id: 'workspace-data', label: t('workspaceSettings.tabs.data'), icon: <Database className="h-4 w-4" /> },
     { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
     { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
@@ -1130,6 +1432,20 @@ const SettingsDialogContent = forwardRef<
 
         {/* Tab content */}
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
+          {/* Workspace Layout Tab (merged from WorkspaceSettingsDialog) */}
+          {activeTab === 'workspace-layout' && <WorkspaceLayoutPanel />}
+
+          {/* Workspace Editor/Display Tab */}
+          {activeTab === 'workspace-editor' && <WorkspaceEditorPanel />}
+
+          {/* Workspace Keyboard Shortcuts Tab */}
+          {activeTab === 'workspace-shortcuts' && (
+            <WorkspaceShortcutsPanel onShowHelp={() => setShowShortcutsHelp(true)} />
+          )}
+
+          {/* Workspace Data Management Tab */}
+          {activeTab === 'workspace-data' && <WorkspaceDataPanel />}
+
           {/* General Settings Tab */}
           {activeTab === 'general' && (
             <div className="space-y-5 py-1">
@@ -1286,6 +1602,9 @@ const SettingsDialogContent = forwardRef<
           )}
         </div>
       </div>
+
+      {/* Keyboard shortcuts help (launched from workspace-shortcuts tab) */}
+      <KeyboardShortcutsHelp open={showShortcutsHelp} onOpenChange={setShowShortcutsHelp} />
     </BrandDialogContent>
   )
 })
@@ -1304,3 +1623,4 @@ const SettingsDialog = forwardRef<
 SettingsDialog.displayName = 'SettingsDialog'
 
 export { SettingsDialog, SettingsDialogContent }
+export type { SettingsTab }
