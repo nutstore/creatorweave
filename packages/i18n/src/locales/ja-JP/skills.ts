@@ -21,6 +21,8 @@ export const skills = {
     enabled: "有効",
     disabled: "無効",
     empty: "スキルがありません",
+    importSkill: "スキルをインポート",
+    importSkillDesc: "フォルダをドラッグして追加",
     categories: {
       codeReview: "コードレビュー",
       testing: "テスト",
@@ -149,6 +151,7 @@ export const skillUpload = {
     files: "ファイル",
     confirmUpload: "アップロード",
     confirmOverwrite: "置き換えてアップロード",
+    importUserSkill: "マイスキルをインポート",
 } as const
 
 export const skillDetail = {

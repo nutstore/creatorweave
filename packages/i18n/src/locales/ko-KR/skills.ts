@@ -21,6 +21,8 @@ export const skills = {
     enabled: "활성화됨",
     disabled: "비활성화됨",
     empty: "스킬 없음",
+    importSkill: "스킬 가져오기",
+    importSkillDesc: "폴더를 드롭하여 추가",
     categories: {
       codeReview: "코드 리뷰",
       testing: "테스트",
@@ -149,6 +151,7 @@ export const skillUpload = {
     files: "파일",
     confirmUpload: "업로드",
     confirmOverwrite: "교체 후 업로드",
+    importUserSkill: "내 스킬 가져오기",
 } as const
 
 export const skillDetail = {

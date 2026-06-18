@@ -12,6 +12,7 @@
 
 import type { Skill, SkillResource } from './skill-types'
 import { parseSkillMd, slugify } from './skill-parser'
+import { copyDirectoryRecursive } from './skill-folder-utils'
 import {
   getResourceType,
   getMimeType,
@@ -386,6 +387,37 @@ export async function writeUserSkillMd(dirName: string, content: string): Promis
  const writable = await mdHandle.createWritable()
  await writable.write(content)
  await writable.close()
+}
+
+/**
+ * Import a skill folder from a native FileSystemDirectoryHandle into OPFS
+ * `.skills/user/<dirName>/`.
+ *
+ * Copies the entire folder recursively (including SKILL.md and any resource
+ * files). If a skill with the same directory name already exists, it is
+ * replaced (old directory removed first to avoid stale file accumulation).
+ *
+ * @param srcDirHandle  Source folder handle (from drag-drop or folder picker)
+ * @returns the number of files copied.
+ */
+export async function importUserSkillFolder(
+  srcDirHandle: FileSystemDirectoryHandle,
+): Promise<number> {
+  const dirName = srcDirHandle.name
+  const opfsRoot = await navigator.storage.getDirectory()
+  const skillsDir = await opfsRoot.getDirectoryHandle(SKILLS_ROOT, { create: true })
+  const userDir = await skillsDir.getDirectoryHandle(USER_SKILLS_DIR, { create: true })
+
+  // Remove existing skill directory to avoid stale files
+  try {
+    await userDir.removeEntry(dirName, { recursive: true })
+  } catch {
+    // Directory doesn't exist yet — fine
+  }
+
+  // Create fresh skill directory and copy files recursively
+  const skillDir = await userDir.getDirectoryHandle(dirName, { create: true })
+  return copyDirectoryRecursive(srcDirHandle, skillDir)
 }
 
 /**

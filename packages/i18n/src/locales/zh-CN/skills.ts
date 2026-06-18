@@ -153,6 +153,7 @@ export const skillUpload = {
     files: "个文件",
     confirmUpload: "上传",
     confirmOverwrite: "替换并上传",
+    importUserSkill: "导入我的技能",
 } as const
 
 export const skillDetail = {

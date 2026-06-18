@@ -151,6 +151,7 @@ export const skillUpload = {
     files: "files",
     confirmUpload: "Upload",
     confirmOverwrite: "Replace & Upload",
+    importUserSkill: "Import My Skill",
 } as const
 
 export const skillDetail = {

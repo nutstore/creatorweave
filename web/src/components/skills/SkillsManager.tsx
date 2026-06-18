@@ -26,6 +26,7 @@ import { SkillEditor } from './SkillEditor'
 import { SkillFileEditor } from './SkillFileEditor'
 import { CreateSkillDialog } from './CreateSkillDialog'
 import { ProjectSkillDropZone } from './ProjectSkillDropZone'
+import { UserSkillDropZone } from './UserSkillDropZone'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { cn } from '@/lib/utils'
@@ -73,6 +74,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   const [editorMode, setEditorMode] = useState<EditorMode>()
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [userImportOpen, setUserImportOpen] = useState(false)
 
   // Collapsed state for each section
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -149,6 +151,9 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   const handleUploadDone = useCallback(() => {
     setUploadOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
   }, [skillsStore])
+  const handleUserImportDone = useCallback(() => {
+    setUserImportOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
+  }, [skillsStore])
   const handleEditorClose = useCallback(() => { setFileEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
   const handleFormEditorClose = useCallback(() => { setFormEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
 
@@ -167,6 +172,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     isReadOnly?: boolean
     onDelete?: (id: string) => void
     action?: { label: string; icon: React.ReactNode; onClick: () => void; primary?: boolean }
+    secondaryAction?: { label: string; icon: React.ReactNode; onClick: () => void }
   }> = [
     {
       key: 'project',
@@ -187,7 +193,8 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
         const skill = skillsStore.skills.find((s) => s.id === id)
         if (skill) setDeleteTarget({ id, name: skill.name })
       },
-      action: { label: t('skills.createNew'), icon: <Plus className="h-4 w-4" />, onClick: handleCreateNew },
+      action: { label: t('skills.createNew'), icon: <Plus className="h-4 w-4" />, onClick: handleCreateNew, primary: true },
+      secondaryAction: { label: t('skills.importSkill'), icon: <Upload className="h-4 w-4" />, onClick: () => setUserImportOpen(true) },
     },
     {
       key: 'builtin',
@@ -267,6 +274,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
                     onEdit={handleEdit}
                     onDelete={section.onDelete}
                     action={section.action}
+                    secondaryAction={section.secondaryAction}
                     t={t}
                   />
                 ))}
@@ -343,6 +351,21 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
           <ProjectSkillDropZone roots={roots} onUploaded={handleUploadDone} onClose={handleUploadDone} />
         </BrandDialogContent>
       </BrandDialog>
+
+      {/* User Skill Import Dialog — imports a folder into OPFS .skills/user/ */}
+      <BrandDialog open={userImportOpen} onOpenChange={(isOpen) => { if (!isOpen) setUserImportOpen(false) }}>
+        <BrandDialogContent className="max-w-lg p-0">
+          <BrandDialogHeader>
+            <BrandDialogTitle className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+              {(t('skillUpload.importUserSkill') || 'Import My Skill')}
+            </BrandDialogTitle>
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+              <X className="h-5 w-5" />
+            </BrandDialogClose>
+          </BrandDialogHeader>
+          <UserSkillDropZone onImported={handleUserImportDone} onClose={handleUserImportDone} />
+        </BrandDialogContent>
+      </BrandDialog>
     </>
   )
 }
@@ -355,6 +378,7 @@ interface SkillSectionAction {
   label: string
   icon: React.ReactNode
   onClick: () => void
+  primary?: boolean
 }
 
 interface SkillSectionProps {
@@ -369,12 +393,13 @@ interface SkillSectionProps {
   onEdit: (skill: SkillMetadata) => void
   onDelete?: (id: string) => void
   action?: SkillSectionAction
+  secondaryAction?: SkillSectionAction
   t: (key: string) => string
 }
 
 function SkillSection({
   icon, label, skills, isCollapsed, onToggleCollapse,
-  isReadOnly, onToggle, onView, onEdit, onDelete, action, t,
+  isReadOnly, onToggle, onView, onEdit, onDelete, action, secondaryAction, t,
 }: SkillSectionProps) {
   return (
     <div>
@@ -391,17 +416,33 @@ function SkillSection({
           <span className="text-xs tabular-nums text-neutral-400 dark:text-neutral-500">({skills.length})</span>
         </button>
 
-        {/* Action button */}
+        {/* Action buttons */}
         {action && (
           <button
             type="button"
             onClick={action.onClick}
             className={cn(
-              'ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800'
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+              action.primary
+                ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
+                : 'ml-auto text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800'
             )}
           >
             {action.icon}
             {action.label}
+          </button>
+        )}
+        {secondaryAction && (
+          <button
+            type="button"
+            onClick={secondaryAction.onClick}
+            className={cn(
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800',
+              !action && 'ml-auto'
+            )}
+          >
+            {secondaryAction.icon}
+            {secondaryAction.label}
           </button>
         )}
       </div>
