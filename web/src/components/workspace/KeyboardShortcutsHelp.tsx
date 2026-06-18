@@ -21,6 +21,7 @@ import {
   formatShortcutKey,
   DEFAULT_SHORTCUTS,
 } from '@/hooks/useKeyboardShortcuts'
+import { useT } from '@/i18n'
 
 interface Shortcut {
   key: string
@@ -29,6 +30,7 @@ interface Shortcut {
   shiftKey?: boolean
   altKey?: boolean
   description: string
+  labelKey?: string
   category?: string
 }
 
@@ -44,27 +46,37 @@ export function KeyboardShortcutsHelp({
   customShortcuts = [],
 }: KeyboardShortcutsHelpProps) {
   const { getAllShortcuts } = useKeyboardShortcuts()
+  const t = useT()
   const [searchQuery, setSearchQuery] = useState('')
+
+  // Localize a shortcut's description if it carries a labelKey
+  const localize = (s: Shortcut): Shortcut =>
+    s.labelKey ? { ...s, description: t(s.labelKey) } : s
 
   // Combine default and custom shortcuts
   const allShortcuts = useMemo(() => {
     const registered = getAllShortcuts().map((s) => ({
       ...s,
-      category: 'General',
+      category: t('keyboardShortcuts.categoryGeneral'),
     }))
 
     return [
-      ...DEFAULT_SHORTCUTS.map((s) => ({ ...s, category: 'General' })),
+      ...DEFAULT_SHORTCUTS.map((s) => ({
+        ...s,
+        category: t('keyboardShortcuts.categoryGeneral'),
+      })),
       ...customShortcuts,
       ...registered,
     ].reduce<Shortcut[]>((acc, shortcut) => {
+      const localized = localize(shortcut)
       // Deduplicate by description
-      if (!acc.find((s) => s.description === shortcut.description)) {
-        acc.push(shortcut)
+      if (!acc.find((s) => s.description === localized.description)) {
+        acc.push(localized)
       }
       return acc
     }, [])
-  }, [getAllShortcuts, customShortcuts])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getAllShortcuts, customShortcuts, t])
 
   // Filter shortcuts by search query
   const filteredShortcuts = useMemo(() => {
@@ -96,7 +108,7 @@ export function KeyboardShortcutsHelp({
     <BrandDialog open={open} onOpenChange={onOpenChange}>
       <BrandDialogContent>
         <BrandDialogHeader>
-          <BrandDialogTitle>Keyboard Shortcuts</BrandDialogTitle>
+          <BrandDialogTitle>{t('keyboardShortcuts.title')}</BrandDialogTitle>
         </BrandDialogHeader>
 
         <BrandDialogBody className="space-y-4">
@@ -105,7 +117,7 @@ export function KeyboardShortcutsHelp({
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
-              placeholder="Search shortcuts..."
+              placeholder={t('keyboardShortcuts.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="border-subtle w-full rounded-lg border bg-white px-4 py-2 pl-10 text-sm outline-none placeholder:text-neutral-400 focus:border-primary-500 dark:bg-neutral-900"
@@ -140,7 +152,7 @@ export function KeyboardShortcutsHelp({
 
             {filteredShortcuts.length === 0 && (
               <div className="py-8 text-center text-sm text-neutral-400">
-                No shortcuts found for "{searchQuery}"
+                {t('keyboardShortcuts.noResults', { query: searchQuery })}
               </div>
             )}
           </div>
@@ -148,14 +160,14 @@ export function KeyboardShortcutsHelp({
 
         <BrandDialogFooter>
           <p className="text-xs text-neutral-400">
-            Press{' '}
+            {t('keyboardShortcuts.closeHint')}{' '}
             <kbd className="border-subtle rounded border bg-white px-1.5 py-0.5 dark:bg-neutral-900">
               Esc
             </kbd>{' '}
-            to close
+            {t('keyboardShortcuts.closeHintKey')}
           </p>
           <BrandButton variant="default" onClick={() => onOpenChange(false)}>
-            Close
+            {t('keyboardShortcuts.closeButton')}
           </BrandButton>
         </BrandDialogFooter>
       </BrandDialogContent>

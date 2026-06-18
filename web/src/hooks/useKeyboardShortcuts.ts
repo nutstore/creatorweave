@@ -180,52 +180,62 @@ export function useShortcut(shortcut: KeyboardShortcut) {
 
 /**
  * Default application shortcuts
+ *
+ * IMPORTANT: This list must stay in sync with the actual keydown handlers
+ * in WorkspaceLayout.tsx. Each entry here must correspond to a real,
+ * implemented global shortcut.
+ *
+ * `labelKey` references a translation key under `keyboardShortcuts.actions.*`
+ * that resolves to the localized description shown in the help dialog.
  */
-export const DEFAULT_SHORTCUTS: Omit<KeyboardShortcut, 'handler' | 'disabled' | 'priority'>[] = [
+export const DEFAULT_SHORTCUTS: (Omit<KeyboardShortcut, 'handler' | 'disabled' | 'priority'> & {
+  labelKey: string
+})[] = [
   {
     key: 'k',
     ctrlKey: true,
     metaKey: true,
     description: 'Open command palette',
+    labelKey: 'keyboardShortcuts.actions.openCommandPalette',
   },
   {
-    key: 's',
+    key: 'p',
     ctrlKey: true,
     metaKey: true,
-    description: 'Save (if applicable)',
+    description: 'Toggle project switcher',
+    labelKey: 'keyboardShortcuts.actions.toggleProjectSwitcher',
   },
   {
-    key: 'f',
+    key: 'g',
     ctrlKey: true,
     metaKey: true,
-    description: 'Search',
+    description: 'Go to file',
+    labelKey: 'keyboardShortcuts.actions.goToFile',
   },
   {
     key: 'b',
     ctrlKey: true,
     metaKey: true,
     description: 'Toggle sidebar',
+    labelKey: 'keyboardShortcuts.actions.toggleSidebar',
+  },
+  {
+    key: ',',
+    ctrlKey: true,
+    metaKey: true,
+    description: 'Open workspace settings',
+    labelKey: 'keyboardShortcuts.actions.openWorkspaceSettings',
+  },
+  {
+    key: '/',
+    ctrlKey: true,
+    metaKey: true,
+    description: 'Toggle this shortcuts help',
+    labelKey: 'keyboardShortcuts.actions.toggleShortcutsHelp',
   },
   {
     key: 'Escape',
     description: 'Close panels / dialogs',
-  },
-  {
-    key: '1',
-    ctrlKey: true,
-    metaKey: true,
-    description: 'Switch to Files tab',
-  },
-  {
-    key: '2',
-    ctrlKey: true,
-    metaKey: true,
-    description: 'Switch to Plugins tab',
-  },
-  {
-    key: '3',
-    ctrlKey: true,
-    metaKey: true,
-    description: 'Switch to Changes tab',
+    labelKey: 'keyboardShortcuts.actions.closePanels',
   },
 ]

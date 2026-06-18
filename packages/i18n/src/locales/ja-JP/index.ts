@@ -27,6 +27,7 @@ import { fileTree } from './fileTree'
 import { agent } from './agent'
 import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
+import { keyboardShortcuts } from './keyboardShortcuts'
 import { assets } from './assets'
 import { tools } from './tools'
 
@@ -77,6 +78,7 @@ export const jaJP = {
   agent,
   sidebar,
   goToFile,
+  keyboardShortcuts,
   workflow,
   questionCard,
   assets,

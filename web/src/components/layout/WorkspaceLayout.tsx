@@ -440,14 +440,7 @@ export function WorkspaceLayout({
         return
       }
 
-      // Cmd/Ctrl + Shift + P to open Go To File dialog
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P') {
-        e.preventDefault()
-        setShowGoToFile(true)
-        return
-      }
-
-      // Cmd/Ctrl + G to open Go To File dialog (alternative shortcut)
+      // Cmd/Ctrl + G to open Go To File dialog
       if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
         e.preventDefault()
         setShowGoToFile(true)
@@ -468,8 +461,12 @@ export function WorkspaceLayout({
         return
       }
 
-      // NOTE: removed Shift+? shortcut — too hidden and conflicts with '?' typing.
-      // Shortcuts help is accessible via Command Palette (⌘K → "Keyboard Shortcuts")
+      // Cmd/Ctrl + / to toggle keyboard shortcuts help
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault()
+        setShowShortcutsHelp((prev) => !prev)
+        return
+      }
 
       // ESC to close panels
       if (e.key === 'Escape') {

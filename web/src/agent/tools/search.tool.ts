@@ -541,11 +541,16 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       const rootName = resolvedRootName || searchPath || undefined
       result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
 
-      // Prepend root prefix to hit paths so they are fully qualified for the LLM
-      // (e.g. "prepared/WS-147951 ...md" instead of bare "WS-147951 ...md")
+      // Prepend root prefix AND sub-path to hit paths so they are fully qualified.
+      // The worker returns paths relative to the resolved sub-directory (vfsSubPath),
+      // so we must reconstruct the full path: rootName/subPath/workerRelativePath.
+      // (e.g. "creatorweave/web/src/i18n/index.ts" not "creatorweave/i18n/index.ts")
       if (resolvedRootName) {
+        const prefix = vfsSubPath
+          ? `${resolvedRootName}/${vfsSubPath}/`
+          : `${resolvedRootName}/`
         for (const hit of result.results) {
-          hit.path = `${resolvedRootName}/${hit.path}`
+          hit.path = `${prefix}${hit.path}`
         }
       }
     } else {
