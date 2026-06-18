@@ -1012,22 +1012,13 @@ export const FileTreePanel = memo(function FileTreePanel({
     return () => { cancelled = true }
   }, [revealTarget, loaded, revealPath, onRevealComplete])
 
-  // Reset states when directoryHandle changes or workspace is cleared
+  // Reset states when directoryHandle changes or workspace switches.
+  // NOTE: We intentionally do NOT block loading when activeWorkspaceId is null.
+  // A brand-new project may have roots (directoryHandle) but no conversations yet,
+  // and users should still be able to browse files in the tree before creating one.
   useEffect(() => {
     // Bump generation to cancel any in-flight revealPath
     revealGenRef.current++
-    // Always reset tree state when directoryHandle changes.
-    // Also reset when there is no activeWorkspaceId (project switched /
-    // workspace cleared) so stale OPFS data doesn't leak into the tree.
-    if (!directoryHandle || !activeWorkspaceId) {
-      setLoaded(false)
-      setLoading(false)
-      setLoadError(null)
-      setExpandedPaths(new Set())
-      setRootNodes([])
-      return
-    }
-    // Reset all states to trigger fresh load
     setLoaded(false)
     setLoading(false)
     setLoadError(null)
@@ -1035,11 +1026,10 @@ export const FileTreePanel = memo(function FileTreePanel({
     setRootNodes([])
   }, [directoryHandle, activeWorkspaceId])
 
-  // Auto-load root when not loaded and not loading
-  // Pass null for directoryHandle if not available (OPFS-only mode)
-  // Skip loading when there is no active workspace to avoid showing stale OPFS cache
+  // Auto-load root when not loaded and not loading.
+  // directoryHandle may be null (OPFS-only mode) — loadChildren handles that.
   useEffect(() => {
-    if (!loaded && !loading && activeWorkspaceId) {
+    if (!loaded && !loading) {
       loadRoot()
     }
   }, [directoryHandle, loaded, loading, loadRoot, activeWorkspaceId])
