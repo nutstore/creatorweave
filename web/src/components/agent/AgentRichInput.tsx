@@ -11,6 +11,7 @@ import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExte
 import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2 } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
+import { Lightbox } from './Lightbox'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -287,6 +288,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
 }: AgentRichInputProps, ref) {
   const t = useT()
   const [isFocused, setIsFocused] = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   // Agent selector state
   const [showAgentSelector, setShowAgentSelector] = useState(false)
   const [isCreatingAgent, setIsCreatingAgent] = useState(false)
@@ -966,7 +968,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       <img
                         src={asset.previewUrl}
                         alt={asset.name}
-                        className="h-8 w-8 rounded object-cover"
+                        className="h-8 w-8 rounded object-cover cursor-zoom-in"
+                        onClick={() => setLightboxSrc(asset.previewUrl)}
                       />
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">
@@ -1206,6 +1209,11 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             </span>
           )}
         />
+      )}
+
+      {/* Lightbox overlay for click-to-enlarge images */}
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
       )}
     </div>
   )

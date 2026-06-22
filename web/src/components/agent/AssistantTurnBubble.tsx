@@ -26,7 +26,7 @@
 
 import { Fragment, memo, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bot, Database, GitFork, AlertTriangle, Download, Maximize2 } from 'lucide-react'
+import { Bot, Database, GitFork, AlertTriangle, Download } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -47,7 +47,8 @@ import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { ConversationActionContext } from './ConversationActionContext'
-import { dataUriToBlob, downloadImage } from './image-utils'
+import { downloadImage } from './image-utils'
+import { Lightbox } from './Lightbox'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -342,6 +343,9 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   const isStreamingReasoning = streamingState?.reasoning ?? false
   const isStreamingContent = streamingState?.content ?? false
 
+  // Lightbox state for image click-to-enlarge
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+
   // TTS settings
   const enableTTS = useSettingsStore((s) => s.enableTTS)
   const autoPlayTTS = useSettingsStore((s) => s.autoPlayTTS)
@@ -431,6 +435,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               streamingToolArgsByCallId,
               conversationId,
               onPreviewAsset,
+              (src: string) => setLightboxSrc(src),
             )}
           </Fragment>
         ))}
@@ -525,6 +530,11 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
           </div>
         )}
       </div>
+
+      {/* Lightbox overlay for click-to-enlarge images */}
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
     </div>
   )
 })
@@ -539,6 +549,7 @@ function renderTimelineItem(
   streamingToolArgsByCallId: Record<string, string> | undefined,
   conversationId: string | null | undefined,
   onPreviewAsset?: (name: string, blob: Blob) => void,
+  onImageClick?: (src: string) => void,
 ): ReactNode {
   switch (item.kind) {
     case 'committed':
@@ -550,6 +561,7 @@ function renderTimelineItem(
           suppressExecutingToolCallIds={suppressedIds}
           conversationId={conversationId ?? undefined}
           onPreviewAsset={onPreviewAsset}
+          onImageClick={onImageClick}
         />
       )
 
@@ -700,6 +712,7 @@ const AssistantStep = memo(function AssistantStep({
   suppressExecutingToolCallIds,
   conversationId,
   onPreviewAsset,
+  onImageClick,
 }: {
   message: Message
   toolResults: Map<string, string>
@@ -707,6 +720,7 @@ const AssistantStep = memo(function AssistantStep({
   suppressExecutingToolCallIds?: Set<string>
   conversationId?: string
   onPreviewAsset?: (name: string, blob: Blob) => void
+  onImageClick?: (src: string) => void
 }) {
   const t = useT()
   const contentRef = useRef<HTMLDivElement>(null)
@@ -783,22 +797,11 @@ const AssistantStep = memo(function AssistantStep({
                   <img
                     src={`data:${img.mimeType};base64,${img.data}`}
                     alt={`Generated image ${idx + 1}`}
-                    className="block max-w-full h-auto"
+                    className="block max-w-full h-auto cursor-zoom-in"
+                    onClick={() => onImageClick?.(`data:${img.mimeType};base64,${img.data}`)}
                   />
                   {/* Hover overlay with action buttons */}
                   <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                    <button
-                      type="button"
-                      className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
-                      title={t('conversation.imageGen.previewFullscreen')}
-                      aria-label={t('conversation.imageGen.previewFullscreen')}
-                      onClick={() => {
-                        const blob = dataUriToBlob(`data:${img.mimeType};base64,${img.data}`, img.mimeType)
-                        onPreviewAsset?.(`image-${idx + 1}.png`, blob)
-                      }}
-                    >
-                      <Maximize2 className="h-4 w-4" />
-                    </button>
                     <button
                       type="button"
                       className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"

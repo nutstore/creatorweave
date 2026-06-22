@@ -13,7 +13,7 @@
  * Inline: $x_1$  Block: $$\varepsilon_l = x_l - \hat{x}_l$$
  */
 
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useContext, createContext, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -21,6 +21,10 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { Loader2 } from 'lucide-react'
 import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
+import { Lightbox } from './Lightbox'
+
+/** Context for passing the image click callback from MarkdownContent to MarkdownImage/AssetImage */
+const ImageClickContext = createContext<(src: string) => void>(() => {})
 
 /** Check if a path looks like an OPFS asset reference */
 function isAssetPath(src: string): boolean {
@@ -61,10 +65,20 @@ function isLocalFilePath(src: string): boolean {
  */
 function MarkdownImage({ src, alt, ...props }: React.ComponentPropsWithoutRef<'img'>) {
   const srcStr = src || ''
+  const onImageClick = useContext(ImageClickContext)
 
-  // External URL or data URI → render as-is
+  // External URL or data URI → render with click-to-enlarge
   if (!isAssetPath(srcStr) && !isLocalFilePath(srcStr)) {
-    return <img src={srcStr} alt={alt || ''} loading="lazy" {...props} />
+    return (
+      <img
+        src={srcStr}
+        alt={alt || ''}
+        loading="lazy"
+        className="max-w-full cursor-zoom-in"
+        onClick={() => onImageClick(srcStr)}
+        {...props}
+      />
+    )
   }
 
   return <AssetImage src={srcStr} alt={alt || ''} />
@@ -86,6 +100,7 @@ function AssetImage({ src, alt }: { src: string; alt: string }) {
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState(false)
   const urlRef = useRef<string | null>(null)
+  const onImageClick = useContext(ImageClickContext)
   const assetPath = isAssetPath(src) ? toRelativePath(src) : src.replace(/^\/+/, '')
 
   // Cleanup blob URL on unmount
@@ -144,8 +159,9 @@ function AssetImage({ src, alt }: { src: string; alt: string }) {
     <img
       src={url}
       alt={alt}
-      className="max-w-full rounded-md"
+      className="max-w-full cursor-zoom-in rounded-md"
       loading="lazy"
+      onClick={() => onImageClick(url)}
     />
   )
 }
@@ -281,14 +297,20 @@ interface MarkdownContentProps {
 }
 
 export const MarkdownContent = memo(function MarkdownContent({ content }: MarkdownContentProps) {
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const normalized = normalizeMathDelimiters(content)
   return (
-    <ReactMarkdown
-      remarkPlugins={REMARK_PLUGINS}
-      rehypePlugins={REHYPE_PLUGINS}
-      components={MARKDOWN_COMPONENTS}
-    >
-      {normalized}
-    </ReactMarkdown>
+    <ImageClickContext.Provider value={setLightboxSrc}>
+      <ReactMarkdown
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
+        components={MARKDOWN_COMPONENTS}
+      >
+        {normalized}
+      </ReactMarkdown>
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
+    </ImageClickContext.Provider>
   )
 })

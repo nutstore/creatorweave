@@ -11,6 +11,7 @@ import { FileText, Image, Download, X, Eye, Loader2 } from 'lucide-react'
 import type { AssetMeta } from '@/types/asset'
 import { inferMimeType } from '@/types/asset'
 import { readAssetBlob, downloadAssetBlob } from './asset-utils'
+import { Lightbox } from './Lightbox'
 import { useT } from '@/i18n'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -58,6 +59,7 @@ export function AssetCard({ asset, compact = false, onRemove, onPreview }: Asset
   const t = useT()
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const mime = asset.mimeType || inferMimeType(asset.name)
   const isImage = isImageMime(mime)
 
@@ -103,34 +105,46 @@ export function AssetCard({ asset, compact = false, onRemove, onPreview }: Asset
 
   if (compact) {
     return (
-      <div className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
-        <AssetIcon mimeType={mime} />
-        <span className="max-w-[120px] truncate">{asset.name}</span>
-        <span className="text-neutral-400">({formatFileSize(asset.size)})</span>
-        {onRemove && (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="ml-0.5 rounded p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-600"
-          >
-            <X className="h-3 w-3" />
-          </button>
+      <>
+        <div className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+          {isImage && imageUrl ? (
+            <button
+              type="button"
+              onClick={() => setLightboxSrc(imageUrl)}
+              className="flex-shrink-0 h-5 w-5 rounded overflow-hidden bg-neutral-200 dark:bg-neutral-600 cursor-zoom-in"
+            >
+              <img src={imageUrl} alt={asset.name} className="h-full w-full object-cover" />
+            </button>
+          ) : (
+            <AssetIcon mimeType={mime} />
+          )}
+          <span className="max-w-[120px] truncate">{asset.name}</span>
+          <span className="text-neutral-400">({formatFileSize(asset.size)})</span>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="ml-0.5 rounded p-0.5 hover:bg-neutral-200 dark:hover:bg-neutral-600"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+        {lightboxSrc && (
+          <Lightbox src={lightboxSrc} alt={asset.name} onClose={() => setLightboxSrc(null)} />
         )}
-      </div>
+      </>
     )
   }
 
   return (
     <div className="group inline-flex flex-col rounded-lg border border-neutral-200 bg-white shadow-sm dark:border-neutral-700 dark:bg-neutral-800 overflow-hidden max-w-[280px]">
-      {/* Image thumbnail — clickable to preview */}
+      {/* Image thumbnail — click to enlarge */}
       {isImage && imageUrl && (
         <div
-          className="w-full aspect-video bg-neutral-50 dark:bg-neutral-900 overflow-hidden cursor-pointer"
-          onClick={onPreview ? handlePreview : undefined}
-          role={onPreview ? 'button' : undefined}
-          tabIndex={onPreview ? 0 : undefined}
-          onKeyDown={(e) => { if (e.key === 'Enter' && onPreview) handlePreview() }}
-          title="Click to preview"
+          className="w-full aspect-video bg-neutral-50 dark:bg-neutral-900 overflow-hidden cursor-zoom-in"
+          onClick={() => setLightboxSrc(imageUrl)}
+          title="Click to enlarge"
         >
           <img
             src={imageUrl}
@@ -178,6 +192,9 @@ export function AssetCard({ asset, compact = false, onRemove, onPreview }: Asset
           <Download className="h-4 w-4" />
         </button>
       </div>
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} alt={asset.name} onClose={() => setLightboxSrc(null)} />
+      )}
     </div>
   )
 }

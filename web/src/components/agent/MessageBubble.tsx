@@ -6,7 +6,7 @@
  */
 
 import { useState, memo } from 'react'
-import { User, Bot, Trash2, Pencil, Download, Maximize2 } from 'lucide-react'
+import { User, Bot, Trash2, Pencil, Download } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
@@ -15,7 +15,8 @@ import { CopyButton } from './CopyButton'
 import { RegenerateButton } from './RegenerateButton'
 import { AssetList } from './AssetCard'
 import { InlineMessageEditor } from './InlineMessageEditor'
-import { dataUriToBlob, downloadImage } from './image-utils'
+import { downloadImage } from './image-utils'
+import { Lightbox } from './Lightbox'
 import { useT } from '@/i18n'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
@@ -89,6 +90,7 @@ export const MessageBubble = memo(function MessageBubble({
 
   // Edit state for user messages
   const [isEditing, setIsEditing] = useState(false)
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
   const handleStartEdit = () => {
     setIsEditing(true)
@@ -237,22 +239,11 @@ export const MessageBubble = memo(function MessageBubble({
                 <img
                   src={`data:${img.mimeType};base64,${img.data}`}
                   alt={`Generated image ${idx + 1}`}
-                  className="block max-w-full h-auto"
+                  className="block max-w-full h-auto cursor-zoom-in"
+                  onClick={() => setLightboxSrc(`data:${img.mimeType};base64,${img.data}`)}
                 />
                 {/* Hover overlay with action buttons */}
                 <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button
-                    type="button"
-                    className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
-                    title={t('conversation.imageGen.previewFullscreen')}
-                    aria-label={t('conversation.imageGen.previewFullscreen')}
-                    onClick={() => {
-                      const blob = dataUriToBlob(`data:${img.mimeType};base64,${img.data}`, img.mimeType)
-                      onPreviewAsset?.(`image-${idx + 1}.png`, blob)
-                    }}
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </button>
                   <button
                     type="button"
                     className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
@@ -300,6 +291,11 @@ export const MessageBubble = memo(function MessageBubble({
           <CopyButton content={message.content} />
         )}
       </div>
+
+      {/* Lightbox overlay for click-to-enlarge images */}
+      {lightboxSrc && (
+        <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
     </div>
   )
 })
