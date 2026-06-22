@@ -627,6 +627,13 @@ export default defineBackground(() => {
       return;
     }
 
+    // Schedule alarm — forward trigger to the active CreatorWeave tab
+    if (alarm.name.startsWith('sched_')) {
+      const scheduleId = alarm.name.slice(6) // strip 'sched_' prefix
+      await forwardScheduleTrigger(scheduleId)
+      return
+    }
+
     if (alarm.name !== CODEX_AUTH_POLL_ALARM) return;
     try {
       const pending = await getPendingCodexAuth();
@@ -643,6 +650,86 @@ export default defineBackground(() => {
       // keep alarm for next retry
     }
   });
+
+  // ── Schedule Alarm Handler ──────────────────────────────────────────────
+  // When a schedule alarm fires, we forward the trigger to the active CreatorWeave tab.
+  // The extension cannot access OPFS directly, so it delegates to the page.
+
+  // Track the active CreatorWeave tab ID (updated on tab activation)
+  let _creatorWeaveTabId: number | null = null
+
+  chrome.tabs.onActivated.addListener(async (activeInfo) => {
+    try {
+      const tabs = await chrome.tabs.query({ url: ['*://*/*'], active: true, windowId: activeInfo.windowId })
+      const tab = tabs[0]
+      if (tab?.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+        _creatorWeaveTabId = tab.id
+      }
+    } catch {
+      // ignore
+    }
+  })
+
+  // Listen for CreatorWeave tab updates to capture the tab ID
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://')) {
+      _creatorWeaveTabId = tabId
+    }
+  })
+
+  /**
+   * Forward a schedule trigger to the CreatorWeave page.
+   * Returns true if forwarded successfully, false if no active tab.
+   */
+  async function forwardScheduleTrigger(scheduleId: string): Promise<boolean> {
+    if (!_creatorWeaveTabId) {
+      // Try to find a CreatorWeave tab
+      try {
+        const tabs = await chrome.tabs.query({ url: ['*://*/*'] })
+        const cwTab = tabs.find(t => t.id && t.url && !t.url.startsWith('chrome://') && !t.url.startsWith('chrome-extension://'))
+        if (cwTab?.id) {
+          _creatorWeaveTabId = cwTab.id
+        } else {
+          return false
+        }
+      } catch {
+        return false
+      }
+    }
+
+    try {
+      await chrome.tabs.sendMessage(_creatorWeaveTabId, {
+        type: 'cw_schedule_run',
+        scheduleId,
+      })
+      return true
+    } catch {
+      // Tab may be closed or not responding
+      _creatorWeaveTabId = null
+      return false
+    }
+  }
+
+  /**
+   * Show a desktop notification for schedule events.
+   */
+  async function showScheduleNotification(options: {
+    title: string
+    body: string
+    scheduleId?: string
+  }): Promise<void> {
+    try {
+      await chrome.notifications.create({
+        type: 'basic',
+        iconUrl: '/icon.png',
+        title: options.title,
+        message: options.body,
+        priority: 1,
+      })
+    } catch {
+      // notifications may not be available
+    }
+  }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Ignore internal messages intended for offscreen document
@@ -970,6 +1057,66 @@ export default defineBackground(() => {
           const text = await resp.text();
           sendResponse({ ok: resp.ok, status: resp.status, text });
           return;
+        }
+
+        // ── Schedule triggers ─────────────────────────────────────────────
+
+        if (message.type === 'cw_schedule_register_alarm') {
+          // CreatorWeave page asks us to set an alarm for a schedule
+          const { scheduleId, nextRunTime } = message as { scheduleId: string; nextRunTime: number }
+          if (!scheduleId || typeof nextRunTime !== 'number') {
+            sendResponse({ ok: false, error: 'Missing scheduleId or nextRunTime' })
+            return
+          }
+          try {
+            const alarmName = `sched_${scheduleId}`
+            const delaySeconds = Math.max(1, Math.round((nextRunTime - Date.now()) / 1000))
+            await chrome.alarms.create(alarmName, { delayInMinutes: delaySeconds / 60 })
+            sendResponse({ ok: true, alarmName })
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) })
+          }
+          return
+        }
+
+        if (message.type === 'cw_schedule_clear_alarm') {
+          // CreatorWeave page asks us to clear an alarm for a schedule
+          const { scheduleId } = message as { scheduleId: string }
+          if (!scheduleId) {
+            sendResponse({ ok: false, error: 'Missing scheduleId' })
+            return
+          }
+          try {
+            await chrome.alarms.delete(`sched_${scheduleId}`)
+            sendResponse({ ok: true })
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) })
+          }
+          return
+        }
+
+        if (message.type === 'cw_schedule_show_notification') {
+          // CreatorWeave page asks us to show a desktop notification
+          const { title, body } = message as { title: string; body: string }
+          await showScheduleNotification({ title, body })
+          sendResponse({ ok: true })
+          return
+        }
+
+        if (message.type === 'cw_schedule_disable_notification') {
+          // CreatorWeave notifies us that a schedule was disabled (e.g., bound conversation deleted)
+          const { scheduleId, reason } = message as { scheduleId: string; reason?: string }
+          if (scheduleId) {
+            try {
+              await chrome.alarms.delete(`sched_${scheduleId}`)
+            } catch { /* ignore */ }
+          }
+          await showScheduleNotification({
+            title: '定时任务已暂停',
+            body: reason ? `原因：${reason}` : '定时任务已被禁用',
+          })
+          sendResponse({ ok: true })
+          return
         }
 
         sendResponse({ ok: false, error: `Unknown message type: ${String(message?.type || '')}` });

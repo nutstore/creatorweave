@@ -30,6 +30,7 @@ import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { assets } from './assets'
 import { tools } from './tools'
+import { schedule } from './schedule'
 
 export const koKR = {
   common,
@@ -83,4 +84,5 @@ export const koKR = {
   questionCard,
   assets,
   tools,
+  schedule,
 } as const

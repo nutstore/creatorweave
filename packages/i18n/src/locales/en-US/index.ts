@@ -32,6 +32,7 @@ import { keyboardShortcuts } from './keyboardShortcuts'
 import { extension } from './extension'
 import { assets } from './assets'
 import { tools } from './tools'
+import { schedule } from './schedule'
 
 export const enUS = {
   common,
@@ -87,4 +88,5 @@ export const enUS = {
   extension,
   assets,
   tools,
+  schedule,
 } as const

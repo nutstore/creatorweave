@@ -11,6 +11,7 @@ export const sidebar = {
     newWorkspace: "新会话",
     workspaceLabel: "工作区: {name}",
     pendingReviewCount: "{count} 个修改待确认",
+    hasSchedule: "此会话有定时任务",
     workspaceDeleted: "工作区已删除",
     emptyStateNoWorkspace:
       "当前项目还没有工作区，创建首个会话后会自动生成对应工作区。",

@@ -127,6 +127,22 @@ export default defineContentScript({
 
     window.addEventListener('message', onBridgeMessage);
 
+    // ── Schedule trigger listener (background → page) ──
+    // When chrome.alarms fires, background sends cw_schedule_run to content.ts,
+    // which relays it here via window.postMessage with __agentWebScheduleTrigger.
+    // We dispatch a CustomEvent that the CreatorWeave app listens for.
+    const onScheduleTrigger = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      const data = event.data;
+      if (!data || data.__agentWebScheduleTrigger !== true) return;
+      const scheduleId = data.scheduleId as string;
+      if (!scheduleId) return;
+
+      // Dispatch a custom event the CreatorWeave app can listen for
+      window.dispatchEvent(new CustomEvent('cw:schedule-trigger', { detail: { scheduleId } }));
+    };
+    window.addEventListener('message', onScheduleTrigger);
+
     // Send request to ISOLATED relay → background
     function sendToBridge(type: string, payload: Record<string, any>, timeoutMs?: number): Promise<any> {
       return new Promise((resolve) => {
@@ -666,11 +682,36 @@ export default defineContentScript({
         if (audio) { audio.pause(); audio.src = ''; }
         (window as any).__ttsAudio = undefined;
       },
+
+      // ── Schedule ──────────────────────────────────────────────────────
+
+      /**
+       * Register an alarm for a schedule in the extension.
+       * The extension will forward the trigger to this page when the alarm fires.
+       */
+      async scheduleRegisterAlarm(scheduleId: string, nextRunTime: number): Promise<{ ok: boolean; alarmName?: string; error?: string }> {
+        return sendToBridge('cw_schedule_register_alarm', { scheduleId, nextRunTime });
+      },
+
+      /**
+       * Clear a registered alarm for a schedule.
+       */
+      async scheduleClearAlarm(scheduleId: string): Promise<{ ok: boolean; error?: string }> {
+        return sendToBridge('cw_schedule_clear_alarm', { scheduleId });
+      },
+
+      /**
+       * Show a desktop notification from the extension.
+       */
+      async scheduleShowNotification(title: string, body: string): Promise<{ ok: boolean }> {
+        return sendToBridge('cw_schedule_show_notification', { title, body });
+      },
     };
 
     ;(window as any).__agentWebBridgeState = {
       dispose() {
         window.removeEventListener('message', onBridgeMessage)
+        window.removeEventListener('message', onScheduleTrigger)
         for (const [id, pending] of _pending) {
           _pending.delete(id)
           clearTimeout(pending.timeoutId)

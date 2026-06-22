@@ -58,6 +58,7 @@ import { ExtensionBanner, ExtensionOutdatedBanner } from '@/components/extension
 import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { ScheduleDrawer } from '@/components/schedule/ScheduleDrawer'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
 import { useWebContainerStore } from '@/store/webcontainer.store'
@@ -161,6 +162,7 @@ export function WorkspaceLayout({
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
   const [showRecentFiles, setShowRecentFiles] = useState(false)
+  const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
   const [showGoToFile, setShowGoToFile] = useState(false)
   /** Target file path (with rootName prefix) to reveal in file tree */
@@ -213,6 +215,19 @@ export function WorkspaceLayout({
   useEffect(() => {
     const cleanup = initializeTheme()
     return cleanup
+  }, [])
+
+  // Start schedule heartbeat on mount
+  useEffect(() => {
+    import('@/services/schedule-heartbeat').then(({ startHeartbeat }) => {
+      startHeartbeat()
+    }).catch(err => {
+      console.warn('[WorkspaceLayout] Failed to start schedule heartbeat:', err)
+    })
+    // Also load schedule badges for sidebar
+    import('@/store/schedule.store').then(({ useScheduleStore }) => {
+      useScheduleStore.getState().refresh()
+    }).catch(() => {})
   }, [])
 
   // Phase 4: Load conversations on mount (independent of Sidebar rendering)
@@ -701,6 +716,7 @@ export function WorkspaceLayout({
         projectSwitcherOpen={projectSwitcherOpen}
         onProjectSwitcherOpenChange={setProjectSwitcherOpen}
         onSelectWorkspace={onSelectWorkspace}
+        onScheduleDrawerOpen={() => setScheduleDrawerOpen(true)}
       />
 
       {/* Extension install banner — opens guide dialog via store */}
@@ -904,6 +920,19 @@ export function WorkspaceLayout({
 
       <MCPSettingsDialog open={showMcpSettings} onOpenChange={setShowMcpSettings} />
       <WebContainerPanel isOpen={isWebContainerPanelOpen} onClose={closeWebContainerPanel} />
+
+      {/* Schedule Drawer */}
+      <ScheduleDrawer
+        workspaceId={activeConversationId ?? ''}
+        open={scheduleDrawerOpen}
+        onClose={() => setScheduleDrawerOpen(false)}
+        onScheduleChanged={() => {
+          // Refresh schedule badges in sidebar after any mutation
+          import('@/store/schedule.store').then(({ useScheduleStore }) => {
+            useScheduleStore.getState().refresh()
+          })
+        }}
+      />
     </div>
   )
 }

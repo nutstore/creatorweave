@@ -36,6 +36,7 @@ import {
   ContextMenuTrigger,
 } from '@creatorweave/ui'
 import { useConversationStore } from '@/store/conversation.store'
+import { useScheduleStore } from '@/store/schedule.store'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useConversationContextStore } from '@/store/conversation-context.store'
 import { useWorkspaceStore } from '@/store/workspace.store'
@@ -63,6 +64,7 @@ interface ConversationItemData {
   isEditing: boolean
   isArchived: boolean
   isPinned: boolean
+  hasSchedule: boolean
 }
 
 interface ConversationItemProps extends ConversationItemData {
@@ -120,6 +122,7 @@ const ConversationItem = memo(function ConversationItem({
   isEditing,
   isArchived,
   isPinned,
+  hasSchedule,
   onSelect,
   onStartRename,
   onDeleteClick,
@@ -241,6 +244,9 @@ const ConversationItem = memo(function ConversationItem({
               {pendingReviewCount}
             </span>
           )}
+          {hasSchedule && !isEditing && (
+            <Clock className="h-3 w-3 shrink-0 text-primary-400" />
+          )}
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">
@@ -289,6 +295,7 @@ const ConversationItem = memo(function ConversationItem({
     prev.pendingReviewCount === next.pendingReviewCount &&
     prev.isEditing === next.isEditing &&
     prev.isPinned === next.isPinned &&
+    prev.hasSchedule === next.hasSchedule &&
     prev.isArchived === next.isArchived &&
     prev.editingTitle === next.editingTitle &&
     prev.composing === next.composing &&
@@ -699,6 +706,9 @@ export const Sidebar = memo(function Sidebar({
     () => scopedConversations.filter((conv) => workspaceStatusMap.get(conv.id) === 'archived').length,
     [scopedConversations, workspaceStatusMap]
   )
+
+  // Schedule badges: subscribe to workspaceScheduleCount map (only re-renders when counts change)
+  const workspaceScheduleCount = useScheduleStore((s) => s.workspaceScheduleCount)
   const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
   const conversationRatio = panelSizes.conversationRatio
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
@@ -1137,6 +1147,7 @@ export const Sidebar = memo(function Sidebar({
                   isEditing={isEditing}
                   isArchived={isArchived}
                   isPinned={isPinned}
+                  hasSchedule={(workspaceScheduleCount.get(conv.id) ?? 0) > 0}
                   onSelect={handleItemSelect}
                   onStartRename={startRename}
                   onDeleteClick={handleItemDeleteClick}
