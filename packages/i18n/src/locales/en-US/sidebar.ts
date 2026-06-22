@@ -11,6 +11,7 @@ export const sidebar = {
     newWorkspace: "New Session",
     workspaceLabel: "Workspace: {name}",
     pendingReviewCount: "{count} changes to confirm",
+    hasSchedule: "This conversation has scheduled tasks",
     workspaceDeleted: "Workspace deleted",
     emptyStateNoWorkspace:
       "No workspace for this project yet. A workspace will be automatically created when you start your first conversation.",

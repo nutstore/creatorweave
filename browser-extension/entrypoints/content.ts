@@ -107,5 +107,21 @@ export default defineContentScript({
         }, '*');
       }
     });
+
+    // ── Background → Page relay: schedule triggers ──
+    // The background script sends cw_schedule_run when a chrome.alarms fires.
+    // We forward it to the page via window.postMessage so the injected script
+    // can call triggerSchedule().
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message?.type === 'cw_schedule_run') {
+        window.postMessage({
+          __agentWebScheduleTrigger: true,
+          scheduleId: message.scheduleId,
+        }, '*');
+        sendResponse({ ok: true });
+        return false; // synchronous response
+      }
+      return false; // not our message
+    });
   },
 });

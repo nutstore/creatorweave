@@ -27,6 +27,7 @@ export const topbar = {
       appSettings: "앱 설정",
       docs: "문서",
       more: "더보기",
+      schedules: "예약 작업",
       webContainer: "WebContainer",
     },
     mobile: {

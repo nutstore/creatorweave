@@ -17,6 +17,7 @@ import {
   Keyboard,
   Menu,
   ArrowLeft,
+  Clock,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey } from '@/store/settings.store'
@@ -74,6 +75,8 @@ interface TopBarProps {
   onProjectSwitcherOpenChange?: (open: boolean) => void
   /** Navigate to a workspace within the current project (updates URL) */
   onSelectWorkspace?: (workspaceId: string) => void
+  /** Open the schedule drawer */
+  onScheduleDrawerOpen?: () => void
 }
 
 export function TopBar({
@@ -92,6 +95,7 @@ export function TopBar({
   projectSwitcherOpen,
   onProjectSwitcherOpenChange,
   onSelectWorkspace,
+  onScheduleDrawerOpen,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
@@ -267,6 +271,13 @@ export function TopBar({
             </ActionTooltip>
 
             <div className="h-5 w-px bg-muted" />
+
+            {/* Schedule / Timer */}
+            <ActionTooltip label={t('topbar.tooltips.schedules')}>
+              <BrandButton iconButton className="shrink-0" onClick={onScheduleDrawerOpen} data-tour="schedules">
+                <Clock className="h-[14px] w-[14px]" />
+              </BrandButton>
+            </ActionTooltip>
 
             {/* Settings */}
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>

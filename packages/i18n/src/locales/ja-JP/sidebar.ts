@@ -9,6 +9,7 @@ export const sidebar = {
     newWorkspace: "新しいセッション",
     workspaceLabel: "ワークスペース: {name}",
     pendingReviewCount: "{count}件の変更が確認待ち",
+    hasSchedule: "この会話にはスケジュールされたタスクがあります",
     workspaceDeleted: "ワークスペースが削除されました",
     emptyStateNoWorkspace:
       "このプロジェクトのワークスペースはまだありません。最初の会話を開始すると、ワークスペースが自動的に作成されます。",

@@ -89,6 +89,9 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
 
   // Image generation (writes generated images to OPFS assets)
   ['generate_image', { name: 'generate_image', category: 'write' }],
+
+  // Schedule management (creates/modifies persistent schedule configs)
+  ['manage_schedule', { name: 'manage_schedule', category: 'write' }],
 ])
 
 /**
