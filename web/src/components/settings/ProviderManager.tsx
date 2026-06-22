@@ -44,7 +44,7 @@ import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
-import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels } from '@/agent/providers/llm-gateway-provider'
+import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels, isLLMGatewayConfigured } from '@/agent/providers/llm-gateway-provider'
 import { performDeviceCodeFlow, logoutGateway as logoutGatewayAuth, getValidAccessToken, fetchGatewayModels } from '@/agent/providers/llm-gateway-auth'
 import type { AuthState } from '@/agent/providers/llm-gateway-auth'
 
@@ -869,7 +869,6 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
 // LLM Gateway Card - Special provider card for Device Code Flow
 // =============================================================================
 
-// @ts-expect-error TS6133: LLMGatewayCard is temporarily hidden in the UI (see commented usage below) but kept for re-enabling later.
 function LLMGatewayCard({
   isExpanded,
   onToggle,
@@ -1364,13 +1363,13 @@ export function ProviderManager() {
         <NewProviderForm onClose={() => setShowNewProvider(false)} />
       )}
 
-      {/* LLM Gateway Card (temporarily hidden) */}
-      {/* {isLLMGatewayConfigured() && (
+      {/* LLM Gateway Card (坚果云 AI) */}
+      {isLLMGatewayConfigured() && (
         <LLMGatewayCard
           isExpanded={expandedProvider === LLM_GATEWAY_PROVIDER_TYPE}
           onToggle={() => toggleProvider(LLM_GATEWAY_PROVIDER_TYPE)}
         />
-      )} */}
+      )}
 
       {/* Provider Cards by Category */}
       {CATEGORY_ORDER.map((category) => {
