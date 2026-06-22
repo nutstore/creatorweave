@@ -67,7 +67,7 @@ interface BatchOperationsPanelProps {
 
 export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOperationsPanelProps) {
   const [state, setState] = useState<BatchOperationState>({
-    type: null,
+    type: 'batch_edit',
     isRunning: false,
     progress: 0,
     preview: null,
@@ -179,7 +179,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
 
   const handleClear = useCallback(() => {
     setState({
-      type: null,
+      type: 'batch_edit',
       isRunning: false,
       progress: 0,
       preview: null,
@@ -408,14 +408,30 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
         <h2 className="mb-4 text-lg font-semibold">Batch Operations</h2>
 
         {/* Tabs */}
-        <div className="mb-4 flex gap-2 border-b border-neutral-200 pb-2 dark:border-neutral-700">
+        <div
+          role="tablist"
+          aria-label="Batch operation modes"
+          className="mb-4 flex gap-2 border-b border-neutral-200 pb-2 dark:border-neutral-700"
+        >
           <button
+            id="batch-edit-tab"
+            type="button"
+            role="tab"
+            aria-selected={state.type === 'batch_edit'}
+            aria-controls="batch-edit-panel"
+            tabIndex={state.type === 'batch_edit' ? 0 : -1}
             onClick={() => setState((prev) => ({ ...prev, type: 'batch_edit' }))}
             className={`px-3 py-1 text-sm ${state.type === 'batch_edit' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
           >
             Batch Edit
           </button>
           <button
+            id="batch-read-tab"
+            type="button"
+            role="tab"
+            aria-selected={state.type === 'read'}
+            aria-controls="batch-read-panel"
+            tabIndex={state.type === 'read' ? 0 : -1}
             onClick={() => setState((prev) => ({ ...prev, type: 'read' }))}
             className={`px-3 py-1 text-sm ${state.type === 'read' ? 'border-b-2 border-blue-500 font-medium' : 'text-neutral-500'}`}
           >
@@ -439,8 +455,16 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
         )}
 
         {/* Forms */}
-        {state.type === 'batch_edit' && renderBatchEditForm()}
-        {state.type === 'read' && renderBatchReadForm()}
+        {state.type === 'batch_edit' && (
+          <div id="batch-edit-panel" role="tabpanel" aria-labelledby="batch-edit-tab">
+            {renderBatchEditForm()}
+          </div>
+        )}
+        {state.type === 'read' && (
+          <div id="batch-read-panel" role="tabpanel" aria-labelledby="batch-read-tab">
+            {renderBatchReadForm()}
+          </div>
+        )}
 
         {/* Preview */}
         {renderPreview()}
