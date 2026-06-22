@@ -957,6 +957,9 @@ function LLMGatewayCard({
       const keyId = getLLMGatewayApiKeyProviderKey()
       const { saveApiKey } = await import('@/security/api-key-store')
       await saveApiKey(keyId, tokens.access_token)
+      useSettingsStore.getState().invalidateApiKeyCache(keyId)
+      // Sync global hasApiKey so TopBar / ModelQuickSwitch stop showing "unavailable"
+      useSettingsStore.getState().setHasApiKey(true)
 
       // Fetch and register model list
       await updateGatewayModels(tokens.access_token)
@@ -973,8 +976,14 @@ function LLMGatewayCard({
 
   const handleLogout = useCallback(async () => {
     const { deleteApiKey } = await import('@/security/api-key-store')
+    const keyId = getLLMGatewayApiKeyProviderKey()
     logoutGatewayAuth()
-    await deleteApiKey(getLLMGatewayApiKeyProviderKey())
+    await deleteApiKey(keyId)
+    useSettingsStore.getState().invalidateApiKeyCache(keyId)
+    // Re-check from DB so we don't flip hasApiKey off when another provider is active
+    if (useSettingsStore.getState().providerType === LLM_GATEWAY_PROVIDER_TYPE) {
+      useSettingsStore.getState().setHasApiKey(false)
+    }
     setIsLoggedIn(false)
     setAllModels([])
     setAuthState({ status: 'idle' })

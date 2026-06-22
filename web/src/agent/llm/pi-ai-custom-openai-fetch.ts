@@ -426,7 +426,7 @@ const BASE_URL_THINKING_FORMAT_MAP: Array<{ pattern: string; format: ThinkingFor
 /**
  * Auto-detect thinking format from the provider's baseUrl.
  */
-function detectThinkingFormat(baseUrl: string): ThinkingFormat {
+export function detectThinkingFormat(baseUrl: string): ThinkingFormat {
   const url = baseUrl.toLowerCase()
   for (const { pattern, format } of BASE_URL_THINKING_FORMAT_MAP) {
     if (url.includes(pattern)) return format

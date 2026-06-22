@@ -10,7 +10,7 @@ import { complete, stream, type Api, type Context, type Message, type Model, typ
 import { estimateMessagesTokens } from './token-counter'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { resolvePiAIModel } from './pi-ai-model-resolver'
-import { ensurePiAICustomProvidersRegistered } from './pi-ai-custom-openai-fetch'
+import { detectThinkingFormat, ensurePiAICustomProvidersRegistered } from './pi-ai-custom-openai-fetch'
 
 const MAX_CONTEXT_TOKENS = 128000
 
@@ -216,9 +216,30 @@ export class PiAIProvider implements LLMProvider {
         }
         // Suppress reasoning when disableThinking is set (Codex API doesn't support these params)
         if (request.disableThinking && this.model.provider !== 'codex-oauth') {
-          p.thinking = { type: 'disabled' }
-          p.enable_thinking = false
-          p.reasoning_effort = 'none'
+          // Each provider uses a different disable field/value — setting the wrong
+          // one (e.g. `thinking` for TokenHub) makes the upstream SDK reject the
+          // request with `unexpected keyword argument`. Match the upstream format.
+          switch (detectThinkingFormat(this.model.baseUrl)) {
+            case 'tencent-tokenhub':
+              // TokenHub / 坚果云 AI Gateway — only accepts reasoning_effort with 'off'
+              p.reasoning_effort = 'off'
+              break
+            case 'openrouter':
+              p.reasoning = { effort: 'none' }
+              break
+            case 'deepseek':
+              p.thinking = { type: 'disabled' }
+              break
+            case 'together':
+              p.reasoning = { enabled: false }
+              break
+            case 'qwen':
+              p.enable_thinking = false
+              break
+            default:
+              // OpenAI-compatible: most accept 'none'
+              p.reasoning_effort = 'none'
+          }
         }
       },
     }
