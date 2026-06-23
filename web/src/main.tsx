@@ -18,6 +18,7 @@ import './styles/globals.css'
 import './components/plugins/plugin-ui.css'
 import 'sonner/dist/styles.css'
 import { registerServiceWorker } from '@/pwa/register-service-worker'
+import { RootErrorBoundary } from '@/components/error/RootErrorBoundary'
 
 // Import Python module to initialize window.__executePython
 import '@/python'
@@ -51,6 +52,8 @@ if (import.meta.env.PROD || enableSwInDev) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <RootErrorBoundary>
+      <App />
+    </RootErrorBoundary>
   </React.StrictMode>
 )

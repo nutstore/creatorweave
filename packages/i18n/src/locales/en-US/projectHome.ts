@@ -36,6 +36,10 @@ export const projectHome = {
         "Clear browser cache to refresh response headers and static resources.",
       clearCache: "Clear Cache",
       clearing: "Clearing...",
+      diagnostics: "Diagnostics",
+      diagnosticsDescription:
+        "Collect runtime environment and storage state. Copy the report to share with the developer when something goes wrong.",
+      runDiagnostics: "Run Diagnostics",
     },
     // Theme settings
     theme: {
@@ -117,6 +121,13 @@ export const projectHome = {
       startFreshConfirmPlaceholder: "Start Fresh",
       confirmReset: "Confirm Reset",
       resetting: "Resetting...",
+      diagnosticsTitle: "Diagnostic Report",
+      diagnosticsRunning: "Collecting diagnostic information...",
+      diagnosticsHint: "Click \"Copy Report\" below and paste it to the developer.",
+      diagnosticsFailed:
+        "Diagnostics failed. Please open the browser console to collect information manually.",
+      copyReport: "Copy Report",
+      copied: "Copied",
     },
     // Empty state
     empty: {

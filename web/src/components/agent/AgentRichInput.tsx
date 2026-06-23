@@ -969,7 +969,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                         src={asset.previewUrl}
                         alt={asset.name}
                         className="h-8 w-8 rounded object-cover cursor-zoom-in"
-                        onClick={() => setLightboxSrc(asset.previewUrl)}
+                        onClick={() => setLightboxSrc(asset.previewUrl ?? null)}
                       />
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">

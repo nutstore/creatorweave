@@ -40,11 +40,15 @@ import {
   FileText,
   RefreshCw,
   Github,
+  Stethoscope,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner } from '@/components/extension'
+import { runDiagnostics, copyMarkdownToClipboard } from '@/storage/diagnostics'
 
 // Design system styles
 const designStyles = `
@@ -447,6 +451,12 @@ export function ProjectHome({
   const [clearDataConfirmText, setClearDataConfirmText] = useState('')
   const [isClearingCache, setIsClearingCache] = useState(false)
 
+  // Diagnostic report state
+  const [diagOpen, setDiagOpen] = useState(false)
+  const [diagRunning, setDiagRunning] = useState(false)
+  const [diagReport, setDiagReport] = useState<string>('')
+  const [diagCopied, setDiagCopied] = useState(false)
+
   const createInputRef = useRef<HTMLInputElement>(null)
 
   // Confirm text for clearing local data (needs to match translated placeholder)
@@ -473,6 +483,32 @@ export function ProjectHome({
     // Wait a bit for SW to process, then reload
     await new Promise((resolve) => setTimeout(resolve, 200))
     window.location.reload()
+  }
+
+  // Run storage diagnostics and show the report dialog
+  const handleRunDiagnostics = async () => {
+    setDiagOpen(true)
+    setDiagRunning(true)
+    setDiagReport('')
+    setDiagCopied(false)
+    try {
+      const report = await runDiagnostics()
+      setDiagReport(report.markdown)
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err)
+      setDiagReport(`${t('projectHome.dialogs.diagnosticsFailed')}\n\n${detail}`)
+    } finally {
+      setDiagRunning(false)
+    }
+  }
+
+  const handleCopyReport = async () => {
+    if (!diagReport) return
+    const ok = await copyMarkdownToClipboard(diagReport)
+    if (ok) {
+      setDiagCopied(true)
+      window.setTimeout(() => setDiagCopied(false), 2000)
+    }
   }
 
   const openCreateDialog = useCallback(() => {
@@ -1055,6 +1091,27 @@ export function ProjectHome({
                 {isClearingCache ? t('projectHome.sidebar.clearing') : t('projectHome.sidebar.clearCache')}
               </BrandButton>
             </div>
+
+            {/* Diagnostics */}
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Stethoscope className="w-4 h-4 text-tertiary" />
+                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                  {t('projectHome.sidebar.diagnostics')}
+                </span>
+              </div>
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+                {t('projectHome.sidebar.diagnosticsDescription')}
+              </p>
+              <BrandButton
+                variant="ghost"
+                className="w-full text-tertiary hover:text-primary hover:border-primary/50"
+                onClick={() => void handleRunDiagnostics()}
+              >
+                <Stethoscope className="w-3.5 h-3.5 mr-1.5" />
+                {t('projectHome.sidebar.runDiagnostics')}
+              </BrandButton>
+            </div>
           </aside>
 
           {/* Right: Activity heatmap + Project list */}
@@ -1368,6 +1425,62 @@ export function ProjectHome({
               disabled={isClearingLocalData || clearDataConfirmText !== t('projectHome.dialogs.startFreshConfirmPlaceholder')}
             >
               {isClearingLocalData ? t('projectHome.dialogs.resetting') : t('projectHome.dialogs.confirmReset')}
+            </BrandButton>
+          </BrandDialogFooter>
+        </BrandDialogContent>
+      </BrandDialog>
+
+      {/* Diagnostics dialog */}
+      <BrandDialog open={diagOpen} onOpenChange={setDiagOpen}>
+        <BrandDialogContent className="max-w-2xl">
+          <BrandDialogHeader>
+            <BrandDialogTitle>
+              {t('projectHome.dialogs.diagnosticsTitle')}
+            </BrandDialogTitle>
+          </BrandDialogHeader>
+          <BrandDialogBody>
+            {diagRunning ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-5 h-5 animate-spin text-tertiary mr-2" />
+                <span className="text-sm text-secondary dark:text-secondary-foreground">
+                  {t('projectHome.dialogs.diagnosticsRunning')}
+                </span>
+              </div>
+            ) : (
+              <>
+                <pre className="home-mono text-[11px] leading-relaxed text-secondary dark:text-secondary-foreground bg-muted/40 dark:bg-muted/20 border border-border/60 rounded-lg p-3 max-h-[50vh] overflow-auto whitespace-pre-wrap break-words">
+                  {diagReport}
+                </pre>
+                <p className="home-body text-xs text-tertiary dark:text-muted mt-3">
+                  {t('projectHome.dialogs.diagnosticsHint')}
+                </p>
+              </>
+            )}
+          </BrandDialogBody>
+          <BrandDialogFooter>
+            <BrandButton
+              variant="ghost"
+              onClick={() => setDiagOpen(false)}
+              disabled={diagRunning}
+            >
+              {t('common.close')}
+            </BrandButton>
+            <BrandButton
+              variant="primary"
+              onClick={() => void handleCopyReport()}
+              disabled={diagRunning || !diagReport}
+            >
+              {diagCopied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 mr-1.5" />
+                  {t('projectHome.dialogs.copied')}
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 mr-1.5" />
+                  {t('projectHome.dialogs.copyReport')}
+                </>
+              )}
             </BrandButton>
           </BrandDialogFooter>
         </BrandDialogContent>

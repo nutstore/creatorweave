@@ -34,6 +34,10 @@ export const projectHome = {
         "ブラウザキャッシュをクリアして、レスポンスヘッダーと静的リソースを更新します。",
       clearCache: "キャッシュをクリア",
       clearing: "クリア中...",
+      diagnostics: "診断",
+      diagnosticsDescription:
+        "実行環境とストレージ状態を収集します。問題発生時にワンクリックでコピーして開発者に共有できます。",
+      runDiagnostics: "診断を実行",
     },
     theme: {
       modeTitle: "テーマモード",
@@ -109,6 +113,13 @@ export const projectHome = {
       startFreshConfirmPlaceholder: "最初からやり直す",
       confirmReset: "リセットを確認",
       resetting: "リセット中...",
+      diagnosticsTitle: "診断レポート",
+      diagnosticsRunning: "診断情報を収集中...",
+      diagnosticsHint: "下の「レポートをコピー」をクリックして開発者に送ってください。",
+      diagnosticsFailed:
+        "診断に失敗しました。ブラウザのコンソールから手動で収集してください。",
+      copyReport: "レポートをコピー",
+      copied: "コピー済み",
     },
     empty: {
       noProjects: "まだプロジェクトがありません",

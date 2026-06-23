@@ -32,6 +32,10 @@ export const projectHome = {
         "브라우저 캐시를 삭제하여 응답 헤더와 정적 리소스를 새로고침합니다.",
       clearCache: "캐시 삭제",
       clearing: "삭제 중...",
+      diagnostics: "진단",
+      diagnosticsDescription:
+        "실행 환경과 저장소 상태를 수집합니다. 문제 발생 시 한 번에 복사해서 개발자에게 공유할 수 있습니다.",
+      runDiagnostics: "진단 실행",
     },
     theme: {
       modeTitle: "테마 모드",
@@ -106,6 +110,13 @@ export const projectHome = {
       startFreshConfirmPlaceholder: "처음부터 시작",
       confirmReset: "초기화 확인",
       resetting: "초기화 중...",
+      diagnosticsTitle: "진단 보고서",
+      diagnosticsRunning: "진단 정보를 수집하는 중...",
+      diagnosticsHint: "아래의「보고서 복사」를 클릭해서 개발자에게 전달해 주세요.",
+      diagnosticsFailed:
+        "진단에 실패했습니다. 브라우저 콘솔에서 수동으로 수집해 주세요.",
+      copyReport: "보고서 복사",
+      copied: "복사됨",
     },
     empty: {
       noProjects: "아직 프로젝트가 없습니다",

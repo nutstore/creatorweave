@@ -32,6 +32,10 @@ export const projectHome = {
       cacheDescription: "清除浏览器缓存以刷新响应头和静态资源。",
       clearCache: "清除缓存",
       clearing: "清除中...",
+      diagnostics: "诊断",
+      diagnosticsDescription:
+        "收集运行环境和存储状态信息，遇到问题时可一键复制反馈给开发者。",
+      runDiagnostics: "运行诊断",
     },
     // 主题设置
     theme: {
@@ -112,6 +116,12 @@ export const projectHome = {
       startFreshConfirmPlaceholder: "重新开始",
       confirmReset: "确认重置",
       resetting: "重置中...",
+      diagnosticsTitle: "诊断报告",
+      diagnosticsRunning: "正在收集诊断信息...",
+      diagnosticsHint: "点击下方「复制报告」按钮，然后粘贴给开发者即可。",
+      diagnosticsFailed: "诊断失败，请打开浏览器控制台手动收集信息。",
+      copyReport: "复制报告",
+      copied: "已复制",
     },
     // 空状态
     empty: {
