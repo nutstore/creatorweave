@@ -602,6 +602,7 @@ function App() {
 
       try {
         const result = await initStorage({
+          allowFallback: false,
           onProgress: (progress) => {
             console.log('[Storage]', progress.step, progress.details)
 

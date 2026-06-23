@@ -35,7 +35,14 @@ export interface InitStorageOptions {
 
   /**
    * Allow fallback to IndexedDB if SQLite fails
-   * @default true
+   *
+   * @deprecated 新架构下 SQLite 是唯一数据源，IndexedDB 中只有 legacy AppSessions。
+   * 静默回退会让 UI 显示空状态却伪装成初始化成功，导致用户感知为"数据丢失"。
+   * 保留参数仅为向后兼容，请显式传 `false`，未来版本会移除。
+   *
+   * 传 `true` 时只影响 `mode` 字段，不会再把 `success` 从 false 改成 true。
+   *
+   * @default false
    */
   allowFallback?: boolean
 }
@@ -119,7 +126,7 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
     return storageInitPromise
   }
 
-  const { onProgress, allowFallback = true } = options
+  const { onProgress, allowFallback = false } = options
   const resetMarker = getStorageResetMarker()
   const initAfterReset = !!resetMarker
 
@@ -130,6 +137,24 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
 
   storageInitPromise = (async () => {
     try {
+      // Request persistent storage as early as possible — before any OPFS
+      // writes happen. Without persistent grant, browsers may evict OPFS
+      // data under storage pressure, which is the most common cause of
+      // "refresh and all data is gone" reports.
+      // This is best-effort: Chromium may grant even without user interaction
+      // for installed PWAs / high-engagement sites; Firefox requires gesture.
+      try {
+        if ('storage' in navigator && 'persist' in navigator.storage) {
+          const persisted = await navigator.storage.persist()
+          console.log(
+            `[Storage] navigator.storage.persist() → ${persisted ? 'GRANTED ✅' : 'DENIED ❌ (will retry on user interaction)'}`
+          )
+        }
+      } catch (persistError) {
+        // Don't let persist() failure abort initialization.
+        console.warn('[Storage] persist() request failed (non-fatal):', persistError)
+      }
+
       // Initialize SQLite (worker will determine actual OPFS availability)
       await initSQLiteDB(onProgress)
       await getSQLiteDB().queryFirst('SELECT 1')
@@ -176,22 +201,17 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
         }
       }
 
-      // If SQLite initialization fails and fallback is allowed
+      // SQLite 是唯一数据源，失败时永远返回 success: false。
+      // 保留 allowFallback 只是为了让 mode 字段反映"假如回退会走哪条路"，
+      // 供诊断 UI 使用，但不会再把失败假装成成功。
       if (allowFallback) {
-        console.warn('[Storage] SQLite initialization failed, allowing app to continue:', errorMsg)
         currentStorageMode = 'indexeddb-fallback'
-
-        onProgress?.({
-          step: 'warning',
-          total: 1,
-          current: 1,
-          details: 'SQLite unavailable, using existing IndexedDB storage',
-        })
-
-        return {
-          success: true,
-          mode: currentStorageMode,
-        }
+        console.warn(
+          '[Storage] SQLite initialization failed. allowFallback=true 仅影响 mode 字段，success 仍为 false。',
+          errorMsg
+        )
+      } else {
+        currentStorageMode = 'sqlite-opfs'
       }
 
       onProgress?.({
