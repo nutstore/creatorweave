@@ -411,20 +411,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
             const manager = await getWorkspaceManager()
 
-            // Create OPFS workspace
-            const workspace = await manager.createWorkspace(rootDirectory, id)
-
-            // Create SQLite record
-            await repo.createWorkspace({
-              id,
-              projectId: activeProjectId,
+            // Create OPFS workspace + SQLite record (manager is the Single
+            // Source of Truth — it handles the SQLite upsert internally).
+            const workspace = await manager.createWorkspace(
               rootDirectory,
-              name: name || rootDirectory.split('/').pop() || id,
-              status: 'active',
-              cacheSize: 0,
-              pendingCount: workspace.pendingCount,
-              modifiedFiles: 0,
-            })
+              id,
+              name || rootDirectory.split('/').pop() || id,
+            )
 
             const newWorkspace: WorkspaceWithStats = {
               id,
@@ -537,25 +530,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Each conversation gets its own isolated workspace directory
               const rootDirectory = `workspaces/${id}`
 
-              // Create the workspace (this creates OPFS structure and adds to SQLite)
-              const workspace = await manager.createWorkspace(rootDirectory, id)
-
               // Get conversation title for workspace name
               const { useConversationStore } = await import('./conversation.store')
               const conversations = useConversationStore.getState().conversations
               const convTitle = conversations.find((c) => c.id === id)?.title
 
-              // Create workspace in SQLite
-              await repo.createWorkspace({
-                id,
-                projectId: activeProjectId,
+              // Create the workspace (OPFS + SQLite via manager, which is the
+              // Single Source of Truth for workspace records).
+              const workspace = await manager.createWorkspace(
                 rootDirectory,
-                name: convTitle || id,
-                status: 'active',
-                cacheSize: 0,
-                pendingCount: workspace.pendingCount,
-                modifiedFiles: 0,
-              })
+                id,
+                convTitle || id,
+              )
 
               const newWorkspace: WorkspaceWithStats = {
                 id,

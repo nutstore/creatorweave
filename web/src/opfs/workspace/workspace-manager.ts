@@ -193,6 +193,10 @@ export class WorkspaceManager {
     const existingRecord = this.index.find((item) => item.workspaceId === id)
     const isExisting = !!existingRecord || !!existingProjectId
 
+    let resolvedCreatedAt: number
+    let resolvedLastAccessedAt: number
+    const resolvedName = name || existingRecord?.name || rootDirectory.split('/').pop() || id
+
     if (isExisting) {
       // Idempotent ensure: keep original timestamps, only refresh
       // rootDirectory/name in case they drifted. If the record isn't in the
@@ -210,25 +214,44 @@ export class WorkspaceManager {
           lastAccessedAt = lastAccessedAt ?? Date.now()
         }
       }
-      this.upsertIndexRecord({
-        workspaceId: id,
-        projectId,
-        rootDirectory,
-        name: name || existingRecord?.name || rootDirectory.split('/').pop() || id,
-        createdAt,
-        lastAccessedAt,
-      })
+      resolvedCreatedAt = createdAt
+      resolvedLastAccessedAt = lastAccessedAt
     } else {
       const now = Date.now()
-      this.upsertIndexRecord({
-        workspaceId: id,
-        projectId,
-        rootDirectory,
-        name: name || rootDirectory.split('/').pop() || id,
-        createdAt: now,
-        lastAccessedAt: now,
-      })
+      resolvedCreatedAt = now
+      resolvedLastAccessedAt = now
     }
+
+    // Update in-memory index (always).
+    this.upsertIndexRecord({
+      workspaceId: id,
+      projectId,
+      rootDirectory,
+      name: resolvedName,
+      createdAt: resolvedCreatedAt,
+      lastAccessedAt: resolvedLastAccessedAt,
+    })
+
+    // Sync to SQLite (Single Source of Truth). UPSERT preserves `created_at`
+    // on existing rows via the ON CONFLICT clause — see upsertWorkspace.
+    //
+    // Errors propagate to the caller. The existing OPFS dir + in-memory index
+    // stay usable for the lifetime of this page session, but a missing SQLite
+    // row would re-trigger the "ensure" path on next launch and retry — so we
+    // surface failures rather than swallowing them. `loadFromDB` already
+    // wraps this call in try/catch to avoid blocking the whole conversation
+    // list load.
+    await getWorkspaceRepository().upsertWorkspace({
+      id,
+      projectId,
+      rootDirectory,
+      name: resolvedName,
+      status: 'active',
+      cacheSize: 0,
+      modifiedFiles: 0,
+      createdAt: resolvedCreatedAt,
+      lastAccessedAt: resolvedLastAccessedAt,
+    })
 
     return workspace
   }

@@ -162,6 +162,61 @@ export class WorkspaceRepository {
   }
 
   /**
+   * Idempotent upsert used by WorkspaceManager to keep SQLite `workspaces`
+   * row in sync with OPFS + in-memory index. Preserves `created_at` on
+   * existing rows (avoids scrambling conversation list order).
+   *
+   * This is the Single Source of Truth entry point: all workspace creation
+   * paths should funnel through WorkspaceManager.createWorkspace, which
+   * calls this method internally.
+   *
+   * `pendingCount` is intentionally excluded — it's a computed column from
+   * `fs_ops`, not a stored field in the `workspaces` table.
+   */
+  async upsertWorkspace(
+    workspace: {
+      id: string
+      projectId: string
+      rootDirectory: string
+      name: string
+      status: 'active' | 'archived'
+      cacheSize: number
+      modifiedFiles: number
+      createdAt?: number
+      lastAccessedAt?: number
+    }
+  ): Promise<void> {
+    const db = getSQLiteDB()
+    const now = Date.now()
+    const createdAt = workspace.createdAt ?? now
+    const lastAccessedAt = workspace.lastAccessedAt ?? now
+
+    await db.execute(
+      `INSERT INTO workspaces (id, project_id, root_directory, name, status, cache_size, modified_files, created_at, last_accessed_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         project_id = excluded.project_id,
+         root_directory = excluded.root_directory,
+         name = excluded.name,
+         status = excluded.status,
+         cache_size = excluded.cache_size,
+         modified_files = excluded.modified_files,
+         last_accessed_at = excluded.last_accessed_at`,
+      [
+        workspace.id,
+        workspace.projectId,
+        workspace.rootDirectory,
+        workspace.name,
+        workspace.status,
+        workspace.cacheSize,
+        workspace.modifiedFiles,
+        createdAt,
+        lastAccessedAt,
+      ]
+    )
+  }
+
+  /**
    * Update workspace
    */
   async updateWorkspace(workspace: Workspace): Promise<void> {

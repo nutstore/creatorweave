@@ -14,6 +14,7 @@ const workspaceRepoMock = vi.hoisted(() => ({
   findWorkspaceById: vi.fn(async () => null),
   updateWorkspaceAccessTime: vi.fn(async () => {}),
   createWorkspace: vi.fn(async () => {}),
+  upsertWorkspace: vi.fn(async () => {}),
   updateWorkspaceStats: vi.fn(async () => {}),
   deleteWorkspace: vi.fn(async () => {}),
   updateWorkspaceName: vi.fn(async () => {}),
