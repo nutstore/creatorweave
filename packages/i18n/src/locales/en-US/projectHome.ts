@@ -85,6 +85,7 @@ export const projectHome = {
       archived: "Archived",
       workspaceCount: "{count} workspaces",
       open: "Open",
+      openProject: "Open project \"{name}\"",
       rename: "Rename",
       archive: "Archive",
       unarchive: "Unarchive",

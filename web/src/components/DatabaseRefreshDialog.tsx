@@ -1,19 +1,26 @@
 /**
  * DatabaseRefreshDialog - Non-dismissible dialog for database inaccessibility
  *
- * This dialog is shown when the database becomes inaccessible (e.g., after tab sleep).
- * It CANNOT be closed by ESC key or backdrop click - user must refresh the page.
- * This ensures the user understands they need to refresh to restore access.
+ * Shown when the SQLite OPFS file handle is invalidated (tab sleep, browser
+ * storage cleanup, etc.). Cannot be closed by ESC or backdrop click — user
+ * must refresh the page to restore access.
+ *
+ * `errorMessage` (raw worker error) is rendered inside a collapsible
+ * <details> block so non-technical users see only the friendly explanation,
+ * while developers / support can expand to view the underlying error string.
  */
 
 import { useEffect, useRef } from 'react'
+import { RefreshCw } from 'lucide-react'
 import { useT } from '@/i18n'
 
 interface DatabaseRefreshDialogProps {
   isOpen: boolean
+  /** Raw error message from the SQLite worker — optional, shown in a collapsible block. */
+  errorMessage?: string | null
 }
 
-export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
+export function DatabaseRefreshDialog({ isOpen, errorMessage }: DatabaseRefreshDialogProps) {
   const t = useT()
   const buttonRef = useRef<HTMLButtonElement>(null)
 
@@ -27,80 +34,58 @@ export function DatabaseRefreshDialog({ isOpen }: DatabaseRefreshDialogProps) {
   if (!isOpen) return null
 
   const handleRefresh = () => {
-    // Reload the page
     window.location.reload()
   }
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
       <div
-        className="mx-4 w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-neutral-900"
+        className="mx-4 w-full max-w-md overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-neutral-900"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Warning Icon */}
-        <div className="flex justify-center bg-warning-bg px-6 pt-6">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-warning-bg">
-            <svg
-              className="h-8 w-8 text-warning"
-              fill="none"
-              viewBox="0 0 24 24"
-              strokeWidth="1.5"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-              />
-            </svg>
-          </div>
-        </div>
-
         {/* Header */}
-        <div className="px-6 py-4 text-center">
-          <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">{t('app.databaseConnectionLost')}</h3>
-          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Database Connection Lost</p>
+        <div className="px-6 pt-8 pb-4 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
+            <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+            {t('app.databaseConnectionLost')}
+          </h3>
+          <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-400">
+            {t('app.willAutoRecoverAfterRefresh')}
+          </p>
         </div>
 
-        {/* Content */}
-        <div className="px-6 pb-6 text-center">
-          <div className="mb-4 rounded-lg bg-amber-50 p-4 text-left">
-            <p className="mb-2 text-sm font-medium text-amber-900">{t('app.whatHappened')}</p>
-            <p className="text-sm text-amber-800">
-              {t('app.databaseHandleInvalidExplanation')}
-            </p>
-            <p className="mt-2 text-sm text-amber-800">
-              {t('app.ifJustClearedData')}
-            </p>
-          </div>
-
-          <p className="mb-4 text-sm text-neutral-700 dark:text-neutral-300">
-            <strong>{t('app.yourDataIsSafe')}</strong>
-            <br />
+        {/* Body — minimal. Data safety + technical details only. */}
+        <div className="px-6 pb-4">
+          <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">
             {t('app.dataStoredInOPFS')}
           </p>
 
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">{t('app.willAutoRecoverAfterRefresh')}</p>
+          {errorMessage && (
+            <details className="mt-3 text-left">
+              <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
+                {t('app.showTechnicalDetails')}
+              </summary>
+              <pre className="mt-2 max-h-32 overflow-auto rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+                {errorMessage}
+              </pre>
+            </details>
+          )}
         </div>
 
-        {/* Footer - Only refresh button, no cancel */}
-        <div className="bg-neutral-50 px-6 py-4 dark:bg-neutral-800">
+        {/* Footer — single primary action */}
+        <div className="px-6 pb-6">
           <button
             ref={buttonRef}
             onClick={handleRefresh}
-            className="w-full rounded-lg bg-primary-600 px-4 py-3 text-base font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
           >
+            <RefreshCw className="h-4 w-4" />
             {t('app.refreshPage')}
-            <span className="ml-2 text-sm opacity-80">(Refresh Page)</span>
           </button>
-          <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
-            {t('app.cannotCloseDialog')}
-          </p>
         </div>
       </div>
-
-      {/* Backdrop overlay - prevent clicks from passing through */}
-      <div className="absolute inset-0" onClick={(e) => e.stopPropagation()} />
     </div>
   )
 }

@@ -52,12 +52,20 @@ export const app = {
       "データはブラウザのOPFSに保存されており、一時的にアクセスできないだけです。",
     willAutoRecoverAfterRefresh:
       "ページを更新すると、データベース接続は自動的に回復します。",
+    showTechnicalDetails: "技術的な詳細を表示",
     refreshPage: "ページを更新",
     cannotCloseDialog:
       "このダイアログは閉じられません - 上のボタンをクリックしてページを更新してください",
     databaseInitFailed: "データベースの初期化に失敗しました",
     databaseResetExplanation:
       "これはデータベースの破損または移行の失敗による可能性があります。データベースをリセットすると、すべてのデータがクリアされ再作成されます。",
+    databaseCorruptedHint:
+      "最近ブラウザのストレージをクリーンアップした場合（CleanMyMac、CCleaner、ブラウザの「閲覧履歴の削除」など）、OPFS データベースファイルも削除されている可能性があります。リセットする前に、下の「データベースをバックアップ」ボタンで残ったデータを救出してください。",
+    exportBeforeResetWarning:
+      "⚠️ リセットするとすべての会話、設定、スキルが削除され、元に戻せません。事前に「データベースをバックアップ」でエクスポートすることを強く推奨します。",
+    exportDatabase: "データベースをバックアップ",
+    exportDatabaseSuccess: "データベースのバックアップをダウンロードしました：{filename}",
+    exportDatabaseFailed: "エクスポートに失敗しました：{error}",
     resetDatabase: "データベースをリセット",
     reloadPage: "ページを再読み込み",
     updateAvailable: "新しいバージョンが利用可能です。最新機能のために更新してください",

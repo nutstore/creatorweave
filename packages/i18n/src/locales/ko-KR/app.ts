@@ -51,12 +51,20 @@ export const app = {
       "데이터는 브라우저 OPFS에 저장되어 있으며 일시적으로 액세스할 수 없을 뿐입니다.",
     willAutoRecoverAfterRefresh:
       "페이지를 새로고침하면 데이터베이스 연결이 자동으로 복원됩니다.",
+    showTechnicalDetails: "기술 세부 정보 보기",
     refreshPage: "페이지 새로고침",
     cannotCloseDialog:
       "이 대화상자는 닫을 수 없습니다 - 위 버튼을 클릭하여 페이지를 새로고침해 주세요",
     databaseInitFailed: "데이터베이스 초기화 실패",
     databaseResetExplanation:
       "이는 데이터베이스 손상 또는 마이그레이션 실패로 인해 발생할 수 있습니다. 데이터베이스를 재설정하면 모든 데이터가 지워지고 다시 생성됩니다.",
+    databaseCorruptedHint:
+      "최근 브라우저 저장소를 정리한 경우(CleanMyMac, MacKeeper, 브라우저의 '브라우징 데이터 삭제' 등) OPFS 데이터베이스 파일도 함께 삭제되었을 수 있습니다. 재설정하기 전에 아래 '데이터베이스 백업 내보내기' 버튼으로 남은 데이터를 복구해 보세요.",
+    exportBeforeResetWarning:
+      "⚠️ 재설정하면 모든 대화, 설정, 스킬이 삭제되며 복구할 수 없습니다. 먼저 '데이터베이스 백업 내보내기'를 사용하는 것을 강력히 권장합니다.",
+    exportDatabase: "데이터베이스 백업 내보내기",
+    exportDatabaseSuccess: "데이터베이스 백업이 다운로드되었습니다: {filename}",
+    exportDatabaseFailed: "내보내기 실패: {error}",
     resetDatabase: "데이터베이스 재설정",
     reloadPage: "페이지 새로고침",
     updateAvailable: "새 버전을 사용할 수 있습니다. 최신 기능을 위해 업데이트하세요",

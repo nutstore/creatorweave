@@ -48,6 +48,7 @@ export const app = {
       "Data is stored in browser OPFS, just temporarily inaccessible.",
     willAutoRecoverAfterRefresh:
       "Database connection will automatically recover after page refresh.",
+    showTechnicalDetails: "Show technical details",
     refreshPage: "Refresh Page",
     cannotCloseDialog:
       "This dialog cannot be closed - please click the button above to refresh the page",
@@ -55,6 +56,13 @@ export const app = {
     databaseInitFailed: "Database initialization failed",
     databaseResetExplanation:
       "This may be due to database corruption or migration failure. Resetting the database will clear all data and recreate.",
+    databaseCorruptedHint:
+      'If you recently cleared browser storage (via CleanMyMac, "Clear Browsing Data", or a system cleaner), the OPFS database file may have been wiped. Try the export below to recover any remaining data before resetting.',
+    exportBeforeResetWarning:
+      "⚠️ Resetting clears all conversations, settings, and skills — this is irreversible. We strongly recommend exporting a backup first.",
+    exportDatabase: "Export Database Backup",
+    exportDatabaseSuccess: "Database backup downloaded: {filename}",
+    exportDatabaseFailed: "Export failed: {error}",
     resetDatabase: "Reset Database",
     reloadPage: "Reload Page",
     updateAvailable: "A new version is available, update for the latest features",

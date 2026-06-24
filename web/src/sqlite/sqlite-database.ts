@@ -20,6 +20,17 @@
 import type { WorkerRequest, WorkerResponse } from './sqlite-worker'
 
 //=============================================================================
+// Constants
+//=============================================================================
+
+/**
+ * OPFS filename (no leading slash) for the unified SQLite database.
+ * `sqlite-worker.ts` opens this same file via the SQLite VFS path
+ * `/bfosa-unified.sqlite` — keep both in sync when renaming.
+ */
+export const SQLITE_DB_FILENAME = 'bfosa-unified.sqlite'
+
+//=============================================================================
 // Types
 //=============================================================================
 
@@ -777,6 +788,46 @@ export async function resetSQLiteDB(): Promise<void> {
   await getSQLiteDB().deleteDatabase()
   console.log('[SQLite] Database deleted. Reloading page to recreate...')
   window.location.reload()
+}
+
+/**
+ * Export the OPFS database file as a downloadable Blob.
+ *
+ * This runs on the main thread and reads the file directly from OPFS, which means
+ * it works even when the SQLite worker failed to initialize (the error case that
+ * triggers this export UI). The user gets whatever bytes are on disk — a corrupted
+ * file is still better than nothing right before a reset.
+ *
+ * Returns a `Blob` plus a suggested filename. The caller is responsible for
+ * turning this into a download (via `URL.createObjectURL` + a temporary `<a>`).
+ *
+ * Throws if the file is missing (NotFoundError) or any other read failure. The
+ * caller should surface the error message to the user.
+ */
+export async function exportSQLiteDB(): Promise<{ blob: Blob; filename: string }> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.getDirectory) {
+    throw new Error('OPFS is not available in this environment')
+  }
+
+  const opfsRoot = await navigator.storage.getDirectory()
+  const fileHandle = await opfsRoot.getFileHandle(SQLITE_DB_FILENAME, { create: false })
+  const file = await fileHandle.getFile()
+
+  // Use lastModified so the user can tell multiple exports apart in their Downloads
+  const ts = new Date(file.lastModified || Date.now())
+    .toISOString()
+    .replace(/[:.]/g, '-')
+    .replace('T', '_')
+    .slice(0, 19) // YYYY-MM-DD_HH-MM-SS
+  const stem = SQLITE_DB_FILENAME.replace(/\.sqlite$/, '')
+  const filename = `${stem}_${ts}.sqlite`
+
+  console.log(
+    `[SQLite] Exported database: ${file.size} bytes → ${filename}`
+  )
+
+  // file is already a Blob, just return it
+  return { blob: file, filename }
 }
 
 function quoteSQLiteIdentifier(identifier: string): string {

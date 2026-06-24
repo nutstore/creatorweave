@@ -81,6 +81,7 @@ export const projectHome = {
       archived: "已归档",
       workspaceCount: "{count} 工作区",
       open: "打开",
+      openProject: "打开项目「{name}」",
       rename: "重命名",
       archive: "归档",
       unarchive: "取消归档",

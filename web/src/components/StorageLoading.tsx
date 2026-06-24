@@ -12,7 +12,7 @@ import {
   BrandCardDescription,
   BrandProgress,
 } from '@creatorweave/ui'
-import { AlertTriangle, Database, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Database, Download, RefreshCw } from 'lucide-react'
 import { useT } from '@/i18n'
 
 export interface StorageLoadingProps {
@@ -26,6 +26,8 @@ export interface StorageLoadingProps {
   canReset?: boolean
   /** Callback when user clicks the reset button */
   onReset?: () => void
+  /** Callback when user clicks the export button. Renders the button only when set. */
+  onExport?: () => void
 }
 
 /**
@@ -37,6 +39,7 @@ export function StorageLoading({
   error,
   canReset = false,
   onReset,
+  onExport,
 }: StorageLoadingProps) {
   const t = useT()
 
@@ -56,7 +59,7 @@ export function StorageLoading({
               </div>
 
               <BrandCardTitle className="text-xl text-red-900 dark:text-red-100">
-                {t('common.databaseInitFailed')}
+                {t('app.databaseInitFailed')}
               </BrandCardTitle>
               <BrandCardDescription className="mt-2 text-sm text-red-700 dark:text-red-300">
                 {error}
@@ -67,14 +70,31 @@ export function StorageLoading({
               {canReset && (
                 <>
                   <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    {t('common.databaseResetExplanation')}
+                    {t('app.databaseResetExplanation')}
+                  </p>
+                  {/* Hint about the most common cause (cleaner tools wiping OPFS).
+                      Kept short so the page doesn't feel like a wall of text. */}
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                    {t('app.databaseCorruptedHint')}
+                  </p>
+                  {onExport && (
+                    <button
+                      className="border-primary-300 text-primary-700 hover:bg-primary-50 flex w-full items-center justify-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium transition-colors dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-950/30"
+                      onClick={onExport}
+                    >
+                      <Download className="h-4 w-4" />
+                      {t('app.exportDatabase')}
+                    </button>
+                  )}
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    {t('app.exportBeforeResetWarning')}
                   </p>
                   <button
                     className="bg-danger-600 hover:bg-danger-700 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
                     onClick={onReset}
                   >
                     <Database className="h-4 w-4" />
-                    {t('common.resetDatabase')}
+                    {t('app.resetDatabase')}
                   </button>
                 </>
               )}
@@ -85,7 +105,7 @@ export function StorageLoading({
                   onClick={() => window.location.reload()}
                 >
                   <RefreshCw className="h-4 w-4" />
-                  {t('common.reloadPage')}
+                  {t('app.reloadPage')}
                 </button>
               </div>
             </div>

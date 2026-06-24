@@ -78,6 +78,7 @@ export const projectHome = {
       archived: "アーカイブ済み",
       workspaceCount: "{count} ワークスペース",
       open: "開く",
+      openProject: "プロジェクト「{name}」を開く",
       rename: "名前を変更",
       archive: "アーカイブ",
       unarchive: "アーカイブ解除",

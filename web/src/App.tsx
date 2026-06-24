@@ -487,7 +487,7 @@ function AppReady() {
         />
       </Routes>
       <InstallPrompt />
-      <DatabaseRefreshDialog isOpen={false} />
+      <DatabaseRefreshDialog isOpen={false} errorMessage={null} />
       <ExtensionInstallGuide
         open={extensionGuideOpen}
         onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
@@ -508,6 +508,7 @@ function App() {
   const [storageError, setStorageError] = useState<string | null>(null)
   const [canResetDatabase, setCanResetDatabase] = useState(false)
   const [isDatabaseInaccessible, setIsDatabaseInaccessible] = useState(false)
+  const [inaccessibleErrorMessage, setInaccessibleErrorMessage] = useState<string | null>(null)
   const t = useT() // i18n hook
   const tRef = useRef(t)
   tRef.current = t
@@ -580,6 +581,40 @@ function App() {
     }
   }
 
+  /**
+   * Export the OPFS database file as a download. Runs on the main thread so
+   * it works even when the SQLite worker failed to initialize (which is the
+   * situation the user is in when they see this button).
+   */
+  async function handleExportDatabase() {
+    try {
+      const { exportSQLiteDB } = await import('@/sqlite')
+      const { blob, filename } = await exportSQLiteDB()
+
+      // Trigger a regular browser download
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      // Append + click + remove is the most reliable cross-browser pattern
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      // Defer revoke so the download has time to start in all browsers
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+
+      toast.success(
+        tRef.current('app.exportDatabaseSuccess', { filename })
+      )
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('[App] Failed to export database:', error)
+      toast.error(
+        tRef.current('app.exportDatabaseFailed', { error: errorMsg })
+      )
+    }
+  }
+
   useEffect(() => {
     // Skip if already completed (from previous StrictMode render)
     if (initCompleteRef.current) {
@@ -633,6 +668,8 @@ function App() {
 
                   if (details.includes('database_inaccessible')) {
                     console.error('[App] Database inaccessible - showing refresh dialog')
+                    // Keep the first error — it's usually the root cause; later ones may be downstream noise.
+                    setInaccessibleErrorMessage((prev) => prev ?? progress.details)
                     setIsDatabaseInaccessible(true)
                     return
                   }
@@ -668,6 +705,7 @@ function App() {
 
           if (errorMsg.toLowerCase().includes('database_inaccessible')) {
             console.error('[App] Database inaccessible - showing refresh dialog')
+            setInaccessibleErrorMessage((prev) => prev ?? errorMsg)
             setIsDatabaseInaccessible(true)
             return
           }
@@ -694,6 +732,7 @@ function App() {
 
         if (errorMsg.toLowerCase().includes('database_inaccessible')) {
           console.error('[App] Database inaccessible - showing refresh dialog')
+          setInaccessibleErrorMessage((prev) => prev ?? errorMsg)
           setIsDatabaseInaccessible(true)
           return
         }
@@ -779,6 +818,7 @@ function App() {
       const errorMsg = event.error?.message || event.message || ''
       if (errorMsg.toLowerCase().includes('database_inaccessible')) {
         console.error('[App] Database inaccessible detected in global handler')
+        setInaccessibleErrorMessage((prev) => prev ?? errorMsg)
         setIsDatabaseInaccessible(true)
         event.preventDefault()
       }
@@ -788,6 +828,7 @@ function App() {
       const errorMsg = event.reason?.message || String(event.reason) || ''
       if (errorMsg.toLowerCase().includes('database_inaccessible')) {
         console.error('[App] Database inaccessible detected in promise handler')
+        setInaccessibleErrorMessage((prev) => prev ?? errorMsg)
         setIsDatabaseInaccessible(true)
         event.preventDefault()
       }
@@ -872,7 +913,10 @@ function App() {
   if (isDatabaseInaccessible) {
     return (
       <>
-        <DatabaseRefreshDialog isOpen={true} />
+        <DatabaseRefreshDialog
+          isOpen={true}
+          errorMessage={inaccessibleErrorMessage}
+        />
         <Toaster position="bottom-right" />
       </>
     )
@@ -885,6 +929,7 @@ function App() {
         error={storageError}
         canReset={canResetDatabase}
         onReset={handleResetDatabase}
+        onExport={handleExportDatabase}
       />
     )
   }

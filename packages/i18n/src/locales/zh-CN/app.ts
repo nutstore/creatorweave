@@ -43,11 +43,19 @@ export const app = {
     yourDataIsSafe: "您的对话数据是安全的！",
     dataStoredInOPFS: "数据存储在浏览器的 OPFS 中，只是暂时无法访问。",
     willAutoRecoverAfterRefresh: "刷新页面后将自动恢复数据库连接。",
+    showTechnicalDetails: "查看技术详情",
     refreshPage: "刷新页面",
     cannotCloseDialog: "此对话框无法关闭 - 请点击上方按钮刷新页面",
     databaseInitFailed: "数据库初始化失败",
     databaseResetExplanation:
       "这可能由于数据库损坏或迁移失败导致。重置数据库将清除所有数据并重新创建。",
+    databaseCorruptedHint:
+      "如果你最近清理过浏览器存储（通过 CleanMyMac、MacKeeper、清理大师或浏览器「清除浏览数据」），OPFS 数据库文件可能已被一并清除。请先点击下方「导出数据库备份」尝试抢救残留数据，再考虑重置。",
+    exportBeforeResetWarning:
+      "⚠️ 重置将清除所有对话、设置和技能，且不可恢复。强烈建议先「导出数据库备份」再重置。",
+    exportDatabase: "导出数据库备份",
+    exportDatabaseSuccess: "数据库备份已下载：{filename}",
+    exportDatabaseFailed: "导出失败：{error}",
     resetDatabase: "重置数据库",
     reloadPage: "重新加载页面",
     updateAvailable: "发现新版本，建议更新以获取最新功能",

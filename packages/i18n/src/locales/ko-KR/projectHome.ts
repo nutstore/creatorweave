@@ -76,6 +76,7 @@ export const projectHome = {
       archived: "보관됨",
       workspaceCount: "{count} 워크스페이스",
       open: "열기",
+      openProject: "프로젝트 \"{name}\" 열기",
       rename: "이름 변경",
       archive: "보관",
       unarchive: "보관 해제",
