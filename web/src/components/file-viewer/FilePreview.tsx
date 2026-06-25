@@ -1,15 +1,20 @@
 /**
- * FilePreview - read-only file content display with Monaco Editor.
+ * FilePreview - file content display with Monaco Editor.
  * Supports text files with syntax highlighting and images with direct display.
  *
- * Comment feature:
+ * Edit mode (toggleable):
+ * - Switch to edit mode to directly modify file content
+ * - Save with ⌘S or the save button
+ * - Unsaved changes are tracked and warned on file switch / close
+ *
+ * Comment feature (preview mode only):
  * - Click line numbers to start a single-line comment
  * - Shift+Click line numbers for multi-line selection
  * - Send comments to AI conversation
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
-import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download, ExternalLink } from 'lucide-react'
+import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download, ExternalLink, Pencil, Save, Circle } from 'lucide-react'
 import { Editor, loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -143,7 +148,12 @@ function triggerDownload(url: string, fileName: string) {
 export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob }: FilePreviewProps) {
   const t = useT()
   const display = useWorkspacePreferencesStore((s) => s.display)
+  const directoryHandle = useAgentStore((s) => s.directoryHandle)
   const [content, setContent] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editedContent, setEditedContent] = useState('')
+  const [originalForDiff, setOriginalForDiff] = useState('')
+  const [saving, setSaving] = useState(false)
   const [fileSize, setFileSize] = useState<number>(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -175,11 +185,14 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const fileType = useMemo(() => (filePath ? getFileType(filePath) : 'text'), [filePath])
   const formatUI = useMemo(() => (filePath ? getFormatUIHandler(filePath) : null), [filePath])
 
-  // Reset comments when file changes
+  // Reset comments + edit state when file changes
   useEffect(() => {
     setComments([])
     setComposer(null)
     anchorLineRef.current = null
+    setEditMode(false)
+    setEditedContent('')
+    setOriginalForDiff('')
   }, [filePath])
 
   // Track dark mode changes
@@ -565,6 +578,46 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     setTimeout(() => setCopied(false), 2000)
   }, [content])
 
+  const isDirty = editMode && editedContent !== originalForDiff
+
+  const handleSave = useCallback(async () => {
+    if (!filePath || !isDirty) return
+    setSaving(true)
+    try {
+      const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+      await opfs.writeFile(filePath, editedContent, directoryHandle)
+      setOriginalForDiff(editedContent)
+      setContent(editedContent)
+      toast.success(t('filePreview.saved'))
+    } catch (err) {
+      console.error('[FilePreview] Save failed:', err)
+      toast.error(t('filePreview.saveFailed'))
+    } finally {
+      setSaving(false)
+    }
+  }, [filePath, isDirty, editedContent, directoryHandle, t])
+
+  // ⌘S / Ctrl+S to save while in edit mode
+  useEffect(() => {
+    if (!editMode) return
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault()
+        void handleSave()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [editMode, handleSave])
+
+  // Warn on close if dirty
+  const handleClose = useCallback(() => {
+    if (isDirty) {
+      if (!confirm(t('filePreview.unsavedOnClose'))) return
+    }
+    onClose()
+  }, [isDirty, t, onClose])
+
   const handleDownload = useCallback(async () => {
     if (!filePath) return
     const name = filePath.split('/').pop() || 'file'
@@ -630,11 +683,15 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
   const fileName = filePath.split('/').pop() || filePath
   const language = getMonacoLanguage(filePath)
 
-  // Check if current file is commentable (text source view or format text view)
-  const isCommentable = !loading && !error && (
+  // Whether Monaco is showing the file as editable text (excludes images,
+  // office docs, binary). Both the edit toggle and the comment feature
+  // require this — comments additionally need preview mode.
+  const canTouchText = !loading && !error && (
     (content && fileType === 'text')
     || (fileType === 'format' && formatViewMode === 'text' && formatTextContent)
   )
+  const canEdit = canTouchText
+  const isCommentable = !editMode && canTouchText
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col bg-white dark:bg-neutral-950">
@@ -701,7 +758,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
             </button>
           )}
           {/* Comment hint for text files */}
-          {isCommentable && !composer && (
+          {isCommentable && !composer && !editMode && (
             <span className="hidden shrink-0 text-[10px] text-neutral-300 dark:text-neutral-600 sm:inline">
               {t('filePreview.clickLineToComment')}
             </span>
@@ -726,9 +783,52 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               <Download className="h-3 w-3" />
             </button>
           )}
+          {/* Edit / Preview mode toggle */}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                if (editMode && isDirty) {
+                  if (!confirm(t('filePreview.unsavedOnSwitch'))) return
+                }
+                if (!editMode) {
+                  // Entering edit mode: snapshot current content
+                  const base = content ?? formatTextContent ?? ''
+                  setEditedContent(base)
+                  setOriginalForDiff(base)
+                }
+                setEditMode(!editMode)
+              }}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                editMode
+                  ? 'bg-blue-600 text-white'
+                  : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+              }`}
+              title={editMode ? t('filePreview.previewMode') : t('filePreview.editMode')}
+            >
+              {editMode ? <Eye className="h-3 w-3" /> : <Pencil className="h-3 w-3" />}
+            </button>
+          )}
+          {/* Save button (edit mode only) */}
+          {editMode && (
+            <button
+              type="button"
+              onClick={() => void handleSave()}
+              disabled={saving || !isDirty}
+              className="flex items-center gap-1 rounded bg-blue-600 px-2 py-0.5 text-[10px] font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-30"
+              title={t('filePreview.save')}
+            >
+              <Save className="h-3 w-3" />
+              {saving ? t('common.saving') : t('filePreview.save')}
+            </button>
+          )}
+          {/* Unsaved indicator */}
+          {isDirty && (
+            <Circle className="h-1.5 w-1.5 shrink-0 fill-amber-500 text-amber-500" />
+          )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             title={t('filePreview.close')}
           >
@@ -790,11 +890,14 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <Editor
             height="100%"
             language={fileType === 'format' ? 'plaintext' : language}
-            value={fileType === 'format' ? formatTextContent! : content!}
+            value={editMode ? editedContent : (fileType === 'format' ? formatTextContent! : content!)}
             theme={isDark ? 'vs-dark' : 'vs'}
             onMount={handleEditorMount}
+            onChange={(val) => {
+              if (editMode) setEditedContent(val ?? '')
+            }}
             options={{
-              readOnly: true,
+              readOnly: !editMode,
               minimap: { enabled: display.showMiniMap },
               lineNumbers: display.showLineNumbers ? 'on' : 'off',
               scrollBeyondLastLine: false,
@@ -808,7 +911,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
                 verticalScrollbarSize: 10,
                 horizontalScrollbarSize: 10,
               },
-              glyphMargin: true,
+              glyphMargin: !editMode, // glyph margin only needed for comment feature
             }}
           />
         )}

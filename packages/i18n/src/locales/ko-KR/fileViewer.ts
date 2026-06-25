@@ -44,6 +44,14 @@ export const filePreview = {
     openInNewTabFailed: "열기 실패: {error}",
     download: "파일 다운로드",
     downloadFailed: "다운로드 실패",
+    // 편집 모드
+    editMode: "편집",
+    previewMode: "미리보기",
+    save: "저장",
+    saved: "저장됨",
+    saveFailed: "저장 실패",
+    unsavedOnClose: "저장하지 않은 변경 사항이 있습니다. 닫으시겠습니까?",
+    unsavedOnSwitch: "저장하지 않은 변경 사항이 있습니다. 삭제하시겠습니까?",
 } as const
 
 // Office 파일 미리보기

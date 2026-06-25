@@ -46,6 +46,14 @@ export const filePreview = {
     openInNewTabFailed: "開けませんでした: {error}",
     download: "ファイルをダウンロード",
     downloadFailed: "ダウンロードに失敗しました",
+    // 編集モード
+    editMode: "編集",
+    previewMode: "プレビュー",
+    save: "保存",
+    saved: "保存しました",
+    saveFailed: "保存に失敗しました",
+    unsavedOnClose: "未保存の変更があります。閉じますか？",
+    unsavedOnSwitch: "未保存の変更があります。破棄しますか？",
 } as const
 
 // Office ファイルプレビュー

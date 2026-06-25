@@ -930,8 +930,24 @@ export class WorkspaceRuntime {
       // Other errors (permission, IO, etc.) should be propagated
       const errorName = err && typeof err === 'object' && 'name' in err ? (err as { name: string }).name : undefined
       if (errorName === 'NotFoundError') {
-        isNewFile = true
-        baselineFsMtime = 0
+        // File not found on native disk — but it may exist in OPFS as an
+        // uncommitted pending change (e.g. LLM created it, not yet synced).
+        // Fall back to OPFS filesIndex to determine new-vs-modify.
+        if (this.hasFileInIndex(normalizedPath)) {
+          // File exists in OPFS cache → this is a modification, not a new file.
+          const fromFiles = await this.readFromFilesDir(normalizedPath)
+          if (fromFiles) {
+            baselineFsMtime = fromFiles.mtime
+            baselineContent = fromFiles.content
+          } else {
+            // Index hit but read failed — rare (index/file/dir out of sync).
+            // Baseline stays unset; downstream should treat as no-prior-content.
+            console.warn(`[WorkspaceRuntime] hasFileInIndex hit but readFromFilesDir returned null for ${normalizedPath}`)
+          }
+        } else {
+          isNewFile = true
+          baselineFsMtime = 0
+        }
       } else {
         throw err
       }

@@ -43,6 +43,14 @@ export const filePreview = {
     openInNewTabFailed: "Failed to open: {error}",
     download: "Download file",
     downloadFailed: "Download failed",
+    // Edit mode
+    editMode: "Edit",
+    previewMode: "Preview",
+    save: "Save",
+    saved: "Saved",
+    saveFailed: "Save failed",
+    unsavedOnClose: "You have unsaved changes. Close anyway?",
+    unsavedOnSwitch: "You have unsaved changes. Discard them?",
 } as const
 
 // Office file preview

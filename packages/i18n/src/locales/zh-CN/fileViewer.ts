@@ -44,6 +44,14 @@ export const filePreview = {
     openInNewTabFailed: "打开失败：{error}",
     download: "下载文件",
     downloadFailed: "下载失败",
+    // 编辑模式
+    editMode: "编辑",
+    previewMode: "预览",
+    save: "保存",
+    saved: "已保存",
+    saveFailed: "保存失败",
+    unsavedOnClose: "有未保存的修改，确定关闭吗？",
+    unsavedOnSwitch: "有未保存的修改，确定放弃吗？",
 } as const
 
 // Office 文件预览
