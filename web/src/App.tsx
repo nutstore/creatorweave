@@ -588,21 +588,8 @@ function App() {
    */
   async function handleExportDatabase() {
     try {
-      const { exportSQLiteDB } = await import('@/sqlite')
-      const { blob, filename } = await exportSQLiteDB()
-
-      // Trigger a regular browser download
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = filename
-      // Append + click + remove is the most reliable cross-browser pattern
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      // Defer revoke so the download has time to start in all browsers
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
-
+      const { downloadSQLiteDBBackup } = await import('@/sqlite')
+      const filename = await downloadSQLiteDBBackup()
       toast.success(
         tRef.current('app.exportDatabaseSuccess', { filename })
       )

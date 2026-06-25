@@ -34,6 +34,11 @@ export const projectHome = {
         "ブラウザキャッシュをクリアして、レスポンスヘッダーと静的リソースを更新します。",
       clearCache: "キャッシュをクリア",
       clearing: "クリア中...",
+      backup: "データバックアップ",
+      backupDescription:
+        "OPFS 全体（SQLite データベース + ワークスペースファイル）をエクスポートします。バックアップや別デバイスへの移行に使用できます。",
+      exportBackup: "完全バックアップをエクスポート",
+      backingUp: "バックアップ中…",
       diagnostics: "診断",
       diagnosticsDescription:
         "実行環境とストレージ状態を収集します。問題発生時にワンクリックでコピーして開発者に共有できます。",

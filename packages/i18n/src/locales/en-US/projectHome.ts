@@ -36,6 +36,11 @@ export const projectHome = {
         "Clear browser cache to refresh response headers and static resources.",
       clearCache: "Clear Cache",
       clearing: "Clearing...",
+      backup: "Data Backup",
+      backupDescription:
+        "Export the entire OPFS (SQLite database + workspace files) — for backups or migration to a new device.",
+      exportBackup: "Export Full Backup",
+      backingUp: "Backing up…",
       diagnostics: "Diagnostics",
       diagnosticsDescription:
         "Collect runtime environment and storage state. Copy the report to share with the developer when something goes wrong.",

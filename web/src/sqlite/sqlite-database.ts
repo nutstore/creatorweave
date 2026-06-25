@@ -830,6 +830,32 @@ export async function exportSQLiteDB(): Promise<{ blob: Blob; filename: string }
   return { blob: file, filename }
 }
 
+/**
+ * Export the OPFS database file and trigger a browser download.
+ *
+ * Wrapper around `exportSQLiteDB()` that handles the createObjectURL +
+ * temporary `<a>` + revoke dance. Returns the filename on success so the
+ * caller can show a success toast; throws on failure so the caller can
+ * surface the error.
+ */
+export async function downloadSQLiteDBBackup(): Promise<string> {
+  const { blob, filename } = await exportSQLiteDB()
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    // Append + click + remove is the most reliable cross-browser pattern
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  } finally {
+    // Defer revoke so the download has time to start in all browsers
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  }
+  return filename
+}
+
 function quoteSQLiteIdentifier(identifier: string): string {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
     throw new Error(`Unsafe SQLite identifier: ${identifier}`)

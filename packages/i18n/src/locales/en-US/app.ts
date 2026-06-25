@@ -63,6 +63,8 @@ export const app = {
     exportDatabase: "Export Database Backup",
     exportDatabaseSuccess: "Database backup downloaded: {filename}",
     exportDatabaseFailed: "Export failed: {error}",
+    backupSuccess: "Full backup downloaded: {filename}",
+    backupFailed: "Backup failed: {error}",
     resetDatabase: "Reset Database",
     reloadPage: "Reload Page",
     updateAvailable: "A new version is available, update for the latest features",

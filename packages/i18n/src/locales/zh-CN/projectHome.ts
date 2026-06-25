@@ -32,6 +32,11 @@ export const projectHome = {
       cacheDescription: "清除浏览器缓存以刷新响应头和静态资源。",
       clearCache: "清除缓存",
       clearing: "清除中...",
+      backup: "数据备份",
+      backupDescription:
+        "导出完整的 OPFS 数据（SQLite 数据库 + 工作区文件），可用于备份或迁移到新设备。",
+      exportBackup: "导出完整备份",
+      backingUp: "正在备份…",
       diagnostics: "诊断",
       diagnosticsDescription:
         "收集运行环境和存储状态信息，遇到问题时可一键复制反馈给开发者。",

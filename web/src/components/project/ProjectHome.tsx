@@ -43,12 +43,14 @@ import {
   Stethoscope,
   Copy,
   Check,
+  Download,
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner } from '@/components/extension'
 import { runDiagnostics, copyMarkdownToClipboard } from '@/storage/diagnostics'
+import { toast } from 'sonner'
 
 // Design system styles
 const designStyles = `
@@ -450,6 +452,7 @@ export function ProjectHome({
   const [showClearDataDialog, setShowClearDataDialog] = useState(false)
   const [clearDataConfirmText, setClearDataConfirmText] = useState('')
   const [isClearingCache, setIsClearingCache] = useState(false)
+  const [isExportingDB, setIsExportingDB] = useState(false)
 
   // Diagnostic report state
   const [diagOpen, setDiagOpen] = useState(false)
@@ -483,6 +486,23 @@ export function ProjectHome({
     // Wait a bit for SW to process, then reload
     await new Promise((resolve) => setTimeout(resolve, 200))
     window.location.reload()
+  }
+
+  // Export the entire OPFS (SQLite db + workspace files) as a downloadable zip
+  const handleExportBackup = async () => {
+    setIsExportingDB(true)
+    const toastId = toast.loading(t('projectHome.sidebar.backingUp'))
+    try {
+      const { downloadOPFSBackup } = await import('@/opfs')
+      const filename = await downloadOPFSBackup()
+      toast.success(t('app.backupSuccess', { filename }), { id: toastId })
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      console.error('[ProjectHome] Failed to export OPFS backup:', error)
+      toast.error(t('app.backupFailed', { error: errorMsg }), { id: toastId })
+    } finally {
+      setIsExportingDB(false)
+    }
   }
 
   // Run storage diagnostics and show the report dialog
@@ -1089,6 +1109,28 @@ export function ProjectHome({
                 disabled={isClearingCache}
               >
                 {isClearingCache ? t('projectHome.sidebar.clearing') : t('projectHome.sidebar.clearCache')}
+              </BrandButton>
+            </div>
+
+            {/* Data backup */}
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Download className="w-4 h-4 text-tertiary" />
+                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                  {t('projectHome.sidebar.backup')}
+                </span>
+              </div>
+              <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
+                {t('projectHome.sidebar.backupDescription')}
+              </p>
+              <BrandButton
+                variant="ghost"
+                className="w-full text-tertiary hover:text-primary hover:border-primary/50"
+                onClick={() => void handleExportBackup()}
+                disabled={isExportingDB}
+              >
+                <Download className="w-3.5 h-3.5 mr-1.5" />
+                {t('projectHome.sidebar.exportBackup')}
               </BrandButton>
             </div>
 

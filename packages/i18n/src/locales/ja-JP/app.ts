@@ -66,6 +66,8 @@ export const app = {
     exportDatabase: "データベースをバックアップ",
     exportDatabaseSuccess: "データベースのバックアップをダウンロードしました：{filename}",
     exportDatabaseFailed: "エクスポートに失敗しました：{error}",
+    backupSuccess: "完全バックアップをダウンロードしました：{filename}",
+    backupFailed: "バックアップに失敗しました：{error}",
     resetDatabase: "データベースをリセット",
     reloadPage: "ページを再読み込み",
     updateAvailable: "新しいバージョンが利用可能です。最新機能のために更新してください",

@@ -56,6 +56,8 @@ export const app = {
     exportDatabase: "导出数据库备份",
     exportDatabaseSuccess: "数据库备份已下载：{filename}",
     exportDatabaseFailed: "导出失败：{error}",
+    backupSuccess: "完整备份已下载：{filename}",
+    backupFailed: "备份失败：{error}",
     resetDatabase: "重置数据库",
     reloadPage: "重新加载页面",
     updateAvailable: "发现新版本，建议更新以获取最新功能",

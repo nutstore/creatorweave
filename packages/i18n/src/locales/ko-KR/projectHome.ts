@@ -32,6 +32,11 @@ export const projectHome = {
         "브라우저 캐시를 삭제하여 응답 헤더와 정적 리소스를 새로고침합니다.",
       clearCache: "캐시 삭제",
       clearing: "삭제 중...",
+      backup: "데이터 백업",
+      backupDescription:
+        "전체 OPFS 데이터(SQLite 데이터베이스 + 워크스페이스 파일)를 내보냅니다. 백업이나 새 기기로 이관용으로 사용할 수 있습니다.",
+      exportBackup: "전체 백업 내보내기",
+      backingUp: "백업 중…",
       diagnostics: "진단",
       diagnosticsDescription:
         "실행 환경과 저장소 상태를 수집합니다. 문제 발생 시 한 번에 복사해서 개발자에게 공유할 수 있습니다.",

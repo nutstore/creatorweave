@@ -20,6 +20,7 @@ export {
   initSQLiteDB,
   resetSQLiteDB,
   exportSQLiteDB,
+  downloadSQLiteDBBackup,
   clearAllSQLiteTables,
   clearLegacySahPoolFromOPFSRoot,
 } from './sqlite-database'
