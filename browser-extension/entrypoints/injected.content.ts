@@ -500,6 +500,7 @@ export default defineContentScript({
        * Invoke a discovered WebMCP tool.
        */
       async webMCPInvoke(payload: {
+        groupKey: string
         fullToolName: string
         args?: Record<string, unknown>
         preferredTabId?: number

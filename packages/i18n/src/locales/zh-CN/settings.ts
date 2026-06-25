@@ -23,7 +23,7 @@ export const settings = {
 
     // General tab
     generalDescription: "语言、主题等基础设置",
-    webMCPDescription: "发现当前浏览器窗口各标签页中的 WebMCP 工具，并按站点级别控制启用状态。",
+    webMCPDescription: "发现当前浏览器窗口各标签页中的 WebMCP 工具，并按站点与工具组级别控制启用状态。",
     webMCPSetupTitle: "浏览器设置",
     webMCPMinChrome: "最低支持 Chrome 版本：{version}+",
     webMCPDetectedBrowser: "当前浏览器：{browser} {version}",
@@ -48,7 +48,9 @@ export const settings = {
     webMCPNeverScanned: "尚未完成扫描",
     webMCPLastScan: "上次扫描：{time}",
     webMCPNoHosts: "当前窗口标签页未发现 WebMCP 工具。",
-    webMCPHostSummary: "{tools} 个工具 · {tabs} 个标签页",
+    webMCPHostSummary: "{groups} 个工具组 · {tools} 个工具 · {tabs} 个标签页",
+    webMCPGroupSummary: "{tools} 个工具 · {tabs} 个标签页",
+    webMCPTabPreview: "标签页：{tabs}",
     webMCPToggleFailed: "切换站点开关失败",
     webMCPExtensionRequired: "需要安装浏览器扩展",
     webMCPExtensionRequiredHint: "WebMCP 需要安装 CreatorWeave 浏览器扩展才能使用。请在设置的「扩展」标签页中安装。",

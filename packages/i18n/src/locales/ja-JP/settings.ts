@@ -23,7 +23,7 @@ export const settings = {
 
     // General tab
     generalDescription: "言語、テーマなどの基本設定",
-    webMCPDescription: "現在のブラウザウィンドウ内タブから WebMCP ツールを検出し、ホスト単位で有効化を制御します。",
+    webMCPDescription: "現在のブラウザウィンドウ内タブから WebMCP ツールを検出し、ホスト単位とグループ単位で有効化を制御します。",
     webMCPSetupTitle: "ブラウザ設定",
     webMCPMinChrome: "最小対応 Chrome バージョン: {version}+",
     webMCPDetectedBrowser: "検出ブラウザ: {browser} {version}",
@@ -48,7 +48,9 @@ export const settings = {
     webMCPNeverScanned: "スキャン履歴がありません",
     webMCPLastScan: "最終スキャン: {time}",
     webMCPNoHosts: "現在のウィンドウのタブで WebMCP ツールが見つかりませんでした。",
-    webMCPHostSummary: "{tools} ツール · {tabs} タブ",
+    webMCPHostSummary: "{groups} グループ · {tools} ツール · {tabs} タブ",
+    webMCPGroupSummary: "{tools} ツール · {tabs} タブ",
+    webMCPTabPreview: "タブ: {tabs}",
     webMCPToggleFailed: "ホスト切り替えの適用に失敗しました",
     webMCPExtensionRequired: "ブラウザ拡張機能が必要です",
     webMCPExtensionRequiredHint: "WebMCP を使用するには CreatorWeave ブラウザ拡張機能をインストールして有効にする必要があります。設定の「拡張機能」タブからインストールしてください。",

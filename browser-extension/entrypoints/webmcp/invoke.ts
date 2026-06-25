@@ -1,4 +1,12 @@
-import { getRecentRoute, getRecentRouteForHostname } from './discovery'
+import {
+  discoverToolsInTab,
+  getRecentRoute,
+  getRecentTabsForGroup,
+  getTabGroupInfo,
+  parseHostname,
+  rememberSuccessfulInvocation,
+} from './discovery'
+import { buildSafeFullName } from './tool-name'
 import type {
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
@@ -60,45 +68,41 @@ function parsePluginDownloadPlan(result: unknown): WebMCPPluginDownloadPlan | nu
   }
 }
 
-function parseHostname(url: string): string | null {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
-    return parsed.hostname || null
-  } catch {
-    return null
-  }
-}
-
-async function tabMatchesHostname(tabId: number, hostname: string): Promise<boolean> {
+async function tabMatchesGroup(tabId: number, groupKey: string, hostname: string): Promise<boolean> {
   try {
     const tab = await chrome.tabs.get(tabId)
     if (!tab.url) return false
-    return parseHostname(tab.url) === hostname
+    if (parseHostname(tab.url) !== hostname) return false
+    const info = await getTabGroupInfo(tabId)
+    return info?.groupKey === groupKey
   } catch {
     return false
   }
 }
 
-async function pickTargetTabId(hostname: string, request: WebMCPInvokeRequest): Promise<number | null> {
+async function pickTargetTabId(
+  groupKey: string,
+  hostname: string,
+  request: WebMCPInvokeRequest,
+): Promise<number | null> {
   if (
     typeof request.preferredTabId === 'number' &&
-    (await tabMatchesHostname(request.preferredTabId, hostname))
+    (await tabMatchesGroup(request.preferredTabId, groupKey, hostname))
   ) {
     return request.preferredTabId
   }
 
-  const recentByTool = getRecentRoute(request.fullToolName)
-  if (recentByTool && (await tabMatchesHostname(recentByTool.tabId, hostname))) {
+  const recentByTool = getRecentRoute(groupKey, request.fullToolName)
+  if (recentByTool && (await tabMatchesGroup(recentByTool.tabId, groupKey, hostname))) {
     return recentByTool.tabId
   }
 
-  const recentByHost = getRecentRouteForHostname(hostname)
-  if (recentByHost && (await tabMatchesHostname(recentByHost.tabId, hostname))) {
-    return recentByHost.tabId
+  for (const recentTab of getRecentTabsForGroup(groupKey)) {
+    if (await tabMatchesGroup(recentTab.tabId, groupKey, hostname)) {
+      return recentTab.tabId
+    }
   }
 
-  // Fallback: query all tabs (avoid currentWindow which is unreliable in Service Worker)
   const tabs = await chrome.tabs.query({})
   const matched = tabs
     .filter((tab): tab is chrome.tabs.Tab & { id: number; url: string } => {
@@ -108,17 +112,78 @@ async function pickTargetTabId(hostname: string, request: WebMCPInvokeRequest): 
 
   if (matched.length === 0) return null
 
-  // Fallback to the most recently visited candidate if no route cache exists.
   const sorted = matched.sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
-  return sorted[0]?.id ?? null
+  for (const tab of sorted) {
+    if (await tabMatchesGroup(tab.id, groupKey, hostname)) return tab.id
+  }
+
+  return null
+}
+
+async function resolveRouteFromTabs(
+  request: WebMCPInvokeRequest,
+): Promise<{
+  tabId: number
+  hostname: string
+  groupKey: string
+  toolName: string
+  fullToolName: string
+  toolsetSignature: string
+} | null> {
+  const candidateTabIds = [
+    ...getRecentTabsForGroup(request.groupKey).map((entry) => entry.tabId),
+  ]
+
+  if (typeof request.preferredTabId === 'number' && !candidateTabIds.includes(request.preferredTabId)) {
+    candidateTabIds.unshift(request.preferredTabId)
+  }
+
+  const allTabs = await chrome.tabs.query({})
+  const additionalTabIds = allTabs
+    .filter((tab): tab is chrome.tabs.Tab & { id: number; url: string } => {
+      return typeof tab.id === 'number' && typeof tab.url === 'string'
+    })
+    .sort((a, b) => (b.lastAccessed || 0) - (a.lastAccessed || 0))
+    .map((tab) => tab.id)
+
+  for (const tabId of additionalTabIds) {
+    if (!candidateTabIds.includes(tabId)) candidateTabIds.push(tabId)
+  }
+
+  for (const tabId of candidateTabIds) {
+    const groupInfo = await getTabGroupInfo(tabId)
+    if (!groupInfo || groupInfo.groupKey !== request.groupKey) continue
+    const result = await discoverToolsInTab(tabId)
+    if (!result.ok || !result.tools) continue
+    const matched = result.tools.find((tool) => {
+      return buildSafeFullName(groupInfo.hostname, String(tool.name)) === request.fullToolName
+    })
+    if (!matched) continue
+    return {
+      tabId,
+      hostname: groupInfo.hostname,
+      groupKey: groupInfo.groupKey,
+      toolName: String(matched.name),
+      fullToolName: request.fullToolName,
+      toolsetSignature: groupInfo.toolsetSignature,
+    }
+  }
+
+  return null
 }
 
 export async function invokeWebMCPTool(
   request: WebMCPInvokeRequest
 ): Promise<WebMCPInvokeResponse> {
-  // Route cache is the source of truth: it holds the original (un-normalized)
-  // hostname and toolName from discovery time.
-  const route = getRecentRoute(request.fullToolName || '')
+  let route = getRecentRoute(request.groupKey || '', request.fullToolName || '')
+  if (!route) {
+    const resolved = await resolveRouteFromTabs(request)
+    if (resolved) {
+      rememberSuccessfulInvocation(resolved)
+      route = { ...resolved, seenAt: Date.now() }
+    }
+  }
+
   if (!route) {
     return {
       ok: false,
@@ -126,12 +191,12 @@ export async function invokeWebMCPTool(
       toolName: '',
       fullToolName: request.fullToolName || '',
       errorCode: 'INVALID_TOOL_NAME',
-      error: 'No route cache entry for tool — try re-discovering WebMCP tools',
+      error: 'No route cache entry for tool and group — try re-discovering WebMCP tools',
     }
   }
 
-  const { hostname, toolName } = route
-  const tabId = await pickTargetTabId(hostname, request)
+  const { hostname, toolName, groupKey } = route
+  const tabId = await pickTargetTabId(groupKey, hostname, request)
   if (tabId === null) {
     return {
       ok: false,
@@ -139,7 +204,7 @@ export async function invokeWebMCPTool(
       toolName,
       fullToolName: request.fullToolName,
       errorCode: 'TOOL_TARGET_NOT_FOUND',
-      error: `No open tab found for hostname: ${hostname}`,
+      error: `No open tab found for WebMCP group: ${groupKey}`,
     }
   }
 
@@ -246,6 +311,15 @@ export async function invokeWebMCPTool(
         error: result.error || 'Tool execution failed',
       }
     }
+
+    rememberSuccessfulInvocation({
+      tabId,
+      hostname,
+      groupKey,
+      toolName,
+      fullToolName: request.fullToolName,
+      toolsetSignature: route.toolsetSignature,
+    })
 
     const plan = parsePluginDownloadPlan(result.result)
     return {

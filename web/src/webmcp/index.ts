@@ -20,5 +20,7 @@ export type {
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
   WebMCPHostCatalog,
+  WebMCPToolGroupCatalog,
+  WebMCPTabInstance,
   WebMCPBridge,
 } from './types'

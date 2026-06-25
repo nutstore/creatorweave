@@ -17,14 +17,15 @@ function dedupeTools(tools: WebMCPDiscoveredTool[]): WebMCPDiscoveredTool[] {
   const deduped = new Map<string, WebMCPDiscoveredTool>()
 
   for (const tool of tools) {
-    const existing = deduped.get(tool.fullName)
+    const key = `${tool.groupKey}__${tool.fullName}__${tool.tabId}`
+    const existing = deduped.get(key)
     if (!existing) {
-      deduped.set(tool.fullName, tool)
+      deduped.set(key, tool)
       continue
     }
 
     if (tool.discoveredAt > existing.discoveredAt) {
-      deduped.set(tool.fullName, tool)
+      deduped.set(key, tool)
     }
   }
 
@@ -93,18 +94,20 @@ export async function refreshWebMCPCatalog(): Promise<WebMCPDiscoveredTool[]> {
 export async function applyWebMCPHostToggle(
   hostname: string,
   _enabled: boolean,
-): Promise<void> {
+): Promise<number> {
   useWebMCPStore.getState().setHostEnabled(hostname, _enabled)
-  await discoverAndCacheTools(true)
+  const tools = await discoverAndCacheTools(true)
+  return tools.length
 }
 
 export async function applyWebMCPGlobalToggle(
   enabled: boolean,
-): Promise<void> {
+): Promise<number> {
   useSettingsStore.getState().setEnableWebMCP(enabled)
   if (!enabled) {
     useWebMCPStore.getState().clearCatalog()
-  } else {
-    await discoverAndCacheTools(true)
+    return 0
   }
+  const tools = await discoverAndCacheTools(true)
+  return tools.length
 }

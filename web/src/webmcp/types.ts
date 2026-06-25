@@ -9,6 +9,8 @@ export interface WebMCPDiscoveredTool {
     untrustedContentHint?: boolean
   }
   hostname: string
+  groupKey: string
+  toolsetSignature: string
   fullName: string
   tabId: number
   tabTitle?: string
@@ -27,6 +29,7 @@ export interface WebMCPDiscoverResponse {
 }
 
 export interface WebMCPInvokeRequest {
+  groupKey: string
   fullToolName: string
   args?: Record<string, unknown>
   preferredTabId?: number
@@ -88,11 +91,27 @@ export interface WebMCPInvokeResponse {
   error?: string
 }
 
+export interface WebMCPTabInstance {
+  tabId: number
+  title: string
+  url: string
+  lastSeenAt: number
+}
+
+export interface WebMCPToolGroupCatalog {
+  groupKey: string
+  hostname: string
+  toolsetSignature: string
+  displayName: string
+  tools: WebMCPDiscoveredTool[]
+  tabs: WebMCPTabInstance[]
+  lastDiscoveredAt: number
+}
+
 export interface WebMCPHostCatalog {
   hostname: string
-  tools: WebMCPDiscoveredTool[]
+  groups: WebMCPToolGroupCatalog[]
   lastDiscoveredAt: number
-  tabs: Array<{ tabId: number; title: string; url: string; lastSeenAt: number }>
 }
 
 export interface WebMCPBridge {

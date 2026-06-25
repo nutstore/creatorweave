@@ -45,7 +45,21 @@ interface UnifiedToolEntry {
   inputSchema: Record<string, unknown>
   /** WebMCP specific */
   hostname?: string
+  actualFullName?: string
+  groupKey?: string
+  toolsetSignature?: string
   annotations?: { readOnlyHint?: boolean; untrustedContentHint?: boolean }
+}
+
+type SearchResultRow = {
+  fullName: string
+  source: string
+  sourceId: string
+  description: string
+  inputSchema: Record<string, unknown>
+  groupKey?: string
+  score?: number
+  relevanceReason?: string
 }
 
 //=============================================================================
@@ -83,14 +97,18 @@ export function collectAllExternalTools(): UnifiedToolEntry[] {
     const store = useWebMCPStore.getState()
     const enabledTools = store.getEnabledTools()
     for (const tool of enabledTools) {
+      const lookupName = `${tool.groupKey}_${tool.fullName}`
       tools.push({
-        fullName: tool.fullName,
+        fullName: lookupName,
         name: tool.name,
         source: 'webmcp',
         sourceId: tool.hostname,
         description: tool.description || '',
         inputSchema: tool.inputSchema || { type: 'object', properties: {} },
         hostname: tool.hostname,
+        actualFullName: tool.fullName,
+        groupKey: tool.groupKey,
+        toolsetSignature: tool.toolsetSignature,
         annotations: tool.annotations,
       })
     }
@@ -323,13 +341,14 @@ function formatBm25Results(
   searchDurationMs?: number,
   extraFields: Record<string, unknown> = {}
 ) {
-  const results = scored.slice(0, Math.min(limit, MAX_SEARCH_RESULTS)).map(s => ({
+  const results: SearchResultRow[] = scored.slice(0, Math.min(limit, MAX_SEARCH_RESULTS)).map(s => ({
     fullName: s.tool.fullName,
     source: s.tool.source,
     sourceId: s.tool.sourceId,
     description: s.tool.description.slice(0, 300),
     inputSchema: s.tool.inputSchema,
-    score: Math.round(s.score * 1000) / 1000,  // Round to 3 decimals for readability
+    ...(s.tool.groupKey ? { groupKey: s.tool.groupKey } : {}),
+    score: Math.round(s.score * 1000) / 1000,
   }))
 
   return toolOkJson('search_tools', {
@@ -365,6 +384,7 @@ interface EnrichedToolRow {
   sourceId: string
   description: string
   inputSchema: Record<string, unknown>
+  groupKey?: string
   relevanceReason: string
 }
 
@@ -399,6 +419,7 @@ function enrichWithCatalog(
         sourceId: catalogEntry?.sourceId || '',
         description: (catalogEntry?.description || t.description || '').slice(0, 300),
         inputSchema: catalogEntry?.inputSchema || {},
+        ...(catalogEntry?.groupKey ? { groupKey: catalogEntry.groupKey } : {}),
         relevanceReason: t.relevance_reason,
       }
     })
@@ -661,7 +682,8 @@ export const searchToolsExecutor: ToolExecutor = async (args, context) => {
       sourceId: c.tool.sourceId,
       description: c.tool.description.slice(0, 300),
       inputSchema: c.tool.inputSchema,
-      score: Math.round(c.score * 1000) / 1000,  // Round to 3 decimals for readability
+      ...(c.tool.groupKey ? { groupKey: c.tool.groupKey } : {}),
+      score: Math.round(c.score * 1000) / 1000,
     })),
     total: fallback.length,
     query,
@@ -839,7 +861,7 @@ async function executeWebMCPTool(
 
   const store = useWebMCPStore.getState()
   const enabledTools = store.getEnabledTools()
-  const toolMap = new Map(enabledTools.map(t => [t.fullName, t]))
+  const toolMap = new Map(enabledTools.map(t => [`${t.groupKey}_${t.fullName}`, t]))
   const toolInfo = toolMap.get(tool.fullName)
 
   if (!toolInfo) {
@@ -855,14 +877,12 @@ async function executeWebMCPTool(
   const validationError = validateToolArgs(tool.fullName, toolArgs, toolInfo.inputSchema)
   if (validationError) return validationError
 
-  const hostname = toolInfo.hostname
-  const preferredTabId = hostname
-    ? store.getPreferredTabIdForHost(hostname)
-    : undefined
+  const preferredTabId = store.getPreferredTabIdForTool(toolInfo.groupKey, toolInfo.fullName)
 
   try {
     const response = await bridge.webMCPInvoke({
-      fullToolName: tool.fullName,
+      groupKey: toolInfo.groupKey,
+      fullToolName: toolInfo.fullName,
       args: toolArgs,
       preferredTabId,
     })
@@ -881,6 +901,10 @@ async function executeWebMCPTool(
           },
         }
       )
+    }
+
+    if (response.tabId) {
+      store.recordToolInvocation(toolInfo.groupKey, toolInfo.fullName, response.tabId)
     }
 
     // Handle plugin download

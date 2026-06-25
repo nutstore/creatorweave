@@ -18,6 +18,8 @@ export function WebMCPSettings() {
   const t = useT()
   const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
   const enabledByHost = useWebMCPStore((state) => state.enabledByHost)
+  const enabledByGroup = useWebMCPStore((state) => state.enabledByGroup)
+  const setGroupEnabled = useWebMCPStore((state) => state.setGroupEnabled)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
   const extensionStatus = useExtensionStore((state) => state.status)
@@ -25,6 +27,7 @@ export function WebMCPSettings() {
   const [refreshing, setRefreshing] = useState(false)
   const [togglingGlobal, setTogglingGlobal] = useState(false)
   const [togglingHost, setTogglingHost] = useState<string | null>(null)
+  const [togglingGroup, setTogglingGroup] = useState<string | null>(null)
 
   const bridgeAvailable = isWebMCPBridgeAvailable()
 
@@ -91,6 +94,19 @@ export function WebMCPSettings() {
     }
   }
 
+  const handleToggleGroup = async (groupKey: string, enabled: boolean) => {
+    if (!globalEnabled) return
+    setTogglingGroup(groupKey)
+    try {
+      setGroupEnabled(groupKey, enabled)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)
+    } finally {
+      setTogglingGroup(null)
+    }
+  }
+
   const formatTime = (timestamp: number) =>
     new Date(timestamp).toLocaleString(undefined, {
       month: 'short',
@@ -122,9 +138,12 @@ export function WebMCPSettings() {
         t={t}
         hosts={hosts}
         enabledByHost={enabledByHost}
+        enabledByGroup={enabledByGroup}
         togglingHost={togglingHost}
+        togglingGroup={togglingGroup}
         globalEnabled={globalEnabled && !togglingGlobal}
         onToggleHost={handleToggleHost}
+        onToggleGroup={handleToggleGroup}
       />
     </div>
   )

@@ -23,7 +23,7 @@ export const settings = {
 
     // General tab
     generalDescription: "언어, 테마 등 기본 설정",
-    webMCPDescription: "현재 브라우저 창 탭의 WebMCP 도구를 검색하고 호스트 단위 활성화를 제어합니다.",
+    webMCPDescription: "현재 브라우저 창 탭의 WebMCP 도구를 검색하고 호스트 및 그룹 단위 활성화를 제어합니다.",
     webMCPSetupTitle: "브라우저 설정",
     webMCPMinChrome: "최소 지원 Chrome 버전: {version}+",
     webMCPDetectedBrowser: "감지된 브라우저: {browser} {version}",
@@ -48,7 +48,9 @@ export const settings = {
     webMCPNeverScanned: "스캔 기록 없음",
     webMCPLastScan: "마지막 스캔: {time}",
     webMCPNoHosts: "현재 창 탭에서 WebMCP 도구를 찾지 못했습니다.",
-    webMCPHostSummary: "{tools}개 도구 · {tabs}개 탭",
+    webMCPHostSummary: "{groups}개 그룹 · {tools}개 도구 · {tabs}개 탭",
+    webMCPGroupSummary: "{tools}개 도구 · {tabs}개 탭",
+    webMCPTabPreview: "탭: {tabs}",
     webMCPToggleFailed: "호스트 스위치 적용 실패",
     webMCPExtensionRequired: "브라우저 확장 프로그램 필요",
     webMCPExtensionRequiredHint: "WebMCP를 사용하려면 CreatorWeave 브라우저 확장 프로그램을 설치하고 활성화해야 합니다. 설정의 '확장 프로그램' 탭에서 설치하세요.",

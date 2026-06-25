@@ -22,7 +22,7 @@ export const settings = {
 
     // General tab
     generalDescription: "Language, theme and basic settings",
-    webMCPDescription: "Discover WebMCP tools from tabs in the current browser window and control host-level enablement.",
+    webMCPDescription: "Discover WebMCP tools from tabs in the current browser window and control host- and group-level enablement.",
     webMCPSetupTitle: "Browser setup",
     webMCPMinChrome: "Minimum supported Chrome: {version}+",
     webMCPDetectedBrowser: "Detected browser: {browser} {version}",
@@ -47,7 +47,9 @@ export const settings = {
     webMCPNeverScanned: "No scan completed yet",
     webMCPLastScan: "Last scan: {time}",
     webMCPNoHosts: "No WebMCP tools discovered in current window tabs.",
-    webMCPHostSummary: "{tools} tools · {tabs} tabs",
+    webMCPHostSummary: "{groups} groups · {tools} tools · {tabs} tabs",
+    webMCPGroupSummary: "{tools} tools · {tabs} tabs",
+    webMCPTabPreview: "Tabs: {tabs}",
     webMCPToggleFailed: "Failed to apply host switch",
     webMCPExtensionRequired: "Browser extension required",
     webMCPExtensionRequiredHint: "WebMCP requires the CreatorWeave browser extension to be installed and active. Go to the Extension tab in Settings to install it.",

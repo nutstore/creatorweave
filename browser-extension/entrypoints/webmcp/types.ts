@@ -12,6 +12,8 @@ export interface WebMCPToolMeta {
 
 export interface WebMCPDiscoveredTool extends WebMCPToolMeta {
   hostname: string
+  groupKey: string
+  toolsetSignature: string
   fullName: string
   tabId: number
   tabTitle?: string
@@ -30,6 +32,7 @@ export interface WebMCPDiscoverResponse {
 }
 
 export interface WebMCPInvokeRequest {
+  groupKey: string
   fullToolName: string
   args?: Record<string, unknown>
   preferredTabId?: number
