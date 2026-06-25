@@ -107,17 +107,54 @@ function streamCwOpenAIChatCompletions(
       const payload = buildChatCompletionsPayload(model, context, options)
       options?.onPayload?.(payload, model)
 
-      const response = await fetch(`${normalizeBaseUrl(model.baseUrl)}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          ...(model.headers || {}),
-          ...(options?.headers || {}),
-        },
-        body: JSON.stringify(payload),
-        signal: options?.signal,
+      const requestUrl = `${normalizeBaseUrl(model.baseUrl)}/chat/completions`
+      const buildHeaders = (token: string) => ({
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...(model.headers || {}),
+        ...(options?.headers || {}),
       })
+      const doFetch = (token: string) =>
+        fetch(requestUrl, {
+          method: 'POST',
+          headers: buildHeaders(token),
+          body: JSON.stringify(payload),
+          signal: options?.signal,
+        })
+
+      let response = await doFetch(apiKey)
+
+      // 401 + LLM Gateway provider → force-refresh token then retry once.
+      // Gateway access tokens are short-lived; this transparently refreshes
+      // on-demand so the user never sees a hard "token expired" failure.
+      // We use forceRefreshAccessToken (not getValidAccessToken) because the
+      // server has already rejected the token — we must NOT trust the local
+      // expiry timestamp and must unconditionally hit /v1/auth/refresh.
+      if (
+        response.status === 401 &&
+        String(model.provider) === 'llm-gateway'
+      ) {
+        console.warn('[llm-gateway] 401 received, attempting force-refresh')
+        try {
+          const { forceRefreshAccessToken } =
+            await import('@/agent/providers/llm-gateway-auth')
+          const { getLLMGatewayBaseURL, getLLMGatewayClientId } =
+            await import('@/agent/providers/llm-gateway-provider')
+          const newToken = await forceRefreshAccessToken(
+            getLLMGatewayBaseURL(),
+            getLLMGatewayClientId()
+          )
+          if (newToken) {
+            console.info('[llm-gateway] force-refresh succeeded, retrying request')
+            response = await doFetch(newToken)
+          } else {
+            console.warn('[llm-gateway] force-refresh returned null (no stored tokens or refresh expired)')
+          }
+        } catch (e) {
+          console.warn('[llm-gateway] force-refresh threw:', e)
+          // Refresh failed — fall through to the normal error path below
+        }
+      }
 
       if (!response.ok) {
         const errorBody = await safeReadText(response)

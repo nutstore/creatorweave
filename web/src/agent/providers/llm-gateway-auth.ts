@@ -44,6 +44,20 @@ export interface GatewayError {
 
 const TOKEN_STORAGE_KEY = 'llm-gateway-tokens'
 
+/**
+ * SQLite-backed storage key for the refresh_token.
+ *
+ * access_token lives in the api-key-store under __llm_gateway_token__
+ * (see llm-gateway-provider.ts). The refresh_token is persisted here so it
+ * survives localStorage clearing — localStorage is volatile (browsers may
+ * evict it, users may clear it, private mode discards it), while the
+ * api-key-store is backed by SQLite in OPFS which is far more durable.
+ *
+ * We store a JSON blob containing refresh_token + expiry metadata so that on
+ * restore we can reconstruct the full StoredTokens object.
+ */
+const REFRESH_TOKEN_DB_KEY = '__llm_gateway_refresh_token__'
+
 export interface StoredTokens {
   access_token: string
   refresh_token: string
@@ -57,6 +71,14 @@ export interface StoredTokens {
   base_url: string
 }
 
+/**
+ * Load tokens. Tries localStorage first (fast synchronous cache), then falls
+ * back to SQLite api-key-store to recover the refresh_token when localStorage
+ * has been cleared.
+ *
+ * This function is async because the SQLite fallback requires async I/O.
+ * Callers that previously used the sync version must be updated to await.
+ */
 function loadStoredTokens(): StoredTokens | null {
   try {
     const raw = localStorage.getItem(TOKEN_STORAGE_KEY)
@@ -67,12 +89,99 @@ function loadStoredTokens(): StoredTokens | null {
   }
 }
 
+/**
+ * Async variant: tries localStorage first, then recovers from SQLite.
+ * Used by the token-refresh path where we need maximum durability.
+ */
+async function loadStoredTokensWithFallback(): Promise<StoredTokens | null> {
+  // Fast path: localStorage hit
+  const cached = loadStoredTokens()
+  if (cached) return cached
+
+  // Slow path: recover from SQLite api-key-store
+  try {
+    const { loadApiKey } = await import('@/security/api-key-store')
+    const raw = await loadApiKey(REFRESH_TOKEN_DB_KEY)
+    if (!raw) return null
+    const recovered = JSON.parse(raw) as Partial<StoredTokens>
+    if (!recovered.refresh_token || !recovered.refresh_expires_at) return null
+    // Reconstruct — access_token may be stale but that's fine, the caller
+    // (forceRefresh) will use refresh_token to get a fresh access_token anyway.
+    const restored: StoredTokens = {
+      access_token: recovered.access_token || '',
+      refresh_token: recovered.refresh_token,
+      access_expires_at: recovered.access_expires_at || 0,
+      refresh_expires_at: recovered.refresh_expires_at,
+      client_id: recovered.client_id || '',
+      base_url: recovered.base_url || '',
+    }
+    // Write back to localStorage so subsequent reads take the fast path
+    // (no async SQLite hit on every call).
+    try {
+      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(restored))
+    } catch {
+      // localStorage may be full / disabled — restored object is still
+      // returned in-memory, the caller will use it directly.
+    }
+    return restored
+  } catch {
+    return null
+  }
+}
+
 function saveStoredTokens(tokens: StoredTokens): void {
   localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens))
+  // Also persist refresh_token to SQLite for durability across localStorage clears.
+  // Fire-and-forget — localStorage is the primary sync store; SQLite is the backup.
+  void persistRefreshTokenToSQLite(tokens).catch((e) => {
+    console.warn('[llm-gateway] persist refresh_token to SQLite failed:', e)
+  })
+}
+
+/**
+ * Persist refresh_token + metadata to SQLite api-key-store.
+ * This survives localStorage clearing (browser eviction, user clear, private mode).
+ */
+async function persistRefreshTokenToSQLite(tokens: StoredTokens): Promise<void> {
+  const { saveApiKey } = await import('@/security/api-key-store')
+  // Store a compact JSON blob with refresh_token + expiry info
+  const blob = JSON.stringify({
+    refresh_token: tokens.refresh_token,
+    refresh_expires_at: tokens.refresh_expires_at,
+    access_token: tokens.access_token,
+    access_expires_at: tokens.access_expires_at,
+    client_id: tokens.client_id,
+    base_url: tokens.base_url,
+  })
+  await saveApiKey(REFRESH_TOKEN_DB_KEY, blob)
+}
+
+/**
+ * Check if an error indicates the refresh_token is definitively invalid
+ * (revoked, expired, etc.) — as opposed to a transient network error.
+ */
+function isTokenInvalidError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false
+  const err = e as Error & { code?: string; status?: number }
+  // OAuth2 standard: invalid_grant means refresh_token is revoked or expired
+  if (err.code === 'invalid_grant') return true
+  // HTTP 400/401 from the refresh endpoint means the token is bad
+  // (network errors throw TypeError, not our Error-with-status objects)
+  if (typeof err.status === 'number' && (err.status === 400 || err.status === 401)) return true
+  return false
 }
 
 function clearStoredTokens(): void {
   localStorage.removeItem(TOKEN_STORAGE_KEY)
+  // Also clear the SQLite backup
+  void (async () => {
+    try {
+      const { deleteApiKey } = await import('@/security/api-key-store')
+      await deleteApiKey(REFRESH_TOKEN_DB_KEY)
+    } catch {
+      // ignore
+    }
+  })()
 }
 
 // ── API Calls ──
@@ -330,6 +439,70 @@ export async function performDeviceCodeFlow(
 }
 
 /**
+ * Force-refresh the access token, bypassing the local expiry check.
+ *
+ * Use this when the gateway has already rejected the current access token
+ * (e.g. HTTP 401 "gateway token expired"). In that situation the server is
+ * the source of truth — the local `access_expires_at` timestamp may still
+ * be in the future (clock skew, early revocation, etc.), so we must NOT
+ * trust it and must unconditionally call `/v1/auth/refresh`.
+ *
+ * Returns the new access token, or null when there is no stored refresh
+ * token or the refresh call fails.
+ */
+export async function forceRefreshAccessToken(
+  baseURL: string,
+  clientId: string
+): Promise<string | null> {
+  // Use the async fallback loader — recovers refresh_token from SQLite
+  // when localStorage has been cleared (browser eviction, user clear, etc.)
+  const stored = await loadStoredTokensWithFallback()
+  if (!stored) {
+    console.warn('[llm-gateway] forceRefresh: no stored tokens (localStorage + SQLite both empty)')
+    return null
+  }
+
+  // Refresh token must still be alive
+  const now = Date.now()
+  if (stored.refresh_expires_at <= now) {
+    console.warn('[llm-gateway] forceRefresh: refresh_token expired', {
+      refresh_expires_at: new Date(stored.refresh_expires_at).toISOString(),
+      now: new Date(now).toISOString(),
+    })
+    clearStoredTokens()
+    return null
+  }
+
+  console.warn('[llm-gateway] forceRefresh: calling /v1/auth/refresh ...')
+
+  try {
+    const tokens = await refreshAccessToken(baseURL, stored.refresh_token)
+    saveStoredTokens({
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      access_expires_at: now + tokens.expires_in * 1000,
+      refresh_expires_at: now + tokens.refresh_expires_in * 1000,
+      client_id: clientId,
+      base_url: baseURL,
+    })
+    // Also persist to API key store so the next LLM request uses the new token
+    await persistAccessTokenToKeyStore(tokens.access_token)
+    return tokens.access_token
+  } catch (e) {
+    // Only clear tokens if the refresh_token is definitively invalid.
+    // Network errors (TypeError), 5xx, etc. should NOT wipe tokens —
+    // they are transient and the user shouldn't have to re-login.
+    if (isTokenInvalidError(e)) {
+      console.warn('[llm-gateway] forceRefresh: token invalid, clearing stored tokens', e)
+      clearStoredTokens()
+    } else {
+      console.warn('[llm-gateway] forceRefresh: transient error, keeping stored tokens', e)
+    }
+    return null
+  }
+}
+
+/**
  * Get a valid access token, refreshing if needed.
  * Returns null if no tokens are stored or refresh fails.
  */
@@ -337,7 +510,9 @@ export async function getValidAccessToken(
   baseURL: string,
   clientId: string
 ): Promise<string | null> {
-  const stored = loadStoredTokens()
+  // Use the async fallback loader — recovers refresh_token from SQLite
+  // when localStorage has been cleared
+  const stored = await loadStoredTokensWithFallback()
   if (!stored) return null
 
   const now = Date.now()
@@ -362,9 +537,15 @@ export async function getValidAccessToken(
       // Also persist to API key store so the next LLM request uses the new token
       await persistAccessTokenToKeyStore(tokens.access_token)
       return tokens.access_token
-    } catch {
-      // Refresh failed, clear tokens
-      clearStoredTokens()
+    } catch (e) {
+      // Only clear tokens if the refresh_token is definitively invalid.
+      // Transient errors (network, 5xx) should NOT wipe tokens.
+      if (isTokenInvalidError(e)) {
+        console.warn('[llm-gateway] getValidAccessToken: token invalid, clearing stored tokens', e)
+        clearStoredTokens()
+      } else {
+        console.warn('[llm-gateway] getValidAccessToken: transient error, keeping stored tokens', e)
+      }
       return null
     }
   }
