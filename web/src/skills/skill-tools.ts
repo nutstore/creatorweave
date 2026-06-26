@@ -14,6 +14,11 @@ import {
   readSkillResourceFromOPFS,
   readSkillMdFromOPFS,
 } from './skills-platform-adapter'
+import {
+  readProjectSkillMdFromNativeFs,
+  listProjectSkillResourcesFromNativeFs,
+  readProjectSkillResourceFromNativeFs,
+} from './project-skill-live-reader'
 
 /**
  * Read SKILL.md from OPFS for a user skill.
@@ -158,9 +163,11 @@ export const readSkillExecutor: ToolExecutor = async (
     return toolErrorJson('read_skill', 'skill_not_found', `Skill '${skill_name}' not found. Available skills: ${availableSkills.join(', ')}`)
   }
 
-  // Get associated resources — read directly from OPFS for builtin skills
+  // Get associated resources — read directly from OPFS/native FS for
+  // builtin/user/project skills (real-time), fallback to cache for project skills.
   const isBuiltin = skill.source === 'builtin'
   const isUser = skill.source === 'user'
+  const isProject = skill.source === 'project'
   let resources: Array<{ resourcePath: string; resourceType: string; size: number; id?: string; skillId?: string; content?: string; contentType?: string; createdAt?: number }> = []
 
   // For builtin skills: read SKILL.md directly from OPFS to get latest content
@@ -202,8 +209,42 @@ export const readSkillExecutor: ToolExecutor = async (
         liveTemplates = parsed.skill.templates
       }
     }
+  } else if (isProject) {
+    // Project skills: read SKILL.md and resources directly from native FS
+    // (real-time, bypassing the in-memory cache that may be stale after
+    // external file edits that didn't trigger a re-scan).
+    //
+    // The in-memory cache (`scanProjectSkills`) is only refreshed when
+    // `skillsScanVersion` bumps. Files edited externally (outside of the
+    // app's SkillFileEditor / file-tree refresh) bypass that bump, so the
+    // cache serves stale instruction + stale resource list. Reading from
+    // native FS here mirrors what builtin/user skills already do with OPFS.
+    const liveMd = await readProjectSkillMdFromNativeFs(skill.id, _context)
+    if (liveMd) {
+      const { parseSkillMd } = await import('./skill-parser')
+      const parsed = parseSkillMd(liveMd, 'project')
+      if (parsed.skill) {
+        liveInstruction = parsed.skill.instruction
+        liveExamples = parsed.skill.examples
+        liveTemplates = parsed.skill.templates
+      }
+      // Live resource list from native FS. If native FS read returns
+      // nothing AND the cached list is non-empty, the handle may be revoked
+      // — fall back to cache so the skill remains usable.
+      const liveResources = await listProjectSkillResourcesFromNativeFs(skill.id, _context)
+      if (liveResources.length > 0) {
+        resources = liveResources
+      } else {
+        const cached = await manager.getSkillResources(skill.id)
+        resources = cached.length > 0 ? cached : liveResources
+      }
+    } else {
+      // SKILL.md not readable from native FS (handle revoked, path changed,
+      // project not active in this tab, etc.) — fall back to cache.
+      resources = await manager.getSkillResources(skill.id)
+    }
   } else {
-    // Project skills: use SQLite storage
+    // Unknown source — use SQLite storage
     resources = await manager.getSkillResources(skill.id)
   }
 
@@ -353,7 +394,39 @@ export const readSkillResourceExecutor: ToolExecutor = async (
     return toolOkJson('read_skill_resource', output)
   }
 
-  // For project/user skills: use SQLite storage
+  // For project skills: read directly from native FS (real-time).
+  // The in-memory cache may be stale if files were edited externally without
+  // triggering a re-scan. Falls back to cache if the native handle is unavailable.
+  if (skill.source === 'project') {
+    const resource = await readProjectSkillResourceFromNativeFs(skill.id, resource_path, _context)
+
+    if (resource) {
+      const typeLabel = resource.resourceType.charAt(0).toUpperCase() + resource.resourceType.slice(1)
+      const output = `# ${skill.id}/${resource_path}\n\n**Type:** ${typeLabel}\n**Content-Type:** ${resource.contentType}\n**Size:** ${resource.size} bytes\n\n---\n\n${resource.content}`
+      return toolOkJson('read_skill_resource', output)
+    }
+
+    // Live read failed (handle revoked, file removed, etc.) — fall back to cache.
+    const cached = await manager.getSkillResources(skill.id)
+    const cachedResource = cached.find((r) => r.resourcePath === resource_path)
+    if (cachedResource) {
+      const typeLabel = cachedResource.resourceType.charAt(0).toUpperCase() + cachedResource.resourceType.slice(1)
+      const output = `# ${cachedResource.skillId}/${cachedResource.resourcePath}\n\n**Type:** ${typeLabel}\n**Content-Type:** ${cachedResource.contentType}\n**Size:** ${cachedResource.size} bytes\n\n---\n\n${cachedResource.content}`
+      return toolOkJson('read_skill_resource', output)
+    }
+
+    // Not in cache either — report available resources (live + cache)
+    const liveAvailable = await listProjectSkillResourcesFromNativeFs(skill.id, _context)
+    const availablePaths = (liveAvailable.length > 0 ? liveAvailable : cached)
+      .map((r) => `  - ${r.resourcePath}`).join('\n')
+    return toolErrorJson(
+      'read_skill_resource',
+      'resource_not_found',
+      `Resource '${resource_path}' not found in skill '${skill_name}'.\n\nAvailable resources in this skill:\n${availablePaths || '  (none)'}`
+    )
+  }
+
+  // Fallback for unknown sources: use SQLite storage
   const available = await manager.getSkillResources(skill.id)
   const resource = available.find((r) => r.resourcePath === resource_path)
 

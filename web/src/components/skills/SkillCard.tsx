@@ -148,8 +148,8 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
               <Pencil className="h-3.5 w-3.5" />
             </BrandButton>
           )}
-          {/* Delete - only for user skills */}
-          {!isReadOnly && onDelete && (
+          {/* Delete - shown when onDelete is provided (even for read-only skills like project skills) */}
+          {onDelete && (
             <BrandButton
               iconButton
               className="h-7 w-7 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"

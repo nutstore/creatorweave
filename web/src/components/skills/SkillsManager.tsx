@@ -180,6 +180,10 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       label: t('skills.projectSkills'),
       skills: projectSkills,
       isReadOnly: true,
+      onDelete: (id) => {
+        const skill = skillsStore.skills.find((s) => s.id === id)
+        if (skill) setDeleteTarget({ id, name: skill.name })
+      },
       action: roots.length > 0
         ? { label: t('skills.importSkill'), icon: <Upload className="h-4 w-4" />, onClick: () => setUploadOpen(true) }
         : undefined,

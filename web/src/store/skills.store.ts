@@ -15,6 +15,7 @@ import {
   deleteUserSkillDir,
   userSkillDirExists,
 } from '@/skills/user-skills-scanner'
+import { deleteProjectSkillFromNativeFs } from '@/skills/project-skill-live-reader'
 
 /** Refresh SkillManager cache to keep it in sync with store */
 async function refreshSkillManagerCache() {
@@ -206,7 +207,8 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
 
     deleteSkill: async (id) => {
       // User skills (source='user', id prefix 'user:') live in OPFS.
-      // Project skills (id prefix 'project:') are handled by the project scanner.
+      // Project skills (id prefix 'project:') live on native FS — delete
+      //   the skill directory from the project's native folder.
       // Persistent skills (builtin) live in SQLite.
       try {
         if (id.startsWith('user:')) {
@@ -220,6 +222,17 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
           } else {
             await storage.deleteSkill(id)
           }
+        } else if (id.startsWith('project:')) {
+          // Project skills live on native FS (e.g. .skills/my-skill/ or
+          // .claude/skills/my-skill/). Delete the directory from native FS
+          // using the active project's runtime handle.
+          const activeProjectId = useProjectStore.getState().activeProjectId || null
+          const deleted = await deleteProjectSkillFromNativeFs(id, activeProjectId)
+          if (!deleted) {
+            console.warn(
+              `[SkillsStore] Project skill directory not found or handle unavailable: ${id}`
+            )
+          }
         } else {
           await storage.deleteSkill(id)
         }
@@ -231,6 +244,12 @@ export const useSkillsStore = create<SkillsStateWithImmer>()(
         state.skills = state.skills.filter((s) => s.id !== id)
       })
       await refreshSkillManagerCache()
+      // For project skills, bump the scan version so WorkspaceLayout
+      // re-scans the project directory and removes the deleted skill from
+      // the in-memory cache.
+      if (id.startsWith('project:')) {
+        get().bumpSkillsScanVersion()
+      }
     },
 
     toggleSkill: async (id, enabled) => {
