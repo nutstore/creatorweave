@@ -16,4 +16,5 @@ export const fileTree = {
     draftFiles: "Unconfirmed Changes",
     approvedNotSynced: "Confirmed, waiting to be written to disk",
     loadFailed: "Directory inaccessible",
+    opfsDraftRoot: "OPFS Drafts",
 } as const

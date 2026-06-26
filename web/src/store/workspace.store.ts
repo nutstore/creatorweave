@@ -267,6 +267,22 @@ interface WorkspaceState {
   /** Clear unsynced snapshots notification */
   clearUnsyncedSnapshots: () => void
 
+  /**
+   * After first native directory mount in pure-OPFS mode, scan OPFS files/
+   * for paths that don't exist in the native directory. Shows a toast with
+   * a one-click "Sync" action if any are found.
+   */
+  checkOpfsOnlyFiles: () => Promise<void>
+
+  /** Batch-write collected OPFS-only files to the native directory. */
+  syncOpfsOnlyFiles: () => Promise<void>
+
+  /** Count of OPFS-only files pending one-time sync to native disk. */
+  opfsOnlyFileCount: number
+
+  /** Paths of OPFS-only files pending one-time sync to native disk. */
+  opfsOnlyFilesPaths: string[]
+
   /** Pinned workspace IDs (persisted via preferences store) */
   pinnedWorkspaceIds: string[]
 
@@ -289,6 +305,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         isSyncPreviewEnabled: true,
         switchingWorkspaceId: null,
         unsyncedSnapshots: [],
+        opfsOnlyFileCount: 0,
+        opfsOnlyFilesPaths: [] as string[],
         pinnedWorkspaceIds: [],
 
         //=============================================================================
@@ -456,9 +474,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         },
 
         switchWorkspace: async (id) => {
+          const __swT0 = performance.now()
+          let __swT1 = 0
+          let __swBranch: 'new' | 'recreate' | 'cached' = 'cached'
           // Avoid redundant call if already active
           const currentActiveId = get().activeWorkspaceId
           if (currentActiveId === id) {
+            console.log(`[WorkspaceStore] switchWorkspace(${id?.slice(0, 8)}) noop (already active)`)
             return
           }
 
@@ -508,6 +530,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               throw new Error('No active project selected')
             }
             const manager = await getWorkspaceManager()
+            __swT1 = performance.now()
             const refreshForWorkspace = async () => {
               // Multi-root: try default root handle first, then any handle
               const projectHandle = getRuntimeDirectoryHandle(activeProjectId)
@@ -516,6 +539,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               } else {
                 await get().refreshPendingChanges(true)
               }
+              // Fire-and-forget: refresh the OPFS store so FileTreePanel's
+              // cachedPaths subscription picks up the new workspace's files.
+              // Intentionally NOT awaited so switchWorkspace returns quickly —
+              // opfs.store.refresh() has its own stale-result guard that drops
+              // the update if the user has already moved on to another workspace.
+              ;(async () => {
+                try {
+                  const { useOPFSStore } = await import('./opfs.store')
+                  await useOPFSStore.getState().refresh()
+                } catch (e) {
+                  console.warn('[WorkspaceStore] Failed to refresh OPFS store after switch:', e)
+                }
+              })()
             }
 
             // Check if workspace exists in SQLite first
@@ -524,6 +560,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // If workspace doesn't exist in SQLite, it's a new conversation
             // We need to create the workspace OPFS structure immediately
             if (!workspaceRecord) {
+              __swBranch = 'new'
               console.log(`[WorkspaceStore] Creating new workspace for conversation: ${id}`)
 
               // Create OPFS workspace using conversation ID as root directory
@@ -580,6 +617,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const workspace = await manager.getWorkspace(id)
 
             if (!workspace) {
+              __swBranch = 'recreate'
               // Workspace exists in SQLite but not in OPFS - data inconsistency
               // This can happen if OPFS was cleared or corrupted
               // Recreate the workspace to fix the inconsistency
@@ -680,6 +718,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
             // Notify any waiters that this switch has completed (replaces busy-wait polling).
             notifySwitchComplete(id)
+            console.log(
+              `[WorkspaceStore] switchWorkspace(${id?.slice(0, 8)}) done (${Math.round(performance.now() - __swT0)}ms)`,
+              { branch: __swBranch, prepareMs: Math.round(__swT1 - __swT0) }
+            )
           }
         },
 
@@ -1073,6 +1115,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           }
 
           await get().checkUnsyncedSnapshots()
+          await get().checkOpfsOnlyFiles()
           await get().refreshPendingChanges(true)
         },
 
@@ -1180,6 +1223,75 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         clearUnsyncedSnapshots: () => {
           set({ unsyncedSnapshots: [] })
+        },
+
+        checkOpfsOnlyFiles: async () => {
+          const activeWorkspaceId = get().activeWorkspaceId
+          if (!activeWorkspaceId) return
+
+          try {
+            const manager = await getWorkspaceManager()
+            const workspace = await manager.getWorkspace(activeWorkspaceId)
+            if (!workspace) return
+
+            // Only fire on the first mount (size === 1); subsequent mounts of
+            // additional roots don't re-trigger the one-time sync prompt.
+            const handles = await workspace.getAllNativeDirectoryHandles()
+            if (handles.size !== 1) {
+              set({ opfsOnlyFileCount: 0, opfsOnlyFilesPaths: [] })
+              return
+            }
+
+            const diffs = await workspace.listOpfsOnlyFiles()
+            set({ opfsOnlyFileCount: diffs.length, opfsOnlyFilesPaths: diffs })
+
+            if (diffs.length > 0) {
+              toast.info(`OPFS 中有 ${diffs.length} 个文件未同步到本地磁盘`, {
+                description: '点击同步将这些文件写入本地目录',
+                action: {
+                  label: '同步',
+                  onClick: () => get().syncOpfsOnlyFiles(),
+                },
+              })
+            }
+          } catch (e) {
+            console.error('[WorkspaceStore] Failed to check OPFS-only files:', e)
+          }
+        },
+
+        syncOpfsOnlyFiles: async () => {
+          const activeWorkspaceId = get().activeWorkspaceId
+          const { opfsOnlyFilesPaths } = get() as { opfsOnlyFilesPaths: string[] }
+          if (!activeWorkspaceId || opfsOnlyFilesPaths.length === 0) return
+
+          set({ isLoading: true })
+          try {
+            const manager = await getWorkspaceManager()
+            const workspace = await manager.getWorkspace(activeWorkspaceId)
+            if (!workspace) return
+
+            const nativeDir = await workspace.getNativeDirectoryHandle()
+            if (!nativeDir) {
+              toast.error('没有可用的本地目录')
+              set({ isLoading: false })
+              return
+            }
+
+            const result = await workspace.syncOpfsFilesToNative(nativeDir, opfsOnlyFilesPaths)
+            set({ opfsOnlyFileCount: 0, opfsOnlyFilesPaths: [], isLoading: false })
+
+            if (result.failed > 0) {
+              toast.warning(`已同步 ${result.synced} 个文件，${result.failed} 个失败`)
+            } else {
+              toast.success(`已同步 ${result.synced} 个文件到本地磁盘`)
+            }
+
+            await get().refreshPendingChanges(true)
+          } catch (e) {
+            console.error('[WorkspaceStore] Failed to sync OPFS-only files:', e)
+            set({ isLoading: false })
+            toast.error('同步 OPFS 文件失败')
+          }
         },
 
         togglePin: (id) => {

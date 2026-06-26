@@ -888,6 +888,23 @@ export class WorkspaceRuntime {
     if (!this.initialized) await this.initialize()
     const normalizedPath = this.normalizeWorkspacePath(path)
 
+    // Pure OPFS mode: no native directory mounted and caller didn't pass one.
+    // Skip pending queue, baseline capture, conflict detection — just write to OPFS.
+    if (directoryHandle == null && !(await this.hasAnyNativeDirectoryHandle())) {
+      await this.writeToFilesDir(normalizedPath, content)
+      this.filesIndex.add(normalizedPath)
+      try {
+        const channel = new BroadcastChannel('opfs-file-changes')
+        channel.postMessage({ type: 'opfs-file-changed', path: normalizedPath })
+        channel.close()
+      } catch (e) {
+        console.warn('[WorkspaceRuntime] Failed to broadcast file change:', e)
+      }
+      this.metadata.lastAccessedAt = Date.now()
+      await this.saveMetadata()
+      return
+    }
+
     // Multi-root: resolve the correct native handle for this path
     let nativeHandle: FileSystemDirectoryHandle | null
     let nativePath = normalizedPath
@@ -1044,6 +1061,16 @@ export class WorkspaceRuntime {
     if (!this.initialized) await this.initialize()
 
     const normalizedPath = this.normalizeWorkspacePath(path)
+
+    // Pure OPFS mode: no native directory mounted and caller didn't pass one.
+    // Skip pending queue and baseline capture — just remove from OPFS.
+    if (directoryHandle == null && !(await this.hasAnyNativeDirectoryHandle())) {
+      await this.deleteFromFilesDir(normalizedPath)
+      this.filesIndex.delete(normalizedPath)
+      this.metadata.lastAccessedAt = Date.now()
+      await this.saveMetadata()
+      return
+    }
 
     // Multi-root: resolve the correct native handle for this path
     let nativeHandle: FileSystemDirectoryHandle | null
@@ -2391,6 +2418,17 @@ export class WorkspaceRuntime {
     }
   }
 
+  /**
+   * Returns true if at least one native directory handle is mounted for this
+   * project (across all roots). Used to detect "pure OPFS mode" — when no
+   * native directory is mounted, agent writes/deletes go directly to OPFS
+   * without entering the pending/approval workflow.
+   */
+  async hasAnyNativeDirectoryHandle(): Promise<boolean> {
+    const handles = await this.getAllNativeDirectoryHandles()
+    return handles.size > 0
+  }
+
   // ===========================================================================
   // Multi-root path resolution
   // ===========================================================================
@@ -2841,8 +2879,41 @@ export class WorkspaceRuntime {
    * @returns Change detection result
    */
   async refreshPendingChanges(): Promise<ChangeDetectionResult> {
+    const t0 = performance.now()
     // Force reload from database to ensure we have latest state (including review_status)
     await this.pendingManager.reload()
+    const tReload = performance.now()
+
+    // Pure OPFS mode short-circuit: when no native directory is mounted, agent
+    // writes/deletes bypass the pending queue (see writeFile/deleteFile), so
+    // there is nothing to reconcile against disk. Still return any legacy
+    // pending rows from before this mode was enabled so the UI can surface them.
+    const hasNative = await this.hasAnyNativeDirectoryHandle()
+    const tHasNative = performance.now()
+    if (!hasNative) {
+      const latestPending = await this.pendingManager.getAll()
+      const reviewPending = latestPending.filter(
+        (pending) => !pending.reviewStatus || pending.reviewStatus === 'pending'
+      )
+      const changes: FileChange[] = reviewPending.map((pending) => ({
+        type: pending.type === 'delete' ? 'delete' : pending.type === 'create' ? 'add' : 'modify',
+        path: pending.path,
+        snapshotId: pending.snapshotId,
+        snapshotStatus: pending.snapshotStatus,
+        snapshotSummary: pending.snapshotSummary,
+        reviewStatus: pending.reviewStatus,
+      }))
+      console.log(
+        `[WorkspaceRuntime] refreshPendingChanges pure-opfs done (${Math.round(performance.now() - t0)}ms)`,
+        { reloadMs: Math.round(tReload - t0), hasNativeCheckMs: Math.round(tHasNative - tReload), legacy: changes.length }
+      )
+      return {
+        changes,
+        added: changes.filter((c) => c.type === 'add').length,
+        modified: changes.filter((c) => c.type === 'modify').length,
+        deleted: changes.filter((c) => c.type === 'delete').length,
+      }
+    }
 
     const normalizeComparePath = (p: string): string => {
       // Worker scan keys are relative paths without leading slash.
@@ -2861,10 +2932,12 @@ export class WorkspaceRuntime {
     // 1. Get current pending changes (from previous operations)
     const existingPending = await this.pendingManager.getAll()
     const existingPaths = new Map(existingPending.map((p) => [normalizeComparePath(p.path), p]))
+    const tGetAll = performance.now()
 
     // 2. Scan current OPFS state using Worker (bypass cache)
     const filesDir = await this.getFilesDir()
     const currentFiles = await scanFilesInWorker(filesDir)
+    const tScan = performance.now()
 
     // 3. Reconcile pending queue against current OPFS state
     const detectedChanges: FileChange[] = []
@@ -2969,16 +3042,20 @@ export class WorkspaceRuntime {
 
     await this.cleanupStaleBaselines()
 
-    console.log('[WorkspaceRuntime] Pending changes refreshed (via worker):', {
-      changes: changes.length,
-      added,
-      modified,
-      deleted,
-      detectedChanges: detectedChanges.length,
-      detectedAdded,
-      detectedModified,
-      detectedDeleted,
-    })
+    console.log(
+      `[WorkspaceRuntime] refreshPendingChanges full done (${Math.round(performance.now() - t0)}ms)`,
+      {
+        reloadMs: Math.round(tReload - t0),
+        getAllMs: Math.round(tGetAll - tHasNative),
+        scanMs: Math.round(tScan - tGetAll),
+        reconcileMs: Math.round(performance.now() - tScan),
+        changes: changes.length,
+        scannedFiles: currentFiles.size,
+        added,
+        modified,
+        deleted,
+      }
+    )
 
     return { changes, added, modified, deleted }
   }
@@ -3132,6 +3209,68 @@ export class WorkspaceRuntime {
 
     this.scanFilesCache = undefined
     return { synced, failed }
+  }
+
+  /**
+   * Scan OPFS files/ and return paths that don't exist (or differ) in the
+   * native directory. Used by the "one-time sync after first mount" flow:
+   * when a user has been working in pure OPFS mode and later mounts a local
+   * directory, this identifies which OPFS-only files need to be written out.
+   *
+   * For multi-root setups, paths are returned with their rootName prefix
+   * preserved (so callers can route them via syncToDisk/syncToNative).
+   */
+  async listOpfsOnlyFiles(): Promise<string[]> {
+    if (!this.initialized) await this.initialize()
+    const filesDir = await this.getFilesDir()
+    const opfsFiles = await scanFilesInWorker(filesDir)
+    if (opfsFiles.size === 0) return []
+
+    const rootHandles = await this.getAllNativeDirectoryHandles()
+    const diffs: string[] = []
+
+    if (rootHandles.size === 0) {
+      // No native handle at all — every OPFS file is "OPFS-only".
+      for (const path of opfsFiles.keys()) diffs.push(path)
+      return diffs
+    }
+
+    // Compare each OPFS file against its routed native root.
+    for (const path of opfsFiles.keys()) {
+      try {
+        const resolved = await this.resolvePath(path)
+        const handle = rootHandles.get(resolved.rootName)
+        if (!handle) {
+          // Root not mounted — count as needing sync.
+          diffs.push(path)
+          continue
+        }
+        const nativePath = resolved.relativePath || path
+        // Only flag as OPFS-only if the native file does NOT exist.
+        // This avoids overwriting user's existing files on first sync.
+        await this.readFromNativeFS(nativePath, handle)
+      } catch {
+        // NotFoundError → OPFS-only. Other errors also default to needing sync.
+        diffs.push(path)
+      }
+    }
+    return diffs
+  }
+
+  /**
+   * Batch-write OPFS files to the native filesystem. Used by the one-time
+   * sync flow after first mount.
+   */
+  async syncOpfsFilesToNative(
+    directoryHandle: FileSystemDirectoryHandle,
+    paths: string[]
+  ): Promise<{ synced: number; failed: number }> {
+    if (!this.initialized) await this.initialize()
+    const changes: FileChange[] = paths.map((path) => ({
+      type: 'add' as const,
+      path,
+    }))
+    return await this.syncToNative(directoryHandle, changes)
   }
 
   /**

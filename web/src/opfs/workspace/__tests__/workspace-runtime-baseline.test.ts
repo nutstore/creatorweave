@@ -84,6 +84,9 @@ describe('WorkspaceRuntime baseline mtime', () => {
     runtime.initialized = true
     runtime.metadata = { lastAccessedAt: 0 }
     runtime.filesIndex = new Set<string>()
+    // Simulate "native directory IS mounted" so the pure-OPFS short-circuit
+    // doesn't fire — these tests exercise the baseline-capture flow.
+    runtime.hasAnyNativeDirectoryHandle = vi.fn(async () => true)
 
     runtime.hasFileInIndex = vi.fn(() => false)
     runtime.readFromFilesDir = vi.fn(async () => null)
@@ -144,6 +147,7 @@ describe('WorkspaceRuntime baseline mtime', () => {
     runtime.initialized = true
     runtime.metadata = { lastAccessedAt: 0 }
     runtime.filesIndex = new Set<string>(['src/a.ts'])
+    runtime.hasAnyNativeDirectoryHandle = vi.fn(async () => true)
 
     runtime.readFromFilesDir = vi.fn(async () => ({
       content: 'old-opfs',
@@ -395,6 +399,7 @@ describe('WorkspaceRuntime baseline mtime', () => {
     runtime.initialized = true
     runtime.metadata = { lastAccessedAt: 0 }
     runtime.filesIndex = new Set<string>(['src/a.ts'])
+    runtime.hasAnyNativeDirectoryHandle = vi.fn(async () => true)
 
     runtime.hasFileInIndex = vi.fn((p: string) => p === 'src/a.ts')
     runtime.readFromFilesDir = vi.fn(async () => ({

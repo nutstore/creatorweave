@@ -349,37 +349,46 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
 }) {
   const handleFileSelect = useCallback(
     (path: string, handle: FileSystemFileHandle | null) => {
-      onFileSelect(`${root.name}/${path}`, handle)
+      // Virtual OPFS root: paths in cachedPaths are already workspace-relative
+      // (no rootName prefix), so pass through unchanged.
+      const fullPath = root.id === '__opfs__' ? path : `${root.name}/${path}`
+      onFileSelect(fullPath, handle)
     },
-    [onFileSelect, root.name]
+    [onFileSelect, root.name, root.id]
   )
 
   const handleInspect = useCallback<(path: string, handle: FileSystemFileHandle | null) => void>(
     onInspect
       ? (path, handle) => {
-          onInspect(`${root.name}/${path}`, handle)
+          const fullPath = root.id === '__opfs__' ? path : `${root.name}/${path}`
+          onInspect(fullPath, handle)
         }
       : () => {},
-    [onInspect, root.name]
+    [onInspect, root.name, root.id]
   )
 
   const handleDelete = useCallback(
     (path: string, node: { kind: 'file' | 'directory'; handle: FileSystemFileHandle | FileSystemDirectoryHandle | null }, pos: { x: number; y: number }) => {
-      onFileDelete?.(root.name, path, node, pos)
+      // Pass '__opfs__' sentinel for virtual root so the delete handler knows
+      // not to prepend rootName to the path.
+      onFileDelete?.(root.id === '__opfs__' ? '__opfs__' : root.name, path, node, pos)
     },
-    [onFileDelete, root.name]
+    [onFileDelete, root.name, root.id]
   )
 
   const rootRevealTarget = useMemo(() => {
     if (!revealTargetPath) return null
+    if (root.id === '__opfs__') return revealTargetPath
     if (selectedFilePath?.startsWith(`${root.name}/`)) return revealTargetPath
     if (rootsLength === 1) return revealTargetPath
     return null
-  }, [revealTargetPath, selectedFilePath, root.name, rootsLength])
+  }, [revealTargetPath, selectedFilePath, root.name, root.id, rootsLength])
 
-  const rootSelectedPath = selectedFilePath?.startsWith(`${root.name}/`)
-    ? selectedFilePath.slice(root.name.length + 1)
-    : null
+  const rootSelectedPath = root.id === '__opfs__'
+    ? selectedFilePath ?? null
+    : selectedFilePath?.startsWith(`${root.name}/`)
+      ? selectedFilePath.slice(root.name.length + 1)
+      : null
 
   // Auto-expand when there's a revealTarget for this root
   const shouldReveal = rootRevealTarget !== null
@@ -405,7 +414,9 @@ const RootFileTreePanel = memo(function RootFileTreePanel({
         <FileTreePanel
           directoryHandle={root.handle}
           rootName={root.name}
-          pathPrefix={root.name}
+          // Virtual OPFS-only root: don't filter cachedPaths by name prefix
+          // (files were written without any rootName prefix in pure-OPFS mode).
+          pathPrefix={root.id === '__opfs__' ? null : root.name}
           onFileSelect={handleFileSelect}
           selectedPath={rootSelectedPath}
           onInspect={handleInspect}
@@ -630,6 +641,20 @@ export const Sidebar = memo(function Sidebar({
 
   // Multi-root: get all roots from folder-access store
   const roots = useFolderAccessStore((state) => state.roots)
+  // Pure-OPFS mode: when no native directory is mounted, render a virtual
+  // "OPFS drafts" root so the file panel is always visible (with an empty
+  // state if no files have been written yet). Files written by the LLM land
+  // here directly, bypassing the pending/approval workflow.
+  // NOTE: we intentionally do NOT consult `hasDirectoryHandle` here — that
+  // boolean can be stale (set true by a previous grant, never cleared after
+  // the user removes the root). `roots.length` from folder-access.store is
+  // the authoritative source of truth for "is a native dir mounted right now".
+  const displayRoots = useMemo(() => {
+    if (roots.length > 0) return roots
+    return [
+      { id: '__opfs__', name: t('fileTree.opfsDraftRoot'), handle: null as FileSystemDirectoryHandle | null },
+    ]
+  }, [roots, t])
   const workspaceStats = useConversationContextStore((state) => state.workspaces)
   // Extract lastAccessedAt as a stable map — avoids re-sorting when other workspace fields
   // (e.g. pendingCount) change frequently during parallel streaming.
@@ -1189,10 +1214,10 @@ export const Sidebar = memo(function Sidebar({
             <ResourceTabPanel
               resourceTab={resourceTab}
               onTabChange={setResourceTab}
-              roots={roots}
+              roots={displayRoots}
               selectedFilePath={selectedFilePath}
               revealTargetPath={revealTargetPath}
-              rootsLength={roots.length}
+              rootsLength={displayRoots.length}
               onFileSelect={handleFileSelect}
               onInspect={onInspect}
               onFileDelete={handleFileDelete}
@@ -1270,7 +1295,8 @@ export const Sidebar = memo(function Sidebar({
               onClick={async () => {
                 try {
                   const { rootName, path, handle } = pendingDeleteTarget
-                  const fullPath = `${rootName}/${path}`
+                  // Virtual OPFS root sentinel: paths are already workspace-relative.
+                  const fullPath = rootName === '__opfs__' ? path : `${rootName}/${path}`
                   const workspaceId = useConversationContextStore.getState().activeWorkspaceId
                   await useOPFSStore.getState().deleteFile(fullPath, handle instanceof FileSystemDirectoryHandle ? handle : null, workspaceId, activeProjectId)
                 } catch (err) {

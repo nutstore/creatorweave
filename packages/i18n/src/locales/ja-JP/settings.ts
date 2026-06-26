@@ -215,6 +215,8 @@ export const settings = {
       title: "確認待ちの変更",
       noPendingChanges: "確認する変更はありません",
       newChangesAppearHere: "AIによるファイル変更が自動的にここに表示されます",
+      pureOpfsMode: "ローカルディレクトリ未マウント",
+      pureOpfsModeHint: "ファイルはブラウザの OPFS に直接保存されます。ローカルディレクトリをマウントすると承認同期フローが有効になります。",
       refreshTooltip: "リストを更新",
       viewDetailsTooltip: "詳細を見る",
       selectedCount: "{count} 件選択済み",

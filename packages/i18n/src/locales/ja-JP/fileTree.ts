@@ -15,4 +15,6 @@ export const fileTree = {
       "AIが変更したファイルはここに一時保存されます。確認後にローカルファイルに保存されます",
     draftFiles: "未確認の変更",
     approvedNotSynced: "確認済み、ディスクへの書き込み待ち",
+    loadFailed: "ディレクトリにアクセスできません",
+    opfsDraftRoot: "OPFS 下書き",
 } as const

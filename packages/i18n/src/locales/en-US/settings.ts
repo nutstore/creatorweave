@@ -213,6 +213,8 @@ export const settings = {
       title: "Changes to Confirm",
       noPendingChanges: "No changes to confirm",
       newChangesAppearHere: "AI file changes will appear here automatically",
+      pureOpfsMode: "No local directory mounted",
+      pureOpfsModeHint: "Files are saved directly to browser OPFS. Mount a local directory to enable the approval sync flow.",
       refreshTooltip: "Refresh list",
       viewDetailsTooltip: "View details",
       selectedCount: "{count} selected",

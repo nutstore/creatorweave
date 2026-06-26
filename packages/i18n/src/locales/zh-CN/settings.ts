@@ -208,6 +208,8 @@ export const settings = {
       title: "待确认的修改",
       noPendingChanges: "没有待确认的修改",
       newChangesAppearHere: "AI 修改文件后，修改会自动出现在这里",
+      pureOpfsMode: "未挂载本地目录",
+      pureOpfsModeHint: "文件直接保存在浏览器 OPFS 中。挂载本地目录后可启用审批同步流程。",
       refreshTooltip: "刷新列表",
       viewDetailsTooltip: "查看详情",
       selectedCount: "{count} 已选",

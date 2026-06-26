@@ -140,26 +140,6 @@ describe('writeFile ghost change dedup', () => {
     expect(runtime.pendingManager.add).toHaveBeenCalled()
   })
 
-  it('skips write in pure OPFS mode when content matches files/ baseline', async () => {
-    // No directoryHandle — pure OPFS mode
-    // hasFileInIndex returns true, readFromFilesDir returns matching content
-    const runtime = createRuntimeForWriteTest({
-      hasFileInIndex: vi.fn(() => true),
-      readFromFilesDir: vi.fn(async () => ({
-        content: 'existing content',
-        mtime: 5000,
-        size: 17,
-        contentType: 'text',
-      })),
-    })
-
-    await runtime.writeFile('src/a.ts', 'existing content', null)
-
-    // Should skip write — content matches files/ baseline
-    expect(runtime.writeToFilesDir).not.toHaveBeenCalled()
-    expect(runtime.pendingManager.add).not.toHaveBeenCalled()
-  })
-
   it('cleans up conflict markers in files/ when dedup triggers during conflict resolution', async () => {
     const resolvedContent = 'clean content'
     const runtime = createRuntimeForWriteTest({

@@ -365,6 +365,8 @@ function AppReady() {
         hasDirectoryHandle: false,
         switchingWorkspaceId: null,
         unsyncedSnapshots: [],
+        opfsOnlyFileCount: 0,
+        opfsOnlyFilesPaths: [],
         error: null,
       })
       useOPFSStore.setState({

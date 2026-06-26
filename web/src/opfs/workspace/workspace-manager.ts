@@ -388,6 +388,16 @@ export class WorkspaceManager {
   }
 
   /**
+   * Cheap check: is the WorkspaceRuntime instance already instantiated?
+   * Used to skip idempotent re-create calls on page reload when the
+   * runtime is already in memory. Distinct from hasWorkspace (which hits
+   * the SQLite-backed index) — this only touches the in-memory Map.
+   */
+  isWorkspaceLoaded(workspaceId: string): boolean {
+    return this.workspaces.has(workspaceId)
+  }
+
+  /**
    * Update workspace root directory.
    */
   async updateWorkspaceRoot(workspaceId: string, rootDirectory: string): Promise<void> {

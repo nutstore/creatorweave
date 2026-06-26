@@ -15,4 +15,5 @@ export const fileTree = {
     draftFiles: "未确认的修改",
     approvedNotSynced: "已确认，等待写入本地磁盘",
     loadFailed: "目录无法访问",
+    opfsDraftRoot: "OPFS 草稿",
 } as const

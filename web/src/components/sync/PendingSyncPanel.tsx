@@ -67,6 +67,7 @@ export function PendingSyncPanel() {
     arePendingChangesEqual,
   )
   const discardPendingPath = useConversationContextStore((state) => state.discardPendingPath)
+  const hasDirectoryHandle = useConversationContextStore((state) => state.hasDirectoryHandle)
   const [selectAll, setSelectAll] = useState(false)
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set())
   const [isSyncing, setIsSyncing] = useState(false)
@@ -526,9 +527,19 @@ export function PendingSyncPanel() {
         {/* Empty State */}
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
-            <div className="text-4xl mb-3 opacity-20 transition-opacity duration-500 hover:opacity-30">✓</div>
-            <p className="text-sm font-medium text-secondary">{t('settings.pendingSyncPanel.noPendingChanges')}</p>
-            <p className="text-xs text-tertiary mt-1">{t('settings.pendingSyncPanel.newChangesAppearHere')}</p>
+            <div className="text-4xl mb-3 opacity-20 transition-opacity duration-500 hover:opacity-30">
+              {hasDirectoryHandle ? '✓' : '📂'}
+            </div>
+            <p className="text-sm font-medium text-secondary">
+              {hasDirectoryHandle
+                ? t('settings.pendingSyncPanel.noPendingChanges')
+                : t('settings.pendingSyncPanel.pureOpfsMode')}
+            </p>
+            <p className="text-xs text-tertiary mt-1">
+              {hasDirectoryHandle
+                ? t('settings.pendingSyncPanel.newChangesAppearHere')
+                : t('settings.pendingSyncPanel.pureOpfsModeHint')}
+            </p>
           </div>
         </div>
       </div>

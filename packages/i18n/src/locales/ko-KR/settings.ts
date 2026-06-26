@@ -212,6 +212,8 @@ export const settings = {
       title: "확인 대기 중인 변경",
       noPendingChanges: "확인할 변경 사항이 없습니다",
       newChangesAppearHere: "AI 파일 변경이 자동으로 여기에 표시됩니다",
+      pureOpfsMode: "로컬 디렉터리 미마운트",
+      pureOpfsModeHint: "파일은 브라우저 OPFS에 직접 저장됩니다. 로컬 디렉터리를 마운트하면 승인 동기화 흐름이 활성화됩니다.",
       refreshTooltip: "목록 새로고침",
       viewDetailsTooltip: "세부 정보 보기",
       selectedCount: "{count}개 선택됨",

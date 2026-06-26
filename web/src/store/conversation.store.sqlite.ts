@@ -402,6 +402,15 @@ import type { SubagentTaskNotification, SubagentStepNotification } from '@/agent
 
 const pendingConversationMetaPersists = new Map<string, Promise<void>>()
 
+/**
+ * In-flight loadFromDB promise. StrictMode (dev only) double-mounts effects
+ * synchronously, and both invocations see `loaded === false` before the first
+ * one finishes. Without this guard, the full N-conversation load runs twice
+ * on every page refresh in dev — observed 2×5.3s back-to-back. Production
+ * builds mount once, so this is a dev-only no-op there.
+ */
+let inflightLoadFromDB: Promise<void> | null = null
+
 async function waitForConversationMetaPersist(convId: string): Promise<void> {
   const pending = pendingConversationMetaPersists.get(convId)
   if (pending) {
@@ -994,9 +1003,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     loadFromDB: async () => {
+      if (inflightLoadFromDB) return inflightLoadFromDB
+      inflightLoadFromDB = (async () => {
+      const t0 = performance.now()
       try {
         // Initialize SQLite first
         await initSQLiteDB()
+        const tSqlite = performance.now()
         // Force one legacy message migration pass in main thread.
         // This repairs cases where worker-side migration was skipped in previous versions.
         try {
@@ -1026,8 +1039,10 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         } catch (migrationError) {
           console.warn('[conversation.store] Legacy message migration pass failed:', migrationError)
         }
+        const tMigrate = performance.now()
 
         const conversations = await loadConversationsMeta()
+        const tLoadMeta = performance.now()
 
         // Orphan recovery: find ask_user_question tool_calls in committed messages
         // that have no matching tool result. This happens when the user refreshed
@@ -1094,34 +1109,46 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           console.warn('[conversation.store] Orphan ask_user_question recovery pass failed:', orphanRecoveryError)
         }
 
-        // Ensure OPFS conversations exist for all loaded conversations
-        const { getWorkspaceManager } = await import('@/opfs')
-        const manager = await getWorkspaceManager()
-
-        const failedWorkspaces: Array<{ id: string; title: string; error: string }> = []
-
-        for (const conv of conversations) {
-          const rootDir = `workspaces/${conv.id}`
-          try {
-            // Create conversation if it doesn't exist (idempotent)
-            await manager.createWorkspace(rootDir, conv.id, conv.title || DEFAULT_CONVERSATION_NAME)
-          } catch (e) {
-            const errorMsg = e instanceof Error ? e.message : String(e)
-            console.error(`[conversation.store] Failed to ensure conversation for ${conv.id}:`, e)
-            failedWorkspaces.push({
-              id: conv.id,
-              title: conv.title || DEFAULT_CONVERSATION_NAME,
-              error: errorMsg,
-            })
+        // Ensure OPFS conversations exist — but ONLY for the active workspace.
+        // switchWorkspace already has lazy self-healing (workspace.store.ts:
+        // "Workspace exists in SQLite but OPFS missing → recreate"), so
+        // iterating all N conversations on every page load was redoing O(N)
+        // SQLite/OPFS probes for no benefit. Measured impact: 4.9s for 119
+        // conversations before this fix.
+        const tManager = performance.now()
+        let ensuredCount = 0
+        let ensuredSkipped = 0
+        try {
+          const { getWorkspaceManager } = await import('@/opfs')
+          const manager = await getWorkspaceManager()
+          const activeWsId = useConversationContextStore.getState().activeWorkspaceId
+          const target = conversations.find((c) => c.id === activeWsId)
+          if (target && !manager.isWorkspaceLoaded(target.id)) {
+            await manager.createWorkspace(
+              `workspaces/${target.id}`,
+              target.id,
+              target.title || DEFAULT_CONVERSATION_NAME,
+            )
+            ensuredCount++
+          } else {
+            ensuredSkipped = conversations.length
           }
+        } catch (e) {
+          console.warn('[conversation.store] Active workspace ensure failed:', e)
         }
-
-        if (failedWorkspaces.length > 0) {
-          console.warn(
-            `[conversation.store] Failed to create/update  workspace(s):`,
-            failedWorkspaces.map((f) => `"${f.title}" (${f.id}): ${f.error}`).join('; ')
-          )
-        }
+        const tEnsure = performance.now()
+        console.log(
+          `[conversation.store] loadFromDB phase timings (${Math.round(performance.now() - t0)}ms total)`,
+          {
+            sqliteInitMs: Math.round(tSqlite - t0),
+            migrateMs: Math.round(tMigrate - tSqlite),
+            loadMetaMs: Math.round(tLoadMeta - tMigrate),
+            ensureOpfsMs: Math.round(tEnsure - tManager),
+            conversationCount: conversations.length,
+            ensuredActive: ensuredCount,
+            lazyDeferred: ensuredSkipped,
+          }
+        )
 
         // NOTE: workspace switching is handled by syncFromRoute in App.tsx.
         // loadFromDB only loads conversation data; it does NOT call refreshWorkspaces or switchWorkspace.
@@ -1193,7 +1220,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         set((state) => {
           state.loaded = true
         })
+      } finally {
+        inflightLoadFromDB = null
       }
+    })()
+      return inflightLoadFromDB
     },
 
     createNew: (title?: string) => {
@@ -1224,6 +1255,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     },
 
     setActive: async (id) => {
+      const t0 = performance.now()
       set((state) => {
         state.activeConversationId = id
       })
@@ -1234,7 +1266,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         if (conv && conv.messages.length === 0) {
           try {
             const msgRepo = getMessageRepository()
+            const tFetch = performance.now()
             const messages = await msgRepo.findByConversation(id)
+            const tDeserialize = performance.now()
             set((state) => {
               const c = state.conversations.find((c) => c.id === id)
               if (c && c.messages.length === 0) {
@@ -1244,9 +1278,22 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 healCompressionBaseline(c)
               }
             })
+            console.log(
+              `[conversation.store] setActive(${id?.slice(0, 8)}) message load (${Math.round(performance.now() - t0)}ms)`,
+              {
+                fetchMs: Math.round(tDeserialize - tFetch),
+                messageCount: messages.length,
+                immutifyMs: Math.round(performance.now() - tDeserialize),
+              }
+            )
           } catch (error) {
             console.error('[conversation.store] Failed to load messages for conversation:', error)
           }
+        } else {
+          console.log(
+            `[conversation.store] setActive(${id?.slice(0, 8)}) cached (${Math.round(performance.now() - t0)}ms)`,
+            { alreadyLoaded: conv ? conv.messages.length : -1 }
+          )
         }
         // NOTE: workspace switching is handled by syncFromRoute in App.tsx.
         // This store only manages conversation data; it does NOT call switchWorkspace.
