@@ -43,32 +43,7 @@ export type { MCPManagerConfig, MCPManagerConnectionStatus } from './mcp-manager
 export { getMCPRepository, MCPRepository } from '../sqlite/repositories/mcp.repository'
 export type { StoredMCPServer } from '../sqlite/repositories/mcp.repository'
 
-// Tool Bridge (on-demand: 2 persistent tools only)
-export {
-  mcpToolToToolDefinition,
-  createMCPToolExecutor,
-  registerServerTools,
-  unregisterServerTools,
-  registerAllMCPTools,
-  unregisterAllMCPTools,
-  syncMCPTools,
-} from './mcp-tool-bridge'
-
-// On-Demand Bridge (the 2 persistent tools + prompt doc)
-export {
-  ON_DEMAND_MCP_TOOLS,
-  mcpOnDemandPromptDoc,
-  mcpGetToolSchemaDefinition,
-  mcpGetToolSchemaExecutor,
-  mcpToolCallDefinition,
-  mcpToolCallExecutor,
-} from './mcp-ondemand-bridge'
-
-// Injection (lightweight catalog for system prompt)
-export {
-  buildAvailableMCPServicesBlock,
-  getMCPServicesSummary,
-  hasConnectedMCPServices,
-  getAllMCPToolNames,
-} from './mcp-injection'
-export type { MCPInjectionContext } from './mcp-injection'
+// NOTE: MCP tool discovery & execution is handled by the unified external-tool
+// bridge (search_tools + call_tool) in src/agent/external-tool-bridge.ts.
+// The old on-demand bridge (mcp_get_tool_schema + mcp_call) and the
+// <available_mcp_services> system-prompt injection have been removed.

@@ -98,17 +98,15 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   //   console.warn('[AgentLoop] Failed to inject workflow catalog:', error)
   // }
 
-  // ⑤: MCP services — register on-demand tools + inject compact summary
-  // (full catalog replaced by search_tools; only summary + source list injected)
+  // ⑤: MCP services — initialize connections + inject compact summary
+  // (tool discovery/execution is handled by the unified bridge search_tools/call_tool
+  //  which are registered as builtins; no per-MCP tool registration needed)
   try {
     const mcpManager = getMCPManager()
     await mcpManager.initialize()
 
     // Auto-connect any enabled servers that are not yet connected
     await mcpManager.connectUnconnectedEnabled()
-
-    // Register on-demand MCP tools to ToolRegistry (2 persistent tools only)
-    await input.toolRegistry.registerMCPTools()
 
     // Inject compact external tools summary instead of full catalog
     const { buildCompactExternalToolsSummary } = await import('../external-tool-bridge')

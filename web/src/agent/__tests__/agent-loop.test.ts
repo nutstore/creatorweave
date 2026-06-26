@@ -26,7 +26,6 @@ vi.mock('../intelligence-coordinator', () => ({
 vi.mock('@/mcp', () => ({
   getMCPManager: vi.fn(() => ({
     initialize: vi.fn(() => Promise.resolve()),
-    getAvailableMCPServicesBlock: vi.fn(() => ''),
   })),
 }))
 

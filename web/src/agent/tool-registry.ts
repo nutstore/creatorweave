@@ -378,39 +378,6 @@ export class ToolRegistry {
   }
 
   //=============================================================================
-  // MCP Tools
-  //=============================================================================
-
-  /**
-   * Register MCP on-demand tools. The unified external tool bridge (search_tools,
-   * call_tool) is registered as builtins in registerBuiltins().
-   * This method handles MCP server lifecycle (connect, discover tools).
-   * The full tool catalog is injected via system prompt, not registered individually.
-   */
-  async registerMCPTools(): Promise<number> {
-    try {
-      const { registerAllMCPTools } = await import('@/mcp')
-      return await registerAllMCPTools(this)
-    } catch (error) {
-      console.error('[ToolRegistry] Failed to register MCP tools:', error)
-      return 0
-    }
-  }
-
-  /**
-   * Unregister all MCP tools
-   */
-  async unregisterMCPTools(): Promise<number> {
-    try {
-      const { unregisterAllMCPTools } = await import('@/mcp')
-      return await unregisterAllMCPTools(undefined)
-    } catch (error) {
-      console.error('[ToolRegistry] Failed to unregister MCP tools:', error)
-      return 0
-    }
-  }
-
-  //=============================================================================
   // Web Bridge Tools (Browser Extension)
   //=============================================================================
 

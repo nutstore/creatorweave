@@ -3,7 +3,6 @@
  *
  * Reuses AgentLoop's enhancement capabilities for workflow node execution:
  * - Skills injection (available skills metadata)
- * - MCP services discovery (available MCP tools)
  * - Intelligence coordinator (agent personality, tool recommendations)
  *
  * This ensures workflow nodes have access to the same context and capabilities
@@ -11,7 +10,6 @@
  */
 
 import { getIntelligenceCoordinator } from '../intelligence-coordinator'
-import { getMCPManager } from '@/mcp'
 import { getSkillManager } from '@/skills/skill-manager'
 
 export interface NodeEnhancementOptions {
@@ -32,11 +30,14 @@ export interface NodeEnhancementOptions {
  *
  * This applies:
  * 1. Intelligence coordinator (agent personality, fingerprint, tool recs, memory)
- * 2. MCP services block (available MCP tools)
- * 3. Skills matching (relevant skills for the node's task)
+ * 2. Skills matching (relevant skills for the node's task)
  *
  * Each enhancement is applied independently with try/catch so a failure
  * in one doesn't block the others.
+ *
+ * NOTE: workflow nodes call the LLM with `tools: []` (no tool-calling), so we
+ * deliberately do NOT inject any tool-catalog blocks here — they would mislead
+ * the model into expecting tools it cannot invoke.
  */
 export async function buildEnhancedWorkflowNodePrompt(
   basePrompt: string,
@@ -59,20 +60,7 @@ export async function buildEnhancedWorkflowNodePrompt(
     console.warn('[workflow-node-enhance] Intelligence enhancement failed:', error)
   }
 
-  // 3. MCP services block
-  try {
-    const mcpManager = getMCPManager()
-    await mcpManager.initialize()
-    const { buildAvailableMCPServicesBlock } = await import('@/mcp/mcp-injection')
-    const mcpBlock = buildAvailableMCPServicesBlock()
-    if (mcpBlock) {
-      enhanced += '\n\n' + mcpBlock
-    }
-  } catch (error) {
-    console.warn('[workflow-node-enhance] MCP injection failed:', error)
-  }
-
-  // 4. Skills block
+  // 2. Skills block
   try {
     const skillManager = getSkillManager()
     const skillsBlock = skillManager.getEnhancedSystemPrompt('')
