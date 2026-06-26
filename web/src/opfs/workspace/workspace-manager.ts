@@ -280,16 +280,13 @@ export class WorkspaceManager {
 
       this.workspaces.set(workspaceId, workspace)
 
-      const metadata = this.index.find((item) => item.workspaceId === workspaceId)
-      if (metadata) {
-        metadata.lastAccessedAt = Date.now()
-      }
-
-      try {
-        await getWorkspaceRepository().updateWorkspaceAccessTime(workspaceId)
-      } catch {
-        // keep runtime usable even if SQLite update fails
-      }
+      // NOTE: Do NOT update lastAccessedAt here.
+      // getWorkspace() is a read-only runtime accessor called by many
+      // background tasks (prefetch, skill-scanner, useStorageInfo, agent
+      // tools). Treating it as an "access" causes spurious lastAccessedAt
+      // bumps that reorder the sidebar non-deterministically on every page
+      // refresh. Access-time updates are the sole responsibility of
+      // switchWorkspace() (explicit user action) in workspace.store.ts.
 
       return workspace
     } catch {

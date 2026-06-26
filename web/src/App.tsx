@@ -53,6 +53,7 @@ function WorkspaceRoute() {
   const setActiveProject = useProjectStore((s) => s.setActiveProject)
   const projects = useProjectStore((s) => s.projects)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
+  const initialized = useProjectStore((s) => s.initialized)
   const activeConversationTitle = useConversationStore((s) => {
     const { activeConversationId, conversations } = s
     if (!activeConversationId) return undefined
@@ -156,6 +157,13 @@ function WorkspaceRoute() {
       // Step 5: Switch workspace (OPFS/SQLite operations only, no conversation side-effects)
       if (activeWorkspaceId !== targetWorkspaceId) {
         await useConversationContextStore.getState().switchWorkspace(targetWorkspaceId)
+      } else {
+        // Already active (typical after a page refresh where initialize()
+        // restored activeWorkspaceId from the persisted record). switchWorkspace
+        // would noop, so we must explicitly refresh pending changes here —
+        // otherwise the badge keeps showing the SQLite-cached count that
+        // initialize() wrote, which may be stale / from the wrong workspace.
+        await useConversationContextStore.getState().refreshPendingChanges(true)
       }
 
       if (cancelled) return
@@ -172,7 +180,7 @@ function WorkspaceRoute() {
     return () => {
       cancelled = true
     }
-  }, [projectId, workspaceId, setActiveProject, navigate, t])
+  }, [projectId, workspaceId, setActiveProject, navigate, t, initialized])
 
   return (
     <WorkspaceLayout
@@ -355,19 +363,10 @@ function AppReady() {
         error: null,
       })
       useConversationContextStore.setState({
+        ...(await import('./store/workspace.store')).PENDING_RESET_PATCH,
         activeWorkspaceId: null,
         workspaces: [],
-        currentPendingCount: 0,
         initialized: false,
-        pendingChanges: null,
-        showPreview: false,
-        previewSelectedPath: null,
-        hasDirectoryHandle: false,
-        switchingWorkspaceId: null,
-        unsyncedSnapshots: [],
-        opfsOnlyFileCount: 0,
-        opfsOnlyFilesPaths: [],
-        error: null,
       })
       useOPFSStore.setState({
         workspaceId: null,

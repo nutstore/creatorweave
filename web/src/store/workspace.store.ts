@@ -69,6 +69,31 @@ function waitForSwitchComplete(workspaceId: string, timeoutMs = 30000): Promise<
   })
 }
 
+// ---------------------------------------------------------------------------
+// PENDING_RESET_PATCH — single source of truth for workspace-derived runtime
+// state that must be cleared whenever the active workspace (or project)
+// changes. These fields all describe the *current* workspace's data; if they
+// leak across a switch, the UI shows stale badge counts, pending file lists,
+// unsynced-snapshot toasts, etc.
+//
+// NOT included here (persisted user preferences): `isSyncPreviewEnabled`,
+// `pinnedWorkspaceIds`.
+// NOT included here (set contextually by callers): `activeWorkspaceId`,
+// `workspaces`, `initialized`, `isLoading`.
+// ---------------------------------------------------------------------------
+export const PENDING_RESET_PATCH: Partial<WorkspaceState> = {
+  currentPendingCount: 0,
+  pendingChanges: null,
+  showPreview: false,
+  previewSelectedPath: null,
+  switchingWorkspaceId: null,
+  unsyncedSnapshots: [],
+  opfsOnlyFileCount: 0,
+  opfsOnlyFilesPaths: [],
+  hasDirectoryHandle: false,
+  error: null,
+}
+
 // De-duplicate concurrent pending-change scans across UI/tool triggers.
 let refreshPendingChangesInFlight: Promise<void> | null = null
 let refreshPendingChangesNeedsRerun = false
@@ -109,6 +134,36 @@ export function getWorkspaceDisplayName(
 export interface WorkspaceWithStats extends WorkspaceMetadata {
   /** Number of pending changes */
   pendingCount: number
+}
+
+/**
+ * Sort workspaces for sidebar display: pinned items first (in pinned order),
+ * then unpinned items by lastAccessedAt desc.
+ *
+ * IMPORTANT: pinned items sort by their position in `pinnedIds` — NOT by
+ * lastAccessedAt. This is what keeps the pinned section stable across page
+ * refreshes: a `switchWorkspace` touch during syncFromRoute must not reorder
+ * pinned items relative to each other.
+ */
+export function sortWorkspacesForDisplay(
+  workspaces: WorkspaceWithStats[],
+  pinnedIds: string[]
+): WorkspaceWithStats[] {
+  const pinnedOrder = new Map<string, number>()
+  pinnedIds.forEach((id, index) => pinnedOrder.set(id, index))
+  const pinnedSet = new Set(pinnedIds)
+  return [...workspaces].sort((a, b) => {
+    const aPinned = pinnedSet.has(a.id)
+    const bPinned = pinnedSet.has(b.id)
+    if (aPinned && bPinned) {
+      // Both pinned → preserve pinning order (stable, not time-based)
+      return (pinnedOrder.get(a.id) ?? 0) - (pinnedOrder.get(b.id) ?? 0)
+    }
+    if (aPinned) return -1
+    if (bPinned) return 1
+    // Neither pinned → most recently accessed first
+    return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0)
+  })
 }
 
 /**
@@ -190,6 +245,13 @@ interface WorkspaceState {
 
   /** Switch to a different workspace */
   switchWorkspace: (id: string) => Promise<void>
+
+  /**
+   * Bump the active workspace's lastAccessedAt without reloading state.
+   * Used when the user clicks the already-active workspace — should still
+   * sort it to the top of the unpinned list.
+   */
+  touchActiveWorkspaceAccessTime: () => Promise<void>
 
   /** Delete a workspace (deletes from both SQLite and OPFS) */
   deleteWorkspace: (id: string) => Promise<void>
@@ -324,13 +386,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
             if (!activeProjectId) {
               set({
-                workspaces: [],
+                ...PENDING_RESET_PATCH,
                 activeWorkspaceId: null,
-                currentPendingCount: 0,
-                pendingChanges: null,
-                showPreview: false,
-                previewSelectedPath: null,
-                unsyncedSnapshots: [],
+                workspaces: [],
                 isLoading: false,
                 initialized: true,
               })
@@ -359,16 +417,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               const { useWorkspacePreferencesStore } = await import('./workspace-preferences.store')
               const pinnedIds = useWorkspacePreferencesStore.getState().pinnedWorkspaceIds
               if (pinnedIds.length > 0) {
-                const pinnedSet = new Set(pinnedIds)
                 set({ pinnedWorkspaceIds: pinnedIds })
-                // Sort: pinned first (in pinnedIds order), then remaining by lastAccessedAt desc
-                workspaces.sort((a, b) => {
-                  const aPinned = pinnedSet.has(a.id)
-                  const bPinned = pinnedSet.has(b.id)
-                  if (aPinned && !bPinned) return -1
-                  if (!aPinned && bPinned) return 1
-                  return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0)
-                })
+                // Pinned items stay in pin order; unpinned by lastAccessedAt desc.
+                workspaces = sortWorkspacesForDisplay(workspaces, pinnedIds)
               }
             } catch {
               // Ignore preference loading errors, keep default order
@@ -385,14 +436,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                 ? persistedActiveId
                 : (workspaces.length > 0 ? workspaces[0].id : null)
 
+            // Use the ACTIVE workspace's count, not workspaces[0].
+            // After pinning/sorting, workspaces[0] may be a different
+            // conversation than activeId — using it here made the badge
+            // show another conversation's pending count after refresh.
+            const activePendingWs = activeId
+              ? workspaces.find((w) => w.id === activeId)
+              : undefined
+
             set({
+              ...PENDING_RESET_PATCH,
               workspaces,
               activeWorkspaceId: activeId,
-              currentPendingCount: activeId ? workspaces[0]?.pendingCount || 0 : 0,
-              pendingChanges: null,
-              showPreview: false,
-              previewSelectedPath: null,
-              unsyncedSnapshots: [],
+              currentPendingCount: activePendingWs?.pendingCount || 0,
               isLoading: false,
               initialized: true,
             })
@@ -403,11 +459,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to initialize workspaces'
             set({
+              ...PENDING_RESET_PATCH,
               error: message,
-              pendingChanges: null,
-              showPreview: false,
-              previewSelectedPath: null,
-              unsyncedSnapshots: [],
               isLoading: false,
               initialized: true,
             })
@@ -477,7 +530,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
           const __swT0 = performance.now()
           let __swT1 = 0
           let __swBranch: 'new' | 'recreate' | 'cached' = 'cached'
-          // Avoid redundant call if already active
+          // Avoid redundant call if already active.
+          // (Clicking the active workspace is handled separately by
+          // touchActiveWorkspaceAccessTime to update its sort position.)
           const currentActiveId = get().activeWorkspaceId
           if (currentActiveId === id) {
             console.log(`[WorkspaceStore] switchWorkspace(${id?.slice(0, 8)}) noop (already active)`)
@@ -514,13 +569,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             }
           }
 
-          // Set switching lock
+          // Set switching lock.
+          // IMPORTANT: reset all pending-derived fields NOW (synchronously)
+          // before any async work. This closes the window where the badge and
+          // preview panel would briefly show the *previous* workspace's data
+          // until `refreshPendingChanges` finishes (Bug 2).
           set({
+            ...PENDING_RESET_PATCH,
             switchingWorkspaceId: id,
             isLoading: true,
-            error: null,
-            pendingChanges: null,
-            previewSelectedPath: null,
+            // error already nulled by PENDING_RESET_PATCH
           })
 
           try {
@@ -722,6 +780,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               `[WorkspaceStore] switchWorkspace(${id?.slice(0, 8)}) done (${Math.round(performance.now() - __swT0)}ms)`,
               { branch: __swBranch, prepareMs: Math.round(__swT1 - __swT0) }
             )
+          }
+        },
+
+        touchActiveWorkspaceAccessTime: async () => {
+          const id = get().activeWorkspaceId
+          if (!id) return
+          const now = Date.now()
+          set({
+            workspaces: get().workspaces.map((w) =>
+              w.id === id ? { ...w, lastAccessedAt: now } : w
+            ),
+          })
+          // Persist to SQLite (fire-and-forget, non-critical)
+          try {
+            const repo = getWorkspaceRepository()
+            void repo.updateWorkspaceAccessTime(id)
+          } catch {
+            // Non-critical — in-memory update already applied
           }
         },
 
@@ -1303,16 +1379,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
           set({ pinnedWorkspaceIds: next })
 
-          // Re-sort workspaces: pinned first, then by lastAccessedAt desc
-          const workspaces = [...get().workspaces]
-          const pinnedSet = new Set(next)
-          workspaces.sort((a, b) => {
-            const aPinned = pinnedSet.has(a.id)
-            const bPinned = pinnedSet.has(b.id)
-            if (aPinned && !bPinned) return -1
-            if (!aPinned && bPinned) return 1
-            return (b.lastAccessedAt ?? 0) - (a.lastAccessedAt ?? 0)
-          })
+          // Re-sort workspaces: pinned items preserve pinning order,
+          // unpinned by lastAccessedAt desc.
+          const workspaces = sortWorkspacesForDisplay([...get().workspaces], next)
           set({ workspaces })
 
           // Persist (lazy import to avoid circular dependency)

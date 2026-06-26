@@ -265,14 +265,15 @@ export const useProjectStore = create<ProjectState>()(
         // 1. Clear stale workspace context atomically BEFORE updating activeProjectId.
         //    This prevents the URL sync effect from firing with the old project's workspace.
         //    Also reset `initialized` so refreshWorkspaces() will fully reload.
+        //    Uses the shared PENDING_RESET_PATCH so the badge count, pending file
+        //    list, unsynced-snapshot list, etc. can never leak across project
+        //    switches (Bug 2: stale badge count from old workspace).
         const { useConversationContextStore } = await import('./conversation-context.store')
+        const { PENDING_RESET_PATCH } = await import('./workspace.store')
         useConversationContextStore.setState({
+          ...PENDING_RESET_PATCH,
           activeWorkspaceId: null,
           workspaces: [],
-          switchingWorkspaceId: null,
-          pendingChanges: null,
-          showPreview: false,
-          previewSelectedPath: null,
           initialized: false,
         })
 
