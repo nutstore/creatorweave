@@ -59,6 +59,9 @@ describe('IntelligenceCoordinator', () => {
       agentManager: {
         getAgent: vi.fn(async () => agentInfo),
         readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+        ]),
       },
     })
 
@@ -66,7 +69,7 @@ describe('IntelligenceCoordinator', () => {
     const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', { projectId: 'proj-store' })
 
     expect(result.agentInfo?.id).toBe('default')
-    expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
+    expect(result.systemPrompt).toContain('BASE_PROMPT\n\n---\n\nAGENT_PROMPT')
     expect(getProjectMock).toHaveBeenCalledWith('proj-store')
   })
 
@@ -80,6 +83,10 @@ describe('IntelligenceCoordinator', () => {
       agentManager: {
         getAgent: getAgentMock,
         readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+          { id: 'novel-editor', name: 'Novel Editor', createdAt: 0, lastAccessedAt: 0 },
+        ]),
       },
     })
 
@@ -91,7 +98,13 @@ describe('IntelligenceCoordinator', () => {
 
     expect(getAgentMock).toHaveBeenCalledWith('novel-editor')
     expect(result.agentInfo?.id).toBe('novel-editor')
-    expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
+    // Agent catalog should be injected and appear BEFORE the persona block
+    expect(result.systemPrompt).toContain('## Available Agents')
+    expect(result.systemPrompt).toContain('`novel-editor`')
+    // Persona still appears at the end, separated by `---`
+    expect(result.systemPrompt).toContain('---\n\nAGENT_PROMPT')
+    // And base prompt is the very first thing
+    expect(result.systemPrompt.startsWith('BASE_PROMPT')).toBe(true)
   })
 
   it('falls back to default agent prompt when routed agent is missing', async () => {
@@ -101,6 +114,9 @@ describe('IntelligenceCoordinator', () => {
       agentManager: {
         getAgent: getAgentMock,
         readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+        ]),
       },
     })
 
@@ -113,7 +129,48 @@ describe('IntelligenceCoordinator', () => {
     expect(getAgentMock).toHaveBeenCalledWith('novel-editor')
     expect(getAgentMock).toHaveBeenCalledWith('default')
     expect(result.agentInfo?.id).toBe('default')
-    expect(result.systemPrompt).toContain('AGENT_PROMPT\n\n---\n\nBASE_PROMPT')
+    expect(result.systemPrompt).toContain('BASE_PROMPT\n\n---\n\nAGENT_PROMPT')
+  })
+
+  it('injects available-agents catalog when project has multiple agents', async () => {
+    const defaultAgent = createAgentInfo('default')
+    getProjectMock.mockResolvedValue({
+      agentManager: {
+        getAgent: vi.fn(async () => defaultAgent),
+        readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+          { id: 'backend-engineer', name: 'Backend Engineer', createdAt: 0, lastAccessedAt: 0 },
+          { id: 'frontend-lead', name: 'Frontend Lead', createdAt: 0, lastAccessedAt: 0 },
+        ]),
+      },
+    })
+
+    const coordinator = new IntelligenceCoordinator()
+    const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', { projectId: 'proj-store' })
+
+    expect(result.systemPrompt).toContain('## Available Agents')
+    expect(result.systemPrompt).toContain('`backend-engineer` — Backend Engineer')
+    expect(result.systemPrompt).toContain('`frontend-lead` — Frontend Lead')
+    expect(result.systemPrompt).toContain('delegate_to')
+  })
+
+  it('does not inject agents catalog when only default agent exists', async () => {
+    const defaultAgent = createAgentInfo('default')
+    getProjectMock.mockResolvedValue({
+      agentManager: {
+        getAgent: vi.fn(async () => defaultAgent),
+        readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+        ]),
+      },
+    })
+
+    const coordinator = new IntelligenceCoordinator()
+    const result = await coordinator.enhanceSystemPrompt('BASE_PROMPT', { projectId: 'proj-store' })
+
+    expect(result.systemPrompt).not.toContain('## Available Agents')
   })
 
   it('routes by @mention in userMessage with Chinese agent id', async () => {
@@ -124,6 +181,10 @@ describe('IntelligenceCoordinator', () => {
       agentManager: {
         getAgent: getAgentMock,
         readTodayLog: vi.fn(async () => null),
+        listAgents: vi.fn(async () => [
+          { id: 'default', name: 'Default', createdAt: 0, lastAccessedAt: 0 },
+          { id: '墨染', name: '墨染', createdAt: 0, lastAccessedAt: 0 },
+        ]),
       },
     })
 

@@ -295,6 +295,17 @@ export interface ToolContext {
    * can correlate their pending question with the UI's toolCall display.
    */
   currentToolCallId?: string
+  /**
+   * Called by the delegate_to tool to signal that the main agent wants to
+   * hand off control. The store reads this after the loop completes and
+   * restarts with the target agent persona. Set by conversation.store on
+   * AgentLoop construction.
+   */
+  onDelegation?: (payload: {
+    targetAgentId: string
+    task: string
+    reason?: string
+  }) => void
 }
 
 /** Ask user question type */

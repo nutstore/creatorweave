@@ -58,6 +58,7 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['read_skill_resource', { name: 'read_skill_resource', category: 'read' }],
   // Meta tools (read-only — no file modifications)
   ['ask_user_question', { name: 'ask_user_question', category: 'read' }],
+  ['delegate_to', { name: 'delegate_to', category: 'read' }],
   // Subagent orchestration tools (read-only orchestration surface)
   ['search_conversations', { name: 'search_conversations', category: 'read' }],
   // Unified external tool bridge (search + call)

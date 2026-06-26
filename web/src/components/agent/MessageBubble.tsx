@@ -6,7 +6,7 @@
  */
 
 import { useState, memo } from 'react'
-import { User, Bot, Trash2, Pencil, Download } from 'lucide-react'
+import { User, Bot, Trash2, Pencil, Download, Forward } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
@@ -106,6 +106,31 @@ export const MessageBubble = memo(function MessageBubble({
       onEditAndResend(message.id, trimmed)
     }
     setIsEditing(false)
+  }
+
+  // Delegation note: synthetic user-role message injected by delegate_to
+  // handoff. Render as a centered card so it's visually distinct from
+  // real user input — not a right-aligned chat bubble.
+  if (isUser && message.delegationNote) {
+    const note = message.delegationNote
+    return (
+      <div className="my-3 flex justify-center">
+        <div className="max-w-[85%] rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900/40 dark:bg-amber-950/20">
+          <div className="mb-1 flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+            <Forward className="h-3.5 w-3.5" />
+            <span>Delegated by {note.fromAgentName ?? note.fromAgentId}</span>
+          </div>
+          <div className="whitespace-pre-wrap break-words text-neutral-700 dark:text-neutral-300">
+            {note.task}
+          </div>
+          {note.reason && (
+            <div className="mt-1 text-xs italic text-neutral-500 dark:text-neutral-400">
+              {note.reason}
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // User message rendering

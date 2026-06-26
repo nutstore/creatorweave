@@ -62,6 +62,13 @@ import {
   askUserQuestionPromptDoc,
 } from './tools/ask-user-question.tool'
 
+// Delegate to another agent persona (one-way handoff)
+import {
+  delegateToDefinition,
+  delegateToExecutor,
+  delegateToPromptDoc,
+} from './tools/delegate.tool'
+
 import {
   batchSpawnDefinition,
   batchSpawnExecutor,
@@ -167,6 +174,7 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   // Meta tools
   { definition: switchAgentModeDefinition, executor: createSwitchModeExecutor() },
   { definition: askUserQuestionDefinition, executor: askUserQuestionExecutor },
+  { definition: delegateToDefinition, executor: delegateToExecutor },
   { definition: spawnSubagentDefinition, executor: spawnSubagentExecutor },
   { definition: batchSpawnDefinition, executor: batchSpawnExecutor },
   { definition: sendMessageToSubagentDefinition, executor: sendMessageToSubagentExecutor },
@@ -200,6 +208,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   subagentPromptDoc,
   switchModePromptDoc,
   askUserQuestionPromptDoc,
+  delegateToPromptDoc,
   webBridgePromptDoc,
   skillPromptDoc,
   unifiedExternalToolsPromptDoc,

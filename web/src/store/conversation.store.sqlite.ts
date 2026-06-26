@@ -1901,6 +1901,22 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         // system-context messages and mirrored into the runtime message state.
         let committed = false
 
+        // --- Delegation handoff state ---
+        // When the delegate_to tool is invoked, it calls `onDelegation`
+        // (registered on toolContext below) which stashes the request here.
+        // After agentLoop.run resolves we check this and restart the loop
+        // with the target agent persona (one-way handoff).
+        let pendingDelegation: {
+          targetAgentId: string
+          task: string
+          reason?: string
+        } | null = null
+        // Per-runAgent invocation depth. Read from the conversation runtime
+        // state so recursive runAgent calls can inherit & increment it.
+        // MAX_DELEGATION_DEPTH prevents infinite A→B→A loops.
+        const MAX_DELEGATION_DEPTH = 5
+        const delegationDepth = conv.delegationDepth ?? 0
+
         // Acquire run lock immediately to prevent concurrent duplicate starts.
         useConversationRuntimeStore.setState((state) => {
           let rt = state.runtimes.get(conversationId)
@@ -2738,6 +2754,18 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   }
                 }
               )
+            },
+            onDelegation: (payload) => {
+              // Only honour delegation from the current run; ignore stale loops.
+              if (!isCurrentRun()) return
+              if (delegationDepth >= MAX_DELEGATION_DEPTH) {
+                console.warn(
+                  '[conversation.store] delegate_to depth limit reached, ignoring handoff',
+                  { conversationId, delegationDepth, target: payload.targetAgentId }
+                )
+                return
+              }
+              pendingDelegation = payload
             },
           },
           maxIterations,
@@ -3766,6 +3794,87 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         })
         latestMessages = resultMessages
         await finalizeRun('idle', latestMessages)
+
+        // ─── delegate_to handoff ───────────────────────────────────────────
+        // If delegate_to was called during this run, restart the loop with the
+        // target agent persona. finalizeRun above already cleaned up the
+        // current run's state (status='idle', activeRunId=null, loop deleted),
+        // so we can safely start a fresh run.
+        //
+        // We inject ONE synthetic user-role "delegation note" message before
+        // restarting. This is required by the LLM API: the previous run ended
+        // with an assistant turn, and the API rejects "Cannot continue from
+        // message role: assistant" without an intervening user/tool message.
+        // The note carries the task framing + a `delegationNote` metadata
+        // flag so the UI can render it as a system card instead of a user
+        // chat bubble.
+        if (pendingDelegation && isCurrentRunEpoch()) {
+          const { targetAgentId, task, reason } = pendingDelegation
+          pendingDelegation = null
+
+          // Dynamic import to avoid circular dependency
+          // (agents.store → project.store → conversation.store).
+          const { useAgentsStore } = await import('./agents.store')
+          const agentsState = useAgentsStore.getState()
+          const sourceAgent = agentsState.agents.find((a) => a.id === activeAgentId)
+          const targetAgent = agentsState.agents.find((a) => a.id === targetAgentId)
+
+          // Sync the agents store so the UI shows the target persona active.
+          void agentsState.setActiveAgent(targetAgentId)
+
+          // Inject the delegation note as a user-role message. The content
+          // doubles as the target agent's framing; `delegationNote` metadata
+          // marks it as system-injected so the UI can render it specially.
+          const note: Message = {
+            id: `${Date.now()}-delegation-${Math.random().toString(36).slice(2, 9)}`,
+            role: 'user',
+            content: `[Delegated task from ${sourceAgent?.name ?? activeAgentId}]: ${task}`,
+            timestamp: Date.now(),
+            delegationNote: {
+              fromAgentId: activeAgentId ?? 'default',
+              fromAgentName: sourceAgent?.name,
+              task,
+              ...(reason ? { reason } : {}),
+            },
+          }
+          get().addMessage(conversationId, note)
+
+          // Stash the incremented depth on the conversation so the recursive
+          // runAgent picks it up (Conversation.delegationDepth is in-memory only).
+          set((state) => {
+            const c = state.conversations.find((x) => x.id === conversationId)
+            if (c) c.delegationDepth = delegationDepth + 1
+          })
+
+          console.info('[conversation.store] delegate_to handoff', {
+            conversationId,
+            from: activeAgentId,
+            to: targetAgentId,
+            targetName: targetAgent?.name,
+            depth: delegationDepth + 1,
+          })
+
+          // Restart with the target agent persona. agentOverrideId forces the
+          // persona even if the latest message @mentions someone else.
+          await get().runAgent(
+            conversationId,
+            providerType,
+            modelName,
+            maxTokens,
+            directoryHandle,
+            targetAgentId
+          )
+          return
+        }
+
+        // Clean exit with no delegation — clear the depth counter so the next
+        // user-initiated turn starts fresh.
+        if (delegationDepth !== 0) {
+          set((state) => {
+            const c = state.conversations.find((x) => x.id === conversationId)
+            if (c) c.delegationDepth = 0
+          })
+        }
       } catch (error) {
         // Flush streaming queues BEFORE destroy so any buffered
         // reasoning/content deltas are applied to the draft before we commit.

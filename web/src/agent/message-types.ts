@@ -126,6 +126,18 @@ export interface Message {
   assets?: AssetMeta[]
   /** AI-generated images from /image command (base64, inline display) */
   images?: GeneratedImage[]
+  /**
+   * Present only on user-role messages synthetically injected by the
+   * `delegate_to` handoff. Lets the UI render the message as a
+   * "delegation note" card (rather than a user chat bubble) and lets
+   * downstream logic distinguish it from real user input.
+   */
+  delegationNote?: {
+    fromAgentId: string
+    fromAgentName?: string
+    task: string
+    reason?: string
+  }
 }
 
 export type DraftAssistantStep =
@@ -254,6 +266,11 @@ export interface Conversation {
   compressedContextCutoffTimestamp?: number | null
   /** Assets collected during current agent run (not persisted, moved to assistant message on commit) */
   collectedAssets?: AssetMeta[]
+  /**
+   * Runtime counter for delegate_to handoffs in the current turn (not persisted).
+   * Prevents infinite A→B→A delegation loops; capped at MAX_DELEGATION_DEPTH.
+   */
+  delegationDepth?: number
 }
 
 /** Generate a unique message ID */

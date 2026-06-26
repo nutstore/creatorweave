@@ -80,23 +80,35 @@ export class IntelligenceCoordinator {
       // Non-critical
     }
 
-    // Combine all enhancements
-    let enhancedPrompt = basePrompt
+    // 3. Available agents catalog (so delegate_to knows valid target_agent_id values).
+    // Stable per project — only changes when user creates/deletes agents.
+    try {
+      const agentsBlock = await this.buildAvailableAgentsBlock(options.projectId)
+      if (agentsBlock) {
+        enhancements.push(agentsBlock)
+      }
+    } catch {
+      // Non-critical
+    }
 
-    // If agent info is available, prepend agent prompt as personality layer
-    // The base prompt (UNIVERSAL_SYSTEM_PROMPT) contains tool usage rules that must be preserved
+    // Combine: base prompt + stable enhancements (multi-root, agent catalog),
+    // then persona appended LAST. Ordering rationale:
+    //   - base prompt + tools + project block = stable across persona switches
+    //     → keeps prompt cache hot when delegate_to swaps persona
+    //   - persona varies per turn when delegation happens → must be at the tail
+    //     so its cache invalidation only affects itself, not the whole prefix
+    let enhancedPrompt = basePrompt
+    if (enhancements.length > 0) {
+      enhancedPrompt += '\n\n' + enhancements.join('\n\n')
+    }
+
     if (agentInfo) {
       const promptOptions: PromptOptions = {
         includeTodayLog: true,
         todayLog: await this.loadTodayLog(agentInfo.id, options.projectId),
       }
       const agentPrompt = buildAgentPrompt(agentInfo, promptOptions)
-      // Agent prompt goes first (personality), then base prompt (capabilities & tools)
-      enhancedPrompt = agentPrompt + '\n\n---\n\n' + basePrompt
-    }
-
-    if (enhancements.length > 0) {
-      enhancedPrompt += '\n\n' + enhancements.join('\n\n')
+      enhancedPrompt += '\n\n---\n\n' + agentPrompt
     }
 
     return {
@@ -161,6 +173,48 @@ export class IntelligenceCoordinator {
       return await project.agentManager.readTodayLog(agentId)
     } catch (error) {
       console.warn('[IntelligenceCoordinator] Failed to load today log:', error)
+      return null
+    }
+  }
+
+  /**
+   * Build a compact catalog of available agents in the current project, so the
+   * LLM knows which `target_agent_id` values are valid for `delegate_to`.
+   *
+   * Returns null if the project has no agents or only the implicit `default`
+   * (in which case delegation is pointless and we don't waste prompt tokens).
+   */
+  private async buildAvailableAgentsBlock(
+    projectId?: string | null
+  ): Promise<string | null> {
+    try {
+      const targetProjectId = projectId?.trim() || null
+      if (!targetProjectId) {
+        return null
+      }
+
+      const projectManager = await ProjectManager.create()
+      const project = await projectManager.getProject(targetProjectId)
+      if (!project) {
+        return null
+      }
+
+      const agents = await project.agentManager.listAgents()
+      // Don't bother emitting a block if there's only `default` — the LLM has
+      // nobody to delegate to, and showing the section would just be noise.
+      if (agents.length === 0) return null
+      if (agents.length === 1 && agents[0].id === 'default') return null
+
+      const lines = agents.map((a) => `- \`${a.id}\` — ${a.name}`)
+      return [
+        '## Available Agents',
+        '',
+        'You can hand off the conversation to any of these personas using `delegate_to(target_agent_id, task, reason?)`. This is a one-way handoff — the target agent takes over with full history.',
+        '',
+        ...lines,
+      ].join('\n')
+    } catch (error) {
+      console.warn('[IntelligenceCoordinator] Failed to build agents block:', error)
       return null
     }
   }
