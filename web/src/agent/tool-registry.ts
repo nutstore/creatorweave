@@ -286,11 +286,12 @@ export class ToolRegistry {
 
   /** Filter out tools disabled by feature flags (e.g. batch_spawn) */
   private filterByFeatureFlags(definitions: ToolDefinition[]): ToolDefinition[] {
-    const { enableBatchSpawn } = useSettingsStore.getState()
-    if (!enableBatchSpawn) {
-      return definitions.filter(tool => tool.function.name !== 'batch_spawn')
-    }
-    return definitions
+    const { enableBatchSpawn, enableSchedules } = useSettingsStore.getState()
+    return definitions.filter(tool => {
+      if (!enableBatchSpawn && tool.function.name === 'batch_spawn') return false
+      if (!enableSchedules && tool.function.name === 'schedule') return false
+      return true
+    })
   }
 
   /**

@@ -746,6 +746,21 @@ function BatchSpawnToggle() {
   )
 }
 
+/** Schedule feature toggle — experimental, lives under its own settings tab */
+function ScheduleToggle() {
+  const t = useT()
+  const enableSchedules = useSettingsStore((s) => s.enableSchedules)
+  const setEnableSchedules = useSettingsStore((s) => s.setEnableSchedules)
+  return (
+    <ExperimentalToggle
+      title={t('settings.scheduleToggle')}
+      description={t('settings.scheduleToggleDesc')}
+      checked={enableSchedules}
+      onChange={setEnableSchedules}
+    />
+  )
+}
+
 // =============================================================================
 // TTS Settings Panel (within Experimental tab)
 // =============================================================================
@@ -1578,6 +1593,9 @@ const SettingsDialogContent = forwardRef<
 
               {/* batch_spawn toggle */}
               <BatchSpawnToggle />
+
+              {/* Schedules toggle */}
+              <ScheduleToggle />
 
               {/* TTS toggle + voice selection */}
               <TTSSettingsPanel />

@@ -20,7 +20,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
-import { useHasApiKey } from '@/store/settings.store'
+import { useHasApiKey, useSettingsStore } from '@/store/settings.store'
 import { SettingsDialog } from '@/components/settings/SettingsDialog'
 import type { SettingsTab } from '@/components/settings/SettingsDialog'
 import { ConversationStorageBadge } from '@/components/conversation'
@@ -102,6 +102,7 @@ export function TopBar({
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
+  const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   const t = useT()
   const conversationName = activeConversationName ?? activeWorkspaceName
 
@@ -272,12 +273,14 @@ export function TopBar({
 
             <div className="h-5 w-px bg-muted" />
 
-            {/* Schedule / Timer */}
+            {/* Schedule / Timer (experimental) */}
+            {enableSchedules && (
             <ActionTooltip label={t('topbar.tooltips.schedules')}>
               <BrandButton iconButton className="shrink-0" onClick={onScheduleDrawerOpen} data-tour="schedules">
                 <Clock className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
+            )}
 
             {/* Settings */}
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>

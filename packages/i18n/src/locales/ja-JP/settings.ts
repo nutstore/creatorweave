@@ -69,6 +69,8 @@ export const settings = {
     experimentalWarningDesc: "有効にすると安定性の問題が発生する可能性があります。一部の機能はプロバイダーの同時接続能力に依存します。",
     batchSpawn: "並列サブエージェント (batch_spawn)",
     batchSpawnDesc: "AIが複数のサブタスクを並列で起動できるようにします。高い同時接続数をサポートするプロバイダーが必要です。そうでない場合、レート制限エラーが発生する可能性があります。",
+    scheduleToggle: "スケジュール (Schedules)",
+    scheduleToggleDesc: "cron 式によるスケジュールタスクを有効にします。オンにするとトップバーにスケジュールボタンが表示され、エージェントは manage_schedule ツールを使用できるようになります。",
     ttsToggle: "テキスト読み上げ (Edge TTS)",
     ttsToggleDesc: "Edge TTS による高品質なニューラル音声合成を有効にします。ブラウザ拡張機能が必要です。",
     ttsVoice: "音声",

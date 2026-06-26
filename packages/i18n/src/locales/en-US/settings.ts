@@ -68,6 +68,8 @@ export const settings = {
     experimentalWarningDesc: "Enabling them may cause stability issues. Some features depend on your provider's concurrency capacity.",
     batchSpawn: "Parallel Subagents (batch_spawn)",
     batchSpawnDesc: "Allow AI to launch multiple subtasks in parallel. Requires provider support for high concurrency, otherwise rate limit errors may occur.",
+    scheduleToggle: "Schedules",
+    scheduleToggleDesc: "Enable cron-based scheduled tasks. When enabled, a Schedules button appears in the top bar and the agent gains the manage_schedule tool.",
     ttsToggle: "Text-to-Speech (Edge TTS)",
     ttsToggleDesc: "Enable high-quality neural text-to-speech powered by Edge TTS. Requires the browser extension.",
     ttsVoice: "Voice",

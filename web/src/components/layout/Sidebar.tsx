@@ -43,6 +43,7 @@ import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
 import { useOPFSStore } from '@/store/opfs.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
+import { useSettingsStore } from '@/store/settings.store'
 import { FileTreePanel } from '@/components/file-viewer/FileTreePanel'
 import { PendingSyncPanel } from '@/components/sync/PendingSyncPanel'
 import { SnapshotList } from '@/components/sync/SnapshotList'
@@ -715,13 +716,20 @@ export const Sidebar = memo(function Sidebar({
         const status = workspaceStatusMap.get(conv.id) || 'active'
         return workspaceTab === 'active' ? status !== 'archived' : status === 'archived'
       })
-      // Sort: pinned first, then by lastAccessedAt desc (most recent first)
+      // Sort: pinned items in pin order, unpinned by lastAccessedAt desc.
+      // Pinned order is positional (from pinnedIds), so a lastAccessedAt
+      // touch during refresh cannot reorder pinned items.
+      const pinnedOrder = new Map<string, number>()
+      pinnedIds.forEach((id, index) => pinnedOrder.set(id, index))
       const pinnedSet = new Set(pinnedIds)
       return [...filtered].sort((a, b) => {
         const aPinned = pinnedSet.has(a.id)
         const bPinned = pinnedSet.has(b.id)
-        if (aPinned && !bPinned) return -1
-        if (!aPinned && bPinned) return 1
+        if (aPinned && bPinned) {
+          return (pinnedOrder.get(a.id) ?? 0) - (pinnedOrder.get(b.id) ?? 0)
+        }
+        if (aPinned) return -1
+        if (bPinned) return 1
         return (lastAccessedAtMap.get(b.id) ?? 0) - (lastAccessedAtMap.get(a.id) ?? 0)
       })
     },
@@ -734,6 +742,7 @@ export const Sidebar = memo(function Sidebar({
 
   // Schedule badges: subscribe to workspaceScheduleCount map (only re-renders when counts change)
   const workspaceScheduleCount = useScheduleStore((s) => s.workspaceScheduleCount)
+  const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   const scopedConversationIds = useMemo(() => scopedConversations.map((conv) => conv.id), [scopedConversations])
   const conversationRatio = panelSizes.conversationRatio
   const [clearConversationsDialogOpen, setClearConversationsDialogOpen] = useState(false)
@@ -988,6 +997,14 @@ export const Sidebar = memo(function Sidebar({
   // Stable callbacks for ConversationItem memoization
   const handleItemSelect = useCallback((id: string) => {
     if (pendingRenameIdRef.current === id) return
+    // Clicking the already-active workspace should still bump its
+    // lastAccessedAt so it sorts to the top of the unpinned list.
+    // onSelectWorkspace / switchWorkspace both early-return when the target
+    // is already active, so we touch the timestamp here explicitly.
+    const currentActive = useConversationContextStore.getState().activeWorkspaceId
+    if (currentActive === id) {
+      void useConversationContextStore.getState().touchActiveWorkspaceAccessTime()
+    }
     if (onSelectWorkspace) {
       onSelectWorkspace(id)
     } else {
@@ -1172,7 +1189,7 @@ export const Sidebar = memo(function Sidebar({
                   isEditing={isEditing}
                   isArchived={isArchived}
                   isPinned={isPinned}
-                  hasSchedule={(workspaceScheduleCount.get(conv.id) ?? 0) > 0}
+                  hasSchedule={enableSchedules && (workspaceScheduleCount.get(conv.id) ?? 0) > 0}
                   onSelect={handleItemSelect}
                   onStartRename={startRename}
                   onDeleteClick={handleItemDeleteClick}

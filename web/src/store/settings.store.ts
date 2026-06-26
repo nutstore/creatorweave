@@ -68,6 +68,7 @@ interface SettingsState {
   enableTTS: boolean
   autoPlayTTS: boolean
   ttsVoice: string
+  enableSchedules: boolean
 
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
@@ -109,6 +110,7 @@ interface SettingsState {
   setImageGenAspectRatio: (v: string) => void
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
+  setEnableSchedules: (v: boolean) => void
   setEnableTTS: (v: boolean) => void
   setAutoPlayTTS: (v: boolean) => void
   setTTSVoice: (voice: string) => void
@@ -206,6 +208,7 @@ export const useSettingsStore = create<SettingsState>()(
       enableTTS: false,
       autoPlayTTS: true,
       ttsVoice: 'zh-CN-XiaoxiaoNeural',
+      enableSchedules: false,
       hasApiKey: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
@@ -430,6 +433,7 @@ export const useSettingsStore = create<SettingsState>()(
       setImageGenAspectRatio: (imageGenAspectRatio) => set({ imageGenAspectRatio }),
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
+      setEnableSchedules: (enableSchedules) => set({ enableSchedules }),
       setEnableTTS: (enableTTS) => set({ enableTTS }),
       setAutoPlayTTS: (autoPlayTTS) => set({ autoPlayTTS }),
       setTTSVoice: (ttsVoice) => set({ ttsVoice }),
@@ -733,6 +737,7 @@ export const useSettingsStore = create<SettingsState>()(
         enableTTS: state.enableTTS,
         autoPlayTTS: state.autoPlayTTS,
         ttsVoice: state.ttsVoice,
+        enableSchedules: state.enableSchedules,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
         imageGenModel: state.imageGenModel,

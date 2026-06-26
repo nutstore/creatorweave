@@ -217,18 +217,31 @@ export function WorkspaceLayout({
     return cleanup
   }, [])
 
-  // Start schedule heartbeat on mount
+  // Start schedule heartbeat on mount (only when experimental feature is on)
+  const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   useEffect(() => {
-    import('@/services/schedule-heartbeat').then(({ startHeartbeat }) => {
+    if (!enableSchedules) return
+    let cancelled = false
+    import('@/services/schedule-heartbeat').then(({ startHeartbeat, stopHeartbeat }) => {
+      if (cancelled) {
+        stopHeartbeat()
+        return
+      }
       startHeartbeat()
     }).catch(err => {
       console.warn('[WorkspaceLayout] Failed to start schedule heartbeat:', err)
     })
     // Also load schedule badges for sidebar
     import('@/store/schedule.store').then(({ useScheduleStore }) => {
-      useScheduleStore.getState().refresh()
+      if (!cancelled) useScheduleStore.getState().refresh()
     }).catch(() => {})
-  }, [])
+    return () => {
+      cancelled = true
+      import('@/services/schedule-heartbeat').then(({ stopHeartbeat }) => {
+        stopHeartbeat()
+      }).catch(() => {})
+    }
+  }, [enableSchedules])
 
   // Phase 4: Load conversations on mount (independent of Sidebar rendering)
   useEffect(() => {
@@ -921,7 +934,8 @@ export function WorkspaceLayout({
       <MCPSettingsDialog open={showMcpSettings} onOpenChange={setShowMcpSettings} />
       <WebContainerPanel isOpen={isWebContainerPanelOpen} onClose={closeWebContainerPanel} />
 
-      {/* Schedule Drawer */}
+      {/* Schedule Drawer (experimental feature) */}
+      {enableSchedules && (
       <ScheduleDrawer
         workspaceId={activeConversationId ?? ''}
         open={scheduleDrawerOpen}
@@ -933,6 +947,7 @@ export function WorkspaceLayout({
           })
         }}
       />
+      )}
     </div>
   )
 }
