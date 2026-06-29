@@ -12,6 +12,8 @@ const workspaceRepoMock = vi.hoisted(() => ({
   findWorkspacesByProject: vi.fn(async () => []),
   getRealPendingCounts: vi.fn(async () => new Map()),
   findWorkspaceById: vi.fn(async () => null),
+  findActiveWorkspaceByProject: vi.fn(async () => null),
+  setActiveWorkspaceForProject: vi.fn(async () => {}),
   updateWorkspaceAccessTime: vi.fn(async () => {}),
   createWorkspace: vi.fn(async () => {}),
   upsertWorkspace: vi.fn(async () => {}),
@@ -211,6 +213,28 @@ describe('workspace.store native directory grant feedback', () => {
     // Multi-root: bindRuntimeDirectoryHandle is called with (projectId, rootName, handle)
     expect(bindRuntimeDirectoryHandleMock).toHaveBeenCalledWith('project-1', 'my-project', handle)
     expect(bindRuntimeDirectoryHandleMock).not.toHaveBeenCalledWith('ws-1', expect.anything(), handle)
+  })
+
+  it('initialize re-derives hasDirectoryHandle from the live runtime handle table', async () => {
+    // Regression: initialize() applies PENDING_RESET_PATCH which contains
+    // `hasDirectoryHandle: false`. folder-access hydration (triggered earlier
+    // by initializeProjects) may have already set it to `true` and bound a
+    // live runtime handle. initialize() must re-derive the value from the
+    // live handle table instead of clobbering it back to false.
+    const { getRuntimeHandlesForProject } = await import('@/native-fs')
+    ;(getRuntimeHandlesForProject as ReturnType<typeof vi.fn>).mockReturnValue(
+      new Map([['my-root', {} as FileSystemDirectoryHandle]])
+    )
+    useWorkspaceStore.setState({ hasDirectoryHandle: true })
+
+    await useWorkspaceStore.getState().initialize()
+
+    expect(useWorkspaceStore.getState().hasDirectoryHandle).toBe(true)
+
+    // And when no live handle exists, it must be false.
+    ;(getRuntimeHandlesForProject as ReturnType<typeof vi.fn>).mockReturnValue(new Map())
+    await useWorkspaceStore.getState().initialize()
+    expect(useWorkspaceStore.getState().hasDirectoryHandle).toBe(false)
   })
 
   it('refreshWorkspaces clears stale pendingChanges and preview state', async () => {

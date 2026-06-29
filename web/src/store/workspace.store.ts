@@ -444,8 +444,24 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               ? workspaces.find((w) => w.id === activeId)
               : undefined
 
+            // Re-derive hasDirectoryHandle from the live runtime handle table
+            // instead of inheriting the `false` from PENDING_RESET_PATCH.
+            // folder-access hydration (triggered earlier via initializeProjects
+            // -> setActiveProject -> hydrateProject) may have already bound the
+            // native handle and set this to `true`; blindly resetting it here
+            // would make the PendingSyncPanel show "未挂载本地目录" even when a
+            // directory is mounted.
+            let liveHasDirectoryHandle = false
+            try {
+              const { getRuntimeHandlesForProject } = await import('@/native-fs')
+              liveHasDirectoryHandle = getRuntimeHandlesForProject(activeProjectId).size > 0
+            } catch {
+              // keep false
+            }
+
             set({
               ...PENDING_RESET_PATCH,
+              hasDirectoryHandle: liveHasDirectoryHandle,
               workspaces,
               activeWorkspaceId: activeId,
               currentPendingCount: activePendingWs?.pendingCount || 0,
