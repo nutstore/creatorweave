@@ -275,7 +275,13 @@ export const useProjectStore = create<ProjectState>()(
           activeConversationId: null,
         })
 
-        // 2. Update project store state.
+        // 2. Update activeProjectId (keep isLoading=true until workspaces loaded).
+        //    CRITICAL: setting isLoading=false here would race with syncFromRoute
+        //    in App.tsx — the effect subscribes to isLoading, and if it sees
+        //    isLoading=false while workspaces is still empty (cleared in step 1,
+        //    not yet refilled by refreshWorkspaces in step 4), it would resolve
+        //    no target workspace and navigate to the bare project URL, stripping
+        //    :workspaceId from the URL on page refresh.
         set({
           activeProjectId: projectId,
           projects: get().projects.map((project) =>
@@ -286,7 +292,6 @@ export const useProjectStore = create<ProjectState>()(
                 }
               : project
           ),
-          isLoading: false,
         })
 
         // 3. Sync dependent stores.
@@ -299,6 +304,9 @@ export const useProjectStore = create<ProjectState>()(
         //    (syncFromRoute in App.tsx) is responsible for selecting the
         //    correct workspace based on the URL.
         await useConversationContextStore.getState().refreshWorkspaces()
+
+        // 5. Loading complete — signal syncFromRoute effect to proceed.
+        set({ isLoading: false })
 
         broadcastProjectChange({ type: 'updated', projectId })
         return true
