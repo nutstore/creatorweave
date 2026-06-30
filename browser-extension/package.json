@@ -1,6 +1,6 @@
 {
   "name": "browser-extension",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "A browser extension that provides web_search and web_fetch capabilities for in-browser Agents",
   "private": true,
   "type": "module",

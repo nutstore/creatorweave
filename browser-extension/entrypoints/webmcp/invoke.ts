@@ -12,6 +12,7 @@ import type {
   WebMCPInvokeResponse,
   WebMCPPluginDownloadPlan,
 } from './types'
+import { runWebMCPPageProbe } from './page-api'
 
 function randomTransferId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -212,90 +213,8 @@ export async function invokeWebMCPTool(
     const results = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
-      args: [toolName, request.args || {}],
-      func: async (toolNameFromArgs: string, argsFromBridge: Record<string, unknown>) => {
-        const serializeResult = (value: unknown): unknown => {
-          if (value === null || value === undefined) return value
-          if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-            return value
-          }
-          try {
-            return JSON.parse(JSON.stringify(value))
-          } catch {
-            return String(value)
-          }
-        }
-
-        try {
-          const inputJson = JSON.stringify(argsFromBridge || {})
-          const modelContext = (navigator as any)?.modelContext
-          if (
-            modelContext?.getTools &&
-            typeof modelContext.getTools === 'function' &&
-            modelContext?.executeTool &&
-            typeof modelContext.executeTool === 'function'
-          ) {
-            const tools = await modelContext.getTools()
-            const targetTool = Array.isArray(tools)
-              ? tools.find((tool: any) => tool?.name === toolNameFromArgs)
-              : null
-
-            if (!targetTool) {
-              return {
-                ok: false,
-                errorCode: 'TOOL_NOT_FOUND',
-                error: `Tool not found in tab: ${toolNameFromArgs}`,
-              }
-            }
-
-            const result = await modelContext.executeTool(targetTool, inputJson)
-            return {
-              ok: true,
-              apiMode: 'modelContext',
-              result: serializeResult(result),
-            }
-          }
-
-          const modelContextTesting = (navigator as any)?.modelContextTesting
-          if (
-            modelContextTesting?.listTools &&
-            typeof modelContextTesting.listTools === 'function' &&
-            modelContextTesting?.executeTool &&
-            typeof modelContextTesting.executeTool === 'function'
-          ) {
-            const tools = await modelContextTesting.listTools()
-            const hasTool = Array.isArray(tools)
-              ? tools.some((tool: any) => tool?.name === toolNameFromArgs)
-              : false
-            if (!hasTool) {
-              return {
-                ok: false,
-                errorCode: 'TOOL_NOT_FOUND',
-                error: `Tool not found in tab: ${toolNameFromArgs}`,
-              }
-            }
-
-            const result = await modelContextTesting.executeTool(toolNameFromArgs, inputJson)
-            return {
-              ok: true,
-              apiMode: 'modelContextTesting',
-              result: serializeResult(result),
-            }
-          }
-
-          return {
-            ok: false,
-            errorCode: 'WEBMCP_UNAVAILABLE',
-            error: 'WebMCP APIs are not available in this tab',
-          }
-        } catch (error: any) {
-          return {
-            ok: false,
-            errorCode: 'INVOKE_FAILED',
-            error: typeof error?.message === 'string' ? error.message : String(error),
-          }
-        }
-      },
+      args: [{ type: 'invoke', toolName, args: request.args || {} }],
+      func: runWebMCPPageProbe,
     })
 
     const result = (results?.[0]?.result as any) || {}
