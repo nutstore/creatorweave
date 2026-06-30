@@ -54,6 +54,12 @@ function WorkspaceRoute() {
   const projects = useProjectStore((s) => s.projects)
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
   const initialized = useProjectStore((s) => s.initialized)
+  // Subscribe to isLoading so the route-sync effect re-runs once a project
+  // switch finishes. Without this, StrictMode (dev) double-invokes the effect:
+  // the first run sets `isLoading=true` via setActiveProject and is then
+  // cancelled by cleanup; the second run sees `isLoading=true`, hits the
+  // guard, and returns — leaving the URL :workspaceId never activated.
+  const projectLoading = useProjectStore((s) => s.isLoading)
   const activeConversationTitle = useConversationStore((s) => {
     const { activeConversationId, conversations } = s
     if (!activeConversationId) return undefined
@@ -75,6 +81,10 @@ function WorkspaceRoute() {
     const _isStorageReady = useProjectStore.getState().initialized
     const _projectLoading = useProjectStore.getState().isLoading
     if (!_isStorageReady || _projectLoading) return
+    // Note: projectLoading is in deps so the effect re-runs when a project
+    // switch (set isLoading true→false) completes. The guard above returns
+    // early while loading is in flight; this subscription is what wakes us
+    // back up.
 
     let cancelled = false
 
@@ -205,7 +215,7 @@ function WorkspaceRoute() {
     return () => {
       cancelled = true
     }
-  }, [projectId, workspaceId, setActiveProject, navigate, t, initialized])
+  }, [projectId, workspaceId, setActiveProject, navigate, t, initialized, projectLoading])
 
   return (
     <WorkspaceLayout
