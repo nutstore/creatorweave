@@ -1320,6 +1320,15 @@ export class WorkspaceRuntime {
     for (const [rootName, rootPaths] of pathsByRoot) {
       const handle = rootHandles.get(rootName)
       if (!handle) {
+        // Defensive: a path was routed to rootName but no native handle is
+        // bound for it. This usually means the SQLite `project_roots` table
+        // has a row with no matching FileSystemDirectoryHandle (handle revoked,
+        // never granted, or data drift). Log loudly instead of silently
+        // skipping — silent skips cause files to never reach disk.
+        console.warn(
+          `[syncToDiskMultiRoot] No native handle for root "${rootName}" — skipping ${rootPaths.length} path(s):`,
+          rootPaths.length > 5 ? rootPaths.slice(0, 5).concat(['...']) : rootPaths
+        )
         aggregated.skipped += rootPaths.length
         continue
       }

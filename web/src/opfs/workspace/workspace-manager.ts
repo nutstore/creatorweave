@@ -433,6 +433,30 @@ export class WorkspaceManager {
   }
 
   /**
+   * Invalidate the cached root map (`_rootMap`) on every instantiated
+   * WorkspaceRuntime whose project matches `projectId`.
+   *
+   * WHY: `resolvePath()` caches the SQLite `project_roots` result in
+   * `_rootMap` (keyed by projectId). When the SQLite table is repaired at
+   * runtime (e.g. by `reconcileProjectRoots` self-healing missing rows),
+   * already-cached runtimes keep serving the stale map → `resolvePath`
+   * keeps falling back to the wrong default root, routing file syncs to the
+   * wrong disk location.
+   *
+   * Call this after mutating `project_roots` so the next `resolvePath()`
+   * lazily rebuilds the map from the repaired SQLite table.
+   */
+  invalidateRootMapCache(projectId?: string): void {
+    for (const record of this.index) {
+      if (projectId && record.projectId !== projectId) continue
+      const runtime = this.workspaces.get(record.workspaceId)
+      if (runtime) {
+        runtime.invalidateRootCache()
+      }
+    }
+  }
+
+  /**
    * Get statistics for all indexed workspaces.
    */
   async getAllStats(): Promise<

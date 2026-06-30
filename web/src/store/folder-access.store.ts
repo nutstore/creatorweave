@@ -56,6 +56,69 @@ async function notifyWorkspaceNativeDirectoryGranted(handle: FileSystemDirectory
 }
 
 /**
+ * Reconcile the SQLite `project_roots` table with the folder handles that exist
+ * in IndexedDB (folderAccessRepo) and/or are bound in the runtime handle map.
+ *
+ * WHY: `resolvePath()` / `ensureRootMap()` / `syncToDiskMultiRoot()` rely on the
+ * SQLite `project_roots` table to route multi-root paths. If a root is present
+ * in IndexedDB (handle persisted) but missing from SQLite (e.g. SQLite was reset
+ * during schema migration, or a root was bound via `bindRuntimeDirectoryHandle`
+ * without a corresponding `createRoot`), `resolvePath` falls back to the default
+ * root, causing files to be synced to the WRONG disk location (root prefix not
+ * stripped) or silently skipped.
+ *
+ * This is called on hydrate / loadRoots to self-heal the SQLite table so that
+ * every persisted handle has a matching `project_roots` row.
+ */
+async function reconcileProjectRoots(projectId: string): Promise<void> {
+  try {
+    const rootRepo = getProjectRootRepository()
+    const dbRoots = await rootRepo.findByProject(projectId)
+    const dbRootNames = new Set(dbRoots.map((r) => r.name))
+
+    // Collect root names from ALL persistence sources
+    const rootNamesToEnsure = new Set<string>()
+
+    // Source 1: runtime handle map (bound via bindRuntimeDirectoryHandle)
+    const runtimeHandles = getRuntimeHandlesForProject(projectId)
+    for (const name of runtimeHandles.keys()) {
+      rootNamesToEnsure.add(name)
+    }
+
+    // Source 2: IndexedDB folderAccessRepo (persisted across refreshes)
+    const persistedRecords = await folderAccessRepo.loadAllForProject(projectId)
+    for (const rec of persistedRecords) {
+      const name = rec.rootName ?? rec.folderName
+      if (name) rootNamesToEnsure.add(name)
+    }
+
+    let created = 0
+    for (const name of rootNamesToEnsure) {
+      if (!dbRootNames.has(name)) {
+        await rootRepo.createRoot({ projectId, name })
+        created++
+        console.warn(
+          `[FolderAccessStore] reconcileProjectRoots: created missing project_roots row "${name}" for project ${projectId} (data drift between IndexedDB and SQLite detected, self-healed)`
+        )
+      }
+    }
+
+    // Invalidate workspace-runtime root map cache so the next resolvePath()
+    // picks up the repaired table instead of a stale cached map.
+    if (created > 0) {
+      try {
+        const { getWorkspaceManager } = await import('@/opfs')
+        ;(await getWorkspaceManager()).invalidateRootMapCache(projectId)
+      } catch {
+        /* manager not ready yet — resolvePath will lazily rebuild */
+      }
+    }
+  } catch (error) {
+    console.warn('[FolderAccessStore] reconcileProjectRoots failed:', error)
+  }
+}
+
+/**
  * Module-level dedup: prevents concurrent ensureFilePaths for the same project
  */
 const _filePathPromises: Map<string, Promise<string[]>> = new Map()
@@ -182,6 +245,12 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
             const rootName = existing.rootName ?? handle.name ?? projectId
             bindRuntimeDirectoryHandle(projectId, rootName, handle)
             await notifyWorkspaceNativeDirectoryGranted(handle)
+            // Self-heal: ensure the SQLite `project_roots` table has a row for
+            // this root. IndexedDB (folderAccessRepo) and SQLite can drift
+            // apart after schema migrations / DB resets, leaving a handle
+            // bound in memory but unresolvable by resolvePath() → sync-to-disk
+            // routes to the wrong root. reconcileProjectRoots is idempotent.
+            await reconcileProjectRoots(projectId)
             console.log('[FolderAccessStore] Permission granted, handle ready:', handle.name)
           } else if (permission === 'prompt') {
             // Needs user activation -> needs_user_activation
@@ -653,6 +722,11 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         return
       }
 
+      // Self-heal SQLite `project_roots` before reading: IndexedDB handles and
+      // the SQLite table can drift (e.g. after a DB reset / migration), which
+      // makes resolvePath() fall back to the wrong root on sync-to-disk.
+      await reconcileProjectRoots(projectId)
+
       // Load from SQLite
       const dbRoots: ProjectRoot[] = await getProjectRootRepository().findByProject(projectId)
 
@@ -746,8 +820,21 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
         return false
       }
 
-      // Create root in SQLite
-      await getProjectRootRepository().createRoot({ projectId, name: rootName })
+      // Create root in SQLite FIRST. If this throws (e.g. UNIQUE constraint,
+      // DB error), we bail before binding the handle or persisting to
+      // IndexedDB — avoiding orphaned handles with no project_roots row
+      // (the exact drift class that breaks syncToDiskMultiRoot routing).
+      try {
+        await getProjectRootRepository().createRoot({ projectId, name: rootName })
+      } catch (createError) {
+        console.error('[FolderAccessStore] addRoot: createRoot failed, aborting before handle bind:', createError)
+        toast.error(`Failed to add root "${rootName}": ${createError instanceof Error ? createError.message : 'database error'}`)
+        return false
+      }
+
+      // SQLite row committed — now bind runtime handle and persist to IndexedDB.
+      // If either of these fails we log but keep going: the SQLite row exists,
+      // and the handle can be re-granted via loadRoots()/needs_user_activation.
 
       // Bind handle to runtime
       bindRuntimeDirectoryHandle(projectId, rootName, handle)

@@ -300,6 +300,26 @@ class FolderAccessRepository {
   }
 
   /**
+   * Load ALL records for a project (multi-root support).
+   * Returns every FolderAccessRecord whose projectId matches.
+   */
+  async loadAllForProject(projectId: string): Promise<FolderAccessRecord[]> {
+    const db = await this.ensureDB()
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const request = store.getAll()
+      request.onsuccess = () => {
+        const results = request.result as any[]
+        const matches = results.filter((r) => r.projectId === projectId)
+        resolve(matches.map((r) => this.toRecord(r)))
+      }
+      request.onerror = () => reject(request.error)
+    })
+  }
+
+  /**
    * 按 projectId + rootName 删除记录（多 root 支持）
    */
   async deleteByProjectAndRoot(projectId: string, rootName: string): Promise<void> {
