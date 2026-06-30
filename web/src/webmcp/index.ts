@@ -16,10 +16,12 @@ export { detectWebMCPBrowserSupport } from './browser-support'
 export type {
   WebMCPApiMode,
   WebMCPDiscoveredTool,
+  WebMCPDiscoveredToolInstance,
   WebMCPDiscoverResponse,
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
   WebMCPHostCatalog,
+  WebMCPRegisteredTool,
   WebMCPToolGroupCatalog,
   WebMCPTabInstance,
   WebMCPBridge,

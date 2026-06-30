@@ -19,6 +19,8 @@ export interface WebMCPDiscoveredTool {
   apiMode: WebMCPApiMode
 }
 
+export type WebMCPDiscoveredToolInstance = WebMCPDiscoveredTool
+
 export interface WebMCPDiscoverResponse {
   ok: boolean
   tools: WebMCPDiscoveredTool[]
@@ -98,12 +100,31 @@ export interface WebMCPTabInstance {
   lastSeenAt: number
 }
 
+export interface WebMCPRegisteredTool {
+  name: string
+  description: string
+  inputSchema: Record<string, unknown>
+  annotations?: {
+    readOnlyHint?: boolean
+    untrustedContentHint?: boolean
+  }
+  hostname: string
+  groupKey: string
+  toolsetSignature: string
+  fullName: string
+  apiMode: WebMCPApiMode
+  representativeTabId: number
+  representativeTabTitle?: string
+  representativeTabUrl?: string
+  discoveredAt: number
+}
+
 export interface WebMCPToolGroupCatalog {
   groupKey: string
   hostname: string
   toolsetSignature: string
   displayName: string
-  tools: WebMCPDiscoveredTool[]
+  registeredTools: WebMCPRegisteredTool[]
   tabs: WebMCPTabInstance[]
   lastDiscoveredAt: number
 }

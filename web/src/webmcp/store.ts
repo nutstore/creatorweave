@@ -1,10 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { buildHostCatalog } from './catalog-normalizer'
 import type {
   WebMCPDiscoveredTool,
   WebMCPHostCatalog,
+  WebMCPRegisteredTool,
   WebMCPToolGroupCatalog,
-  WebMCPTabInstance,
 } from './types'
 
 type ToolRouteMap = Record<string, number>
@@ -13,6 +14,7 @@ interface WebMCPState {
   enabledByHost: Record<string, boolean>
   enabledByGroup: Record<string, boolean>
   catalogByHost: Record<string, WebMCPHostCatalog>
+  discoveredTools: WebMCPDiscoveredTool[]
   preferredTabByGroup: Record<string, number>
   preferredTabByTool: ToolRouteMap
   lastScanAt: number | null
@@ -21,10 +23,10 @@ interface WebMCPState {
   setGroupEnabled: (groupKey: string, enabled: boolean) => void
   isHostEnabled: (hostname: string) => boolean
   isGroupEnabled: (groupKey: string) => boolean
-  setCatalog: (tools: WebMCPDiscoveredTool[], scannedAt: number) => void
+  setDiscoveredTools: (tools: WebMCPDiscoveredTool[], scannedAt: number) => void
   clearCatalog: () => void
-  getAllTools: () => WebMCPDiscoveredTool[]
-  getEnabledTools: () => WebMCPDiscoveredTool[]
+  getAllTools: () => WebMCPRegisteredTool[]
+  getEnabledTools: () => WebMCPRegisteredTool[]
   getEnabledGroups: () => WebMCPToolGroupCatalog[]
   getGroupByKey: (groupKey: string) => WebMCPToolGroupCatalog | undefined
   getPreferredTabIdForGroup: (groupKey: string) => number | undefined
@@ -36,93 +38,14 @@ function buildToolRouteKey(groupKey: string, fullName: string): string {
   return `${groupKey}__${fullName}`
 }
 
-function createDisplayName(index: number): string {
-  return `Tool Group ${index}`
-}
-
-function buildTabs(tools: WebMCPDiscoveredTool[]): WebMCPTabInstance[] {
-  const tabs = new Map<number, WebMCPTabInstance>()
-  for (const tool of tools) {
-    const existing = tabs.get(tool.tabId)
-    if (existing) {
-      existing.lastSeenAt = Math.max(existing.lastSeenAt, tool.discoveredAt)
-      if (!existing.title && tool.tabTitle) existing.title = tool.tabTitle
-      if (!existing.url && tool.tabUrl) existing.url = tool.tabUrl
-      continue
-    }
-    tabs.set(tool.tabId, {
-      tabId: tool.tabId,
-      title: tool.tabTitle || '',
-      url: tool.tabUrl || '',
-      lastSeenAt: tool.discoveredAt,
-    })
-  }
-  return Array.from(tabs.values()).sort((a, b) => b.lastSeenAt - a.lastSeenAt)
-}
-
-function groupByHost(tools: WebMCPDiscoveredTool[]): Record<string, WebMCPHostCatalog> {
-  const hostMap = new Map<
-    string,
-    {
-      hostname: string
-      lastDiscoveredAt: number
-      groups: Map<string, WebMCPToolGroupCatalog>
-    }
-  >()
-
-  for (const tool of tools) {
-    let hostEntry = hostMap.get(tool.hostname)
-    if (!hostEntry) {
-      hostEntry = {
-        hostname: tool.hostname,
-        lastDiscoveredAt: tool.discoveredAt,
-        groups: new Map<string, WebMCPToolGroupCatalog>(),
-      }
-      hostMap.set(tool.hostname, hostEntry)
-    }
-
-    hostEntry.lastDiscoveredAt = Math.max(hostEntry.lastDiscoveredAt, tool.discoveredAt)
-
-    let groupEntry = hostEntry.groups.get(tool.groupKey)
-    if (!groupEntry) {
-      groupEntry = {
-        groupKey: tool.groupKey,
-        hostname: tool.hostname,
-        toolsetSignature: tool.toolsetSignature,
-        displayName: '',
-        tools: [],
-        tabs: [],
-        lastDiscoveredAt: tool.discoveredAt,
-      }
-      hostEntry.groups.set(tool.groupKey, groupEntry)
-    }
-
-    groupEntry.lastDiscoveredAt = Math.max(groupEntry.lastDiscoveredAt, tool.discoveredAt)
-    groupEntry.tools.push(tool)
-  }
-
-  const result: Record<string, WebMCPHostCatalog> = {}
-  for (const [hostname, hostEntry] of hostMap) {
-    const groups = Array.from(hostEntry.groups.values())
-      .map((group) => ({
-        ...group,
-        tools: group.tools.sort((a, b) => a.fullName.localeCompare(b.fullName)),
-        tabs: buildTabs(group.tools),
-      }))
-      .sort((a, b) => b.lastDiscoveredAt - a.lastDiscoveredAt)
-      .map((group, index) => ({
-        ...group,
-        displayName: createDisplayName(index + 1),
-      }))
-
-    result[hostname] = {
-      hostname,
-      groups,
-      lastDiscoveredAt: hostEntry.lastDiscoveredAt,
-    }
-  }
-
-  return result
+function rebuildCatalog(state: Pick<
+  WebMCPState,
+  'discoveredTools' | 'preferredTabByGroup' | 'preferredTabByTool'
+>): Record<string, WebMCPHostCatalog> {
+  return buildHostCatalog(state.discoveredTools, {
+    preferredTabByGroup: state.preferredTabByGroup,
+    preferredTabByTool: state.preferredTabByTool,
+  })
 }
 
 export const useWebMCPStore = create<WebMCPState>()(
@@ -131,6 +54,7 @@ export const useWebMCPStore = create<WebMCPState>()(
       enabledByHost: {},
       enabledByGroup: {},
       catalogByHost: {},
+      discoveredTools: [],
       preferredTabByGroup: {},
       preferredTabByTool: {},
       lastScanAt: null,
@@ -165,16 +89,27 @@ export const useWebMCPStore = create<WebMCPState>()(
         return value !== false
       },
 
-      setCatalog: (tools, scannedAt) => {
-        set({
-          catalogByHost: groupByHost(tools),
+      setDiscoveredTools: (tools, scannedAt) => {
+        set((state) => ({
+          discoveredTools: tools,
+          catalogByHost: buildHostCatalog(tools, {
+            preferredTabByGroup: state.preferredTabByGroup,
+            preferredTabByTool: state.preferredTabByTool,
+          }),
           lastScanAt: scannedAt,
-        })
+        }))
       },
 
-      clearCatalog: () => set({ catalogByHost: {}, lastScanAt: null }),
+      clearCatalog: () => set({
+        catalogByHost: {},
+        discoveredTools: [],
+        lastScanAt: null,
+      }),
 
-      getAllTools: () => Object.values(get().catalogByHost).flatMap((host) => host.groups.flatMap((group) => group.tools)),
+      getAllTools: () =>
+        Object.values(get().catalogByHost).flatMap((host) =>
+          host.groups.flatMap((group) => group.registeredTools),
+        ),
 
       getEnabledGroups: () => {
         const state = get()
@@ -183,7 +118,7 @@ export const useWebMCPStore = create<WebMCPState>()(
           .flatMap((host) => host.groups.filter((group) => state.isGroupEnabled(group.groupKey)))
       },
 
-      getEnabledTools: () => get().getEnabledGroups().flatMap((group) => group.tools),
+      getEnabledTools: () => get().getEnabledGroups().flatMap((group) => group.registeredTools),
 
       getGroupByKey: (groupKey) => {
         const state = get()
@@ -212,10 +147,21 @@ export const useWebMCPStore = create<WebMCPState>()(
 
       recordToolInvocation: (groupKey, fullName, tabId) => {
         const routeKey = buildToolRouteKey(groupKey, fullName)
-        set((state) => ({
-          preferredTabByGroup: { ...state.preferredTabByGroup, [groupKey]: tabId },
-          preferredTabByTool: { ...state.preferredTabByTool, [routeKey]: tabId },
-        }))
+        set((state) => {
+          const nextState = {
+            preferredTabByGroup: { ...state.preferredTabByGroup, [groupKey]: tabId },
+            preferredTabByTool: { ...state.preferredTabByTool, [routeKey]: tabId },
+          }
+
+          return {
+            ...nextState,
+            catalogByHost: rebuildCatalog({
+              discoveredTools: state.discoveredTools,
+              preferredTabByGroup: nextState.preferredTabByGroup,
+              preferredTabByTool: nextState.preferredTabByTool,
+            }),
+          }
+        })
       },
     }),
     {

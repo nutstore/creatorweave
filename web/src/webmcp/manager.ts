@@ -1,35 +1,17 @@
 import { getWebMCPBridge } from './bridge-client'
+import { dedupeDiscoveredInstances } from './catalog-normalizer'
 import { useWebMCPStore } from './store'
-import type { WebMCPDiscoveredTool } from './types'
+import type { WebMCPRegisteredTool } from './types'
 import { useSettingsStore } from '@/store/settings.store'
 
 const DISCOVERY_TTL_MS = 8000
 
 let lastDiscoveryAt = 0
-let discoveryInFlight: Promise<WebMCPDiscoveredTool[]> | null = null
+let discoveryInFlight: Promise<WebMCPRegisteredTool[]> | null = null
 
 function isExtensionContextInvalidatedError(error: unknown): boolean {
   if (typeof error !== 'string') return false
   return error.toLowerCase().includes('extension context invalidated')
-}
-
-function dedupeTools(tools: WebMCPDiscoveredTool[]): WebMCPDiscoveredTool[] {
-  const deduped = new Map<string, WebMCPDiscoveredTool>()
-
-  for (const tool of tools) {
-    const key = `${tool.groupKey}__${tool.fullName}__${tool.tabId}`
-    const existing = deduped.get(key)
-    if (!existing) {
-      deduped.set(key, tool)
-      continue
-    }
-
-    if (tool.discoveredAt > existing.discoveredAt) {
-      deduped.set(key, tool)
-    }
-  }
-
-  return Array.from(deduped.values()).sort((a, b) => a.fullName.localeCompare(b.fullName))
 }
 
 /**
@@ -37,7 +19,7 @@ function dedupeTools(tools: WebMCPDiscoveredTool[]): WebMCPDiscoveredTool[] {
  * This is called by the agent loop to keep the catalog fresh.
  * Tool registration is handled by the unified external-tool bridge (search_tools/call_tool).
  */
-async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredTool[]> {
+async function discoverAndCacheTools(force = false): Promise<WebMCPRegisteredTool[]> {
   const now = Date.now()
   const store = useWebMCPStore.getState()
   const cached = store.getAllTools()
@@ -66,10 +48,12 @@ async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredToo
       return useWebMCPStore.getState().getAllTools()
     }
 
-    const tools = dedupeTools(response.tools || [])
-    useWebMCPStore.getState().setCatalog(tools, response.discoveredAt || Date.now())
+    const tools = dedupeDiscoveredInstances(response.tools || []).sort((a, b) =>
+      a.fullName.localeCompare(b.fullName),
+    )
+    useWebMCPStore.getState().setDiscoveredTools(tools, response.discoveredAt || Date.now())
     lastDiscoveryAt = Date.now()
-    return tools
+    return useWebMCPStore.getState().getAllTools()
   })().finally(() => {
     discoveryInFlight = null
   })
@@ -78,7 +62,7 @@ async function discoverAndCacheTools(force = false): Promise<WebMCPDiscoveredToo
 }
 
 /** Discover and cache WebMCP tools without registering any tools. */
-export async function discoverWebMCPCatalog(force = false): Promise<WebMCPDiscoveredTool[]> {
+export async function discoverWebMCPCatalog(force = false): Promise<WebMCPRegisteredTool[]> {
   if (!useSettingsStore.getState().enableWebMCP) {
     useWebMCPStore.getState().clearCatalog()
     return []
@@ -87,7 +71,7 @@ export async function discoverWebMCPCatalog(force = false): Promise<WebMCPDiscov
 }
 
 /** Refresh WebMCP catalog (force re-discovery). */
-export async function refreshWebMCPCatalog(): Promise<WebMCPDiscoveredTool[]> {
+export async function refreshWebMCPCatalog(): Promise<WebMCPRegisteredTool[]> {
   return discoverWebMCPCatalog(true)
 }
 

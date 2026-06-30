@@ -56,7 +56,7 @@ export function WebMCPHostList({
       )}
       {hosts.map((host) => {
         const checked = enabledByHost[host.hostname] !== false
-        const totalTools = host.groups.reduce((sum, group) => sum + group.tools.length, 0)
+        const totalTools = host.groups.reduce((sum, group) => sum + group.registeredTools.length, 0)
         const totalTabs = host.groups.reduce((sum, group) => sum + group.tabs.length, 0)
         return (
           <div
@@ -103,7 +103,7 @@ export function WebMCPHostList({
                         </div>
                         <p className="mt-1 text-xs text-tertiary">
                           {t('settings.webMCPGroupSummary')
-                            .replace('{tools}', String(group.tools.length))
+                            .replace('{tools}', String(group.registeredTools.length))
                             .replace('{tabs}', String(group.tabs.length))}
                         </p>
                       </div>
@@ -115,11 +115,11 @@ export function WebMCPHostList({
                     </div>
 
                     <div className="mt-2 rounded bg-white/80 px-2 py-1.5 text-[11px] text-tertiary dark:bg-neutral-950/40">
-                      {group.tools
+                      {group.registeredTools
                         .slice(0, 5)
                         .map((tool) => tool.name)
                         .join(' · ')}
-                      {group.tools.length > 5 ? ` +${group.tools.length - 5}` : ''}
+                      {group.registeredTools.length > 5 ? ` +${group.registeredTools.length - 5}` : ''}
                     </div>
 
                     {group.tabs.length > 0 && (
