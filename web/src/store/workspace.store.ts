@@ -93,6 +93,28 @@ export const PENDING_RESET_PATCH: Partial<WorkspaceState> = {
   error: null,
 }
 
+/**
+ * Derive `hasDirectoryHandle` from the live in-memory runtime handle table.
+ *
+ * `PENDING_RESET_PATCH` hard-codes `hasDirectoryHandle: false`. Any store
+ * reset that spreads `...PENDING_RESET_PATCH` will clobber the field to false
+ * unless it is explicitly re-derived afterwards. This helper centralizes the
+ * re-derivation so every reset site (initialize early-return, initialize
+ * catch, switchWorkspace reset) stays consistent with the already-mounted
+ * native directory.
+ *
+ * Returns false on error so callers can safely use it as a fallback.
+ */
+async function deriveLiveHasDirectoryHandle(activeProjectId: string | null): Promise<boolean> {
+  if (!activeProjectId) return false
+  try {
+    const { getRuntimeHandlesForProject } = await import('@/native-fs')
+    return getRuntimeHandlesForProject(activeProjectId).size > 0
+  } catch {
+    return false
+  }
+}
+
 // De-duplicate concurrent pending-change scans across UI/tool triggers.
 let refreshPendingChangesInFlight: Promise<void> | null = null
 let refreshPendingChangesNeedsRerun = false
@@ -444,13 +466,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             // native handle and set this to `true`; blindly resetting it here
             // would make the PendingSyncPanel show "未挂载本地目录" even when a
             // directory is mounted.
-            let liveHasDirectoryHandle = false
-            try {
-              const { getRuntimeHandlesForProject } = await import('@/native-fs')
-              liveHasDirectoryHandle = getRuntimeHandlesForProject(activeProjectId).size > 0
-            } catch {
-              // keep false
-            }
+            const liveHasDirectoryHandle = await deriveLiveHasDirectoryHandle(activeProjectId)
 
             set({
               ...PENDING_RESET_PATCH,
@@ -470,8 +486,16 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             )
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to initialize workspaces'
+            // Re-derive hasDirectoryHandle so a transient error (e.g.
+            // resolveActiveProjectId timing) does not clobber the already-
+            // mounted native directory and make the PendingSyncPanel show
+            // "未挂载本地目录" after a successful approval sync.
+            const liveHandle = await deriveLiveHasDirectoryHandle(
+              await resolveActiveProjectId().catch(() => null),
+            )
             set({
               ...PENDING_RESET_PATCH,
+              hasDirectoryHandle: liveHandle,
               error: message,
               isLoading: false,
               initialized: true,

@@ -524,6 +524,24 @@ export function PendingSyncPanel() {
       <div className="flex flex-col h-full">
         <SidebarPanelHeader title={t('settings.pendingSyncPanel.title')} />
 
+        {/* Success Toast Notification (also shown in empty state so the
+            user sees confirmation right after a successful approval sync,
+            instead of a cold empty panel). */}
+        {showSyncSuccess && (
+          <div className="mx-3 mt-2 px-3 py-2 bg-success/20 text-success text-sm rounded-lg flex items-center gap-2 animate-fade-in-down">
+            <Check className="w-4 h-4" />
+            {t('settings.pendingSyncPanel.reviewSuccess')}
+          </div>
+        )}
+
+        {/* Error Toast Notification */}
+        {syncError && (
+          <div className="mx-3 mt-2 px-3 py-2 bg-danger/20 text-danger text-sm rounded-lg flex items-center gap-2 animate-fade-in-down">
+            <AlertTriangle className="w-4 h-4" />
+            {syncError}
+          </div>
+        )}
+
         {/* Empty State */}
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
