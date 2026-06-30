@@ -81,10 +81,17 @@ function WorkspaceRoute() {
     const syncFromRoute = async () => {
       const _projects = useProjectStore.getState().projects
       const _activeProjectId = useProjectStore.getState().activeProjectId
+      console.log('[syncFromRoute] enter', {
+        projectId,
+        workspaceId,
+        activeProjectId: _activeProjectId,
+        projectsCount: _projects.length,
+      })
 
       // Step 1: Validate project exists
       const projectExists = _projects.some((project) => project.id === projectId)
       if (!projectExists) {
+        console.warn('[syncFromRoute] project not found, redirecting to /projects', { projectId })
         toast.error(t('app.projectNotFound'))
         navigate('/projects', { replace: true })
         return
@@ -92,8 +99,10 @@ function WorkspaceRoute() {
 
       // Step 2: Switch project if needed (this clears workspace state & loads new list)
       if (_activeProjectId !== projectId) {
+        console.log('[syncFromRoute] switching project', { from: _activeProjectId, to: projectId })
         const switched = await setActiveProject(projectId)
         if (!switched) {
+          console.warn('[syncFromRoute] setActiveProject returned false')
           if (!cancelled) {
             toast.error(t('app.switchProjectFailed'))
             navigate('/projects', { replace: true })
@@ -108,6 +117,12 @@ function WorkspaceRoute() {
       const workspaces = useConversationContextStore.getState().workspaces
       const scopedWorkspaceIds = workspaces.map((w) => w.id)
       const activeWorkspaceId = useConversationContextStore.getState().activeWorkspaceId
+      console.log('[syncFromRoute] step3 workspaces loaded', {
+        count: workspaces.length,
+        scopedIds: scopedWorkspaceIds,
+        activeWorkspaceId,
+        hasTargetInScope: workspaceId ? scopedWorkspaceIds.includes(workspaceId) : null,
+      })
 
       // Resolve target workspace ID:
       // - If URL specifies one, use it (if valid)
@@ -138,6 +153,9 @@ function WorkspaceRoute() {
 
       // No workspace available — redirect to bare project URL
       if (!targetWorkspaceId) {
+        console.warn('[syncFromRoute] no targetWorkspaceId — redirecting to bare project URL', {
+          requestedWorkspaceId: workspaceId,
+        })
         if (!workspaceId) {
           // Already on bare project URL, nothing more to do
           return
@@ -148,6 +166,7 @@ function WorkspaceRoute() {
 
       // Step 4: Update URL to include the resolved workspace (replace, not push)
       if (targetWorkspaceId !== workspaceId) {
+        console.log('[syncFromRoute] replacing URL workspace', { from: workspaceId, to: targetWorkspaceId })
         const desiredPath = `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(targetWorkspaceId)}`
         navigate(desiredPath, { replace: true })
       }
@@ -170,9 +189,15 @@ function WorkspaceRoute() {
 
       // Step 6: Activate conversation (loads messages, no workspace side-effects)
       const activeConversationId = useConversationStore.getState().activeConversationId
+      console.log('[syncFromRoute] step6 activate conversation', {
+        targetWorkspaceId,
+        activeConversationId,
+        willCall: activeConversationId !== targetWorkspaceId,
+      })
       if (activeConversationId !== targetWorkspaceId) {
         await useConversationStore.getState().setActive(targetWorkspaceId)
       }
+      console.log('[syncFromRoute] done', { targetWorkspaceId })
     }
 
     void syncFromRoute()
