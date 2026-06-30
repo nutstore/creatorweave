@@ -22,7 +22,7 @@ import {
   requestDirectoryAccess,
   releaseDirectoryHandle,
   bindRuntimeDirectoryHandle,
-  getRuntimeDirectoryHandle,
+  getRuntimeHandlesForProject,
 } from '@/native-fs'
 import { getToolRegistry } from '@/agent/tool-registry'
 import { toast } from 'sonner'
@@ -626,10 +626,20 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const manager = await getWorkspaceManager()
             __swT1 = performance.now()
             const refreshForWorkspace = async () => {
-              // Multi-root: try default root handle first, then any handle
-              const projectHandle = getRuntimeDirectoryHandle(activeProjectId)
-              if (projectHandle) {
-                await get().onNativeDirectoryGranted(projectHandle)
+              // Multi-root: pick any available handle for this project.
+              // Previously this called getRuntimeDirectoryHandle(projectId)
+              // without a rootName, which falls back to the synthetic key
+              // (projectId, projectId). But hydrateProject binds handles
+              // under (projectId, handle.name), so the lookup returned null
+              // for any folder whose name isn't the projectId — i.e. almost
+              // every real folder. The result: after a page refresh,
+              // switchWorkspace reset hasDirectoryHandle to false (via
+              // PENDING_RESET_PATCH) and never restored it, leaving the
+              // PendingSyncPanel showing "未挂载本地目录".
+              const allHandles = getRuntimeHandlesForProject(activeProjectId)
+              const anyHandle = allHandles.values().next().value ?? null
+              if (anyHandle) {
+                await get().onNativeDirectoryGranted(anyHandle)
               } else {
                 await get().refreshPendingChanges(true)
               }

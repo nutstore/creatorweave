@@ -5,6 +5,7 @@ const getWorkspaceMock = vi.hoisted(() => vi.fn())
 const getWorkspaceManagerMock = vi.hoisted(() => vi.fn())
 const bindRuntimeDirectoryHandleMock = vi.hoisted(() => vi.fn())
 const getRuntimeDirectoryHandleMock = vi.hoisted(() => vi.fn())
+const getRuntimeHandlesForProjectMock = vi.hoisted(() => vi.fn((_id: string) => new Map()))
 const requestDirectoryAccessMock = vi.hoisted(() => vi.fn())
 const conversationSetActiveMock = vi.hoisted(() => vi.fn(async () => {}))
 const toastInfoMock = vi.hoisted(() => vi.fn())
@@ -32,7 +33,7 @@ vi.mock('@/native-fs', () => ({
   releaseDirectoryHandle: vi.fn(),
   bindRuntimeDirectoryHandle: bindRuntimeDirectoryHandleMock,
   getRuntimeDirectoryHandle: getRuntimeDirectoryHandleMock,
-  getRuntimeHandlesForProject: vi.fn(() => new Map()),
+  getRuntimeHandlesForProject: getRuntimeHandlesForProjectMock,
 }))
 
 vi.mock('@/sqlite/repositories/workspace.repository', () => ({
@@ -158,8 +159,13 @@ describe('workspace.store native directory grant feedback', () => {
 
   it('switchWorkspace reuses project native handle and triggers migration rebind', async () => {
     const projectHandle = {} as FileSystemDirectoryHandle
-    getRuntimeDirectoryHandleMock.mockImplementation((id: string) =>
-      id === 'project-1' ? projectHandle : null
+    // Multi-root: switchWorkspace picks any handle bound for the project
+    // (folder-access.store binds under handle.name, not projectId), so the
+    // single-root getRuntimeDirectoryHandle lookup is not used here.
+    getRuntimeHandlesForProjectMock.mockImplementation((id: string) =>
+      id === 'project-1'
+        ? new Map([['my-root', projectHandle]])
+        : new Map()
     )
     rebindMock.mockResolvedValue({
       checked: 2,
