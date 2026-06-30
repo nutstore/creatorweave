@@ -399,16 +399,45 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     // Resolve native FS handle (disk files)
     // Use allowMissing so we can distinguish "directory does not exist" from other errors
     const nativeResult = await scope.resolveHandle(scope.subPath, { allowMissing: true })
+
+    // When the directory is missing from native FS, fall back to OPFS before
+    // declaring it not-found. A directory may exist only in OPFS (agent writes,
+    // Python-created, pending changes) while the native disk has no such entry.
+    // The OPFS merge step below only adds extra *files* inside an existing native
+    // directory; it cannot recover a directory that is itself OPFS-only.
     if (!nativeResult.exists && scope.subPath) {
-      // Build the full display path (include rootName for multi-root)
-      const rootName = 'rootName' in scope ? scope.rootName : undefined
-      const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
-      return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
-        hint: 'Check the path for typos, or use ls() without arguments to list available roots and directories.',
-        details: { requested_path: scope.subPath, rootName },
-      })
+      // For workspace scope, try OPFS as a fallback source.
+      if (scope.kind === 'workspace') {
+        const opfsFilesHandle = await getOPFSFilesHandle(toolContext.workspaceId)
+        let opfsHasDir = false
+        if (opfsFilesHandle) {
+          const opfsSubPath = scope.rootName
+            ? (scope.subPath ? `${scope.rootName}/${scope.subPath}` : scope.rootName)
+            : scope.subPath
+          const opfsResolved = await resolveDirectoryHandle(opfsFilesHandle, opfsSubPath, { allowMissing: true })
+          opfsHasDir = opfsResolved.exists
+        }
+        if (!opfsHasDir) {
+          const rootName = 'rootName' in scope ? scope.rootName : undefined
+          const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
+          return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
+            hint: 'Check the path for typos, or use ls() without arguments to list available roots and directories.',
+            details: { requested_path: scope.subPath, rootName },
+          })
+        }
+        // OPFS has the directory — proceed with an empty native handle so only
+        // the OPFS merge scan runs below.
+      } else {
+        const rootName = 'rootName' in scope ? scope.rootName : undefined
+        const displayPath = rootName ? `${rootName}/${scope.subPath}` : scope.subPath
+        return toolErrorJson('ls', 'directory_not_found', `Directory "${displayPath}" does not exist.`, {
+          hint: 'Check the path for typos, or use ls() without arguments to list available roots and directories.',
+          details: { requested_path: scope.subPath, rootName },
+        })
+      }
     }
-    const nativeHandle = nativeResult.handle
+    // When native is missing but OPFS has the dir, use a sentinel: scan only OPFS.
+    const nativeHandle: FileSystemDirectoryHandle | null = nativeResult.exists ? nativeResult.handle : null
 
     const startedAt = Date.now()
     const deadlineAt = startedAt + deadlineMs
@@ -466,8 +495,11 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
       }
     }
 
-    // 1. Scan native FS (disk files — base)
-    await scanTree(nativeHandle)
+    // 1. Scan native FS (disk files — base). Skipped when the directory only
+    //    exists in OPFS (nativeHandle is null in that case).
+    if (nativeHandle) {
+      await scanTree(nativeHandle)
+    }
 
     // 2. Merge OPFS-only files (pending changes, .skills/, etc.)
     if (!isTruncated && !timedOut && scope.kind === 'workspace') {
