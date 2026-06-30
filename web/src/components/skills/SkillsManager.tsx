@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useProjectStore } from '@/store/project.store'
+import { exportSkillAsZip } from '@/skills/skill-export'
 
 interface SkillsManagerProps {
   open: boolean
@@ -156,6 +157,14 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   }, [skillsStore])
   const handleEditorClose = useCallback(() => { setFileEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
   const handleFormEditorClose = useCallback(() => { setFormEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
+  const handleExport = useCallback(async (skill: SkillMetadata) => {
+    try {
+      await exportSkillAsZip(skill.id, skill.name, activeProjectId)
+    } catch (e) {
+      console.error('[SkillsManager] Export failed:', e)
+      alert(t('skillCard.exportFailed') + ': ' + (e instanceof Error ? e.message : String(e)))
+    }
+  }, [activeProjectId, t])
 
   const toggleCollapse = useCallback((key: string) => {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -171,6 +180,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     skills: SkillMetadata[]
     isReadOnly?: boolean
     onDelete?: (id: string) => void
+    onExport?: (skill: SkillMetadata) => void
     action?: { label: string; icon: React.ReactNode; onClick: () => void; primary?: boolean }
     secondaryAction?: { label: string; icon: React.ReactNode; onClick: () => void }
   }> = [
@@ -184,6 +194,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
         const skill = skillsStore.skills.find((s) => s.id === id)
         if (skill) setDeleteTarget({ id, name: skill.name })
       },
+      onExport: handleExport,
       action: roots.length > 0
         ? { label: t('skills.importSkill'), icon: <Upload className="h-4 w-4" />, onClick: () => setUploadOpen(true) }
         : undefined,
@@ -197,6 +208,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
         const skill = skillsStore.skills.find((s) => s.id === id)
         if (skill) setDeleteTarget({ id, name: skill.name })
       },
+      onExport: handleExport,
       action: { label: t('skills.createNew'), icon: <Plus className="h-4 w-4" />, onClick: handleCreateNew, primary: true },
       secondaryAction: { label: t('skills.importSkill'), icon: <Upload className="h-4 w-4" />, onClick: () => setUserImportOpen(true) },
     },
@@ -277,6 +289,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
                     onView={handleView}
                     onEdit={handleEdit}
                     onDelete={section.onDelete}
+                    onExport={section.onExport}
                     action={section.action}
                     secondaryAction={section.secondaryAction}
                     t={t}
@@ -396,6 +409,7 @@ interface SkillSectionProps {
   onView: (skill: SkillMetadata) => void
   onEdit: (skill: SkillMetadata) => void
   onDelete?: (id: string) => void
+  onExport?: (skill: SkillMetadata) => void
   action?: SkillSectionAction
   secondaryAction?: SkillSectionAction
   t: (key: string) => string
@@ -403,7 +417,7 @@ interface SkillSectionProps {
 
 function SkillSection({
   icon, label, skills, isCollapsed, onToggleCollapse,
-  isReadOnly, onToggle, onView, onEdit, onDelete, action, secondaryAction, t,
+  isReadOnly, onToggle, onView, onEdit, onDelete, onExport, action, secondaryAction, t,
 }: SkillSectionProps) {
   return (
     <div>
@@ -469,6 +483,7 @@ function SkillSection({
                 onView={onView}
                 onEdit={isReadOnly ? onView : onEdit}
                 onDelete={onDelete}
+                onExport={onExport}
               />
             ))
           )}

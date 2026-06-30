@@ -10,7 +10,7 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
-import { Upload, FolderOpen, CheckCircle, AlertCircle, FileText, Folder, AlertTriangle } from 'lucide-react'
+import { Upload, FolderOpen, CheckCircle, AlertCircle, FileText, Folder, AlertTriangle, FileArchive } from 'lucide-react'
 import { BrandButton } from '@creatorweave/ui'
 import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
@@ -18,7 +18,10 @@ import {
   copyDirectoryRecursive,
   containsSkillMd,
   readFileTree,
+  previewSkillZip,
+  writeZipSkillToDir,
   type FileEntry,
+  type ZipSkillPreview,
 } from '@/skills/skill-folder-utils'
 
 interface DropZoneRoot {
@@ -34,6 +37,18 @@ interface ProjectSkillDropZoneProps {
 
 type UploadStatus = 'idle' | 'dragover' | 'confirm' | 'uploading' | 'success' | 'error'
 
+/** Unified pending-skill state — either a folder handle or a zip preview. */
+interface PendingSkill {
+  dirName: string
+  fileTree: FileEntry[]
+  fileCount: number
+  isZip: boolean
+  isBundle: boolean
+  bundleSkills?: Array<{ dirName: string; fileCount: number }>
+  dirHandle?: FileSystemDirectoryHandle
+  zipPreview?: ZipSkillPreview
+}
+
 export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkillDropZoneProps) {
   const t = useT()
   const [status, setStatus] = useState<UploadStatus>('idle')
@@ -45,9 +60,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
   const dropRef = useRef<HTMLDivElement>(null)
 
   // Confirmation preview state
-  const [pendingDirHandle, setPendingDirHandle] = useState<FileSystemDirectoryHandle | null>(null)
-  const [pendingFileTree, setPendingFileTree] = useState<FileEntry[]>([])
-  const [pendingFileCount, setPendingFileCount] = useState(0)
+  const [pending, setPending] = useState<PendingSkill | null>(null)
   const [pendingOverwrite, setPendingOverwrite] = useState(false)
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -68,12 +81,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
     }
   }
 
-  /** Get the folder name from a directory handle */
-  function getFolderName(handle: FileSystemDirectoryHandle): string {
-    return handle.name
-  }
-
-  /** Stage 1: validate & prepare confirmation preview */
+  /** Stage 1a: validate folder & prepare confirmation preview */
   async function handleUpload(dirHandle: FileSystemDirectoryHandle) {
     // Validate SKILL.md exists
     const hasSkillMd = await containsSkillMd(dirHandle)
@@ -96,18 +104,74 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
     const { entries, count } = await readFileTree(dirHandle)
 
     // Check if already exists (will overwrite)
-    const overwrite = await checkExistingSkill(targetRoot.handle, getFolderName(dirHandle))
+    const overwrite = await checkExistingSkill(targetRoot.handle, dirHandle.name)
 
-    setPendingDirHandle(dirHandle)
-    setPendingFileTree(entries)
-    setPendingFileCount(count)
+    setPending({
+      dirName: dirHandle.name,
+      fileTree: entries,
+      fileCount: count,
+      isZip: false,
+      isBundle: false,
+      dirHandle,
+    })
     setPendingOverwrite(overwrite)
     setStatus('confirm')
   }
 
+  /** Stage 1b: validate zip & prepare confirmation preview */
+  async function handleZip(zipFile: File) {
+    const targetRootName = selectedRoot || roots[0]?.name
+    const targetRoot = roots.find((r) => r.name === targetRootName)
+    if (!targetRoot) {
+      setStatus('error')
+      setErrorMsg(t('skillUpload.noRoot') || 'No project root available')
+      return
+    }
+
+    try {
+      const preview = await previewSkillZip(zipFile)
+
+      if (preview.isBundle && preview.skills) {
+        const skills = preview.skills
+        const overwriteChecks = await Promise.all(
+          skills.map((s) => checkExistingSkill(targetRoot.handle, s.dirName)),
+        )
+        const overwrite = overwriteChecks.some(Boolean)
+
+        setPending({
+          dirName: `${skills.length} skills`,
+          fileTree: [],
+          fileCount: skills.reduce((sum, s) => sum + s.fileCount, 0),
+          isZip: true,
+          isBundle: true,
+          bundleSkills: skills.map((s) => ({ dirName: s.dirName, fileCount: s.fileCount })),
+          zipPreview: preview,
+        })
+        setPendingOverwrite(overwrite)
+      } else if (preview.skill) {
+        const skill = preview.skill
+        const overwrite = await checkExistingSkill(targetRoot.handle, skill.dirName)
+        setPending({
+          dirName: skill.dirName,
+          fileTree: skill.entries,
+          fileCount: skill.fileCount,
+          isZip: true,
+          isBundle: false,
+          zipPreview: preview,
+        })
+        setPendingOverwrite(overwrite)
+      }
+
+      setStatus('confirm')
+    } catch (err) {
+      setStatus('error')
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to read ZIP archive')
+    }
+  }
+
   /** Stage 2: confirmed — execute the actual write */
   async function handleConfirmUpload() {
-    if (!pendingDirHandle) return
+    if (!pending) return
 
     const targetRootName = selectedRoot || roots[0]?.name
     const targetRoot = roots.find((r) => r.name === targetRootName)
@@ -138,27 +202,49 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
     try {
       // Ensure .skills/ directory exists
       const skillsDir = await targetRoot.handle.getDirectoryHandle('.skills', { create: true })
-      const folderName = getFolderName(pendingDirHandle)
+      let totalCount = 0
 
-      // Remove existing skill directory to avoid stale file accumulation
-      try {
-        await skillsDir.removeEntry(folderName, { recursive: true })
-      } catch {
-        // Directory doesn't exist yet, which is fine
+      if (pending.isZip && pending.zipPreview) {
+        // ── ZIP import path ──
+        const preview = pending.zipPreview
+        if (preview.isBundle && preview.skills) {
+          // Bundle mode — write each skill
+          for (const s of preview.skills) {
+            try {
+              await skillsDir.removeEntry(s.dirName, { recursive: true })
+            } catch { /* doesn't exist, fine */ }
+            const skillDir = await skillsDir.getDirectoryHandle(s.dirName, { create: true })
+            totalCount += await writeZipSkillToDir(preview.raw, skillDir, s.commonRoot)
+          }
+        } else if (preview.skill) {
+          const s = preview.skill
+          try {
+            await skillsDir.removeEntry(s.dirName, { recursive: true })
+          } catch { /* doesn't exist, fine */ }
+          const skillDir = await skillsDir.getDirectoryHandle(s.dirName, { create: true })
+          totalCount = await writeZipSkillToDir(preview.raw, skillDir, s.commonRoot)
+        }
+      } else if (pending.dirHandle) {
+        // ── Folder import path ──
+        const folderName = pending.dirHandle.name
+        try {
+          await skillsDir.removeEntry(folderName, { recursive: true })
+        } catch { /* doesn't exist, fine */ }
+        const skillDir = await skillsDir.getDirectoryHandle(folderName, { create: true })
+        totalCount = await copyDirectoryRecursive(pending.dirHandle, skillDir)
       }
-
-      // Create fresh skill subdirectory
-      const skillDir = await skillsDir.getDirectoryHandle(folderName, { create: true })
-      // Copy files recursively
-      const count = await copyDirectoryRecursive(pendingDirHandle, skillDir)
 
       setStatus('success')
       setSuccessMsg(
-        (t('skillUpload.success') || 'Uploaded {count} file(s) to .skills/{name}/')
-          .replace('{count}', String(count))
-          .replace('{name}', folderName)
+        pending.isBundle
+          ? (t('skillUpload.bundleSuccess') || 'Imported {count} file(s) across {n} skills')
+              .replace('{count}', String(totalCount))
+              .replace('{n}', String(pending.bundleSkills?.length ?? 0))
+          : (t('skillUpload.success') || 'Uploaded {count} file(s) to .skills/{name}/')
+              .replace('{count}', String(totalCount))
+              .replace('{name}', pending.dirName),
       )
-      setPendingDirHandle(null)
+      setPending(null)
       onUploaded()
     } catch (err) {
       console.error('[ProjectSkillDropZone] Upload failed:', err)
@@ -171,9 +257,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
 
   /** Cancel the confirmation and go back to idle */
   function handleCancelConfirm() {
-    setPendingDirHandle(null)
-    setPendingFileTree([])
-    setPendingFileCount(0)
+    setPending(null)
     setPendingOverwrite(false)
     setStatus('idle')
   }
@@ -201,30 +285,54 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
       e.stopPropagation()
       setStatus('idle')
 
-      // Try getAsFileSystemHandle for directory support (Chrome 86+)
+      // Collect DataTransfer synchronously (items become invalid after first await)
       const items = e.dataTransfer.items
-      let foundDir = false
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i]
-        // getAsFileSystemHandle returns FileSystemHandle (file or directory)
-        const handle = await item.getAsFileSystemHandle?.()
-        if (handle?.kind === 'directory') {
-          foundDir = true
-          await handleUpload(handle as FileSystemDirectoryHandle)
+      const files = Array.from(e.dataTransfer.files) // sync snapshot
+
+      const supportsDirHandle =
+        items.length > 0 && typeof items[0].getAsFileSystemHandle === 'function'
+
+      const handlePromises: Promise<FileSystemHandle | null>[] = []
+      if (supportsDirHandle) {
+        for (let i = 0; i < items.length; i++) {
+          const p = items[i].getAsFileSystemHandle?.()
+          if (p) handlePromises.push(p)
+        }
+      }
+
+      // First pass: check for directory handles
+      if (supportsDirHandle) {
+        for (const promise of handlePromises) {
+          const handle = await promise
+          if (handle?.kind === 'directory') {
+            await handleUpload(handle as FileSystemDirectoryHandle)
+            return
+          }
+        }
+      }
+
+      // Second pass: check for .zip files
+      if (files.length > 0) {
+        const zipFile = files.find((f) => f.name.toLowerCase().endsWith('.zip'))
+        if (zipFile) {
+          await handleZip(zipFile)
           return
         }
       }
 
-      // Fallback: no directory found
-      if (!foundDir) {
-        // Check if browser supports getAsFileSystemHandle at all
-        if (items.length > 0 && typeof items[0].getAsFileSystemHandle !== 'function') {
-          setStatus('error')
-          setErrorMsg(t('skillUpload.browserNotSupported') || 'Your browser does not support folder drag-and-drop. Please use the browse button instead.')
-        } else {
-          setStatus('error')
-          setErrorMsg(t('skillUpload.dropFolderOnly') || 'Please drop a folder, not individual files')
-        }
+      // Nothing recognized
+      if (items.length > 0 && !supportsDirHandle) {
+        setStatus('error')
+        setErrorMsg(
+          t('skillUpload.browserNotSupported') ||
+            'Your browser does not support folder drag-and-drop. Please use the browse button.',
+        )
+      } else {
+        setStatus('error')
+        setErrorMsg(
+          t('skillUpload.dropFolderOrZipOnly') ||
+            'Please drop a skill folder or a .zip file',
+        )
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,15 +342,34 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
   // ── Folder picker fallback ────────────────────────────────────────────
 
   const handlePickFolder = useCallback(async () => {
+    // Try directory picker first (Chrome 86+). If user cancels, abort silently.
     try {
       const dirHandle = await window.showDirectoryPicker({ mode: 'read' })
       await handleUpload(dirHandle)
+      return
     } catch (err) {
-      // User cancelled the picker — ignore
+      if ((err as DOMException)?.name === 'AbortError') return
+      // Directory picker failed (e.g. Firefox) — fall through to file picker
+    }
+
+    // Fallback: file picker for .zip
+    try {
+      const fileHandle = await (window as unknown as {
+        showOpenFilePicker?: (opts: {
+          types: Array<{ description: string; accept: Record<string, string[]> }>
+          multiple: boolean
+        }) => Promise<FileSystemFileHandle[]>
+      }).showOpenFilePicker!({
+        types: [{ description: 'ZIP archive', accept: { 'application/zip': ['.zip'] } }],
+        multiple: false,
+      })
+      const file = await fileHandle[0].getFile()
+      await handleZip(file)
+    } catch (err) {
       if ((err as DOMException)?.name === 'AbortError') return
       console.error('[ProjectSkillDropZone] Picker error:', err)
       setStatus('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to pick folder')
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to pick file')
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoot, roots])
@@ -310,7 +437,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
       )}
 
       {/* ── Confirmation preview ── */}
-      {status === 'confirm' && pendingDirHandle ? (
+      {status === 'confirm' && pending ? (
         <div className="space-y-3">
           {/* Target path */}
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
@@ -318,7 +445,11 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
               {t('skillUpload.confirmTarget') || 'Upload Target'}
             </p>
             <p className="font-mono text-sm text-neutral-800 dark:text-neutral-200">
-              {targetRootName}/.skills/<span className="font-semibold text-blue-600 dark:text-blue-400">{pendingDirHandle.name}</span>/
+              {pending.isBundle ? (
+                <>{targetRootName}/.skills/ <span className="font-semibold text-blue-600 dark:text-blue-400">({pending.dirName})</span>/</>
+              ) : (
+                <>{targetRootName}/.skills/<span className="font-semibold text-blue-600 dark:text-blue-400">{pending.dirName}</span>/</>
+              )}
             </p>
           </div>
 
@@ -327,27 +458,65 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
             <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/30">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
               <p className="text-sm text-amber-700 dark:text-amber-300">
-                {(t('skillUpload.overwriteWarning') || 'A skill folder named "{name}" already exists. It will be replaced.')
-                  .replace('{name}', pendingDirHandle.name)}
+                {pending.isBundle
+                  ? (t('skillUpload.overwriteWarningBundle') || 'One or more skill folders already exist. They will be replaced.')
+                  : (t('skillUpload.overwriteWarning') || 'A skill folder named "{name}" already exists. It will be replaced.')
+                      .replace('{name}', pending.dirName)}
               </p>
             </div>
           )}
 
-          {/* File tree preview */}
-          <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
-              <FolderOpen className="h-4 w-4 text-neutral-500" />
-              <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                {pendingDirHandle.name}
-              </span>
-              <span className="text-xs text-neutral-400 dark:text-neutral-500">
-                ({pendingFileCount} {t('skillUpload.files') || 'files'})
-              </span>
+          {/* ZIP source indicator */}
+          {pending.isZip && (
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+              <FileArchive className="h-3.5 w-3.5" />
+              {t('skillUpload.zipSource') || 'Importing from ZIP archive'}
             </div>
-            <div className="max-h-40 overflow-y-auto p-3">
-              {renderFileTree(pendingFileTree)}
+          )}
+
+          {/* Bundle skill list */}
+          {pending.isBundle && pending.bundleSkills ? (
+            <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+                <FileArchive className="h-4 w-4 text-neutral-500" />
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  {pending.bundleSkills.length} {t('skillUpload.skills') || 'skills'}
+                </span>
+                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                  ({pending.fileCount} {t('skillUpload.files') || 'files'})
+                </span>
+              </div>
+              <div className="max-h-40 overflow-y-auto p-3 space-y-1">
+                {pending.bundleSkills.map((s) => (
+                  <div key={s.dirName} className="flex items-center gap-1.5 text-sm">
+                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+                    <span className="text-neutral-700 dark:text-neutral-300">{s.dirName}</span>
+                    <span className="text-xs text-neutral-400">({s.fileCount})</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* File tree preview (single skill — folder or zip) */
+            <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
+              <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+                {pending.isZip ? (
+                  <FileArchive className="h-4 w-4 text-neutral-500" />
+                ) : (
+                  <FolderOpen className="h-4 w-4 text-neutral-500" />
+                )}
+                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                  {pending.dirName}
+                </span>
+                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                  ({pending.fileCount} {t('skillUpload.files') || 'files'})
+                </span>
+              </div>
+              <div className="max-h-40 overflow-y-auto p-3">
+                {renderFileTree(pending.fileTree)}
+              </div>
+            </div>
+          )}
         </div>
       ) : status === 'uploading' ? (
         /* ── Uploading spinner ── */

@@ -55,6 +55,8 @@ export const skillCard = {
     viewDetails: "查看详情",
     edit: "编辑",
     delete: "删除",
+    export: "导出为 ZIP",
+    exportFailed: "导出失败",
     category: {
       codeReview: "代码审查",
       testing: "测试",
@@ -159,6 +161,9 @@ export const skillUpload = {
     bundleOverwriteWarning: "部分技能已存在，将被替换。",
     skillsLabel: "个技能",
    bundleSuccess: "导入 {count} 个文件，共 {n} 个技能",
+    overwriteWarningBundle: "一个或多个技能文件夹已存在，将被替换。",
+    zipSource: "从 ZIP 压缩包导入",
+    skills: "个技能",
 } as const
 
 export const skillDetail = {

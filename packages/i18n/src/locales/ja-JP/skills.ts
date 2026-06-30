@@ -54,6 +54,8 @@ export const skillCard = {
     viewDetails: "詳細を見る",
     edit: "編集",
     delete: "削除",
+    export: "ZIPとしてエクスポート",
+    exportFailed: "エクスポートに失敗しました",
     category: {
       codeReview: "コードレビュー",
       testing: "テスト",
@@ -157,6 +159,9 @@ export const skillUpload = {
     bundleOverwriteWarning: "一部のスキルは既に存在し、置き換えられます。",
     skillsLabel: "スキル",
    bundleSuccess: "{count} ファイルをインポート（{n} スキル）",
+    overwriteWarningBundle: "1つ以上のスキルフォルダが既に存在します。置き換えられます。",
+    zipSource: "ZIPアーカイブからインポート",
+    skills: "スキル",
 } as const
 
 export const skillDetail = {

@@ -3,7 +3,7 @@
  * Optimized: Switch toggle, dark mode contrast, separated view/edit actions.
  */
 
-import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { Eye, Pencil, Trash2, Download } from 'lucide-react'
 import { BrandButton } from '@creatorweave/ui'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ interface SkillCardProps {
   onView: (skill: SkillMetadata) => void
   onEdit: (skill: SkillMetadata) => void
   onDelete?: (id: string) => void
+  onExport?: (skill: SkillMetadata) => void
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -45,7 +46,7 @@ const CATEGORY_KEYS: Record<string, string> = {
   general: 'skillCard.category.general',
 }
 
-export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelete }: SkillCardProps) {
+export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelete, onExport }: SkillCardProps) {
   const t = useT()
 
   return (
@@ -146,6 +147,17 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
               title={t('skillCard.edit')}
             >
               <Pencil className="h-3.5 w-3.5" />
+            </BrandButton>
+          )}
+          {/* Export - download skill as ZIP (user + project skills) */}
+          {onExport && (
+            <BrandButton
+              iconButton
+              className="h-7 w-7 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400"
+              onClick={() => onExport(skill)}
+              title={t('skillCard.export')}
+            >
+              <Download className="h-3.5 w-3.5" />
             </BrandButton>
           )}
           {/* Delete - shown when onDelete is provided (even for read-only skills like project skills) */}

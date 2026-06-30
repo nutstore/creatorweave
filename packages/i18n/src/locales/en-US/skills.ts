@@ -55,6 +55,8 @@ export const skillCard = {
     viewDetails: "View details",
     edit: "Edit",
     delete: "Delete",
+    export: "Export as ZIP",
+    exportFailed: "Export failed",
     category: {
       codeReview: "Code Review",
       testing: "Testing",
@@ -157,6 +159,9 @@ export const skillUpload = {
     bundleOverwriteWarning: "Some skills already exist and will be replaced.",
     skillsLabel: "skills",
    bundleSuccess: "Imported {count} file(s) across {n} skills",
+    overwriteWarningBundle: "One or more skill folders already exist. They will be replaced.",
+    zipSource: "Importing from ZIP archive",
+    skills: "skills",
 } as const
 
 export const skillDetail = {

@@ -54,6 +54,8 @@ export const skillCard = {
     viewDetails: "세부정보 보기",
     edit: "편집",
     delete: "삭제",
+    export: "ZIP으로 내보내기",
+    exportFailed: "내보내기 실패",
     category: {
       codeReview: "코드 리뷰",
       testing: "테스트",
@@ -157,6 +159,9 @@ export const skillUpload = {
     bundleOverwriteWarning: "일부 스킬이 이미 존재하여 교체됩니다.",
     skillsLabel: "스킬",
    bundleSuccess: "{count}개 파일 가져오기 ({n} 스킬)",
+    overwriteWarningBundle: "하나 이상의 스킬 폴더가 이미 존재합니다. 교체됩니다.",
+    zipSource: "ZIP 아카이브에서 가져오기",
+    skills: "스킬",
 } as const
 
 export const skillDetail = {
