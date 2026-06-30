@@ -168,22 +168,20 @@ export const useProjectStore = create<ProjectState>()(
       set({ isLoading: true, error: null })
       try {
         const repo = getProjectRepository()
-        const [projects, stats, activeProject] = await Promise.all([
+        const [projects, stats] = await Promise.all([
           repo.findAllProjects(),
           repo.findProjectStats(),
-          repo.findActiveProject(),
         ])
         let normalizedProjects = projects
         let normalizedStats = stats
-        let normalizedActiveProjectId = activeProject?.id || ''
+        // PR-B: active project is URL-driven, NOT restored from a persisted
+        // singleton. Leave activeProjectId empty here; App.tsx's syncFromRoute
+        // (driven by the URL :projectId param) sets it after init.
+        let normalizedActiveProjectId = ''
 
         // Dev-phase hard cleanup: remove legacy seeded default project if it exists.
         const hasLegacyDefault = normalizedProjects.some((project) => project.id === DEFAULT_PROJECT_ID)
         if (hasLegacyDefault) {
-          if (normalizedActiveProjectId === DEFAULT_PROJECT_ID) {
-            await repo.clearActiveProject()
-            normalizedActiveProjectId = ''
-          }
           // Delete OPFS directory for legacy default project
           try {
             const pm = await ProjectManager.create()
@@ -196,17 +194,10 @@ export const useProjectStore = create<ProjectState>()(
           normalizedStats = normalizedStats.filter((entry) => entry.projectId !== DEFAULT_PROJECT_ID)
         }
 
-        // Keep active project in sync with available projects.
-        if (!normalizedActiveProjectId && normalizedProjects.length > 0) {
-          normalizedActiveProjectId = normalizedProjects[0].id
-          await repo.setActiveProject(normalizedActiveProjectId)
-        } else if (!normalizedActiveProjectId) {
-          await repo.clearActiveProject()
-        }
-
-        if (normalizedActiveProjectId) {
-          await bootstrapProjectOpfs(normalizedActiveProjectId)
-        }
+        // Active project is now URL-driven. Do NOT auto-pick projects[0] here —
+        // that would race with the URL and cause cross-tab desync. If there's no
+        // URL project, the user lands on /projects and picks one.
+        // (bootstrapProjectOpfs now happens in setActiveProject, called by syncFromRoute.)
 
         const projectStats = Object.fromEntries(
           normalizedStats.map((entry) => [entry.projectId, entry])

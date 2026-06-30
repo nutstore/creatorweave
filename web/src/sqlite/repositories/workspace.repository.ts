@@ -118,16 +118,12 @@ export class WorkspaceRepository {
   }
 
   /**
-   * Get active workspace
+   * @deprecated Active workspace singleton table removed (PR-B). Use
+   * findActiveWorkspaceByProject or the workspace store instead.
+   * Returns null — kept only to avoid breaking imports.
    */
   async findActiveWorkspace(): Promise<Workspace | null> {
-    const db = getSQLiteDB()
-    const row = await db.queryFirst<WorkspaceRow>(
-      `SELECT w.* FROM workspaces w
-       JOIN active_workspace a ON w.id = a.workspace_id
-       WHERE w.status = 'active'`
-    )
-    return row ? this.rowToWorkspace(row) : null
+    return null
   }
 
   /**
@@ -272,60 +268,58 @@ export class WorkspaceRepository {
   }
 
   /**
-   * Set active workspace
+   * @deprecated No-op. Active workspace singleton removed (PR-B).
    */
   async setActiveWorkspace(workspaceId: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute(
-      `INSERT INTO active_workspace (singleton_id, workspace_id, last_modified)
-       VALUES (0, ?, ?)
-       ON CONFLICT(singleton_id) DO UPDATE SET workspace_id = excluded.workspace_id, last_modified = excluded.last_modified`,
-      [workspaceId, Date.now()]
-    )
+    void workspaceId // signature retained for callers; write path is gone
   }
 
   /**
-   * Get the last active workspace for a specific project.
-   * Returns null if no record exists for the project.
+   * @deprecated Active workspace is now URL-driven. Returns the most recently
+   * accessed workspace for the project as a best-effort fallback, or null.
+   * Callers that need the *current* active workspace should read the workspace
+   * store's activeWorkspaceId instead.
    */
   async findActiveWorkspaceByProject(projectId: string): Promise<Workspace | null> {
     const db = getSQLiteDB()
     const row = await db.queryFirst<WorkspaceRow>(
-      `SELECT w.* FROM workspaces w
-       JOIN project_active_workspace paw ON w.id = paw.workspace_id
-       WHERE paw.project_id = ? AND w.status = 'active'`,
+      `SELECT * FROM workspaces
+       WHERE project_id = ? AND status = 'active'
+       ORDER BY last_accessed_at DESC
+       LIMIT 1`,
       [projectId]
     )
     return row ? this.rowToWorkspace(row) : null
   }
 
   /**
-   * Set the last active workspace for a specific project.
+   * @deprecated No-op for active tracking. Per-project active workspace pointer
+   * was removed (PR-B); the active workspace is derived from the URL route.
+   * Still bumps last_accessed_at on the workspace so the "recent work" fallback
+   * sort in findActiveWorkspaceByProject returns sensible results.
    */
   async setActiveWorkspaceForProject(projectId: string, workspaceId: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute(
-      `INSERT INTO project_active_workspace (project_id, workspace_id, last_modified)
-       VALUES (?, ?, ?)
-       ON CONFLICT(project_id) DO UPDATE SET workspace_id = excluded.workspace_id, last_modified = excluded.last_modified`,
-      [projectId, workspaceId, Date.now()]
-    )
+    void projectId // per-project pointer is gone; only workspaceId is used below
+    try {
+      const db = getSQLiteDB()
+      await db.execute('UPDATE workspaces SET last_accessed_at = ? WHERE id = ?', [Date.now(), workspaceId])
+    } catch {
+      // ignore
+    }
   }
 
   /**
-   * Clear the last active workspace for a specific project.
+   * @deprecated No-op. Per-project active workspace tracking removed (PR-B).
    */
   async clearActiveWorkspaceForProject(projectId: string): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('DELETE FROM project_active_workspace WHERE project_id = ?', [projectId])
+    void projectId // signature retained for callers; table is gone
   }
 
   /**
-   * Clear active workspace
+   * @deprecated No-op. Active workspace singleton removed (PR-B).
    */
   async clearActiveWorkspace(): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('DELETE FROM active_workspace WHERE singleton_id = 0')
+    // no-op
   }
 
   /**
@@ -333,13 +327,7 @@ export class WorkspaceRepository {
    */
   async deleteWorkspace(id: string): Promise<void> {
     const db = getSQLiteDB()
-    // Remove project_active_workspace records first to avoid NOT NULL constraint violation
-    // (workspace_id is NOT NULL but FK has ON DELETE SET NULL — we must delete the rows instead)
-    await db.execute('DELETE FROM project_active_workspace WHERE workspace_id = ?', [id])
-    // Cascade delete will handle related records
     await db.execute('DELETE FROM workspaces WHERE id = ?', [id])
-    // Also clear active workspace if this was the active one
-    await db.execute('DELETE FROM active_workspace WHERE workspace_id = ?', [id])
   }
 
   /**

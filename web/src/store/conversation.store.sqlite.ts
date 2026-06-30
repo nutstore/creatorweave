@@ -1894,6 +1894,27 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           await workspaceStore.switchWorkspace(conversationId)
         }
 
+        // FIX (parallel isolation): Resolve directoryHandle from THIS run's
+        // conversationId (= workspaceId), NOT from the global active-project
+        // pointer. Previously the caller passed useAgentStore.directoryHandle
+        // which is a global singleton shared by all parallel runs — switching
+        // the UI view (or another tab) mid-run rewrote it and caused tools to
+        // read/write the WRONG project's directory. Each run now resolves its
+        // own handle so parallel runs in different projects never cross-talk.
+        // The legacy `directoryHandle` parameter is kept for backward-compat
+        // but overridden by the per-workspace resolution below.
+        let resolvedDirHandle: FileSystemDirectoryHandle | null = directoryHandle
+        try {
+          const { resolveWorkspaceDirectoryHandle } = await import('@/agent/tools/tool-utils')
+          const wsHandle = await resolveWorkspaceDirectoryHandle(conversationId)
+          if (wsHandle) {
+            resolvedDirHandle = wsHandle
+          }
+        } catch {
+          // Fall back to the caller-provided handle if per-workspace resolution fails.
+        }
+        directoryHandle = resolvedDirHandle
+
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
         let latestMessages: Message[] = conv.messages
@@ -3971,16 +3992,17 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           const currentConv = get().conversations.find((c) => c.id === conversationId)
           if (currentConv) {
             get().updateMessages(conversationId, [...currentConv.messages, userMsg])
-            // Schedule the next run on the next microtask to avoid re-entrancy
-            const { useAgentStore } = await import('./agent.store')
-            const { directoryHandle: dh } = useAgentStore.getState()
+            // Schedule the next run on the next microtask to avoid re-entrancy.
+            // FIX (parallel isolation): Pass null — runAgent now resolves the
+            // directoryHandle from conversationId internally, so the global
+            // active-project pointer can no longer cross-contaminate this run.
             queueMicrotask(() => {
               get().runAgent(
                 conversationId,
                 providerType,
                 modelName,
                 maxTokens,
-                dh,
+                null,
                 nextMsg.agentOverrideId ?? null,
               )
             })
@@ -4340,8 +4362,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       })
 
       const toolRegistry = getToolRegistry()
-      const { useAgentStore } = await import('@/store/agent.store')
-      const directoryHandle = useAgentStore.getState().directoryHandle || null
+      // FIX (parallel isolation): resolve handle from conversationId, not global state.
+      let directoryHandle: FileSystemDirectoryHandle | null = null
+      try {
+        const { resolveWorkspaceDirectoryHandle } = await import('@/agent/tools/tool-utils')
+        directoryHandle = await resolveWorkspaceDirectoryHandle(conversationId)
+      } catch {
+        // compression loop tolerates a null handle
+      }
 
       const agentLoop = new AgentLoop({
         provider,

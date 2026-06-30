@@ -17,7 +17,6 @@ import { immer } from 'zustand/middleware/immer'
 import type { WorkspaceMetadata, ChangeDetectionResult } from '@/opfs/types/opfs-types'
 import { getWorkspaceManager, WorkspaceFiles } from '@/opfs'
 import { getWorkspaceRepository, type Workspace } from '@/sqlite/repositories/workspace.repository'
-import { getProjectRepository } from '@/sqlite/repositories/project.repository'
 import { getFSOverlayRepository } from '@/sqlite/repositories/fs-overlay.repository'
 import {
   requestDirectoryAccess,
@@ -183,9 +182,15 @@ function sqliteWorkspaceToWorkspaceStats(workspace: Workspace): WorkspaceWithSta
 }
 
 async function resolveActiveProjectId(): Promise<string | null> {
-  const projectRepo = getProjectRepository()
-  const activeProject = await projectRepo.findActiveProject()
-  return activeProject?.id || null
+  // PR-B: active project is URL-driven, mirrored into the project store by
+  // App.tsx's syncFromRoute. Read it directly from the store instead of
+  // querying a (now-removed) persisted singleton table.
+  try {
+    const { useProjectStore } = await import('./project.store')
+    return useProjectStore.getState().activeProjectId || null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -425,24 +430,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               // Ignore preference loading errors, keep default order
             }
 
-            // Prefer per-project persisted active workspace.
-            // Fallback to most recent workspace only when no record exists.
-            const projectActiveWs = activeProjectId
-              ? await repo.findActiveWorkspaceByProject(activeProjectId)
-              : null
-            const persistedActiveId = projectActiveWs?.id || null
-            const activeId =
-              (persistedActiveId && workspaces.some((w) => w.id === persistedActiveId))
-                ? persistedActiveId
-                : (workspaces.length > 0 ? workspaces[0].id : null)
-
-            // Use the ACTIVE workspace's count, not workspaces[0].
-            // After pinning/sorting, workspaces[0] may be a different
-            // conversation than activeId — using it here made the badge
-            // show another conversation's pending count after refresh.
-            const activePendingWs = activeId
-              ? workspaces.find((w) => w.id === activeId)
-              : undefined
+            // PR-B: active workspace is URL-driven. Do NOT restore from a
+            // persisted singleton here — that caused cross-tab pollution.
+            // syncFromRoute (App.tsx) sets activeWorkspaceId from the URL
+            // :workspaceId param after init. Leave it null until then; the
+            // workspace list is still loaded so the sidebar can render.
+            const activeId = null
 
             // Re-derive hasDirectoryHandle from the live runtime handle table
             // instead of inheriting the `false` from PENDING_RESET_PATCH.
@@ -464,7 +457,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               hasDirectoryHandle: liveHasDirectoryHandle,
               workspaces,
               activeWorkspaceId: activeId,
-              currentPendingCount: activePendingWs?.pendingCount || 0,
+              // PR-B: active workspace is URL-driven and not known at initialize
+              // time (syncFromRoute sets it later). Badge count starts at 0 and
+              // is refreshed when activeWorkspaceId is set.
+              currentPendingCount: 0,
               isLoading: false,
               initialized: true,
             })

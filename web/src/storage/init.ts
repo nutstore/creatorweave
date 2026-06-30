@@ -485,8 +485,6 @@ export async function clearAllStorage(): Promise<void> {
     await db.execute('DELETE FROM file_metadata')
     await db.execute('DELETE FROM pending_changes')
     await db.execute('DELETE FROM undo_records')
-    await db.execute('DELETE FROM active_workspace')
-    await db.execute('DELETE FROM active_project')
 
     console.log('[Storage] All data cleared')
   } catch (error) {

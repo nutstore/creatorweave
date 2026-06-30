@@ -121,54 +121,52 @@ export class ProjectRepository {
 
   async deleteProject(id: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.transaction(async () => {
-      // active_project uses ON DELETE RESTRICT; clear pointer before deleting the project row.
-      await db.execute('DELETE FROM active_project WHERE singleton_id = 0 AND project_id = ?', [id])
-      await db.execute('DELETE FROM projects WHERE id = ?', [id])
-    })
+    await db.execute('DELETE FROM projects WHERE id = ?', [id])
   }
 
+  // NOTE: The active_project singleton table was removed (PR-B: URL-driven active
+  // project). The following methods are kept as no-ops / store-backed fallbacks
+  // for backward-compatibility with callers that haven't been migrated yet.
+  // Active project is now derived from the URL route, never persisted.
+
+  /**
+   * @deprecated Active project is now URL-driven. Returns the project matching
+   * the current in-memory store's activeProjectId, or null. Does NOT read any
+   * persisted singleton.
+   */
   async findActiveProject(): Promise<Project | null> {
-    const db = getSQLiteDB()
-    const row = await db.queryFirst<ProjectRow>(
-      `SELECT p.*
-       FROM projects p
-       JOIN active_project a ON a.project_id = p.id
-       WHERE a.singleton_id = 0`
-    )
-    return row ? this.rowToProject(row) : null
+    try {
+      const { useProjectStore } = await import('@/store/project.store')
+      const activeId = useProjectStore.getState().activeProjectId
+      if (!activeId) return null
+      const db = getSQLiteDB()
+      const row = await db.queryFirst<ProjectRow>('SELECT * FROM projects WHERE id = ?', [activeId])
+      return row ? this.rowToProject(row) : null
+    } catch {
+      return null
+    }
   }
 
+  /**
+   * @deprecated No-op. Active project is URL-driven and not persisted.
+   * Retained only to avoid breaking callers; the DB write is gone.
+   */
   async setActiveProject(projectId: string): Promise<void> {
-    if (!projectId) {
-      throw new Error('Project ID is required')
+    if (!projectId) return
+    // Keep "recent work" sorting signal: bump updated_at on switch.
+    try {
+      const db = getSQLiteDB()
+      await db.execute('UPDATE projects SET updated_at = ? WHERE id = ?', [Date.now(), projectId])
+    } catch {
+      // ignore — best-effort
     }
-
-    const db = getSQLiteDB()
-    const now = Date.now()
-
-    // Avoid opaque FK errors by validating existence first.
-    const existing = await db.queryFirst<{ id: string }>('SELECT id FROM projects WHERE id = ?', [projectId])
-    if (!existing) {
-      throw new Error(`Project not found: ${projectId}`)
-    }
-
-    await db.execute(
-      `INSERT INTO active_project (singleton_id, project_id, last_modified)
-       VALUES (0, ?, ?)
-       ON CONFLICT(singleton_id) DO UPDATE SET
-         project_id = excluded.project_id,
-         last_modified = excluded.last_modified`,
-      [projectId, now]
-    )
-
-    // Treat opening/switching project as project activity for "recent work" sorting.
-    await db.execute('UPDATE projects SET updated_at = ? WHERE id = ?', [now, projectId])
   }
 
+  /**
+   * @deprecated No-op. Active project is URL-driven and not persisted.
+   */
   async clearActiveProject(): Promise<void> {
-    const db = getSQLiteDB()
-    await db.execute('DELETE FROM active_project WHERE singleton_id = 0')
+    // no-op — nothing to clear
   }
 
   private rowToProject(row: ProjectRow): Project {

@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 7
+export const BASE_SCHEMA_VERSION = 9
 
 // ============================================================================
 // Migration Registry
@@ -155,6 +155,25 @@ export const migrations: Migration[] = [
       ALTER TABLE conversations ADD COLUMN compressed_context_cutoff_ts INTEGER;
 
       PRAGMA user_version = 8;
+    `,
+  },
+  {
+    version: 9,
+    name: 'drop_active_singleton_tables',
+    up: `
+      -- PR-B: active project/workspace must be derived from the URL route,
+      -- never persisted in a shared singleton table. Drop the legacy tables,
+      -- triggers, and view that previously stored this global pointer.
+      -- (A shared OPFS SQLite file is visible to ALL browser tabs, so a
+      -- singleton "active" row caused cross-tab pollution on refresh.)
+      DROP VIEW IF EXISTS v_active_workspace;
+      DROP TRIGGER IF EXISTS active_workspace_singleton;
+      DROP TRIGGER IF EXISTS active_project_singleton;
+      DROP TABLE IF EXISTS project_active_workspace;
+      DROP TABLE IF EXISTS active_workspace;
+      DROP TABLE IF EXISTS active_project;
+
+      PRAGMA user_version = 9;
     `,
   },
 ]

@@ -39,8 +39,20 @@ vi.mock('@/sqlite/repositories/workspace.repository', () => ({
   getWorkspaceRepository: vi.fn(() => workspaceRepoMock),
 }))
 
+// PR-B: resolveActiveProjectId() in workspace.store now reads
+// useProjectStore.getState().activeProjectId (URL-driven, not a persisted
+// singleton) instead of getProjectRepository().findActiveProject(). Mock the
+// project store so the workspace store's initialize() proceeds past the
+// early-return guard and re-derives hasDirectoryHandle.
+const projectStoreStateMock = vi.hoisted(() => ({ activeProjectId: 'project-1' }))
+vi.mock('../project.store', () => ({
+  useProjectStore: {
+    getState: () => projectStoreStateMock,
+  },
+}))
 vi.mock('@/sqlite/repositories/project.repository', () => ({
   getProjectRepository: vi.fn(() => ({
+    // Legacy dead-code mock — retained for any import that still references it.
     findActiveProject: vi.fn(async () => ({ id: 'project-1' })),
   })),
 }))
@@ -190,7 +202,10 @@ describe('workspace.store native directory grant feedback', () => {
     expect(bindRuntimeDirectoryHandleMock).not.toHaveBeenCalledWith('ws-2', projectHandle)
     expect(rebindMock).toHaveBeenCalledWith(projectHandle)
     expect(useWorkspaceStore.getState().hasDirectoryHandle).toBe(true)
-    expect(conversationSetActiveMock).toHaveBeenCalledWith('ws-2')
+    // PR-B: conversation activation is now URL-driven (syncFromRoute in
+    // App.tsx), NOT done by switchWorkspace. Assert it does NOT call
+    // conversation.setActive — that would re-introduce cross-tab coupling.
+    expect(conversationSetActiveMock).not.toHaveBeenCalled()
   })
 
   it('requestDirectoryAccess binds runtime handle only by project id', async () => {
@@ -226,6 +241,10 @@ describe('workspace.store native directory grant feedback', () => {
       new Map([['my-root', {} as FileSystemDirectoryHandle]])
     )
     useWorkspaceStore.setState({ hasDirectoryHandle: true })
+    // PR-B: resolveActiveProjectId() reads the project store. Ensure a project
+    // is "active" so initialize() loads the workspace list instead of
+    // early-returning (which would skip the hasDirectoryHandle re-derivation).
+    projectStoreStateMock.activeProjectId = 'project-1'
 
     await useWorkspaceStore.getState().initialize()
 

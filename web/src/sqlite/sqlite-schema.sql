@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 7;
+PRAGMA user_version = 9;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -30,20 +30,6 @@ CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
 
 
 -- Active project tracking
-CREATE TABLE IF NOT EXISTS active_project (
-    singleton_id INTEGER PRIMARY KEY DEFAULT 0,
-    project_id TEXT NOT NULL,
-    last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE RESTRICT
-);
-
-CREATE TRIGGER IF NOT EXISTS active_project_singleton
-    BEFORE INSERT ON active_project
-    WHEN NEW.singleton_id != 0
-    BEGIN
-        SELECT RAISE(ABORT, 'Only one active project allowed with singleton_id=0');
-    END;
-
 
 -- ============================================================================
 -- Project Roots Table (multi-root: one project can have N local folders)
@@ -335,34 +321,6 @@ CREATE TABLE IF NOT EXISTS fs_sync_items (
 CREATE INDEX IF NOT EXISTS idx_fs_sync_items_batch_id ON fs_sync_items(batch_id);
 CREATE INDEX IF NOT EXISTS idx_fs_sync_items_op_id ON fs_sync_items(op_id);
 
--- Active workspace tracking
-CREATE TABLE IF NOT EXISTS active_workspace (
-    singleton_id INTEGER PRIMARY KEY DEFAULT 0,
-    workspace_id TEXT NOT NULL,
-    last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
-);
-
--- Ensure only one row for singleton
--- Note: Only check singleton_id value, let PRIMARY KEY handle duplicates via INSERT OR IGNORE
-CREATE TRIGGER IF NOT EXISTS active_workspace_singleton
-    BEFORE INSERT ON active_workspace
-    WHEN NEW.singleton_id != 0
-    BEGIN
-        SELECT RAISE(ABORT, 'Only one active workspace allowed with singleton_id=0');
-    END;
-
--- Per-project active workspace tracking
--- Remembers the last active workspace for each project, so switching back to
--- a project restores the workspace the user was using.
-CREATE TABLE IF NOT EXISTS project_active_workspace (
-    project_id TEXT PRIMARY KEY,
-    workspace_id TEXT NOT NULL,
-    last_modified INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-    FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE SET NULL
-);
-
 -- ============================================================================
 -- File Metadata Table (for OPFS workspace files)
 -- ============================================================================
@@ -457,13 +415,6 @@ INSERT OR IGNORE INTO idb_migration_state (singleton_id, status) VALUES (0, 'pen
 -- ============================================================================
 -- Views for Common Queries
 -- ============================================================================
-
--- Active workspace with full info
-CREATE VIEW IF NOT EXISTS v_active_workspace AS
-    SELECT w.*, a.last_modified as active_since
-    FROM workspaces w
-    JOIN active_workspace a ON w.id = a.workspace_id
-    WHERE w.status = 'active';
 
 -- Workspaces with file counts
 -- Note: pending_count is computed from fs_ops with review_status filter
