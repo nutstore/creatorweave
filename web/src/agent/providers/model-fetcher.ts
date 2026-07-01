@@ -12,6 +12,7 @@
 
 import type { LLMProviderType, ModelInfo, ModelCapability } from './types'
 import { LLM_PROVIDER_CONFIGS, PROVIDER_META, isCustomProviderType } from './types'
+import { getOpenRouterContextWindow } from './openrouter-pricing'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -458,6 +459,11 @@ const CONTEXT_WINDOW_MAP: Array<{ pattern: string; context: number }> = [
  * matching prematurely (e.g. "deepseek-v4-pro" must match before "deepseek").
  */
 function guessContextWindow(id: string): number {
+  // 0. OpenRouter static snapshot (authoritative — covers 338 models).
+  //    This is the primary source, checked before the heuristic table below.
+  const orCtx = getOpenRouterContextWindow(id)
+  if (orCtx != null && orCtx > 0) return orCtx
+
   const lower = id.toLowerCase()
 
   // 1. Explicit size hints in the ID (e.g. "128k", "32k")

@@ -17,6 +17,7 @@
 import type { LLMProviderConfig, LLMProviderType, ModelInfo, ProviderMeta } from './types'
 import { registerDynamicProvider, unregisterDynamicProvider } from './types'
 import { fetchGatewayModels } from './llm-gateway-auth'
+import { getModelContextWindow } from './model-store'
 
 // ── Provider Identity ──
 
@@ -88,7 +89,9 @@ export async function updateGatewayModels(accessToken: string): Promise<ModelInf
     id: m.id,
     name: m.name,
     capabilities: ['code', 'writing', 'reasoning'] as const,
-    contextWindow: 200000,
+    // Resolve contextWindow dynamically so MiniMax-m3 (1M), glm-5.2 (1M),
+    // gpt-4o (128K), etc. each show their real value instead of a flat 200K.
+    contextWindow: getModelContextWindow(LLM_GATEWAY_PROVIDER_TYPE, m.id),
   }))
 
   const baseURL_str = getGatewayBaseURL()

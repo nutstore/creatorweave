@@ -13,6 +13,7 @@
 import type { LLMProviderType, ModelInfo } from './types'
 import { getModelsForProvider } from './types'
 import type { FetchModelsResult } from './model-fetcher'
+import { getOpenRouterContextWindow } from './openrouter-pricing'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -194,21 +195,36 @@ export function getModelContextWindow(
     const models = getCachedModels(pt, pk)
     if (!models) continue
     for (const m of models) {
-      if (seenIds.has(m.id)) continue
-      seenIds.add(m.id)
+      const key = m.id.toLowerCase()
+      if (seenIds.has(key)) continue
+      seenIds.add(key)
       merged.push(m)
     }
   }
 
-  const cached = merged.find((m) => m.id === modelId)
-  if (cached && cached.contextWindow > 0) return cached.contextWindow
+  // Lowercase the modelId once for case-insensitive matching.
+  // Dynamic /models endpoints and OpenRouter ids may differ in casing
+  // (e.g. "Minimax/MiniMax-m3" vs "minimax/minimax-m3").
+  const lowerModelId = modelId.toLowerCase()
 
-  // 2. Static registry
+  const cached = merged.find((m) => m.id.toLowerCase() === lowerModelId)
+  if (cached && cached.contextWindow != null && cached.contextWindow > 0) return cached.contextWindow
+
+  // 2. OpenRouter public model data (universal — covers all providers
+  //    that don't publish context_length via their own /models endpoint).
+  //    Pure static lookup from the bundled JSON snapshot.
+  const orCtx = getOpenRouterContextWindow(modelId)
+  if (orCtx != null && orCtx > 0) return orCtx
+
+  // 3. Static registry (last-resort fallback for models OpenRouter
+  //    doesn't know about either).
   const staticModels = getModelsForProvider(providerType)
-  const fromStatic = staticModels.find((m) => m.id === modelId)?.contextWindow
+  const fromStatic = staticModels.find(
+    (m) => m.id.toLowerCase() === lowerModelId
+  )?.contextWindow
   if (fromStatic !== undefined && fromStatic > 0) return fromStatic
 
-  // 3. Default fallback
+  // 4. Default fallback
   return 128000
 }
 
@@ -239,9 +255,10 @@ export function getModelPricing(
     const models = getCachedModels(pt, pk)
     if (!models) continue
     for (const m of models) {
-      if (seenIds.has(m.id)) continue
-      seenIds.add(m.id)
-      if (m.id === modelId && m.pricing) return m.pricing
+      const key = m.id.toLowerCase()
+      if (seenIds.has(key)) continue
+      seenIds.add(key)
+      if (key === modelId.toLowerCase() && m.pricing) return m.pricing
     }
   }
   return null

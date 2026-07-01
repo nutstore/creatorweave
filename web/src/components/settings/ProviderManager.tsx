@@ -186,7 +186,16 @@ function ProviderCard({
     return pinnedIds
       .map((id) => {
         const found = allModels.find((m) => m.id === id)
-        return found || { id, name: id, capabilities: [] as const, contextWindow: 0 }
+        // Fallback: resolve contextWindow via the full lookup chain
+        // (dynamic cache → OpenRouter snapshot → static registry → default).
+        // This ensures pinned models always show accurate context info
+        // even when they're not in the current dynamic/static model list.
+        return found || {
+          id,
+          name: id,
+          capabilities: [] as const,
+          contextWindow: getModelContextWindow(providerType, id),
+        }
       })
   }, [pinnedModelsByProvider, providerType, allModels])
 
@@ -588,9 +597,11 @@ function ProviderCard({
                   >
                     {model.name}
                     <span className="text-[9px] text-tertiary">
-                      {model.contextWindow >= 1000000
+                      {model.contextWindow != null &&
+                        model.contextWindow >= 1000000
                         ? `${(model.contextWindow / 1000000).toFixed(0)}M`
-                        : model.contextWindow >= 1000
+                        : model.contextWindow != null &&
+                          model.contextWindow >= 1000
                           ? `${(model.contextWindow / 1000).toFixed(0)}K`
                           : ''}
                     </span>
@@ -739,7 +750,7 @@ function ProviderCard({
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          {model.contextWindow > 0 && (
+                          {model.contextWindow != null && model.contextWindow > 0 && (
                             <span className="text-[9px] text-tertiary">
                               {model.contextWindow >= 1000000
                                 ? `${(model.contextWindow / 1000000).toFixed(0)}M`

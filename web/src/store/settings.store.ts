@@ -15,6 +15,7 @@ import {
   unregisterDynamicProvider,
   getProviderConfig,
 } from '@/agent/providers/types'
+import { getModelContextWindow } from '@/agent/providers/model-store'
 import type { ThinkingLevel } from '@earendil-works/pi-ai'
 
 // Cache for hasApiKey to avoid repeated database queries
@@ -185,7 +186,10 @@ function registerCustomAsDynamic(cp: CustomProviderConfig) {
         id: m,
         name: m,
         capabilities: ['code', 'writing'] as const,
-        contextWindow: 128000,
+        // Resolve contextWindow dynamically so each custom model shows
+        // its real value (minimax-m3 → 1M, glm-5.2 → 1M, gpt-4o → 128K, etc.)
+        // instead of a flat 128K default.
+        contextWindow: getModelContextWindow(cp.id, m),
       })),
     },
   )
