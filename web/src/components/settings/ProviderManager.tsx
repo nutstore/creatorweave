@@ -44,9 +44,9 @@ import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
-import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels, isLLMGatewayConfigured } from '@/agent/providers/llm-gateway-provider'
+import { LLM_GATEWAY_PROVIDER_TYPE, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId, updateGatewayModels, isLLMGatewayConfigured, fetchGatewayRateLimits, type RateLimitsResponse } from '@/agent/providers/llm-gateway-provider'
 import { performDeviceCodeFlow, logoutGateway as logoutGatewayAuth, getValidAccessToken, fetchGatewayModels } from '@/agent/providers/llm-gateway-auth'
-import type { AuthState } from '@/agent/providers/llm-gateway-auth'
+import type { AuthState, RateLimitWindow } from '@/agent/providers/llm-gateway-auth'
 
 // =============================================================================
 // Constants
@@ -880,6 +880,16 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
 // LLM Gateway Card - Special provider card for Device Code Flow
 // =============================================================================
 
+/** Format an ISO reset timestamp as a compact relative string. */
+function formatResetTime(iso: string): string {
+  const d = new Date(iso)
+  const diffMs = d.getTime() - Date.now()
+  const diffH = Math.round(diffMs / 3_600_000)
+  if (diffH <= 0) return '即将重置'
+  if (diffH < 24) return `${diffH} 小时后重置`
+  return `${Math.round(diffH / 24)} 天后重置`
+}
+
 function LLMGatewayCard({
   isExpanded,
   onToggle,
@@ -895,6 +905,11 @@ function LLMGatewayCard({
   const [modelSearch, setModelSearch] = useState('')
   const [addingManual, setAddingManual] = useState(false)
   const [manualDraft, setManualDraft] = useState('')
+
+  // Rate-limits query state for the quota progress bars
+  const [rateLimitsLoading, setRateLimitsLoading] = useState(false)
+  const [rateLimitsResult, setRateLimitsResult] = useState<RateLimitsResponse | null>(null)
+  const [rateLimitsError, setRateLimitsError] = useState<string | null>(null)
 
   // Inline auth flow state
   const [authState, setAuthState] = useState<AuthState & { userCode?: string; verificationUri?: string }>({
@@ -998,6 +1013,9 @@ function LLMGatewayCard({
     setIsLoggedIn(false)
     setAllModels([])
     setAuthState({ status: 'idle' })
+    // Clear cached rate-limits so next login refetches
+    setRateLimitsResult(null)
+    setRateLimitsError(null)
     triggerProviderRefresh()
   }, [triggerProviderRefresh])
 
@@ -1016,6 +1034,33 @@ function LLMGatewayCard({
     setManualDraft('')
     setAddingManual(false)
   }, [manualDraft, pinModel])
+
+  const handleFetchRateLimits = useCallback(async () => {
+    setRateLimitsLoading(true)
+    setRateLimitsError(null)
+    try {
+      const result = await fetchGatewayRateLimits()
+      setRateLimitsResult(result)
+      if (import.meta.env.DEV) {
+        console.log('[llm-gateway] GET /v1/rate-limits response:', result)
+      }
+    } catch (e) {
+      const msg = (e as Error).message || '查询失败'
+      setRateLimitsError(msg)
+      if (import.meta.env.DEV) {
+        console.error('[llm-gateway] GET /v1/rate-limits error:', e)
+      }
+    } finally {
+      setRateLimitsLoading(false)
+    }
+  }, [])
+
+  // Auto-fetch rate limits when the card is expanded and logged in
+  useEffect(() => {
+    if (!isLoggedIn || !isExpanded) return
+    if (rateLimitsResult || rateLimitsError) return // already loaded this session
+    void handleFetchRateLimits()
+  }, [isLoggedIn, isExpanded, handleFetchRateLimits, rateLimitsResult, rateLimitsError])
 
   return (
     <div className="rounded-lg border border-[var(--brand-border,rgba(13,148,136,0.25))] overflow-hidden"
@@ -1221,7 +1266,63 @@ function LLMGatewayCard({
                 </BrandDialogContent>
               </BrandDialog>
 
+              {/* Rate-limits status */}
+              {(rateLimitsResult || rateLimitsError) && (
+                <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-2">
+                  {rateLimitsError ? (
+                    <p className="text-[11px] text-red-500 break-all">{rateLimitsError}</p>
+                  ) : rateLimitsResult ? (
+                    [
+                      { label: '近 5 小时', data: rateLimitsResult.five_hour },
+                      { label: '本周', data: rateLimitsResult.week },
+                    ]
+                      .filter((w): w is { label: string; data: RateLimitWindow } => {
+                        const d = w.data
+                        return (
+                          !!d &&
+                          typeof d.used === 'number' &&
+                          typeof d.limit === 'number' &&
+                          typeof d.remaining_percentage === 'number' &&
+                          typeof d.next_reset_at === 'string'
+                        )
+                      })
+                      .map(({ label, data }) => {
+                      const usedPct = Math.max(0, 100 - data.remaining_percentage)
+                      const color =
+                        usedPct >= 85 ? '#ef4444' : usedPct >= 60 ? '#f59e0b' : 'var(--brand, #0d9488)'
+                      return (
+                        <div key={label}>
+                          <div className="flex items-center justify-between text-[11px] mb-1">
+                            <span className="text-secondary">{label}</span>
+                            <span className="font-mono text-tertiary">
+                              ¥{data.used.toFixed(1)} / ¥{data.limit}
+                            </span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-border/40 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ width: `${usedPct}%`, background: color }}
+                            />
+                          </div>
+                          <div className="text-[10px] text-tertiary/70 mt-0.5">
+                            {formatResetTime(data.next_reset_at)}
+                          </div>
+                        </div>
+                      )
+                    })
+                  ) : null}
+                </div>
+              )}
+
               <div className="flex gap-2 pt-1">
+                <BrandButton
+                  variant="outline"
+                  className="flex-1 h-8 text-[11px]"
+                  onClick={handleFetchRateLimits}
+                  disabled={rateLimitsLoading}
+                >
+                  {rateLimitsLoading ? '刷新中...' : '刷新'}
+                </BrandButton>
                 <BrandButton
                   variant="outline"
                   className="flex-1 h-8 text-[11px]"

@@ -16,7 +16,7 @@
 
 import type { LLMProviderConfig, LLMProviderType, ModelInfo, ProviderMeta } from './types'
 import { registerDynamicProvider, unregisterDynamicProvider } from './types'
-import { fetchGatewayModels } from './llm-gateway-auth'
+import { fetchGatewayModels, fetchRateLimits, forceRefreshAccessToken, getValidAccessToken, type RateLimitsResponse } from './llm-gateway-auth'
 import { getModelContextWindow } from './model-store'
 
 // ── Provider Identity ──
@@ -133,6 +133,44 @@ export function getLLMGatewayApiKeyProviderKey(): string {
   return LLM_GATEWAY_API_KEY_ID
 }
 
+/**
+ * Fetch rate-limit / quota status from the gateway with automatic token
+ * management.
+ *
+ * Acquires a valid access token (refreshing if needed), calls
+ * `GET /v1/rate-limits`, and retries once on HTTP 401 after a force-refresh.
+ *
+ * Requires the user to be logged in (have stored gateway tokens).
+ *
+ * @returns The raw gateway response — structure is gateway-defined.
+ * @throws Error when not logged in, or when the request fails after retry.
+ */
+export async function fetchGatewayRateLimits(): Promise<RateLimitsResponse> {
+  const baseURL = getGatewayBaseURL()
+  const clientId = getGatewayClientId()
+
+  let token = await getValidAccessToken(baseURL, clientId)
+  if (!token) {
+    throw new Error('未登录坚果云 AI，请先完成登录')
+  }
+
+  try {
+    return await fetchRateLimits(baseURL, token)
+  } catch (e) {
+    // 401 → access token rejected by gateway; force-refresh and retry once
+    const status = (e as Error & { status?: number }).status
+    if (status === 401) {
+      console.warn('[llm-gateway] rate-limits: 401, force-refreshing token...')
+      token = await forceRefreshAccessToken(baseURL, clientId)
+      if (!token) {
+        throw new Error('Token 已失效且无法刷新，请重新登录')
+      }
+      return await fetchRateLimits(baseURL, token)
+    }
+    throw e
+  }
+}
+
 // Re-export auth functions for convenience
 export {
   performDeviceCodeFlow,
@@ -141,6 +179,9 @@ export {
   hasValidAccessToken,
   logoutGateway,
   fetchGatewayModels,
+  fetchRateLimits,
+  forceRefreshAccessToken,
   type AuthState,
   type TokenResponse,
+  type RateLimitsResponse,
 } from './llm-gateway-auth'

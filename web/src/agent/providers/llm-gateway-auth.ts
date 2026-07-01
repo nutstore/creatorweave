@@ -40,6 +40,32 @@ export interface GatewayError {
   retriable: boolean
 }
 
+// ── Rate Limits ──
+
+/** Single rate-limit window (e.g. 5-hour rolling window or weekly window). */
+export interface RateLimitWindow {
+  /** 配额上限（人民币） */
+  limit: number
+  /** 已用配额（人民币） */
+  used: number
+  /** 剩余配额（人民币） */
+  remaining: number
+  /** 剩余百分比 (0–100) */
+  remaining_percentage: number
+  /** 下次重置时间 (ISO 8601 UTC) */
+  next_reset_at: string
+}
+
+/** Response of `GET /v1/rate-limits`. */
+export interface RateLimitsResponse {
+  /** 用户标识 */
+  uid: string
+  /** 5 小时滚动窗口 */
+  five_hour: RateLimitWindow
+  /** 周窗口 */
+  week: RateLimitWindow
+}
+
 // ── Token Persistence ──
 
 const TOKEN_STORAGE_KEY = 'llm-gateway-tokens'
@@ -599,6 +625,46 @@ export async function fetchGatewayModels(
       name: m.name || m.id || '',
     })
   )
+}
+
+/**
+ * Fetch rate-limit / quota status from the gateway.
+ *
+ * GET /v1/rate-limits with Authorization: Bearer <access_token>.
+ *
+ * The response structure is gateway-defined and not yet documented in the
+ * device-code-flow integration doc (only the endpoint path is listed in §3.7).
+ * This function returns the raw JSON so callers can inspect the actual shape.
+ *
+ * @throws Error with `.status` set to the HTTP status code on non-2xx
+ *   (401 when the access token is expired, 403 when rate-limited, etc.)
+ */
+export async function fetchRateLimits(
+  baseURL: string,
+  accessToken: string
+): Promise<RateLimitsResponse> {
+  const res = await fetch(`${baseURL}/v1/rate-limits`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!res.ok) {
+    const err = new Error(
+      `fetchRateLimits failed: ${res.status} ${res.statusText}`
+    ) as Error & { status?: number }
+    err.status = res.status
+    // Attach response body for easier debugging
+    try {
+      const body = await res.text()
+      if (body) {
+        err.message = `${err.message} — ${body}`
+      }
+    } catch {
+      // ignore body read failure
+    }
+    throw err
+  }
+
+  return res.json()
 }
 
 // ── Helpers ──
