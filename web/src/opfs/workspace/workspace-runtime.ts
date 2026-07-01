@@ -641,12 +641,20 @@ export class WorkspaceRuntime {
     const projectId = options.projectId
 
     // Multi-root: resolve the correct native handle for this path
-    // If directoryHandle is provided, use it (explicit override).
+    // If directoryHandle is provided, use it (explicit override) but still
+    // strip the rootName prefix so nativePath matches the disk layout
+    // (otherwise readFromNativeFS misses the file and falls back to OPFS).
     // Otherwise, resolve the per-root handle based on path prefix.
     let nativeHandle: FileSystemDirectoryHandle | null
     let nativePath = normalizedPath
     if (directoryHandle) {
       nativeHandle = directoryHandle
+      try {
+        const resolved = await this.resolvePath(normalizedPath, projectId)
+        nativePath = resolved.relativePath || normalizedPath
+      } catch {
+        nativePath = normalizedPath
+      }
     } else {
       nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       // Resolve the path relative to the root (strip root prefix for native FS access)
@@ -910,6 +918,17 @@ export class WorkspaceRuntime {
     let nativePath = normalizedPath
     if (directoryHandle) {
       nativeHandle = directoryHandle
+      // Strip rootName prefix so nativePath matches disk layout. Without this,
+      // readFromNativeFS throws NotFoundError → baselineFsMtime falls back to
+      // the OPFS mtime → false conflict in detect_conflicts (disk mtime ≠ OPFS
+      // mtime). Agent write/edit pass null so were unaffected; only callers
+      // passing a directoryHandle (FilePreview saves, git restore) hit this.
+      try {
+        const resolved = await this.resolvePath(normalizedPath, projectId)
+        nativePath = resolved.relativePath || normalizedPath
+      } catch {
+        nativePath = normalizedPath
+      }
     } else {
       nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       const resolved = await this.resolvePath(normalizedPath, projectId)
@@ -1077,6 +1096,12 @@ export class WorkspaceRuntime {
     let nativePath = normalizedPath
     if (directoryHandle) {
       nativeHandle = directoryHandle
+      try {
+        const resolved = await this.resolvePath(normalizedPath, projectId)
+        nativePath = resolved.relativePath || normalizedPath
+      } catch {
+        nativePath = normalizedPath
+      }
     } else {
       nativeHandle = await this.getNativeDirectoryHandleForPath(normalizedPath, projectId)
       const resolved = await this.resolvePath(normalizedPath, projectId)

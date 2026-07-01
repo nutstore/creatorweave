@@ -585,7 +585,12 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     setSaving(true)
     try {
       const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
-      await opfs.writeFile(filePath, editedContent, directoryHandle)
+      // Do NOT pass directoryHandle: writeFile resolves the correct per-root
+      // native handle from the path's rootName prefix. Passing the global UI
+      // handle skips root-prefix stripping in the directoryHandle branch, so
+      // baselineFsMtime falls back to the OPFS mtime and detect_conflicts then
+      // reports a false conflict (disk mtime != OPFS mtime).
+      await opfs.writeFile(filePath, editedContent)
       setOriginalForDiff(editedContent)
       setContent(editedContent)
       toast.success(t('filePreview.saved'))
@@ -595,7 +600,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     } finally {
       setSaving(false)
     }
-  }, [filePath, isDirty, editedContent, directoryHandle, t])
+  }, [filePath, isDirty, editedContent, t])
 
   // ⌘S / Ctrl+S to save while in edit mode
   useEffect(() => {
