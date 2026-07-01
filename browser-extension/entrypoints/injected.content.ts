@@ -334,6 +334,71 @@ export default defineContentScript({
       }
     }
 
+    /**
+     * Parse Baidu search results HTML using DOMParser.
+     * Runs in MAIN world where DOM APIs are available.
+     * Extracts title, url, snippet from each organic result block.
+     */
+    function parseBaiduHtml(html: string, limit: number): Array<{ title: string; url: string; snippet: string }> {
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const results: Array<{ title: string; url: string; snippet: string }> = [];
+
+      // Each organic result is a <div> with a result-title.
+      // Baidu result blocks: <div class="result ..."> or <div class="c-container ...">
+      // Title is in <h3><a>, snippet is in various child elements.
+      const blocks = doc.querySelectorAll('div.result, div.c-container');
+
+      // Known Baidu snippet container selectors (tried first, whitelist)
+      const SNIPPET_SELECTORS = [
+        '.c-abstract',
+        '[class*="content-right_"]',
+        '[class*="c-span-later"]',
+        '[class*="text_"]',
+      ];
+
+      // Noise keywords commonly found inside Baidu result blocks
+      const NOISE_TEXTS = ['收藏', '举报', '快照', '分享', '下载', '保障', '百度V', '高清版本', '查看更多', '免责声明'];
+
+      /** Extract a clean snippet from a result block */
+      function extractSnippet(block: Element): string {
+        // Strategy 1: try known snippet containers
+        for (const sel of SNIPPET_SELECTORS) {
+          const el = block.querySelector(sel);
+          if (el) {
+            const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+            if (text.length > 10) return text.substring(0, 300);
+          }
+        }
+        // Strategy 2: clone + remove title/icons/noise-text elements
+        const clone = block.cloneNode(true) as Element;
+        clone.querySelectorAll('h3, img, span.c-icon, .c-icon-bear-circle').forEach((e) => e.remove());
+        // Remove elements whose text matches a known noise pattern
+        clone.querySelectorAll('a, span, em, div').forEach((el) => {
+          const text = (el.textContent || '').trim();
+          if (text && text.length < 20 && NOISE_TEXTS.some((n) => text.includes(n))) {
+            el.remove();
+          }
+        });
+        return (clone.textContent || '').replace(/\s+/g, ' ').trim().substring(0, 300);
+      }
+
+      for (const block of Array.from(blocks)) {
+        if (results.length >= limit) break;
+
+        const titleLink = block.querySelector('h3 a');
+        if (!titleLink) continue;
+
+        const title = (titleLink.textContent || '').trim();
+        const url = titleLink.getAttribute('href') || '';
+
+        if (!title || !url) continue;
+
+        results.push({ title, url, snippet: extractSnippet(block) });
+      }
+
+      return results;
+    }
+
     (window as any).__agentWeb = {
       ready: true,
 
@@ -345,54 +410,108 @@ export default defineContentScript({
       },
 
       /**
-       * Search the web via DuckDuckGo
+       * Search the web. Provider auto-detected (DuckDuckGo or Baidu) unless
+       * explicitly specified via options.provider.
+       * For Baidu, raw HTML is fetched in background and parsed here via DOMParser.
        */
-      async search(query: string, options?: { count?: number }) {
+      async search(query: string, options?: { count?: number; provider?: string }) {
         const opts = options || {};
-        return sendToBridge('web_search', {
+        const response = await sendToBridge('web_search', {
           query,
           count: opts.count || 10,
+          provider: opts.provider || 'auto',
         });
+
+        // If background returned raw HTML (format: 'html'), parse it here via DOMParser
+        if (response.ok && response.html && response.format === 'html') {
+          const results = parseBaiduHtml(response.html, response.limit || 10);
+          return { ok: true, results, provider: response.provider };
+        }
+
+        return response;
       },
 
       /**
        * Fetch a URL and return clean Markdown.
        * Pipeline: HTTP fetch → Readability (extract main content) → Turndown (HTML→Markdown).
        * Falls back to full-page Turndown if Readability can't extract.
+       *
+       * SPA detection: if Readability-extracted content is very short (likely a
+       * JS-rendered SPA shell), automatically retries via a hidden browser tab
+       * that executes JavaScript and extracts the fully rendered DOM.
+       *
+       * Set options.render = true to force hidden-tab rendering (skip HTTP fetch).
        */
       async fetch(url: string, options?: {
         method?: string;
         headers?: Record<string, string>;
         body?: string | null;
+        render?: boolean;
       }) {
         const opts = options || {};
 
-        // Try fast HTTP fetch first; fall back to render tab if response looks like an SPA shell
-        let response = await sendToBridge('web_fetch', {
-          url,
-          method: opts.method || 'GET',
-          headers: opts.headers || {},
-          body: opts.body || null,
-          extract: 'raw',
-        });
+        // Helper: get raw HTML response (HTTP or render mode)
+        async function getRawHtml(useRender: boolean) {
+          if (useRender) {
+            return await sendToBridge('web_fetch_render', { url });
+          }
+          return await sendToBridge('web_fetch', {
+            url,
+            method: opts.method || 'GET',
+            headers: opts.headers || {},
+            body: opts.body || null,
+            extract: 'raw',
+          });
+        }
 
-        // If fast fetch failed or returned very little content, try render mode
-        if (!response.ok || !response.body || response.body.length < 200) {
-          const renderResponse = await sendToBridge('web_fetch_render', { url });
-          if (renderResponse.ok && renderResponse.body && renderResponse.body.length > (response.body?.length || 0)) {
-            response = renderResponse;
+        // Helper: apply Readability + Turndown to a response
+        function toMarkdown(response: any) {
+          const result = htmlToMarkdown(response.body);
+          return {
+            ...response,
+            body: result.body,
+            ...(result.readability ? { readability: result.readability } : {}),
+          };
+        }
+
+        // ── Force render mode ──
+        if (opts.render === true) {
+          const response = await getRawHtml(true);
+          if (!response.ok) return response;
+          return toMarkdown(response);
+        }
+
+        // ── Default: fast HTTP fetch first ──
+        let response = await getRawHtml(false);
+
+        // HTTP failed entirely → try render as last resort
+        if (!response.ok || !response.body) {
+          const renderResponse = await getRawHtml(true);
+          if (renderResponse.ok && renderResponse.body) {
+            return toMarkdown(renderResponse);
+          }
+          return response;
+        }
+
+        // Extract content, then check if it looks like an SPA shell.
+        // We measure Readability-extracted text length (not raw HTML bytes)
+        // because SPA shells often have large HTML but near-zero readable text.
+        const extracted = toMarkdown(response);
+        const extractedLength = extracted.body.trim().length;
+
+        if (extractedLength < 200) {
+          // Likely a JS-rendered SPA shell — retry with full rendering
+          const renderResponse = await getRawHtml(true);
+          if (renderResponse.ok && renderResponse.body) {
+            const rendered = toMarkdown(renderResponse);
+            // Use rendered version only if it has more content
+            if (rendered.body.trim().length > extractedLength) {
+              return rendered;
+            }
           }
         }
 
-        if (!response.ok) return response;
-
-        const result = htmlToMarkdown(response.body);
-
-        return {
-          ...response,
-          body: result.body,
-          ...(result.readability ? { readability: result.readability } : {}),
-        };
+        return extracted;
       },
 
       /**

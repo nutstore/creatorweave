@@ -23,6 +23,7 @@ interface AgentWebSearchResult {
 interface AgentWebSearchResponse {
   ok: boolean
   results: AgentWebSearchResult[]
+  provider?: string
   error?: string
 }
 
@@ -50,11 +51,12 @@ function getAgentWeb() {
   if (typeof window === 'undefined') return null
   const w = window as unknown as { __agentWeb?: { ready: boolean; search: unknown; fetch: unknown } }
   return w.__agentWeb?.ready ? w.__agentWeb as {
-    search: (query: string, options?: { count?: number }) => Promise<AgentWebSearchResponse>
+    search: (query: string, options?: { count?: number; provider?: string }) => Promise<AgentWebSearchResponse>
     fetch: (url: string, options?: {
       method?: string
       headers?: Record<string, string>
       body?: string | null
+      render?: boolean
     }) => Promise<AgentWebFetchResponse>
   } : null
 }
@@ -73,8 +75,9 @@ export const webSearchDefinition: ToolDefinition = {
   function: {
     name: 'web_search',
     description: [
-      'Search the web using DuckDuckGo. Returns a list of results with title, URL, and snippet.',
+      'Search the web. Returns a list of results with title, URL, and snippet.',
       'Use this tool to find information on the internet, look up documentation, research topics, or find specific URLs.',
+      'The search engine is auto-selected based on your region (DuckDuckGo for overseas, Baidu for China).',
       'This tool requires the Browser Extension to be installed and active.',
     ].join('\n'),
     parameters: {
@@ -87,6 +90,15 @@ export const webSearchDefinition: ToolDefinition = {
         count: {
           type: 'number',
           description: 'Number of results to return (default: 10, max: 20)',
+        },
+        provider: {
+          type: 'string',
+          description: [
+            'Search engine to use. Default: auto (region-detected).',
+            'Options: "auto" (recommended), "duckduckgo", "baidu".',
+            'Set explicitly only when you need to override the auto-detected engine.',
+          ].join('\n'),
+          enum: ['auto', 'duckduckgo', 'baidu'],
         },
       },
       required: ['query'],
@@ -106,9 +118,10 @@ export const webSearchExecutor: ToolExecutor = async (args) => {
   }
 
   const count = typeof args.count === 'number' ? Math.min(args.count, 20) : 10
+  const provider = typeof args.provider === 'string' ? args.provider : 'auto'
 
   try {
-    const result = await bridge.search(query, { count })
+    const result = await bridge.search(query, { count, provider })
 
     if (!result.ok) {
       return toolErrorJson('web_search', 'SEARCH_FAILED', result.error || 'Search returned no results', { retryable: true })
@@ -117,6 +130,7 @@ export const webSearchExecutor: ToolExecutor = async (args) => {
     return toolOkJson('web_search', {
       results: result.results,
       total: result.results.length,
+      ...(result.provider ? { provider: result.provider } : {}),
     })
   } catch (err) {
     return toolErrorJson('web_search', 'SEARCH_ERROR', (err as Error).message, { retryable: true })
@@ -135,7 +149,8 @@ export const webFetchDefinition: ToolDefinition = {
       'Fetch the content of a web page by URL and return clean Markdown.',
       '',
       'Automatically extracts the main article content (removes ads, navigation, sidebars, footers) using Mozilla Readability, then converts to Markdown.',
-      'If the page is a JS-heavy SPA that returns an empty shell via HTTP, automatically falls back to a hidden browser tab for full rendering.',
+      'If the page is a JS-heavy SPA that returns an empty shell via HTTP, automatically retries with a hidden browser tab for full JavaScript rendering.',
+      'You can also set render=true to force JavaScript rendering (useful when you know the page is an SPA like a React/Vue app).',
       '',
       'Returns: Markdown body, HTTP status, headers, and readability metadata (title, excerpt, byline).',
       '',
@@ -161,6 +176,14 @@ export const webFetchDefinition: ToolDefinition = {
         body: {
           type: 'string',
           description: 'Request body (for POST/PUT/PATCH)',
+        },
+        render: {
+          type: 'boolean',
+          description: [
+            'Force full JavaScript rendering via a hidden browser tab.',
+            'Set to true for JS-heavy SPA pages (e.g. React/Vue apps that return an empty HTML shell).',
+            'Default: false (fast HTTP fetch). The tool also auto-detects SPA shells and retries with rendering automatically.',
+          ].join('\n'),
         },
       },
       required: ['url'],
@@ -190,11 +213,13 @@ export const webFetchExecutor: ToolExecutor = async (args) => {
     method?: string
     headers?: Record<string, string>
     body?: string | null
+    render?: boolean
   } = {}
 
   if (args.method && typeof args.method === 'string') options.method = args.method
   if (args.headers && typeof args.headers === 'object') options.headers = args.headers as Record<string, string>
   if (args.body !== undefined && args.body !== null) options.body = String(args.body)
+  if (typeof args.render === 'boolean') options.render = args.render
 
   try {
     const result = await bridge.fetch(url, options)
@@ -219,7 +244,7 @@ export const webBridgePromptDoc: ToolPromptDoc = {
   category: 'web',
   section: '### Web Tools (requires Browser Extension)',
   lines: [
-    '- `web_search(query, count?)` - Search the web using DuckDuckGo',
+    '- `web_search(query, count?, provider?)` - Search the web (auto-selects DuckDuckGo or Baidu based on region)',
     '- `web_fetch(url, ...)` - Fetch the content of a web page by URL',
   ],
 }

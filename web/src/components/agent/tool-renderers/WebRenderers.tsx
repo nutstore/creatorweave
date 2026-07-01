@@ -14,6 +14,11 @@ import type { ToolRenderCtx } from './types'
 
 // ── web_search ──
 
+const PROVIDER_LABELS: Record<string, string> = {
+  duckduckgo: 'DuckDuckGo',
+  baidu: '百度',
+}
+
 registerRenderer({
   name: 'web_search',
   icon: <Globe className="h-3.5 w-3.5 text-neutral-400" />,
@@ -21,14 +26,22 @@ registerRenderer({
     const t = useT()
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractSearchResults(ctx)
+    const provider = extractProvider(ctx)
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">web_search</code>
         {query && <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{query}&quot;</span>}
         {!ctx.isExecuting && !ctx.isStreaming && (
-          <span className="ml-auto text-xs text-neutral-400 shrink-0">
-            {t('toolCallDisplay.resultCount', { count: results.length, s: results.length !== 1 ? 's' : '' })}
-          </span>
+          <>
+            {provider && (
+              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
+                {PROVIDER_LABELS[provider] || provider}
+              </span>
+            )}
+            <span className="ml-auto text-xs text-neutral-400 shrink-0">
+              {t('toolCallDisplay.resultCount', { count: results.length, s: results.length !== 1 ? 's' : '' })}
+            </span>
+          </>
         )}
       </>
     )
@@ -36,6 +49,7 @@ registerRenderer({
   Detail(ctx) {
     const t = useT()
     const results = extractSearchResults(ctx)
+    const provider = extractProvider(ctx)
     if (results.length === 0) {
       if (ctx.isExecuting) return <StreamingSkeleton />
       return <div className="px-4 py-3 text-xs text-neutral-400">{t('toolCallDisplay.noResults')}</div>
@@ -50,7 +64,10 @@ registerRenderer({
           </div>
         ))}
         {results.length > 6 && <div className="text-[10px] text-neutral-400">{t('toolCallDisplay.moreCount', { count: results.length - 6 })}</div>}
-        <div className="flex justify-end"><CopyIconButton content={results.map(r => `${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')} /></div>
+        <div className="flex items-center justify-between">
+          {provider && <span className="text-[10px] text-neutral-400 dark:text-neutral-500">via {PROVIDER_LABELS[provider] || provider}</span>}
+          <CopyIconButton content={results.map(r => `${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')} />
+        </div>
       </div>
     )
   },
@@ -272,6 +289,11 @@ function extractSearchResults(ctx: ToolRenderCtx): SearchResult[] {
     url: typeof item.url === 'string' ? item.url : typeof item.link === 'string' ? item.link : '',
     snippet: typeof item.snippet === 'string' ? item.snippet : typeof item.description === 'string' ? item.description : '',
   })).filter(r => r.title || r.url)
+}
+
+function extractProvider(ctx: ToolRenderCtx): string | undefined {
+  const data = ctx.result?.data as Record<string, unknown> | undefined
+  return typeof data?.provider === 'string' ? data.provider : undefined
 }
 
 function shortUrl(url: string): string {

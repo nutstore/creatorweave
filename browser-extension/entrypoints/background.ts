@@ -56,54 +56,169 @@ function extractRealUrl(href) {
 }
 
 // ============================================================
-// web_search: DuckDuckGo HTML search
+// web_search: Multi-provider search (DuckDuckGo / Baidu)
 // ============================================================
+
+/**
+ * Region detection cache. Module-level only — MV3 service workers are
+ * killed after ~30s idle, so this cache is per-session. That's fine:
+ * re-detection runs once per SW lifecycle (a few searches in a row
+ * share the cache; the next day starts fresh).
+ */
+let _cachedProvider = null; // null = not detected yet
+let _cachedProviderAt = 0;
+const PROVIDER_CACHE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+/**
+ * Detect the best search provider for the current user.
+ * Strategy: timezone hint → connectivity test → cache result.
+ */
+async function detectProvider() {
+  // Return cache if still valid
+  if (_cachedProvider && (Date.now() - _cachedProviderAt) < PROVIDER_CACHE_TTL) {
+    return _cachedProvider;
+  }
+
+  // Step 1: timezone hint
+  let hint = 'duckduckgo';
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz === 'Asia/Shanghai' || tz === 'Asia/Urumqi' ||
+        tz === 'Asia/Hong_Kong' || tz === 'Asia/Taipei' ||
+        tz === 'Asia/Macau') {
+      hint = 'baidu';
+    }
+  } catch {}
+
+  // Step 2: connectivity test (3s timeout)
+  // If DDG is reachable, always prefer it (works for both CN-vpn and overseas)
+  const ddgReachable = await isDuckDuckGoReachable();
+
+  let provider;
+  if (ddgReachable) {
+    provider = 'duckduckgo';
+  } else {
+    provider = 'baidu';
+  }
+
+  _cachedProvider = provider;
+  _cachedProviderAt = Date.now();
+  return provider;
+}
+
+/** Quick connectivity test for DuckDuckGo */
+async function isDuckDuckGoReachable() {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    await fetch('https://html.duckduckgo.com/html/?q=test', {
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Search via DuckDuckGo HTML */
+async function searchDuckDuckGo(query, limit) {
+  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const resp = await fetchWithTimeout(url);
+  const html = await resp.text();
+
+  const results = [];
+  const blocks = html.split(/class="result\b/);
+
+  for (let i = 1; i < blocks.length && results.length < limit; i++) {
+    const block = blocks[i];
+
+    const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/);
+    const title = titleMatch
+      ? titleMatch[1].replace(/<[^>]+>/g, '').trim()
+      : '';
+
+    const urlMatch = block.match(/class="result__a"[^>]*href="([^"]*)"/)
+      || block.match(/href="([^"]*)"[^>]*class="result__a"/);
+    const rawUrl = urlMatch ? extractRealUrl(urlMatch[1]) : '';
+
+    const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+    const snippet = snippetMatch
+      ? snippetMatch[1].replace(/<[^>]+>/g, '').trim()
+      : '';
+
+    if (title && rawUrl) {
+      results.push({ title, url: rawUrl, snippet });
+    }
+  }
+  return results;
+}
+
+/** Fetch Baidu search results HTML (raw, unparsed) */
+async function fetchBaiduHtml(query, limit) {
+  const url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}&rn=${Math.min(limit * 2, 20)}`;
+  const resp = await fetchWithTimeout(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+    },
+  });
+  const html = await resp.text();
+  return html;
+}
+
+/**
+ * Run search with symmetric fallback chain.
+ * Order is decided by the detected/explicit primary provider:
+ *   CN user (baidu primary)   → try baidu, then duckduckgo
+ *   Overseas (ddg primary)    → try duckduckgo, then baidu
+ * Each provider is wrapped — 0 results OR thrown error both trigger
+ * fallback to the next. Returns ok:false only when all providers fail.
+ */
+async function searchWithFallback(query, limit, primary) {
+  const order = primary === 'baidu'
+    ? ['baidu', 'duckduckgo']
+    : ['duckduckgo', 'baidu'];
+
+  let lastError = null;
+
+  for (const p of order) {
+    try {
+      if (p === 'baidu') {
+        const html = await fetchBaiduHtml(query, limit);
+        // format: 'html' tells injected.content to DOMParser this payload
+        return { ok: true, html, provider: 'baidu', format: 'html', limit };
+      }
+      const results = await searchDuckDuckGo(query, limit);
+      if (results.length > 0) {
+        return { ok: true, results, provider: 'duckduckgo' };
+      }
+      lastError = 'duckduckgo returned 0 results';
+    } catch (err) {
+      lastError = err.message;
+    }
+  }
+
+  return {
+    ok: false,
+    results: [],
+    error: lastError || 'All search providers exhausted',
+    provider: primary,
+  };
+}
 
 async function handleSearch(message) {
   const { query, count = 10 } = message;
   const limit = Math.min(count, CONFIG.SEARCH_MAX_RESULTS);
 
-  try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
-    const resp = await fetchWithTimeout(url);
-    const html = await resp.text();
-
-    // Parse search results
-    const results = [];
-
-    // Split by result blocks — class may be "result" or "result results_links..."
-    const blocks = html.split(/class="result\b/);
-
-    for (let i = 1; i < blocks.length && results.length < limit; i++) {
-      const block = blocks[i];
-
-      // Extract title — class="result__a" may appear before or after href
-      const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/);
-      const title = titleMatch
-        ? titleMatch[1].replace(/<[^>]+>/g, '').trim()
-        : '';
-
-      // Extract URL — href may appear before or after class="result__a"
-      const urlMatch = block.match(/class="result__a"[^>]*href="([^"]*)"/)
-        || block.match(/href="([^"]*)"[^>]*class="result__a"/);
-      const rawUrl = urlMatch ? extractRealUrl(urlMatch[1]) : '';
-
-      // Extract snippet
-      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-      const snippet = snippetMatch
-        ? snippetMatch[1].replace(/<[^>]+>/g, '').trim()
-        : '';
-
-      if (title && rawUrl) {
-        results.push({ title, url: rawUrl, snippet });
-      }
-    }
-
-    return { ok: true, results };
-
-  } catch (err) {
-    return { ok: false, results: [], error: err.message };
+  // Resolve provider: explicit > cached/auto
+  let provider = message.provider;
+  if (!provider || provider === 'auto') {
+    provider = await detectProvider();
   }
+
+  return searchWithFallback(query, limit, provider);
 }
 
 // ============================================================
