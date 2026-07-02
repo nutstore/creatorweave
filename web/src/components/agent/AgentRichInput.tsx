@@ -660,7 +660,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
         if (disabledRef.current) return false
         if (event.isComposing) return false
 
-        // Escape — cancel agent if processing, otherwise clear editor content.
+        // Escape — cancel agent if processing; otherwise two-step clear:
+        //   1st Esc selects all (visual cue), 2nd Esc clears.
         // When a suggestion popup (@-mention or #-fileMention) is open, the
         // Suggestion plugin should handle Escape to dismiss the popup. Since
         // editorProps.handleKeyDown runs BEFORE the Suggestion plugin, we must
@@ -678,12 +679,25 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             onCancelRef.current?.()
             return true
           }
-          // Not processing — clear editor content
+          // Not processing — two-step clear to prevent accidental loss:
+          //   1st Esc → select all (visual highlight, content intact)
+          //   2nd Esc → actually clear (only when everything is selected)
+          // If the user deselects in between (mouse click, arrow key, …) the
+          // next Esc re-selects instead of clearing — safe by construction.
           const ed = editor // editor is in closure from useEditor
           if (ed && !ed.isEmpty) {
             event.preventDefault()
-            ed.commands.clearContent()
-            emitValue(ed)
+            const { from, to } = ed.state.selection
+            const isAllSelected = from === 0 && to === ed.state.doc.content.size
+            if (isAllSelected) {
+              ed.commands.clearContent()
+              // clearContent can leave a selection highlight on the now-empty
+              // document — collapse caret to start for a clean state.
+              ed.commands.focus('start')
+              emitValue(ed)
+            } else {
+              ed.commands.selectAll()
+            }
             return true
           }
           return false
