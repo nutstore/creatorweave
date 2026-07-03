@@ -33,9 +33,54 @@ export const askUserQuestionDefinition: ToolDefinition = {
       '3. Choose — when multiple viable approaches exist',
       '4. Gather info — when critical parameters are missing',
       '',
+      '## Choosing `type` (decision tree — pick the most specific match)',
+      '- `yes_no` (DEFAULT — use this most often): two clearly opposed answers — "Apply / Cancel", "Keep / Discard", "Proceed / Stop". If only 2 options and one semantically means "yes", use `yes_no`.',
+      '- `single_choice`: 3+ mutually exclusive options — "Pick a DB engine", "Which deployment target".',
+      '- `multi_choice`: 3+ independent toggleable items — "Select features to enable", "Pick which files to refactor".',
+      '- `free_text`: no good preset exists — user must type their own answer (project name, explanation, free-form feedback).',
+      '',
+      '⚠️ Common mistake: do NOT use `single_choice` with just 2 options like [{ label: "Yes" }, { label: "No" }] — use `yes_no` instead. Two radio buttons is strictly worse UX than Yes/No buttons for a binary decision.',
+      '',
+      '## Examples (GOOD vs BAD)',
+      '',
+      '✅ GOOD — `yes_no` for binary confirmation:',
+      '  ask_user_question({ question: "Apply 3 pending migrations to local DB?", type: "yes_no", context: { affected_files: ["db/migrations/001_init.sql", "db/migrations/002_users.sql"] } })',
+      '',
+      '✅ GOOD — `single_choice` with object form (recommended + description):',
+      '  ask_user_question({ question: "Which database engine should the project use?", type: "single_choice", options: [',
+      '    { label: "PostgreSQL", recommended: true, description: "Mature, production-grade, strong consistency" },',
+      '    { label: "SQLite", description: "Zero-config, file-based, good for single-user" },',
+      '    { label: "MySQL", description: "Wide compatibility, but weaker consistency guarantees" }',
+      '  ], default_answer: "PostgreSQL" })',
+      '',
+      '✅ GOOD — `multi_choice` for independent toggles:',
+      '  ask_user_question({ question: "Which features should I scaffold in the new project?", type: "multi_choice", options: [',
+      '    { label: "Authentication", description: "User login, signup, password reset" },',
+      '    { label: "Payments", description: "Stripe integration, subscription billing" },',
+      '    { label: "Email", description: "Transactional and marketing emails" },',
+      '    { label: "Search", description: "Full-text search across content" }',
+      '  ] })',
+      '',
+      '✅ GOOD — `free_text` when no preset fits:',
+      '  ask_user_question({ question: "What should we name this new project?", type: "free_text" })',
+      '',
+      '❌ BAD — `single_choice` used for a binary decision:',
+      '  ask_user_question({ question: "Apply migrations?", type: "single_choice", options: [{ label: "Yes" }, { label: "No" }] })',
+      '  → Should be: type: "yes_no" with NO options field',
+      '',
+      '❌ BAD — `options` passed to `yes_no` (executor rejects with INVALID_INPUT):',
+      '  ask_user_question({ question: "Confirm?", type: "yes_no", options: [{ label: "Yes" }, { label: "No" }] })',
+      '  → Just omit `options`. yes_no uses built-in Yes/No buttons.',
+      '',
+      '❌ BAD — passing string options (executor rejects with INVALID_INPUT):',
+      '  ask_user_question({ options: ["PostgreSQL", "MySQL", "SQLite"] })',
+      '  → Use object form: options: [{ label: "PostgreSQL" }, { label: "MySQL" }, { label: "SQLite" }].',
+      '  → The string form was removed; ⭐ prefix and em-dash separator tricks no longer work.',
+      '',
       '## When NOT to use',
       '- You can find the answer yourself via read/search tools — prefer tools over asking the user',
       '- The answer has one obvious interpretation and the cost of being wrong is low',
+      '- You want to batch multiple questions in one turn — this tool shows ONE question at a time. Ask the most important one first, then continue based on the answer.',
     ].join('\n'),
     parameters: {
       type: 'object',
@@ -58,32 +103,32 @@ export const askUserQuestionDefinition: ToolDefinition = {
         options: {
           type: 'array',
           items: {
-            oneOf: [
-              { type: 'string' },
-              {
-                type: 'object',
-                properties: {
-                  label: { type: 'string', description: '选项主标签' },
-                  description: { type: 'string', description: '选项补充说明（可选），会显示在 label 下方较小字号' },
-                  recommended: { type: 'boolean', description: '是否标记为推荐（可选，默认 false），标记后会在 label 前显示 ⭐ 推荐 徽章' },
-                },
-                required: ['label'],
-              },
-            ],
+            type: 'object',
+            properties: {
+              label: { type: 'string', description: '选项主标签（必填）。' },
+              description: { type: 'string', description: '选项补充说明（可选），会显示在 label 下方较小字号。' },
+              recommended: { type: 'boolean', description: '是否标记为推荐（可选，默认 false），标记后会在 label 前显示 ⭐ 推荐 徽章。' },
+            },
+            required: ['label'],
           },
           description: [
-            '选项列表（type 为 single_choice 或 multi_choice 时必填，至少 2 个选项）。',
+            '选项列表。',
+            '- `type=single_choice` 或 `multi_choice` 时必填，至少 2 个选项。',
+            '- `type=yes_no` 或 `free_text` 时严禁传此字段（executor 会返回 INVALID_INPUT）。',
             '',
-            '## 两种形式',
-            '**简洁形式**（字符串）：直接传选项文字。',
-            '- `"PostgreSQL"`',
-            '- `"⭐ PostgreSQL — 推荐：成熟稳定，适合生产环境"`（⭐ 前缀标记推荐；第一个 ` — ` 分隔 label 和 description）',
+            '## 唯一支持的格式：对象形式',
+            '每个选项必须是 object，必填 `label`，可选 `description` 和 `recommended`。',
             '',
-            '**丰富形式**（对象）：当字符串解析规则会冲突时使用，UI 会展示两行（label + description + ⭐ 推荐徽章）。',
-            '- `{label: "PostgreSQL", description: "成熟稳定，适合生产环境", recommended: true}`',
+            '```json',
+            '{ "label": "PostgreSQL", "description": "成熟稳定，适合生产环境", "recommended": true }',
+            '```',
+            '',
+            '⚠️ 字符串形式已被完全移除（之前支持 `"PostgreSQL"` 和 `"⭐ PostgreSQL — 推荐"` 写法）。',
+            '传字符串的选项会被 executor 拒绝并返回 INVALID_INPUT + 详细 hint。',
             '',
             '## 标注推荐',
-            '当 agent 对某个选项有明确倾向时，应使用 ⭐ 标记推荐项，并附上简短理由，方便用户快速决策。',
+            '使用对象形式的 `recommended: true` 字段，不要用 ⭐ 前缀字符串。',
+            '当 agent 对某个选项有明确倾向时，应标注推荐并附上简短理由。',
             '如果各选项没有明显优劣，则不要标注推荐。',
             '标注推荐时，`default_answer` 也应对齐到推荐项的 label。',
           ].join('\n'),
@@ -98,7 +143,7 @@ export const askUserQuestionDefinition: ToolDefinition = {
             affected_files: {
               type: 'array',
               items: { type: 'string' },
-              description: '受影响的文件列表（用于确认操作时展示上下文）',
+              description: '受影响的文件列表（用于确认操作时展示上下文）。使用 workspace 相对路径，不带 rootName 前缀、不带前导斜杠，例如 "src/App.tsx"（不是 "creatorweave/src/App.tsx" 也不是 "/abs/path/src/App.tsx"）。',
             },
             preview: {
               type: 'string',
@@ -140,7 +185,7 @@ export const askUserQuestionExecutor: ToolExecutor = async (
   } = args as {
     question: string
     type?: 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text'
-    options?: Array<string | { label: string; description?: string; recommended?: boolean }>
+    options?: Array<{ label: string; description?: string; recommended?: boolean }>
     default_answer?: string
     context?: { affected_files?: string[]; preview?: string }
     timeout_ms?: number
@@ -167,6 +212,48 @@ export const askUserQuestionExecutor: ToolExecutor = async (
       'INVALID_INPUT',
       `Parameter "options" must have at least 2 items for type "${questionType}".`,
       { retryable: true }
+    )
+  }
+
+  // String form was REMOVED. All options must be objects.
+  // Runtime check (defense-in-depth) in case the LLM SDK doesn't strictly
+  // enforce the JSON schema.
+  if (questionType === 'single_choice' || questionType === 'multi_choice') {
+    const stringOptions = (options ?? []).filter(o => typeof o === 'string')
+    if (stringOptions.length > 0) {
+      const sample = stringOptions
+        .slice(0, 3)
+        .map(s => JSON.stringify(s))
+        .join(', ')
+      return toolErrorJson(
+        'ask_user_question',
+        'INVALID_INPUT',
+        `Parameter "options" no longer accepts string entries (${stringOptions.length} found, e.g. ${sample}). Each option must be an object with at least a "label" field.`,
+        {
+          retryable: true,
+          hint: 'Replace each string entry with an object. For example, options: ["Yes", "No"] becomes options: [{ label: "Yes" }, { label: "No" }].',
+        }
+      )
+    }
+  }
+
+  // yes_no / free_text have built-in UI affordances — options field is invalid.
+  // Catching this here (rather than silently ignoring) gives the LLM a clear
+  // signal to fix the call instead of producing a confusing QuestionCard.
+  if (
+    (questionType === 'yes_no' || questionType === 'free_text') &&
+    options !== undefined &&
+    options.length > 0
+  ) {
+    const hint =
+      questionType === 'yes_no'
+        ? 'Use type: "yes_no" with NO options field (Yes/No buttons are built-in), or switch to type: "single_choice" if you need custom labels.'
+        : 'Use type: "free_text" with NO options field (text input is built-in).'
+    return toolErrorJson(
+      'ask_user_question',
+      'INVALID_INPUT',
+      `Parameter "options" is not allowed when type is "${questionType}". ${hint}`,
+      { retryable: true, hint }
     )
   }
 

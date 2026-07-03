@@ -10,14 +10,16 @@
  * All choice-based types also offer a "自定义输入" (custom input) option so the user
  * can type their own answer instead of (or in addition to) selecting from presets.
  *
- * Options can be either:
- *   - String (legacy): "PostgreSQL" or "⭐ PostgreSQL — 推荐：成熟稳定"
- *   - Object: { label: "PostgreSQL", description?: "...", recommended?: true }
+ * Options MUST use the object form:
+ *   { label: "PostgreSQL", description?: "...", recommended?: boolean }
  *
- * String parsing rules (backward compat):
- *   1. Leading "⭐ " marks the option as recommended.
- *   2. First occurrence of " — " splits label and description.
- * Use the object form if either rule would interfere with your text.
+ * The string form was REMOVED. The ask_user_question executor rejects
+ * string entries with INVALID_INPUT + a hint pointing to the object form.
+ *
+ * Historical chat data may still contain string entries (from before this
+ * change); normalizeOption() silently coerces them to plain labels for
+ * backward compatibility, so old tool calls still render (without description
+ * or recommended status).
  *
  * The card is shown when the tool call is executing (waiting for user input).
  * Once answered, it shows the original question, the type, and the full answer
@@ -28,48 +30,7 @@ import { useState, useCallback, useId, type KeyboardEvent, type TextareaHTMLAttr
 import { MessageCircleQuestion, CheckCircle2, Clock, FileText, PencilLine, Star } from 'lucide-react'
 import { MarkdownContent } from './MarkdownContent'
 import { useT } from '@/i18n'
-
-// ---------------------------------------------------------------------------
-// Option types — accept both string (legacy) and rich object form
-// ---------------------------------------------------------------------------
-
-export type RawOption = string | {
-  label: string
-  description?: string
-  recommended?: boolean
-}
-
-export interface NormalizedOption {
-  label: string
-  description?: string
-  recommended: boolean
-}
-
-/** Normalize a RawOption to a consistent object form. See header for parsing rules. */
-function normalizeOption(raw: RawOption): NormalizedOption {
-  if (typeof raw === 'object' && raw !== null) {
-    return {
-      label: raw.label,
-      description: raw.description,
-      recommended: !!raw.recommended,
-    }
-  }
-  let str = raw
-  let recommended = false
-  if (str.startsWith('⭐ ')) {
-    recommended = true
-    str = str.slice(2)
-  }
-  const dashIdx = str.indexOf(' — ')
-  if (dashIdx > 0) {
-    return {
-      label: str.slice(0, dashIdx).trim(),
-      description: str.slice(dashIdx + 3).trim(),
-      recommended,
-    }
-  }
-  return { label: str.trim(), recommended }
-}
+import { normalizeOption, type RawOption, type NormalizedOption } from './QuestionCard.utils'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -80,7 +41,7 @@ export interface QuestionCardProps {
   question: string
   /** Question type */
   type: 'yes_no' | 'single_choice' | 'multi_choice' | 'free_text'
-  /** Options for single_choice / multi_choice (accepts string or object form) */
+  /** Options for single_choice / multi_choice (object form only — string form was removed) */
   options?: RawOption[]
   /** Default answer for pre-selection */
   defaultAnswer?: string
