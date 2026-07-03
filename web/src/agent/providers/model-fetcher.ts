@@ -13,6 +13,7 @@
 import type { LLMProviderType, ModelInfo, ModelCapability } from './types'
 import { LLM_PROVIDER_CONFIGS, PROVIDER_META, isCustomProviderType } from './types'
 import { getOpenRouterContextWindow } from './openrouter-pricing'
+import { assertHeaderAscii } from '../llm/http-headers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,10 +68,14 @@ async function fetchOpenAICompatibleModels(
 
   const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers: (() => {
+      const h = {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      }
+      assertHeaderAscii(h, 'model list request headers')
+      return h
+    })(),
     signal: AbortSignal.timeout(10000), // 10s timeout
   })
 

@@ -14,6 +14,7 @@ import {
 } from '@earendil-works/pi-ai'
 import '@earendil-works/pi-ai/openai-responses'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
+import { assertHeaderAscii } from './http-headers'
 
 export const CW_OPENAI_FETCH_API = 'cw-openai-fetch' as const
 
@@ -114,13 +115,16 @@ function streamCwOpenAIChatCompletions(
         ...(model.headers || {}),
         ...(options?.headers || {}),
       })
-      const doFetch = (token: string) =>
-        fetch(requestUrl, {
+      const doFetch = (token: string) => {
+        const headers = buildHeaders(token)
+        assertHeaderAscii(headers, 'LLM request headers')
+        return fetch(requestUrl, {
           method: 'POST',
-          headers: buildHeaders(token),
+          headers,
           body: JSON.stringify(payload),
           signal: options?.signal,
         })
+      }
 
       let response = await doFetch(apiKey)
 
