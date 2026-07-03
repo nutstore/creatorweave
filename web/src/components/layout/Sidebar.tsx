@@ -19,7 +19,7 @@ import { motion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, PanelLeftClose, PanelLeft, FolderTree, Clock, History, Pencil, Archive, ArchiveRestore, Download, Pin, PinOff, ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   BrandButton,
@@ -56,6 +56,9 @@ type ResourceTab = 'files' | 'plugins' | 'pending' | 'snapshots'
 const MIN_CONVERSATION_RATIO = 20 // minimum percentage
 const MAX_CONVERSATION_RATIO = 80 // maximum percentage
 
+/** Tracks conversations currently generating a title, to prevent duplicate clicks. */
+const generatingTitleIds = new Set<string>()
+
 interface ConversationItemData {
   id: string
   title: string
@@ -76,6 +79,7 @@ interface ConversationItemProps extends ConversationItemData {
   onExport: (id: string) => void
   onArchive: (id: string, archived: boolean) => void
   onDelete: (id: string) => void
+  onGenerateTitle: (id: string) => void
   editingTitle: string
   onEditingTitleChange: (title: string) => void
   onConfirmRename: () => void
@@ -131,6 +135,7 @@ const ConversationItem = memo(function ConversationItem({
   onExport,
   onArchive,
   onDelete,
+  onGenerateTitle,
   editingTitle,
   onEditingTitleChange,
   onConfirmRename,
@@ -265,6 +270,12 @@ const ConversationItem = memo(function ConversationItem({
         >
           <Download className="mr-2 h-3.5 w-3.5" />
           {t('sidebar.exportWorkspace') || 'Export'}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() => onGenerateTitle(id)}
+        >
+          <Sparkles className="mr-2 h-3.5 w-3.5" />
+          {t('sidebar.generateTitle')}
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -623,6 +634,7 @@ export const Sidebar = memo(function Sidebar({
   const deleteConversation = useConversationStore((s) => s.deleteConversation)
   const deleteConversations = useConversationStore((s) => s.deleteConversations)
   const updateTitle = useConversationStore((s) => s.updateTitle)
+  const generateTitle = useConversationStore((s) => s.generateTitle)
 
   // Subscribe to runtime store for running status — this ensures Sidebar
   // re-renders when agent status changes (idle → pending → streaming → idle),
@@ -1022,6 +1034,37 @@ export const Sidebar = memo(function Sidebar({
     togglePin(id)
   }, [togglePin])
 
+  const handleItemGenerateTitle = useCallback(async (id: string) => {
+    if (generatingTitleIds.has(id)) return
+    generatingTitleIds.add(id)
+    const toastId = toast.loading(t('sidebar.generatingTitle'))
+    try {
+      const result = await generateTitle(id, true)
+      if (result.ok) {
+        if (result.changed) {
+          toast.success(t('sidebar.titleGenerated'), { id: toastId })
+        } else {
+          // Model produced a valid title but it happens to equal the current one.
+          toast.info(t('sidebar.titleUnchanged'), { id: toastId })
+        }
+      } else {
+        // Map every failure reason to a precise, actionable toast message.
+        const messageKey =
+          result.reason === 'no_provider' || result.reason === 'no_model'
+            ? 'sidebar.titleGenerateNoProvider'
+            : result.reason === 'no_api_key'
+            ? 'sidebar.titleGenerateNoApiKey'
+            : 'sidebar.titleGenerateFailed'
+        toast.error(t(messageKey), { id: toastId })
+      }
+    } catch (error) {
+      console.error('[Sidebar] Failed to generate title:', error)
+      toast.error(t('sidebar.titleGenerateFailed'), { id: toastId })
+    } finally {
+      generatingTitleIds.delete(id)
+    }
+  }, [generateTitle, t])
+
   const handleItemExport = useCallback((id: string) => {
     setExportConvId(id)
   }, [])
@@ -1197,6 +1240,7 @@ export const Sidebar = memo(function Sidebar({
                   onExport={handleItemExport}
                   onArchive={handleItemArchive}
                   onDelete={handleItemDelete}
+                  onGenerateTitle={handleItemGenerateTitle}
                   editingTitle={editingTitle}
                   onEditingTitleChange={handleEditingTitleChange}
                   onConfirmRename={confirmRename}

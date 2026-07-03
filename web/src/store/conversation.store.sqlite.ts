@@ -377,6 +377,7 @@ import { getOrCreateSubagentRuntime } from '@/agent/subagent/runtime'
 import { getApiKeyRepository } from '@/sqlite'
 import { LLM_PROVIDER_CONFIGS, isCustomProviderType, type LLMProviderType } from '@/agent/providers/types'
 import { generateFollowUp } from '@/agent/follow-up-generator'
+import { generateConversationTitle } from '@/agent/title-generator'
 import {
   WORKFLOW_DRY_RUN_MODEL_PREFIX,
   type RunWorkflowTemplateDryRunResult,
@@ -865,6 +866,34 @@ interface ConversationState {
     failed: Array<{ id: string; error: string }>
   }>
   updateTitle: (id: string, title: string) => void
+  /**
+   * Generate a title for a conversation using the current model.
+   *
+   * @param id - conversation id
+   * @param manual - true when triggered by user (right-click menu); the
+   *   resulting title is treated as user-confirmed (titleMode='manual') and
+   *   will not be overwritten by subsequent auto-generation. false when
+   *   triggered automatically after an agent run; only overwrites titles that
+   *   are still in 'auto' mode.
+   * @returns A discriminated result so callers can show precise toasts.
+   */
+  generateTitle: (
+    id: string,
+    manual: boolean
+  ) => Promise<
+    | { ok: true; title: string; changed: boolean }
+    | {
+        ok: false
+        reason:
+          | 'conversation_missing'
+          | 'title_is_manual'
+          | 'no_provider'
+          | 'no_model'
+          | 'no_api_key'
+          | 'model_returned_empty'
+          | 'model_error'
+      }
+  >
 
   // Mount tracking actions
   mountConversation: (id: string) => void
@@ -1865,6 +1894,81 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           )
           toast.error('标题修改保存失败')
         })
+    },
+
+    generateTitle: async (id, manual) => {
+      const conv = get().conversations.find((c) => c.id === id)
+      if (!conv) return { ok: false, reason: 'conversation_missing' }
+
+      // Auto mode must not overwrite a user-edited (manual) title.
+      if (!manual && conv.titleMode === 'manual') {
+        return { ok: false, reason: 'title_is_manual' }
+      }
+
+      const settingsState = useSettingsStore.getState()
+      const providerType = settingsState.providerType
+      if (!providerType) return { ok: false, reason: 'no_provider' }
+
+      const effectiveConfig = settingsState.getEffectiveProviderConfig()
+      const modelName = effectiveConfig?.modelName || settingsState.modelName
+      if (!modelName) return { ok: false, reason: 'no_model' }
+
+      const providerConfig = isCustomProviderType(providerType)
+        ? effectiveConfig
+        : {
+            apiKeyProviderKey: providerType,
+            baseUrl: LLM_PROVIDER_CONFIGS[providerType].baseURL,
+            modelName: modelName || LLM_PROVIDER_CONFIGS[providerType].modelName,
+          }
+      if (!providerConfig?.baseUrl || !providerConfig.modelName) {
+        return { ok: false, reason: 'no_model' }
+      }
+
+      const apiKeyRepo = getApiKeyRepository()
+      const apiKey = await apiKeyRepo.load(providerConfig.apiKeyProviderKey)
+      if (!apiKey) return { ok: false, reason: 'no_api_key' }
+
+      const title = await generateConversationTitle(
+        conv.messages,
+        conv.compressedContextSummary ?? null,
+        {
+          apiKey,
+          providerType,
+          baseUrl: providerConfig.baseUrl,
+          model: providerConfig.modelName,
+          apiMode: isCustomProviderType(providerType)
+            ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode ||
+              'chat-completions'
+            : undefined,
+        }
+      )
+      if (!title) return { ok: false, reason: 'model_returned_empty' }
+
+      // Re-check mode right before applying — a manual edit may have landed
+      // while the generation request was in flight.
+      const current = get().conversations.find((c) => c.id === id)
+      if (!current) return { ok: false, reason: 'conversation_missing' }
+      if (!manual && current.titleMode === 'manual') {
+        return { ok: false, reason: 'title_is_manual' }
+      }
+
+      const changed = current.title !== title
+      set((state) => {
+        const c = state.conversations.find((x) => x.id === id)
+        if (!c) return
+        // Never overwrite a manual title with an auto one.
+        if (!manual && c.titleMode === 'manual') return
+        c.title = title
+        c.titleMode = manual ? 'manual' : 'auto'
+        c.updatedAt = Date.now()
+      })
+      const updated = get().conversations.find((c) => c.id === id)
+      if (updated) {
+        persistConversationMeta(updated).catch((error) => {
+          if (import.meta.env.DEV) console.error('[conversation.store] Failed to persist generated title:', error)
+        })
+      }
+      return { ok: true, title, changed }
     },
 
     // Agent runtime actions
@@ -3003,7 +3107,22 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                   }
                 }
               } catch (err) {
-                console.error('[conversation.store] Failed to generate follow-up:', err)
+                if (import.meta.env.DEV) console.error('[conversation.store] Failed to generate follow-up:', err)
+              }
+
+              // Auto-generate a topic title using the current model.
+              // Only fires within the first 2 user turns and only overwrites
+              // titles that are still in 'auto' mode (not user-edited).
+              try {
+                const titleConv = get().conversations.find((c) => c.id === conversationId)
+                const userTurnCount = titleConv?.messages.filter(
+                  (m) => m.role === 'user' && (m.content || '').trim().length > 0
+                ).length ?? 0
+                if (titleConv && titleConv.titleMode !== 'manual' && userTurnCount <= 2) {
+                  get().generateTitle(conversationId, false)
+                }
+              } catch (err) {
+                if (import.meta.env.DEV) console.error('[conversation.store] Failed to auto-generate title:', err)
               }
             }
             // Clean up cancelled run ID tracking (moved inside set() above)
