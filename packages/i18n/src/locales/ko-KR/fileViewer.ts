@@ -34,6 +34,7 @@ export const filePreview = {
     source: "소스",
     // 댓글 기능
     clickLineToComment: "행 번호를 클릭하여 댓글 추가",
+    selectToComment: "텍스트를 선택하거나 행 번호를 클릭하여 댓글 추가",
     addComment: "댓글 추가...",
     send: "보내기",
     commentsCount: "{count}개 댓글",
@@ -44,6 +45,7 @@ export const filePreview = {
     openInNewTabFailed: "열기 실패: {error}",
     download: "파일 다운로드",
     downloadFailed: "다운로드 실패",
+    refresh: "디스크에서 다시 불러오기",
     // 편집 모드
     editMode: "편집",
     previewMode: "미리보기",
@@ -52,6 +54,9 @@ export const filePreview = {
     saveFailed: "저장 실패",
     unsavedOnClose: "저장하지 않은 변경 사항이 있습니다. 닫으시겠습니까?",
     unsavedOnSwitch: "저장하지 않은 변경 사항이 있습니다. 삭제하시겠습니까?",
+    // 표시 모드 전환
+    switchToOverlay: "전체 너비 오버레이로 전환",
+    switchToSplit: "나란히 분할로 전환",
 } as const
 
 // Office 파일 미리보기

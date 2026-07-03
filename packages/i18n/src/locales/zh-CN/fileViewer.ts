@@ -34,6 +34,7 @@ export const filePreview = {
     source: "源码",
     // 评论功能
     clickLineToComment: "点击行号添加评论",
+    selectToComment: "选中文字或点击行号添加评论",
     addComment: "添加评论...",
     send: "发送",
     commentsCount: "{count} 条评论",
@@ -44,6 +45,7 @@ export const filePreview = {
     openInNewTabFailed: "打开失败：{error}",
     download: "下载文件",
     downloadFailed: "下载失败",
+    refresh: "从磁盘重新加载",
     // 编辑模式
     editMode: "编辑",
     previewMode: "预览",
@@ -52,6 +54,9 @@ export const filePreview = {
     saveFailed: "保存失败",
     unsavedOnClose: "有未保存的修改，确定关闭吗？",
     unsavedOnSwitch: "有未保存的修改，确定放弃吗？",
+    // 显示模式切换
+    switchToOverlay: "切换为全屏覆盖",
+    switchToSplit: "切换为并排分屏",
 } as const
 
 // Office 文件预览

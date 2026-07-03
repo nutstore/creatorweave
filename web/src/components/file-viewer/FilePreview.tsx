@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
-import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download, ExternalLink, Pencil, Save, Circle } from 'lucide-react'
+import { X, FileText, Copy, Check, Eye, Code, MessageSquare, Send, Trash2, Download, ExternalLink, Pencil, Save, Circle, PanelRightClose, Maximize2, RefreshCw } from 'lucide-react'
 import { Editor, loader, type OnMount } from '@monaco-editor/react'
 import * as monaco from 'monaco-editor'
 import type { editor as MonacoEditor } from 'monaco-editor'
@@ -26,6 +26,7 @@ import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
+import type { ConversationStatus } from '@/agent/message-types'
 import { toast } from 'sonner'
 import { OfficePreview, OFFICE_EXTS, getEo2EditorUrl } from './OfficePreview'
 import { getFormatUIHandler } from '@/agent/tools/format-registry'
@@ -49,6 +50,22 @@ interface LineComment {
   endLine: number
   text: string
   createdAt: number
+  /** Optional selected text snippet (for text-selection-based comments) */
+  selectedText?: string
+  /** Optional column range for precise text selection */
+  startColumn?: number
+  endColumn?: number
+}
+
+interface ComposerState {
+  startLine: number
+  endLine: number
+  text: string
+  /** Optional selected text snippet (for text-selection-based comments) */
+  selectedText?: string
+  /** Optional column range for precise text selection */
+  startColumn?: number
+  endColumn?: number
 }
 
 // ── FilePreview Props ──────────────────────────────────────────────────────
@@ -148,7 +165,8 @@ function triggerDownload(url: string, fileName: string) {
 export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob }: FilePreviewProps) {
   const t = useT()
   const display = useWorkspacePreferencesStore((s) => s.display)
-  const directoryHandle = useAgentStore((s) => s.directoryHandle)
+  const filePreviewMode = useWorkspacePreferencesStore((s) => s.filePreviewMode)
+  const setFilePreviewMode = useWorkspacePreferencesStore((s) => s.setFilePreviewMode)
   const [content, setContent] = useState<string | null>(null)
   const [editMode, setEditMode] = useState(false)
   const [editedContent, setEditedContent] = useState('')
@@ -171,16 +189,19 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
 
   // ── Comment State ──────────────────────────────────────────────────────
   const [comments, setComments] = useState<LineComment[]>([])
-  const [composer, setComposer] = useState<{
-    startLine: number
-    endLine: number
-    text: string
-  } | null>(null)
+  const [composer, setComposer] = useState<ComposerState | null>(null)
   // Multi-line selection: track anchor line (like LazyDiffViewer's Shift+Click)
   const anchorLineRef = useRef<number | null>(null)
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   // Monaco decorations for comment highlights
   const decorationsRef = useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
+  // Mirror editMode for use inside Monaco mouse handlers (registered once on
+  // mount). Avoids popping the comment composer when the user selects text
+  // while editing the file.
+  const editModeRef = useRef(false)
+  useEffect(() => {
+    editModeRef.current = editMode
+  }, [editMode])
 
   const fileType = useMemo(() => (filePath ? getFileType(filePath) : 'text'), [filePath])
   const formatUI = useMemo(() => (filePath ? getFormatUIHandler(filePath) : null), [filePath])
@@ -245,20 +266,36 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
 
     // Highlight selected composer range
     if (composer) {
-      for (let line = composer.startLine; line <= composer.endLine; line++) {
+      if (composer.selectedText) {
+        // Precise text selection highlight
         newDecorations.push({
           range: {
-            startLineNumber: line,
-            startColumn: 1,
-            endLineNumber: line,
-            endColumn: 1,
+            startLineNumber: composer.startLine,
+            startColumn: composer.startColumn ?? 1,
+            endLineNumber: composer.endLine,
+            endColumn: composer.endColumn ?? 1,
           },
           options: {
-            isWholeLine: true,
-            className: 'fp-selected-line',
-            glyphMarginClassName: 'fp-selected-glyph',
+            className: 'fp-selected-text',
           },
         })
+      } else {
+        // Whole-line highlight (click on line number)
+        for (let line = composer.startLine; line <= composer.endLine; line++) {
+          newDecorations.push({
+            range: {
+              startLineNumber: line,
+              startColumn: 1,
+              endLineNumber: line,
+              endColumn: 1,
+            },
+            options: {
+              isWholeLine: true,
+              className: 'fp-selected-line',
+              glyphMarginClassName: 'fp-selected-glyph',
+            },
+          })
+        }
       }
     }
 
@@ -312,6 +349,50 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         }))
       }
     })
+
+    // Text selection: when user finishes selecting text (mouse up),
+    // open the comment composer immediately with the selected snippet.
+    let suppressSelectionOnce = false
+    // Track gutter clicks to suppress the text-selection path
+    editor.onMouseDown((e) => {
+      const target = e.target
+      if (
+        target.type === 2 || // GUTTER_GLYPH_MARGIN
+        target.type === 3 || // GUTTER_LINE_NUMBERS
+        target.type === 4    // GUTTER_LINE_DECORATIONS
+      ) {
+        suppressSelectionOnce = true
+      }
+    })
+
+    editor.onMouseUp(() => {
+      // Skip if this mouseup came from a gutter click
+      if (suppressSelectionOnce) {
+        suppressSelectionOnce = false
+        return
+      }
+      // Skip in edit mode — text selection there is for editing, not commenting.
+      if (editModeRef.current) return
+      const selection = editor.getSelection()
+      if (!selection || selection.isEmpty()) return
+
+      const selectedText = editor.getModel()?.getValueInRange(selection) ?? ''
+      // Ignore trivial selections (single char or whitespace-only) to avoid
+      // popping the composer on accidental clicks / double-click-word when the
+      // user just wanted to copy or focus.
+      if (selectedText.trim().length < 2) return
+
+      // Build composer with precise selection range + snippet
+      setComposer((prev) => ({
+        startLine: selection.startLineNumber,
+        endLine: selection.endLineNumber,
+        startColumn: selection.startColumn,
+        endColumn: selection.endColumn,
+        selectedText,
+        text: prev?.text ?? '',
+      }))
+      anchorLineRef.current = null
+    })
   }, [])
 
   // ── Comment Actions ────────────────────────────────────────────────────
@@ -328,6 +409,9 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       endLine: composer.endLine,
       text,
       createdAt: Date.now(),
+      ...(composer.selectedText ? { selectedText: composer.selectedText } : {}),
+      ...(composer.startColumn ? { startColumn: composer.startColumn } : {}),
+      ...(composer.endColumn ? { endColumn: composer.endColumn } : {}),
     }
 
     setComments((prev) => [...prev, comment])
@@ -354,7 +438,11 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         const lineLabel = item.startLine === item.endLine
           ? `L${item.startLine}`
           : `L${item.startLine}-L${item.endLine}`
-        return `- ${item.path} [${lineLabel}] ${item.text}`
+        // Include the selected text snippet if available for precise context
+        const snippetPart = item.selectedText
+          ? ` "${item.selectedText}"`
+          : ''
+        return `- ${item.path} [${lineLabel}]${snippetPart} ${item.text}`
       })
       .join('\n')
 
@@ -366,8 +454,11 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       return
     }
 
-    // Close preview drawer first
-    onClose()
+    // Close preview only in overlay mode; keep it open in split mode
+    // so the user can continue watching the file alongside the conversation.
+    if (filePreviewMode === 'overlay') {
+      onClose()
+    }
 
     // Ensure conversation exists
     const conversationStore = useConversationStore.getState()
@@ -412,7 +503,172 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       settings.maxTokens,
       directoryHandle
     )
-  }, [comments, filePath, t, onClose])
+  }, [comments, filePath, t, onClose, filePreviewMode])
+
+  // ── File loading logic ──────────────────────────────────────────────────
+  // Ref to track the latest object URL for cleanup
+  const objectUrlRef = useRef<string | null>(null)
+
+  /**
+   * Core file loader — reads from OPFS/disk/externalBlob and populates state.
+   * Shared by: initial load effect, manual refresh button, and auto-refresh
+   * after agent loop completes.
+   *
+   * @param silent When true (auto-refresh), skips clearing content state to avoid
+   *               editor unmount/remount — instead replaces content in place and
+   *               preserves scroll position. When false (initial load / file switch),
+   *               fully resets state for a clean slate.
+   */
+  const loadFile = useCallback(async (path: string, silent = false) => {
+    // For silent refresh, save scroll position to restore after content swap.
+    // For non-silent loads, don't bother — it's a fresh file.
+    let savedScroll: number | null = null
+    if (silent && editorRef.current) {
+      savedScroll = editorRef.current.getScrollTop()
+    }
+
+    if (!silent) {
+      setLoading(true)
+    }
+    setError(null)
+    if (!silent) {
+      // Full reset for initial load / file switch
+      setContent(null)
+      setImageUrl(null)
+      setOfficeBlob(null)
+      setFormatBlob(null)
+      setFormatTextContent(null)
+      setFormatViewMode(formatUI?.viewModes.find((m) => m.default)?.id ?? 'preview')
+      setDiskNewer(false)
+
+      // Clean up previous object URL
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
+    }
+
+    try {
+      let text: string | undefined
+      let blob: Blob | undefined
+      let fSize = 0
+      let opfsMtime: number | null = null
+      let diskMtime: number | null = null
+
+      // Fast path: external blob provided (e.g. from OPFS assets/)
+      if (externalBlob) {
+        fSize = externalBlob.size
+        if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
+          blob = externalBlob
+        } else {
+          text = await externalBlob.text()
+        }
+      } else {
+        try {
+          const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
+          const result = await opfs.readFile(path)
+
+          if (result.content instanceof Blob) {
+            blob = result.content
+            fSize = result.content.size
+          } else if (typeof result.content === 'string') {
+            text = result.content
+            fSize = new Blob([result.content]).size
+          } else {
+            // ArrayBuffer - for image/office/format, keep as Blob; for text, decode it
+            const buffer = result.content as ArrayBuffer
+            fSize = buffer.byteLength
+            if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
+              blob = new Blob([buffer])
+            } else {
+              const decoder = new TextDecoder()
+              text = decoder.decode(buffer)
+            }
+          }
+          opfsMtime = result.metadata.mtime || null
+        } catch {
+          // OPFS read failed, will try disk
+        }
+
+        if (fileHandle) {
+          try {
+            const diskFile = await fileHandle.getFile()
+            diskMtime = diskFile.lastModified
+
+            if (opfsMtime !== null && diskMtime > opfsMtime) {
+              fSize = diskFile.size
+              if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
+                blob = diskFile
+              } else {
+                text = await diskFile.text()
+              }
+              setDiskNewer(true)
+            } else if (opfsMtime === null) {
+              fSize = diskFile.size
+              if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
+                blob = diskFile
+              } else {
+                text = await diskFile.text()
+              }
+            }
+          } catch {
+            // Disk read failed, rely on OPFS if available
+          }
+        } else if (!text && !blob) {
+          setError(t('filePreview.cannotReadFile'))
+          setLoading(false)
+          return
+        }
+      } // end else (no externalBlob)
+
+      if (!text && !blob) {
+        setError(t('filePreview.cannotReadFile'))
+        setLoading(false)
+        return
+      }
+
+      if (fSize > MAX_FILE_SIZE && fileType !== 'format') {
+        setError(t('filePreview.fileTooLarge', { size: formatBytes(fSize), maxSize: formatBytes(MAX_FILE_SIZE) }))
+        setLoading(false)
+        return
+      }
+
+      setFileSize(fSize)
+
+      if (fileType === 'image' && blob) {
+        objectUrlRef.current = URL.createObjectURL(blob)
+        setImageUrl(objectUrlRef.current)
+      } else if (fileType === 'office' && blob) {
+        setOfficeBlob(blob)
+      } else if (fileType === 'format' && blob) {
+        setFormatBlob(blob)
+        // Also render as text for text view mode
+        if (formatUI?.renderTextContent) {
+          try {
+            const arrayBuffer = await blob.arrayBuffer()
+            const bytes = new Uint8Array(arrayBuffer)
+            const renderedText = await formatUI.renderTextContent(bytes, path)
+            setFormatTextContent(renderedText)
+          } catch {
+            /* ignore render error */
+          }
+        }
+      } else if (text !== undefined) {
+        setContent(text)
+      }
+    } catch (err) {
+      setError(t('filePreview.readFileFailed', { error: err instanceof Error ? err.message : String(err) }))
+    } finally {
+      setLoading(false)
+      // Restore scroll position after silent refresh (content was swapped in place)
+      if (savedScroll != null && editorRef.current) {
+        // Use rAF to ensure Monaco has laid out the new content
+        requestAnimationFrame(() => {
+          editorRef.current?.setScrollTop(savedScroll!)
+        })
+      }
+    }
+  }, [fileHandle, fileType, externalBlob, formatUI, t])
 
   // Load file content when filePath or fileHandle changes
   useEffect(() => {
@@ -422,154 +678,49 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
       setOfficeBlob(null)
       setFormatBlob(null)
       setFormatTextContent(null)
-      setFormatViewMode(formatUI?.viewModes.find(m => m.default)?.id ?? 'preview')
+      setFormatViewMode(formatUI?.viewModes.find((m) => m.default)?.id ?? 'preview')
       setError(null)
       setDiskNewer(false)
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
       return
     }
 
-    let cancelled = false
-    let objectUrl: string | null = null
+    loadFile(filePath)
+    // loadFile already depends on fileHandle/fileType/externalBlob/formatUI/t,
+    // so we only need filePath + loadFile here. formatUI is included for the
+    // cleanup branch above (which uses formatUI?.viewModes directly).
+  }, [filePath, loadFile, formatUI])
 
-    async function loadFile() {
-      setLoading(true)
-      setError(null)
-      setContent(null)
-      setImageUrl(null)
-      setOfficeBlob(null)
-      setFormatBlob(null)
-      setFormatTextContent(null)
-      setFormatViewMode(formatUI?.viewModes.find(m => m.default)?.id ?? 'preview')
-      setDiskNewer(false)
-
-      try {
-        let text: string | undefined
-        let blob: Blob | undefined
-        let fileSize = 0
-        let opfsMtime: number | null = null
-        let diskMtime: number | null = null
-
-        // Fast path: external blob provided (e.g. from OPFS assets/)
-        if (externalBlob) {
-          fileSize = externalBlob.size
-          if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
-            blob = externalBlob
-          } else {
-            text = await externalBlob.text()
-          }
-        } else {
-          try {
-            const opfs = (await import('@/store/opfs.store')).useOPFSStore.getState()
-            const result = await opfs.readFile(filePath!)
-
-            if (result.content instanceof Blob) {
-              blob = result.content
-              fileSize = result.content.size
-            } else if (typeof result.content === 'string') {
-              text = result.content
-              fileSize = new Blob([result.content]).size
-            } else {
-              // ArrayBuffer - for image/office/format, keep as Blob; for text, decode it
-              const buffer = result.content as ArrayBuffer
-              fileSize = buffer.byteLength
-              if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
-                blob = new Blob([buffer])
-              } else {
-                const decoder = new TextDecoder()
-                text = decoder.decode(buffer)
-              }
-            }
-            opfsMtime = result.metadata.mtime || null
-          } catch {
-            // OPFS read failed, will try disk
-          }
-
-          if (fileHandle) {
-            try {
-              const diskFile = await fileHandle.getFile()
-              diskMtime = diskFile.lastModified
-
-              if (opfsMtime !== null && diskMtime > opfsMtime) {
-                fileSize = diskFile.size
-                if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
-                  blob = diskFile
-                } else {
-                  text = await diskFile.text()
-                }
-                setDiskNewer(true)
-              } else if (opfsMtime === null) {
-                fileSize = diskFile.size
-                if (fileType === 'image' || fileType === 'office' || fileType === 'format') {
-                  blob = diskFile
-                } else {
-                  text = await diskFile.text()
-                }
-              }
-            } catch {
-              // Disk read failed, rely on OPFS if available
-            }
-          } else if (!text && !blob) {
-            setError(t('filePreview.cannotReadFile'))
-            setLoading(false)
-            return
-          }
-        } // end else (no externalBlob)
-
-        if (!text && !blob) {
-          setError(t('filePreview.cannotReadFile'))
-          setLoading(false)
-          return
-        }
-
-        if (cancelled) return
-
-        if (fileSize > MAX_FILE_SIZE && fileType !== 'format') {
-          setError(t('filePreview.fileTooLarge', { size: formatBytes(fileSize), maxSize: formatBytes(MAX_FILE_SIZE) }))
-          setLoading(false)
-          return
-        }
-
-        setFileSize(fileSize)
-
-        if (fileType === 'image' && blob) {
-          objectUrl = URL.createObjectURL(blob)
-          setImageUrl(objectUrl)
-        } else if (fileType === 'office' && blob) {
-          setOfficeBlob(blob)
-        } else if (fileType === 'format' && blob) {
-          setFormatBlob(blob)
-          // Also render as text for text view mode
-          if (formatUI?.renderTextContent) {
-            try {
-              const arrayBuffer = await blob.arrayBuffer()
-              const bytes = new Uint8Array(arrayBuffer)
-              const text = await formatUI.renderTextContent(bytes, filePath ?? '')
-              setFormatTextContent(text)
-            } catch { /* ignore render error */ }
-          }
-        } else if (text !== undefined) {
-          setContent(text)
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setError(t('filePreview.readFileFailed', { error: err instanceof Error ? err.message : String(err) }))
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false)
-        }
-      }
-    }
-
-    loadFile()
-
+  // Cleanup object URL on unmount
+  useEffect(() => {
     return () => {
-      cancelled = true
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
       }
     }
-  }, [filePath, fileHandle, fileType, externalBlob])
+  }, [])
+
+  // ── Auto-refresh after agent loop completes ──────────────────────────────
+  // When watching a file in split mode and the agent finishes a loop that may
+  // have modified it, automatically reload to show the latest content.
+  // Skip if user is in edit mode with unsaved changes (would discard their work).
+  const activeConversationId = useConversationStore((s) => s.activeConversationId)
+  const convStatus = useConversationRuntimeStore((s) =>
+    activeConversationId ? s.getConversationStatus(activeConversationId) : 'idle'
+  )
+  const prevStatusRef = useRef<ConversationStatus>('idle')
+
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = convStatus
+    // Edge: running/streaming → idle (loop just finished)
+    if (prev !== 'idle' && prev !== 'error' && convStatus === 'idle' && filePath && !editMode) {
+      loadFile(filePath, true)
+    }
+  }, [convStatus, filePath, editMode, loadFile])
 
   const handleCopy = useCallback(async () => {
     if (!content) return
@@ -577,6 +728,11 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [content])
+
+  /** Manual refresh — reload the current file from disk/OPFS */
+  const handleRefresh = useCallback(() => {
+    if (filePath) loadFile(filePath)
+  }, [filePath, loadFile])
 
   const isDirty = editMode && editedContent !== originalForDiff
 
@@ -762,10 +918,22 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               <ExternalLink className="h-3 w-3" />
             </button>
           )}
+          {/* Refresh — reload file from disk/OPFS */}
+          {filePath && (
+            <button
+              type="button"
+              onClick={handleRefresh}
+              disabled={loading}
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title={t('filePreview.refresh')}
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          )}
           {/* Comment hint for text files */}
           {isCommentable && !composer && !editMode && (
             <span className="hidden shrink-0 text-[10px] text-neutral-300 dark:text-neutral-600 sm:inline">
-              {t('filePreview.clickLineToComment')}
+              {t('filePreview.selectToComment')}
             </span>
           )}
           {content && (
@@ -831,6 +999,15 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           {isDirty && (
             <Circle className="h-1.5 w-1.5 shrink-0 fill-amber-500 text-amber-500" />
           )}
+          {/* Toggle between split (side-by-side) and overlay (full-width drawer) mode */}
+          <button
+            type="button"
+            onClick={() => setFilePreviewMode(filePreviewMode === 'split' ? 'overlay' : 'split')}
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            title={filePreviewMode === 'split' ? t('filePreview.switchToOverlay') : t('filePreview.switchToSplit')}
+          >
+            {filePreviewMode === 'split' ? <Maximize2 className="h-3 w-3" /> : <PanelRightClose className="h-3 w-3" />}
+          </button>
           <button
             type="button"
             onClick={handleClose}
@@ -908,7 +1085,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               scrollBeyondLastLine: false,
               wordWrap: 'on',
               automaticLayout: true,
-              fontSize: display.fontSize === 'small' ? 11 : display.fontSize === 'large' ? 14 : 12,
+              fontSize: display.fontSize === 'small' ? 13 : display.fontSize === 'large' ? 16 : 14,
               padding: { top: 8, bottom: 8 },
               scrollbar: {
                 vertical: 'auto',
@@ -945,6 +1122,20 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
+          {/* Show selected text snippet if available */}
+          {composer.selectedText && (
+            <div className="px-3 pb-1.5">
+              <div className="flex items-start gap-1.5 rounded border border-blue-200 bg-blue-50/60 px-2 py-1 dark:border-blue-800/50 dark:bg-blue-950/20">
+                <span className="shrink-0 text-[10px] font-medium text-blue-500 dark:text-blue-400">{"\""}</span>
+                <code className="min-w-0 flex-1 truncate text-[11px] text-blue-700 dark:text-blue-300" title={composer.selectedText}>
+                  {composer.selectedText.length > 100
+                    ? `${[...composer.selectedText].slice(0, 100).join('')}...`
+                    : composer.selectedText}
+                </code>
+                <span className="shrink-0 text-[10px] font-medium text-blue-500 dark:text-blue-400">{"\""}</span>
+              </div>
+            </div>
+          )}
           <div className="flex items-start gap-2 px-3 pb-2.5">
             <textarea
               className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-500"
@@ -1056,6 +1247,10 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           width: 6px !important;
           height: 6px !important;
           margin-top: 7px;
+        }
+        .fp-selected-text {
+          background-color: rgba(59, 130, 246, 0.18) !important;
+          border-radius: 2px;
         }
       `}</style>
     </div>

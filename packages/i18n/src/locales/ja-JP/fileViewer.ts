@@ -36,6 +36,7 @@ export const filePreview = {
     source: "ソース",
     // コメント機能
     clickLineToComment: "行番号をクリックしてコメント",
+    selectToComment: "テキストを選択、または行番号をクリックしてコメント",
     addComment: "コメントを追加...",
     send: "送信",
     commentsCount: "{count} 件のコメント",
@@ -46,6 +47,7 @@ export const filePreview = {
     openInNewTabFailed: "開けませんでした: {error}",
     download: "ファイルをダウンロード",
     downloadFailed: "ダウンロードに失敗しました",
+    refresh: "ディスクから再読み込み",
     // 編集モード
     editMode: "編集",
     previewMode: "プレビュー",
@@ -54,6 +56,9 @@ export const filePreview = {
     saveFailed: "保存に失敗しました",
     unsavedOnClose: "未保存の変更があります。閉じますか？",
     unsavedOnSwitch: "未保存の変更があります。破棄しますか？",
+    // 表示モード切替
+    switchToOverlay: "全幅オーバーレイに切り替え",
+    switchToSplit: "並列スプリットに切り替え",
 } as const
 
 // Office ファイルプレビュー

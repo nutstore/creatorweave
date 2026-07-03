@@ -33,6 +33,7 @@ export const filePreview = {
     source: "Source",
     // Comment feature
     clickLineToComment: "Click line number to comment",
+    selectToComment: "Select text or click line to comment",
     addComment: "Add comment...",
     send: "Send",
     commentsCount: "{count} comments",
@@ -43,6 +44,7 @@ export const filePreview = {
     openInNewTabFailed: "Failed to open: {error}",
     download: "Download file",
     downloadFailed: "Download failed",
+    refresh: "Reload from disk",
     // Edit mode
     editMode: "Edit",
     previewMode: "Preview",
@@ -51,6 +53,9 @@ export const filePreview = {
     saveFailed: "Save failed",
     unsavedOnClose: "You have unsaved changes. Close anyway?",
     unsavedOnSwitch: "You have unsaved changes. Discard them?",
+    // Display mode toggle
+    switchToOverlay: "Switch to full-width overlay",
+    switchToSplit: "Switch to side-by-side split",
 } as const
 
 // Office file preview

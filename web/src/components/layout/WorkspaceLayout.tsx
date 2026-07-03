@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * WorkspaceLayout - main layout for the AI workbench.
  *
@@ -156,6 +155,7 @@ export function WorkspaceLayout({
   const setSidebarCollapsed = useWorkspacePreferencesStore((s) => s.setSidebarCollapsed)
   const setActiveResourceTab = useWorkspacePreferencesStore((s) => s.setActiveResourceTab)
   const panelSizes = useWorkspacePreferencesStore((s) => s.panelSizes)
+  const filePreviewMode = useWorkspacePreferencesStore((s) => s.filePreviewMode)
 
   // Phase 4: Dialog states
   const [showCommandPalette, setShowCommandPalette] = useState(false)
@@ -672,6 +672,62 @@ export function WorkspaceLayout({
     setSelectedFileBlob(blob)
   }, [])
 
+  // ── Resizable file preview pane (split mode) ───────────────────────────
+  const splitContainerRef = useRef<HTMLDivElement>(null)
+  const setPreviewRatio = useWorkspacePreferencesStore((s) => s.setPreviewRatio)
+  // Holds the cleanup function for an in-progress drag, so that unmount
+  // mid-drag can still remove the global listeners and restore body styles.
+  const dragCleanupRef = useRef<(() => void) | null>(null)
+
+  // Live preview width during drag (visual feedback before committing to store).
+  // Also serves as the "is dragging" signal: non-null = dragging.
+  const [dragPreviewWidth, setDragPreviewWidth] = useState<number | null>(null)
+
+  const startPreviewResize = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      const container = splitContainerRef.current
+      if (!container) return
+
+      const onMove = (ev: MouseEvent) => {
+        if (!container) return
+        const rect = container.getBoundingClientRect()
+        if (rect.width === 0) return
+        const previewWidth = rect.right - ev.clientX
+        const percent = (previewWidth / rect.width) * 100
+        // Clamp locally during drag for smooth visual feedback
+        const clamped = Math.max(30, Math.min(80, percent))
+        setDragPreviewWidth(clamped)
+      }
+      const cleanup = () => {
+        // Commit final ratio to store once
+        setDragPreviewWidth((finalPercent) => {
+          if (finalPercent != null) setPreviewRatio(finalPercent)
+          return null
+        })
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        dragCleanupRef.current = null
+      }
+      const onUp = cleanup
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+      dragCleanupRef.current = cleanup
+    },
+    [setPreviewRatio]
+  )
+
+  // Clean up global drag listeners on unmount
+  useEffect(() => {
+    return () => {
+      if (dragCleanupRef.current) dragCleanupRef.current()
+    }
+  }, [])
+
   // Handle "go to file" selection from GoToFileDialog
   const handleGoToFileSelect = useCallback(
     (fullPath: string) => {
@@ -774,7 +830,7 @@ export function WorkspaceLayout({
         )}
 
         {/* Main area: conversation + optional sync preview panel */}
-        <div className="flex min-w-0 flex-1 overflow-hidden">
+        <div ref={splitContainerRef} className="flex min-w-0 flex-1 overflow-hidden">
           {/* Conversation / Welcome */}
           <main className="min-w-0 flex-1 overflow-hidden">
             {hasActiveConversation ? (
@@ -806,19 +862,54 @@ export function WorkspaceLayout({
             )}
           </main>
 
-          {/* File preview as Drawer (overlay, no squeeze) */}
-          <Drawer
-            open={!!selectedFilePath}
-            onClose={handleCloseFilePreview}
-            width={isMobile ? '100vw' : `${panelSizes.previewRatio}vw`}
-          >
-            <FilePreview
-              filePath={selectedFilePath}
-              fileHandle={selectedFileHandle}
+          {/* File preview — split (side-by-side) or overlay (drawer) mode */}
+          {filePreviewMode === 'split' && !isMobile && selectedFilePath ? (
+            <>
+              {/* Draggable resize handle */}
+              <div
+                onMouseDown={startPreviewResize}
+                className="group relative w-1 shrink-0 cursor-col-resize bg-transparent transition-colors"
+                title=""
+              >
+                {/* Wider hit area */}
+                <div className="absolute inset-y-0 -left-1.5 -right-1.5 z-10" />
+                {/* Visible divider line on hover/drag */}
+                <div
+                  className={`absolute inset-y-0 left-0 w-px transition-colors ${
+                    dragPreviewWidth !== null ? 'bg-blue-500' : 'bg-neutral-200 group-hover:bg-blue-400 dark:bg-neutral-700'
+                  }`}
+                />
+              </div>
+              <aside
+                className="h-full shrink-0 overflow-hidden"
+                style={{
+                  width: `${dragPreviewWidth ?? panelSizes.previewRatio}%`,
+                  minWidth: 280,
+                  maxWidth: '80%',
+                }}
+              >
+                <FilePreview
+                  filePath={selectedFilePath}
+                  fileHandle={selectedFileHandle}
+                  onClose={handleCloseFilePreview}
+                  blob={selectedFileBlob}
+                />
+              </aside>
+            </>
+          ) : (
+            <Drawer
+              open={!!selectedFilePath}
               onClose={handleCloseFilePreview}
-              blob={selectedFileBlob}
-            />
-          </Drawer>
+              width={isMobile ? '100vw' : `${panelSizes.previewRatio}vw`}
+            >
+              <FilePreview
+                filePath={selectedFilePath}
+                fileHandle={selectedFileHandle}
+                onClose={handleCloseFilePreview}
+                blob={selectedFileBlob}
+              />
+            </Drawer>
+          )}
 
           {/* Sync preview as Drawer (overlay, no squeeze) */}
           <Drawer

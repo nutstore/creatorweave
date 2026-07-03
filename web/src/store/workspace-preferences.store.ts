@@ -68,6 +68,8 @@ export interface WorkspacePreferences {
   agentModeByWorkspace: Record<string, 'plan' | 'act'>
   /** Pinned workspace IDs — pinned items show at top of sidebar */
   pinnedWorkspaceIds: string[]
+  /** File preview display mode: 'split' = side-by-side with conversation (default), 'overlay' = full-width drawer on top */
+  filePreviewMode: 'split' | 'overlay'
 }
 
 /**
@@ -77,7 +79,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   panelSizes: {
     sidebarWidth: 260,
     conversationRatio: 50,
-    previewRatio: 60,
+    previewRatio: 38,
   },
   panelState: {
     sidebarCollapsed: false,
@@ -97,6 +99,7 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   agentMode: 'act',
   agentModeByWorkspace: {},
   pinnedWorkspaceIds: [],
+  filePreviewMode: 'split',
 }
 
 /**
@@ -136,6 +139,9 @@ interface WorkspacePreferencesState extends WorkspacePreferences {
 
   // Pinned workspaces actions
   setPinnedWorkspaceIds: (ids: string[]) => void
+
+  // File preview mode actions
+  setFilePreviewMode: (mode: 'split' | 'overlay') => void
 
   // Reset actions
   resetAll: () => void
@@ -278,6 +284,12 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
           state.pinnedWorkspaceIds = ids
         }),
 
+      // File preview mode actions
+      setFilePreviewMode: (mode) =>
+        set((state) => {
+          state.filePreviewMode = mode
+        }),
+
       // Reset actions
       resetAll: () =>
         set((state) => {
@@ -292,7 +304,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 4, // Bump version for pinnedWorkspaceIds
+      version: 5, // Bump version for filePreviewMode
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         panelState: state.panelState,
@@ -302,6 +314,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
         agentMode: state.agentMode,
         agentModeByWorkspace: state.agentModeByWorkspace,
         pinnedWorkspaceIds: state.pinnedWorkspaceIds,
+        filePreviewMode: state.filePreviewMode,
       }),
       migrate: (persistedState) => {
         const state = (persistedState || {}) as Partial<WorkspacePreferences>
@@ -310,6 +323,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
           ...state,
           agentModeByWorkspace: state.agentModeByWorkspace || {},
           pinnedWorkspaceIds: (state as Record<string, unknown>).pinnedWorkspaceIds as string[] || [],
+          filePreviewMode: state.filePreviewMode || 'split',
         }
       },
     }
