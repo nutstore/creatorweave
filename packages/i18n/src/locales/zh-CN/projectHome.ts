@@ -65,6 +65,21 @@ export const projectHome = {
       less: "少",
       more: "多",
       count: "次活动",
+      docsLabel: "个文档",
+      chatsLabel: "次对话",
+      activeDaysLabel: "个活跃天",
+      clickToView: "点击查看详情",
+      noActivity: "这天没有工作记录",
+      dayWork: "{date} 的工作",
+      moreItems: "项…",
+      emptyHint: "还没有工作记录，开始创建你的第一个项目吧",
+      range: {
+        label: "时间范围",
+        "1m": "最近1个月",
+        "3m": "最近3个月",
+        "6m": "最近6个月",
+        "1y": "最近一年",
+      },
     },
     // 项目时间线
     timeline: {

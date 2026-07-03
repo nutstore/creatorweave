@@ -69,6 +69,21 @@ export const projectHome = {
       less: "Less",
       more: "More",
       count: "activities",
+      docsLabel: "docs",
+      chatsLabel: "chats",
+      activeDaysLabel: "active days",
+      clickToView: "Click to view details",
+      noActivity: "No activity this day",
+      dayWork: "Work on {date}",
+      moreItems: "more…",
+      emptyHint: "No activity yet — create your first project to get started",
+      range: {
+        label: "Range",
+        "1m": "Last month",
+        "3m": "Last 3 months",
+        "6m": "Last 6 months",
+        "1y": "Last year",
+      },
     },
     // Project timeline
     timeline: {
