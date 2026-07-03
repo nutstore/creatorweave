@@ -42,6 +42,7 @@ export const conversation = {
         agentMention: "输入 @ 提及智能体",
         slashCommand: "输入 / 使用命令",
       },
+      dropFilesHere: "拖拽文件到此处",
     },
     // 按钮
     buttons: {

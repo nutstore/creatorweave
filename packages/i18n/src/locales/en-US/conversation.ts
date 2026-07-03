@@ -42,6 +42,7 @@ export const conversation = {
         agentMention: "Type @ to mention an agent",
         slashCommand: "Type / to use commands",
       },
+      dropFilesHere: "Drop files here",
     },
     // Buttons
     buttons: {

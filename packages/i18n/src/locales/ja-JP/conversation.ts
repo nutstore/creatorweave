@@ -41,6 +41,7 @@ export const conversation = {
         agentMention: "@ でエージェントを指定",
         slashCommand: "/ でコマンドを使用",
       },
+      dropFilesHere: "ここにファイルをドロップ",
     },
     buttons: {
       stop: "停止",

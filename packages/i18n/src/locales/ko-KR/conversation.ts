@@ -41,6 +41,7 @@ export const conversation = {
         agentMention: "@로 에이전트 언급",
         slashCommand: "/로 명령 사용",
       },
+      dropFilesHere: "여기에 파일을 드롭하세요",
     },
     buttons: {
       stop: "중지",

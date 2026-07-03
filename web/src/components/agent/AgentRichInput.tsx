@@ -946,7 +946,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-400 bg-primary-50/80 dark:bg-primary-900/30">
           <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-300">
             <Paperclip className="h-8 w-8" />
-            <span className="text-sm font-medium">Drop files here</span>
+            <span className="text-sm font-medium">{t('conversation.input.dropFilesHere')}</span>
           </div>
         </div>
       )}
