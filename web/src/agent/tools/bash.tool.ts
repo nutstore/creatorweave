@@ -27,19 +27,33 @@ const WORKSPACE_MOUNT = '/workspace'
 // Lazy-loaded just-bash (heavy module — only import when tool is actually used)
 // ---------------------------------------------------------------------------
 
+type BashExecResult = {
+  stdout: string
+  stderr: string
+  exitCode: number
+  env?: Record<string, string>
+  stdoutKind?: 'text' | 'bytes'
+  stdoutEncoding?: 'binary'
+}
+
 type BashInstance = {
-  exec(commandLine: string, options?: any): Promise<{
-    stdout: string
-    stderr: string
-    exitCode: number
-    env?: Record<string, string>
-  }>
+  exec(commandLine: string, options?: any): Promise<BashExecResult>
   fs: any
 }
 
 type BashConstructor = new (options: any) => BashInstance
 
+type JustBashModule = {
+  Bash: BashConstructor
+  decodeBytesToUtf8: (input: unknown) => string
+  unsafeBytesFromLatin1: (input: string) => unknown
+  stdoutKind?: (result: { stdoutKind?: 'text' | 'bytes'; stdoutEncoding?: 'binary' }) => 'text' | 'bytes'
+}
+
 let BashClass: BashConstructor | null = null
+let decodeBytesToUtf8Helper: ((input: unknown) => string) | null = null
+let unsafeBytesFromLatin1Helper: ((input: string) => unknown) | null = null
+let stdoutKindHelper: JustBashModule['stdoutKind'] | null = null
 let loadError: string | null = null
 let loadErrorTime = 0
 /** Retry loading after this many ms (prevents permanent failure on transient WASM issues) */
@@ -58,8 +72,11 @@ async function loadBash(): Promise<BashConstructor> {
   try {
     // Use variable import to prevent rollup from statically analyzing
     // just-bash's internals (contains node:zlib reference that breaks PWA build)
-    const mod = await import('just-bash')
+    const mod = await import('just-bash') as JustBashModule
     BashClass = mod.Bash
+    decodeBytesToUtf8Helper = mod.decodeBytesToUtf8
+    unsafeBytesFromLatin1Helper = mod.unsafeBytesFromLatin1
+    stdoutKindHelper = mod.stdoutKind ?? null
     return BashClass!
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -146,14 +163,10 @@ export const bashDefinition: ToolDefinition = {
       'Pipes (|), redirections (>, >>), chaining (&&, ||, ;) all work.',
       'Workspace at /workspace/<rootName>/..., assets at /assets/..., agents at /agents/...',
       '',
-      'UTF-8 / ENCODING (important):',
-      '- Bash sandbox runs in no-locale mode (LANG/LC_ALL empty). `cat` reads bytes as Latin-1 then re-encodes as UTF-8 on output, so `cat src > dst` MOJIBAKES CJK/UTF-8 files. Same for `cat src >> dst`, even with LC_ALL=C.UTF-8 (sandbox ignores locale).',
-      '- WORKAROUNDS (verified):',
-      '  * Copy a file: use `cp src dst` (byte-level, no mojibake) — PREFERRED over `cat src > dst`.',
-      '  * Write new content: use `echo "text" > file` (bash builtin, UTF-8 safe) or `printf "..." > file` (printf is a builtin).',
-      '  * Append a UTF-8 file: use `cp` (write to temp then move), or `printf "%s" "$(cat src)" >> dst` is NOT safe (cat still mojibakes). For appends, prefer the read/edit tools or rewrite the whole file with the write tool.',
-      '  * `dd if=src of=dst` is NOT available in this sandbox.',
-      '- Tests: `cp` preserves bytes exactly; `echo "周报" > file` writes correct UTF-8; `cat` always mojibakes.',
+      'UTF-8 / ENCODING:',
+      '- Bash sandbox now preserves UTF-8/CJK correctly for `cat`, command substitution (`$(cat file)`), and binary redirects like `cat src > dst` / `uniq src > dst`.',
+      '- Safe choices: `cp`, `cat`, `uniq`, `sed`, `awk`, `printf`, `echo`, pipes, and `>` / `>>` with normal UTF-8 text all work correctly.',
+      '- `echo -e` still does NOT interpret escapes in this sandbox; use `printf` for escape sequences.',
     ].join(' '),
     parameters: {
       type: 'object',
@@ -294,10 +307,25 @@ export const bashToolExecutor: ToolExecutor = async (
     ])
     const elapsedMs = Date.now() - startTime
 
+    // Decode byte-shaped stdout for display in the tool result.
+    // just-bash 3.x distinguishes text vs bytes via stdoutKind / stdoutEncoding.
+    // The bash tool should present human-readable UTF-8 text to the agent,
+    // not the internal latin1-shaped byte string used inside the pipeline.
+    const outputKind = stdoutKindHelper
+      ? stdoutKindHelper(result)
+      : (result.stdoutEncoding === 'binary' ? 'bytes' : 'text')
+
     // Truncate large outputs
     const MAX_OUTPUT = 50_000
     let stdout = result.stdout || ''
     let stderr = result.stderr || ''
+    if (outputKind === 'bytes' && decodeBytesToUtf8Helper && unsafeBytesFromLatin1Helper) {
+      try {
+        stdout = decodeBytesToUtf8Helper(unsafeBytesFromLatin1Helper(stdout))
+      } catch {
+        // Fall back to raw stdout if decoding fails.
+      }
+    }
     let truncated = false
 
     if (stdout.length > MAX_OUTPUT) {

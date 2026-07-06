@@ -44,12 +44,37 @@ export class WorkspaceBackend implements VfsBackend {
     const { readFile } = useOPFSStore.getState()
     // Pass null as directoryHandle to let WorkspaceRuntime resolve the correct root via resolvePath()
     const readPolicy = options?.readPolicy as ReadPolicy | undefined
+    const requestedEncoding = options?.encoding
 
     const result = readPolicy
       ? await readFile(path, null, this.workspaceId, readPolicy, this.projectId)
       : await readFile(path, null, this.workspaceId, undefined, this.projectId)
 
-    const { content, metadata, source } = result
+    let { content } = result
+    const { metadata, source } = result
+
+    // VfsReadOptions.encoding is part of the public backend contract used by
+    // just-bash bridge and other tools. WorkspaceRuntime currently auto-detects
+    // text vs binary by file extension, so adapt the payload here to honor the
+    // caller's requested encoding.
+    if (requestedEncoding === 'binary') {
+      if (typeof content === 'string') {
+        content = new TextEncoder().encode(content)
+      } else if (content instanceof ArrayBuffer) {
+        content = new Uint8Array(content)
+      } else if (content instanceof Blob) {
+        content = new Uint8Array(await content.arrayBuffer())
+      }
+    } else if (requestedEncoding === 'text') {
+      if (content instanceof Uint8Array) {
+        content = new TextDecoder().decode(content)
+      } else if (content instanceof ArrayBuffer) {
+        content = new TextDecoder().decode(content)
+      } else if (content instanceof Blob) {
+        content = await content.text()
+      }
+    }
+
     return {
       content,
       size: metadata.size,

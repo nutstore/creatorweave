@@ -76,6 +76,19 @@ const DEFAULT_FILE_MODE = 0o644
 const DEFAULT_DIR_MODE = 0o755
 
 /**
+ * Decode a VfsReadResult.content (string | Uint8Array | ArrayBuffer | Blob) into
+ * a UTF-8 string. Centralized so the read path doesn't fall into the Blob
+ * branch when the backend returns Uint8Array (which is structurally a Blob for
+ * TypeScript but lacks Blob methods at runtime).
+ */
+async function decodeResultContent(content: string | Uint8Array | ArrayBuffer | Blob): Promise<string> {
+  if (typeof content === 'string') return content
+  if (content instanceof Uint8Array) return new TextDecoder().decode(content)
+  if (content instanceof ArrayBuffer) return new TextDecoder().decode(content)
+  return await content.text()
+}
+
+/**
  * IFileSystem implementation that delegates workspace I/O to a VfsBackend,
  * while keeping system directories in memory.
  */
@@ -143,9 +156,7 @@ export class VfsBridgeFs {
       if (!this.assetsBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAssetsRelative(path)
       const result = await this.assetsBackend.readFile(relPath)
-      if (typeof result.content === 'string') return result.content
-      if (result.content instanceof ArrayBuffer) return new TextDecoder().decode(result.content)
-      return await (result.content as Blob).text()
+      return decodeResultContent(result.content)
     }
 
     // Agent namespace file
@@ -153,17 +164,13 @@ export class VfsBridgeFs {
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const result = await this.agentBackend.readFile(relPath)
-      if (typeof result.content === 'string') return result.content
-      if (result.content instanceof ArrayBuffer) return new TextDecoder().decode(result.content)
-      return await (result.content as Blob).text()
+      return decodeResultContent(result.content)
     }
 
     // Workspace file
     const relPath = this.toRelative(path)
     const result = await this.backend.readFile(relPath)
-    if (typeof result.content === 'string') return result.content
-    if (result.content instanceof ArrayBuffer) return new TextDecoder().decode(result.content)
-    return await (result.content as Blob).text()
+    return decodeResultContent(result.content)
   }
 
   async readFileBuffer(path: string): Promise<Uint8Array> {
@@ -173,16 +180,19 @@ export class VfsBridgeFs {
       return sysEntry.content
     }
 
+    const toUint8Array = async (content: string | Uint8Array | ArrayBuffer | Blob): Promise<Uint8Array> => {
+      if (content instanceof Uint8Array) return content
+      if (content instanceof ArrayBuffer) return new Uint8Array(content)
+      if (typeof content === 'string') return new TextEncoder().encode(content)
+      return new Uint8Array(await content.arrayBuffer())
+    }
+
     // Assets file
     if (this.isAssetsPath(path)) {
       if (!this.assetsBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAssetsRelative(path)
       const result = await this.assetsBackend.readFile(relPath, { encoding: 'binary' })
-      if (result.content instanceof Uint8Array) return result.content
-      if (result.content instanceof ArrayBuffer) return new Uint8Array(result.content)
-      if (typeof result.content === 'string') return new TextEncoder().encode(result.content)
-      const buf = await (result.content as Blob).arrayBuffer()
-      return new Uint8Array(buf)
+      return toUint8Array(result.content)
     }
 
     // Agent namespace file
@@ -190,30 +200,43 @@ export class VfsBridgeFs {
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const result = await this.agentBackend.readFile(relPath, { encoding: 'binary' })
-      if (result.content instanceof Uint8Array) return result.content
-      if (result.content instanceof ArrayBuffer) return new Uint8Array(result.content)
-      if (typeof result.content === 'string') return new TextEncoder().encode(result.content)
-      const buf2 = await (result.content as Blob).arrayBuffer()
-      return new Uint8Array(buf2)
+      return toUint8Array(result.content)
     }
 
     const relPath = this.toRelative(path)
     const result = await this.backend.readFile(relPath, { encoding: 'binary' })
-    if (result.content instanceof Uint8Array) return result.content
-    if (result.content instanceof ArrayBuffer) return new Uint8Array(result.content)
-    if (typeof result.content === 'string') return new TextEncoder().encode(result.content)
-    const buf = await (result.content as Blob).arrayBuffer()
-    return new Uint8Array(buf)
+    return toUint8Array(result.content)
   }
 
-  /** Convert VfsReadResult.content (string | ArrayBuffer | Blob) to writable form (string | Uint8Array) */
-  private async toWritableContent(content: string | ArrayBuffer | Blob): Promise<string | Uint8Array> {
+  /** Convert VfsReadResult.content (string | Uint8Array | ArrayBuffer | Blob) to writable form (string | Uint8Array) */
+  private async toWritableContent(content: string | Uint8Array | ArrayBuffer | Blob): Promise<string | Uint8Array> {
+    if (content instanceof Uint8Array) return content
     if (content instanceof ArrayBuffer) return new Uint8Array(content)
     if (content instanceof Blob) return new Uint8Array(await content.arrayBuffer())
     return content
   }
 
-  async writeFile(path: string, content: string | Uint8Array, _options?: { encoding?: string } | string): Promise<void> {
+  private normalizeWriteEncoding(options?: { encoding?: string } | string): 'binary' | 'text' {
+    const encoding = typeof options === 'string' ? options : options?.encoding
+    return encoding === 'binary' ? 'binary' : 'text'
+  }
+
+  private latin1StringToBytes(content: string): Uint8Array {
+    // Inverse of just-bash's `unsafeBytesFromLatin1`: when a caller writes
+    // with encoding='binary', the string content is latin1-shaped — each
+    // JS char's low byte IS one file byte. We preserve those bytes verbatim.
+    // DO NOT use this on a real UTF-16 string with multi-byte chars; doing
+    // so truncates each char to its low byte and silently corrupts the file.
+    // Real UTF-8 roundtrip flows through `Uint8Array` (from the pipeline),
+    // not through this path.
+    const bytes = new Uint8Array(content.length)
+    for (let i = 0; i < content.length; i++) {
+      bytes[i] = content.charCodeAt(i) & 0xff
+    }
+    return bytes
+  }
+
+  async writeFile(path: string, content: string | Uint8Array, options?: { encoding?: string } | string): Promise<void> {
     // /dev/null, /dev/zero — silently consume writes
     if (path === '/dev/null' || path === '/dev/zero') return
 
@@ -221,9 +244,12 @@ export class VfsBridgeFs {
     if (this.isSystemPath(path)) {
       const normalized = this.normalizeAbsolutePath(path)
       this.ensureSysDir(this.dirname(normalized))
+      const encoding = this.normalizeWriteEncoding(options)
       this.sysFs.set(normalized, {
         type: 'file',
-        content: typeof content === 'string' ? new TextEncoder().encode(content) : content,
+        content: typeof content === 'string'
+          ? (encoding === 'binary' ? this.latin1StringToBytes(content) : new TextEncoder().encode(content))
+          : content,
         mode: DEFAULT_FILE_MODE,
         mtime: new Date(),
       })
@@ -235,7 +261,11 @@ export class VfsBridgeFs {
     if (this.isAssetsPath(path)) {
       if (!this.assetsBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAssetsRelative(path)
-      await this.assetsBackend.writeFile(relPath, content)
+      const encoding = this.normalizeWriteEncoding(options)
+      const writable = typeof content === 'string'
+        ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
+        : content
+      await this.assetsBackend.writeFile(relPath, writable)
       this._cachedAllPaths = null
       return
     }
@@ -244,7 +274,11 @@ export class VfsBridgeFs {
     if (this.isAgentsPath(path)) {
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
-      await this.agentBackend.writeFile(relPath, content)
+      const encoding = this.normalizeWriteEncoding(options)
+      const writable = typeof content === 'string'
+        ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
+        : content
+      await this.agentBackend.writeFile(relPath, writable)
       this._cachedAllPaths = null
       return
     }
@@ -255,18 +289,25 @@ export class VfsBridgeFs {
     }
 
     const relPath = this.toRelative(path)
-    await this.backend.writeFile(relPath, content)
+    const encoding = this.normalizeWriteEncoding(options)
+    const writable = typeof content === 'string'
+      ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
+      : content
+    await this.backend.writeFile(relPath, writable)
     this._cachedAllPaths = null // invalidate cache
   }
 
-  async appendFile(path: string, content: string | Uint8Array, _options?: { encoding?: string } | string): Promise<void> {
+  async appendFile(path: string, content: string | Uint8Array, options?: { encoding?: string } | string): Promise<void> {
     if (path === '/dev/null' || path === '/dev/zero') return
 
     if (this.isSystemPath(path)) {
       const normalized = this.normalizeAbsolutePath(path)
       const existing = this.sysFs.get(normalized)
       const existingContent = existing && existing.type === 'file' ? existing.content : new Uint8Array(0)
-      const toAppend = typeof content === 'string' ? new TextEncoder().encode(content) : content
+      const encoding = this.normalizeWriteEncoding(options)
+      const toAppend = typeof content === 'string'
+        ? (encoding === 'binary' ? this.latin1StringToBytes(content) : new TextEncoder().encode(content))
+        : content
       const combined = new Uint8Array(existingContent.length + toAppend.length)
       combined.set(existingContent)
       combined.set(toAppend, existingContent.length)
@@ -284,16 +325,33 @@ export class VfsBridgeFs {
     if (this.isAssetsPath(path)) {
       if (!this.assetsBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAssetsRelative(path)
-      let existing = ''
-      try {
-        const result = await this.assetsBackend.readFile(relPath)
-        if (typeof result.content === 'string') existing = result.content
-        else if (result.content instanceof ArrayBuffer) existing = new TextDecoder().decode(result.content)
-      } catch {
-        // File doesn't exist yet
+      const encoding = this.normalizeWriteEncoding(options)
+      if (encoding === 'binary') {
+        let existing = new Uint8Array(0)
+        try {
+          const result = await this.assetsBackend.readFile(relPath, { encoding: 'binary' })
+          existing = await this.toWritableContent(result.content) as Uint8Array
+        } catch {
+          // File doesn't exist yet
+        }
+        const toAppend = typeof content === 'string' ? this.latin1StringToBytes(content) : content
+        const combined = new Uint8Array(existing.length + toAppend.length)
+        combined.set(existing)
+        combined.set(toAppend, existing.length)
+        await this.assetsBackend.writeFile(relPath, combined)
+      } else {
+        let existing = ''
+        try {
+          const result = await this.assetsBackend.readFile(relPath, { encoding: 'text' })
+          if (typeof result.content === 'string') existing = result.content
+          else if (result.content instanceof Uint8Array) existing = new TextDecoder().decode(result.content)
+          else if (result.content instanceof ArrayBuffer) existing = new TextDecoder().decode(result.content)
+        } catch {
+          // File doesn't exist yet
+        }
+        const toAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
+        await this.assetsBackend.writeFile(relPath, existing + toAppend)
       }
-      const toAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
-      await this.assetsBackend.writeFile(relPath, existing + toAppend)
       return
     }
 
@@ -301,14 +359,29 @@ export class VfsBridgeFs {
     if (this.isAgentsPath(path)) {
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
-      let agExisting = ''
-      try {
-        const result = await this.agentBackend.readFile(relPath)
-        if (typeof result.content === 'string') agExisting = result.content
-        else if (result.content instanceof ArrayBuffer) agExisting = new TextDecoder().decode(result.content)
-      } catch {}
-      const agToAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
-      await this.agentBackend.writeFile(relPath, agExisting + agToAppend)
+      const encoding = this.normalizeWriteEncoding(options)
+      if (encoding === 'binary') {
+        let agExisting = new Uint8Array(0)
+        try {
+          const result = await this.agentBackend.readFile(relPath, { encoding: 'binary' })
+          agExisting = await this.toWritableContent(result.content) as Uint8Array
+        } catch {}
+        const agToAppend = typeof content === 'string' ? this.latin1StringToBytes(content) : content
+        const combined = new Uint8Array(agExisting.length + agToAppend.length)
+        combined.set(agExisting)
+        combined.set(agToAppend, agExisting.length)
+        await this.agentBackend.writeFile(relPath, combined)
+      } else {
+        let agExisting = ''
+        try {
+          const result = await this.agentBackend.readFile(relPath, { encoding: 'text' })
+          if (typeof result.content === 'string') agExisting = result.content
+          else if (result.content instanceof Uint8Array) agExisting = new TextDecoder().decode(result.content)
+          else if (result.content instanceof ArrayBuffer) agExisting = new TextDecoder().decode(result.content)
+        } catch {}
+        const agToAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
+        await this.agentBackend.writeFile(relPath, agExisting + agToAppend)
+      }
       return
     }
 
@@ -318,16 +391,33 @@ export class VfsBridgeFs {
     }
 
     const relPath = this.toRelative(path)
-    let existing = ''
-    try {
-      const result = await this.backend.readFile(relPath)
-      if (typeof result.content === 'string') existing = result.content
-      else if (result.content instanceof ArrayBuffer) existing = new TextDecoder().decode(result.content)
-    } catch {
-      // File doesn't exist yet
+    const encoding = this.normalizeWriteEncoding(options)
+    if (encoding === 'binary') {
+      let existing = new Uint8Array(0)
+      try {
+        const result = await this.backend.readFile(relPath, { encoding: 'binary' })
+        existing = await this.toWritableContent(result.content) as Uint8Array
+      } catch {
+        // File doesn't exist yet
+      }
+      const toAppend = typeof content === 'string' ? this.latin1StringToBytes(content) : content
+      const combined = new Uint8Array(existing.length + toAppend.length)
+      combined.set(existing)
+      combined.set(toAppend, existing.length)
+      await this.backend.writeFile(relPath, combined)
+    } else {
+      let existing = ''
+      try {
+        const result = await this.backend.readFile(relPath, { encoding: 'text' })
+        if (typeof result.content === 'string') existing = result.content
+        else if (result.content instanceof Uint8Array) existing = new TextDecoder().decode(result.content)
+        else if (result.content instanceof ArrayBuffer) existing = new TextDecoder().decode(result.content)
+      } catch {
+        // File doesn't exist yet
+      }
+      const toAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
+      await this.backend.writeFile(relPath, existing + toAppend)
     }
-    const toAppend = typeof content === 'string' ? content : new TextDecoder().decode(content)
-    await this.backend.writeFile(relPath, existing + toAppend)
   }
 
   // ==========================================================================

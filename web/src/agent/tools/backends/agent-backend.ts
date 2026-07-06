@@ -26,14 +26,14 @@ export class AgentBackend implements VfsBackend {
     private agentId: string,
   ) {}
 
-  async readFile(path: string, _options?: VfsReadOptions): Promise<VfsReadResult> {
+  async readFile(path: string, options?: VfsReadOptions): Promise<VfsReadResult> {
     const content = await this.agentManager.readPath(this.agentId, path)
     if (content == null) {
       throw new Error(`File not found: vfs://agents/${this.agentId}/${path}`)
     }
     const size = new TextEncoder().encode(content).length
     return {
-      content,
+      content: options?.encoding === 'binary' ? new TextEncoder().encode(content) : content,
       size,
       mimeType: inferMimeType(path),
       source: 'agent',

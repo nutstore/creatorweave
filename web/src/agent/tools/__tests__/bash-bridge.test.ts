@@ -6,18 +6,40 @@ import type { VfsBackend, VfsReadResult, VfsDirEntry } from '../vfs-backend'
 // Mock VfsBackend
 // ---------------------------------------------------------------------------
 
-function makeMockBackend(files: Record<string, string> = {}): VfsBackend {
+function makeMockBackend(files: Record<string, string | Uint8Array> = {}): VfsBackend {
   const fileMap = new Map(Object.entries(files))
   return {
     label: 'workspace' as const,
-    async readFile(path: string): Promise<VfsReadResult> {
+    async readFile(path: string, options?: { encoding?: 'text' | 'binary' }): Promise<VfsReadResult> {
       const content = fileMap.get(path)
       if (content === undefined) throw new Error(`ENOENT: '${path}'`)
-      return { content, size: content.length, mimeType: 'text/plain' }
+      if (content instanceof Uint8Array) {
+        return {
+          content: options?.encoding === 'text' ? new TextDecoder().decode(content) : content,
+          size: content.length,
+          mimeType: 'application/octet-stream',
+        }
+      }
+      return {
+        content: options?.encoding === 'binary' ? new TextEncoder().encode(content) : content,
+        size: new TextEncoder().encode(content).length,
+        mimeType: 'text/plain',
+      }
     },
-    async writeFile(path: string, content: string | ArrayBuffer | Blob): Promise<void> {
-      const text = typeof content === 'string' ? content : await (content as Blob).text()
-      fileMap.set(path, text)
+    async writeFile(path: string, content: string | Uint8Array | ArrayBuffer | Blob): Promise<void> {
+      if (typeof content === 'string') {
+        fileMap.set(path, content)
+        return
+      }
+      if (content instanceof Uint8Array) {
+        fileMap.set(path, content)
+        return
+      }
+      if (content instanceof ArrayBuffer) {
+        fileMap.set(path, new Uint8Array(content))
+        return
+      }
+      fileMap.set(path, new Uint8Array(await (content as Blob).arrayBuffer()))
     },
     async deleteFile(path: string): Promise<void> {
       if (!fileMap.has(path)) throw new Error(`ENOENT: '${path}'`)
@@ -218,6 +240,127 @@ describe('VfsBridgeFs appendFile', () => {
     await bridge.appendFile('/workspace/myroot/new.txt', 'first line')
     const content = await bridge.readFile('/workspace/myroot/new.txt')
     expect(content).toBe('first line')
+  })
+
+  it('appends latin1-shaped bytes correctly in binary mode', async () => {
+    // Binary-mode contract from just-bash: when encoding === 'binary', the
+    // string content is latin1-shaped (each char's low byte IS one file byte).
+    // '周报\n' in UTF-8 is the bytes [E5 91 A8 E6 8A A5 0A]. To pass that as a
+    // latin1-shaped string we use String.fromCharCode so each char's low byte
+    // matches the desired file byte.
+    const utf8BytesForZhouBao = [0xE5, 0x91, 0xA8, 0xE6, 0x8A, 0xA5, 0x0A]
+    const latin1 = String.fromCharCode(...utf8BytesForZhouBao)
+
+    const encoder = new TextEncoder()
+    const backend = makeMockBackend({ 'myroot/log.txt': encoder.encode('中文\n') })
+    const bridge = new VfsBridgeFs(backend, ['myroot'])
+
+    await bridge.appendFile('/workspace/myroot/log.txt', latin1, 'binary')
+
+    const content = await bridge.readFile('/workspace/myroot/log.txt')
+    expect(content).toBe('中文\n周报\n')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// UTF-8 / binary writeback
+// ---------------------------------------------------------------------------
+
+describe('VfsBridgeFs UTF-8 binary writeback', () => {
+  it('writes latin1-shaped bytes correctly in binary mode', async () => {
+    const bridge = new VfsBridgeFs(makeMockBackend(), ['myroot'])
+
+    // See comment above — 'binary' mode receives a latin1-shaped string, not
+    // a JS UTF-16 string with multi-byte chars.
+    const utf8Bytes = Array.from(new TextEncoder().encode('中文测试 周报\n'))
+    const latin1 = String.fromCharCode(...utf8Bytes)
+
+    await bridge.writeFile('/workspace/myroot/report.txt', latin1, 'binary')
+
+    const bytes = await bridge.readFileBuffer('/workspace/myroot/report.txt')
+    expect(Array.from(bytes)).toEqual(utf8Bytes)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// End-to-end: just-bash 3.0.2 + VfsBridgeFs UTF-8/CJK roundtrip
+// ---------------------------------------------------------------------------
+//
+// These tests pin down the bash.tool.ts description claim that
+// `cat src > dst`, `cat src >> dst`, and `$(cat file)` all preserve UTF-8
+// correctly with just-bash 3.0.2. If a future just-bash upgrade regresses,
+// these will fail before the agent gets a chance to corrupt user files.
+
+describe('VfsBridgeFs + just-bash end-to-end CJK roundtrip', () => {
+  // Load just-bash dynamically — same trick as bash.tool.ts uses to avoid
+  // rollup pulling node:zlib into the PWA bundle.
+  async function loadBash(): Promise<{ Bash: any }> {
+    return (await import('just-bash')) as { Bash: any }
+  }
+
+  // Helper: build a bridge with a UTF-8 file pre-loaded.
+  function bridgeWith(content: string, file = 'src.txt'): VfsBridgeFs {
+    const backend = makeMockBackend({
+      [`myroot/${file}`]: new TextEncoder().encode(content),
+    })
+    return new VfsBridgeFs(backend, ['myroot'])
+  }
+
+  it('`cat src > dst` preserves UTF-8 bytes', async () => {
+    const { Bash } = await loadBash()
+    const bridge = bridgeWith('中文 hello 周报\n')
+    const bash = new Bash({ fs: bridge as any, cwd: '/workspace/myroot' })
+    const result = await bash.exec('cat src.txt > dst.txt')
+    expect(result.exitCode).toBe(0)
+
+    const written = await bridge.readFileBuffer('/workspace/myroot/dst.txt')
+    expect(Array.from(written)).toEqual(
+      Array.from(new TextEncoder().encode('中文 hello 周报\n'))
+    )
+  })
+
+  it('`cat src >> dst` appends UTF-8 bytes correctly', async () => {
+    const { Bash } = await loadBash()
+    const encoder = new TextEncoder()
+    const backend = makeMockBackend({
+      'myroot/dst.txt': encoder.encode('first 周报\n'),
+      'myroot/src.txt': encoder.encode('second 中文\n'),
+    })
+    const bridge = new VfsBridgeFs(backend, ['myroot'])
+    const bash = new Bash({ fs: bridge as any, cwd: '/workspace/myroot' })
+    const result = await bash.exec('cat src.txt >> dst.txt')
+    expect(result.exitCode).toBe(0)
+
+    const written = await bridge.readFileBuffer('/workspace/myroot/dst.txt')
+    expect(Array.from(written)).toEqual(
+      Array.from(encoder.encode('first 周报\nsecond 中文\n'))
+    )
+  })
+
+  it('command substitution `$(cat file)` returns UTF-8 text', async () => {
+    const { Bash } = await loadBash()
+    const bridge = bridgeWith('中文 周报')
+    const bash = new Bash({ fs: bridge as any, cwd: '/workspace/myroot' })
+    const result = await bash.exec('echo "$(cat src.txt)"')
+    expect(result.exitCode).toBe(0)
+    // stdout for echo round-trips correctly: the text was UTF-8 on disk,
+    // survived the bash pipeline, and comes back as the same UTF-8 text.
+    expect(result.stdout).toBe('中文 周报\n')
+  })
+
+  it('`uniq src > dst` (text processing pipeline) preserves UTF-8', async () => {
+    // uniq reads lines, dedupes, writes — exercises the text-mode path
+    // through cat's output redirect.
+    const { Bash } = await loadBash()
+    const bridge = bridgeWith('中文\n中文\n周报\n')
+    const bash = new Bash({ fs: bridge as any, cwd: '/workspace/myroot' })
+    const result = await bash.exec('uniq src.txt > out.txt')
+    expect(result.exitCode).toBe(0)
+
+    const written = await bridge.readFileBuffer('/workspace/myroot/out.txt')
+    expect(Array.from(written)).toEqual(
+      Array.from(new TextEncoder().encode('中文\n周报\n'))
+    )
   })
 })
 

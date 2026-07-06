@@ -53,7 +53,7 @@ export interface VfsSearchOptions {
 
 /** Result of a readFile operation */
 export interface VfsReadResult {
-  content: string | ArrayBuffer | Blob
+  content: string | Uint8Array | ArrayBuffer | Blob
   size: number
   mimeType: string
   /** Where the content came from (backend-specific) */

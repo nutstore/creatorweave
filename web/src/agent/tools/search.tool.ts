@@ -158,8 +158,15 @@ async function collectPendingOverlays(
       // For modify/create, read the cached content from OPFS
       try {
         const result = await workspace.readFile(change.path, null, { projectId })
+        // ReadResult.content can be string | Uint8Array | ArrayBuffer. Decode
+        // bytes-shaped variants so binary-cached files still produce a usable
+        // search overlay (otherwise the worker falls back to disk content).
         if (typeof result.content === 'string') {
           overlays[change.path] = { content: result.content }
+        } else if (result.content instanceof Uint8Array) {
+          overlays[change.path] = { content: new TextDecoder().decode(result.content) }
+        } else if (result.content instanceof ArrayBuffer) {
+          overlays[change.path] = { content: new TextDecoder().decode(result.content) }
         }
       } catch {
         // If we can't read the cached content, skip the overlay

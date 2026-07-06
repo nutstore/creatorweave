@@ -455,8 +455,8 @@ importers:
         specifier: ^2.5.2
         version: 2.5.2
       just-bash:
-        specifier: ^3.0.1
-        version: 3.0.1
+        specifier: ^3.0.2
+        version: 3.0.2
       katex:
         specifier: ^0.16.11
         version: 0.16.47
@@ -5937,8 +5937,8 @@ packages:
   jszip@3.10.1:
     resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
 
-  just-bash@3.0.1:
-    resolution: {integrity: sha512-YVyzCN08fKarUnwqy7rKOAcX+2MLYLnYInuowmUXn3mqhrtd4ieZNBuzdQG+qYV9DqnIWuv9Whiph0WRIWsBtw==}
+  just-bash@3.0.2:
+    resolution: {integrity: sha512-uY8LMD2NpADp1HlYUcZSw9ffuq0tRhW76sg8xkeo+ZRDMu7mbekWbKbYDWquazVVi7pqpGZlic/liMFktQKy6w==}
     hasBin: true
 
   jwa@2.0.1:
@@ -15553,7 +15553,7 @@ snapshots:
       readable-stream: 2.3.8
       setimmediate: 1.0.5
 
-  just-bash@3.0.1:
+  just-bash@3.0.2:
     dependencies:
       diff: 8.0.3
       fast-xml-parser: 5.7.3
