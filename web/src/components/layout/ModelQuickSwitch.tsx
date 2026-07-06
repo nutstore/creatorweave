@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, Search, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Search, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { Popover, PopoverContent, PopoverTrigger, BrandButton } from '@creatorweave/ui'
@@ -31,6 +31,7 @@ export function ModelQuickSwitch() {
   const [providers, setProviders] = useState<AvailableProvider[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
+  const [collapsedProviders, setCollapsedProviders] = useState<Record<string, boolean>>({})
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -74,6 +75,36 @@ export function ModelQuickSwitch() {
     providers.filter((p) => p.models.length > 0),
     [providers]
   )
+
+  useEffect(() => {
+    setCollapsedProviders((prev) => {
+      const next: Record<string, boolean> = {}
+      let changed = Object.keys(prev).length !== visibleProviders.length
+
+      for (const provider of visibleProviders) {
+        if (provider.providerKey in prev) {
+          next[provider.providerKey] = prev[provider.providerKey]
+        } else {
+          next[provider.providerKey] = false
+          changed = true
+        }
+      }
+
+      return changed ? next : prev
+    })
+  }, [visibleProviders])
+
+  useEffect(() => {
+    if (!open || !providerType) return
+    const currentProvider = visibleProviders.find((p) => p.providerType === providerType)
+    if (!currentProvider) return
+
+    setCollapsedProviders((prev) =>
+      prev[currentProvider.providerKey]
+        ? { ...prev, [currentProvider.providerKey]: false }
+        : prev
+    )
+  }, [open, providerType, visibleProviders])
 
   // Build a flat list of all models for cross-provider search
   const flatModels = useMemo<FlatModel[]>(() => {
@@ -124,6 +155,13 @@ export function ModelQuickSwitch() {
     setOpen(false)
   }
 
+  const toggleProviderCollapsed = (providerKey: string) => {
+    setCollapsedProviders((prev) => ({
+      ...prev,
+      [providerKey]: !prev[providerKey],
+    }))
+  }
+
   // Keyboard: Enter selects the first matched model, Esc clears or closes
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && isSearching && filteredFlatModels.length > 0) {
@@ -153,7 +191,7 @@ export function ModelQuickSwitch() {
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
         </BrandButton>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[360px] p-2">
+      <PopoverContent align="end" className="w-[360px] p-3">
         <div className="mb-2 px-2 py-1 text-xs font-medium text-tertiary">
           {t('topbar.modelSwitcher.title')}
         </div>
@@ -189,7 +227,7 @@ export function ModelQuickSwitch() {
               {t('topbar.modelSwitcher.noResults')}
             </div>
           ) : (
-            <div className="max-h-[320px] space-y-0.5 overflow-auto">
+            <div className="max-h-[320px] space-y-0.5 overflow-auto pr-1">
               {filteredFlatModels.map(({ provider, model }) => {
                 const selected =
                   provider.providerType === providerType && model.id === modelName
@@ -214,31 +252,57 @@ export function ModelQuickSwitch() {
           )
         ) : (
           /* Default mode: grouped by provider (original layout) */
-          <div className="max-h-[320px] space-y-2 overflow-auto">
+          <div className="max-h-[320px] space-y-2 overflow-auto pr-1">
             {visibleProviders.map((provider) => {
               const isCurrentProvider = provider.providerType === providerType
+              const isCollapsed = collapsedProviders[provider.providerKey] ?? false
 
               return (
-                <div key={provider.providerKey} className="rounded-lg border border-border/60 p-2">
-                  <div className="mb-1 px-1 text-xs font-semibold text-secondary">
-                    {provider.displayName}
-                  </div>
-                  <div className="space-y-1">
-                    {provider.models.map((model) => {
-                      const selected = isCurrentProvider && model.id === modelName
-                      return (
-                        <button
-                          key={`${provider.providerKey}:${model.id}`}
-                          type="button"
-                          onClick={() => handleSelect(provider, model.id)}
-                          className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-                        >
-                          <span className="truncate">{model.name}</span>
-                          {selected ? <Check className="h-4 w-4 text-primary" /> : null}
-                        </button>
-                      )
-                    })}
-                  </div>
+                <div
+                  key={provider.providerKey}
+                  className="overflow-hidden rounded-lg border border-border/60 bg-background/60"
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleProviderCollapsed(provider.providerKey)}
+                    className="flex w-full items-center justify-between px-3 py-2 text-left transition-colors hover:bg-muted/30"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      {isCollapsed ? (
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-tertiary" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-tertiary" />
+                      )}
+                      <span className="truncate text-[13px] font-semibold text-primary">
+                        {provider.displayName}
+                      </span>
+                      {isCurrentProvider ? (
+                        <span className="text-[10px] text-[var(--brand,#0d9488)]">●</span>
+                      ) : null}
+                    </span>
+                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-tertiary">
+                      {provider.models.length}
+                    </span>
+                  </button>
+                  {!isCollapsed ? (
+                    <div className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
+                      {provider.models.map((model) => {
+                        const selected = isCurrentProvider && model.id === modelName
+                        return (
+                          <button
+                            key={`${provider.providerKey}:${model.id}`}
+                            type="button"
+                            onClick={() => handleSelect(provider, model.id)}
+                            className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors ${selected ? 'bg-muted/60' : 'hover:bg-muted'}`}
+                          >
+                            <span className="truncate">{model.name}</span>
+                            {selected ? <Check className="h-4 w-4 text-primary" /> : null}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               )
             })}
