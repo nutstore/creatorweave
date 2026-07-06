@@ -191,6 +191,43 @@ const SuggestionDropdown = forwardRef(
 ) => React.ReactElement | null
 
 // ---------------------------------------------------------------------------
+// Input history (terminal-style ↑/↓ navigation)
+// ---------------------------------------------------------------------------
+
+const INPUT_HISTORY_KEY = 'creatorweave:input-history'
+const MAX_HISTORY = 50
+
+function loadInputHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(INPUT_HISTORY_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string').slice(-MAX_HISTORY) : []
+  } catch {
+    return []
+  }
+}
+
+function saveInputHistory(history: string[]): void {
+  try {
+    localStorage.setItem(INPUT_HISTORY_KEY, JSON.stringify(history.slice(-MAX_HISTORY)))
+  } catch {
+    // ignore quota / serialization errors — history is best-effort
+  }
+}
+
+/** Append a sent message to history (dedup consecutive duplicates). */
+function appendToHistory(history: string[], text: string): string[] {
+  const trimmed = text.trim()
+  if (!trimmed) return history
+  const last = history[history.length - 1]
+  if (last === trimmed) return history
+  const next = [...history, trimmed].slice(-MAX_HISTORY)
+  saveInputHistory(next)
+  return next
+}
+
+// ---------------------------------------------------------------------------
 // Helpers – extract plain text & mention IDs from editor document
 // ---------------------------------------------------------------------------
 
@@ -295,6 +332,16 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const [newAgentInput, setNewAgentInput] = useState('')
   const [agentSelection, setAgentSelection] = useState(0)
   const [isDragOver, setIsDragOver] = useState(false)
+
+  // ---- Input history navigation (↑/↓) ------------------------------------
+  const [inputHistory, setInputHistory] = useState<string[]>(() => loadInputHistory())
+  const inputHistoryRef = useRef(inputHistory)
+  useEffect(() => { inputHistoryRef.current = inputHistory }, [inputHistory])
+  /** null = not navigating history; otherwise an index into inputHistory. */
+  const navIndexRef = useRef<number | null>(null)
+  /** True while we are programmatically setting editor content (history nav) —
+   *  used to avoid resetting navIndex in onUpdate for programmatic changes. */
+  const isProgrammaticUpdateRef = useRef(false)
 
   // Asset upload state
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -703,6 +750,83 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           return false
         }
 
+        // ArrowUp / ArrowDown — terminal-style input history navigation.
+        // Fires only when no suggestion popup is open (those are guarded
+        // above or handled earlier by the suggestion plugin) and only at the
+        // document boundaries (top for ↑, bottom for ↓).
+        if (event.key === 'ArrowUp' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          // Defer to suggestion popups (@-mention / #-fileMention / slash cmd)
+          // when one is open — they need arrow keys for dropdown navigation.
+          if (
+            suggestionItemsRef.current.length > 0 ||
+            fileSuggestionItemsRef.current.length > 0 ||
+            slashSuggestionItemsRef.current.length > 0
+          ) {
+            return false
+          }
+          const history = inputHistoryRef.current
+          if (history.length === 0) return false
+          // Guard: navigate when caret is at the document start. In ProseMirror
+          // an empty `<p></p>` places the caret at pos 1 (inside the first
+          // paragraph), so we treat from <= 1 as "at the top".
+          const ed = editor
+          if (ed && ed.state.selection.empty && ed.state.selection.from <= 1) {
+            event.preventDefault()
+            const nextIdx = navIndexRef.current === null
+              ? history.length - 1
+              : Math.max(0, navIndexRef.current - 1)
+            navIndexRef.current = nextIdx
+            isProgrammaticUpdateRef.current = true
+            ed.commands.setContent(history[nextIdx])
+            ed.commands.focus('end')
+            // clearContent/setContent run their transactions synchronously in
+            // TipTap, so by the next tick the onUpdate guard can be cleared.
+            isProgrammaticUpdateRef.current = false
+            emitValue(ed)
+            return true
+          }
+          return false
+        }
+        if (event.key === 'ArrowDown' && !event.shiftKey && !event.metaKey && !event.ctrlKey && !event.altKey) {
+          if (
+            suggestionItemsRef.current.length > 0 ||
+            fileSuggestionItemsRef.current.length > 0 ||
+            slashSuggestionItemsRef.current.length > 0
+          ) {
+            return false
+          }
+          const ed = editor
+          // Only navigate when active and caret at the end of the doc.
+          // doc.content.size counts the closing tag of the last block, so the
+          // real caret-at-end position is size - 1.
+          const docEnd = ed ? ed.state.doc.content.size : 0
+          if (
+            navIndexRef.current !== null &&
+            ed &&
+            ed.state.selection.empty &&
+            ed.state.selection.from >= docEnd - 1
+          ) {
+            event.preventDefault()
+            const nextIdx = navIndexRef.current + 1
+            const history = inputHistoryRef.current
+            isProgrammaticUpdateRef.current = true
+            if (nextIdx >= history.length) {
+              // Stepped past the newest entry — clear to a blank input.
+              navIndexRef.current = null
+              ed.commands.clearContent()
+              ed.commands.focus('end')
+            } else {
+              navIndexRef.current = nextIdx
+              ed.commands.setContent(history[nextIdx])
+              ed.commands.focus('end')
+            }
+            isProgrammaticUpdateRef.current = false
+            emitValue(ed)
+            return true
+          }
+          return false
+        }
+
         // Enter (without Shift) submits the message.
         // Suggestion handles its own Enter, so this only fires when the
         // suggestion popup is closed.
@@ -754,6 +878,12 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
       emitValue(created)
     },
     onUpdate: ({ editor: updated }) => {
+      // Reset history navigation when the user edits the content themselves
+      // (typing / deleting / pasting). Programmatic setContent during history
+      // navigation sets isProgrammaticUpdateRef to skip this reset.
+      if (!isProgrammaticUpdateRef.current) {
+        navIndexRef.current = null
+      }
       emitValue(updated)
     },
     onFocus: () => setIsFocused(true),
@@ -774,6 +904,15 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   // ── Clear editor on resetToken change (message sent) ──
   useEffect(() => {
     if (!editor) return
+    // Capture the message being sent into the input history BEFORE clearing.
+    if (!editor.isEmpty) {
+      const sent = getPlainText(editor)
+      if (sent.trim()) {
+        setInputHistory((prev) => appendToHistory(prev, sent))
+      }
+    }
+    // Reset history navigation state for the next (empty) input.
+    navIndexRef.current = null
     editor.commands.clearContent()
     // Clear pending asset uploads when input resets (message sent)
     useAssetStore.getState().clearAll()
