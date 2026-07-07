@@ -136,12 +136,11 @@ export function WorkspaceLayout({
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   const role = useRemoteStore((s) => s.role)
-  // `showPreview` is a boolean state field; `showPreviewPanel` is the action that
-  // toggles it. Earlier the boolean was aliased to `showPreview`, which clashed
-  // with the action name and caused a `TypeError: showPreview is not a function`
-  // when the file-preview request effect tried to call it.
+  // `showPreview` is a boolean state field controlling the sync preview drawer.
+  // `showPreviewPanel` is the action that toggles it (used elsewhere).
+  // Earlier the boolean was aliased to `showPreview`, which clashed with the
+  // action name and caused a `TypeError: showPreview is not a function`.
   const isPreviewOpen = useConversationContextStore((state) => state.showPreview)
-  const showPreviewPanel = useConversationContextStore((state) => state.showPreviewPanel)
   const workspaceCount = useConversationContextStore((state) => state.workspaces.length)
   const hidePreviewPanel = useConversationContextStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
@@ -206,7 +205,9 @@ export function WorkspaceLayout({
   // (e.g. PendingSyncPanel's preview button). `openInFilePreview()` in the
   // workspace store bumps `filePreviewRequestSeq` and writes the path to
   // `filePreviewRequestPath`. The seq counter guarantees this effect re-fires
-  // even when the same path is requested twice in a row.
+  // even when the same path is requested twice in a row. Setting
+  // `selectedFilePath` is enough to open the FilePreview drawer — its `open`
+  // prop / split-mode `aside` both derive from it (see lines 924 & 959).
   const filePreviewRequestSeq = useConversationContextStore((s) => s.filePreviewRequestSeq)
   const filePreviewRequestPath = useConversationContextStore((s) => s.filePreviewRequestPath)
   useEffect(() => {
@@ -215,8 +216,7 @@ export function WorkspaceLayout({
     setSelectedFilePath(filePreviewRequestPath)
     setSelectedFileHandle(null)
     setSelectedFileBlob(null)
-    showPreviewPanel()
-  }, [filePreviewRequestSeq, filePreviewRequestPath, showPreviewPanel])
+  }, [filePreviewRequestSeq, filePreviewRequestPath])
   /** Target file path (with rootName prefix) to reveal in file tree */
   const [revealTargetPath, setRevealTargetPath] = useState<string | null>(null)
   const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
