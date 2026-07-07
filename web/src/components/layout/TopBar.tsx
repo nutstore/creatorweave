@@ -244,7 +244,7 @@ export function TopBar({
             )}
 
             <div className="shrink-0">
-              <ModelQuickSwitch />
+              <ModelQuickSwitch onManageProviders={() => openSettings('llm')} />
             </div>
 
             {/* Image generation model + aspect ratio (combined) */}

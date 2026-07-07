@@ -14,6 +14,7 @@ export const topbar = {
       noPinnedModels: "まだピン留めされたモデルはありません。設定で追加してください。",
       searchPlaceholder: "モデルを検索…",
       noResults: "一致するモデルはありません",
+      manageProviders: "LLM プロバイダーを管理",
     },
     tooltips: {
       backToProjects: "プロジェクト一覧に戻る",

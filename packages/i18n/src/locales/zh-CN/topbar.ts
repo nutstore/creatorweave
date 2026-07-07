@@ -14,6 +14,7 @@ export const topbar = {
       noPinnedModels: "暂无常用模型，请在设置中添加",
       searchPlaceholder: "搜索模型…",
       noResults: "无匹配模型",
+      manageProviders: "管理 LLM 服务商",
     },
     tooltips: {
       backToProjects: "返回项目列表",

@@ -14,6 +14,7 @@ export const topbar = {
       noPinnedModels: "아직 고정된 모델이 없습니다. 설정에서 추가하세요.",
       searchPlaceholder: "모델 검색…",
       noResults: "일치하는 모델 없음",
+      manageProviders: "LLM 서비스 관리",
     },
     tooltips: {
       backToProjects: "프로젝트 목록으로 돌아가기",

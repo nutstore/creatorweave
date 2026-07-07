@@ -13,6 +13,7 @@ export const topbar = {
       noPinnedModels: "No models pinned yet. Add models in Settings.",
       searchPlaceholder: "Search models…",
       noResults: "No matching models",
+      manageProviders: "Manage LLM Providers",
     },
     tooltips: {
       backToProjects: "Back to Project List",

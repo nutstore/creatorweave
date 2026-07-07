@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Search, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Search, Settings, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { Popover, PopoverContent, PopoverTrigger, BrandButton } from '@creatorweave/ui'
@@ -18,7 +18,13 @@ interface FlatModel {
   model: { id: string; name: string }
 }
 
-export function ModelQuickSwitch() {
+interface ModelQuickSwitchProps {
+  /** Called when user clicks the "Manage providers" entry. Typically opens
+   *  the settings dialog on the LLM provider tab. */
+  onManageProviders?: () => void
+}
+
+export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = {}) {
   const t = useT()
   const providerType = useSettingsStore((s) => s.providerType)
   const modelName = useSettingsStore((s) => s.modelName)
@@ -307,6 +313,24 @@ export function ModelQuickSwitch() {
               )
             })}
           </div>
+        )}
+
+        {/* Manage providers entry — opens settings → LLM tab */}
+        {onManageProviders && (
+          <>
+            <div className="mt-2 border-t border-border/40" />
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                onManageProviders()
+              }}
+              className="mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-secondary transition-colors hover:bg-muted"
+            >
+              <Settings className="h-3.5 w-3.5 shrink-0 text-tertiary" />
+              {t('topbar.modelSwitcher.manageProviders')}
+            </button>
+          </>
         )}
       </PopoverContent>
     </Popover>
