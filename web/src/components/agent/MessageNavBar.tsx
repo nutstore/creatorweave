@@ -145,17 +145,17 @@ export const MessageNavBar = memo(function MessageNavBar({
         <div className="relative h-full">
           {/* Rail container — positioned just outside the content right edge */}
           <nav
-            className="msg-nav-rail pointer-events-auto absolute -right-8 top-8 bottom-8 flex w-4 flex-col items-center overflow-visible"
+            className="msg-nav-rail pointer-events-auto absolute -right-10 top-8 bottom-8 flex w-8 flex-col items-center overflow-visible"
             role="navigation"
             aria-label={t('conversation.nav.label', { defaultValue: 'Message navigation' })}
           >
             {/* Track + fill line (always visible) */}
             <div className="relative flex flex-1 w-full">
               {/* Background line */}
-              <div className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-[var(--brand-muted)] dark:bg-[var(--brand-muted)]" style={{ top: 0, bottom: 0 }} />
+              <div className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-gray-200" style={{ top: 0, bottom: 0 }} />
               {/* Fill line */}
               <div
-                className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-primary-400 dark:bg-primary-600"
+                className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-primary-500 dark:bg-primary-600"
                 style={{
                   top: 0,
                   height: fillRatio > 0 ? `${fillRatio * 100}%` : 0,
@@ -183,12 +183,12 @@ export const MessageNavBar = memo(function MessageNavBar({
                   >
                     <div
                       className={[
-                        'rounded-full transition-all duration-200',
+                        'rounded-full border-0 ring-2 ring-background transition-all duration-200',
                         isActive
-                          ? 'bg-primary-500 dark:bg-primary-500'
-                          : 'bg-[var(--brand-muted)] hover:bg-primary-300 dark:bg-[var(--brand-muted)] dark:hover:bg-primary-400',
+                          ? 'bg-primary-500 dark:bg-primary-400'
+                          : 'bg-primary-300/60 hover:bg-primary-500 dark:bg-primary-700/60 dark:hover:bg-primary-400',
                       ].filter(Boolean).join(' ')}
-                      style={{ width: isActive ? 6 : 5, height: isActive ? 6 : 5 }}
+                      style={{ width: isActive ? 7 : 6, height: isActive ? 7 : 6 }}
                     />
                     {/* Tooltip — appears to the left */}
                     <div className="pointer-events-none absolute right-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 opacity-0 shadow-sm transition-opacity group-hover/dot:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">

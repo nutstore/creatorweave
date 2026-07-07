@@ -101,11 +101,15 @@ export function createBaseConfig(options = {}) {
         foreground: cssVar('primary-foreground'),
         50: cssVar('primary-50'),
         100: cssVar('primary-100'),
+        200: cssVar('primary-200'),
+        300: cssVar('primary-300'),
         400: cssVar('primary-400'),
         500: cssVar('primary-500'),
         600: cssVar('primary-600'),
         700: cssVar('primary-700'),
         800: cssVar('primary-800'),
+        900: cssVar('primary-900'),
+        950: cssVar('primary-950'),
       },
 
       // Status colors — same pattern: CSS vars only.
@@ -115,13 +119,18 @@ export function createBaseConfig(options = {}) {
         text: cssVar('success-text'),
         50: cssVar('success-50'),
         200: cssVar('success-200'),
+        950: cssVar('success-950'),
       },
 
       warning: {
         DEFAULT: cssVar('warning'),
         bg: cssVar('warning-bg'),
         50: cssVar('warning-50'),
+        100: cssVar('warning-100'),
         200: cssVar('warning-200'),
+        500: cssVar('warning-500'),
+        900: cssVar('warning-900'),
+        950: cssVar('warning-950'),
       },
 
       danger: {
@@ -130,6 +139,9 @@ export function createBaseConfig(options = {}) {
         border: cssVar('danger-border'),
         50: cssVar('danger-50'),
         200: cssVar('danger-200'),
+        500: cssVar('danger-500'),
+        600: cssVar('danger-600'),
+        700: cssVar('danger-700'),
       },
 
       // Warm accent — extended brand token (only used in a few places)

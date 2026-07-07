@@ -46,11 +46,15 @@
     --primary-foreground: 0 0% 100%;
     --primary-50: 174 30% 97%; /* #F4F8F7 - 极淡底色 */
     --primary-100: 174 30% 93%; /* #E0EBE9 */
+    --primary-200: 174 35% 89%; /* #D5E8E5 */
+    --primary-300: 174 40% 78%; /* #A5D2CD */
     --primary-400: 174 45% 55%; /* #5DB3AC - 略亮于 primary */
     --primary-500: 174 45% 47%; /* #4D9F98 - 品牌色基准 */
     --primary-600: 174 42% 38%; /* #3A7D77 - hover */
     --primary-700: 174 38% 31%; /* #34605D */
     --primary-800: 174 30% 25%; /* #2D4745 */
+    --primary-900: 174 30% 18%; /* #1F3532 */
+    --primary-950: 174 30% 11%; /* #121F1D */
 
     /* ========== Status Colors (Muted) ========== */
     --success: 150 50% 38%; /* #2D8A4E - 更柔和的绿色 */
@@ -58,15 +62,23 @@
     --success-200: 150 40% 85%; /* #C5E0CD */
     --success-bg: 150 25% 96%; /* #EDF5F0 */
     --success-text: 150 50% 35%; /* #257543 */
+    --success-950: 150 50% 8%; /* #0D1F14 */
 
     --warning: 35 60% 45%; /* #B86E0D - 柔和的橙色 */
     --warning-50: 35 30% 96%; /* #FEF6E8 */
+    --warning-100: 35 40% 90%; /* #F4E0C0 */
     --warning-200: 35 50% 80%; /* #EDD9A3 */
+    --warning-500: 35 65% 48%; /* #C58327 */
+    --warning-900: 35 50% 18%; /* #4B3318 */
+    --warning-950: 35 50% 10%; /* #2A1B0C */
     --warning-bg: 35 30% 96%; /* #FEF6E8 */
 
     --danger: 15 55% 55%; /* #C46B4A - 柔和的红色 */
     --danger-50: 15 30% 97%; /* #FDF5F0 */
     --danger-200: 15 45% 82%; /* #EDC4B0 */
+    --danger-500: 15 60% 50%; /* #C85A38 */
+    --danger-600: 15 65% 45%; /* #A84727 */
+    --danger-700: 15 65% 38%; /* #823520 */
     --danger-bg: 15 30% 97%; /* #FDF5F0 */
     --danger-border: 15 45% 70%; /* #D98B6E */
 
@@ -129,26 +141,38 @@
     --primary-foreground: 210 10% 95%;
     --primary-50: 174 30% 14%; /* #112524 - 深色表面叠底 */
     --primary-100: 174 35% 20%; /* #1A3634 */
+    --primary-200: 174 32% 24%; /* #213734 */
+    --primary-300: 174 38% 30%; /* #2D4F4A */
     --primary-400: 174 50% 65%; /* #7ACFC9 - 最亮（hover 高亮） */
     --primary-500: 174 45% 47%; /* #4D9F98 - 品牌色基准（不变） */
     --primary-600: 174 50% 58%; /* #5FBCB4 - 等于 primary */
     --primary-700: 174 45% 65%; /* #7AC8C2 */
     --primary-800: 174 40% 60%; /* #6FB8B3 */
+    --primary-900: 174 30% 8%; /* #0E1817 */
+    --primary-950: 174 30% 5%; /* #080D0C */
 
     --success: 150 55% 50%; /* #3D9E66 */
     --success-50: 150 30% 12%; /* #121D16 */
     --success-200: 150 35% 22%; /* #1A3425 */
     --success-bg: 150 45% 18%; /* #1A3425 - 更明显的深色背景 */
     --success-text: 150 50% 60%; /* #5CB882 */
+    --success-950: 150 40% 5%; /* #07140D */
 
     --warning: 38 70% 50%; /* #C9922E */
     --warning-50: 38 40% 12%; /* #1F180C */
+    --warning-100: 38 50% 22%; /* #4A371B */
     --warning-200: 38 50% 28%; /* #382A16 */
+    --warning-500: 38 70% 60%; /* #D7A450 */
+    --warning-900: 38 60% 12%; /* #2E2310 */
+    --warning-950: 38 60% 6%; /* #1A1308 */
     --warning-bg: 38 35% 10%; /* #191408 */
 
     --danger: 15 50% 58%; /* #C8745A */
     --danger-50: 15 30% 14%; /* #221512 */
     --danger-200: 15 40% 28%; /* #34231D */
+    --danger-500: 15 60% 50%; /* #C85638 */
+    --danger-600: 15 65% 60%; /* #DC8165 */
+    --danger-700: 15 65% 70%; /* #E89F86 */
     --danger-bg: 15 55% 18%; /* #34231D - 更明显的深色背景 */
     --danger-border: 15 45% 45%; /* #A05540 */
 
@@ -369,14 +393,9 @@
   animation: edge-flow 0.8s linear infinite;
 }
 
-/* ── MessageNavBar: hover-expand dots ── */
+/* ── MessageNavBar: rail + dots ── */
 .msg-nav-rail .msg-nav-line {
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   width: 1px;
-}
-
-.msg-nav-rail:hover .msg-nav-line {
-  width: 2.5px;
 }
 
 .msg-nav-rail:hover .msg-nav-dots {
