@@ -189,7 +189,7 @@ const MARKDOWN_COMPONENTS = {
               {match[1]}
             </div>
           )}
-          <pre className="overflow-x-auto bg-neutral-50 dark:bg-[#1A1A1A] p-3">
+          <pre className="overflow-x-auto bg-neutral-50 dark:bg-bg-tertiary p-3">
             <code className={`text-[13px] leading-relaxed text-neutral-800 dark:text-white ${className || ''}`} {...props}>
               {children}
             </code>

@@ -37,19 +37,20 @@
 
     --border: 0 0% 90%; /* #E5E5E5 */
     --input: 0 0% 90%;
-    --ring: 170 35% 45%; /* Muted Teal */
+    --ring: 174 45% 47%; /* Teal - 与 primary 对齐 */
 
     --radius: 0.5rem; /* 8px */
 
-    /* ========== Primary (Muted Teal) ========== */
-    --primary: 170 35% 45%; /* #5D8A8E - 更柔和的青色 */
+    /* ========== Primary (Muted Teal — option B) ========== */
+    --primary: 174 45% 47%; /* #4D9F98 - 专业鲜活 */
     --primary-foreground: 0 0% 100%;
-    --primary-50: 170 20% 97%; /* #F5F8F8 */
-    --primary-100: 170 20% 93%; /* #E6EBEC */
-    --primary-500: 170 35% 45%; /* #5D8A8E */
-    --primary-600: 170 30% 38%; /* #4A7275 */
-    --primary-700: 170 25% 32%; /* #3C5C5F */
-    --primary-800: 170 20% 28%; /* #334B4E */
+    --primary-50: 174 30% 97%; /* #F4F8F7 - 极淡底色 */
+    --primary-100: 174 30% 93%; /* #E0EBE9 */
+    --primary-400: 174 45% 55%; /* #5DB3AC - 略亮于 primary */
+    --primary-500: 174 45% 47%; /* #4D9F98 - 品牌色基准 */
+    --primary-600: 174 42% 38%; /* #3A7D77 - hover */
+    --primary-700: 174 38% 31%; /* #34605D */
+    --primary-800: 174 30% 25%; /* #2D4745 */
 
     /* ========== Status Colors (Muted) ========== */
     --success: 150 50% 38%; /* #2D8A4E - 更柔和的绿色 */
@@ -82,6 +83,12 @@
     --border-strong: 0 0% 83%; /* #D4D4D4 */
     --border-subtle: 0 0% 94%; /* #F0F0F0 */
 
+    /* ========== Brand-tinted Muted Surface ==========
+       用于需要 brand 色温但不抢眼的中性交互表面：导航轨道、非激活圆点、
+       次要标记等。比 --bg-tertiary 多了 teal 色温，避免挨着 teal 主色时
+       读起来"断层"。 */
+    --brand-muted: 174 20% 80%;    /* #CEDDDB - light */
+
     --gray-100: 0 0% 96%; /* #F3F4F6 */
     --gray-200: 0 0% 90%; /* #E5E7EB */
   }
@@ -109,20 +116,24 @@
     --destructive: 15 74% 67%; /* #F59E6B */
     --destructive-foreground: 0 0% 100%;
 
+    /* ========== Accent (Amber) - dark ========== */
+    --accent-warm: 38 70% 60%; /* dark mode 增亮 */
+
     /* Border - subtle tint */
     --border: 210 10% 18%; /* #1E2529 */
     --input: 210 10% 18%;
-    --ring: 170 30% 50%; /* #6B999D - 柔和的 rings */
+    --ring: 174 50% 58%; /* Teal - dark mode primary */
 
-    /* Primary - muted teal for dark */
-    --primary: 170 35% 55%; /* #6B999D */
+    /* Primary - Muted Teal for dark (option B) */
+    --primary: 174 50% 58%; /* #5FBCB4 - dark mode 提亮增饱和 */
     --primary-foreground: 210 10% 95%;
-    --primary-50: 170 25% 12%; /* #151D1E */
-    --primary-100: 170 25% 18%; /* #1C292A */
-    --primary-500: 170 35% 45%; /* #5D8A8E */
-    --primary-600: 170 35% 55%; /* #6B999D */
-    --primary-700: 170 30% 62%; /* #7FA8AB */
-    --primary-800: 170 25% 58%; /* #709293 */
+    --primary-50: 174 30% 14%; /* #112524 - 深色表面叠底 */
+    --primary-100: 174 35% 20%; /* #1A3634 */
+    --primary-400: 174 50% 65%; /* #7ACFC9 - 最亮（hover 高亮） */
+    --primary-500: 174 45% 47%; /* #4D9F98 - 品牌色基准（不变） */
+    --primary-600: 174 50% 58%; /* #5FBCB4 - 等于 primary */
+    --primary-700: 174 45% 65%; /* #7AC8C2 */
+    --primary-800: 174 40% 60%; /* #6FB8B3 */
 
     --success: 150 55% 50%; /* #3D9E66 */
     --success-50: 150 30% 12%; /* #121D16 */
@@ -154,6 +165,9 @@
 
     --border-strong: 210 10% 22%; /* #2A3033 */
     --border-subtle: 210 10% 12%; /* #1A1E21 */
+
+    /* Brand-tinted Muted Surface (dark) */
+    --brand-muted: 174 18% 28%;    /* #2E4241 - dark */
 
     /* Grays - neutral */
     --gray-100: 210 8% 16%; /* #1F2528 */

@@ -85,6 +85,8 @@ export const PENDING_RESET_PATCH: Partial<WorkspaceState> = {
   pendingChanges: null,
   showPreview: false,
   previewSelectedPath: null,
+  filePreviewRequestSeq: 0,
+  filePreviewRequestPath: null,
   switchingWorkspaceId: null,
   unsyncedSnapshots: [],
   opfsOnlyFileCount: 0,
@@ -245,6 +247,17 @@ interface WorkspaceState {
   /** Optional preselected file path for change review panel */
   previewSelectedPath: string | null
 
+  /**
+   * Counter that bumps whenever a sidebar / list row wants to hand the file
+   * off to the workspace-level FilePreview drawer (e.g. "open in preview" from
+   * PendingSyncPanel). WorkspaceLayout subscribes via useEffect and reacts by
+   * setting selectedFilePath + showPreviewPanel(). The path itself is carried in
+   * `filePreviewRequestPath`; the counter guarantees the effect re-fires
+   * even when the same path is requested twice in a row.
+   */
+  filePreviewRequestSeq: number
+  filePreviewRequestPath: string | null
+
   /** Whether workspace has valid native FS directory handle */
   hasDirectoryHandle: boolean
 
@@ -324,6 +337,13 @@ interface WorkspaceState {
   clearPreviewSelectedPath: () => void
 
   /**
+   * Request the workspace-level FilePreview drawer to open with a given path.
+   * Decouples sidebar components (which have no access to WorkspaceLayout's
+   * drawer state) from the drawer owner.
+   */
+  openInFilePreview: (path: string) => void
+
+  /**
    * Refresh pending changes - independent of Python tool execution
    * Scans OPFS and updates pendingChanges with any new/modified/deleted files
    */
@@ -397,6 +417,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         opfsOnlyFileCount: 0,
         opfsOnlyFilesPaths: [] as string[],
         pinnedWorkspaceIds: [],
+        filePreviewRequestSeq: 0,
+        filePreviewRequestPath: null,
 
         //=============================================================================
         // Actions
@@ -1098,6 +1120,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
 
         clearPreviewSelectedPath: () => {
           set({ previewSelectedPath: null })
+        },
+
+        openInFilePreview: (path: string) => {
+          set((state) => ({
+            filePreviewRequestSeq: state.filePreviewRequestSeq + 1,
+            filePreviewRequestPath: path,
+          }))
         },
 
         refreshPendingChanges: async (silent = false) => {

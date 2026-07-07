@@ -1,8 +1,8 @@
 export const welcome = {
     title: "CreatorWeave",
-    tagline: "AI-Native Creator Workspace for Knowledge & Multi-Agent Flows",
+    tagline: "AI-Native Workspace for Creators",
     placeholder: "Type a message to start...",
-    placeholderNoKey: "Please configure API Key in settings first",
+    placeholderNoKey: "Please configure an AI model first",
     send: "Send",
     openLocalFolder: "Open Local Folder",
     recentHint:
@@ -14,6 +14,17 @@ export const welcome = {
     apiKeyRequiredHint:
       "Please configure API Key in model settings first to start",
     filesReady: "{count} file(s) ready",
+    // Shown while the async API-key check is in flight (avoids flashing the
+    // "no API key" setup card before SQLite has been consulted).
+    checkingConfig: "Checking AI configuration...",
+    // Setup card (shown when no API key configured)
+    setupCardTitle: "Choose how to connect AI before you start",
+    setupGatewayTitle: "Login with Jianguoyun Account",
+    setupGatewayDesc: "Have a Jianguoyun account? Login instantly — no API Key needed",
+    setupGatewayRecommend: "Recommended",
+    setupApiKeyTitle: "Configure Your Own API Key",
+    setupApiKeyDesc: "Supports OpenAI, OpenRouter, Anthropic, and more",
+    setupLocalFirstHint: "All data is stored locally in your browser, never uploaded",
     personas: {
       developer: {
         title: "Developer",
@@ -52,4 +63,20 @@ export const welcome = {
         },
       },
     },
+    gateway: {
+        title: "Login to Jianguoyun AI",
+        close: "Close",
+        requesting: "Creating authorization session...",
+        enterCode: "Enter the following code on the authorization page",
+        authCodeLabel: "Authorization Code",
+        copy: "Copy",
+        openAuthPage: "Open Authorization Page",
+        waiting: "Waiting for authorization...",
+        success: "Login successful!",
+        clientIdMissing:
+            "Client ID not configured. Set VITE_JIANGUOYUN_AI_CLIENT_ID env variable.",
+        authFailedFallback: "Authentication failed",
+    },
+    quickActionPrompt: "What can you help me with?",
+    commandPaletteHint: "Open command palette",
 } as const

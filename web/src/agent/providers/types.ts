@@ -184,6 +184,31 @@ export function getProviderConfig(type: LLMProviderType): Omit<LLMProviderConfig
   return (LLM_PROVIDER_CONFIGS as Record<string, Omit<LLMProviderConfig, 'apiKey'>>)[type] ?? null
 }
 
+/**
+ * Provider types that are registered asynchronously after app startup.
+ * `checkHasApiKey()` defers its conclusion when the user's `providerType`
+ * is one of these but the registry doesn't yet have a config — otherwise
+ * we'd prematurely report "no API key" while a registration is in flight
+ * (e.g. codex-oauth waiting for extension auth, llm-gateway registering
+ * in App.tsx, custom-* waiting for restore).
+ *
+ * NOTE: Keep this in sync with the dynamic registration paths. If you add
+ * a new async-registered provider, add it here too.
+ */
+const POTENTIALLY_DYNAMIC_PROVIDER_IDS: ReadonlySet<string> = new Set([
+  'codex-oauth',
+  'llm-gateway',
+])
+
+const POTENTIALLY_DYNAMIC_PROVIDER_PREFIXES: readonly string[] = ['custom-']
+
+/** True if the given providerType might register itself asynchronously. */
+export function isPotentiallyDynamicProviderType(type: string): boolean {
+  if (!type) return false
+  if (POTENTIALLY_DYNAMIC_PROVIDER_IDS.has(type)) return true
+  return POTENTIALLY_DYNAMIC_PROVIDER_PREFIXES.some((p) => type.startsWith(p))
+}
+
 /** Get meta for any provider (built-in or dynamic) */
 export function getProviderMeta(type: LLMProviderType): ProviderMeta | null {
   if (DYNAMIC_PROVIDER_METAS.has(type)) return DYNAMIC_PROVIDER_METAS.get(type)!

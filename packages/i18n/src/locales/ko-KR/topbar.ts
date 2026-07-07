@@ -7,7 +7,7 @@ export const topbar = {
     settings: "설정",
     skillsManagement: "스킬 관리",
     projectLabel: "프로젝트: {name}",
-    workspaceLabel: "워크스페이스: {name}",
+    workspaceLabel: "채팅: {name}",
     modelSwitcher: {
       title: "빠른 모델 전환",
       unavailable: "모델을 사용할 수 없음",
@@ -19,7 +19,7 @@ export const topbar = {
       backToProjects: "프로젝트 목록으로 돌아가기",
       menu: "메뉴",
       openApiKeySettings: "API Key 설정 열기",
-      workspaceSettings: "워크스페이스 레이아웃 및 환경설정",
+      workspaceSettings: "채팅 레이아웃 및 환경설정",
       toolsPanel: "도구 패널",
       commandPalette: "명령 팔레트 (Cmd/Ctrl+K)",
       skillsManager: "스킬 관리",
@@ -32,7 +32,7 @@ export const topbar = {
     },
     mobile: {
       workDirectory: "작업 디렉토리",
-      workspaceSettings: "워크스페이스 설정",
+      workspaceSettings: "채팅 설정",
       skills: "스킬",
       commandPalette: "명령 팔레트",
       mcpSettings: "MCP 설정",

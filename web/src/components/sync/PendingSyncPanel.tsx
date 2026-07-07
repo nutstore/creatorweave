@@ -25,7 +25,7 @@ import {
   BrandDialogBody,
   BrandDialogFooter,
 } from '@creatorweave/ui'
-import { RefreshCw, ChevronRight, X, Check, AlertTriangle } from 'lucide-react'
+import { RefreshCw, ChevronRight, X, Check, AlertTriangle, FileInput } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
 import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
@@ -167,6 +167,14 @@ export function PendingSyncPanel() {
   const handleOpenPreviewForPath = useCallback((path: string) => {
     const { showPreviewPanelForPath } = useConversationContextStore.getState()
     showPreviewPanelForPath(path)
+  }, [])
+
+  // Open this file in the workspace-level FilePreview drawer (full file view,
+  // not the diff view). Implemented via a request field on the store so that
+  // WorkspaceLayout (which owns the drawer) can react without prop drilling.
+  const handleOpenInFilePreview = useCallback((path: string) => {
+    const { openInFilePreview } = useConversationContextStore.getState()
+    openInFilePreview(path)
   }, [])
 
   // Calculate selected count
@@ -674,6 +682,24 @@ export function PendingSyncPanel() {
                 <span className="text-xs text-tertiary flex-shrink-0 w-14 text-right">
                   {formatFileSize(change.size)}
                 </span>
+
+                {/* Open in file preview (hover-only). Skip the diff view and
+                    read the full file directly. Hidden for delete-type changes
+                    because there is no previewable body. */}
+                {change.type !== 'delete' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation() // don't trigger row click (open diff)
+                      handleOpenInFilePreview(change.path)
+                    }}
+                    className="p-1 text-tertiary transition-all rounded opacity-0 group-hover:opacity-100 hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 focus:opacity-100 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 flex-shrink-0"
+                    title={t('sidebar.fileDiffViewer.openInPreviewTooltip')}
+                    type="button"
+                    aria-label={t('sidebar.fileDiffViewer.openInPreview')}
+                  >
+                    <FileInput className="w-3.5 h-3.5" />
+                  </button>
+                )}
 
                 {/* Remove Button */}
                 <button

@@ -22,6 +22,16 @@ const OUTDATED_BANNER_DISMISS_DURATION_MS = 3 * 24 * 60 * 60 * 1000 // 3 days
 /** The provider ID used for Codex OAuth */
 const CODEX_OAUTH_PROVIDER_ID = 'codex-oauth'
 
+/**
+ * In-flight mutex for `ensureCodexRegistered`. App.tsx runs `checkStatus`
+ * on a 5s interval and each tick kicks off an ensure. Without this mutex,
+ * two concurrent ticks can both pass the `codexOAuthRegistered` early-return
+ * check, both call `registerCodexOAuthProvider`, and both fire a
+ * `checkHasApiKey({flush:true})` — duplicate provider registration + repeated
+ * DB-adjacent work. Reuse the same in-flight promise for all callers.
+ */
+let codexRegisterPromise: Promise<void> | null = null
+
 /** Virtual API key for codex-oauth (real token is in the extension) */
 export const CODEX_OAUTH_API_KEY = '__codex_oauth_extension_bridge__'
 
@@ -177,56 +187,126 @@ export const useExtensionStore = create<ExtensionState>()(
             const isOutdated = compareVersions(version, latestVersion) < 0
             set({ extensionVersion: version, outdated: isOutdated })
           }).catch(() => {})
-        } else if (get().codexOAuthRegistered) {
-          unregisterCodexOAuthProvider()
-          set({ codexOAuthRegistered: false, extensionVersion: null, outdated: false })
+        } else {
+          // Extension not installed or in error state. If we previously had
+          // codex registered, tear it down. Either way, flush any deferred
+          // checkHasApiKey so the UI doesn't sit in the loading state
+          // forever waiting for codex to register.
+          if (get().codexOAuthRegistered) {
+            unregisterCodexOAuthProvider()
+            set({ codexOAuthRegistered: false, extensionVersion: null, outdated: false })
+          }
+          // Flush deferred checkHasApiKey — the caller is asking "definitively,
+          // is there a codex API key or not?" and we've done our best to find
+          // out (no extension = no codex).
+          void import('@/store/settings.store').then(({ useSettingsStore }) => {
+            void useSettingsStore
+              .getState()
+              .checkHasApiKey({ flush: true })
+              .catch(() => {})
+          }).catch(() => {})
         }
 
         return newStatus
       },
 
       ensureCodexRegistered: async () => {
-        // Already registered — no-op
-        if (get().codexOAuthRegistered) return
+        // Serialize concurrent calls. App.tsx drives this on a 5s interval
+        // so without this mutex two ticks can both pass the early-return
+        // check below and double-register the provider. Reuse the in-flight
+        // promise for all callers — `finally` clears it for the next tick.
+        if (codexRegisterPromise) return codexRegisterPromise
 
-        const bridge = (window as any).__agentWeb
-        if (!bridge?.codexGetStatus) return
+        codexRegisterPromise = (async () => {
+          try {
+            // Already registered — still flush checkHasApiKey in case a prior
+            // deferred call is waiting.
+            if (get().codexOAuthRegistered) {
+              try {
+                const { useSettingsStore } = await import('@/store/settings.store')
+                await useSettingsStore.getState().checkHasApiKey().catch(() => {})
+              } catch {
+                // Best-effort flush — failure here doesn't block registration.
+              }
+              return
+            }
 
-        try {
-          const resp = await bridge.codexGetStatus()
-          if (resp?.ok && resp.data?.authorized && !get().codexOAuthRegistered) {
-            await registerCodexOAuthProvider(resp.data.models)
-            set({ codexOAuthRegistered: true })
-            // Auto-pin codex models if none pinned yet + refresh provider list
+            const bridge = (window as any).__agentWeb
+            if (!bridge?.codexGetStatus) {
+              // Bridge not ready (extension page might still be initializing).
+              // Flush with `flush: true` so the deferred checkHasApiKey doesn't
+              // hang forever — caller can re-trigger later if needed.
+              try {
+                const { useSettingsStore } = await import('@/store/settings.store')
+                await useSettingsStore.getState().checkHasApiKey({ flush: true })
+              } catch {
+                // Best-effort flush.
+              }
+              return
+            }
+
             try {
-              const { useSettingsStore } = await import('@/store/settings.store')
-              const settings = useSettingsStore.getState()
-              const existing = settings.pinnedModelsByProvider['codex-oauth']
-              if (!existing || existing.length === 0) {
-                const models = resp.data.models || []
-                if (models.length > 0) {
-                  settings.setPinnedModels(
-                    'codex-oauth',
-                    models.map((m: any) => m.id),
-                  )
+              const resp = await bridge.codexGetStatus()
+              if (resp?.ok && resp.data?.authorized && !get().codexOAuthRegistered) {
+                await registerCodexOAuthProvider(resp.data.models)
+                set({ codexOAuthRegistered: true })
+                // Auto-pin codex models if none pinned yet + refresh provider list
+                try {
+                  const { useSettingsStore } = await import('@/store/settings.store')
+                  const settings = useSettingsStore.getState()
+                  const existing = settings.pinnedModelsByProvider['codex-oauth']
+                  if (!existing || existing.length === 0) {
+                    const models = resp.data.models || []
+                    if (models.length > 0) {
+                      settings.setPinnedModels(
+                        'codex-oauth',
+                        models.map((m: any) => m.id),
+                      )
+                    }
+                  }
+                  useSettingsStore.getState().triggerProviderRefresh()
+                } catch {
+                  // Pinning + provider refresh are best-effort.
+                }
+                // Re-check API key now that the provider is registered.
+                // No `{ flush: true }` needed here — by this point the provider
+                // IS registered, so the check can proceed normally.
+                try {
+                  const { useSettingsStore } = await import('@/store/settings.store')
+                  useSettingsStore.getState().invalidateApiKeyCache('codex-oauth')
+                  await useSettingsStore.getState().checkHasApiKey()
+                } catch {
+                  // Cache invalidation / re-check is best-effort.
+                }
+              } else {
+                // Not authorized, or auth revoked. Flush any deferred
+                // checkHasApiKey so the UI doesn't stay in loading state.
+                if (get().codexOAuthRegistered) {
+                  unregisterCodexOAuthProvider()
+                  set({ codexOAuthRegistered: false })
+                }
+                try {
+                  const { useSettingsStore } = await import('@/store/settings.store')
+                  await useSettingsStore.getState().checkHasApiKey({ flush: true })
+                } catch {
+                  // Best-effort flush.
                 }
               }
-              useSettingsStore.getState().triggerProviderRefresh()
-            } catch {}
-            // Re-check API key now that the provider is registered,
-            // so the UI updates from "model unavailable" to ready.
-            try {
-              const { useSettingsStore } = await import('@/store/settings.store')
-              useSettingsStore.getState().invalidateApiKeyCache('codex-oauth')
-              await useSettingsStore.getState().checkHasApiKey()
-            } catch {}
-          } else if ((!resp?.ok || !resp.data?.authorized) && get().codexOAuthRegistered) {
-            unregisterCodexOAuthProvider()
-            set({ codexOAuthRegistered: false })
+            } catch {
+              // Bridge error (extension may not support codex, or auth flow
+              // not yet ready). Flush the deferred check so the UI doesn't hang.
+              try {
+                const { useSettingsStore } = await import('@/store/settings.store')
+                await useSettingsStore.getState().checkHasApiKey({ flush: true })
+              } catch {
+                // Best-effort flush.
+              }
+            }
+          } finally {
+            codexRegisterPromise = null
           }
-        } catch {
-          // Silently ignore — extension may not support codex yet
-        }
+        })()
+        return codexRegisterPromise
       },
 
       dismissBanner: () => {

@@ -11,6 +11,7 @@ import { persist } from 'zustand/middleware'
 import type { LLMProviderType } from '@/agent/providers/types'
 import {
   isCustomProviderType,
+  isPotentiallyDynamicProviderType,
   registerDynamicProvider,
   unregisterDynamicProvider,
   getProviderConfig,
@@ -74,6 +75,13 @@ interface SettingsState {
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
   hasApiKey: boolean
+  /**
+   * True once `checkHasApiKey()` has completed at least once (regardless of
+   * result). UI components that gate on `!hasApiKey` should also gate on
+   * `hasApiKeyLoaded` to avoid flashing the "no API key" state during the
+   * initial async check (which defaults `hasApiKey` to `false`).
+   */
+  hasApiKeyLoaded: boolean
 
   // Per-workspace model overrides
   modelOverridesByWorkspace: Record<string, WorkspaceModelOverride>
@@ -120,9 +128,16 @@ interface SettingsState {
 
   /**
    * Check if API key exists for current provider
-   * This queries the database directly, bypassing the cached state
+   * This queries the database directly, bypassing the cached state.
+   *
+   * Pass `{ flush: true }` to bypass the "dynamic provider still
+   * registering" defer — the caller has already attempted registration
+   * and wants a definitive answer (typically "no key"). Without this flag,
+   * the check defers (returns without setting `hasApiKeyLoaded`) when the
+   * configured provider is one of the async-registered dynamic providers
+   * (see `isPotentiallyDynamicProviderType`).
    */
-  checkHasApiKey: () => Promise<boolean>
+  checkHasApiKey: (options?: { flush?: boolean }) => Promise<boolean>
 
   /**
    * Invalidate the API key cache for a provider
@@ -214,6 +229,7 @@ export const useSettingsStore = create<SettingsState>()(
       ttsVoice: 'zh-CN-XiaoxiaoNeural',
       enableSchedules: false,
       hasApiKey: false,
+      hasApiKeyLoaded: false,
       modelOverridesByWorkspace: {},
       lastUsedModelByProvider: {},
       imageGenModel: 'google/gemini-2.5-flash-image',
@@ -460,15 +476,36 @@ export const useSettingsStore = create<SettingsState>()(
         }
       },
 
-      checkHasApiKey: async () => {
-        const effective = get().getEffectiveProviderConfig()
+      checkHasApiKey: async (options?: { flush?: boolean }) => {
+        const state = get()
+        const effective = state.getEffectiveProviderConfig()
         if (!effective) {
-          set({ hasApiKey: false })
+          // Provider config not available. If the configured provider is a
+          // dynamic one that registers asynchronously (e.g. codex-oauth
+          // waiting for extension auth, llm-gateway / custom-* still
+          // registering), DON'T conclude "no API key" yet — wait for the
+          // registration path to call this again. Otherwise the UI would
+          // flash a false "setup" state before the registration completes.
+          //
+          // The `flush: true` escape hatch is for callers that have already
+          // attempted registration (e.g. extension.store.checkStatus after
+          // determining the extension isn't installed, App.tsx after
+          // registerLLMGatewayProvider). They want a definitive answer even
+          // if it's "no".
+          if (
+            isPotentiallyDynamicProviderType(state.providerType) &&
+            !options?.flush
+          ) {
+            return false
+          }
+          set({ hasApiKey: false, hasApiKeyLoaded: true })
           return false
         }
         const providerKey = effective.apiKeyProviderKey
 
-        // Return cached value if available and not stale
+        // Return cached value if available and not stale.
+        // `hasApiKeyLoaded` was set during the initial population that
+        // filled the cache, so we don't need to set it again here.
         if (apiKeyCache.has(providerKey)) {
           return apiKeyCache.get(providerKey)!
         }
@@ -485,12 +522,16 @@ export const useSettingsStore = create<SettingsState>()(
             const hasKey = !!key
             apiKeyCache.set(providerKey, hasKey)
 
-            // Update the reactive state
-            set({ hasApiKey: hasKey })
+            // Update the reactive state. Mark loaded in the same set() so
+            // subscribers see a consistent (hasApiKey, hasApiKeyLoaded) pair.
+            set({ hasApiKey: hasKey, hasApiKeyLoaded: true })
 
             return hasKey
           } catch (error) {
             console.error('[SettingsStore] Failed to check API key:', error)
+            // Even on error, mark as loaded — otherwise the UI would stay
+            // in the "loading" state forever.
+            set({ hasApiKey: false, hasApiKeyLoaded: true })
             return false
           } finally {
             apiKeyCachePromise.delete(providerKey)

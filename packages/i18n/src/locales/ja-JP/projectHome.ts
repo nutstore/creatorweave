@@ -29,6 +29,8 @@ export const projectHome = {
         "ユーザー向け・開発者向けドキュメントを参照して、使い方と技術情報を確認できます。",
       openDocs: "ドキュメントセンターを開く",
       appearance: "外観",
+      advanced: "詳細 · データ管理",
+      advancedHint: "リセット、バックアップ、キャッシュクリアなど",
       cache: "キャッシュ",
       cacheDescription:
         "ブラウザキャッシュをクリアして、レスポンスヘッダーと静的リソースを更新します。",
@@ -147,4 +149,5 @@ export const projectHome = {
       noResults: "一致するプロジェクトが見つかりません",
       createFirst: "最初のプロジェクトを作成",
     },
+    defaultProjectName: "マイプロジェクト",
 } as const

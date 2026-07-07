@@ -9,7 +9,7 @@
  * - Handles permission restoration
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, type RefObject } from 'react'
 import { toast } from 'sonner'
 import {
   FolderOpen,
@@ -26,7 +26,15 @@ import { useT } from '@/i18n'
 import { cn } from '@/lib/utils'
 import type { RootInfo } from '@/types/folder-access'
 
-export function FolderSelector() {
+interface FolderSelectorProps {
+  /**
+   * Forwarded to the inner "open folder" / "add" button so that external UI
+   * (e.g. FolderTipBubble) can anchor or programmatically focus it.
+   */
+  buttonRef?: RefObject<HTMLButtonElement | null>
+}
+
+export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
   const t = useT()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -125,6 +133,7 @@ export function FolderSelector() {
           type="button"
           onClick={handleAddRoot}
           disabled={!canPickDirectory || isAdding}
+          ref={buttonRef}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
@@ -173,6 +182,7 @@ export function FolderSelector() {
           type="button"
           onClick={handleAddRoot}
           disabled={isAdding}
+          ref={buttonRef}
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-border',
             'text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600',

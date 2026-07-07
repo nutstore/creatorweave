@@ -5,12 +5,44 @@
  * Import and extend this in your project's tailwind.config.js
  *
  * @module tailwind
+ *
+ * @architecture
+ * Color system uses a SINGLE source of truth: CSS variables defined in
+ * `web/src/styles/globals.css` (and `packages/ui/src/styles/globals.css`).
+ * All Tailwind color classes reference those variables via
+ * `hsl(var(--xxx) / <alpha-value>)`, which means:
+ *
+ *   1. Runtime theme switching (theme.store.ts setting --primary etc.)
+ *      actually affects `.bg-primary` etc. — previously the build-time
+ *      tokens.js was the source and theme switching silently failed.
+ *   2. Changing a brand color requires editing ONE file (globals.css).
+ *   3. Tailwind alpha utilities (bg-primary/20) still work because
+ *      <alpha-value> is the placeholder Tailwind swaps at build time.
+ *
+ * @deprecated `packages/config/src/tokens/colors.js` (the JS HSL triplets)
+ * is kept only for `hexColors` (chart libraries, meta theme-color, etc).
+ * Do not use its `colors` object for any Tailwind CSS values.
  */
 
-import { colors } from '../tokens/colors.js'
 import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 const tailwindcssAnimate = require('tailwindcss-animate')
+
+/**
+ * Create a `hsl(var(--xxx) / <alpha-value>)` reference for a CSS variable.
+ * The CSS variable must contain an HSL triplet (e.g. `174 30% 42%`),
+ * NOT a fully wrapped `hsl(...)` value — Tailwind needs to splice in the
+ * alpha channel at build time.
+ *
+ * @param {string} name  CSS variable name WITH the leading `--`.
+ *                        Pass the bare suffix (e.g. `primary`) or full
+ *                        (e.g. `--primary`); both work.
+ * @returns {string}
+ */
+function cssVar(name) {
+  const v = name.startsWith('--') ? name : `--${name}`
+  return `hsl(var(${v}) / <alpha-value>)`
+}
 
 /**
  * Create base Tailwind configuration with application design tokens
@@ -25,84 +57,97 @@ export function createBaseConfig(options = {}) {
   const baseExtend = {
     colors: {
       // Base colors from CSS variables
-      border: 'hsl(var(--border))',
-      input: 'hsl(var(--input))',
-      ring: 'hsl(var(--ring))',
-      background: 'hsl(var(--background))',
-      foreground: 'hsl(var(--foreground))',
+      border: cssVar('border'),
+      input: cssVar('input'),
+      ring: cssVar('ring'),
+      background: cssVar('background'),
+      foreground: cssVar('foreground'),
 
       // Component colors
       card: {
-        DEFAULT: 'hsl(var(--card))',
-        foreground: 'hsl(var(--card-foreground))',
+        DEFAULT: cssVar('card'),
+        foreground: cssVar('card-foreground'),
       },
 
       popover: {
-        DEFAULT: 'hsl(var(--popover))',
-        foreground: 'hsl(var(--popover-foreground))',
+        DEFAULT: cssVar('popover'),
+        foreground: cssVar('popover-foreground'),
       },
 
       secondary: {
-        DEFAULT: 'hsl(var(--secondary))',
-        foreground: 'hsl(var(--secondary-foreground))',
+        DEFAULT: cssVar('secondary'),
+        foreground: cssVar('secondary-foreground'),
       },
 
       muted: {
-        DEFAULT: 'hsl(var(--muted))',
-        foreground: 'hsl(var(--muted-foreground))',
+        DEFAULT: cssVar('muted'),
+        foreground: cssVar('muted-foreground'),
       },
 
       accent: {
-        DEFAULT: 'hsl(var(--accent))',
-        foreground: 'hsl(var(--accent-foreground))',
+        DEFAULT: cssVar('accent'),
+        foreground: cssVar('accent-foreground'),
       },
 
       destructive: {
-        DEFAULT: 'hsl(var(--destructive))',
-        foreground: 'hsl(var(--destructive-foreground))',
+        DEFAULT: cssVar('destructive'),
+        foreground: cssVar('destructive-foreground'),
       },
 
-      // Primary (Teal)
+      // Primary brand palette — all read from CSS vars so runtime theme
+      // switching (theme.store.ts) actually affects these classes.
       primary: {
-        DEFAULT: `hsl(${colors.primary})`,
-        foreground: 'hsl(var(--primary-foreground))',
-        50: `hsl(${colors.primary50})`,
-        100: `hsl(${colors.primary100})`,
-        500: `hsl(${colors.primary500})`,
-        600: `hsl(${colors.primary600})`,
-        700: `hsl(${colors.primary700})`,
-        800: 'hsl(174 60% 35%)',  // #0B7168
+        DEFAULT: cssVar('primary'),
+        foreground: cssVar('primary-foreground'),
+        50: cssVar('primary-50'),
+        100: cssVar('primary-100'),
+        400: cssVar('primary-400'),
+        500: cssVar('primary-500'),
+        600: cssVar('primary-600'),
+        700: cssVar('primary-700'),
+        800: cssVar('primary-800'),
       },
 
-      // Status colors
+      // Status colors — same pattern: CSS vars only.
       success: {
-        DEFAULT: `hsl(${colors.success})`,
-        bg: `hsl(${colors.successBg})`,
-        text: `hsl(${colors.successText})`,
-        50: `hsl(${colors.success50})`,
-        200: `hsl(${colors.success200})`,
+        DEFAULT: cssVar('success'),
+        bg: cssVar('success-bg'),
+        text: cssVar('success-text'),
+        50: cssVar('success-50'),
+        200: cssVar('success-200'),
       },
 
       warning: {
-        DEFAULT: `hsl(${colors.warning})`,
-        bg: `hsl(${colors.warningBg})`,
-        50: `hsl(${colors.warning50})`,
-        200: `hsl(${colors.warning200})`,
+        DEFAULT: cssVar('warning'),
+        bg: cssVar('warning-bg'),
+        50: cssVar('warning-50'),
+        200: cssVar('warning-200'),
       },
 
       danger: {
-        DEFAULT: `hsl(${colors.danger})`,
-        bg: `hsl(${colors.dangerBg})`,
-        border: `hsl(${colors.dangerBorder})`,
-        50: `hsl(${colors.danger50})`,
-        200: `hsl(${colors.danger200})`,
+        DEFAULT: cssVar('danger'),
+        bg: cssVar('danger-bg'),
+        border: cssVar('danger-border'),
+        50: cssVar('danger-50'),
+        200: cssVar('danger-200'),
       },
 
-      // Gray/Neutral colors (comprehensive)
+      // Warm accent — extended brand token (only used in a few places)
+      'accent-warm': cssVar('accent-warm'),
+
+      // Brand-tinted muted surface. Use for interaction elements that
+      // should harmonize with brand color (nav rails, inactive dots,
+      // secondary markers) without competing for attention.
+      'brand-muted': cssVar('brand-muted'),
+
+      // Gray/Neutral colors — scaled ramp. Lower values come from CSS vars
+      // (--gray-100 / --gray-200); mid/dark values are static HSL because
+      // they don't participate in accent switching and the CSS variable
+      // surface would otherwise balloon.
       gray: {
-        50: 'hsl(var(--gray-100))',
-        100: 'hsl(var(--gray-100))',
-        200: 'hsl(var(--gray-200))',
+        50: cssVar('gray-100'),
+        100: cssVar('gray-100'),
+        200: cssVar('gray-200'),
         300: 'hsl(0 0% 67%)',    /* #AAA */
         400: 'hsl(0 0% 60%)',    /* #999 */
         500: 'hsl(0 0% 53%)',    /* #808080 */
@@ -114,9 +159,9 @@ export function createBaseConfig(options = {}) {
 
       // Neutral alias for compatibility
       neutral: {
-        50: 'hsl(var(--gray-100))',
-        100: 'hsl(var(--gray-100))',
-        200: 'hsl(var(--gray-200))',
+        50: cssVar('gray-100'),
+        100: cssVar('gray-100'),
+        200: cssVar('gray-200'),
         300: 'hsl(0 0% 67%)',
         400: 'hsl(0 0% 60%)',
         500: 'hsl(0 0% 53%)',
@@ -127,28 +172,28 @@ export function createBaseConfig(options = {}) {
       },
 
       // Extended colors
-      'bg-tertiary': 'hsl(var(--bg-tertiary))',
-      'bg-elevated': 'hsl(var(--bg-elevated))',
-      'bg-hover': 'hsl(var(--bg-hover))',
+      'bg-tertiary': cssVar('bg-tertiary'),
+      'bg-elevated': cssVar('bg-elevated'),
+      'bg-hover': cssVar('bg-hover'),
 
-      'text-primary': 'hsl(var(--text-primary))',
-      'text-secondary': 'hsl(var(--text-secondary))',
-      'text-tertiary': 'hsl(var(--text-tertiary))',
-      'text-muted': 'hsl(var(--text-muted))',
-      'text-on-primary': 'hsl(var(--text-on-primary))',
+      'text-primary': cssVar('text-primary'),
+      'text-secondary': cssVar('text-secondary'),
+      'text-tertiary': cssVar('text-tertiary'),
+      'text-muted': cssVar('text-muted'),
+      'text-on-primary': cssVar('text-on-primary'),
 
-      'border-strong': 'hsl(var(--border-strong))',
-      'border-subtle': 'hsl(var(--border-subtle))',
+      'border-strong': cssVar('border-strong'),
+      'border-subtle': cssVar('border-subtle'),
 
-      'gray-100': 'hsl(var(--gray-100))',
-      'gray-200': 'hsl(var(--gray-200))',
+      'gray-100': cssVar('gray-100'),
+      'gray-200': cssVar('gray-200'),
 
       // Flat primary shades for ring/border utilities
-      'primary-50': `hsl(${colors.primary50})`,
-      'primary-100': `hsl(${colors.primary100})`,
-      'primary-500': `hsl(${colors.primary500})`,
-      'primary-600': `hsl(${colors.primary600})`,
-      'primary-700': `hsl(${colors.primary700})`,
+      'primary-50': cssVar('primary-50'),
+      'primary-100': cssVar('primary-100'),
+      'primary-500': cssVar('primary-500'),
+      'primary-600': cssVar('primary-600'),
+      'primary-700': cssVar('primary-700'),
     },
     borderRadius: {
       lg: 'var(--radius)',

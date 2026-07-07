@@ -115,6 +115,32 @@ interface ProjectState {
   deleteProject: (projectId: string) => Promise<boolean>
 }
 
+/**
+ * localStorage key for tracking whether we've already auto-created a default
+ * project for this browser.
+ *
+ * Set once after the first auto-creation. If the user later deletes all
+ * projects, we DON'T auto-create again — they've expressed intent to have
+ * zero projects.
+ */
+const AUTO_DEFAULT_CREATED_KEY = 'creatorweave:auto-default-project-created'
+
+/**
+ * Get a localized default project name without React hooks (for use in store).
+ */
+function getLocalizedDefaultProjectName(): string {
+  try {
+    const stored = localStorage.getItem('bfosa-i18n')
+    const locale = stored ? (JSON.parse(stored)?.state?.locale as string) : undefined
+    if (locale === 'en-US') return 'My Project'
+    if (locale === 'ja-JP') return 'マイプロジェクト'
+    if (locale === 'ko-KR') return '내 프로젝트'
+    return '我的项目' // zh-CN default
+  } catch {
+    return '我的项目'
+  }
+}
+
 async function bootstrapProjectOpfs(projectId: string): Promise<void> {
   if (!projectId) return
   if (typeof navigator === 'undefined') return
@@ -198,6 +224,34 @@ export const useProjectStore = create<ProjectState>()(
         // that would race with the URL and cause cross-tab desync. If there's no
         // URL project, the user lands on /projects and picks one.
         // (bootstrapProjectOpfs now happens in setActiveProject, called by syncFromRoute.)
+
+        // ── Auto-create default project for first-time users ──────────────
+        // If this is a brand-new user with zero projects, automatically create
+        // one so they can start chatting immediately instead of being blocked
+        // by an empty ProjectHome that demands a project name decision.
+        //
+        // Only fires ONCE per browser (tracked by localStorage flag). If the
+        // user deletes all projects later, we respect that decision and don't
+        // auto-create again.
+        if (
+          normalizedProjects.length === 0 &&
+          !localStorage.getItem(AUTO_DEFAULT_CREATED_KEY)
+        ) {
+          try {
+            const defaultName = getLocalizedDefaultProjectName()
+            const defaultProject = await repo.createProject({ name: defaultName })
+            await bootstrapProjectOpfs(defaultProject.id)
+            localStorage.setItem(AUTO_DEFAULT_CREATED_KEY, '1')
+            normalizedProjects = [defaultProject]
+            normalizedStats = [{
+              projectId: defaultProject.id,
+              workspaceCount: 0,
+            }]
+            console.log('[ProjectStore] Auto-created default project:', defaultProject.id)
+          } catch (err) {
+            console.warn('[ProjectStore] Failed to auto-create default project:', err)
+          }
+        }
 
         const projectStats = Object.fromEntries(
           normalizedStats.map((entry) => [entry.projectId, entry])

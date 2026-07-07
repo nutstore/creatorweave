@@ -28,6 +28,8 @@ export const projectHome = {
       helpDocsDescription: "查看用户与开发者文档，快速找到使用说明和技术资料。",
       openDocs: "打开文档中心",
       appearance: "外观",
+      advanced: "高级 · 数据管理",
+      advancedHint: "重置、备份、缓存清理等",
       cache: "缓存",
       cacheDescription: "清除浏览器缓存以刷新响应头和静态资源。",
       clearCache: "清除缓存",
@@ -150,4 +152,5 @@ export const projectHome = {
       noResults: "没有找到匹配的项目",
       createFirst: "创建第一个项目",
     },
+    defaultProjectName: "我的项目",
 } as const

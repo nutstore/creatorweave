@@ -77,6 +77,11 @@ interface TopBarProps {
   onSelectWorkspace?: (workspaceId: string) => void
   /** Open the schedule drawer */
   onScheduleDrawerOpen?: () => void
+  /**
+   * Forwarded to the FolderSelector's "open folder" / "add" button so that
+   * external UI (e.g. FolderTipBubble) can anchor to it.
+   */
+  folderButtonRef?: React.RefObject<HTMLButtonElement | null>
 }
 
 export function TopBar({
@@ -96,12 +101,14 @@ export function TopBar({
   onProjectSwitcherOpenChange,
   onSelectWorkspace,
   onScheduleDrawerOpen,
+  folderButtonRef,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
+  const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   const t = useT()
   const conversationName = activeConversationName ?? activeWorkspaceName
@@ -189,7 +196,7 @@ export function TopBar({
         {/* Right: Actions */}
         {isMobile ? (
           <div className="ml-2 flex shrink-0 items-center gap-1">
-            {!hasApiKey && (
+            {hasApiKeyLoaded && !hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
                 <BrandButton iconButton onClick={() => openSettings()}>
                   <KeyRound className="h-[14px] w-[14px]" />
@@ -219,11 +226,11 @@ export function TopBar({
           <div className="flex items-center gap-2">
             {/* Folder Selector */}
             <div className="shrink-0">
-              <FolderSelector />
+              <FolderSelector buttonRef={folderButtonRef} />
             </div>
 
             {/* API Key status - consistent button style */}
-            {!hasApiKey && (
+            {hasApiKeyLoaded && !hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
                 <button
                   type="button"
@@ -305,7 +312,7 @@ export function TopBar({
             <div className="mb-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
               {t('topbar.mobile.workDirectory')}
             </div>
-            <FolderSelector />
+            <FolderSelector buttonRef={folderButtonRef} />
           </div>
 
           <div className="grid grid-cols-2 gap-1.5">

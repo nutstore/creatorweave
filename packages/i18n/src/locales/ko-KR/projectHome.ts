@@ -27,6 +27,8 @@ export const projectHome = {
         "사용자/개발자 문서를 확인해 사용 가이드와 기술 정보를 빠르게 찾으세요.",
       openDocs: "문서 센터 열기",
       appearance: "외관",
+      advanced: "고급 · 데이터 관리",
+      advancedHint: "재설정, 백업, 캐시 정리 등",
       cache: "캐시",
       cacheDescription:
         "브라우저 캐시를 삭제하여 응답 헤더와 정적 리소스를 새로고침합니다.",
@@ -144,4 +146,5 @@ export const projectHome = {
       noResults: "일치하는 프로젝트를 찾을 수 없습니다",
       createFirst: "첫 번째 프로젝트 생성",
     },
+    defaultProjectName: "내 프로젝트",
 } as const

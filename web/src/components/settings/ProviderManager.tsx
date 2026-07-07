@@ -1382,7 +1382,13 @@ function LLMGatewayCard({
                   {/* Verification link (re-open if user missed it) */}
                   {authState.verificationUri && (
                     <a
-                      href={`${authState.verificationUri}?user_code=${encodeURIComponent(authState.userCode)}`}
+                      href={
+                        authState.verificationUri.includes('user_code=')
+                          ? authState.verificationUri
+                          : `${authState.verificationUri}${
+                              authState.verificationUri.includes('?') ? '&' : '?'
+                            }user_code=${encodeURIComponent(authState.userCode || '')}`
+                      }
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium text-white"

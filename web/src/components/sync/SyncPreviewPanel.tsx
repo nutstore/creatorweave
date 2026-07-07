@@ -783,7 +783,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
 
           {/* Diff Viewer */}
           <div className="flex-1">
-            <FileDiffViewer fileChange={selectedFile} commentsByPath={commentsByPath} onCommentsChange={setCommentsByPath} />
+            <FileDiffViewer
+              fileChange={selectedFile}
+              commentsByPath={commentsByPath}
+              onCommentsChange={setCommentsByPath}
+            />
           </div>
         </div>
         )}

@@ -5,7 +5,6 @@
  */
 
 export { CommandPalette } from './CommandPalette'
-export { OnboardingTour, DEFAULT_ONBOARDING_STEPS } from './OnboardingTour'
 export { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp'
 export { RecentFilesPanel } from './RecentFilesPanel'
 export { ThemeToggle } from './ThemeToggle'
@@ -16,4 +15,3 @@ export { GoToFileDialog } from './GoToFileDialog'
 export { buildEnhancedCommands } from './command-palette-commands'
 
 export type { Command } from './CommandPalette'
-export type { TourStep } from './OnboardingTour'

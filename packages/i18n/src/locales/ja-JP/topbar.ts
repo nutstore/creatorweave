@@ -7,7 +7,7 @@ export const topbar = {
     settings: "設定",
     skillsManagement: "スキル管理",
     projectLabel: "プロジェクト: {name}",
-    workspaceLabel: "ワークスペース: {name}",
+    workspaceLabel: "チャット: {name}",
     modelSwitcher: {
       title: "クイックモデル切替",
       unavailable: "モデルは利用できません",
@@ -19,7 +19,7 @@ export const topbar = {
       backToProjects: "プロジェクト一覧に戻る",
       menu: "メニュー",
       openApiKeySettings: "API Key 設定を開く",
-      workspaceSettings: "ワークスペースレイアウトと設定",
+      workspaceSettings: "チャットレイアウトと設定",
       toolsPanel: "ツールパネル",
       commandPalette: "コマンドパレット (Cmd/Ctrl+K)",
       skillsManager: "スキル管理",
@@ -32,7 +32,7 @@ export const topbar = {
     },
     mobile: {
       workDirectory: "作業ディレクトリ",
-      workspaceSettings: "ワークスペース設定",
+      workspaceSettings: "チャット設定",
       skills: "スキル",
       commandPalette: "コマンドパレット",
       mcpSettings: "MCP 設定",

@@ -32,9 +32,9 @@ export interface AccentColorConfig {
 export const ACCENT_COLORS: Record<AccentColor, AccentColorConfig> = {
   teal: {
     name: '青色',
-    hue: 170,
-    saturation: 35,
-    lightness: 45,
+    hue: 174,
+    saturation: 45,
+    lightness: 47,
   },
   rose: {
     name: '玫瑰',
@@ -112,31 +112,34 @@ function applyAccentColor(accentColor: AccentColor, theme: 'light' | 'dark') {
   if (typeof document === 'undefined') return
 
   const config = ACCENT_COLORS[accentColor]
-  const { hue, saturation } = config
+  const { hue, saturation, lightness } = config
 
-  // Light theme values
+  // Light theme values — use config lightness as base, derive darker shades
   const lightValues = {
-    '--primary': `${hue} ${saturation}% 45%`,
+    '--primary': `${hue} ${saturation}% ${lightness}%`,
     '--primary-foreground': '0 0% 100%',
     '--primary-50': `${hue} ${Math.max(10, saturation - 15)}% 97%`,
     '--primary-100': `${hue} ${Math.max(15, saturation - 15)}% 93%`,
-    '--primary-500': `${hue} ${saturation}% 45%`,
-    '--primary-600': `${hue} ${Math.max(25, saturation - 5)}% 38%`,
-    '--primary-700': `${hue} ${Math.max(20, saturation - 10)}% 32%`,
-    '--primary-800': `${hue} ${Math.max(15, saturation - 15)}% 28%`,
-    '--ring': `${hue} ${saturation}% 45%`,
+    '--primary-400': `${hue} ${Math.max(20, saturation - 5)}% ${Math.max(40, lightness + 6)}%`,
+    '--primary-500': `${hue} ${saturation}% ${lightness}%`,
+    '--primary-600': `${hue} ${Math.max(25, saturation - 5)}% ${Math.max(20, lightness - 7)}%`,
+    '--primary-700': `${hue} ${Math.max(20, saturation - 10)}% ${Math.max(15, lightness - 13)}%`,
+    '--primary-800': `${hue} ${Math.max(15, saturation - 15)}% ${Math.max(10, lightness - 17)}%`,
+    '--ring': `${hue} ${saturation}% ${lightness}%`,
   }
 
-  // Dark theme values
+  // Dark theme values — brighter primary for contrast on dark bg
+  const darkLightness = Math.min(60, lightness + 13)
   const darkValues = {
-    '--primary': `${hue} ${saturation}% 55%`,
+    '--primary': `${hue} ${saturation}% ${darkLightness}%`,
     '--primary-foreground': '210 10% 95%',
     '--primary-50': `${hue} ${Math.max(15, saturation - 10)}% 12%`,
     '--primary-100': `${hue} ${Math.max(20, saturation - 7)}% 18%`,
-    '--primary-500': `${hue} ${saturation}% 45%`,
-    '--primary-600': `${hue} ${saturation}% 55%`,
-    '--primary-700': `${hue} ${Math.max(25, saturation - 5)}% 62%`,
-    '--primary-800': `${hue} ${Math.max(20, saturation - 10)}% 58%`,
+    '--primary-400': `${hue} ${saturation}% ${darkLightness}%`,
+    '--primary-500': `${hue} ${saturation}% ${lightness}%`,
+    '--primary-600': `${hue} ${saturation}% ${darkLightness}%`,
+    '--primary-700': `${hue} ${Math.max(25, saturation - 5)}% ${Math.min(65, darkLightness + 7)}%`,
+    '--primary-800': `${hue} ${Math.max(20, saturation - 10)}% ${Math.min(60, darkLightness + 3)}%`,
     '--ring': `${hue} ${Math.max(25, saturation - 5)}% 50%`,
   }
 

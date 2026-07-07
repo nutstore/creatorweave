@@ -40,4 +40,11 @@ export const agent = {
         stop: "정지하고 대기열 지우기",
         clear: "대기열 지우기",
     },
+    folderTip: {
+        title: "로컬 폴더 열기",
+        description:
+            "폴더 권한을 부여하면 AI가 파일을 읽고 편집하고 로컬에 저장할 수 있습니다.",
+        selectFolder: "폴더 선택",
+        later: "나중에",
+    },
 } as const

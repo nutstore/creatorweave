@@ -30,7 +30,7 @@ import { TopBar } from './TopBar'
 import { Sidebar } from './Sidebar'
 import { ConversationView } from '@/components/agent/ConversationView'
 import { FilePreview } from '@/components/file-viewer/FilePreview'
-import { WelcomeScreenV2 } from '@/components/WelcomeScreenV2'
+import { WelcomeScreen } from '@/components/WelcomeScreen'
 import { SyncPreviewPanel } from '@/components/sync'
 import { SharedSyncDialogs } from '@/components/sync/SharedSyncDialogs'
 import { Drawer } from '@/components/ui/drawer'
@@ -43,20 +43,20 @@ import { useSkillsStore } from '@/store/skills.store'
 import { createUserMessage } from '@/agent/message-types'
 import {
   CommandPalette,
-  OnboardingTour,
   KeyboardShortcutsHelp,
   RecentFilesPanel,
   GoToFileDialog,
   buildEnhancedCommands,
   type Command,
 } from '@/components/workspace'
+import { FolderTipBubble } from '@/components/agent/FolderTipBubble'
 import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner, ExtensionOutdatedBanner } from '@/components/extension'
 import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
-import { SettingsDialog } from '@/components/settings/SettingsDialog'
+import { SettingsDialog, type SettingsTab } from '@/components/settings/SettingsDialog'
 import { ScheduleDrawer } from '@/components/schedule/ScheduleDrawer'
 import { useLocale, useT } from '@/i18n'
 import { WebContainerPanel } from '@/components/webcontainer/WebContainerPanel'
@@ -117,6 +117,7 @@ export function WorkspaceLayout({
   const loadFromDB = useConversationStore((s) => s.loadFromDB)
   const directoryHandle = useAgentStore((s) => s.directoryHandle)
   const roots = useFolderAccessStore((s) => s.roots)
+  const addRoot = useFolderAccessStore((s) => s.addRoot)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
 
   // Stable key derived from active project + roots + manual scan trigger.
@@ -131,10 +132,16 @@ export function WorkspaceLayout({
   const modelName = useSettingsStore((s) => s.modelName)
   const maxTokens = useSettingsStore((s) => s.maxTokens)
   const hasApiKey = useSettingsStore((s) => s.hasApiKey)
+  const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const syncModelForWorkspace = useSettingsStore((s) => s.syncModelForWorkspace)
   const saveModelOverrideForWorkspace = useSettingsStore((s) => s.saveModelOverrideForWorkspace)
   const role = useRemoteStore((s) => s.role)
-  const showPreview = useConversationContextStore((state) => state.showPreview)
+  // `showPreview` is a boolean state field; `showPreviewPanel` is the action that
+  // toggles it. Earlier the boolean was aliased to `showPreview`, which clashed
+  // with the action name and caused a `TypeError: showPreview is not a function`
+  // when the file-preview request effect tried to call it.
+  const isPreviewOpen = useConversationContextStore((state) => state.showPreview)
+  const showPreviewPanel = useConversationContextStore((state) => state.showPreviewPanel)
   const workspaceCount = useConversationContextStore((state) => state.workspaces.length)
   const hidePreviewPanel = useConversationContextStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
@@ -161,10 +168,55 @@ export function WorkspaceLayout({
   const [showCommandPalette, setShowCommandPalette] = useState(false)
   const [showShortcutsHelp, setShowShortcutsHelp] = useState(false)
   const [showWorkspaceSettings, setShowWorkspaceSettings] = useState(false)
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('workspace-layout')
   const [showRecentFiles, setShowRecentFiles] = useState(false)
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState(false)
   const [showMcpSettings, setShowMcpSettings] = useState(false)
   const [showGoToFile, setShowGoToFile] = useState(false)
+  // Show a lightweight folder tip after model is first connected
+  const [showFolderTip, setShowFolderTip] = useState(false)
+  // Ref to the FolderSelector's "open folder" button, used by FolderTipBubble
+  // to anchor visually and to invoke the add-root action via the store.
+  const folderButtonRef = useRef<HTMLButtonElement | null>(null)
+
+  // Trigger the native folder picker. Used by FolderTipBubble in place of the
+  // old DOM-hack that synthesized a click on the TopBar button.
+  const handleOpenFolder = useCallback(async () => {
+    try {
+      await addRoot()
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[WorkspaceLayout] addRoot failed:', err)
+    }
+  }, [addRoot])
+
+  // Auto-show folder tip when hasApiKey becomes true (first time only)
+  useEffect(() => {
+    if (!hasApiKey) return
+    const SEEN_KEY = 'creatorweave:folder-tip-seen'
+    if (localStorage.getItem(SEEN_KEY)) return
+    // Small delay to let TopBar render the folder button
+    const timer = setTimeout(() => {
+      setShowFolderTip(true)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [hasApiKey])
+
+  // React to "open in preview" requests from sidebar/list rows
+  // (e.g. PendingSyncPanel's preview button). `openInFilePreview()` in the
+  // workspace store bumps `filePreviewRequestSeq` and writes the path to
+  // `filePreviewRequestPath`. The seq counter guarantees this effect re-fires
+  // even when the same path is requested twice in a row.
+  const filePreviewRequestSeq = useConversationContextStore((s) => s.filePreviewRequestSeq)
+  const filePreviewRequestPath = useConversationContextStore((s) => s.filePreviewRequestPath)
+  useEffect(() => {
+    if (filePreviewRequestSeq === 0) return
+    if (!filePreviewRequestPath) return
+    setSelectedFilePath(filePreviewRequestPath)
+    setSelectedFileHandle(null)
+    setSelectedFileBlob(null)
+    showPreviewPanel()
+  }, [filePreviewRequestSeq, filePreviewRequestPath, showPreviewPanel])
   /** Target file path (with rootName prefix) to reveal in file tree */
   const [revealTargetPath, setRevealTargetPath] = useState<string | null>(null)
   const isWebContainerPanelOpen = useWebContainerStore((s) => s.isPanelOpen)
@@ -545,7 +597,10 @@ export function WorkspaceLayout({
     }
 
     const handleRemoteMessage = async (content: string, messageId: string) => {
-      if (!hasApiKey) {
+      // Guard against the initial `hasApiKey=false` state — wait until the
+      // async SQLite check completes before deciding whether to accept the
+      // remote message.
+      if (!hasApiKeyLoaded || !hasApiKey) {
         return
       }
 
@@ -665,6 +720,17 @@ export function WorkspaceLayout({
     setSelectedFileBlob(null)
   }, [])
 
+  // Hand off from sync-preview diff view to workspace-level FilePreview:
+  // close the sync drawer and open the file preview drawer. The selected
+  // file (and comments / pending changes) stay in SyncPreviewPanel state and
+  // are recoverable on the next reopen.
+  const handleOpenInPreview = useCallback((path: string) => {
+    setSelectedFilePath(path)
+    setSelectedFileHandle(null)
+    setSelectedFileBlob(null)
+    hidePreviewPanel()
+  }, [hidePreviewPanel])
+
   // Handle asset preview from AssetsPopover — opens the FilePreview drawer with a pre-loaded blob
   const handleAssetPreview = useCallback((fileName: string, blob: Blob) => {
     setSelectedFilePath(fileName)
@@ -771,6 +837,7 @@ export function WorkspaceLayout({
     <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-white dark:bg-neutral-950">
       {/* Header */}
       <TopBar
+        folderButtonRef={folderButtonRef}
         onSkillsManagerOpen={handleSkillsManagerOpen}
         onToolsPanelOpen={() => setToolsPanelOpen(true)}
         onCommandPaletteOpen={() => setShowCommandPalette(true)}
@@ -841,23 +908,14 @@ export function WorkspaceLayout({
               />
             ) : (
               <div className="relative h-full min-h-0 w-full overflow-hidden">
-                {workspaceCount === 0 && (
-                  <div
-                    className={`absolute z-10 rounded-lg border border-primary-200/70 bg-primary-50/85 text-primary-800 shadow-sm backdrop-blur-sm dark:border-primary-900/40 dark:bg-primary-950/25 dark:text-primary-200 ${
-                      isMobile
-                        ? 'left-3 right-3 top-3 max-w-none p-2.5 text-xs'
-                        : 'left-4 top-4 max-w-md p-3 text-sm'
-                    }`}
-                  >
-                    <p className="mb-2 text-primary-800 dark:text-primary-200">
-                      {t('sidebar.emptyStateNoWorkspace')}
-                    </p>
-                    <BrandButton variant="outline" onClick={handleCreateFirstWorkspace}>
-                      {t('sidebar.createFirstWorkspace')}
-                    </BrandButton>
-                  </div>
-                )}
-                <WelcomeScreenV2 onStartConversation={handleStartConversation} />
+                <WelcomeScreen
+                  onStartConversation={handleStartConversation}
+                  onOpenSettings={(tab) => {
+                    if (tab) setSettingsInitialTab(tab)
+                    setShowWorkspaceSettings(true)
+                  }}
+                  onGatewayLoginSuccess={() => setShowFolderTip(true)}
+                />
               </div>
             )}
           </main>
@@ -913,12 +971,12 @@ export function WorkspaceLayout({
 
           {/* Sync preview as Drawer (overlay, no squeeze) */}
           <Drawer
-            open={showPreview}
+            open={isPreviewOpen}
             onClose={handleClosePreview}
             title={t('settings.syncPanel.syncPreview.emptyStateTitle')}
             width={isMobile ? '100vw' : '85vw'}
           >
-            <SyncPreviewPanel onCancel={handleClosePreview} />
+            <SyncPreviewPanel onCancel={handleClosePreview} onOpenInPreview={handleOpenInPreview} />
           </Drawer>
 
           {/* Shared sync dialogs (approval + conflict) — rendered ONCE here.
@@ -973,7 +1031,7 @@ export function WorkspaceLayout({
       <SettingsDialog
         open={showWorkspaceSettings}
         onOpenChange={() => setShowWorkspaceSettings(false)}
-        initialTab="workspace-layout"
+        initialTab={settingsInitialTab}
       />
 
       {/* Phase 4: Recent Files Panel */}
@@ -995,11 +1053,15 @@ export function WorkspaceLayout({
         </div>
       )}
 
-      {/* Phase 4: Onboarding Tour */}
-      <OnboardingTour
-        autoStart={true}
-        onComplete={() => console.log('[WorkspaceLayout] Onboarding tour completed')}
-        onSkip={() => console.log('[WorkspaceLayout] Onboarding tour skipped')}
+      {/* Folder tip bubble — shown once after model is connected */}
+      <FolderTipBubble
+        show={showFolderTip}
+        anchorRef={folderButtonRef}
+        onOpenFolder={handleOpenFolder}
+        onDismiss={() => {
+          localStorage.setItem('creatorweave:folder-tip-seen', '1')
+          setShowFolderTip(false)
+        }}
       />
 
       {/* Export Panel */}

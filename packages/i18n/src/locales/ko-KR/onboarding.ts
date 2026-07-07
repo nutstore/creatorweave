@@ -1,38 +1,31 @@
-// 온보딩
 export const onboarding = {
-    dontShowAgain: "다시 표시 안 함",
+    dontShowAgain: "다시 표시하지 않기",
     previous: "이전",
     next: "다음",
     complete: "완료",
-    stepProgress: "{current} / {total} 단계",
+    skip: "건너뛰기",
+    stepProgress: "단계 {current} / {total}",
     steps: {
-      welcome: {
-        title: "CreatorWeave에 오신 것을 환영합니다!",
-        description: "주요 기능을 안내해 드리겠습니다.",
+      model: {
+        title: "AI 모델 연결",
+        description: "가장 적합한 방법을 선택하세요",
+        done: "모델이 준비되었습니다",
+        pending: "아래 버튼을 클릭하여 설정",
       },
-      conversations: {
-        title: "대화",
-        description:
-          "AI와 채팅하여 코드베이스를 분석합니다. 각 대화에는 전용 워크스페이스가 있습니다.",
+      firstMessage: {
+        title: "첫 번째 메시지 보내기",
+        description: "입력 상자에 입력하거나 아래 예시를 사용해보세요",
+        tip: "AI가 즉시 응답을 시작합니다",
       },
-      fileTree: {
-        title: "파일 브라우저",
-        description:
-          "프로젝트 파일과 폴더를 탐색합니다. 파일을 클릭하여 내용을 미리 봅니다.",
+      files: {
+        title: "AI가 파일 읽기",
+        description: "인증 후, AI가 지정된 로컬 파일을 읽고 쓸 수 있습니다",
+        tip: "사이드바의「폴더 열기」클릭",
       },
-      skills: {
-        title: "스킬",
-        description:
-          "일반적인 작업을 위한 재사용 가능한 스킬을 관리하고 실행합니다.",
-      },
-      tools: {
-        title: "도구 패널",
-        description: "빠른 작업, 추론 시각화, 스마트 제안에 액세스합니다.",
-      },
-      complete: {
-        title: "준비 완료!",
-        description:
-          "이러한 기능은 언제든지 도구 모음이나 키보드 단축키에서 액세스할 수 있습니다.",
+      explore: {
+        title: "더 많은 기능 탐색",
+        description: "⌘K로 명령 팔레트를 열어 스킬, 스케줄 등을 발견하세요",
+        tip: "명령 팔레트에서 언제든 모든 기능에 접근할 수 있습니다",
       },
     },
 } as const

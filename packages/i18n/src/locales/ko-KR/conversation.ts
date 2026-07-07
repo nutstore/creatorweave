@@ -1,4 +1,4 @@
-// 대화
+// 채팅
 export const conversation = {
     thinking: "생각：끔",
     reasoning: "추론 과정",
@@ -25,11 +25,11 @@ export const conversation = {
     tokenBudget:
       "유효 입력 예산 {effectiveBudget} = 총 한도 {modelMaxTokens} - 예약 {reserveTokens}",
     empty: {
-      title: "새 대화 시작",
+      title: "새 채팅 시작",
       description:
         "코드, 데이터 분석, 문서 작성 등 다양한 작업을 도와드립니다. 질문을 입력하세요!",
       onlineStatus: "항상 온라인",
-      smartConversation: "스마트 대화",
+      smartConversation: "스마트 채팅",
     },
     input: {
       placeholder: "메시지 입력... (Shift+Enter 줄바꿈)",
@@ -51,8 +51,8 @@ export const conversation = {
     },
     toast: {
       noApiKey: "먼저 설정에서 API Key를 구성하세요",
-      deletedTurn: "완전한 대화 턴 삭제됨",
-      branchCreated: "분기 대화가 생성되었습니다",
+      deletedTurn: "완전한 채팅 턴 삭제됨",
+      branchCreated: "분기 채팅가 생성되었습니다",
       messageQueued: "메시지가 대기열에 추가되었습니다 (위치 {position})",
       queueFull: "대기열이 가득 찼습니다. 현재 작업이 완료될 때까지 기다려주세요.",
     },
@@ -95,7 +95,7 @@ export const conversation = {
     codex: {
       error: {
         authRequired: "Codex 인증 필요",
-        authRequiredDesc: "Codex 세션이 만료되었거나 인증되지 않았습니다. 브라우저 확장 프로그램을 열어 다시 인증해주세요.",
+        authRequiredDesc: "Codex 채팅이 만료되었거나 인증되지 않았습니다. 브라우저 확장 프로그램을 열어 다시 인증해주세요.",
         openExtension: "확장 프로그램 열기",
         extensionRequired: "확장 프로그램 없음",
         extensionRequiredDesc: "Codex 제공자는 CreatorWeave 브라우저 확장 프로그램이 설치되어 있고 활성화되어야 합니다.",
@@ -117,7 +117,7 @@ export const conversation = {
       cache: "캐시 적중 토큰",
     },
     usageBar: {
-      title: "대화 누적 사용량",
+      title: "채팅 누적 사용량",
       cost: "약 {amount}",
       unknownPricing: "{model} 가격 정보 없음",
       costBreakdown:
@@ -137,9 +137,9 @@ export const conversation = {
       remove: "대기열에서 제거",
     },
 
-    // 대화 내보내기
+    // 채팅 내보내기
     export: {
-      title: "대화 내보내기",
+      title: "채팅 내보내기",
       format: "형식",
       markdownDesc: "읽기 쉬운 형식, 공유에 적합",
       jsonDesc: "구조화된 데이터, 백업에 적합",

@@ -16,6 +16,17 @@ export const welcome = {
     apiKeyRequiredHint:
       "먼저 모델 설정에서 API Key를 구성한 후 대화를 시작하세요",
     filesReady: "{count}개 파일 준비됨",
+    // Shown while the async API-key check is in flight (avoids flashing the
+    // "no API key" setup card before SQLite has been consulted).
+    checkingConfig: "AI 설정 확인 중...",
+    // Setup card (shown when no API key configured)
+    setupCardTitle: "시작하기 전에 AI 연결 방법을 선택하세요",
+    setupGatewayTitle: "견과클라우드 계정으로 로그인",
+    setupGatewayDesc: "견과클라우드 계정이 있나요? 원클릭 로그인, API Key 불필요",
+    setupGatewayRecommend: "추천",
+    setupApiKeyTitle: "자체 API Key 구성",
+    setupApiKeyDesc: "OpenAI, OpenRouter, Anthropic 등 지원",
+    setupLocalFirstHint: "모든 데이터는 브라우저에 로컬 저장되며 서버에 업로드되지 않습니다",
     personas: {
       developer: {
         title: "개발자",
@@ -54,4 +65,20 @@ export const welcome = {
         },
       },
     },
+    gateway: {
+        title: "견과클라우드 AI 로그인",
+        close: "닫기",
+        requesting: "인증 세션 생성 중...",
+        enterCode: "인증 페이지에서 다음 코드를 입력하세요",
+        authCodeLabel: "인증 코드",
+        copy: "복사",
+        openAuthPage: "인증 페이지 열기",
+        waiting: "인증 대기 중...",
+        success: "로그인 성공!",
+        clientIdMissing:
+            "Client ID가 설정되지 않았습니다. VITE_JIANGUOYUN_AI_CLIENT_ID 환경 변수를 설정하세요.",
+        authFailedFallback: "인증 실패",
+    },
+    quickActionPrompt: "무엇을 도와드릴까요?",
+    commandPaletteHint: "명령 팔레트 열기",
 } as const

@@ -70,19 +70,23 @@ export function SnapshotApprovalDialog({
               </div>
               {generatingSummary ? (
                 // Streaming: read-only display with blinking cursor
+                // max-h-[40vh] + overflow-auto keeps the container bounded so the dialog
+                // doesn't grow with the streamed content.
                 <div
-                  className="w-full min-h-[10rem] resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary whitespace-pre-wrap break-words overflow-y-auto"
+                  className="w-full min-h-[10rem] max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary whitespace-pre-wrap break-words"
                 >
                   {summary || ''}
                   <span className="inline-block w-[2px] h-[1em] bg-primary align-text-bottom animate-pulse" />
                 </div>
               ) : (
                 // Idle: editable textarea
+                // max-h-[40vh] + overflow-auto caps user-resized height so the dialog
+                // stays within the viewport.
                 <textarea
                   value={summary}
                   onChange={(e) => onSummaryChange(e.target.value)}
                   rows={8}
-                  className="w-full resize-y rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full resize-y max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder={t('sidebar.snapshotApproval.summaryPlaceholder')}
                 />
               )}

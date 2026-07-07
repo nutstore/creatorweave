@@ -16,6 +16,17 @@ export const welcome = {
     apiKeyRequiredHint:
       "まずモデル設定で API Key を構成してから会話を始めてください",
     filesReady: "{count} 件のファイルが準備完了",
+    // Shown while the async API-key check is in flight (avoids flashing the
+    // "no API key" setup card before SQLite has been consulted).
+    checkingConfig: "AI 設定を確認中...",
+    // Setup card (shown when no API key configured)
+    setupCardTitle: "開始前に、AI への接続方法を選択してください",
+    setupGatewayTitle: "堅果雲アカウントでログイン",
+    setupGatewayDesc: "堅果雲アカウントをお持ちですか？ワンクリックでログイン、API Key 不要",
+    setupGatewayRecommend: "推奨",
+    setupApiKeyTitle: "独自の API Key を構成",
+    setupApiKeyDesc: "OpenAI、OpenRouter、Anthropic などに対応",
+    setupLocalFirstHint: "すべてのデータはブラウザにローカル保存され、サーバーにアップロードされません",
     personas: {
       developer: {
         title: "開発者",
@@ -54,4 +65,20 @@ export const welcome = {
         },
       },
     },
+    gateway: {
+        title: "堅果雲 AI にログイン",
+        close: "閉じる",
+        requesting: "認可セッションを作成中...",
+        enterCode: "認可ページで次のコードを入力してください",
+        authCodeLabel: "認可コード",
+        copy: "コピー",
+        openAuthPage: "認可ページを開く",
+        waiting: "認可を待機中...",
+        success: "ログイン成功！",
+        clientIdMissing:
+            "Client ID が設定されていません。VITE_JIANGUOYUN_AI_CLIENT_ID 環境変数を設定してください。",
+        authFailedFallback: "認証に失敗しました",
+    },
+    quickActionPrompt: "何を手伝ってもらえますか？",
+    commandPaletteHint: "コマンドパレットを開く",
 } as const

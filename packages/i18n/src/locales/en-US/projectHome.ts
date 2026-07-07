@@ -31,6 +31,8 @@ export const projectHome = {
         "Browse user and developer documentation for guides and technical references.",
       openDocs: "Open Docs Hub",
       appearance: "Appearance",
+      advanced: "Advanced · Data Management",
+      advancedHint: "Reset, backup, cache clearing, etc.",
       cache: "Cache",
       cacheDescription:
         "Clear browser cache to refresh response headers and static resources.",
@@ -156,4 +158,5 @@ export const projectHome = {
       noResults: "No matching projects found",
       createFirst: "Create First Project",
     },
+    defaultProjectName: "My Project",
 } as const

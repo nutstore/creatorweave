@@ -317,6 +317,25 @@ function AppReady() {
 
   const [isClearingLocalData, setIsClearingLocalData] = useState(false)
 
+  // ── Auto-navigate to default project for first-time users ──────────
+  // When a brand-new user's default project was auto-created during init,
+  // redirect them into it immediately instead of landing on the empty
+  // ProjectHome list. Uses a session-level flag so it only fires once
+  // per browser session (avoids hijacking navigation for returning users).
+  useEffect(() => {
+    const JUST_REDIRECTED_KEY = 'creatorweave:auto-default-redirected'
+    if (sessionStorage.getItem(JUST_REDIRECTED_KEY)) return
+    // Only redirect if there's exactly 1 project (the auto-created one) AND
+    // the auto-default-project flag is set (meaning it was created this session).
+    const autoCreated = localStorage.getItem('creatorweave:auto-default-project-created')
+    if (!autoCreated) return
+    if (projects.length !== 1) return
+    const targetProject = projects[0]
+    if (!targetProject) return
+    sessionStorage.setItem(JUST_REDIRECTED_KEY, '1')
+    navigate(`/projects/${encodeURIComponent(targetProject.id)}/workspace`, { replace: true })
+  }, [projects, navigate])
+
   // --- Service Worker update prompt ---
   const swUpdateToastShownRef = useRef(false)
 
@@ -388,6 +407,10 @@ function AppReady() {
     setIsClearingLocalData(true)
     try {
       await clearSQLiteAndProjectsDirectory()
+
+      // Reset auto-default-project flags so re-init can auto-create again
+      localStorage.removeItem('creatorweave:auto-default-project-created')
+      sessionStorage.removeItem('creatorweave:auto-default-redirected')
 
       useProjectStore.setState({
         activeProjectId: '',
@@ -816,6 +839,36 @@ function App() {
         }
       } catch (err) {
         console.error('[App] Failed to register LLM Gateway provider:', err)
+        // Registration failed (e.g. network error, saved token invalid).
+        // Flush the API-key cache so the UI doesn't stay stuck in a stale
+        // "has API key" state from a previous session — re-evaluate with
+        // flush:true so a missing/failed provider config resolves to "no".
+        try {
+          const { useSettingsStore } = await import('@/store/settings.store')
+          await useSettingsStore.getState().checkHasApiKey({ flush: true })
+        } catch (flushErr) {
+          console.error('[App] checkHasApiKey flush failed:', flushErr)
+        }
+      }
+
+      // Restore custom-* providers from persisted settings and re-check the
+      // API key. Without this, `getProviderConfig('custom-xxx')` returns
+      // null on startup and the user would see a spurious "no API key"
+      // setup card for providers they've already configured.
+      //
+      // NOTE: deliberately NOT using `{ flush: true }` here. We only restored
+      // custom-* providers in this step; for extension-managed providers
+      // (codex-oauth), the registration happens asynchronously in
+      // extension.store.checkStatus() which runs on a 1s timer. Flushing
+      // here would force a false "no API key" conclusion for codex users
+      // before the extension has had a chance to register, causing the
+      // welcome screen to flash the setup card.
+      try {
+        const { useSettingsStore } = await import('@/store/settings.store')
+        useSettingsStore.getState()._restoreDynamicProviders()
+        await useSettingsStore.getState().checkHasApiKey()
+      } catch (err) {
+        console.error('[App] Failed to restore dynamic providers:', err)
       }
 
       if (mounted) {

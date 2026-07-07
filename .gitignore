@@ -90,3 +90,6 @@ docs/technical-debt-plan.md
 browser-extension/.output/
 browser-extension/.wxt/
 .codegraph/
+
+# Local design prototypes (HTML exploration files, not shippable assets)
+prototypes/

@@ -266,10 +266,22 @@ export async function createDeviceSession(
  * Step 2: Open browser for user authorization
  */
 export function openAuthorizationPage(verificationUri: string, userCode?: string): void {
-  const url = userCode
-    ? `${verificationUri}?user_code=${encodeURIComponent(userCode)}`
+  // If the server already includes user_code in the verification_uri,
+  // don't append it again (would cause double ?user_code=... leading to
+  // a malformed URL like ?user_code=XXX%3Fuser_code%3DXXX).
+  const alreadyHasUserCode = verificationUri.includes('user_code=')
+  const url = userCode && !alreadyHasUserCode
+    ? appendQueryParam(verificationUri, 'user_code', userCode)
     : verificationUri
   window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Append a query parameter to a URL, using ? or & as appropriate.
+ */
+function appendQueryParam(uri: string, key: string, value: string): string {
+  const separator = uri.includes('?') ? '&' : '?'
+  return `${uri}${separator}${key}=${encodeURIComponent(value)}`
 }
 
 /**

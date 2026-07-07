@@ -10,8 +10,7 @@
     "./tsconfig/react": "./src/typescript/react.json",
     "./tsconfig/library": "./src/typescript/library.json",
     "./eslint/base": "./src/eslint/base.js",
-    "./eslint/react": "./src/eslint/react.js",
-    "./tokens": "./src/tokens/index.js"
+    "./eslint/react": "./src/eslint/react.js"
   },
   "files": [
     "src"

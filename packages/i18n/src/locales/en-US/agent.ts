@@ -42,4 +42,11 @@ export const agent = {
         stop: "Stop and clear queue",
         clear: "Clear queue",
     },
+    folderTip: {
+        title: "Open Local Folder",
+        description:
+            "AI can read and edit files in a folder you authorize, and save content locally.",
+        selectFolder: "Select Folder",
+        later: "Later",
+    },
 } as const

@@ -55,14 +55,14 @@ export const conversation = {
     toast: {
       noApiKey: "请先在设置中配置 API Key",
       deletedTurn: "已删除完整对话轮次",
-      stopBeforeSend: "当前会话正在运行，请先停止后再发送",
+      stopBeforeSend: "当前对话正在运行，请先停止后再发送",
       stopBeforeRegenerate: "请先停止当前运行，再重新生成",
-      conversationMissingForRegenerate: "会话不存在，无法重新生成",
+      conversationMissingForRegenerate: "对话不存在，无法重新生成",
       targetMessageMissing: "目标消息不存在，可能已被删除",
       onlyUserMessageRegenerate: "只能重新生成用户消息",
       modelNotConfigured: "模型未配置，请先在设置中选择服务商和模型",
       stopBeforeEditResend: "请先停止当前运行，再编辑发送",
-      conversationMissingForEditResend: "会话不存在，无法编辑重发",
+      conversationMissingForEditResend: "对话不存在，无法编辑重发",
       onlyUserMessageEditResend: "只能编辑并重发用户消息",
       branchCreated: "已创建分叉对话",
       messageQueued: "消息已加入队列 (第 {position} 位)",
@@ -109,7 +109,7 @@ export const conversation = {
     codex: {
       error: {
         authRequired: "Codex 需要授权",
-        authRequiredDesc: "您的 Codex 会话已过期或未授权，请打开浏览器扩展重新授权。",
+        authRequiredDesc: "您的 Codex 对话已过期或未授权，请打开浏览器扩展重新授权。",
         openExtension: "打开扩展",
         extensionRequired: "扩展不可用",
         extensionRequiredDesc: "Codex 服务需要安装并启用 CreatorWeave 浏览器扩展。",
@@ -131,7 +131,7 @@ export const conversation = {
       output: "输出 token",
       cache: "缓存命中 token",
     },
-    // 会话级累计消耗条
+    // 对话级累计消耗条
     usageBar: {
       title: "本次对话消耗",
       cost: "约 {amount}",
@@ -152,9 +152,9 @@ export const conversation = {
       divider: "{count} 条消息排队等待中",
       remove: "撤销排队",
     },
-    // 导出会话
+    // 导出对话
     export: {
-      title: "导出会话记录",
+      title: "导出对话记录",
       format: "导出格式",
       markdownDesc: "易读格式，适合分享和阅读",
       jsonDesc: "结构化数据，适合备份和导入",

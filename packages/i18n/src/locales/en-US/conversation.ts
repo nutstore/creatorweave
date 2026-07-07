@@ -109,7 +109,7 @@ export const conversation = {
     codex: {
       error: {
         authRequired: "Codex Authorization Required",
-        authRequiredDesc: "Your Codex session has expired or is not authorized. Please open the browser extension to re-authorize.",
+        authRequiredDesc: "Your Codex chat has expired or is not authorized. Please open the browser extension to re-authorize.",
         openExtension: "Open Extension",
         extensionRequired: "Extension Not Available",
         extensionRequiredDesc: "The Codex provider requires the CreatorWeave browser extension to be installed and active.",

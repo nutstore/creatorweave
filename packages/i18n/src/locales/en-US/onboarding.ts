@@ -2,41 +2,30 @@ export const onboarding = {
     dontShowAgain: "Don't show again",
     previous: "Previous",
     next: "Next",
-    complete: "Complete",
+    complete: "Done",
+    skip: "Skip",
     stepProgress: "Step {current} of {total}",
     steps: {
-      welcome: {
-        title: "Welcome to CreatorWeave!",
-        description: "Let us show you around the key features.",
+      model: {
+        title: "Connect an AI Model",
+        description: "Choose the best way for you to get started",
+        done: "Model is ready",
+        pending: "Click the button below to configure",
       },
-      conversations: {
-        title: "Conversations",
-        description:
-          "Interact with AI using natural language. Each conversation has its own workspace.",
+      firstMessage: {
+        title: "Send Your First Message",
+        description: "Type in the input box, or try an example below",
+        tip: "AI will start replying immediately",
       },
-      fileTree: {
-        title: "File Browser",
-        description:
-          "Browse your project files and folders. Click any file to preview its contents.",
+      files: {
+        title: "Let AI Read Your Files",
+        description: "After authorization, AI can read and write your local files",
+        tip: "Click \"Open Folder\" in the sidebar",
       },
-      skills: {
-        title: "Skills",
-        description: "Manage and execute reusable skills for common tasks.",
-      },
-      multiAgent: {
-        title: "Multi-Agent",
-        description:
-          "Create multiple AI agents to work together on complex tasks.",
-      },
-      tools: {
-        title: "Tools Panel",
-        description:
-          "Access quick actions, reasoning visualization, and smart suggestions.",
-      },
-      complete: {
-        title: "All Set!",
-        description:
-          "You can always access these features from the toolbar or keyboard shortcuts.",
+      explore: {
+        title: "Explore More Features",
+        description: "Press ⌘K to open the command palette for skills, schedules, and more",
+        tip: "Access all features from the command palette anytime",
       },
     },
 } as const

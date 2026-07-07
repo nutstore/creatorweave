@@ -1,4 +1,4 @@
-// 会話
+// チャット
 export const conversation = {
     thinking: "思考：オフ",
     reasoning: "推論プロセス",
@@ -25,11 +25,11 @@ export const conversation = {
     tokenBudget:
       "有効な入力予算 {effectiveBudget} = 上限 {modelMaxTokens} - 予約 {reserveTokens}",
     empty: {
-      title: "新しい会話を開始",
+      title: "新しいチャットを開始",
       description:
         "コード、データ分析、ドキュメント作成など、様々なタスクをお手伝いします。質問を入力してください！",
       onlineStatus: "常時オンライン",
-      smartConversation: "スマート会話",
+      smartConversation: "スマートチャット",
     },
     input: {
       placeholder: "メッセージを入力... (Shift+Enter で改行)",
@@ -51,8 +51,8 @@ export const conversation = {
     },
     toast: {
       noApiKey: "まず設定で API Key を設定してください",
-      deletedTurn: "完全な会話ターンを削除しました",
-      branchCreated: "分岐会話を作成しました",
+      deletedTurn: "完全なチャットターンを削除しました",
+      branchCreated: "分岐チャットを作成しました",
       messageQueued: "メッセージをキューに追加しました (位置 {position})",
       queueFull: "キューが満杯です。現在のタスクが完了するまでお待ちください。",
     },
@@ -96,7 +96,7 @@ export const conversation = {
     codex: {
       error: {
         authRequired: "Codex 認証が必要です",
-        authRequiredDesc: "Codex セッションが期限切れか認証されていません。ブラウザ拡張機能を開いて再認証してください。",
+        authRequiredDesc: "Codex チャットが期限切れか認証されていません。ブラウザ拡張機能を開いて再認証してください。",
         openExtension: "拡張機能を開く",
         extensionRequired: "拡張機能が利用できません",
         extensionRequiredDesc: "Codex プロバイダーを使用するには、CreatorWeave ブラウザ拡張機能がインストールされ有効になっている必要があります。",
@@ -118,7 +118,7 @@ export const conversation = {
       cache: "キャッシュヒットトークン",
     },
     usageBar: {
-      title: "会話の累計消費",
+      title: "チャットの累計消費",
       cost: "約 {amount}",
       unknownPricing: "{model} の価格データなし",
       costBreakdown:
@@ -138,9 +138,9 @@ export const conversation = {
       remove: "キューから削除",
     },
 
-    // 会話エクスポート
+    // チャットエクスポート
     export: {
-      title: "会話をエクスポート",
+      title: "チャットをエクスポート",
       format: "フォーマット",
       markdownDesc: "読みやすく、共有に最適",
       jsonDesc: "構造化データ、バックアップに適している",

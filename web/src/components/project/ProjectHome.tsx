@@ -44,6 +44,7 @@ import {
   Copy,
   Check,
   Download,
+  ChevronDown,
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
@@ -449,6 +450,7 @@ export function ProjectHome({
     projectId: string
     type: 'rename' | 'archive' | 'unarchive' | 'delete'
   } | null>(null)
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const [showClearDataDialog, setShowClearDataDialog] = useState(false)
   const [clearDataConfirmText, setClearDataConfirmText] = useState('')
   const [isClearingCache, setIsClearingCache] = useState(false)
@@ -981,27 +983,6 @@ export function ProjectHome({
               </BrandButton>
             </div>
 
-            {/* Start fresh */}
-            <div className="home-reveal home-delay-5 rounded-xl border border-border/60 bg-card/50 p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <RotateCcw className="w-4 h-4 text-tertiary" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
-                  {t('projectHome.sidebar.startFresh')}
-                </span>
-              </div>
-              <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
-                {t('projectHome.sidebar.startFreshDescription')}
-              </p>
-              <BrandButton
-                variant="ghost"
-                className="w-full text-tertiary hover:text-danger hover:border-danger/50"
-                onClick={() => setShowClearDataDialog(true)}
-                disabled={isClearingLocalData || isLoading}
-              >
-                {isClearingLocalData ? t('projectHome.sidebar.resetting') : t('projectHome.sidebar.resetApp')}
-              </BrandButton>
-            </div>
-
             {/* Appearance settings */}
             <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -1091,6 +1072,45 @@ export function ProjectHome({
               </div>
 </div>
 
+            {/* Advanced / Data Management — collapsed by default */}
+            <div className="rounded-xl border border-border/40 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="home-mono text-[11px] uppercase tracking-wider text-tertiary">
+                    {t('projectHome.sidebar.advanced')}
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 text-tertiary transition-transform ${showAdvanced ? '' : '-rotate-90'}`}
+                />
+              </button>
+              {showAdvanced && (
+                <div className="space-y-4 border-t border-border/40 p-4">
+                  {/* Start fresh (moved here from above) */}
+                  <div className="rounded-lg border border-border/40 bg-card/30 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RotateCcw className="w-3.5 h-3.5 text-tertiary" />
+                      <span className="home-mono text-[10px] uppercase tracking-wider text-tertiary">
+                        {t('projectHome.sidebar.startFresh')}
+                      </span>
+                    </div>
+                    <p className="home-body text-xs text-secondary dark:text-secondary-foreground mb-3">
+                      {t('projectHome.sidebar.startFreshDescription')}
+                    </p>
+                    <BrandButton
+                      variant="ghost"
+                      className="w-full text-xs text-tertiary hover:text-danger hover:border-danger/50"
+                      onClick={() => setShowClearDataDialog(true)}
+                      disabled={isClearingLocalData || isLoading}
+                    >
+                      {isClearingLocalData ? t('projectHome.sidebar.resetting') : t('projectHome.sidebar.resetApp')}
+                    </BrandButton>
+                  </div>
+
             {/* Clear cache */}
             <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -1153,6 +1173,9 @@ export function ProjectHome({
                 <Stethoscope className="w-3.5 h-3.5 mr-1.5" />
                 {t('projectHome.sidebar.runDiagnostics')}
               </BrandButton>
+            </div>
+                </div>
+              )}
             </div>
           </aside>
 

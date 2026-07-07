@@ -40,4 +40,11 @@ export const agent = {
         stop: "停止してキューをクリア",
         clear: "キューをクリア",
     },
+    folderTip: {
+        title: "ローカルフォルダを開く",
+        description:
+            "フォルダを許可すると、AI がファイルを読み書きし、ローカルに保存できます。",
+        selectFolder: "フォルダを選択",
+        later: "後で",
+    },
 } as const
