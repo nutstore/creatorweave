@@ -462,6 +462,11 @@ const BASE_URL_THINKING_FORMAT_MAP: Array<{ pattern: string; format: ThinkingFor
   { pattern: 'api.together.xyz', format: 'together' },
   // Qwen (Alibaba DashScope)
   { pattern: 'dashscope.aliyuncs.com', format: 'qwen' },
+  // MiniMax — both international (api.minimax.io) and domestic (api.minimaxi.com)
+  // MiniMax does NOT support disabling thinking; reasoning_split isolates the
+  // thinking content into reasoning_details so it can be hidden from the user.
+  { pattern: 'api.minimax.io', format: 'minimax' },
+  { pattern: 'api.minimaxi.com', format: 'minimax' },
 ]
 
 /**
@@ -473,6 +478,33 @@ export function detectThinkingFormat(baseUrl: string): ThinkingFormat {
     if (url.includes(pattern)) return format
   }
   return 'auto'
+}
+
+/**
+ * Thinking format for MiniMax.
+ * MiniMax does NOT support disabling thinking — the model always generates
+ * reasoning content. We can only redirect it to a separate field so the
+ * end user doesn't see it.
+ */
+function applyMinimaxThinkingParams(
+  payload: Record<string, unknown>,
+  enabled: boolean,
+  level?: ThinkingLevel,
+  levelMap?: Partial<Record<string, string | null>>
+): void {
+  if (enabled) {
+    // Enabled: tell MiniMax to include reasoning in reasoning_details (split mode).
+    // reasoning_effort is optional and controls how much thinking the model does.
+    payload.reasoning_split = true
+    if (level) {
+      payload.reasoning_effort = toEffortValue(level, levelMap)
+    }
+  } else {
+    // Disabled: still send reasoning_split=true so the thinking goes into
+    // reasoning_details instead of contaminating content.
+    // The UI will filter out reasoning_details when the user has disabled thinking.
+    payload.reasoning_split = true
+  }
 }
 
 /**
@@ -533,6 +565,13 @@ function applyThinkingParams(
       payload.reasoning_effort = enabled
         ? toEffortValue(level!, thinkingLevelMap)
         : 'off'
+      break
+    }
+    case 'minimax': {
+      // MiniMax does not support disabling thinking. Use reasoning_split so
+      // the thinking content lands in reasoning_details and can be hidden from
+      // the user without being stripped from the conversation history.
+      applyMinimaxThinkingParams(payload, enabled, level, thinkingLevelMap)
       break
     }
     case 'openai':

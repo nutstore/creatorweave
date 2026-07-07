@@ -224,6 +224,11 @@ export class PiAIProvider implements LLMProvider {
               // TokenHub / 坚果云 AI Gateway — only accepts reasoning_effort with 'off'
               p.reasoning_effort = 'off'
               break
+            case 'minimax':
+              // MiniMax does not support disabling thinking; use reasoning_split so
+              // the thinking content lands in reasoning_details instead of content.
+              p.reasoning_split = true
+              break
             case 'openrouter':
               p.reasoning = { effort: 'none' }
               break

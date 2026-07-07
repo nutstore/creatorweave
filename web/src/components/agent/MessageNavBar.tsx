@@ -152,7 +152,7 @@ export const MessageNavBar = memo(function MessageNavBar({
             {/* Track + fill line (always visible) */}
             <div className="relative flex flex-1 w-full">
               {/* Background line */}
-              <div className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-neutral-200/70 dark:bg-neutral-800/70" style={{ top: 0, bottom: 0 }} />
+              <div className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-[var(--brand-muted)] dark:bg-[var(--brand-muted)]" style={{ top: 0, bottom: 0 }} />
               {/* Fill line */}
               <div
                 className="msg-nav-line absolute left-1/2 -translate-x-1/2 bg-primary-400 dark:bg-primary-600"
@@ -185,8 +185,8 @@ export const MessageNavBar = memo(function MessageNavBar({
                       className={[
                         'rounded-full transition-all duration-200',
                         isActive
-                          ? 'bg-primary-500 dark:bg-primary-600'
-                          : 'bg-neutral-400 hover:bg-primary-400 dark:bg-neutral-600 dark:hover:bg-primary-400',
+                          ? 'bg-primary-500 dark:bg-primary-500'
+                          : 'bg-[var(--brand-muted)] hover:bg-primary-300 dark:bg-[var(--brand-muted)] dark:hover:bg-primary-400',
                       ].filter(Boolean).join(' ')}
                       style={{ width: isActive ? 6 : 5, height: isActive ? 6 : 5 }}
                     />
