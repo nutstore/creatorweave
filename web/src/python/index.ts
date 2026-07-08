@@ -36,23 +36,10 @@ export type { PyodideState } from './api'
 export type {
   ExecuteRequest,
   ExecuteResult,
-  FileRef,
   FileOutput,
   ImageOutput,
   WorkerResponse,
 } from './worker-types'
-
-export type { PyodideWorkerManagerOptions } from './manager'
-
-export {
-  createTextFile,
-  createFileFromBlob,
-  createFileFromFile,
-  fileOutputToBlob,
-  fileOutputToText,
-  fileOutputToDataUrl,
-  downloadFileOutput,
-} from './manager'
 
 //=============================================================================
 // Utility Functions
@@ -69,6 +56,7 @@ export {
  * - cleanupTempFiles: Clean up Pyodide filesystem
  * - formatExecutionResult: Format execution results
  * - isExecutionSuccessful: Check result status
+ * - fileOutputToBlob / fileOutputToText / fileOutputToDataUrl / downloadFileOutput
  */
 export * from './utils'
 
@@ -77,7 +65,6 @@ export * from './utils'
 //=============================================================================
 
 export type {
-  FileRef as CoreFileRef,
   PyodideFileMeta,
   BridgeResult,
   PyodideInstance,
@@ -88,37 +75,14 @@ export {
   PYODIDE_BASE_URL,
   DEFAULT_TIMEOUT,
   MOUNT_POINT,
-  MAX_FILE_SIZE,
   PYTHON_PACKAGES,
   type PythonPackage,
   MAX_CODE_SIZE,
-  MAX_FILE_COUNT,
   MAX_OUTPUT_SIZE,
 } from './constants'
 
 // Package management
 export { PackageManager } from './packages'
-
-// File operations and bridge layer
-export {
-  readFileFromHandle,
-  readFileFromOPFS,
-  validateFileSize,
-  injectFile,
-  readFileFromPyodide,
-  listPyodideFiles,
-  fileToFileRef,
-  readFileAsBinary,
-  isTextFile,
-} from './files'
-
-export {
-  getActiveFiles,
-  bridgeFilesToPyodide,
-  bridgeOutputFiles,
-  clearPyodideFiles,
-  getPyodideFileStats,
-} from './bridge'
 
 //=============================================================================
 // Singleton Instance
@@ -141,41 +105,16 @@ export {
  * ```
  */
 export { pythonExecutor } from './api'
+import { pythonExecutor } from './api'
 
 //=============================================================================
 // Window Binding (for Agent Tool Integration)
 //=============================================================================
 
 /**
- * Bind pythonExecutor to window object for Agent tool access
+ * Bind pythonExecutor to window object for Agent tool access.
  * This allows the Agent to execute Python code through the global scope.
  */
-import { pythonExecutor as executorInstance } from './api'
-
 if (typeof window !== 'undefined') {
-  (window as any).pythonExecutor = executorInstance
-
-  // Convenience function for Agent tool integration
-  // Note: Using loose file type to match FileRef interface expectations
-  ;(window as any).__executePython = async (
-    code: string,
-    options?: {
-      files?: Array<{ name: string; content: string | ArrayBuffer }>
-      packages?: string[]
-      timeout?: number
-    }
-  ) => {
-    // Convert string content to ArrayBuffer for FileRef compatibility
-    const convertedFiles = options?.files?.map((f) => ({
-      ...f,
-      content:
-        typeof f.content === 'string' ? new TextEncoder().encode(f.content).buffer : f.content,
-    }))
-
-    return executorInstance.execute({
-      code,
-      files: convertedFiles as any,
-      timeout: options?.timeout,
-    })
-  }
+  ;(window as any).pythonExecutor = pythonExecutor
 }

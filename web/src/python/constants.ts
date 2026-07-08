@@ -31,12 +31,6 @@ export const DEFAULT_TIMEOUT = 180000
  */
 export const MOUNT_POINT = '/mnt'
 
-/**
- * Maximum file size for file injection (50MB)
- * Prevents memory exhaustion from large files
- */
-export const MAX_FILE_SIZE = 50 * 1024 * 1024
-
 //=============================================================================
 // Python Packages
 //=============================================================================
@@ -61,12 +55,6 @@ export type PythonPackage = (typeof PYTHON_PACKAGES)[number]
  * Prevents memory issues from large code blocks
  */
 export const MAX_CODE_SIZE = 1024 * 1024
-
-/**
- * Maximum number of files that can be injected
- * Prevents filesystem exhaustion
- */
-export const MAX_FILE_COUNT = 100
 
 /**
  * Maximum stdout/stderr buffer size (10MB)

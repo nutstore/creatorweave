@@ -32,12 +32,6 @@ const MICROPIP_WHITELIST = {
 //=============================================================================
 
 /**
- * @typedef {Object} FileRef
- * @property {string} name
- * @property {ArrayBuffer} content
- */
-
-/**
  * @typedef {Object} ImageOutput
  * @property {string} filename
  * @property {string} data - base64
@@ -692,7 +686,7 @@ async function handleMessage(/** @type {any} */ data) {
   }
 
   // Handle 'execute' type - run Python code
-  const { code, files = [], timeout = DEFAULT_TIMEOUT, mountDir, assetsDir, syncFs = true } = data
+  const { code, timeout = DEFAULT_TIMEOUT, mountDir, assetsDir, syncFs = true } = data
 
   const startTime = performance.now()
   /** @type {number | undefined} */
@@ -707,20 +701,6 @@ async function handleMessage(/** @type {any} */ data) {
     // Handle mountDir if provided (mountNativeFS)
     if (mountDir) {
       await ensureMounted(mountDir)
-    } else {
-      // Ensure /mnt directory exists for regular file injection
-      if (!pyodide.FS.analyzePath('/mnt').exists) {
-        pyodide.FS.mkdir('/mnt')
-      }
-
-      // Inject files into /mnt
-      if (files.length > 0) {
-        for (const file of files) {
-          const filePath = `/mnt/${file.name}`
-          const data = new Uint8Array(file.content)
-          pyodide.FS.writeFile(filePath, data)
-        }
-      }
     }
 
     // Handle assetsDir if provided — mount at /mnt_assets

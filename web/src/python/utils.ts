@@ -6,7 +6,7 @@
  * matplotlib image detection, and Pyodide filesystem management.
  */
 
-import type { ExecuteResult } from './worker-types'
+import type { ExecuteResult, FileOutput } from './worker-types'
 
 //=============================================================================
 // ID Generation
@@ -232,4 +232,51 @@ export function formatExecutionResult(result: ExecuteResult): string {
  */
 export function isExecutionSuccessful(result: ExecuteResult): boolean {
   return result.success && !result.error
+}
+
+//=============================================================================
+// FileOutput Helpers
+//=============================================================================
+
+/**
+ * Convert FileOutput to Blob
+ */
+export function fileOutputToBlob(file: FileOutput): Blob {
+  return new Blob([file.content], { type: 'application/octet-stream' })
+}
+
+/**
+ * Convert FileOutput to text (for text files)
+ */
+export function fileOutputToText(file: FileOutput): string {
+  const decoder = new TextDecoder()
+  return decoder.decode(file.content)
+}
+
+/**
+ * Convert FileOutput to data URL (for downloads)
+ */
+export function fileOutputToDataUrl(
+  file: FileOutput,
+  mimeType: string = 'application/octet-stream'
+): string {
+  const bytes = new Uint8Array(file.content)
+  const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '')
+  const base64 = btoa(binary)
+  return `data:${mimeType};base64,${base64}`
+}
+
+/**
+ * Download FileOutput as file
+ */
+export function downloadFileOutput(file: FileOutput, filename?: string): void {
+  const blob = fileOutputToBlob(file)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || file.name
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }

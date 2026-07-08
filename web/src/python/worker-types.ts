@@ -5,15 +5,6 @@
  * so types are defined here for TypeScript imports.
  */
 
-/**
- * Simple file reference for worker message passing
- * Note: For full file metadata, use types.FileRef instead
- */
-export interface FileRef {
-  name: string
-  content: ArrayBuffer
-}
-
 export interface FileOutput {
   name: string
   content: ArrayBuffer
@@ -35,7 +26,6 @@ export interface ExecuteRequest {
   id: string
   type: 'execute'
   code: string
-  files?: FileRef[]
   /** @deprecated Packages are auto-loaded from imports. This field is kept for backward compatibility. */
   packages?: string[]
   timeout?: number

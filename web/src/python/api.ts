@@ -21,7 +21,7 @@
 // Type Definitions
 //=============================================================================
 
-import type { FileRef, ExecuteRequest, ExecuteResult, WorkerResponse } from './worker-types'
+import type { ExecuteRequest, ExecuteResult, WorkerResponse } from './worker-types'
 import { DEFAULT_TIMEOUT } from './constants'
 import { generateId, logger, formatTime, isExecutionSuccessful } from './utils'
 
@@ -210,8 +210,6 @@ export class PythonExecutor {
   async execute(options: {
     /** Python code to execute */
     code: string
-    /** Optional files to inject into /mnt (only used when not using mountDir) */
-    files?: FileRef[]
     /** Execution timeout in milliseconds (default: 30000) */
     timeout?: number
     /** Optional directory handle to mount at /mnt (File System Access API) */
@@ -234,7 +232,6 @@ export class PythonExecutor {
       id,
       type: 'execute',
       code: options.code,
-      files: options.files || [],
       timeout: options.timeout || DEFAULT_TIMEOUT,
       mountDir: options.mountDir,
       assetsDir: options.assetsDir,
@@ -244,7 +241,6 @@ export class PythonExecutor {
 
     logger(`Executing Python code (id: ${id})`)
     logger(`  Code length: ${options.code.length} bytes`)
-    logger(`  Files: ${options.files?.length || 0}`)
     logger(`  Mount dir: ${options.mountDir?.name || 'none'}`)
     logger(`  Timeout: ${formatTime(options.timeout || DEFAULT_TIMEOUT)}`)
 
@@ -318,7 +314,6 @@ export class PythonExecutor {
    */
   async executeAndFormat(options: {
     code: string
-    files?: FileRef[]
     packages?: string[]
     timeout?: number
   }): Promise<string> {
@@ -582,7 +577,6 @@ export enum PyodideState {
 
 // Re-export types from worker.ts for convenience
 export type {
-  FileRef,
   FileOutput,
   ImageOutput,
   ExecuteRequest,

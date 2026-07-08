@@ -20,7 +20,7 @@ import 'sonner/dist/styles.css'
 import { registerServiceWorker } from '@/pwa/register-service-worker'
 import { RootErrorBoundary } from '@/components/error/RootErrorBoundary'
 
-// Import Python module to initialize window.__executePython
+// Import Python module to initialize window.pythonExecutor
 import '@/python'
 
 // React Scan - Visualize unnecessary re-renders in dev
