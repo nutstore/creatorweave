@@ -13,13 +13,13 @@
  * Inline: $x_1$  Block: $$\varepsilon_l = x_l - \hat{x}_l$$
  */
 
-import { memo, useContext, createContext, useEffect, useRef, useState } from 'react'
+import { memo, useContext, createContext, useEffect, useRef, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import { Loader2 } from 'lucide-react'
+import { Copy, Check, Loader2 } from 'lucide-react'
 import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
 import { Lightbox } from './Lightbox'
 
@@ -176,30 +176,85 @@ const REMARK_PLUGINS: any = [remarkGfm, remarkMath]
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const REHYPE_PLUGINS: any = [rehypeKatex]
 
+/**
+ * Extract plain text from react-markdown children (may be string, ReactNode[], etc.)
+ */
+function extractText(children: React.ReactNode): string {
+  if (typeof children === 'string') return children
+  if (Array.isArray(children)) return children.map(extractText).join('')
+  if (children && typeof children === 'object' && 'props' in (children as React.ReactElement)) {
+    return extractText((children as React.ReactElement).props.children)
+  }
+  return String(children)
+}
+
+/**
+ * CodeBlock — renders a fenced code block with language label and copy button.
+ */
+function CodeBlock({
+  language,
+  code,
+}: {
+  language: string | undefined
+  code: React.ReactNode
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    const text = extractText(code)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard API may be unavailable in some contexts
+    }
+  }, [code])
+
+  return (
+    <div className="my-2 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+      <div className="flex items-center justify-between bg-neutral-100 px-3 py-1 dark:bg-neutral-800">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+          {language || 'code'}
+        </span>
+        <button
+          onClick={handleCopy}
+          title={copied ? 'Copied!' : 'Copy code'}
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-700"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3 w-3 text-green-500" />
+              <span className="text-green-600 dark:text-green-400">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3 text-neutral-400 dark:text-neutral-500" />
+              <span className="text-neutral-400 dark:text-neutral-500">Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="overflow-x-auto bg-neutral-50 p-3 dark:bg-bg-tertiary">
+        <code className="text-[13px] leading-relaxed text-neutral-800 dark:text-white">
+          {code}
+        </code>
+      </pre>
+    </div>
+  )
+}
+
 const MARKDOWN_COMPONENTS = {
   // Code blocks
   code({ className, children, ...props }: React.ComponentPropsWithoutRef<'code'> & { className?: string }) {
     const match = /language-(\w+)/.exec(className || '')
     const isBlock = match || (typeof children === 'string' && children.includes('\n'))
     if (isBlock) {
-      return (
-        <div className="my-2 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
-          {match && (
-            <div className="bg-neutral-100 dark:bg-neutral-800 px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
-              {match[1]}
-            </div>
-          )}
-          <pre className="overflow-x-auto bg-neutral-50 dark:bg-bg-tertiary p-3">
-            <code className={`text-[13px] leading-relaxed text-neutral-800 dark:text-white ${className || ''}`} {...props}>
-              {children}
-            </code>
-          </pre>
-        </div>
-      )
+      return <CodeBlock language={match?.[1]} code={children} />
     }
     return (
       <code
-        className="rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[13px] text-pink-600 dark:text-pink-400"
+        className="rounded bg-neutral-100 px-1.5 py-0.5 text-[13px] text-pink-600 dark:bg-neutral-800 dark:text-pink-400"
         {...props}
       >
         {children}
