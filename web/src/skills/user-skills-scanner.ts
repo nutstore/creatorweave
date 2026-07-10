@@ -117,9 +117,11 @@ async function scanSingleUserSkill(
 
   // Read and parse SKILL.md
   let content: string
+  let fileMtime = 0
   try {
     const file = await skillMdHandle.getFile()
     content = await file.text()
+    fileMtime = file.lastModified
   } catch (e) {
     errors.push(`user/${dirName}/SKILL.md: ${e instanceof Error ? e.message : String(e)}`)
     return { skill: null, resources, errors }
@@ -137,6 +139,13 @@ async function scanSingleUserSkill(
   const skill = result.skill
   skill.id = `user:${dirName}`
   skill.source = 'user'
+  // Use the actual file modification time so multiple skills imported
+  // around the same time can be distinguished by when their SKILL.md
+  // was last edited.
+  if (fileMtime) {
+    skill.updatedAt = fileMtime
+    skill.createdAt = fileMtime
+  }
 
   // Scan resources (same logic as project skill scanner)
   await scanUserSkillResources(skillDirHandle, skill.id, resources, errors)

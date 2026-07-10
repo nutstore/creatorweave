@@ -46,6 +46,26 @@ const CATEGORY_KEYS: Record<string, string> = {
   general: 'skillCard.category.general',
 }
 
+/**
+ * Format a timestamp as a compact relative-time string (e.g. "3 min ago").
+ * Falls back to a locale-aware absolute date for older values.
+ */
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  const diffMs = now - timestamp
+  const diffSec = Math.round(diffMs / 1000)
+  const diffMin = Math.round(diffSec / 60)
+  const diffHr = Math.round(diffMin / 60)
+  const diffDay = Math.round(diffHr / 24)
+
+  if (diffSec < 60) return `${diffSec}s`
+  if (diffMin < 60) return `${diffMin}m`
+  if (diffHr < 24) return `${diffHr}h`
+  if (diffDay < 30) return `${diffDay}d`
+  // Older than 30 days — show absolute date
+  return new Date(timestamp).toLocaleDateString()
+}
+
 export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelete, onExport }: SkillCardProps) {
   const t = useT()
 
@@ -125,6 +145,14 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
             <>
               <span className="text-neutral-200 dark:text-neutral-700">|</span>
               <span>{t('skillCard.project')}</span>
+            </>
+          )}
+          {skill.updatedAt > 0 && (
+            <>
+              <span className="text-neutral-200 dark:text-neutral-700">|</span>
+              <span title={new Date(skill.updatedAt).toLocaleString()}>
+                {t('skillCard.updated')} {formatRelativeTime(skill.updatedAt)}
+              </span>
             </>
           )}
         </div>

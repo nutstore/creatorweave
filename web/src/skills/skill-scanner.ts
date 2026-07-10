@@ -106,6 +106,14 @@ async function scanDirectoryForSkillMd(
           // Prefix ID with project source and full path (excluding SKILL.md)
           const dirPath = currentPath
           result.skill.id = `project:${dirPath}`
+          // Use the actual file modification time so multiple skills
+          // imported at the same time can be distinguished by when their
+          // SKILL.md was last edited on disk.
+          const fileMtime = file.lastModified
+          if (fileMtime) {
+            result.skill.updatedAt = fileMtime
+            result.skill.createdAt = fileMtime
+          }
           skills.push(result.skill)
           console.log(`[SkillScanner] Parsed skill: ${result.skill.name} (${result.skill.id})`)
           await scanSkillDirectoryResources(

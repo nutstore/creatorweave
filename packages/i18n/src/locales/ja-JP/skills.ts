@@ -56,6 +56,7 @@ export const skillCard = {
     delete: "削除",
     export: "ZIPとしてエクスポート",
     exportFailed: "エクスポートに失敗しました",
+    updated: "更新",
     category: {
       codeReview: "コードレビュー",
       testing: "テスト",

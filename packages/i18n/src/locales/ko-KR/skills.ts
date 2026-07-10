@@ -56,6 +56,7 @@ export const skillCard = {
     delete: "삭제",
     export: "ZIP으로 내보내기",
     exportFailed: "내보내기 실패",
+    updated: "업데이트됨",
     category: {
       codeReview: "코드 리뷰",
       testing: "테스트",

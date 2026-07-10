@@ -57,6 +57,7 @@ export const skillCard = {
     delete: "删除",
     export: "导出为 ZIP",
     exportFailed: "导出失败",
+    updated: "更新于",
     category: {
       codeReview: "代码审查",
       testing: "测试",
