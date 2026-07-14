@@ -124,11 +124,12 @@ export default defineContentScript({
 
       // Recalculate and apply position based on current viewport.
       // Called on load, after drag, on window resize, and after toggle.
+      const EDGE_OFFSET = 8 // px gap from screen edge — avoids scrollbar overlap
       function reposition() {
         const w = window.innerWidth
         const h = window.innerHeight
         const clampedY = Math.max(40, Math.min(posY, h - 40))
-        const x = edge === 'left' ? 0 : w
+        const x = edge === 'left' ? EDGE_OFFSET : w - EDGE_OFFSET
         container.style.left = `${x}px`
         container.style.top = `${clampedY}px`
         container.style.transform = edge === 'left' ? 'translate(0, -50%)' : 'translate(-100%, -50%)'
