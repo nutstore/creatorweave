@@ -18,6 +18,8 @@ import {
   ArrowLeft,
   Clock,
   ExternalLink,
+  SquarePen,
+  MoreHorizontal,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey, useSettingsStore } from '@/store/settings.store'
@@ -78,6 +80,8 @@ interface TopBarProps {
   onSelectWorkspace?: (workspaceId: string) => void
   /** Open the schedule drawer */
   onScheduleDrawerOpen?: () => void
+  /** Create a new conversation */
+  onNewConversation?: () => void
   /**
    * Forwarded to the FolderSelector's "open folder" / "add" button so that
    * external UI (e.g. FolderTipBubble) can anchor to it.
@@ -103,6 +107,7 @@ export function TopBar({
   onSelectWorkspace,
   onScheduleDrawerOpen,
   folderButtonRef,
+  onNewConversation,
 }: TopBarProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined)
@@ -199,6 +204,18 @@ export function TopBar({
         {/* Right: Actions */}
         {isMobile ? (
           <div className="ml-1 flex shrink-0 items-center gap-0.5">
+            {/* New conversation — primary action */}
+            <ActionTooltip label={t('sidebar.newWorkspace')}>
+              <BrandButton
+                iconButton
+                className="h-7 w-7"
+                onClick={() => onNewConversation?.()}
+              >
+                <SquarePen className="h-[15px] w-[15px]" />
+              </BrandButton>
+            </ActionTooltip>
+
+            {/* API key warning badge — can't hide this in more menu */}
             {hasApiKeyLoaded && !hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
                 <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7">
@@ -207,30 +224,16 @@ export function TopBar({
               </ActionTooltip>
             )}
 
-            {/* Folder selector — always visible */}
-            <FolderSelector buttonRef={folderButtonRef} />
-
-            {/* Model switcher — always visible, even on mobile/side-panel */}
-            <ModelQuickSwitch onManageProviders={() => openSettings('llm')} />
-
+            {/* More menu */}
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>
-              <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7">
-                <Settings className="h-[13px] w-[13px]" />
+              <BrandButton
+                iconButton
+                className="h-7 w-7"
+                onClick={() => setMobileMoreOpen(true)}
+              >
+                <MoreHorizontal className="h-[15px] w-[15px]" />
               </BrandButton>
             </ActionTooltip>
-
-            {/* Side panel only: open current workspace in a new tab */}
-            {isSidePanelMode() && (
-              <ActionTooltip label="在新标签页打开">
-                <BrandButton
-                  iconButton
-                  className="h-7 w-7"
-                  onClick={() => window.open(window.location.href, '_blank', 'noopener')}
-                >
-                  <ExternalLink className="h-[13px] w-[13px]" />
-                </BrandButton>
-              </ActionTooltip>
-            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -331,44 +334,68 @@ export function TopBar({
           ref={mobileMorePanelRef}
           className="fixed right-2 top-14 z-50 w-[min(92vw,340px)] rounded-xl border border-neutral-200 bg-white p-2 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
         >
-          <div className="mb-2 rounded-lg border border-neutral-200 bg-neutral-50/60 p-2 dark:border-neutral-700 dark:bg-neutral-800/60">
-            <div className="mb-1 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
-              {t('topbar.mobile.workDirectory')}
+            {/* Workspace settings */}
+            <div className="mb-2 rounded-lg border border-neutral-200 bg-neutral-50/60 p-2 dark:border-neutral-700 dark:bg-neutral-800/60">
+              <div className="mb-1.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+                {t('topbar.mobile.workDirectory')}
+              </div>
+              <FolderSelector buttonRef={folderButtonRef} />
             </div>
-            <FolderSelector buttonRef={folderButtonRef} />
-          </div>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                onSkillsManagerOpen?.()
-                closeMobileMorePanel()
-              }}
-            >
-              <Wrench className="h-3.5 w-3.5" />
-              {t('topbar.mobile.skills')}
-            </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className="h-9 justify-start gap-2 text-xs"
-              onClick={() => {
-                onCommandPaletteOpen?.()
-                closeMobileMorePanel()
-              }}
-            >
-              <Keyboard className="h-3.5 w-3.5" />
-              {t('topbar.mobile.commandPalette')}
-            </BrandButton>
-          </div>
-
-          <div className="mt-2 grid grid-cols-2 gap-1.5">
-            <div className="rounded-lg border border-neutral-200 px-2 py-1.5 dark:border-neutral-700">
-              <div className="mb-1 text-[10px] text-neutral-500 dark:text-neutral-400">{t('topbar.mobile.storage')}</div>
-              <ConversationStorageBadge compact onSelectWorkspace={onSelectWorkspace} />
+            {/* Model switcher */}
+            <div className="mb-2 rounded-lg border border-neutral-200 p-2 dark:border-neutral-700">
+              <ModelQuickSwitch onManageProviders={() => openSettings('llm')} />
             </div>
-          </div>
+
+            {/* Quick actions grid */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <BrandButton
+                variant="ghost"
+                className="h-9 justify-start gap-2 text-xs"
+                onClick={() => {
+                  openSettings()
+                  closeMobileMorePanel()
+                }}
+              >
+                <Settings className="h-3.5 w-3.5" />
+                {t('topbar.tooltips.appSettings')}
+              </BrandButton>
+              <BrandButton
+                variant="ghost"
+                className="h-9 justify-start gap-2 text-xs"
+                onClick={() => {
+                  onSkillsManagerOpen?.()
+                  closeMobileMorePanel()
+                }}
+              >
+                <Wrench className="h-3.5 w-3.5" />
+                {t('topbar.mobile.skills')}
+              </BrandButton>
+              <BrandButton
+                variant="ghost"
+                className="h-9 justify-start gap-2 text-xs"
+                onClick={() => {
+                  onCommandPaletteOpen?.()
+                  closeMobileMorePanel()
+                }}
+              >
+                <Keyboard className="h-3.5 w-3.5" />
+                {t('topbar.mobile.commandPalette')}
+              </BrandButton>
+              {isSidePanelMode() && (
+                <BrandButton
+                  variant="ghost"
+                  className="h-9 justify-start gap-2 text-xs"
+                  onClick={() => {
+                    window.open(window.location.href, '_blank', 'noopener')
+                    closeMobileMorePanel()
+                  }}
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  新标签页
+                </BrandButton>
+              )}
+            </div>
         </div>
       )}
       </TooltipProvider>

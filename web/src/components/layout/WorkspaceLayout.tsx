@@ -835,6 +835,10 @@ export function WorkspaceLayout({
         onProjectSwitcherOpenChange={setProjectSwitcherOpen}
         onSelectWorkspace={onSelectWorkspace}
         onScheduleDrawerOpen={() => setScheduleDrawerOpen(true)}
+        onNewConversation={() => {
+          const newConv = createNew('New conversation')
+          onSelectWorkspace?.(newConv.id)
+        }}
       />
 
       {/* Extension install banner — opens guide dialog via store */}
