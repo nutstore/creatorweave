@@ -9,7 +9,7 @@
  * - Handles permission restoration
  */
 
-import { useState, useRef, useEffect, useCallback, type RefObject } from 'react'
+import { useState, useRef, useEffect, useCallback, type MutableRefObject } from 'react'
 import { toast } from 'sonner'
 import {
   FolderOpen,
@@ -31,12 +31,25 @@ interface FolderSelectorProps {
    * Forwarded to the inner "open folder" / "add" button so that external UI
    * (e.g. FolderTipBubble) can anchor or programmatically focus it.
    */
-  buttonRef?: RefObject<HTMLButtonElement | null>
+  buttonRef?: MutableRefObject<HTMLButtonElement | null>
 }
 
 export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
   const t = useT()
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Bridge the parent-provided `RefObject<HTMLButtonElement | null>` (React 19
+  // semantics: `current: HTMLButtonElement | null`) to the button's expected
+  // `LegacyRef<HTMLButtonElement>` (RefObject with `current: HTMLButtonElement`).
+  // Without this wrapper TS rejects passing the nullable ref directly.
+  const setButtonRef = useCallback(
+    (node: HTMLButtonElement | null) => {
+      if (buttonRef) {
+        buttonRef.current = node
+      }
+    },
+    [buttonRef]
+  )
 
   // Multi-root state
   const { roots, activeProjectId, addRoot, removeRoot, loadRoots, toggleReadOnly } =
@@ -133,7 +146,7 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           type="button"
           onClick={handleAddRoot}
           disabled={!canPickDirectory || isAdding}
-          ref={buttonRef}
+          ref={setButtonRef}
           className={cn(
             'flex h-8 items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1',
             'text-xs font-normal text-secondary',
@@ -182,7 +195,7 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           type="button"
           onClick={handleAddRoot}
           disabled={isAdding}
-          ref={buttonRef}
+          ref={setButtonRef}
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-border',
             'text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600',

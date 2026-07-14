@@ -442,6 +442,7 @@ type ThinkingFormat =
   | 'together'      // reasoning: { enabled } + optional reasoning_effort
   | 'qwen'          // enable_thinking: boolean
   | 'tencent-tokenhub' // reasoning_effort with "off" to disable, requires reasoning_content
+  | 'minimax'       // reasoning_split: boolean (always on; reasoning_details carries the content)
   | 'auto'          // fallback: send reasoning_effort (most widely supported)
 
 /**

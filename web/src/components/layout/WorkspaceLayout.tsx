@@ -54,7 +54,6 @@ import { ExportPanel, useExport } from '@/components/export'
 import { initializeTheme, useThemeStore } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionBanner, ExtensionOutdatedBanner } from '@/components/extension'
-import { BrandButton } from '@creatorweave/ui'
 import { MCPSettingsDialog } from '@/components/mcp'
 import { SettingsDialog, type SettingsTab } from '@/components/settings/SettingsDialog'
 import { ScheduleDrawer } from '@/components/schedule/ScheduleDrawer'
@@ -141,7 +140,6 @@ export function WorkspaceLayout({
   // Earlier the boolean was aliased to `showPreview`, which clashed with the
   // action name and caused a `TypeError: showPreview is not a function`.
   const isPreviewOpen = useConversationContextStore((state) => state.showPreview)
-  const workspaceCount = useConversationContextStore((state) => state.workspaces.length)
   const hidePreviewPanel = useConversationContextStore((state) => state.hidePreviewPanel)
   const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
@@ -252,11 +250,6 @@ export function WorkspaceLayout({
   const handleInitialMessageConsumed = useCallback(() => {
     setPendingMessage(null)
   }, [])
-
-  const handleCreateFirstWorkspace = useCallback(() => {
-    const conv = createNew('New conversation')
-    setActive(conv.id)
-  }, [createNew, setActive])
 
   // Skills management handlers
   const handleSkillsManagerOpen = useCallback(() => {
@@ -720,17 +713,6 @@ export function WorkspaceLayout({
     setSelectedFileBlob(null)
   }, [])
 
-  // Hand off from sync-preview diff view to workspace-level FilePreview:
-  // close the sync drawer and open the file preview drawer. The selected
-  // file (and comments / pending changes) stay in SyncPreviewPanel state and
-  // are recoverable on the next reopen.
-  const handleOpenInPreview = useCallback((path: string) => {
-    setSelectedFilePath(path)
-    setSelectedFileHandle(null)
-    setSelectedFileBlob(null)
-    hidePreviewPanel()
-  }, [hidePreviewPanel])
-
   // Handle asset preview from AssetsPopover — opens the FilePreview drawer with a pre-loaded blob
   const handleAssetPreview = useCallback((fileName: string, blob: Blob) => {
     setSelectedFilePath(fileName)
@@ -976,7 +958,7 @@ export function WorkspaceLayout({
             title={t('settings.syncPanel.syncPreview.emptyStateTitle')}
             width={isMobile ? '100vw' : '85vw'}
           >
-            <SyncPreviewPanel onCancel={handleClosePreview} onOpenInPreview={handleOpenInPreview} />
+            <SyncPreviewPanel onCancel={handleClosePreview} />
           </Drawer>
 
           {/* Shared sync dialogs (approval + conflict) — rendered ONCE here.
