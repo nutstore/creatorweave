@@ -299,7 +299,7 @@ export const PRESET_PROVIDERS: MCPPresetProvider[] = [
     ],
   },
 
-  // Productivity
+  // Communication
   {
     id: 'slack',
     name: 'Slack',
@@ -336,6 +336,72 @@ export const PRESET_PROVIDERS: MCPPresetProvider[] = [
         name: 'SLACK_BOT_TOKEN',
         description: 'Slack Bot User OAuth Token',
         where: 'env',
+      },
+    ],
+  },
+  {
+    id: 'mail',
+    name: 'Mail MCP',
+    description:
+      'Send and draft emails via SMTP (QQ Mail, Gmail, 163, Outlook, ...). Multi-user — each user keeps their own mailbox in their Personal Mail Token.',
+    category: 'communication',
+    icon: 'mail',
+    config: {
+      id: 'mail',
+      name: 'Mail MCP',
+      description:
+        'CreatorWeave Mail MCP server — draft and send emails through a shared SMTP relay',
+      url: 'https://mail-mcp.jianguoyun.net.cn/mcp',
+      transport: 'streamable_http',
+      enabled: false,
+      type: 'user',
+    },
+    setupInstructions: `
+1. Use the shared internal Mail MCP server:
+   URL: https://mail-mcp.jianguoyun.net.cn/mcp
+   Setup page: https://mail-mcp.jianguoyun.net.cn/setup
+
+   (For local development instead:
+     pnpm -C mcp-servers/mail-mcp-server dev
+     default URL http://127.0.0.1:3011/mcp, setup http://127.0.0.1:3011/setup
+   )
+
+2. Open the setup page and generate your Personal Mail Token
+   - Click "生成 token" and keep it safe — this token is how the server
+     identifies which mailbox belongs to you
+   - The token is NOT auto-generated; you must create one yourself
+
+3. Fill in your SMTP settings on the setup page
+   - SMTP Host / Port / Secure / Require TLS
+   - SMTP User / SMTP Pass (or 授权码)
+   - From Email / From Name
+   - Click "verify" first, then "save"
+   - For QQ Mail: host=smtp.qq.com, port=465 (SSL) or 587 (STARTTLS),
+     use the SMTP 授权码 from QQ 邮箱设置 → 账户, NOT your web login password
+
+4. Paste the same Personal Mail Token into CreatorWeave:
+   - MCP Settings → Quick add Mail MCP (or manually add a server)
+   - Set the URL to your mail-mcp server URL
+   - Set the transport to streamable_http
+   - Paste your Personal Mail Token into Auth Token
+
+5. Click Connect. The agent will then be able to call:
+   - get_mail_account_status / get_mail_setup_link
+   - draft_email / get_email_draft / list_email_drafts / delete_email_draft
+   - send_email_draft / send_email
+   - verify_smtp_connection
+    `.trim(),
+    requiredEnvVars: [
+      {
+        name: 'MAIL_MCP_URL',
+        description: 'Mail MCP server base URL',
+        where: 'url',
+      },
+      {
+        name: 'MAIL_MCP_TOKEN',
+        description:
+          'Personal Mail Token generated on the mail-mcp /setup page (server uses this to identify which mailbox to use)',
+        where: 'token',
       },
     ],
   },

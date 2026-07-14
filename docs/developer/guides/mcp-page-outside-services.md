@@ -218,7 +218,78 @@ Figma Remote 是当前最直接可接入的页面外 MCP 服务。
 
 ---
 
-## 7. OpenPencil 接入步骤
+## 7. Mail MCP 接入步骤
+
+Mail MCP 是 CreatorWeave 自研的 streamable_http MCP server，提供邮件起草 / 发送 / 草稿管理能力。典型场景：agent 帮用户写邮件 → 起草 → 二次确认 → 发送。
+
+### 7.1 服务信息
+
+- 内部共享 endpoint：`https://mail-mcp.jianguoyun.net.cn/mcp`
+- 共享 setup 页：`https://mail-mcp.jianguoyun.net.cn/setup`
+- 本地开发 endpoint：`http://127.0.0.1:3011/mcp`
+- 本地 setup 页：`http://127.0.0.1:3011/setup`
+- 部署命令：`pnpm -C mcp-servers/mail-mcp-server dev` / `build` / `start`
+- 推荐 transport：`streamable_http`
+
+提供 9 个工具：`get_mail_account_status` / `get_mail_setup_link` / `verify_smtp_connection` / `draft_email` / `get_email_draft` / `list_email_drafts` / `delete_email_draft` / `send_email_draft` / `send_email`。
+
+### 7.2 多用户模式（推荐）
+
+共享部署下，每位用户用自己的 **Personal Mail Token** 隔离邮箱：
+
+1. 用户访问 `/setup` → 点 "生成 token" → 保存 token
+2. 用户在 setup 页填 SMTP 凭据（host / port / user / 授权码）→ 验证 → 保存
+3. 用户在 CreatorWeave MCP Settings 加 Mail MCP preset → 把同一个 token 粘到 Auth Token
+4. Agent 调 `tools/call` → server 拿 token 识别该用户 → 用该用户的 SMTP 凭据发送
+
+**关键点**：CreatorWeave 端**不存** SMTP 凭据，只存 Personal Mail Token（由 mail-mcp 自己生成）。server 端用 token 查账号配置并解密 SMTP 密码。CreatorWeave 前端代码无需感知 SMTP 细节。
+
+> 旧版「单账号模式」通过环境变量 `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` 等配置，目前保留为向后兼容，不推荐用于多用户共享部署。
+
+### 7.3 平台接入方式
+
+当前项目已经提供 Mail preset：
+
+- 配置位置：`web/src/mcp/preset-providers.ts`（id: `mail`，category: `communication`，icon: `mail`）
+- UI 入口：`web/src/components/mcp/MCPSettings.tsx`
+
+### 7.4 配置步骤
+
+1. 打开 MCP Settings
+2. 使用 **Quick add Mail MCP preset**，或手动新增 server
+3. 填写：
+   - ID：`mail`
+   - URL：`https://mail-mcp.jianguoyun.net.cn/mcp`（或本地 `http://127.0.0.1:3011/mcp`）
+   - Transport：`streamable_http`
+   - Auth Token：粘贴你在 `/setup` 页生成的 Personal Mail Token
+4. 保存配置
+5. 点击 Connect（走浏览器插件 bridge）
+
+### 7.5 常见失败原因
+
+- 浏览器插件不存在 / 版本过旧，不支持页面外 MCP 代理
+- Mail MCP server 未启动，或内网 firewall 拦截
+- Personal Mail Token 没生成 / 复制错位 / 在 setup 页未保存 SMTP 凭据
+- SMTP 凭据错误（QQ Mail 必须用 SMTP **授权码**，不是登录密码；host: `smtp.qq.com`，port: `465` SSL 或 `587` STARTTLS）
+- transport 误设为 `sse`
+
+### 7.6 当前已自动化 vs 未自动化
+
+**已自动化**：
+
+- preset provider（`id: mail`）
+- setup 引导文案（覆盖 `/setup` 页流程 + QQ Mail 配置示例）
+- 默认 URL 指向内网共享部署，文档同时给出本地开发备选
+
+**未自动化（后续可演进）**：
+
+- 没有 "前往 setup 页" 快捷按钮（用户需自己记 `/setup` URL）
+- 发送前**未**弹确认对话框（`send_email` / `send_email_draft` 直接执行，依赖 agent 自觉）
+- `mail-mcp` 已为未来确认对话框预留 `draft_response.preview.text/html` 字段（draft 工具返回 JSON 中），但 CreatorWeave 当前未消费
+
+---
+
+## 8. OpenPencil 接入步骤
 
 OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 
@@ -278,7 +349,7 @@ OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 
 ---
 
-## 8. 新增一个页面外 MCP 服务的标准步骤
+## 9. 新增一个页面外 MCP 服务的标准步骤
 
 以后接入新的页面外 MCP 服务时，建议按下面流程：
 
@@ -339,7 +410,7 @@ OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 
 ---
 
-## 9. 当前实现状态
+## 10. 当前实现状态
 
 当前仓库里的实际状态是：
 
@@ -350,19 +421,21 @@ OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 - 支持 timeout 透传
 - 支持从响应头捕获 `mcp-session-id`
 - 支持 task 轮询也走 bridge
-- MCP Settings 已集成 Figma preset
-- Figma 连接失败提示已增强
+- MCP Settings 已集成 Figma preset、Mail MCP preset
+- Figma / Mail MCP 连接失败提示已增强
+- 文档覆盖：Figma Remote、Mail MCP（含内网共享 + 本地开发两种部署形态）
 
 ### 未完成
 
 - OpenPencil preset
 - OpenPencil 专属 setup 文案
 - OpenPencil 专属错误提示
+- Mail MCP 的 send 前确认对话框（draft_response.preview 字段待消费）
 - 页面外 MCP 服务的更完整产品化文档/测试矩阵
 
 ---
 
-## 10. 建议的后续演进
+## 11. 建议的后续演进
 
 如果后续继续做产品化，建议按优先级推进：
 
@@ -391,10 +464,11 @@ OpenPencil 更适合作为 **本地桌面应用 + 插件代理** 场景接入。
 
 ---
 
-## 11. 一句话结论
+## 12. 一句话结论
 
 在当前平台架构下：
 
 - **Figma Remote**：可以直接作为页面外 MCP 服务接入，推荐优先支持
+- **Mail MCP**：CreatorWeave 自研远程 MCP，已通过 preset 接入，依赖用户在 `/setup` 页自助配置 Personal Mail Token + SMTP 凭据
 - **OpenPencil MCP**：技术上可接，但应通过浏览器插件 bridge 代理，不应由页面直连本地地址
 - **通用原则**：所有页面外的 MCP 服务，都通过 `web/src/services/mcp-client.service.ts` + 浏览器插件 bridge 接入

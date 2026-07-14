@@ -11,6 +11,25 @@ console.log('[Main Thread]  - crossOriginIsolated:', self.crossOriginIsolated)
 console.log('[Main Thread]  - location:', window.location.href)
 console.log('[Main Thread]  - navigator.userAgent:', navigator.userAgent)
 
+// ── Workspace Assistant: capture side panel trigger BEFORE React Router ──
+// HashRouter's catch-all redirect will destroy query params in the hash.
+// We import workspace-assistant-context early so its module-level IIFE
+// runs synchronously here — before React mounts and before the router
+// can modify the hash. The IIFE captures `source` + `origin` from the
+// URL hash and sets up the per-hostname project find-or-create flow.
+//
+// Note: as of 2026-07-13, we no longer read `public_id` from the URL.
+// Page context is delivered separately by the browser extension via
+// `window.__creatorweaveSidePanel.provideContext(data)`.
+import '@/agent/workspace-assistant-context'
+
+// Mark this page as CreatorWeave so the side-panel-button content script
+// (which matches <all_urls>) knows NOT to inject the "唤起怡氧知知" button
+// here — you can't open the side panel from inside the side panel.
+// Uses a data attribute on <html> because content scripts in the ISOLATED
+// world can read DOM but NOT MAIN-world window variables.
+document.documentElement.dataset.creatorweave = 'true'
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'

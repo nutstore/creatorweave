@@ -882,7 +882,7 @@ export function WorkspaceLayout({
           />
         )}
         {isMobile && isSidebarOpen && (
-          <div className="absolute inset-y-0 left-0 z-50 w-[min(88vw,360px)] border-r border-border bg-background shadow-2xl dark:bg-card">
+          <div className="absolute inset-y-0 left-0 z-50 w-[min(80vw,300px)] border-r border-border bg-background shadow-2xl dark:bg-card">
             <Sidebar
               isMobile
               onRequestClose={() => setIsSidebarOpen(false)}

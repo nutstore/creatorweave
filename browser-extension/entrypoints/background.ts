@@ -773,10 +773,13 @@ export default defineBackground(() => {
   // Track the active CreatorWeave tab ID (updated on tab activation)
   let _creatorWeaveTabId: number | null = null
 
+  // Per-tab side panel state is tracked via chrome.sidePanel.getOptions()
+  // (the single source of truth) instead of a local Set — see toggle handler
+  // below for the rationale (no onClosed event exists for chrome.sidePanel).
+
   chrome.tabs.onActivated.addListener(async (activeInfo) => {
     try {
-      const tabs = await chrome.tabs.query({ url: ['*://*/*'], active: true, windowId: activeInfo.windowId })
-      const tab = tabs[0]
+      const tab = await chrome.tabs.get(activeInfo.tabId)
       if (tab?.id && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
         _creatorWeaveTabId = tab.id
       }
@@ -785,12 +788,14 @@ export default defineBackground(() => {
     }
   })
 
-  // Listen for CreatorWeave tab updates to capture the tab ID
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://')) {
       _creatorWeaveTabId = tabId
     }
   })
+
+  // ── (No _sidePanelTabs cleanup on tab close needed: panel state is
+  //   fetched fresh from chrome.sidePanel.getOptions() per toggle click.) ──
 
   /**
    * Forward a schedule trigger to the CreatorWeave page.
@@ -848,12 +853,86 @@ export default defineBackground(() => {
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // Ignore internal messages intended for offscreen document
-    // (tts_offscreen_*). These are sent via chrome.runtime.sendMessage
-    // from this service worker to the offscreen document, but this
-    // listener also receives them. Responding to them here causes
-    // "Could not establish connection. Receiving end does not exist."
     if (typeof message?.type === 'string' && message.type.startsWith('tts_offscreen_')) {
-      return false; // Not handled — let the offscreen document respond
+      return false;
+    }
+
+    // ── Side Panel: toggle open/close on user click ──
+    // Per Chrome's official sample, chrome.sidePanel.open() can be called
+    // from background's onMessage when triggered by a content script click.
+    // Must use tabId (not windowId) for the gesture to work.
+    //
+    // Triggered by side-panel-button.content.ts (which runs on <all_urls>)
+    // when the user clicks the "唤起怡氧知知" floating button on any page.
+    // Toggles: if the side panel is currently open for this tab, close it
+    // (via setOptions { enabled: false }); otherwise open it.
+    //
+    // URL params carry ONLY routing metadata (source / tabId / origin).
+    // Page context (URL/title/selected text/business fields) is fetched
+    // live per LLM call via the pull-based bridge — see
+    // `requestSidePanelContext` handler below.
+    if (message.type === 'cw_side_panel_toggle') {
+      const tabId = _sender?.tab?.id
+      if (typeof tabId !== 'number') return false
+
+      // ── Toggle open/close ──
+      // chrome.sidePanel has NO `onClosed` event. A local Set tracking
+      // open tabs desyncs the moment the user closes the panel via its
+      // built-in X button — next toggle click would think it's still
+      // open and try to close (no-op). Read state from Chrome's API
+      // instead: it's always current, including closes we can't observe.
+      chrome.sidePanel
+        .getOptions({ tabId })
+        .then((opts) => {
+          const isOpen = opts?.enabled !== false && opts?.path != null
+          if (isOpen) {
+            chrome.sidePanel.setOptions({ tabId, enabled: false })
+            // eslint-disable-next-line no-console
+            console.log('[CreatorWeave][bg] side panel closed (toggle)', { tabId })
+            return
+          }
+
+          const pageUrl = typeof message.url === 'string' ? message.url : ''
+
+          const params = new URLSearchParams()
+          params.set('source', 'side_panel')
+          params.set('tabId', String(tabId))
+          if (pageUrl) {
+            try {
+              params.set('origin', new URL(pageUrl).origin)
+            } catch {}
+          }
+
+          const isDev = import.meta.env.MODE === 'development'
+          const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
+          const cwUrl = `${cwBase}/#/?${params.toString()}`
+          // eslint-disable-next-line no-console
+          console.log('[CreatorWeave][bg] opening side panel', {
+            tabId,
+            pageUrl,
+            cwUrl,
+          })
+
+          // setOptions must run BEFORE open; do NOT await (preserves user gesture).
+          // Pattern from Chrome's official sample + the user-gesture thread:
+          // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
+          chrome.sidePanel.setOptions({
+            tabId,
+            path: cwUrl,
+            enabled: true,
+          })
+          chrome.sidePanel.open({ tabId }).catch((err: any) => {
+            console.warn(
+              '[CreatorWeave] Side panel open failed, falling back to new tab:',
+              err,
+            )
+            chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
+          })
+        })
+        .catch(() => {
+          // getOptions failed (tab gone, etc.) — no-op; user can retry.
+        })
+      return false
     }
 
     (async () => {
@@ -881,6 +960,108 @@ export default defineBackground(() => {
         if (message.type === 'web_fetch_render') {
           sendResponse(await handleFetchRender(message));
           return;
+        }
+
+        // ── Workspace Assistant: pull page context from upstream tab ──
+        //
+        // CreatorWeave side panel sends {type:'requestSidePanelContext', tabId}.
+        // We execute in the upstream tab's MAIN world and combine two sources:
+        //   - __cwUpstreamPage.{getUrl,getTitle,getSelectedText}   ← OUR content script
+        //     (upstream-page.content.ts), present on ALL URLs (matches
+        //     <all_urls>). Reads generic page metadata directly. Fresh at
+        //     every call (no URL-params snapshot). This is what we own.
+        //   - __sidePanelContextProvider.getContext()   ← OPTIONAL upstream
+        //     provider (per docs/developer/guides/side-panel-context-provider.md).
+        //     Yields business-specific fields (page_type, public_id, etc.).
+        //     We don't parse its shape.
+        //
+        // Return shape: { url, title, selectedText, providerContext } | null
+        // The split makes responsibility clear: url/title/selectedText are
+        // "what we recorded", providerContext is "what the upstream site told us".
+        if (message.type === 'requestSidePanelContext') {
+          const targetTabId = message.tabId
+          if (typeof targetTabId !== 'number') {
+            sendResponse(null)
+            return
+          }
+          try {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: targetTabId },
+              world: 'MAIN',
+              func: () => {
+                const w = window as unknown as {
+                  __cwUpstreamPage?: {
+                    getUrl?: () => unknown
+                    getTitle?: () => unknown
+                    getSelectedText?: () => unknown
+                  }
+                  __sidePanelContextProvider?: {
+                    getContext?: () => unknown
+                  }
+                }
+
+                // Our content script: URL / title / selected text.
+                // Fall back to window.location / document / window.getSelection
+                // if our content script didn't run (defensive against
+                // races or future extensions).
+                let url: string | null = null
+                let title: string | null = null
+                let selectedText: string | null = null
+                const upstream = w.__cwUpstreamPage
+                if (upstream) {
+                  try {
+                    const u = upstream.getUrl?.()
+                    if (typeof u === 'string' && u) url = u
+                  } catch {}
+                  try {
+                    const t = upstream.getTitle?.()
+                    if (typeof t === 'string' && t) title = t
+                  } catch {}
+                  try {
+                    const s = upstream.getSelectedText?.()
+                    if (typeof s === 'string') selectedText = s
+                  } catch {}
+                }
+                if (!url) url = window.location.href
+                if (!title) title = document.title
+                if (selectedText == null) {
+                  try {
+                    const sel = window.getSelection?.()
+                    selectedText = sel ? sel.toString().trim() : ''
+                  } catch {
+                    selectedText = ''
+                  }
+                }
+
+                // Upstream provider: business-specific context (optional).
+                let providerContext: unknown = null
+                const provider = w.__sidePanelContextProvider
+                if (provider && typeof provider.getContext === 'function') {
+                  try {
+                    const ctx = provider.getContext()
+                    if (ctx && typeof (ctx as Promise<unknown>).then === 'function') {
+                      providerContext = (ctx as Promise<unknown>).then(
+                        (v) => v ?? null,
+                        () => null,
+                      )
+                    } else {
+                      providerContext = ctx ?? null
+                    }
+                  } catch {
+                    providerContext = null
+                  }
+                }
+
+                return { url, title, selectedText, providerContext }
+              },
+            })
+            const result = Array.isArray(results) ? results[0]?.result : null
+            sendResponse(result ?? null)
+          } catch (err: any) {
+            console.warn('[Background] requestSidePanelContext failed:', err?.message || err)
+            sendResponse(null)
+          }
+          return
         }
 
         if (message.type === 'edge_tts_status') {
@@ -1175,6 +1356,10 @@ export default defineBackground(() => {
         }
 
         // ── Schedule triggers ─────────────────────────────────────────────
+
+        // NOTE: cw_side_panel_toggle is handled synchronously above
+        // (before the async block) to preserve user gesture context for
+        // chrome.sidePanel.open().
 
         if (message.type === 'cw_schedule_register_alarm') {
           // CreatorWeave page asks us to set an alarm for a schedule

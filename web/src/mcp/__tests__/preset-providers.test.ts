@@ -56,6 +56,7 @@ describe('Preset Providers', () => {
       expect(providers.length).toBeGreaterThan(0)
       expect(providers.every((p) => p.category === 'communication')).toBe(true)
       expect(providers.some((p) => p.id === 'slack')).toBe(true)
+      expect(providers.some((p) => p.id === 'mail')).toBe(true)
     })
   })
 
@@ -77,6 +78,27 @@ describe('Preset Providers', () => {
       expect(provider!.name).toBe('Figma MCP Remote')
       expect(provider!.config.url).toBe('https://mcp.figma.com/mcp')
       expect(provider!.config.transport).toBe('streamable_http')
+    })
+
+    it('should return Mail MCP provider with streamable_http transport', () => {
+      const provider = getProviderById('mail')
+
+      expect(provider).toBeDefined()
+      expect(provider!.id).toBe('mail')
+      expect(provider!.name).toBe('Mail MCP')
+      expect(provider!.category).toBe('communication')
+      expect(provider!.config.transport).toBe('streamable_http')
+      expect(provider!.config.url).toMatch(/\/mcp$/)
+      expect(provider!.config.type).toBe('user')
+    })
+
+    it('should expose /setup page in Mail MCP setup instructions', () => {
+      const provider = getProviderById('mail')
+
+      expect(provider).toBeDefined()
+      expect(provider!.setupInstructions).toContain('/setup')
+      expect(provider!.setupInstructions).toContain('Personal Mail Token')
+      expect(provider!.setupInstructions).toContain('QQ Mail')
     })
 
     it('should return undefined for unknown provider', () => {
@@ -152,6 +174,18 @@ describe('Preset Providers', () => {
 
       expect(result.missingVars).toContain('SLACK_BOT_TOKEN')
     })
+
+    it('should not flag Mail MCP as missing env vars (token is at runtime, not env)', () => {
+      const provider = getProviderById('mail')
+      expect(provider).toBeDefined()
+
+      // requiredEnvVars use `where: 'token'`, not `where: 'env'`,
+      // so validateProviderConfig (which only checks env vars) should report valid.
+      const result = validateProviderConfig(provider!)
+
+      expect(result.missingVars).not.toContain('MAIL_MCP_TOKEN')
+      expect(result.missingVars).not.toContain('MAIL_MCP_URL')
+    })
   })
 
   describe('getEnvVarTemplate', () => {
@@ -209,6 +243,14 @@ describe('Preset Providers', () => {
         expect(provider.config.url).toBeDefined()
         expect(provider.config.transport).toMatch(/^(sse|streamable_http)$/)
       }
+    })
+
+    it('should have unique provider IDs', () => {
+      const providers = getPresetProviders()
+      const ids = providers.map((p) => p.id)
+      const uniqueIds = new Set(ids)
+
+      expect(uniqueIds.size).toBe(ids.length)
     })
   })
 })

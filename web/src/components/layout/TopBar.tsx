@@ -13,11 +13,11 @@ import {
   Wrench,
   KeyRound,
   List,
-  MoreHorizontal,
   Keyboard,
   Menu,
   ArrowLeft,
   Clock,
+  ExternalLink,
 } from 'lucide-react'
 import { ProjectSwitcher } from './ProjectSwitcher'
 import { useHasApiKey, useSettingsStore } from '@/store/settings.store'
@@ -35,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@creatorweave/ui'
+import { isSidePanelMode } from '@/agent/workspace-assistant-context'
 
 /** Stable tooltip wrapper — defined at module level to avoid recreating on every render. */
 const ActionTooltip = ({
@@ -146,27 +147,29 @@ export function TopBar({
       <TooltipProvider delayDuration={200}>
         <header
           className={`relative flex shrink-0 items-center justify-between border-b border-neutral-200 bg-background dark:border-border ${
-            isMobile ? 'h-12 px-2' : 'h-[52px] px-4'
+            isMobile
+              ? 'min-h-12 px-2 py-1 max-[599px]:flex-wrap max-[599px]:gap-y-0.5'
+              : 'h-[52px] px-4'
           }`}
         >
         {/* Left: Menu button (mobile) + Logo + Name */}
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className={`flex min-w-0 items-center ${isMobile ? 'gap-1 flex-1' : 'flex-1 gap-2'}`}>
           {onBackToProjects && (
             <ActionTooltip label={t('topbar.tooltips.backToProjects')}>
-              <BrandButton iconButton onClick={onBackToProjects}>
-                <ArrowLeft className="h-[14px] w-[14px]" />
+              <BrandButton iconButton onClick={onBackToProjects} className={isMobile ? 'h-7 w-7 shrink-0' : ''}>
+                <ArrowLeft className={isMobile ? 'h-[13px] w-[13px]' : 'h-[14px] w-[14px]'} />
               </BrandButton>
             </ActionTooltip>
           )}
           {isMobile && (
             <ActionTooltip label={t('topbar.tooltips.menu')}>
-              <BrandButton iconButton onClick={onMenuOpen} data-tour="menu">
-                <Menu className="h-[14px] w-[14px]" />
+              <BrandButton iconButton onClick={onMenuOpen} data-tour="menu" className="h-7 w-7 shrink-0">
+                <Menu className="h-[13px] w-[13px]" />
               </BrandButton>
             </ActionTooltip>
           )}
           {activeProjectName && (
-            <div className={`flex min-w-0 items-center gap-1 ${isMobile ? 'max-w-[58vw]' : ''}`}>
+            <div className={`flex min-w-0 items-center gap-1 ${isMobile ? 'max-w-[30vw]' : ''}`}>
               <ProjectSwitcher
                 activeProjectName={activeProjectName}
                 onSwitchProject={onSwitchProject ?? (async () => {})}
@@ -195,32 +198,39 @@ export function TopBar({
 
         {/* Right: Actions */}
         {isMobile ? (
-          <div className="ml-2 flex shrink-0 items-center gap-1">
+          <div className="ml-1 flex shrink-0 items-center gap-0.5">
             {hasApiKeyLoaded && !hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
-                <BrandButton iconButton onClick={() => openSettings()}>
-                  <KeyRound className="h-[14px] w-[14px]" />
+                <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7">
+                  <KeyRound className="h-[13px] w-[13px]" />
                 </BrandButton>
               </ActionTooltip>
             )}
 
-            <ActionTooltip label={t('topbar.tooltips.toolsPanel')}>
-              <BrandButton iconButton onClick={onToolsPanelOpen} data-tour="tools">
-                <List className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
+            {/* Folder selector — always visible */}
+            <FolderSelector buttonRef={folderButtonRef} />
+
+            {/* Model switcher — always visible, even on mobile/side-panel */}
+            <ModelQuickSwitch onManageProviders={() => openSettings('llm')} />
 
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>
-              <BrandButton iconButton onClick={() => openSettings()}>
-                <Settings className="h-[14px] w-[14px]" />
+              <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7">
+                <Settings className="h-[13px] w-[13px]" />
               </BrandButton>
             </ActionTooltip>
 
-            <ActionTooltip label={t('topbar.tooltips.more')}>
-              <BrandButton iconButton onClick={() => setMobileMoreOpen((prev) => !prev)}>
-                <MoreHorizontal className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
+            {/* Side panel only: open current workspace in a new tab */}
+            {isSidePanelMode() && (
+              <ActionTooltip label="在新标签页打开">
+                <BrandButton
+                  iconButton
+                  className="h-7 w-7"
+                  onClick={() => window.open(window.location.href, '_blank', 'noopener')}
+                >
+                  <ExternalLink className="h-[13px] w-[13px]" />
+                </BrandButton>
+              </ActionTooltip>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-2">
@@ -295,6 +305,19 @@ export function TopBar({
                 <Settings className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
+
+            {/* Side panel only: open current workspace in a new tab */}
+            {isSidePanelMode() && (
+              <ActionTooltip label="在新标签页打开">
+                <BrandButton
+                  iconButton
+                  className="shrink-0"
+                  onClick={() => window.open(window.location.href, '_blank', 'noopener')}
+                >
+                  <ExternalLink className="h-[14px] w-[14px]" />
+                </BrandButton>
+              </ActionTooltip>
+            )}
           </div>
         )}
       </header>

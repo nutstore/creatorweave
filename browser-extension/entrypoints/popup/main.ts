@@ -1,5 +1,17 @@
 try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
 
+// Show build mode (dev/prod)
+(function () {
+  var el = document.getElementById('buildMode');
+  if (!el) return;
+  // WXT/Vite injects `import.meta.env` typings via `wxt-env.d.ts` (generated).
+  // MODE is one of 'development' | 'production' per Vite contract.
+  var mode = import.meta.env.MODE || 'production';
+  var isDev = mode === 'development';
+  el.className = 'build-mode ' + (isDev ? 'dev' : 'prod');
+  el.textContent = isDev ? 'DEV' : 'PROD';
+})();
+
 // Check injection status
 (function () {
   var el = document.getElementById('status')!;

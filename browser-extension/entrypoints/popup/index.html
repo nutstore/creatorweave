@@ -30,7 +30,22 @@
     .version {
       font-size: 11px;
       color: #9ca3af;
+    }
+    .build-mode {
+      font-size: 10px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
       margin-left: auto;
+      margin-right: 6px;
+    }
+    .build-mode.dev {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .build-mode.prod {
+      background: #f0fdfa;
+      color: #0d9488;
     }
     .main {
       padding: 14px 16px;
@@ -160,6 +175,7 @@
       <circle cx="256" cy="256" r="20" fill="#FBBF24" opacity="0.95"/>
     </svg>
     <span class="logo-text">CreatorWeave</span>
+    <span class="build-mode" id="buildMode"></span>
     <span class="version" id="version"></span>
   </header>
 

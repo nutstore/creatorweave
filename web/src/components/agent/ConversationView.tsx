@@ -412,7 +412,7 @@ export function ConversationView({
         )}
 
         {/* Input area */}
-        <div className="shrink-0 border-t border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="shrink-0 border-t border-neutral-200 bg-white px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900 sm:px-4 sm:py-3">
           <TTSQueueIndicator />
           <div className="mx-auto flex max-w-3xl flex-col">
             <div className="relative">
@@ -463,7 +463,7 @@ export function ConversationView({
           </div>
 
           {/* Compact toolbar row */}
-          <div className="mx-auto mt-2 flex max-w-3xl flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto mt-1.5 flex max-w-3xl flex-col gap-1.5 sm:mt-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2 pt-0.5 sm:flex-nowrap sm:pt-0">
               <AgentDropdown
                 allAgents={allAgents}

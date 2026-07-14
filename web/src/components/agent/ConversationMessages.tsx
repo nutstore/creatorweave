@@ -251,8 +251,8 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
   const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant
   return (
-    <div className="min-h-0 px-4 py-4">
-      <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="min-h-0 px-2 py-3 sm:px-4 sm:py-4">
+      <div className="mx-auto w-full max-w-3xl space-y-4 px-3 sm:px-0">
         {/* Cumulative token usage across all turns in this conversation */}
         <ConversationUsageBar messages={activeMessages} />
         {turns.map((turn, idx) => {

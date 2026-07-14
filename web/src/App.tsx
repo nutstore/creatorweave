@@ -317,6 +317,19 @@ function AppReady() {
 
   const [isClearingLocalData, setIsClearingLocalData] = useState(false)
 
+  // ── Workspace Assistant: side panel URL params are captured synchronously
+  //    at module load by workspace-assistant-context.ts (before HashRouter
+  //    can strip them). Page context itself is pulled fresh on every LLM
+  //    call via fetchSidePanelContext() in enhancements.ts — no React-side
+  //    hook needed. We only handle project routing here.
+  const initialized = useProjectStore((s) => s.initialized)
+  useEffect(() => {
+    if (!initialized) return
+    import('@/agent/workspace-assistant-context').then(({ handleWorkspaceAssistantOnReady }) => {
+      handleWorkspaceAssistantOnReady(navigate)
+    })
+  }, [initialized, navigate])
+
   // ── Auto-navigate to default project for first-time users ──────────
   // When a brand-new user's default project was auto-created during init,
   // redirect them into it immediately instead of landing on the empty

@@ -644,6 +644,19 @@ export default defineContentScript({
       },
 
       /**
+       * Pull page context from the upstream tab that opened this CreatorWeave
+       * side panel. Used by workspace-assistant-context.ts at system-prompt
+       * build time. The extension executes
+       * `window.__sidePanelContextProvider.getContext()` in the upstream tab's
+       * MAIN world and returns the result raw (any shape, CreatorWeave does
+       * not parse). Returns `null` if the upstream tab did not expose a
+       * provider, the tab is unreachable, or the request times out.
+       */
+      async fetchSidePanelContext(tabId: number) {
+        return sendToBridge('requestSidePanelContext', { tabId })
+      },
+
+      /**
        * Proxy a Codex API request through the extension with SSE streaming.
        * Returns an async iterable of raw SSE text chunks.
        * The caller should parse SSE events from the yielded strings.

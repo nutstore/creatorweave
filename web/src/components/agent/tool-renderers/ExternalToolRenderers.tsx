@@ -23,9 +23,9 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-600 dark:text-neutral-300">search_tools</code>
+        <code className="shrink-0 font-medium text-neutral-600 dark:text-neutral-300">search_tools</code>
         {displayText && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[280px]">
+          <span className="truncate min-w-0 text-neutral-400 dark:text-neutral-500">
             "{displayText}"
           </span>
         )}
@@ -66,8 +66,8 @@ registerRenderer({
     }
 
     return (
-      <div className="px-3 py-2">
-        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2 flex items-center gap-2">
+      <div className="px-2 py-2 sm:px-3">
+        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2 flex items-center gap-2 flex-wrap">
           <span>
             {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
           </span>
@@ -110,19 +110,13 @@ registerRenderer({
   icon: <Plug className="h-3.5 w-3.5 text-violet-400" />,
   Summary(ctx) {
     const fullName = typeof ctx.args.full_tool_name === 'string' ? ctx.args.full_tool_name : ''
-    const sourceLabel = getSourceLabel(fullName)
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">call_tool</code>
+        <code className="shrink-0 font-medium text-neutral-700 dark:text-neutral-200">call_tool</code>
         {fullName && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[240px]">
+          <span className="truncate min-w-0 text-neutral-400 dark:text-neutral-500">
             {shortToolName(fullName)}
-          </span>
-        )}
-        {sourceLabel && (
-          <span className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 shrink-0">
-            {sourceLabel}
           </span>
         )}
         {!ctx.isExecuting && !ctx.isStreaming && (
@@ -153,10 +147,10 @@ registerRenderer({
     const isDone = !ctx.isExecuting && !ctx.isStreaming
 
     return (
-      <div className="px-3 py-2 space-y-2">
+      <div className="px-2 py-2 space-y-2 sm:px-3">
         {/* Header: source + tool name (shown as soon as fullName is available) */}
         {fullName && (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 min-w-0">
             {sourceForBadge && (
               <span
                 className={`text-[10px] font-mono px-1 py-0.5 rounded ${
@@ -168,7 +162,7 @@ registerRenderer({
                 {sourceForBadge}
               </span>
             )}
-            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">
               {shortToolName(fullName)}
             </span>
           </div>
@@ -288,7 +282,7 @@ function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unkn
             )}
             {typeof prop.description === 'string' && prop.description && (
               <span className="text-neutral-400 dark:text-neutral-500 ml-2 font-sans">
-                — {prop.description.length > 60 ? prop.description.slice(0, 60) + '…' : prop.description}
+                — {prop.description.length > 40 ? prop.description.slice(0, 40) + '…' : prop.description}
               </span>
             )}
           </div>
@@ -410,10 +404,19 @@ function getSourceLabel(fullName: string): string {
   if (fullName.includes(':') && !fullName.includes('__')) {
     return fullName.split(':')[0] || ''
   }
-  // WebMCP: workspace_jianguoyun_com__fetch_ticket_messages → workspace.jianguoyun.com
+  // WebMCP: {hostname}_{hash}_{hostname}__{toolName}
+  // e.g. workspace.jianguoyun.com_46be71ea_workspace_jianguoyun_com__fetch_ticket_content
   const sepIdx = fullName.indexOf('__')
   if (sepIdx === -1) return ''
   const hostPart = fullName.slice(0, sepIdx)
+  // Extract hostname: take the part before the first _{hash}_
+  // The hostname itself may contain dots (e.g. workspace.jianguoyun.com)
+  // followed by _{hash}_{normalized_hostname_with_underscores}
+  // Strategy: split by first _ that's preceded by a dot (hostname boundary)
+  // or simpler: the first segment that looks like a hash (8+ hex chars)
+  const match = hostPart.match(/^(.+?)_[a-f0-9]{6,}_/)
+  if (match) return match[1]
+  // Fallback: no hash found, just clean up underscores
   return hostPart.replace(/_/g, '.')
 }
 

@@ -144,6 +144,81 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // WebMCP tools are now discoverable via search_tools alongside MCP tools.
   // The compact summary in step ⑤ already covers both MCP and WebMCP.
 
+  // ⑧: Workspace Assistant page context (pull mode — runtime fetch)
+  //
+  // If CreatorWeave is running inside the browser extension's side panel,
+  // we ask the extension to pull context from the upstream tab and inject
+  // it into this system prompt. The pull happens HERE on every LLM call,
+  // so context is always fresh — no race, no stale state, no module-level
+  // context cache to manage.
+  //
+  // The data shape is fully upstream-defined (the upstream page or a
+  // userscript exposes `window.__sidePanelContextProvider.getContext()`
+  // returning whatever it wants). CreatorWeave just stringifies and
+  // forwards. See workspace-assistant-context.ts for the full contract.
+  try {
+    const wsCtx = await import('../workspace-assistant-context')
+    // Skip this step entirely when not in side panel mode. Bare `return` here
+    // would exit buildRuntimeEnhancedPrompt and skip the date step ⑨ too —
+    // that was a real bug fixed in the 2026-07-14 review.
+    if (wsCtx.isSidePanelMode()) {
+      const hostname = wsCtx.getSidePanelHostname()
+      // New shape (since 2026-07-13 split):
+      //   { url, title, providerContext } | null
+      //   - url / title: read live by our content script's __cwUpstreamPage.
+      //     Always available when the upstream tab is reachable.
+      //   - providerContext: whatever the upstream site's optional
+      //     __sidePanelContextProvider.getContext() returns (business fields).
+      //     May be null if the upstream site didn't expose a provider.
+      const upstream = await wsCtx.fetchSidePanelContext()
+      const url =
+        upstream && typeof upstream === 'object' && 'url' in upstream
+          ? (upstream as { url?: unknown }).url
+          : null
+      const title =
+        upstream && typeof upstream === 'object' && 'title' in upstream
+          ? (upstream as { title?: unknown }).title
+          : null
+      const selectedText =
+        upstream && typeof upstream === 'object' && 'selectedText' in upstream
+          ? (upstream as { selectedText?: unknown }).selectedText
+          : null
+      const providerContext =
+        upstream && typeof upstream === 'object' && 'providerContext' in upstream
+          ? (upstream as { providerContext?: unknown }).providerContext
+          : null
+
+      let ctxBlock = '\n\n<current_page_context>\n'
+      ctxBlock += `You are running as a side panel in the browser sidebar, linked to the upstream page the user is browsing. The user invoked you from ${hostname || 'an upstream website'}.\n`
+
+      // ── 我们记录的（来自 CreatorWeave 的 content script，URL/title 实时读）──
+      ctxBlock += '\n[Source — read live by CreatorWeave]\n'
+      ctxBlock += `- Website: ${hostname || 'unknown'}\n`
+      ctxBlock += `- URL: ${typeof url === 'string' && url ? url : 'unknown'}\n`
+      ctxBlock += `- Title: ${typeof title === 'string' && title ? title : 'unknown'}\n`
+      const selStr = typeof selectedText === 'string' ? selectedText : ''
+      ctxBlock += `- Selected text: ${selStr ? selStr : '(none)'}\n`
+
+      if (providerContext != null) {
+        const rendered =
+          typeof providerContext === 'string'
+            ? providerContext
+            : JSON.stringify(providerContext, null, 2)
+        ctxBlock += '\n[Page details — provided live by ' + (hostname || 'the upstream site') + ']\n```\n' + rendered + '\n```\n'
+      } else {
+        ctxBlock += `\n[Page details — ${hostname || 'the upstream site'} provided no additional business fields]\n`
+      }
+
+      ctxBlock += '\nWhen the user says "this", "it", or "that one above", they usually mean an element in the context above. When the user navigates to a different page, URL/title/details refresh automatically — the user does not need to restate.\n'
+      ctxBlock += '\nTip: use the `web_fetch` tool on the URL above if you need the full page content.\n'
+      ctxBlock += '</current_page_context>'
+
+      enhancedPrompt += ctxBlock
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject workspace assistant context:', error)
+  }
+
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
