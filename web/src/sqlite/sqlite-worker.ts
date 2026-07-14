@@ -15,6 +15,7 @@
  */
 
 import sqlite3InitModule from '@sqlite.org/sqlite-wasm'
+import type { OpfsDatabase } from '@sqlite.org/sqlite-wasm'
 import { initializeSchema } from './migrations/index'
 
 const DB_NAME = '/bfosa-unified.sqlite'
@@ -585,6 +586,69 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 }
 
 /**
+ * Open an OpfsDb with retry on OPFS sync-handle contention.
+ *
+ * Regular OPFS VFS (not SAH Pool) acquires a Sync Access Handle for each I/O
+ * operation. When multiple tabs/workers access the same database file, their
+ * I/O can collide and the OPFS API throws NoModificationAllowedError, which
+ * SQLite wraps as SQLITE_BUSY or GetSyncHandleError.
+ *
+ * Instead of failing immediately, we retry with exponential backoff. The
+ * contention window is very short (milliseconds), so even a modest retry
+ * budget dramatically reduces spurious init failures.
+ *
+ * Returns the opened OpfsDb on success; throws the last error on exhaustion.
+ */
+function isOpfsBusyError(error: unknown): boolean {
+  const msg = String(error instanceof Error ? error.message : error).toLowerCase()
+  return (
+    msg.includes('nomodificationallowederror') ||
+    msg.includes('modifications are not allowed') ||
+    msg.includes('sync handle') ||
+    msg.includes('getsynchandleerror') ||
+    msg.includes('sqlite_busy') ||
+    msg.includes('database is locked') ||
+    msg.includes('result code 5') ||
+    msg.includes('result code 6') // SQLITE_LOCKED
+  )
+}
+
+async function openOpfsDbWithRetry(
+  opener: () => OpfsDatabase,
+  initId: string,
+  options: { maxAttempts?: number; baseDelay?: number; maxDelay?: number } = {}
+): Promise<OpfsDatabase> {
+  const maxAttempts = options.maxAttempts ?? 6
+  if (maxAttempts < 1) {
+    throw new Error('openOpfsDbWithRetry: maxAttempts must be >= 1')
+  }
+  const baseDelay = options.baseDelay ?? 150 // ms
+  const maxDelay = options.maxDelay ?? 2000 // ms
+
+  let lastError: unknown
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return opener()
+    } catch (error) {
+      lastError = error
+      if (!isOpfsBusyError(error) || attempt === maxAttempts) {
+        throw error
+      }
+      const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay)
+      // Add small jitter to avoid synchronized retry storms
+      const jitter = Math.random() * delay * 0.3
+      const wait = delay + jitter
+      console.warn(
+        `[SQLite Worker] ${initId}: OPFS busy (attempt ${attempt}/${maxAttempts}), retrying in ${Math.round(wait)}ms...`,
+        String(error instanceof Error ? error.message : error)
+      )
+      await new Promise((resolve) => setTimeout(resolve, wait))
+    }
+  }
+  throw lastError
+}
+
+/**
  * Recover from database errors by attempting reconnection first
  * This is called when SQLITE_CANTOPEN or GetSyncHandleError errors occur
  *
@@ -687,7 +751,10 @@ async function handleRecover() {
   // Step 2: Try regular OPFS reconnection when SAH pool is disabled/unavailable.
   if (sqlite3?.oo1?.OpfsDb) {
     try {
-      db = new sqlite3.oo1.OpfsDb(DB_NAME)
+      db = await openOpfsDbWithRetry(
+        () => new sqlite3.oo1.OpfsDb(DB_NAME),
+        recoverId
+      )
       dbMode = 'opfs'
       db.exec({ sql: 'SELECT 1', returnValue: 'resultRows' })
 
@@ -827,14 +894,20 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
         error
       )
       // Fallback to regular opfs VFS
-      db = new sqlite3!.oo1.OpfsDb(DB_NAME)
+      db = await openOpfsDbWithRetry(
+        () => new sqlite3!.oo1.OpfsDb(DB_NAME),
+        initId
+      )
       dbMode = 'opfs'
       poolUtil = null
     }
   } else if (sqlite3 && 'opfs' in sqlite3 && sqlite3.opfs) {
     // opfs-sahpool not available, use regular opfs VFS
     console.log(`[SQLite Worker] ${initId}: Using regular OPFS VFS`)
-    db = new sqlite3.oo1.OpfsDb(DB_NAME)
+    db = await openOpfsDbWithRetry(
+      () => new sqlite3.oo1.OpfsDb(DB_NAME),
+      initId
+    )
     dbMode = 'opfs'
   } else {
     // OPFS completely unavailable - this MUST NOT fallback to memory mode

@@ -585,6 +585,17 @@ class SQLiteDatabaseManager {
   private initialized = false
   private initPromise: Promise<void> | null = null
   private initializing = false // Guard for StrictMode double init
+  /**
+   * Retry tracking to prevent worker-spawn storms after transient failures
+   * (e.g. OPFS sync-handle contention when multiple tabs init simultaneously).
+   *
+   * Without backoff, every component that lazily calls initSQLiteDB() (settings
+   * store, project store, conversation store, ...) creates its own worker on
+   * the heels of the previous failure. The old worker's OPFS handle hasn't been
+   * released yet, so the new worker fails too — a cascade.
+   */
+  private initRetryCount = 0
+  private readonly MAX_INIT_RETRIES = 2
 
   private constructor() {}
 
@@ -623,6 +634,7 @@ class SQLiteDatabaseManager {
         await this.workerClient.initialize(onMigrationProgress)
         this.initialized = true
         this.initializing = false
+        this.initRetryCount = 0 // Reset on success
       } catch (error) {
         console.error('[SQLite] Failed to initialize:', error)
         try {
@@ -630,9 +642,32 @@ class SQLiteDatabaseManager {
         } catch {
           // Ignore cleanup failures; we'll recreate worker on next init.
         }
+
+        // CRITICAL: keep `initPromise`/`initializing` set across the backoff so
+        // that callers arriving during the window join THIS in-flight promise
+        // instead of bypassing the gate and spawning their own worker. Clear
+        // state AFTER the backoff completes (or after max retries). Failing
+        // to do this re-creates the exact cascade we're trying to prevent.
+        if (this.initRetryCount < this.MAX_INIT_RETRIES) {
+          this.initRetryCount++
+          const backoff = Math.min(500 * Math.pow(2, this.initRetryCount - 1), 4000)
+          console.warn(
+            `[SQLite] Init failed (attempt ${this.initRetryCount}/${this.MAX_INIT_RETRIES}). ` +
+              `Waiting ${backoff}ms before allowing retry...`
+          )
+          await new Promise((resolve) => setTimeout(resolve, backoff))
+        } else {
+          console.error(
+            `[SQLite] Max init retries (${this.MAX_INIT_RETRIES}) exhausted. ` +
+              'Deferring to caller for user-facing error handling.'
+          )
+          this.initRetryCount = 0 // Reset so user-triggered retries get a fresh budget
+        }
+
         this.workerClient = null
         this.initPromise = null
         this.initializing = false
+
         throw error
       }
     })()
