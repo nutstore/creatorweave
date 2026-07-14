@@ -794,8 +794,17 @@ export default defineBackground(() => {
     }
   })
 
-  // ── (No _sidePanelTabs cleanup on tab close needed: panel state is
-  //   fetched fresh from chrome.sidePanel.getOptions() per toggle click.) ──
+  // Track which tabs have the side panel open. Used by the toggle
+  // handler to decide open vs close — MUST be synchronous (async
+  // getOptions would break the user gesture call stack for open()).
+  // Cleaned up on tab close. Best-effort: Chrome has no onClosed event
+  // for the X button, so a manual close via X may leave a stale entry
+  // (harmless — next click closes, then the one after opens).
+  const _sidePanelTabs = new Set<number>()
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    _sidePanelTabs.delete(tabId)
+  })
 
   /**
    * Forward a schedule trigger to the CreatorWeave page.
@@ -875,63 +884,61 @@ export default defineBackground(() => {
       const tabId = _sender?.tab?.id
       if (typeof tabId !== 'number') return false
 
-      // ── Toggle open/close ──
-      // chrome.sidePanel has NO `onClosed` event. A local Set tracking
-      // open tabs desyncs the moment the user closes the panel via its
-      // built-in X button — next toggle click would think it's still
-      // open and try to close (no-op). Read state from Chrome's API
-      // instead: it's always current, including closes we can't observe.
-      chrome.sidePanel
-        .getOptions({ tabId })
-        .then((opts) => {
-          const isOpen = opts?.enabled !== false && opts?.path != null
-          if (isOpen) {
-            chrome.sidePanel.setOptions({ tabId, enabled: false })
-            // eslint-disable-next-line no-console
-            console.log('[CreatorWeave][bg] side panel closed (toggle)', { tabId })
-            return
-          }
+      // ── Toggle close ──
+      // Check _sidePanelTabs synchronously to preserve the user gesture
+      // call stack. This is a best-effort local Set — it can desync if
+      // the user closes the panel via Chrome's built-in X (there's no
+      // onClosed event). But trading occasional desync for reliable
+      // open() is the right call: a failed close is a no-op, while a
+      // failed open loses the side panel entirely.
+      if (_sidePanelTabs.has(tabId)) {
+        chrome.sidePanel.setOptions({ tabId, enabled: false })
+        _sidePanelTabs.delete(tabId)
+        // eslint-disable-next-line no-console
+        console.log('[CreatorWeave][bg] side panel closed (toggle)', { tabId })
+        return false
+      }
 
-          const pageUrl = typeof message.url === 'string' ? message.url : ''
+      // ── Toggle open ──
+      const pageUrl = typeof message.url === 'string' ? message.url : ''
 
-          const params = new URLSearchParams()
-          params.set('source', 'side_panel')
-          params.set('tabId', String(tabId))
-          if (pageUrl) {
-            try {
-              params.set('origin', new URL(pageUrl).origin)
-            } catch {}
-          }
+      const params = new URLSearchParams()
+      params.set('source', 'side_panel')
+      params.set('tabId', String(tabId))
+      if (pageUrl) {
+        try {
+          params.set('origin', new URL(pageUrl).origin)
+        } catch {}
+      }
 
-          const isDev = import.meta.env.MODE === 'development'
-          const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
-          const cwUrl = `${cwBase}/#/?${params.toString()}`
-          // eslint-disable-next-line no-console
-          console.log('[CreatorWeave][bg] opening side panel', {
-            tabId,
-            pageUrl,
-            cwUrl,
-          })
+      const isDev = import.meta.env.MODE === 'development'
+      const cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn'
+      const cwUrl = `${cwBase}/#/?${params.toString()}`
+      // eslint-disable-next-line no-console
+      console.log('[CreatorWeave][bg] opening side panel', {
+        tabId,
+        pageUrl,
+        cwUrl,
+      })
 
-          // setOptions must run BEFORE open; do NOT await (preserves user gesture).
-          // Pattern from Chrome's official sample + the user-gesture thread:
-          // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
-          chrome.sidePanel.setOptions({
-            tabId,
-            path: cwUrl,
-            enabled: true,
-          })
-          chrome.sidePanel.open({ tabId }).catch((err: any) => {
-            console.warn(
-              '[CreatorWeave] Side panel open failed, falling back to new tab:',
-              err,
-            )
-            chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
-          })
-        })
-        .catch(() => {
-          // getOptions failed (tab gone, etc.) — no-op; user can retry.
-        })
+      // setOptions must run BEFORE open; do NOT await (preserves user gesture).
+      // Pattern from Chrome's official sample + the user-gesture thread:
+      // https://groups.google.com/a/chromium.org/g/chromium-extensions/c/S2bR12jOCKA
+      chrome.sidePanel.setOptions({
+        tabId,
+        path: cwUrl,
+        enabled: true,
+      })
+
+      chrome.sidePanel.open({ tabId }).then(() => {
+        _sidePanelTabs.add(tabId)
+      }).catch((err: any) => {
+        console.warn(
+          '[CreatorWeave] Side panel open failed, falling back to new tab:',
+          err,
+        )
+        chrome.tabs.create({ url: `${cwBase}/#/` }).catch(() => {})
+      })
       return false
     }
 
@@ -988,7 +995,7 @@ export default defineBackground(() => {
             const results = await chrome.scripting.executeScript({
               target: { tabId: targetTabId },
               world: 'MAIN',
-              func: () => {
+              func: async () => {
                 const w = window as unknown as {
                   __cwUpstreamPage?: {
                     getUrl?: () => unknown
@@ -1034,19 +1041,17 @@ export default defineBackground(() => {
                 }
 
                 // Upstream provider: business-specific context (optional).
+                // Await the result so executeScript returns a resolved
+                // plain value — NOT a Promise (executeScript uses
+                // structured clone, which cannot serialize Promise).
                 let providerContext: unknown = null
                 const provider = w.__sidePanelContextProvider
                 if (provider && typeof provider.getContext === 'function') {
                   try {
                     const ctx = provider.getContext()
-                    if (ctx && typeof (ctx as Promise<unknown>).then === 'function') {
-                      providerContext = (ctx as Promise<unknown>).then(
-                        (v) => v ?? null,
-                        () => null,
-                      )
-                    } else {
-                      providerContext = ctx ?? null
-                    }
+                    providerContext = ctx && typeof (ctx as Promise<unknown>).then === 'function'
+                      ? await (ctx as Promise<unknown>).catch(() => null)
+                      : ctx ?? null
                   } catch {
                     providerContext = null
                   }
