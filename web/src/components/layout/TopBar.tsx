@@ -124,6 +124,14 @@ export function TopBar({
 
     const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
       const target = event.target as Node
+      // Ignore clicks inside Radix portals (e.g. ModelQuickSwitch Popover content).
+      // These render to document.body via Portal, so they are NOT children of
+      // mobileMorePanelRef, but they are logically part of the panel.
+      // Without this check, clicking a model in the popover immediately closes
+      // the entire mobile panel before the selection registers.
+      if (target instanceof Element && target.closest('[data-radix-popper-content-wrapper]')) {
+        return
+      }
       if (!mobileMorePanelRef.current?.contains(target)) {
         setMobileMoreOpen(false)
       }
