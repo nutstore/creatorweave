@@ -1161,21 +1161,27 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           </>
         )}
         {!isFocused && isEmpty && (
-          <div className="pointer-events-none absolute left-11 top-4 pr-16">
-            <div className="text-sm text-neutral-400 dark:text-neutral-500">
+          // Pin both edges so the absolute box covers the parent input's width
+          // (and lets the hint chips track along with it on resize) instead of
+          // sizing to shrink-to-fit content. Chips wrap to a second line on
+          // narrow screens via `flex-wrap` + `gap-y-1`; labels stay short
+          // (just describe the action — kbd chip shows the keypress) so they
+          // fit comfortably even when wrapping.
+          <div className="pointer-events-none absolute inset-x-0 top-4 px-11">
+            <div className="truncate text-sm text-neutral-400 dark:text-neutral-500">
               {placeholder}
             </div>
-            <div className="mt-2.5 flex items-center gap-3 text-[11px] leading-none text-neutral-300 dark:text-neutral-600">
-              <span className="inline-flex items-center gap-0.5">
-                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">#</kbd>
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] leading-none text-neutral-300 dark:text-neutral-600">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">#</kbd>
                 <span>{t('conversation.input.hints.fileMention')}</span>
               </span>
-              <span className="inline-flex items-center gap-0.5">
-                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">@</kbd>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">@</kbd>
                 <span>{t('conversation.input.hints.agentMention')}</span>
               </span>
-              <span className="inline-flex items-center gap-0.5">
-                <kbd className="rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">/</kbd>
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">/</kbd>
                 <span>{t('conversation.input.hints.slashCommand')}</span>
               </span>
             </div>

@@ -47,9 +47,9 @@ export const conversation = {
       placeholderQueuing: "メッセージをキューに追加... (Shift+Enter で改行)",
       ariaLabel: "メッセージを入力",
       hints: {
-        fileMention: "# でファイル参照",
-        agentMention: "@ でエージェントを指定",
-        slashCommand: "/ でコマンドを使用",
+        fileMention: "ファイル参照",
+        agentMention: "エージェント指定",
+        slashCommand: "コマンド",
       },
       dropFilesHere: "ここにファイルをドロップ",
     },

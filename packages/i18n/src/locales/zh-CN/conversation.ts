@@ -48,9 +48,9 @@ export const conversation = {
       placeholderQueuing: "输入消息排队发送... (Shift+Enter 换行)",
       ariaLabel: "输入消息",
       hints: {
-        fileMention: "输入 # 引用文件",
-        agentMention: "输入 @ 提及智能体",
-        slashCommand: "输入 / 使用命令",
+        fileMention: "引用文件",
+        agentMention: "指定 Agent",
+        slashCommand: "快捷指令",
       },
       dropFilesHere: "拖拽文件到此处",
     },

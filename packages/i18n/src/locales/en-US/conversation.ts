@@ -48,9 +48,9 @@ export const conversation = {
       placeholderQueuing: "Queue a message... (Shift+Enter for new line)",
       ariaLabel: "Type a message",
       hints: {
-        fileMention: "Type # to mention a file",
-        agentMention: "Type @ to mention an agent",
-        slashCommand: "Type / to use commands",
+        fileMention: "Reference file",
+        agentMention: "Mention agent",
+        slashCommand: "Slash command",
       },
       dropFilesHere: "Drop files here",
     },

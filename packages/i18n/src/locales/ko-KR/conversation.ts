@@ -47,9 +47,9 @@ export const conversation = {
       placeholderQueuing: "메시지 대기열에 추가... (Shift+Enter 줄바꿈)",
       ariaLabel: "메시지 입력",
       hints: {
-        fileMention: "#로 파일 언급",
-        agentMention: "@로 에이전트 언급",
-        slashCommand: "/로 명령 사용",
+        fileMention: "파일 참조",
+        agentMention: "에이전트 지정",
+        slashCommand: "명령어",
       },
       dropFilesHere: "여기에 파일을 드롭하세요",
     },
