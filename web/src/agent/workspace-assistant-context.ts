@@ -63,6 +63,10 @@ export function isSidePanelMode(): boolean {
   return _sidePanelTabId != null
 }
 
+export function getSidePanelTabId(): number | null {
+  return _sidePanelTabId
+}
+
 export function getSidePanelHostname(): string | null {
   return _sidePanelHostname
 }
@@ -326,4 +330,181 @@ export async function handleWorkspaceAssistantOnReady(
   } catch (err) {
     console.warn('[Workspace Assistant] Failed to handle side panel open:', err)
   }
+}
+
+//=============================================================================
+// Page context capture + rendering
+//=============================================================================
+//
+// These helpers replaced the old system-prompt injection (which broke prompt
+// caching). Now the page context is captured per-user-message (like image OCR
+// text) and rendered into the user message text only at LLM-send time.
+
+export interface PageContextSnapshot {
+  hostname?: string | null
+  url?: string | null
+  title?: string | null
+  selectedText?: string | null
+  providerContext?: unknown
+}
+
+/**
+ * Capture a fresh page-context snapshot from the upstream tab, if CreatorWeave
+ * is in side-panel mode. Returns null otherwise (non-side-panel sessions).
+ */
+export async function capturePageContext(): Promise<PageContextSnapshot | null> {
+  if (!isSidePanelMode()) return null
+  const hostname = getSidePanelHostname()
+  try {
+    const upstream = await fetchSidePanelContext()
+    // Generic over the expected field type so per-field casts live at the call
+    // site (where we know the contract) instead of leaking `unknown` through
+    // PageContextSnapshot. `providerContext` falls through to `unknown` by
+    // default — it has no stable schema.
+    const pick = <T = unknown>(key: string): T | null =>
+      upstream && typeof upstream === 'object' && key in upstream
+        ? ((upstream as Record<string, unknown>)[key] as T)
+        : null
+    return {
+      hostname,
+      url: pick<string>('url'),
+      title: pick<string>('title'),
+      selectedText: pick<string>('selectedText'),
+      providerContext: pick('providerContext'),
+    }
+  } catch (err) {
+    console.warn('[Workspace Assistant] capturePageContext failed:', err)
+    return { hostname }
+  }
+}
+
+/**
+ * Read the current upstream page URL, as cheaply as possible, for the "has
+ * the page changed?" comparison.
+ *
+ * Bridge capability probing (forward-compatible):
+ *   1. If a future plugin build exposes a lightweight `fetchSidePanelUrl`
+ *      (reads just window.location via the already-injected __cwUpstreamPage
+ *      content script, WITHOUT calling the site's getContext() provider),
+ *      we use it — one cheap round-trip, no backend call.
+ *   2. Otherwise we fall back to the full `fetchSidePanelContext` and keep
+ *      only the url field. This is what current plugin builds (1.1.0+)
+ *      support. It does invoke the site's getContext() provider, so the
+ *      optimization only fully pays off once the lightweight bridge lands —
+ *      but the comparison logic itself is correct regardless.
+ *
+ * Returns null in non-side-panel mode, or when the read fails.
+ */
+export async function capturePageUrl(): Promise<string | null> {
+  if (!isSidePanelMode()) return null
+  const tabId = getSidePanelTabId()
+  if (tabId == null) return null
+  try {
+    // ── Forward-compatible: prefer a lightweight url-only bridge if present ──
+    const agentWeb = (
+      globalThis as {
+        __agentWeb?: {
+          fetchSidePanelUrl?: (tabId: number) => Promise<unknown>
+        }
+      }
+    ).__agentWeb
+    if (agentWeb?.fetchSidePanelUrl) {
+      const url = await Promise.race([
+        agentWeb.fetchSidePanelUrl(tabId),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('url fetch timeout')), 1500),
+        ),
+      ])
+      return typeof url === 'string' && url ? url : null
+    }
+    // ── Current plugin builds: full pull, keep only the url field ──
+    const upstream = await fetchSidePanelContext()
+    const url =
+      upstream && typeof upstream === 'object' && 'url' in upstream
+        ? (upstream as { url?: unknown }).url
+        : null
+    return typeof url === 'string' && url ? url : null
+  } catch (err) {
+    console.warn('[Workspace Assistant] capturePageUrl failed:', err)
+    return null
+  }
+}
+
+/**
+ * Decide whether the latest user message needs a fresh page-context snapshot
+ * attached. Optimization to avoid re-pulling (and re-sending) context on every
+ * message when the user is still on the same page.
+ *
+ * Rules (only the LAST user message with a pageContext is considered):
+ *   - No prior message carries a pageContext → must refresh (first send, or
+ *     context was dropped by compression) → returns `true`.
+ *   - The last pageContext-bearing message's URL differs from the current
+ *     upstream URL → user navigated → returns `true`.
+ *   - URL unchanged → context is still valid → returns `false` (skip capture).
+ *
+ * `currentUrl` is the fresh URL just read via capturePageUrl().
+ */
+export function shouldRefreshPageContext(
+  messages: { role: string; pageContext?: PageContextSnapshot | null }[],
+  currentUrl: string | null,
+): boolean {
+  // Walk backwards to find the most recent message that carries a pageContext.
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i]
+    if (msg.role !== 'user') continue
+    if (!msg.pageContext) continue
+    // Found the most recent page-context snapshot.
+    const lastUrl = msg.pageContext.url
+    // No URL recorded (legacy/odd snapshot) → refresh to be safe.
+    if (typeof lastUrl !== 'string' || !lastUrl) return true
+    // Couldn't read the current URL (extension hiccup) → refresh to be safe.
+    if (!currentUrl) return true
+    // Same URL → context still valid, skip the pull.
+    return lastUrl !== currentUrl
+  }
+  // No pageContext-bearing message at all → must capture.
+  return true
+}
+
+/**
+ * Render a page-context snapshot into a markdown block suitable for appending
+ * to a user message (mirrors the old system-prompt block). Returns an empty
+ * string when the snapshot is null (non-side-panel mode).
+ */
+export function renderPageContextBlock(ctx: PageContextSnapshot | null): string {
+  if (!ctx) return ''
+  const hostname = ctx.hostname || 'an upstream website'
+  const urlStr = typeof ctx.url === 'string' && ctx.url ? ctx.url : 'unknown'
+  const titleStr = typeof ctx.title === 'string' && ctx.title ? ctx.title : 'unknown'
+  const selStr = typeof ctx.selectedText === 'string' ? ctx.selectedText : ''
+
+  let block = '\n\n<current_page_context>\n'
+  block += `You are running as a side panel in the browser sidebar, linked to the upstream page the user is browsing. The user invoked you from ${hostname}.\n`
+  block += '\n[Source — read live by CreatorWeave]\n'
+  block += `- Website: ${ctx.hostname || 'unknown'}\n`
+  block += `- URL: ${urlStr}\n`
+  block += `- Title: ${titleStr}\n`
+  block += `- Selected text: ${selStr ? selStr : '(none)'}\n`
+
+  if (ctx.providerContext != null) {
+    let rendered: string
+    if (typeof ctx.providerContext === 'string') {
+      rendered = ctx.providerContext
+    } else {
+      try {
+        rendered = JSON.stringify(ctx.providerContext, null, 2)
+      } catch (err) {
+        console.warn('[Workspace Assistant] Failed to stringify providerContext:', err)
+        rendered = '[unserializable provider context]'
+      }
+    }
+    block += '\n[Page details — provided live by ' + hostname + ']\n```\n' + rendered + '\n```\n'
+  } else {
+    block += `\n[Page details — ${hostname} provided no additional business fields]\n`
+  }
+
+  block += '\nWhen the user says "this", "it", or "that one above", they usually mean an element in the context above. When the user navigates to a different page, URL/title/details refresh automatically — the user does not need to restate.\n'
+  block += '\nTip: use the `web_fetch` tool on the URL above if you need the full page content.\n'
+  block += '</current_page_context>'
+  return block
 }

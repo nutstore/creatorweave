@@ -4107,7 +4107,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
       if (finalStatus === 'idle') {
         const nextMsg = useConversationRuntimeStore.getState().dequeueMessage(conversationId)
         if (nextMsg) {
-          const userMsg = createUserMessage(nextMsg.text, nextMsg.assets)
+          const userMsg = createUserMessage(nextMsg.text, nextMsg.assets, nextMsg.pageContext)
           const currentConv = get().conversations.find((c) => c.id === conversationId)
           if (currentConv) {
             get().updateMessages(conversationId, [...currentConv.messages, userMsg])

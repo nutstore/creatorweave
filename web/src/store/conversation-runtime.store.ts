@@ -20,6 +20,7 @@ import type {
   ToolCall,
   DraftAssistantStep,
   ContextWindowUsage,
+  Message,
 } from '@/agent/message-types'
 import type { AssetMeta } from '@/types/asset'
 
@@ -29,6 +30,8 @@ export interface QueuedMessage {
   assets?: AssetMeta[]
   agentOverrideId?: string | null
   enqueuedAt: number
+  /** Upstream page context captured at enqueue time (side-panel mode) */
+  pageContext?: Message['pageContext']
 }
 
 /** Maximum queued messages per conversation */

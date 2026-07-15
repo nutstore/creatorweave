@@ -138,6 +138,25 @@ export interface Message {
     task: string
     reason?: string
   }
+  /**
+   * Frozen snapshot of the upstream page context at the moment this user
+   * message was sent. Populated only when CreatorWeave runs in side-panel
+   * mode (opened from a WebMCP-enabled page). The UI does NOT render this
+   * field; it is appended to the user message text at LLM-send time (see
+   * message-mappers.ts), analogous to how image OCR text is attached.
+   *
+   * Storing it per-message (rather than injecting into system prompt)
+   * keeps the system prompt stable so prompt caching still hits across
+   * turns in the same conversation.
+   */
+  pageContext?: {
+    hostname?: string | null
+    url?: string | null
+    title?: string | null
+    selectedText?: string | null
+    /** Arbitrary business fields from the upstream provider (stringified when sent) */
+    providerContext?: unknown
+  }
 }
 
 export type DraftAssistantStep =
@@ -279,13 +298,18 @@ export function generateId(): string {
 }
 
 /** Create a user message */
-export function createUserMessage(content: string, assets?: AssetMeta[]): Message {
+export function createUserMessage(
+  content: string,
+  assets?: AssetMeta[],
+  pageContext?: Message['pageContext'],
+): Message {
   return {
     id: generateId(),
     role: 'user',
     content,
     timestamp: Date.now(),
     assets,
+    ...(pageContext ? { pageContext } : {}),
   }
 }
 

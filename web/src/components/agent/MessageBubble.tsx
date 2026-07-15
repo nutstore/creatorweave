@@ -6,7 +6,7 @@
  */
 
 import { useState, memo } from 'react'
-import { User, Bot, Trash2, Pencil, Download, Forward } from 'lucide-react'
+import { User, Bot, Trash2, Pencil, Download, Forward, Globe } from 'lucide-react'
 import type { Message } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { MarkdownContent } from './MarkdownContent'
@@ -18,6 +18,7 @@ import { InlineMessageEditor } from './InlineMessageEditor'
 import { downloadImage } from './image-utils'
 import { Lightbox } from './Lightbox'
 import { useT } from '@/i18n'
+import { PageContextCard } from './PageContextCard'
 
 /** Format token count: 999 → "999", 1234 → "1.2K" */
 function formatTokens(n: number): string {
@@ -91,6 +92,8 @@ export const MessageBubble = memo(function MessageBubble({
   // Edit state for user messages
   const [isEditing, setIsEditing] = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  // Page-context inspector (side-panel mode only)
+  const [showPageContext, setShowPageContext] = useState(false)
 
   const handleStartEdit = () => {
     setIsEditing(true)
@@ -167,6 +170,12 @@ export const MessageBubble = memo(function MessageBubble({
             </div>
           )}
 
+          {/* Page context inspector (side-panel mode) — structured preview of
+              the upstream page snapshot frozen into this message. */}
+          {message.pageContext && showPageContext && (
+            <PageContextCard pageContext={message.pageContext} />
+          )}
+
           {/* Timestamp + Copy + Delete buttons */}
           <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-400">
             <span>
@@ -175,6 +184,19 @@ export const MessageBubble = memo(function MessageBubble({
                 minute: '2-digit',
               })}
             </span>
+            {/* Page context toggle (side-panel mode only) */}
+            {message.pageContext && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-0.5 rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                onClick={() => setShowPageContext((v) => !v)}
+                title={showPageContext ? t('conversation.hidePageContext') : t('conversation.viewPageContext')}
+                aria-label={t('conversation.viewPageContext')}
+                aria-expanded={showPageContext}
+              >
+                <Globe className="h-3.5 w-3.5" />
+              </button>
+            )}
             {/* Edit button */}
             {onEditAndResend && !isEditing && (
               <button

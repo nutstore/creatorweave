@@ -289,6 +289,41 @@ export function useConversationLogic() {
       setActive(targetConvId)
     }
 
+    // Hoist the target-conversation lookup: both the page-context refresh
+    // check below and the direct-send path at the bottom need it. Reading
+    // state once keeps the two paths consistent (no race where the
+    // conversation object changes between reads).
+    const targetConv = useConversationStore
+      .getState()
+      .conversations.find((c) => c.id === targetConvId)
+
+    // ── Page context capture (side-panel mode only) ────────────────────
+    // Optimization: only re-pull the full context when the upstream page has
+    // actually changed. We read just the URL cheaply (capturePageUrl) and
+    // compare against the most recent pageContext-bearing message in history.
+    //   - URL unchanged → reuse null (history already has valid context)
+    //   - URL changed / no prior context / compression dropped it → full pull
+    // Null in normal (non-side-panel) mode. Shared by the direct-send and
+    // queued-message paths below.
+    let pageContext: Awaited<ReturnType<typeof import('@/agent/workspace-assistant-context')['capturePageContext']>> = null
+    {
+      const { capturePageUrl, capturePageContext, shouldRefreshPageContext } =
+        await import('@/agent/workspace-assistant-context')
+      const currentUrl = await capturePageUrl()
+      if (currentUrl) {
+        // Side-panel mode + URL read OK → compare against history.
+        const needRefresh = shouldRefreshPageContext(targetConv?.messages ?? [], currentUrl)
+        if (needRefresh) {
+          pageContext = await capturePageContext()
+        }
+      } else {
+        // Either non-side-panel mode (capturePageContext returns null too) or
+        // side-panel mode where URL read failed — fall back to a full capture.
+        // In non-side-panel mode this is a cheap null return.
+        pageContext = await capturePageContext()
+      }
+    }
+
     if (useConversationRuntimeStore.getState().isConversationRunning(targetConvId)) {
       // Queue the message instead of rejecting it
       const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
@@ -296,6 +331,7 @@ export function useConversationLogic() {
         assets: options?.assets,
         agentOverrideId: options?.agentOverrideId ?? null,
         enqueuedAt: Date.now(),
+        pageContext: pageContext ?? undefined,
       })
       if (result.enqueued) {
         setInput('')
@@ -347,9 +383,8 @@ export function useConversationLogic() {
         clearAll()
       }
     }
-    const userMsg = createUserMessage(text, assets)
-    const conv = useConversationStore.getState().conversations.find((c) => c.id === targetConvId)
-    updateMessages(targetConvId, conv ? [...conv.messages, userMsg] : [userMsg])
+    const userMsg = createUserMessage(text, assets, pageContext ?? undefined)
+    updateMessages(targetConvId, targetConv ? [...targetConv.messages, userMsg] : [userMsg])
     setInput('')
     setMentionedAgentIds([])
     setInputResetToken((v) => v + 1)

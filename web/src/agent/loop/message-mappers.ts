@@ -1,6 +1,7 @@
 import type { AgentMessage as PiAgentMessage } from '@earendil-works/pi-agent-core'
 import type { Api, Message as PiMessage, Model } from '@earendil-works/pi-ai'
 import { createAssistantMessage, createToolMessage, type Message, type ToolCall } from '../message-types'
+import { renderPageContextBlock } from '../workspace-assistant-context'
 
 /** Format file size for display in asset metadata */
 function formatAssetSize(bytes: number): string {
@@ -82,6 +83,17 @@ export function internalToPiMessages(
         const nonImageAssets = msg.assets.filter((a) => !a.mimeType.startsWith('image/'))
         if (nonImageAssets.length > 0) {
           userContent += '\nUse read vfs://assets/<filename> to read file contents.'
+        }
+      }
+
+      // Inject page context captured at send time (side-panel mode only).
+      // Mirrors the OCR-text attachment pattern: stored per-message, rendered
+      // into the user content only here (UI never shows it). Kept out of the
+      // system prompt so prompt caching remains stable across turns.
+      if (msg.pageContext) {
+        const block = renderPageContextBlock(msg.pageContext)
+        if (block) {
+          userContent += block
         }
       }
 
