@@ -344,7 +344,12 @@ export function createConversation(title?: string): Conversation {
   return {
     id,
     title: title || `Chat ${new Date(now).toLocaleString()}`,
-    titleMode: title ? 'manual' : 'auto',
+    // Always start in 'auto' mode so the title can be auto-generated after
+    // the first agent run. Callers that pass a title (e.g. 'New conversation',
+    // or the first 30 chars of the user's message) are passing placeholders,
+    // not user-confirmed titles. Only updateTitle() (user rename) and
+    // generateTitle(manual=true) set titleMode to 'manual'.
+    titleMode: 'auto' as const,
     messages: [],
     createdAt: now,
     updatedAt: now,
