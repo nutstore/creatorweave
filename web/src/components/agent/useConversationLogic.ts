@@ -23,6 +23,8 @@ import { createUserMessage } from '@/agent/message-types'
 import type { Message } from '@/agent/message-types'
 import { useAssetStore } from '@/store/asset.store'
 import { writePendingAssetsToOPFS } from '@/services/asset.service'
+import { performOcr, isOcrCompatibleImage } from '@/services/ocr.service'
+import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
 import { useInputDraftStore } from '@/store/input-draft.store'
 import { useActiveConversation } from './useActiveConversation'
 
@@ -364,17 +366,56 @@ export function useConversationLogic() {
           assets = await writePendingAssetsToOPFS(
             pendingAssets.map((a) => ({ name: a.name, file: a.file })),
           )
-          // Carry over OCR data from PendingAsset to AssetMeta
+          // Lazy OCR: only run OCR for non-vision models (vision models can
+          // OCR the image themselves, so the Tesseract text would be noise).
+          // We do this here rather than at upload time because the model is
+          // resolved from settings at send time, not at upload time.
+          const settingsState = useSettingsStore.getState()
+          // Vision capability is purely a function of model id (from the
+          // OpenRouter snapshot), so we can skip resolving the full Model<Api>
+          // (which would require baseUrl + apiMode) for this UI decision.
+          // No model selected → skip OCR entirely (no target to send to).
+          const hasVision = settingsState.modelName
+            ? supportsImageInput(settingsState.modelName)
+            : false
+          const imageAssetIndexes: number[] = []
+          pendingAssets.forEach((a, idx) => {
+            if (a.mimeType.startsWith('image/') && isOcrCompatibleImage(a.mimeType)) {
+              imageAssetIndexes.push(idx)
+            }
+          })
+          let ocrResults: Map<number, string> | null = null
+          if (!hasVision && imageAssetIndexes.length > 0) {
+            // Show a brief loading hint so users know why send is paused.
+            const id = toast.loading(`正在识别图片文字…`)
+            try {
+              const results = await Promise.all(
+                imageAssetIndexes.map(async (idx) => {
+                  try {
+                    const r = await performOcr(pendingAssets[idx].file)
+                    return { idx, text: r.text }
+                  } catch {
+                    return { idx, text: '' }
+                  }
+                })
+              )
+              ocrResults = new Map(results.map((r) => [r.idx, r.text]))
+            } finally {
+              toast.dismiss(id)
+            }
+          }
+          // Carry over base64 + (lazily computed) OCR text from PendingAsset to AssetMeta
           assets = assets.map((assetMeta, idx) => {
             const pending = pendingAssets[idx]
-            if (pending && (pending.ocrText || pending.ocrBase64)) {
-              return {
-                ...assetMeta,
-                ocrText: pending.ocrText,
-                ocrBase64: pending.ocrBase64,
-              }
+            if (!pending) return assetMeta
+            const carry: { ocrText?: string; ocrBase64?: string } = {}
+            if (pending.ocrBase64) carry.ocrBase64 = pending.ocrBase64
+            if (ocrResults && ocrResults.has(idx) && ocrResults.get(idx)) {
+              carry.ocrText = ocrResults.get(idx)
+            } else if (pending.ocrText) {
+              carry.ocrText = pending.ocrText
             }
-            return assetMeta
+            return Object.keys(carry).length > 0 ? { ...assetMeta, ...carry } : assetMeta
           })
         } catch (err) {
           toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)

@@ -9,21 +9,52 @@ import { getApiKeyRepository, initSQLiteDB } from '@/sqlite'
 
 let initPromise: Promise<void> | null = null
 
-/** Initialize SQLite for API keys (with promise caching to prevent race conditions) */
+/**
+ * Retry policy for transient SQLite worker init races (e.g. OPFS lock not yet
+ * released by a previous tab, worker handshake after a cold start).  Without
+ * retry, the first concurrent caller sees "Database not initialized" and the
+ * error silently degrades to "key not configured" in the UI — users perceive
+ * this as data loss.
+ */
+const INIT_RETRY_DELAYS_MS = [200, 500, 1500]
+
+/**
+ * Initialize SQLite for API keys.
+ *
+ * Retries up to 3 times with exponential backoff because the OPFS-backed
+ * SQLite worker occasionally rejects the first `init` message during cold
+ * start or right after a tab-switch — the second attempt almost always
+ * succeeds.  On any attempt failure, the cached promise is cleared so the
+ * next caller can re-attempt cleanly.
+ */
 async function ensureInitialized(): Promise<void> {
-  if (initPromise) {
-    return initPromise
-  }
-  initPromise = (async () => {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= INIT_RETRY_DELAYS_MS.length; attempt++) {
+    if (initPromise) return initPromise
+
+    initPromise = (async () => {
+      try {
+        await initSQLiteDB()
+      } catch (error) {
+        // Clear promise on error so subsequent callers (including the next
+        // retry iteration) start fresh.
+        initPromise = null
+        throw error
+      }
+    })()
+
     try {
-      await initSQLiteDB()
+      return await initPromise
     } catch (error) {
-      // Clear promise on error to allow retry
-      initPromise = null
-      throw error
+      lastError = error
+      // Backoff before the next attempt; the last iteration's await below
+      // is harmless because we exit immediately after.
+      if (attempt < INIT_RETRY_DELAYS_MS.length) {
+        await new Promise((resolve) => setTimeout(resolve, INIT_RETRY_DELAYS_MS[attempt]))
+      }
     }
-  })()
-  return initPromise
+  }
+  throw lastError
 }
 
 /** Save an API key (encrypted) */

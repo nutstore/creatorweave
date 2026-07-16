@@ -108,6 +108,12 @@ export interface Message {
   id: string
   role: MessageRole
   content: string | null
+  /**
+   * Multimodal content parts (text + images) for vision-capable models.
+   * When present, sent to the LLM as-is and not flattened to a text string.
+   * Mirrors pi-ai's UserMessage.content array format.
+   */
+  contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
   /** UI-only classification for special assistant records */
   kind?: 'normal' | 'context_summary' | 'workflow_dry_run' | 'workflow_real_run'
   /** Structured payload for workflow dry-run assistant records */

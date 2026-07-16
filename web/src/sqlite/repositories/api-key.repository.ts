@@ -235,7 +235,18 @@ export class ApiKeyRepository {
   }
 
   /**
-   * Load an API key (decrypted)
+   * Load an API key (decrypted).
+   *
+   * Error policy: any DB or crypto failure propagates to the caller.  The
+   * caller (loadApiKey + UI) decides whether to surface a toast.  Previously
+   * this method silently swallowed decrypt failures and returned null, which
+   * made users believe their saved key had vanished.
+   *
+   * NOTE: `decrypt()` internally calls `getEncryptionKey()`, which performs
+   * another SQLite query.  An "encryption key load" failure therefore surfaces
+   * here — we let it propagate as-is so retry logic in `ensureInitialized()`
+   * can act on it.  Do NOT wrap the whole body in try/catch; only narrow
+   * catches around genuinely-recoverable crypto errors are appropriate here.
    */
   async load(provider: string): Promise<string | null> {
     const db = getSQLiteDB()
@@ -247,12 +258,7 @@ export class ApiKeyRepository {
 
     if (!row) return null
 
-    try {
-      return await decrypt(row.iv, row.ciphertext)
-    } catch (error) {
-      console.warn(`[ApiKeyRepo] Failed to decrypt key for ${provider}:`, error)
-      return null
-    }
+    return await decrypt(row.iv, row.ciphertext)
   }
 
   /**

@@ -317,6 +317,7 @@ export const settings = {
       modelNameRequired: "모델 이름은 비워둘 수 없습니다",
       modelAdded: "모델이 추가되었습니다",
       apiKeyRequired: "먼저 API Key를 저장하세요",
+      apiKeyLoadFailed: "저장된 API Key를 읽지 못했습니다. 데이터베이스 초기화 중일 수 있으니 잠시 후 다시 시도해 주세요.",
       modelsRefreshed: "API에서 모델 목록을 새로고침했습니다",
     },
 

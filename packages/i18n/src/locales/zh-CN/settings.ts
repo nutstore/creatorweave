@@ -311,6 +311,7 @@ export const settings = {
       modelNameRequired: "模型名称不能为空",
       modelAdded: "模型已添加",
       apiKeyRequired: "请先保存 API Key",
+      apiKeyLoadFailed: "读取已保存的 API Key 失败,数据库可能正在初始化,请稍后重试。",
       modelsRefreshed: "已从 API 刷新模型列表",
     },
 

@@ -324,6 +324,7 @@ export const settings = {
       modelNameRequired: "モデル名は空にできません",
       modelAdded: "モデルが追加されました",
       apiKeyRequired: "先にAPI Keyを保存してください",
+      apiKeyLoadFailed: "保存済みAPI Keyの読み込みに失敗しました。データベース初期化中の可能性がありますので、しばらくしてから再試行してください。",
       modelsRefreshed: "APIからモデルリストを更新しました",
     },
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolvePiAIModel } from '../pi-ai-model-resolver'
+import { getOpenRouterInputModalities } from '@/agent/providers/openrouter-pricing'
 
 describe('resolvePiAIModel', () => {
   it('should resolve known native provider/model', () => {
@@ -45,5 +46,67 @@ describe('resolvePiAIModel', () => {
     expect(model.provider).toBe('minimax-cn')
     expect(model.id).toBe('MiniMax-M2.7')
     expect(model.api).toBe('cw-openai-fetch')
+  })
+
+  // ── Vision capability via OpenRouter modalities ─────────────────────────
+
+  it('should resolve codex-oauth vision model with image input', () => {
+    const model = resolvePiAIModel('codex-oauth', 'gpt-5.6-terra', 'https://chatgpt.com/backend-api/codex')
+    expect(model.provider).toBe('codex-oauth')
+    expect(model.id).toBe('gpt-5.6-terra')
+    expect(model.api).toBe('openai-responses')
+    // Terra supports image input per OpenRouter snapshot — must NOT be text-only
+    expect(model.input).toContain('image')
+  })
+
+  it('should resolve all gpt-5.6 variants as vision models', () => {
+    for (const id of ['gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol']) {
+      const model = resolvePiAIModel('codex-oauth', id, 'https://chatgpt.com/backend-api/codex')
+      expect(model.input).toContain('image')
+    }
+  })
+
+  it('should keep unknown codex-oauth model as text-only', () => {
+    const model = resolvePiAIModel('codex-oauth', 'some-future-unknown-model', 'https://chatgpt.com/backend-api/codex')
+    expect(model.input).toEqual(['text'])
+    expect(model.input).not.toContain('image')
+  })
+
+  it('should resolve vision for custom provider model known to OpenRouter', () => {
+    // Custom OpenAI-compatible endpoint serving a model that OpenRouter knows
+    // supports image input.
+    const model = resolvePiAIModel('custom', 'gpt-5.6-terra', 'https://my-proxy.example.com/v1')
+    expect(model.input).toContain('image')
+  })
+
+  it('should keep custom provider model text-only when unknown to OpenRouter', () => {
+    const model = resolvePiAIModel('custom', 'my-private-model-v1', 'https://my-proxy.example.com/v1')
+    expect(model.input).toEqual(['text'])
+  })
+
+  it('should resolve vision for GLM-5.2 text-only model as text-only', () => {
+    // GLM-5.2 is text-only per OpenRouter snapshot — must NOT declare image
+    const model = resolvePiAIModel('glm-coding', 'glm-5.2', 'https://open.bigmodel.cn/api/coding/paas/v4/')
+    expect(model.input).toEqual(['text'])
+    expect(model.input).not.toContain('image')
+  })
+})
+
+describe('getOpenRouterInputModalities', () => {
+  it('should return modalities for gpt-5.6-terra', () => {
+    const mods = getOpenRouterInputModalities('gpt-5.6-terra')
+    expect(mods).not.toBeNull()
+    expect(mods).toContain('text')
+    expect(mods).toContain('image')
+  })
+
+  it('should return null for unknown model', () => {
+    expect(getOpenRouterInputModalities('totally-nonexistent-model-xyz')).toBeNull()
+  })
+
+  it('should match regardless of vendor prefix', () => {
+    // Full id "openai/gpt-5.6-terra" and bare id "gpt-5.6-terra" both match
+    expect(getOpenRouterInputModalities('openai/gpt-5.6-terra')).toContain('image')
+    expect(getOpenRouterInputModalities('gpt-5.6-terra')).toContain('image')
   })
 })

@@ -35,7 +35,7 @@ server: {
 | `bfosa-conversations.conversations` | `conversations`   | `ConversationRepository` | `conversation.store.sqlite.ts`     |
 | `bfosa-skills.skills`               | `skills`          | `SkillRepository`        | `skill-storage.sqlite.ts`          |
 | `bfosa-plugins.plugins`             | `plugins`         | `PluginRepository`       | `plugin-storage.service.sqlite.ts` |
-| `bfosa-security.api-keys`           | `api_keys`        | `ApiKeyRepository`       | `api-key-store.sqlite.ts`          |
+| `bfosa-security.api-keys`           | `api_keys`        | `ApiKeyRepository`       | `api-key-store.ts`                 |
 | _(OPFS projects/{projectId}/workspaces/{workspaceId})_ | `workspaces` | `WorkspaceRepository` | `workspace.repository.ts` |
 | _(OPFS file_metadata)_              | `file_metadata`   | `WorkspaceRepository`    | `workspace.repository.ts`          |
 | _(OPFS pending_changes)_            | `pending_changes` | `WorkspaceRepository`    | `workspace.repository.ts`          |
@@ -68,7 +68,7 @@ web/src/
 ├── skills/
 │   └── skill-storage.sqlite.ts      # 技能存储 (SQLite 版本)
 ├── security/
-│   └── api-key-store.sqlite.ts      # API 密钥存储 (SQLite 版本)
+│   └── api-key-store.ts             # API 密钥存储 (SQLite 版本)
 └── services/
     └── plugin-storage.service.sqlite.ts  # 插件存储 (SQLite 版本)
 ```

@@ -62,8 +62,25 @@ export function internalToPiMessages(
       ]
     }
     if (msg.role === 'user') {
+      // If a prior agent-loop round already produced a multimodal contentParts
+      // array (e.g. from image uploads), reuse it verbatim.  This preserves
+      // images across subsequent LLM calls; building fresh from msg.assets
+      // would require re-reading OPFS and re-running base64 conversion.
+      // pi-ai's UserMessage accepts the multimodal array via `content` directly
+      // (no separate contentParts field), so we hand the array through as-is.
+      if (msg.contentParts && msg.contentParts.length > 0) {
+        return [{
+          role: 'user',
+          content: msg.contentParts,
+          timestamp: msg.timestamp || Date.now(),
+        }]
+      }
+
       // Inject asset metadata into user message so the LLM knows about uploaded files
       let userContent = msg.content || ''
+      // Defensive: model.input is required by pi-ai's Model<Api> type, but
+      // test mocks sometimes omit it.  Default to text-only when absent.
+      const hasVision = model.input?.includes('image') ?? false
       if (msg.assets && msg.assets.length > 0) {
         const assetLines = msg.assets.map((a) => {
           const dir = a.direction === 'upload' ? 'Uploaded' : 'Generated'
@@ -72,10 +89,12 @@ export function internalToPiMessages(
         userContent += `\n\n[Attached files]\n${assetLines.join('\n')}`
 
         // Inject OCR text for image assets (so AI can read text from screenshots)
-        const ocrTexts = msg.assets
-          .filter((a) => a.ocrText && a.ocrText.trim().length > 0)
-          .map((a) => `[OCR text from ${a.name}]\n${a.ocrText}`)
-        if (ocrTexts.length > 0) {
+        // ONLY when the model can't see images directly.  Vision-capable models
+        // can OCR the image themselves, so including Tesseract's noisy output
+        // would waste tokens and degrade quality.
+        const imageAssetsForOcr = msg.assets.filter((a) => a.ocrText && a.ocrText.trim().length > 0)
+        if (!hasVision && imageAssetsForOcr.length > 0) {
+          const ocrTexts = imageAssetsForOcr.map((a) => `[OCR text from ${a.name}]\n${a.ocrText}`)
           userContent += `\n\n${ocrTexts.join('\n\n')}`
         }
 
@@ -203,10 +222,16 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
   if (typeof message !== 'object' || !message || !('role' in message)) return null
 
   if (message.role === 'user') {
+    const rawContent = message.content
+    const isMultimodal = Array.isArray(rawContent)
+    const textContent = isMultimodal
+      ? extractTextContent(rawContent)
+      : (typeof rawContent === 'string' ? rawContent : null)
     return {
       id: `${now}-${Math.random().toString(36).slice(2, 9)}`,
       role: 'user',
-      content: extractTextContent(message.content),
+      content: textContent,
+      ...(isMultimodal ? { contentParts: rawContent as Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> } : {}),
       timestamp: message.timestamp || now,
     }
   }

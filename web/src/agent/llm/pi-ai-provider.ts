@@ -11,6 +11,7 @@ import { estimateMessagesTokens } from './token-counter'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { resolvePiAIModel } from './pi-ai-model-resolver'
 import { detectThinkingFormat, ensurePiAICustomProvidersRegistered } from './pi-ai-custom-openai-fetch'
+import { extractTextContent } from '../loop/message-mappers'
 
 const MAX_CONTEXT_TOKENS = 128000
 
@@ -117,14 +118,16 @@ export class PiAIProvider implements LLMProvider {
 
     for (const msg of request.messages) {
       if (msg.role === 'system') {
-        if (msg.content) systemPrompts.push(msg.content)
+        const text = extractTextContent(msg.content)
+        if (text) systemPrompts.push(text)
         continue
       }
 
       if (msg.role === 'user') {
+        const text = extractTextContent(msg.content) || ''
         messages.push({
           role: 'user',
-          content: msg.content || '',
+          content: text,
           timestamp: Date.now(),
         })
         continue
@@ -137,8 +140,15 @@ export class PiAIProvider implements LLMProvider {
           | { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> }
         > = []
 
-        if (msg.content) {
-          content.push({ type: 'text', text: msg.content })
+        const text = extractTextContent(msg.content)
+        if (text) {
+          content.push({ type: 'text', text })
+        }
+        if (msg.reasoning) {
+          // Mirror message-mappers.internalToPiMessages: when an assistant
+          // message carries chain-of-thought reasoning, replay it as a
+          // thinking content part so subsequent turns see the same context.
+          content.push({ type: 'thinking', thinking: msg.reasoning })
         }
         if (msg.tool_calls?.length) {
           for (const toolCall of msg.tool_calls) {
@@ -165,12 +175,13 @@ export class PiAIProvider implements LLMProvider {
       }
 
       if (msg.role === 'tool') {
+        const text = extractTextContent(msg.content) || ''
         messages.push({
           role: 'toolResult',
           toolCallId: msg.tool_call_id || '',
           toolName: msg.name || 'tool',
-          content: [{ type: 'text', text: msg.content || '' }],
-          isError: msg.content?.startsWith('Error:') ?? false,
+          content: [{ type: 'text', text }],
+          isError: text.startsWith('Error:'),
           timestamp: Date.now(),
         })
       }

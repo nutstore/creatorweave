@@ -14,6 +14,9 @@ export const topbar = {
       searchPlaceholder: "Search models…",
       noResults: "No matching models",
       manageProviders: "Manage LLM Providers",
+      visionOnly: "Vision only",
+      visionOnlyTooltip: "Only show models that support image input",
+      visionCapable: "Supports image input",
     },
     tooltips: {
       backToProjects: "Back to Project List",

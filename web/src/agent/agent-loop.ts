@@ -21,6 +21,7 @@ import { generateContextSummaryWithLLM } from './loop/context-summary'
 import { getCompressionCutoffTimestamp, type CompressionBaselineState } from './loop/context-compression'
 import { buildRuntimeEnhancedPrompt, triggerPrefetchForMessages } from './loop/enhancements'
 import { executePiCoreLoop } from './loop/pi-core-runner'
+import { extractTextContent } from './loop/message-mappers'
 import type { AgentCallbacks, AgentLoopConfig } from './loop/types'
 import { generateId } from './message-types'
 
@@ -229,9 +230,11 @@ export class AgentLoop {
       const nonSummaryMessages = messages.filter((msg) => msg.kind !== 'context_summary')
       const droppedContent = nonSummaryMessages
         .map((msg) => {
-          if (msg.role === 'user') return `User: ${(msg.content || '').slice(0, 800)}`
-          if (msg.role === 'assistant') return `Assistant: ${(msg.content || '').slice(0, 800)}`
-          if (msg.role === 'tool') return `Tool result: ${(msg.content || '').slice(0, 600)}`
+          // For multimodal messages, use the text representation for compression.
+          const text = extractTextContent(msg.contentParts ?? msg.content)
+          if (msg.role === 'user') return `User: ${(text || '').slice(0, 800)}`
+          if (msg.role === 'assistant') return `Assistant: ${(text || '').slice(0, 800)}`
+          if (msg.role === 'tool') return `Tool result: ${(text || '').slice(0, 600)}`
           return ''
         })
         .filter(Boolean)

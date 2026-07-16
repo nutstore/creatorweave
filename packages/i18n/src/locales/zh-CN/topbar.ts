@@ -15,6 +15,9 @@ export const topbar = {
       searchPlaceholder: "搜索模型…",
       noResults: "无匹配模型",
       manageProviders: "管理 LLM 服务商",
+      visionOnly: "仅视觉",
+      visionOnlyTooltip: "只显示支持图片输入的模型",
+      visionCapable: "支持图片输入",
     },
     tooltips: {
       backToProjects: "返回项目列表",

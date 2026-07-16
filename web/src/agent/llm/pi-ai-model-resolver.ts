@@ -3,6 +3,7 @@ import type { Api, KnownProvider, Model } from '@earendil-works/pi-ai'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { isCustomProviderType } from '@/agent/providers/types'
 import { getModelContextWindow } from '@/agent/providers/model-store'
+import { getOpenRouterInputModalities } from '@/agent/providers/openrouter-pricing'
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
@@ -81,6 +82,31 @@ function lookupContextWindow(providerType: LLMProviderType, modelName: string): 
   return getModelContextWindow(providerType, modelName)
 }
 
+/**
+ * Resolve a model's input modalities (e.g. ['text', 'image']) from the
+ * OpenRouter snapshot. Returns ['text'] as the conservative fallback when
+ * the model is unknown or has no modality info — sending image_url to a model
+ * that doesn't support it causes the entire API request to fail.
+ */
+function resolveInputModalities(modelName: string): Array<'text' | 'image'> {
+  const modalities = getOpenRouterInputModalities(modelName)
+  if (modalities && modalities.includes('image')) {
+    return ['text', 'image']
+  }
+  return ['text']
+}
+
+/**
+ * Check whether a model accepts image input, as determined by the OpenRouter
+ * snapshot.  Use this from UI contexts (model pickers, capability badges) that
+ * need to render vision-capability indicators without constructing a full
+ * `Model<Api>` — those callers usually don't have a `baseUrl` / `apiMode` in
+ * hand, and `resolvePiAIModel`'s 3rd arg is required.
+ */
+export function supportsImageInput(modelName: string): boolean {
+  return resolveInputModalities(modelName).includes('image')
+}
+
 function createOpenAICompatibleFallback(
   providerType: LLMProviderType,
   modelName: string,
@@ -97,7 +123,7 @@ function createOpenAICompatibleFallback(
       provider: providerType,
       baseUrl: normalizeBaseUrl(baseUrl),
       reasoning: true,
-      input: ['text'],
+      input: resolveInputModalities(modelName),
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow,
       maxTokens: DEFAULT_MAX_TOKENS,
@@ -117,11 +143,12 @@ function createOpenAICompatibleFallback(
     provider: providerType,
     baseUrl: normalizeBaseUrl(baseUrl),
     reasoning: true,
-    // Conservative: only declare 'text' input for unknown/fallback models.
-    // Vision capability ('image') is only set for models explicitly known in
-    // the pi-ai library (via tryGetNativeModel). Sending image_url to a model
-    // that doesn't support it causes the entire API request to fail.
-    input: ['text'],
+    // Resolve vision capability from the OpenRouter snapshot. If the model is
+    // known to support image input (per authoritative metadata), declare it;
+    // otherwise fall back to text-only. Sending image_url to a model that
+    // doesn't support it causes the entire API request to fail, so the
+    // conservative default (['text']) is used when the model is unknown.
+    input: resolveInputModalities(modelName),
     cost: {
       input: 0,
       output: 0,

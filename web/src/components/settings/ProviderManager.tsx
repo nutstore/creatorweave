@@ -35,6 +35,7 @@ import {
   getProviderConfig,
   isCustomProviderType,
 } from '@/agent/providers/types'
+import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
 import type {
   LLMProviderType,
   ModelInfo,
@@ -210,15 +211,36 @@ function ProviderCard({
     )
   }, [allModels, pinnedModelsByProvider, providerType, addModelSearch])
 
-  // Load API Key (always check on mount; reload when expanded for freshness)
+  // Enrich filtered models with vision capability (from OpenRouter snapshot).
+  // Mirrors the eye-icon pattern in ModelQuickSwitch so users can see at
+  // a glance which models accept image input.  supportsImageInput is a sync
+  // snapshot lookup that never throws.
+  const filteredModelsWithVision = useMemo(() => {
+    return filteredModels.map((m) => ({ ...m, hasVision: supportsImageInput(m.id) }))
+  }, [filteredModels])
+
+  // Load API Key (always check on mount; reload when expanded for freshness).
+  // Errors are surfaced to the user instead of silently swallowed — when
+  // loadApiKey returns null due to a DB init failure, users previously saw
+  // "no key configured" and assumed their saved key had vanished.
   useEffect(() => {
+    let cancelled = false
     loadApiKey(providerKey)
       .then((key) => {
+        if (cancelled) return
         setApiKey(key || '')
         setHasKey(!!key)
       })
-      .catch(console.error)
-  }, [providerKey, isExpanded])
+      .catch((error) => {
+        if (cancelled) return
+        console.error('[ProviderManager] Failed to load API key:', error)
+        toast.error(t('settings.toast.apiKeyLoadFailed'))
+        setHasKey(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [providerKey, isExpanded, t])
 
   // Populate edit form
   useEffect(() => {
@@ -297,11 +319,17 @@ function ProviderCard({
     providerType,
     addCustomProviderModel,
     triggerProviderRefresh,
-    t,
   ])
 
   const handleRefreshModels = useCallback(async () => {
-    const key = await loadApiKey(providerKey)
+    let key: string | null
+    try {
+      key = await loadApiKey(providerKey)
+    } catch (error) {
+      console.error('[ProviderManager] Failed to load API key for refresh:', error)
+      toast.error(t('settings.toast.apiKeyLoadFailed'))
+      return
+    }
     if (!key) {
       toast.error(t('settings.toast.apiKeyRequired'))
       return
@@ -731,7 +759,7 @@ function ProviderCard({
                   </div>
                 ) : (
                   <div className="space-y-0.5">
-                    {filteredModels.map((model) => (
+                    {filteredModelsWithVision.map((model) => (
                       <button
                         key={model.id}
                         type="button"
@@ -742,8 +770,16 @@ function ProviderCard({
                         }}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="truncate text-[12px] text-primary">
-                            {model.name}
+                          <div className="flex items-center gap-1.5">
+                            <span className="truncate text-[12px] text-primary">
+                              {model.name}
+                            </span>
+                            {model.hasVision ? (
+                              <Eye
+                                className="h-3 w-3 shrink-0 text-[var(--brand,#0d9488)]"
+                                aria-label={t('topbar.modelSwitcher.visionCapable')}
+                              />
+                            ) : null}
                           </div>
                           <div className="truncate text-[10px] text-tertiary font-mono">
                             {model.id}
@@ -933,16 +969,31 @@ function LLMGatewayCard({
         m.name.toLowerCase().includes(modelSearch.toLowerCase())
       )
 
-  // Check login status
+  // Enrich with vision capability for the "add model" picker (LLM Gateway).
+  // supportsImageInput is a sync snapshot lookup that never throws.
+  const filteredUnpinnedWithVision = useMemo(() => {
+    return filteredUnpinned.map((m) => ({ ...m, hasVision: supportsImageInput(m.id) }))
+  }, [filteredUnpinned])
+
+  // Check login status.  Errors here previously left `isLoggedIn = false`
+// silently — the same "key disappeared" symptom users reported for built-in
+// providers.  Surface a toast so users know it's a transient DB init issue.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const { loadApiKey } = await import('@/security/api-key-store')
-      const key = await loadApiKey(getLLMGatewayApiKeyProviderKey())
-      if (!cancelled) setIsLoggedIn(!!key)
+      try {
+        const { loadApiKey } = await import('@/security/api-key-store')
+        const key = await loadApiKey(getLLMGatewayApiKeyProviderKey())
+        if (!cancelled) setIsLoggedIn(!!key)
+      } catch (error) {
+        if (cancelled) return
+        console.error('[LLMGatewayCard] Failed to check login status:', error)
+        toast.error(t('settings.toast.apiKeyLoadFailed'))
+        setIsLoggedIn(false)
+      }
     })()
     return () => { cancelled = true }
-  }, [isExpanded])
+  }, [isExpanded, t])
 
   // Fetch models when logged in
   useEffect(() => {
@@ -1237,7 +1288,7 @@ function LLMGatewayCard({
                       </div>
                     ) : (
                       <div className="space-y-0.5">
-                        {filteredUnpinned.map((m) => (
+                        {filteredUnpinnedWithVision.map((m) => (
                           <button
                             key={m.id}
                             type="button"
@@ -1248,7 +1299,15 @@ function LLMGatewayCard({
                             }}
                           >
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-[12px] text-primary">{m.name}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="truncate text-[12px] text-primary">{m.name}</span>
+                                {m.hasVision ? (
+                                  <Eye
+                                    className="h-3 w-3 shrink-0 text-[var(--brand,#0d9488)]"
+                                    aria-label={t('topbar.modelSwitcher.visionCapable')}
+                                  />
+                                ) : null}
+                              </div>
                               <div className="truncate text-[10px] text-tertiary font-mono">{m.id}</div>
                             </div>
                             <Plus className="h-3.5 w-3.5 text-tertiary shrink-0 ml-2" />
@@ -1459,7 +1518,17 @@ export function ProviderManager() {
   const [expandedProvider, setExpandedProvider] = useState<LLMProviderType | null>(null)
   const [showNewProvider, setShowNewProvider] = useState(false)
 
-  const groupedProviders = useMemo(() => getProvidersByCategory(), [customProviders])
+  // `customProviders` is intentionally listed as a dep even though
+// getProvidersByCategory() doesn't reference it directly — it reads from
+// the module-level DYNAMIC_PROVIDER_METAS map, which is updated whenever
+// the customProviders store slice changes.  Without this dep, the memo
+// would return a stale provider list and the UI wouldn't refresh when
+// users add/remove custom providers.
+const groupedProviders = useMemo(
+  () => getProvidersByCategory(),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [customProviders]
+)
 
   const toggleProvider = useCallback(
     (type: LLMProviderType) => {

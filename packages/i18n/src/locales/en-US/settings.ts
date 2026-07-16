@@ -320,6 +320,7 @@ export const settings = {
       modelNameRequired: "Model name cannot be empty",
       modelAdded: "Model added",
       apiKeyRequired: "Please save an API key first",
+      apiKeyLoadFailed: "Failed to read saved API key. The database may be initializing — please retry in a moment.",
       modelsRefreshed: "Models refreshed from API",
     },
 

@@ -21,7 +21,13 @@ export interface ChatCompletionRequest {
 /** Message format sent to LLM API */
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | null
+  /**
+   * For text-only messages this is the text payload. For multimodal user
+   * messages this is an array of text + image content parts (mirrors
+   * pi-ai's UserMessage.content format).  pi-ai's openai-responses-shared
+   * handler produces `input_image` content parts from this array.
+   */
+  content: string | null | Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
   /** Chain-of-thought reasoning from assistant thinking blocks */
   reasoning?: string | null
   tool_calls?: Array<{
@@ -109,9 +115,16 @@ export interface LLMProvider {
 /** Convert internal Message[] to ChatMessage[] for API calls */
 export function messagesToChatMessages(messages: Message[]): ChatMessage[] {
   return messages.map((msg) => {
+    // For multimodal messages (user uploads with images), pass the content
+    // array as `content` so pi-ai's openai-responses-shared handler will
+    // emit `input_image` parts.  Otherwise fall back to the text content.
+    const content = msg.contentParts && msg.contentParts.length > 0
+      ? msg.contentParts
+      : msg.content
+
     const chatMsg: ChatMessage = {
       role: msg.role,
-      content: msg.content,
+      content,
     }
 
     if (msg.reasoning) {

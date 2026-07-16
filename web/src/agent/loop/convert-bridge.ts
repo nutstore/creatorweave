@@ -7,8 +7,9 @@ import {
   COMPRESSION_TRIGGER_RATIO,
   type CompressionBaselineState,
 } from './context-compression'
-import { internalToPiMessages, piToInternalMessage } from './message-mappers'
+import { internalToPiMessages, piToInternalMessage, extractTextContent } from './message-mappers'
 import { messagesToChatMessages } from '../llm/llm-provider'
+import { generateId, type Message } from '../message-types'
 import type { AgentCallbacks, CompressionSummaryMode } from './types'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
 
@@ -71,7 +72,7 @@ export async function convertAgentMessagesToLlm(
   input: ConvertAgentMessagesToLlmInput
 ): Promise<ConvertAgentMessagesToLlmResult> {
   const convertCallCount = input.convertCallCount + 1
-  let lastSummaryConvertCall = input.lastSummaryConvertCall
+  const lastSummaryConvertCall = input.lastSummaryConvertCall
   let compressionBaseline = input.compressionBaseline
 
   const internalMessagesRaw = input.agentMessages
@@ -134,16 +135,25 @@ export async function convertAgentMessagesToLlm(
   // No silent trimming.  When compression is not triggered, send all messages
   // as-is.  When compression IS triggered, the summary replaces all old
   // messages — no trimming needed either.
-  let trimmed = chatMessages
+  //
+  // We track the output as `Message[]` (NOT ChatMessage[]) because
+  // messagesToChatMessages() strips `contentParts` (image data), which
+  // destroys multimodal context.  The output path must stay in Message-space
+  // to preserve user-uploaded images across LLM rounds.
+  let outputMessages: Message[] = internalMessages
+  let trimmed = chatMessages // ChatMessage-space mirror, used only for token metrics
 
   if (shouldAllowCompression) {
     // Compression: generate summary via LLM, then replace all messages with [summary].
     const droppedContent = internalMessages
       .filter((msg) => msg.kind !== 'context_summary')
       .map((msg) => {
-        if (msg.role === 'user') return `User: ${(msg.content || '').slice(0, 800)}`
-        if (msg.role === 'assistant') return `Assistant: ${(msg.content || '').slice(0, 800)}`
-        if (msg.role === 'tool') return `Tool result: ${(msg.content || '').slice(0, 600)}`
+        // For multimodal messages (with images), use the extracted text only.
+        // The LLM doing compression can't see the images anyway, so this is safe.
+        const text = extractTextContent(msg.contentParts ?? msg.content)
+        if (msg.role === 'user') return `User: ${(text || '').slice(0, 800)}`
+        if (msg.role === 'assistant') return `Assistant: ${(text || '').slice(0, 800)}`
+        if (msg.role === 'tool') return `Tool result: ${(text || '').slice(0, 600)}`
         return ''
       })
       .filter(Boolean)
@@ -164,12 +174,23 @@ export async function convertAgentMessagesToLlm(
           compressionBaseline = { summary, cutoffTimestamp }
         }
 
-        // Replace everything with just the summary
-        trimmed = injectSummaryMessage(
-          [],
-          summary,
-          input.compressedMemoryPrefix
-        )
+        // Build the summary in Message-space (preserving kind='context_summary'
+        // so internalToPiMessages emits a stable system-context block instead
+        // of being treated as a fresh user turn).  Mirror into ChatMessage-space
+        // only for token-counting metrics below.
+        outputMessages = [
+          {
+            id: generateId(),
+            role: 'user',
+            content: summary,
+            kind: 'context_summary',
+            timestamp:
+              typeof cutoffTimestamp === 'number'
+                ? Math.max(0, cutoffTimestamp - 1)
+                : Date.now(),
+          },
+        ]
+        trimmed = injectSummaryMessage([], summary, input.compressedMemoryPrefix)
 
         if (typeof cutoffTimestamp === 'number') {
           input.onSummaryInjected?.(summary, cutoffTimestamp)
@@ -204,24 +225,7 @@ export async function convertAgentMessagesToLlm(
   }
 
   return {
-    piMessages: internalToPiMessages(
-      trimmed.map((msg) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        role: msg.role,
-        content: msg.content,
-        reasoning: msg.reasoning,
-        toolCalls: msg.tool_calls?.map((tc) => ({
-          id: tc.id,
-          type: 'function' as const,
-          function: { name: tc.function.name, arguments: tc.function.arguments },
-        })),
-        toolCallId: msg.tool_call_id,
-        name: msg.name,
-        timestamp: Date.now(),
-      })),
-      input.model,
-      input.compressedMemoryPrefix
-    ),
+    piMessages: internalToPiMessages(outputMessages, input.model, input.compressedMemoryPrefix),
     convertCallCount,
     lastSummaryConvertCall,
     compressionBaseline,

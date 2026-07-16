@@ -15,6 +15,9 @@ export const topbar = {
       searchPlaceholder: "モデルを検索…",
       noResults: "一致するモデルはありません",
       manageProviders: "LLM プロバイダーを管理",
+      visionOnly: "ビジョンのみ",
+      visionOnlyTooltip: "画像入力対応のモデルだけ表示",
+      visionCapable: "画像入力対応",
     },
     tooltips: {
       backToProjects: "プロジェクト一覧に戻る",

@@ -532,6 +532,21 @@ export const useSettingsStore = create<SettingsState>()(
             // Even on error, mark as loaded — otherwise the UI would stay
             // in the "loading" state forever.
             set({ hasApiKey: false, hasApiKeyLoaded: true })
+
+            // Schedule a delayed retry — the SQLite worker init race
+            // (OPFS lock release, cold-start handshake) often self-resolves
+            // within ~1-2s.  Without this retry, a single transient failure
+            // would mark the user as "no key" for the entire session, even
+            // though their saved key is fine — they would perceive it as
+            // data loss.  Only retry if the user hasn't switched providers
+            // in the meantime.
+            const providerTypeAtError = state.providerType
+            setTimeout(() => {
+              const currentState = get()
+              if (currentState.providerType !== providerTypeAtError) return
+              void get().checkHasApiKey()
+            }, 2000)
+
             return false
           } finally {
             apiKeyCachePromise.delete(providerKey)

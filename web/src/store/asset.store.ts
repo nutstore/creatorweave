@@ -10,7 +10,7 @@
  */
 
 import { create } from 'zustand'
-import { performOcr, isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
+import { isOcrCompatibleImage, fileToBase64 } from '@/services/ocr.service'
 import type { OcrStatus } from '@/services/ocr.service'
 
 /** A file awaiting upload, held in browser memory. */
@@ -105,23 +105,21 @@ export const useAssetStore = create<AssetStore>((set, get) => ({
           .then((base64) => { get()._setBase64(asset.id, base64) })
           .catch(() => { /* best effort */ })
       }
-      // Trigger OCR text recognition in background (slow, seconds)
+      // OCR text recognition is intentionally NOT triggered here.
+      //
+      // Previously OCR ran eagerly on every image upload, regardless of the
+      // target model's vision capability.  For vision-capable models (the
+      // default), the model can OCR the image itself, so eager OCR was:
+      //   1. Wasted CPU/tokens on a never-consumed signal
+      //   2. Actively harmful — Tesseract's noisy output on non-text
+      //      images (e.g. photos) would be injected as the model's only
+      //      image description, drowning the real visual signal
+      //
+      // OCR is now deferred to message send time and only runs for
+      // non-vision models.  See useConversationLogic.sendMessage().
       if (isOcrCompatibleImage(asset.mimeType)) {
-        get()._updateOcrResult(asset.id, { status: 'processing' })
-        performOcr(asset.file)
-          .then((result) => {
-            get()._updateOcrResult(asset.id, {
-              status: result.status,
-              text: result.text,
-              error: result.error,
-            })
-          })
-          .catch((err) => {
-            get()._updateOcrResult(asset.id, {
-              status: 'failed',
-              error: err instanceof Error ? err.message : String(err),
-            })
-          })
+        // Mark as idle (not processing) so the UI doesn't show a spinner.
+        get()._updateOcrResult(asset.id, { status: 'idle' })
       }
     }
   },

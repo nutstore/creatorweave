@@ -420,7 +420,10 @@ export function buildChatCompletionsPayload(
   // When undefined (user disabled thinking), we must still send an explicit "off" signal
   // because providers like OpenRouter enable thinking by default for capable models.
   if (model.reasoning) {
-    const reasoning = (options as Record<string, unknown> & { reasoning?: ThinkingLevel }).reasoning
+    // options can be undefined when caller doesn't pass it (e.g. test fixtures
+    // or non-streaming paths) — guard with optional chaining instead of casting
+    // through undefined.
+    const reasoning = (options as (Record<string, unknown> & { reasoning?: ThinkingLevel }) | undefined)?.reasoning
     applyThinkingParams(payload, model.baseUrl, reasoning, model.thinkingLevelMap)
   }
 
@@ -604,10 +607,10 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
 
   for (const message of context.messages) {
     if (message.role === 'user') {
-      if (typeof message.content === 'string') {
+      if (typeof message.content === 'string' || message.content == null) {
         messages.push({
           role: 'user',
-          content: message.content,
+          content: message.content as string | null,
         })
       } else {
         const content = message.content

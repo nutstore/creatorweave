@@ -40,12 +40,45 @@ export function estimateStringTokens(text: string): number {
   return Math.ceil(cjkChars * 1.5 + otherChars * 0.25)
 }
 
+/**
+ * Flat per-image token estimate used by the trim heuristic.
+ *
+ * Vision tokens are provider-priced (Anthropic 1600-6500, OpenAI 85-1700,
+ * Google varies).  We can't tokenize image bytes client-side, and using
+ * base64 byte-length as a proxy wildly over-counts (a 100KB screenshot →
+ * ~25K tokens vs actual ~1500).  This constant lands near OpenAI's
+ * high-detail 1024x1024 reference (765 tokens) — defensive round number
+ * matching the file's documented intent: estimates LOW so trimMessages
+ * does NOT drop groups prematurely.  Real overflow is caught by the API
+ * usage response (usedRealTokens).
+ */
+const VISION_TOKEN_OVERHEAD_PER_IMAGE = 765
+
+/** Estimate tokens for a multimodal content part. Mirrors ChatMessage.content
+ *  variants: text parts tokenize via the string heuristic; image parts use a
+ *  flat constant since vision tokens are provider-priced and bytes aren't a
+ *  meaningful signal. */
+function estimateContentPartTokens(
+  part: { type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string },
+): number {
+  if (part.type === 'text') return estimateStringTokens(part.text)
+  // image: see VISION_TOKEN_OVERHEAD_PER_IMAGE above.
+  return VISION_TOKEN_OVERHEAD_PER_IMAGE
+}
+
 /** Estimate tokens for a chat message */
 export function estimateMessageTokens(message: ChatMessage): number {
   let tokens = 4 // Message overhead (role, separators)
 
   if (message.content) {
-    tokens += estimateStringTokens(message.content)
+    if (typeof message.content === 'string') {
+      tokens += estimateStringTokens(message.content)
+    } else {
+      // Multimodal (text + image parts) — tokenize each part.
+      for (const part of message.content) {
+        tokens += estimateContentPartTokens(part)
+      }
+    }
   }
 
   if (message.tool_calls) {

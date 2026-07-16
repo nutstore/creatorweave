@@ -402,9 +402,12 @@ const CODEX_AUTH_POLL_ALARM = 'codex_auth_poll_alarm';
 const TOKEN_REFRESH_MARGIN_MS = 5 * 60 * 1000; // refresh 5 min before expiry
 
 const CODEX_DEFAULT_MODELS = [
-  { id: 'gpt-5.4', name: 'GPT-5.4', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
-  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', contextWindow: 128000, capabilities: ['code', 'reasoning'] },
-  { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 200000, capabilities: ['code', 'reasoning'] },
+  { id: 'gpt-5.4', name: 'GPT-5.4', contextWindow: 1000000, capabilities: ['code', 'reasoning', 'vision'] },
+  { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', contextWindow: 400000, capabilities: ['code', 'reasoning', 'vision'] },
+  { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 1000000, capabilities: ['code', 'reasoning', 'vision'] },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', contextWindow: 1000000, capabilities: ['code', 'reasoning', 'vision'] },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', contextWindow: 1000000, capabilities: ['code', 'reasoning', 'vision'] },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', contextWindow: 1000000, capabilities: ['code', 'reasoning', 'vision'] },
 ];
 
 

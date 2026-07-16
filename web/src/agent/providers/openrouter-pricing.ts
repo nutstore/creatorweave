@@ -26,6 +26,7 @@ interface ORSnapshotShape {
     id: string
     pricing?: Record<string, string>
     context_length?: number
+    architecture?: { input_modalities?: string[] }
   }>
 }
 const orSnapshot = orSnapshotRaw as unknown as ORSnapshotShape
@@ -45,6 +46,7 @@ interface ORModelEntry {
   output: number | null
   cacheRead: number | null
   contextLength: number | null
+  inputModalities: string[] | null // e.g. ["text", "image", "file"]
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ function buildIndex(
       id: string
       pricing?: Record<string, string>
       context_length?: number
+      architecture?: { input_modalities?: string[] }
     }>
   }
 ): {
@@ -84,6 +87,11 @@ function buildIndex(
 
   for (const m of models) {
     const p = m.pricing ?? {}
+    const inputModalities =
+      Array.isArray(m.architecture?.input_modalities) &&
+      m.architecture!.input_modalities!.length > 0
+        ? m.architecture!.input_modalities!
+        : null
     const entry: ORModelEntry = {
       id: m.id,
       input: perTokenToPerMillion(p.prompt),
@@ -93,12 +101,14 @@ function buildIndex(
         typeof m.context_length === 'number' && m.context_length > 0
           ? m.context_length
           : null,
+      inputModalities,
     }
-    // Skip entries with no usable pricing AND no context length
+    // Skip entries with no usable pricing AND no context length AND no modalities
     if (
       entry.input == null &&
       entry.output == null &&
-      entry.contextLength == null
+      entry.contextLength == null &&
+      entry.inputModalities == null
     )
       continue
 
@@ -160,4 +170,19 @@ export function getOpenRouterContextWindow(modelId: string): number | null {
   const entry = findEntry(modelId)
   if (!entry || entry.contextLength == null) return null
   return entry.contextLength
+}
+
+/**
+ * Look up a model's input modalities (e.g. ["text", "image", "file"]) from the
+ * OpenRouter snapshot.
+ *
+ * Returns null if the model is unknown or has no modality info.
+ * Use this to avoid hardcoding vision capabilities — a model's ability to
+ * accept image inputs should be driven by authoritative metadata, not by
+ * model-name guessing.
+ */
+export function getOpenRouterInputModalities(modelId: string): string[] | null {
+  const entry = findEntry(modelId)
+  if (!entry || entry.inputModalities == null) return null
+  return entry.inputModalities
 }
