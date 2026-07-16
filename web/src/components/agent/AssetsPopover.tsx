@@ -85,7 +85,6 @@ function AssetRow({
   const t = useT()
   const mime = asset.mimeType || inferMimeType(asset.path)
   const isImage = mime.startsWith('image/')
-  const [confirmDelete, setConfirmDelete] = useState(false)
   const [previewing, setPreviewing] = useState(false)
 
   // Image thumbnail
@@ -170,25 +169,9 @@ function AssetRow({
         </button>
         <button
           type="button"
-          onClick={() => {
-            if (confirmDelete) {
-              onDelete(asset.path)
-              setConfirmDelete(false)
-            } else {
-              setConfirmDelete(true)
-              setTimeout(() => setConfirmDelete(false), 2000)
-            }
-          }}
-          className={`rounded p-1 ${
-            confirmDelete
-              ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30'
-              : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-600 dark:hover:text-neutral-300'
-          }`}
-          title={
-            confirmDelete
-              ? t('assets.confirmDelete', { defaultValue: 'Click again to confirm' })
-              : t('assets.delete', { defaultValue: 'Delete' })
-          }
+          onClick={() => onDelete(asset.path)}
+          className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-600 dark:hover:text-neutral-300"
+          title={t('assets.delete', { defaultValue: 'Delete' })}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
