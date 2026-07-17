@@ -511,78 +511,136 @@ async function backfillLegacyMessagesFromSahpoolIfNeeded(currentDb: any): Promis
   }
 }
 
-// Handle messages from main thread
-self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
-  const { type } = e.data
-  const id = 'id' in e.data ? (e.data.id as string) : `msg-${Date.now()}`
+const OPFS_LOCK_NAME = 'creatorweave-sqlite-opfs'
+
+let requestQueue: Promise<void> = Promise.resolve()
+let transactionLockRelease: (() => void) | null = null
+
+function supportsWebLocks(): boolean {
+  return typeof navigator !== 'undefined' && !!navigator.locks
+}
+
+async function withOpfsLock<T>(operation: () => Promise<T> | T): Promise<T> {
+  if (transactionLockRelease || !supportsWebLocks()) {
+    return operation()
+  }
+  return navigator.locks.request(OPFS_LOCK_NAME, { mode: 'exclusive' }, operation)
+}
+
+async function acquireTransactionLock(): Promise<void> {
+  if (transactionLockRelease || !supportsWebLocks()) return
+
+  let acquired!: () => void
+  const lockAcquired = new Promise<void>((resolve) => {
+    acquired = resolve
+  })
+  let release!: () => void
+  const holdLock = new Promise<void>((resolve) => {
+    release = resolve
+  })
+
+  void navigator.locks
+    .request(OPFS_LOCK_NAME, { mode: 'exclusive' }, async () => {
+      acquired()
+      await holdLock
+    })
+    .catch((error) => console.error('[SQLite Worker] OPFS transaction lock failed:', error))
+
+  await lockAcquired
+  transactionLockRelease = release
+}
+
+function releaseTransactionLock(): void {
+  transactionLockRelease?.()
+  transactionLockRelease = null
+}
+
+async function processWorkerRequest(request: WorkerRequest): Promise<void> {
+  const { type } = request
+  const id = 'id' in request ? (request.id as string) : `msg-${Date.now()}`
 
   try {
-    switch (type) {
-      case 'init':
-        // schemaSQL parameter is ignored - we use the migration system instead
-        await handleInit(e.data.reportProgress, id)
-        postMessage({ type: 'init', id, success: true, mode: dbMode })
-        break
-
-      case 'recover':
-        await handleRecover()
-        postMessage({ type: 'recover', id, success: true })
-        break
-
-      case 'queryAll': {
-        const rows = handleQueryAll(e.data.sql, e.data.params)
-        postMessage({ type: 'queryAll', id, rows } as const)
-        break
-      }
-
-      case 'queryFirst': {
-        const row = handleQueryFirst(e.data.sql, e.data.params)
-        postMessage({ type: 'queryFirst', id, row } as const)
-        break
-      }
-
-      case 'execute':
-        handleExecute(e.data.sql, e.data.params)
-        postMessage({ type: 'execute', id } as const)
-        break
-
-      case 'beginTransaction':
+    if (type === 'beginTransaction') {
+      await acquireTransactionLock()
+      try {
         handleExecute('BEGIN TRANSACTION', [])
         postMessage({ type: 'beginTransaction', id } as const)
-        break
-
-      case 'commit':
-        handleExecute('COMMIT', [])
-        postMessage({ type: 'commit', id } as const)
-        break
-
-      case 'rollback':
-        handleExecute('ROLLBACK', [])
-        postMessage({ type: 'rollback', id } as const)
-        break
-
-      case 'close':
-        if (db) {
-          db.close()
-          db = null
-        }
-        postMessage({ type: 'close', id } as const)
-        break
-
-      case 'getMode':
-        postMessage({ type: 'getMode', id, mode: dbMode })
-        break
-
-      case 'setSQLLogging':
-        enableSQLLogging = e.data.enabled
-        console.log(`[SQLite Worker] SQL logging ${enableSQLLogging ? 'ENABLED' : 'DISABLED'}`)
-        postMessage({ type: 'setSQLLogging', id, enabled: enableSQLLogging })
-        break
+      } catch (error) {
+        releaseTransactionLock()
+        throw error
+      }
+      return
     }
+
+    if (type === 'commit' || type === 'rollback') {
+      try {
+        handleExecute(type === 'commit' ? 'COMMIT' : 'ROLLBACK', [])
+        postMessage({ type, id } as const)
+      } finally {
+        releaseTransactionLock()
+      }
+      return
+    }
+
+    await withOpfsLock(async () => {
+      switch (type) {
+        case 'init':
+          // schemaSQL parameter is ignored - we use the migration system instead
+          await handleInit(request.reportProgress, id)
+          postMessage({ type: 'init', id, success: true, mode: dbMode })
+          break
+
+        case 'recover':
+          await handleRecover()
+          postMessage({ type: 'recover', id, success: true })
+          break
+
+        case 'queryAll': {
+          const rows = handleQueryAll(request.sql, request.params)
+          postMessage({ type: 'queryAll', id, rows } as const)
+          break
+        }
+
+        case 'queryFirst': {
+          const row = handleQueryFirst(request.sql, request.params)
+          postMessage({ type: 'queryFirst', id, row } as const)
+          break
+        }
+
+        case 'execute':
+          handleExecute(request.sql, request.params)
+          postMessage({ type: 'execute', id } as const)
+          break
+
+        case 'close':
+          if (db) {
+            db.close()
+            db = null
+          }
+          releaseTransactionLock()
+          postMessage({ type: 'close', id } as const)
+          break
+
+        case 'getMode':
+          postMessage({ type: 'getMode', id, mode: dbMode })
+          break
+
+        case 'setSQLLogging':
+          enableSQLLogging = request.enabled
+          console.log(`[SQLite Worker] SQL logging ${enableSQLLogging ? 'ENABLED' : 'DISABLED'}`)
+          postMessage({ type: 'setSQLLogging', id, enabled: enableSQLLogging })
+          break
+      }
+    })
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error)
     postMessage({ type, id, error: errorMsg } as any)
   }
+}
+
+// Queue messages so an async init/recovery cannot race a later transaction.
+self.onmessage = (e: MessageEvent<WorkerRequest>) => {
+  requestQueue = requestQueue.then(() => processWorkerRequest(e.data)).catch(() => undefined)
 }
 
 /**

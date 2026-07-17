@@ -89,11 +89,21 @@ let storageInitPromise: Promise<InitStorageResult> | undefined = undefined
 
 function isDatabaseInaccessibleError(errorMsg: string): boolean {
   const msg = errorMsg.toLowerCase()
-  return msg.includes('database_inaccessible') || msg.includes('cantopen')
+  return (
+    msg.includes('database_inaccessible') ||
+    msg.includes('cantopen') ||
+    msg.includes('getsynchandleerror') ||
+    msg.includes('sqlite_busy') ||
+    msg.includes('database is locked')
+  )
 }
 
 function buildPostResetInaccessibleMessage(rawError: string): string {
   return `DATABASE_INACCESSIBLE_AFTER_RESET: ${rawError}. 请关闭同源的其他标签页/窗口后重试。`
+}
+
+function buildDatabaseInaccessibleMessage(rawError: string): string {
+  return `DATABASE_INACCESSIBLE: ${rawError}. 请关闭同源的其他标签页/窗口后刷新重试。`
 }
 
 function buildResetRequiresTabClosureMessage(rawError: string): string {
@@ -187,6 +197,22 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
 
       if (inaccessibleAfterReset) {
         const actionableError = buildPostResetInaccessibleMessage(errorMsg)
+        onProgress?.({
+          step: 'error',
+          total: 1,
+          current: 0,
+          details: actionableError,
+        })
+        storageInitPromise = undefined
+        return {
+          success: false,
+          mode: currentStorageMode,
+          error: actionableError,
+        }
+      }
+
+      if (isDatabaseInaccessibleError(errorMsg)) {
+        const actionableError = buildDatabaseInaccessibleMessage(errorMsg)
         onProgress?.({
           step: 'error',
           total: 1,

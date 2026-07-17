@@ -186,6 +186,18 @@ class SQLiteWorkerClient {
     }
   }
 
+  private invalidateWorker(reason: Error): void {
+    // A timed-out message can still complete in the worker later. Terminating it
+    // is the only reliable way to prevent a late BEGIN/COMMIT from corrupting
+    // the transaction state of a replacement connection.
+    this.terminateWorker()
+    this.resetClientState(reason)
+  }
+
+  isReady(): boolean {
+    return this.initialized && this.worker !== null
+  }
+
   async initialize(
     onMigrationProgress?: (progress: {
       step: string
@@ -249,14 +261,15 @@ class SQLiteWorkerClient {
           const pending = this.pendingRequests.get(response.id)
 
           if (pending) {
-            this.pendingRequests.delete(response.id)
-
             if (response.error) {
               // Check if this is a recoverable database error
               const isGetSyncHandleError = response.error.includes('GetSyncHandleError')
               const isCantOpen = response.error.includes('CANTOPEN')
 
-              if (isGetSyncHandleError || isCantOpen) {
+              // Do not recursively recover a failed recovery request. Its caller
+              // needs the error so it can release the original request cleanly.
+              const canRecover = response.type !== 'recover' && response.type !== 'init'
+              if (canRecover && (isGetSyncHandleError || isCantOpen)) {
                 const errorType = isGetSyncHandleError
                   ? 'GetSyncHandleError (stale handle)'
                   : 'CANTOPEN'
@@ -271,12 +284,16 @@ class SQLiteWorkerClient {
                   })
                   .catch((recoveryError) => {
                     console.error('[SQLite] Recovery failed:', recoveryError)
-                    pending.reject(new Error(response.error))
+                    if (this.pendingRequests.delete(response.id)) {
+                      pending.reject(new Error(response.error))
+                    }
                   })
                 return
               }
+              this.pendingRequests.delete(response.id)
               pending.reject(new Error(response.error))
             } else {
+              this.pendingRequests.delete(response.id)
               switch (response.type) {
                 case 'init':
                   // Init response has success property and mode
@@ -365,8 +382,9 @@ class SQLiteWorkerClient {
       // Use the provided timeout or default to 30 seconds
       setTimeout(() => {
         if (this.pendingRequests.has(id)) {
-          this.pendingRequests.delete(id)
-          reject(new Error(`Request timeout: ${request.type}`))
+          const reason = new Error(`Request timeout: ${request.type}`)
+          console.error(`[SQLite] ${reason.message}; terminating stale worker`)
+          this.invalidateWorker(reason)
         }
       }, timeout)
     })
@@ -431,7 +449,11 @@ class SQLiteWorkerClient {
       return result
     } catch (error) {
       if (began) {
-        await this.sendRequest<void>({ type: 'rollback', id: this.nextRequestId('txn-rollback') })
+        try {
+          await this.sendRequest<void>({ type: 'rollback', id: this.nextRequestId('txn-rollback') })
+        } catch (rollbackError) {
+          console.warn('[SQLite] Rollback failed after transaction error:', rollbackError)
+        }
       }
       throw error
     } finally {
@@ -480,6 +502,10 @@ class SQLiteWorkerClient {
       this.resetClientState(new Error('SQLite worker closed'))
       console.log('[SQLite] Worker closed')
     }
+  }
+
+  dispose(): void {
+    this.invalidateWorker(new Error('SQLite worker disposed'))
   }
 
   /** Get the current database mode (opfs or memory) */
@@ -675,60 +701,65 @@ class SQLiteDatabaseManager {
     return this.initPromise
   }
 
+  private async getReadyWorkerClient(): Promise<SQLiteWorkerClient> {
+    if (!this.workerClient?.isReady()) {
+      this.workerClient = null
+      this.initialized = false
+      this.initPromise = null
+      this.initializing = false
+      await this.initialize()
+    }
+    if (!this.workerClient) throw new Error('Database not initialized')
+    return this.workerClient
+  }
+
   /**
    * Execute a query and return all rows
    */
   async queryAll<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.queryAll<T>(sql, params)
+    return (await this.getReadyWorkerClient()).queryAll<T>(sql, params)
   }
 
   /**
    * Execute a query and return first row
    */
   async queryFirst<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.queryFirst<T>(sql, params)
+    return (await this.getReadyWorkerClient()).queryFirst<T>(sql, params)
   }
 
   /**
    * Execute a statement (INSERT, UPDATE, DELETE)
    */
   async execute(sql: string, params: unknown[] = []): Promise<void> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.execute(sql, params)
+    return (await this.getReadyWorkerClient()).execute(sql, params)
   }
 
   /**
    * Execute multiple statements in a transaction
    */
   async transaction<T>(callback: () => Promise<T>): Promise<T> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.transaction(callback)
+    return (await this.getReadyWorkerClient()).transaction(callback)
   }
 
   /**
    * Begin transaction
    */
   async beginTransaction(): Promise<void> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.beginTransaction()
+    return (await this.getReadyWorkerClient()).beginTransaction()
   }
 
   /**
    * Commit transaction
    */
   async commit(): Promise<void> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.commit()
+    return (await this.getReadyWorkerClient()).commit()
   }
 
   /**
    * Rollback transaction
    */
   async rollback(): Promise<void> {
-    if (!this.workerClient) throw new Error('Database not initialized')
-    return this.workerClient.rollback()
+    return (await this.getReadyWorkerClient()).rollback()
   }
 
   /**
@@ -741,6 +772,15 @@ class SQLiteDatabaseManager {
       this.initialized = false
       this.initPromise = null
     }
+  }
+
+  /** Synchronously release OPFS handles before a Vite HMR module replacement. */
+  dispose(): void {
+    this.workerClient?.dispose()
+    this.workerClient = null
+    this.initialized = false
+    this.initPromise = null
+    this.initializing = false
   }
 
   /**
@@ -1224,3 +1264,9 @@ export function generateId(prefix: string = ''): string {
 }
 
 export { SQLiteDatabaseManager }
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    SQLiteDatabaseManager.getInstance().dispose()
+  })
+}

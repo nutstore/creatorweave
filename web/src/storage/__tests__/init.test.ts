@@ -70,4 +70,18 @@ describe('storage init reset marker guard', () => {
     expect(window.sessionStorage.getItem(STORAGE_RESET_MARKER_KEY)).toBe('pending')
     __test__.resetForTests()
   })
+
+  it('treats an OPFS sync-handle conflict as an inaccessible database, not corruption', async () => {
+    mocks.initSQLiteDB.mockRejectedValueOnce(
+      new Error('GetSyncHandleError: database is locked')
+    )
+
+    const { initStorage, __test__ } = await import('../init')
+    const result = await initStorage({ allowFallback: false })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('DATABASE_INACCESSIBLE')
+    expect(result.error).toContain('请关闭同源的其他标签页/窗口后刷新重试')
+    __test__.resetForTests()
+  })
 })
