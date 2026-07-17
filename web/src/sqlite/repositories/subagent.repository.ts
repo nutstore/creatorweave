@@ -84,9 +84,9 @@ export class SubagentRepository {
 
   async saveBatch(workspaceId: string, tasks: StoredSubagentTask[]): Promise<void> {
     const db = getSQLiteDB()
-    await db.transaction(async () => {
+    await db.transaction(async (tx) => {
       for (const task of tasks) {
-        await db.execute(
+        await tx.execute(
           `INSERT INTO subagent_tasks (
               agent_id, workspace_id, name, description, status, mode,
               messages_json, queue_json, usage_json, error_json, stopped,
@@ -150,8 +150,8 @@ export class SubagentRepository {
     const placeholders = fromStatuses.map(() => '?').join(', ')
     // Wrap UPDATE + changes() in a transaction so no other async operation
     // (e.g. saveBatch) can interleave between them and corrupt the changes() count.
-    return db.transaction(async () => {
-      await db.execute(
+    return db.transaction(async (tx) => {
+      await tx.execute(
         `UPDATE subagent_tasks
             SET status = ?,
                 mode = ?,
@@ -180,11 +180,11 @@ export class SubagentRepository {
           ...fromStatuses,
         ]
       )
-      const changed = await db.queryFirst<{ count: number }>('SELECT changes() as count')
+      const changed = await tx.queryFirst<{ count: number }>('SELECT changes() as count')
       if ((changed?.count || 0) > 0) {
         return { applied: true }
       }
-      const current = await db.queryFirst<{ status: string }>(
+      const current = await tx.queryFirst<{ status: string }>(
         `SELECT status
            FROM subagent_tasks
           WHERE workspace_id = ?

@@ -80,22 +80,17 @@ export class MessageRepository {
    */
   async insertBatch(convId: string, messages: Message[]): Promise<void> {
     const db = getSQLiteDB()
-    await db.beginTransaction()
-    try {
+    await db.transaction(async (tx) => {
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i]
         const { contentJson, metaJson } = this.serializeMessage(msg)
-        await db.execute(
+        await tx.execute(
           `INSERT OR IGNORE INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [msg.id, convId, msg.role, contentJson, metaJson, msg.timestamp, i, msg.timestamp || Date.now()]
         )
       }
-      await db.commit()
-    } catch (error) {
-      await db.rollback().catch(() => {})
-      throw error
-    }
+    })
   }
 
   /**
@@ -160,23 +155,18 @@ export class MessageRepository {
    */
   async replaceAll(convId: string, messages: Message[]): Promise<void> {
     const db = getSQLiteDB()
-    await db.beginTransaction()
-    try {
-      await db.execute('DELETE FROM messages WHERE conversation_id = ?', [convId])
+    await db.transaction(async (tx) => {
+      await tx.execute('DELETE FROM messages WHERE conversation_id = ?', [convId])
       for (let i = 0; i < messages.length; i++) {
         const msg = messages[i]
         const { contentJson, metaJson } = this.serializeMessage(msg)
-        await db.execute(
+        await tx.execute(
           `INSERT INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [msg.id, convId, msg.role, contentJson, metaJson, msg.timestamp, i, msg.timestamp || Date.now()]
         )
       }
-      await db.commit()
-    } catch (error) {
-      await db.rollback().catch(() => {})
-      throw error
-    }
+    })
   }
 
   /**
@@ -323,9 +313,8 @@ export class MessageRepository {
       const messages: Message[] = parseJSON<Message[]>(row.messages_json, [])
       if (messages.length === 0) continue
 
-      await db.beginTransaction()
-      try {
-        const before = await db.queryFirst<{ count: number }>(
+      await db.transaction(async (tx) => {
+        const before = await tx.queryFirst<{ count: number }>(
           'SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?',
           [row.id]
         )
@@ -335,29 +324,24 @@ export class MessageRepository {
           const msg = messages[i]
           if (!msg.id) continue // skip malformed
           const { contentJson, metaJson } = this.serializeMessage(msg)
-          await db.execute(
+          await tx.execute(
             `INSERT OR IGNORE INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [msg.id, row.id, msg.role, contentJson, metaJson, msg.timestamp, i, msg.timestamp || Date.now()]
           )
         }
-        const after = await db.queryFirst<{ count: number }>(
+        const after = await tx.queryFirst<{ count: number }>(
           'SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?',
           [row.id]
         )
         const afterCount = after?.count || 0
 
-        await db.commit()
         const added = Math.max(0, afterCount - beforeCount)
         if (added > 0) {
           totalMessages += added
           totalConversations++
         }
-      } catch (error) {
-        await db.rollback().catch(() => {})
-        console.error(`[MessageRepo] Migration failed for conversation ${row.id}:`, error)
-        throw error
-      }
+      })
     }
 
     console.log(
@@ -396,9 +380,8 @@ export class MessageRepository {
         const existingCount = existing?.count ?? 0
         if (existingCount >= conv.messages.length) continue
 
-        await db.beginTransaction()
-        try {
-          await db.execute(
+        await db.transaction(async (tx) => {
+          await tx.execute(
             `INSERT INTO conversations (id, title, title_mode, context_usage_json, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(id) DO UPDATE SET
@@ -420,7 +403,7 @@ export class MessageRepository {
 
             const normalized = this.deserializeAppSessionMessage(msg)
             const { contentJson, metaJson } = this.serializeMessage(normalized)
-            await db.execute(
+            await tx.execute(
               `INSERT OR IGNORE INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
               [
@@ -436,7 +419,7 @@ export class MessageRepository {
             )
           }
 
-          const finalCount = await db.queryFirst<{ count: number }>(
+          const finalCount = await tx.queryFirst<{ count: number }>(
             'SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?',
             [conv.id]
           )
@@ -445,11 +428,9 @@ export class MessageRepository {
             restoredConversations++
             restoredMessages += added
           }
-          await db.commit()
-        } catch (error) {
-          await db.rollback().catch(() => {})
+        }).catch((error) => {
           console.warn('[MessageRepo] AppSessions recovery failed for conversation', conv.id, error)
-        }
+        })
       }
     }
 

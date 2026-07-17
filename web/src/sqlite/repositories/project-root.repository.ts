@@ -140,12 +140,12 @@ export class ProjectRootRepository {
    */
   async setDefaultRoot(projectId: string, rootId: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.transaction(async () => {
-      await db.execute(
+    await db.transaction(async (tx) => {
+      await tx.execute(
         'UPDATE project_roots SET is_default = 0 WHERE project_id = ?',
         [projectId]
       )
-      await db.execute(
+      await tx.execute(
         'UPDATE project_roots SET is_default = 1 WHERE id = ? AND project_id = ?',
         [rootId, projectId]
       )

@@ -123,6 +123,12 @@ export interface PendingChangeRow {
   timestamp: number
 }
 
+export interface SQLiteTransaction {
+  queryAll<T = unknown>(sql: string, params?: unknown[]): Promise<T[]>
+  queryFirst<T = unknown>(sql: string, params?: unknown[]): Promise<T | null>
+  execute(sql: string, params?: unknown[]): Promise<void>
+}
+
 //=============================================================================
 // SQLite Worker Client
 //=============================================================================
@@ -148,7 +154,6 @@ class SQLiteWorkerClient {
   private readonly RECOVERY_COOLDOWN = 5000 // Minimum 5 seconds between recoveries
   private readonly MAX_RECOVERIES_PER_HOUR = 5 // Prevent excessive recovery attempts
   private transactionTail: Promise<void> = Promise.resolve()
-  private manualTransactionRelease: (() => void) | null = null
   private onMigrationProgress?: (progress: {
     step: string
     details: string
@@ -172,7 +177,6 @@ class SQLiteWorkerClient {
     this.dbMode = null
     this.recovering = false
     this.transactionTail = Promise.resolve()
-    this.manualTransactionRelease = null
   }
 
   private terminateWorker(): void {
@@ -395,7 +399,7 @@ class SQLiteWorkerClient {
     return `${prefix}-${this.requestId}`
   }
 
-  queryAll<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+  private sendQueryAll<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
     return this.sendRequest<T[]>({
       type: 'queryAll',
       sql,
@@ -404,7 +408,7 @@ class SQLiteWorkerClient {
     })
   }
 
-  queryFirst<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
+  private sendQueryFirst<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
     return this.sendRequest<T | null>({
       type: 'queryFirst',
       sql,
@@ -413,7 +417,7 @@ class SQLiteWorkerClient {
     })
   }
 
-  execute(sql: string, params: unknown[] = []): Promise<void> {
+  private sendExecute(sql: string, params: unknown[] = []): Promise<void> {
     return this.sendRequest<void>({
       type: 'execute',
       sql,
@@ -435,7 +439,28 @@ class SQLiteWorkerClient {
     return release
   }
 
-  async transaction<T>(callback: () => Promise<T>): Promise<T> {
+  private async runOutsideTransaction<T>(operation: () => Promise<T>): Promise<T> {
+    let currentTail: Promise<void>
+    do {
+      currentTail = this.transactionTail
+      await currentTail.catch(() => undefined)
+    } while (currentTail !== this.transactionTail)
+    return operation()
+  }
+
+  queryAll<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+    return this.runOutsideTransaction(() => this.sendQueryAll<T>(sql, params))
+  }
+
+  queryFirst<T = unknown>(sql: string, params: unknown[] = []): Promise<T | null> {
+    return this.runOutsideTransaction(() => this.sendQueryFirst<T>(sql, params))
+  }
+
+  execute(sql: string, params: unknown[] = []): Promise<void> {
+    return this.runOutsideTransaction(() => this.sendExecute(sql, params))
+  }
+
+  async transaction<T>(callback: (tx: SQLiteTransaction) => Promise<T>): Promise<T> {
     const release = await this.acquireTransactionSlot()
     let began = false
     try {
@@ -444,7 +469,12 @@ class SQLiteWorkerClient {
         id: this.nextRequestId('txn-begin'),
       })
       began = true
-      const result = await callback()
+      const tx: SQLiteTransaction = {
+        queryAll: <U = unknown>(sql: string, params: unknown[] = []) => this.sendQueryAll<U>(sql, params),
+        queryFirst: <U = unknown>(sql: string, params: unknown[] = []) => this.sendQueryFirst<U>(sql, params),
+        execute: (sql: string, params: unknown[] = []) => this.sendExecute(sql, params),
+      }
+      const result = await callback(tx)
       await this.sendRequest<void>({ type: 'commit', id: this.nextRequestId('txn-commit') })
       return result
     } catch (error) {
@@ -458,35 +488,6 @@ class SQLiteWorkerClient {
       throw error
     } finally {
       release()
-    }
-  }
-
-  async beginTransaction(): Promise<void> {
-    const release = await this.acquireTransactionSlot()
-    try {
-      await this.sendRequest<void>({ type: 'beginTransaction', id: this.nextRequestId('begin') })
-      this.manualTransactionRelease = release
-    } catch (error) {
-      release()
-      throw error
-    }
-  }
-
-  async commit(): Promise<void> {
-    try {
-      await this.sendRequest<void>({ type: 'commit', id: this.nextRequestId('commit') })
-    } finally {
-      this.manualTransactionRelease?.()
-      this.manualTransactionRelease = null
-    }
-  }
-
-  async rollback(): Promise<void> {
-    try {
-      await this.sendRequest<void>({ type: 'rollback', id: this.nextRequestId('rollback') })
-    } finally {
-      this.manualTransactionRelease?.()
-      this.manualTransactionRelease = null
     }
   }
 
@@ -702,11 +703,16 @@ class SQLiteDatabaseManager {
   }
 
   private async getReadyWorkerClient(): Promise<SQLiteWorkerClient> {
-    if (!this.workerClient?.isReady()) {
-      this.workerClient = null
+    if (!this.workerClient) {
+      throw new Error('Database not initialized')
+    }
+    if (this.initializing && this.initPromise) {
+      await this.initPromise
+    } else if (!this.workerClient.isReady()) {
+      // A timed-out worker resets its own state. Reinitialize that same client
+      // so an in-progress initialization cannot leave an orphaned OPFS handle.
       this.initialized = false
       this.initPromise = null
-      this.initializing = false
       await this.initialize()
     }
     if (!this.workerClient) throw new Error('Database not initialized')
@@ -737,29 +743,8 @@ class SQLiteDatabaseManager {
   /**
    * Execute multiple statements in a transaction
    */
-  async transaction<T>(callback: () => Promise<T>): Promise<T> {
+  async transaction<T>(callback: (tx: SQLiteTransaction) => Promise<T>): Promise<T> {
     return (await this.getReadyWorkerClient()).transaction(callback)
-  }
-
-  /**
-   * Begin transaction
-   */
-  async beginTransaction(): Promise<void> {
-    return (await this.getReadyWorkerClient()).beginTransaction()
-  }
-
-  /**
-   * Commit transaction
-   */
-  async commit(): Promise<void> {
-    return (await this.getReadyWorkerClient()).commit()
-  }
-
-  /**
-   * Rollback transaction
-   */
-  async rollback(): Promise<void> {
-    return (await this.getReadyWorkerClient()).rollback()
   }
 
   /**

@@ -560,14 +560,12 @@ export async function importStorage(data: {
 }): Promise<void> {
   const db = getSQLiteDB()
 
-  // Import in transaction
-  await db.beginTransaction()
-
-  try {
+  // Import in a transaction so callers never observe a partial restore.
+  await db.transaction(async (tx) => {
     if (data.conversations) {
       for (const row of data.conversations) {
         const conv = row as any
-        await db.execute(
+        await tx.execute(
           'INSERT OR REPLACE INTO conversations (id, title, title_mode, context_usage_json, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)',
           [
             conv.id,
@@ -593,7 +591,7 @@ export async function importStorage(data: {
                 for (const field of metaFields) {
                   if (msg[field] !== undefined) { meta[field] = msg[field]; hasMeta = true }
                 }
-                await db.execute(
+                await tx.execute(
                   'INSERT OR IGNORE INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)',
                   [msg.id, conv.id, msg.role, contentJson, hasMeta ? JSON.stringify(meta) : null, msg.timestamp, i, msg.timestamp || Date.now()]
                 )
@@ -607,7 +605,7 @@ export async function importStorage(data: {
     if (data.messages) {
       for (const row of data.messages) {
         const msg = row as any
-        await db.execute(
+        await tx.execute(
           'INSERT OR IGNORE INTO messages (id, conversation_id, role, content_json, meta_json, timestamp, seq, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)',
           [
             msg.id,
@@ -626,7 +624,7 @@ export async function importStorage(data: {
     if (data.skills) {
       for (const row of data.skills) {
         const skill = row as any
-        await db.execute(
+        await tx.execute(
           `INSERT OR REPLACE INTO skills
            (id, name, version, description, author, category, tags, source, triggers,
             instruction, examples, templates, raw_content, enabled, created_at, updated_at)
@@ -656,7 +654,7 @@ export async function importStorage(data: {
     if (data.plugins) {
       for (const row of data.plugins) {
         const plugin = row as any
-        await db.execute(
+        await tx.execute(
           `INSERT OR REPLACE INTO plugins
            (id, name, version, api_version, description, author, capabilities_json,
             resource_limits_json, state, wasm_bytes, loaded_at, created_at)
@@ -686,7 +684,7 @@ export async function importStorage(data: {
         if (!projectId) {
           throw new Error(`Workspace ${workspace.id || '(unknown)'} missing required project_id`)
         }
-        await db.execute(
+        await tx.execute(
           `INSERT OR REPLACE INTO workspaces
            (id, project_id, root_directory, name, status, cache_size, undo_count,
             modified_files, created_at, last_accessed_at)
@@ -707,11 +705,6 @@ export async function importStorage(data: {
       }
     }
 
-    await db.commit()
-    console.log('[Storage] Import complete')
-  } catch (error) {
-    db.rollback()
-    console.error('[Storage] Import failed:', error)
-    throw error
-  }
+  })
+  console.log('[Storage] Import complete')
 }

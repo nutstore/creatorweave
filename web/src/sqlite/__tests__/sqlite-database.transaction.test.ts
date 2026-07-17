@@ -6,12 +6,15 @@ class FakeWorker {
   static inTransaction = false
   static beginWhileInTransaction = 0
   static terminateCalls = 0
+  static instanceCount = 0
   static handleRequest: ((request: any, respond: (response: any) => void) => void) | null = null
 
   onmessage: ((event: MessageEvent<any>) => void) | null = null
   onerror: ((event: ErrorEvent) => void) | null = null
 
-  constructor(_url: URL, _options?: WorkerOptions) {}
+  constructor(_url: URL, _options?: WorkerOptions) {
+    FakeWorker.instanceCount += 1
+  }
 
   postMessage(request: any) {
     FakeWorker.requests.push(request)
@@ -74,6 +77,7 @@ describe('SQLiteDatabaseManager transaction serialization', () => {
     FakeWorker.inTransaction = false
     FakeWorker.beginWhileInTransaction = 0
     FakeWorker.terminateCalls = 0
+    FakeWorker.instanceCount = 0
     FakeWorker.handleRequest = null
   })
 
@@ -101,28 +105,92 @@ describe('SQLiteDatabaseManager transaction serialization', () => {
       firstCallbackStarted = resolve
     })
 
-    const first = db.transaction(async () => {
+    const first = db.transaction(async (tx) => {
       firstCallbackStarted()
       await firstCanFinish
-      await db.execute('INSERT INTO test VALUES (1)')
+      await tx.execute('INSERT INTO test VALUES (1)')
     })
 
     await firstStarted
 
     let secondCallbackRan = false
-    const second = db.transaction(async () => {
+    const second = db.transaction(async (tx) => {
       secondCallbackRan = true
-      await db.execute('INSERT INTO test VALUES (2)')
+      await tx.execute('INSERT INTO test VALUES (2)')
     })
 
-    await Promise.resolve()
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(secondCallbackRan).toBe(false)
     expect(FakeWorker.beginWhileInTransaction).toBe(0)
 
     releaseFirst()
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
     expect(secondCallbackRan).toBe(true)
+  })
+
+  it('waits for initialization instead of creating a second worker', async () => {
+    const initResponders: Array<() => void> = []
+    FakeWorker.handleRequest = (request, respond) => {
+      if (request.type === 'init') {
+        initResponders.push(() =>
+          respond({ type: 'init', id: request.id, success: true, mode: 'opfs' })
+        )
+        return
+      }
+      if (request.type === 'queryFirst') {
+        respond({ type: 'queryFirst', id: request.id, row: { value: 1 } })
+        return
+      }
+      respond({ type: request.type, id: request.id })
+    }
+
+    const db = SQLiteDatabaseManager.getInstance()
+    const initialization = db.initialize()
+    const query = db.queryFirst<{ value: number }>('SELECT 1')
+
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(FakeWorker.instanceCount).toBe(1)
+
+    initResponders.forEach((respond) => respond())
+    await expect(Promise.all([initialization, query])).resolves.toEqual([undefined, { value: 1 }])
+  })
+
+  it('runs unrelated writes only after the active transaction commits', async () => {
+    const db = SQLiteDatabaseManager.getInstance()
+    await db.initialize()
+
+    let releaseTransaction!: () => void
+    const transactionCanFinish = new Promise<void>((resolve) => {
+      releaseTransaction = resolve
+    })
+    let transactionStarted!: () => void
+    const started = new Promise<void>((resolve) => {
+      transactionStarted = resolve
+    })
+
+    const transaction = db.transaction(async (tx) => {
+      transactionStarted()
+      await transactionCanFinish
+      await tx.execute('INSERT INTO test VALUES (1)')
+    })
+    await started
+
+    const outsideWrite = db.execute('INSERT INTO test VALUES (2)')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(FakeWorker.requests.filter((request) => request.type === 'execute')).toHaveLength(0)
+
+    releaseTransaction()
+    await expect(Promise.all([transaction, outsideWrite])).resolves.toEqual([undefined, undefined])
+
+    expect(FakeWorker.requests.map((request) => request.type)).toEqual([
+      'init',
+      'beginTransaction',
+      'execute',
+      'commit',
+      'execute',
+    ])
   })
 
   it('retries a sync-handle error after recovery without losing the original request', async () => {
