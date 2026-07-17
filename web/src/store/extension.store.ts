@@ -96,10 +96,11 @@ async function registerCodexOAuthProvider(extensionModels?: Array<{ id: string; 
     },
   )
 
-  // Persist a virtual API key so apiKeyRepo.load() returns non-null
+  // Persist through the initialization gate: extension detection starts before
+  // the app's storage bootstrap has necessarily completed.
   try {
-    const { getApiKeyRepository } = await import('@/sqlite')
-    await getApiKeyRepository().save(CODEX_OAUTH_PROVIDER_ID, CODEX_OAUTH_API_KEY)
+    const { saveApiKey } = await import('@/security/api-key-store')
+    await saveApiKey(CODEX_OAUTH_PROVIDER_ID, CODEX_OAUTH_API_KEY)
   } catch (err) {
     console.warn('[extension.store] Failed to save codex-oauth virtual API key:', err)
   }
