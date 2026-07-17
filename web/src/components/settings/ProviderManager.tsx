@@ -42,6 +42,7 @@ import type {
   ProviderCategory,
 } from '@/agent/providers/types'
 import { useDynamicModels } from '@/agent/providers/use-dynamic-models'
+import { canFetchModels } from '@/agent/providers/model-fetcher'
 import { getCachedModels, getModelContextWindow } from '@/agent/providers/model-store'
 import { useT } from '@/i18n'
 import { BrandInput, BrandButton, BrandDialog, BrandDialogContent, BrandDialogHeader, BrandDialogBody, BrandDialogFooter, BrandDialogTitle, BrandDialogClose } from '@creatorweave/ui'
@@ -93,6 +94,7 @@ function ProviderCard({
   } = useSettingsStore()
 
   const providerKey = providerType
+  const supportsModelRefresh = canFetchModels(providerType)
   const config = getProviderConfig(providerType)
   const baseUrl = isCustom
     ? customProvider?.baseUrl || ''
@@ -603,15 +605,17 @@ function ProviderCard({
                 <span className="text-[10px] font-medium text-tertiary">
                   {t('settings.pinnedModels.count', { count: pinnedModels.length })}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleRefreshModels}
-                  disabled={modelsLoading}
-                  className="text-tertiary hover:text-primary disabled:opacity-50"
-                  title={t('settings.modelSelection.refreshModels')}
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
-                </button>
+                {supportsModelRefresh && (
+                  <button
+                    type="button"
+                    onClick={handleRefreshModels}
+                    disabled={modelsLoading}
+                    className="text-tertiary hover:text-primary disabled:opacity-50"
+                    title={t('settings.modelSelection.refreshModels')}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${modelsLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
               </div>
             </div>
 

@@ -11,7 +11,7 @@
  */
 
 import type { LLMProviderType, ModelInfo, ModelCapability } from './types'
-import { LLM_PROVIDER_CONFIGS, PROVIDER_META, isCustomProviderType } from './types'
+import { LLM_PROVIDER_CONFIGS, PROVIDER_META, getModelsForProvider, isCustomProviderType } from './types'
 import { getOpenRouterContextWindow } from './openrouter-pricing'
 import { assertHeaderAscii } from '../llm/http-headers'
 
@@ -47,12 +47,13 @@ const OPENAI_COMPATIBLE_PROVIDERS: LLMProviderType[] = [
  * Anthropic has no list models API
  */
 const STATIC_ONLY_PROVIDERS: LLMProviderType[] = ['anthropic']
+const CODEX_OAUTH_PROVIDER = 'codex-oauth'
 
 /**
  * Check if a provider supports dynamic model fetching
  */
 export function canFetchModels(providerType: LLMProviderType): boolean {
-  return !STATIC_ONLY_PROVIDERS.includes(providerType)
+  return providerType !== CODEX_OAUTH_PROVIDER && !STATIC_ONLY_PROVIDERS.includes(providerType)
 }
 
 // ─── Fetch implementations ──────────────────────────────────────────────────
@@ -180,6 +181,17 @@ export async function fetchModelsForProvider(
   options?: { apiKey?: string; baseUrl?: string }
 ): Promise<FetchModelsResult> {
   const now = Date.now()
+
+  // The ChatGPT Codex backend exposes response generation only, not an
+  // OpenAI-compatible /models endpoint. Its model list comes from the extension.
+  if (providerType === CODEX_OAUTH_PROVIDER) {
+    return {
+      models: getModelsForProvider(providerType),
+      source: 'static',
+      fetchedAt: now,
+    }
+  }
+
   const isCustom = isCustomProviderType(providerType)
   const staticModels = isCustom ? [] : (PROVIDER_META[providerType]?.models ?? [])
 
