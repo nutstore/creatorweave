@@ -22,7 +22,6 @@ import {
   Trash2,
   ExternalLink,
   Check,
-  Wifi,
   FlaskConical,
   Globe,
   Sun,
@@ -35,7 +34,6 @@ import {
   CheckCircle2,
   XCircle,
   Terminal,
-  Radio,
   Volume2,
   LayoutDashboard,
   RotateCcw,
@@ -1393,10 +1391,6 @@ const SettingsDialogContent = forwardRef<
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
     { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
     { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
-    { id: 'sync', label: t('settings.sync'), icon: <Cloud className="h-4 w-4" /> },
-    { id: 'offline', label: t('settings.offline'), icon: <Wifi className="h-4 w-4" /> },
-    { id: 'remote', label: t('remote.title'), icon: <Radio className="h-4 w-4" /> },
-    { id: 'webcontainer', label: 'WebContainer', icon: <Terminal className="h-4 w-4" /> },
     { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
   ]
 
