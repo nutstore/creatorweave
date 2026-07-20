@@ -185,6 +185,8 @@ export const toolCallDisplay = {
     lines: "{count} 行",
     chars: "{count} 文字",
     truncated: "切り詰め",
+    fallbackTooltip: "{from} を要求しましたが、{to} に自動切り替えしました",
+    fallbackNotice: "{from} を要求しましたが、{to} に自動切り替えしました",
 } as const
 
 // Question Card (ask_user_question tool)

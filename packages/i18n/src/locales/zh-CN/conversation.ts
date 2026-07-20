@@ -199,6 +199,8 @@ export const toolCallDisplay = {
     lines: "{count} 行",
     chars: "{count} 字符",
     truncated: "已截断",
+    fallbackTooltip: "请求的是 {from}，但已自动切换到 {to}",
+    fallbackNotice: "请求的是 {from}，但已自动切换到 {to}",
 } as const
 
 // Question Card (ask_user_question tool)

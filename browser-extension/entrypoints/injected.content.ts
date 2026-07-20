@@ -413,6 +413,10 @@ export default defineContentScript({
        * Search the web. Provider auto-detected (DuckDuckGo or Baidu) unless
        * explicitly specified via options.provider.
        * For Baidu, raw HTML is fetched in background and parsed here via DOMParser.
+       *
+       * `provider: "auto"` may fall back after a provider failure or no parsed
+       * results. Explicit provider requests are strict and return an error with
+       * `suggestedProvider` instead of silently substituting search engines.
        */
       async search(query: string, options?: { count?: number; provider?: string }) {
         const opts = options || {};
@@ -425,7 +429,58 @@ export default defineContentScript({
         // If background returned raw HTML (format: 'html'), parse it here via DOMParser
         if (response.ok && response.html && response.format === 'html') {
           const results = parseBaiduHtml(response.html, response.limit || 10);
-          return { ok: true, results, provider: response.provider };
+          const isAuto = !opts.provider || opts.provider === 'auto';
+          const attempts = Array.isArray(response.attempts) ? [...response.attempts] : [];
+
+          if (results.length === 0 && isAuto) {
+            attempts.push({ provider: 'baidu', ok: false, reason: '0 results' });
+            const duckDuckGoAlreadyTried = attempts.some((attempt: any) => attempt.provider === 'duckduckgo');
+
+            if (!duckDuckGoAlreadyTried) {
+              const fallbackResponse = await sendToBridge('web_search', {
+                query,
+                count: opts.count || 10,
+                provider: 'duckduckgo',
+              });
+
+              if (fallbackResponse.ok && Array.isArray(fallbackResponse.results) && fallbackResponse.results.length > 0) {
+                return {
+                  ok: true,
+                  results: fallbackResponse.results,
+                  provider: 'duckduckgo',
+                  requestedProvider: response.requestedProvider || 'baidu',
+                  fallback: true,
+                };
+              }
+
+              attempts.push({
+                provider: 'duckduckgo',
+                ok: false,
+                reason: fallbackResponse.reason || (fallbackResponse.ok ? '0 results' : 'unavailable'),
+              });
+            }
+
+            return {
+              ok: false,
+              results: [],
+              error: 'All search providers exhausted',
+              requestedProvider: response.requestedProvider || 'baidu',
+              attempts,
+            };
+          }
+
+          return {
+            ok: true,
+            results,
+            provider: response.provider,
+            ...(response.requestedProvider ? { requestedProvider: response.requestedProvider } : {}),
+            ...(typeof response.fallback === 'boolean' ? { fallback: response.fallback } : {}),
+          };
+        }
+
+        if (response.ok) {
+          const { attempts: _attempts, auto: _auto, ...publicResponse } = response;
+          return publicResponse;
         }
 
         return response;

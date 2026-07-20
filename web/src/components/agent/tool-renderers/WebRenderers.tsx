@@ -19,6 +19,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   baidu: '百度',
 }
 
+const PROVIDER_SHORT: Record<string, string> = {
+  duckduckgo: 'DDG',
+  baidu: '百度',
+}
+
 registerRenderer({
   name: 'web_search',
   icon: <Globe className="h-3.5 w-3.5 text-neutral-400" />,
@@ -27,6 +32,8 @@ registerRenderer({
     const query = typeof ctx.args.query === 'string' ? ctx.args.query : ''
     const results = extractSearchResults(ctx)
     const provider = extractProvider(ctx)
+    const requestedProvider = extractRequestedProvider(ctx)
+    const fallback = provider && requestedProvider && provider !== requestedProvider
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-neutral-200">web_search</code>
@@ -34,9 +41,21 @@ registerRenderer({
         {!ctx.isExecuting && !ctx.isStreaming && (
           <>
             {provider && (
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
-                {PROVIDER_LABELS[provider] || provider}
-              </span>
+              fallback ? (
+                <span
+                  className="text-[10px] text-amber-600 dark:text-amber-400 shrink-0"
+                  title={t('toolCallDisplay.fallbackTooltip', {
+                    from: PROVIDER_LABELS[requestedProvider!] || requestedProvider,
+                    to: PROVIDER_LABELS[provider] || provider,
+                  })}
+                >
+                  🟡 {PROVIDER_SHORT[requestedProvider!] || requestedProvider} → {PROVIDER_LABELS[provider] || provider}
+                </span>
+              ) : (
+                <span className="text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
+                  {PROVIDER_LABELS[provider] || provider}
+                </span>
+              )
             )}
             <span className="ml-auto text-xs text-neutral-400 shrink-0">
               {t('toolCallDisplay.resultCount', { count: results.length, s: results.length !== 1 ? 's' : '' })}
@@ -50,12 +69,22 @@ registerRenderer({
     const t = useT()
     const results = extractSearchResults(ctx)
     const provider = extractProvider(ctx)
+    const requestedProvider = extractRequestedProvider(ctx)
+    const fallback = provider && requestedProvider && provider !== requestedProvider
     if (results.length === 0) {
       if (ctx.isExecuting) return <StreamingSkeleton />
       return <div className="px-4 py-3 text-xs text-neutral-400">{t('toolCallDisplay.noResults')}</div>
     }
     return (
       <div className="px-4 py-3 space-y-3">
+        {fallback && (
+          <div className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1.5">
+            {t('toolCallDisplay.fallbackNotice', {
+              from: PROVIDER_LABELS[requestedProvider!] || requestedProvider,
+              to: PROVIDER_LABELS[provider!] || provider,
+            })}
+          </div>
+        )}
         {results.slice(0, 6).map((r, i) => (
           <div key={i} className="space-y-0.5">
             <div className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{r.title}</div>
@@ -294,6 +323,11 @@ function extractSearchResults(ctx: ToolRenderCtx): SearchResult[] {
 function extractProvider(ctx: ToolRenderCtx): string | undefined {
   const data = ctx.result?.data as Record<string, unknown> | undefined
   return typeof data?.provider === 'string' ? data.provider : undefined
+}
+
+function extractRequestedProvider(ctx: ToolRenderCtx): string | undefined {
+  const data = ctx.result?.data as Record<string, unknown> | undefined
+  return typeof data?.requestedProvider === 'string' ? data.requestedProvider : undefined
 }
 
 function shortUrl(url: string): string {

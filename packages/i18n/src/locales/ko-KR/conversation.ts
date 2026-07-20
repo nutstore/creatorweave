@@ -184,6 +184,8 @@ export const toolCallDisplay = {
     lines: "{count}줄",
     chars: "{count}자",
     truncated: "잘림",
+    fallbackTooltip: "{from}을(를) 요청했지만 {to}(으)로 자동 전환되었습니다",
+    fallbackNotice: "{from}을(를) 요청했지만 {to}(으)로 자동 전환되었습니다",
 } as const
 
 // Question Card (ask_user_question tool)

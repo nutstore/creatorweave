@@ -169,56 +169,117 @@ async function fetchBaiduHtml(query, limit) {
 }
 
 /**
- * Run search with symmetric fallback chain.
- * Order is decided by the detected/explicit primary provider:
- *   CN user (baidu primary)   → try baidu, then duckduckgo
- *   Overseas (ddg primary)    → try duckduckgo, then baidu
- * Each provider is wrapped — 0 results OR thrown error both trigger
- * fallback to the next. Returns ok:false only when all providers fail.
+ * Search one provider without substituting another provider. Explicit callers
+ * rely on this strict behavior to preserve source provenance.
  */
-async function searchWithFallback(query, limit, primary) {
-  const order = primary === 'baidu'
-    ? ['baidu', 'duckduckgo']
-    : ['duckduckgo', 'baidu'];
-
-  let lastError = null;
-
-  for (const p of order) {
-    try {
-      if (p === 'baidu') {
-        const html = await fetchBaiduHtml(query, limit);
-        // format: 'html' tells injected.content to DOMParser this payload
-        return { ok: true, html, provider: 'baidu', format: 'html', limit };
-      }
-      const results = await searchDuckDuckGo(query, limit);
-      if (results.length > 0) {
-        return { ok: true, results, provider: 'duckduckgo' };
-      }
-      lastError = 'duckduckgo returned 0 results';
-    } catch (err) {
-      lastError = err.message;
+async function searchSingleProvider(query, limit, provider) {
+  try {
+    if (provider === 'baidu') {
+      const html = await fetchBaiduHtml(query, limit);
+      // format: 'html' tells injected.content to DOMParser this payload.
+      return { ok: true, html, provider: 'baidu', format: 'html', limit };
     }
+
+    const results = await searchDuckDuckGo(query, limit);
+    return { ok: true, results, provider: 'duckduckgo' };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      results: [],
+      provider,
+      suggestedProvider: provider === 'baidu' ? 'duckduckgo' : 'baidu',
+      reason,
+      error: `${provider} is unavailable. Try ${provider === 'baidu' ? 'duckduckgo' : 'baidu'}.`,
+    };
+  }
+}
+
+/**
+ * Automatic selection may use the alternate provider. Baidu's result count is
+ * only available in the injected MAIN-world parser, so an HTML response carries
+ * enough metadata for that layer to perform the final retry when needed.
+ */
+async function searchAuto(query, limit, primary) {
+  const first = await searchSingleProvider(query, limit, primary);
+  const attempts = [];
+
+  if (first.ok && primary === 'baidu') {
+    return {
+      ...first,
+      requestedProvider: primary,
+      fallback: false,
+      attempts: [{ provider: 'baidu', ok: true }],
+      auto: true,
+    };
   }
 
-  return {
-    ok: false,
-    results: [],
-    error: lastError || 'All search providers exhausted',
+  if (first.ok && first.results.length > 0) {
+    return {
+      ...first,
+      requestedProvider: primary,
+      fallback: false,
+      attempts: [{ provider: 'duckduckgo', ok: true, resultCount: first.results.length }],
+      auto: true,
+    };
+  }
+
+  attempts.push({
     provider: primary,
+    ok: false,
+    reason: first.ok ? '0 results' : first.reason || 'unavailable',
+  });
+  const alternate = primary === 'baidu' ? 'duckduckgo' : 'baidu';
+  const second = await searchSingleProvider(query, limit, alternate);
+
+  if (!second.ok) {
+    attempts.push({ provider: alternate, ok: false, reason: second.reason || 'unavailable' });
+    return {
+      ok: false,
+      results: [],
+      error: 'All search providers exhausted',
+      requestedProvider: primary,
+      attempts,
+    };
+  }
+
+  if (alternate === 'duckduckgo' && second.results.length === 0) {
+    attempts.push({ provider: alternate, ok: false, reason: '0 results' });
+    return {
+      ok: false,
+      results: [],
+      error: 'All search providers returned no results',
+      requestedProvider: primary,
+      attempts,
+    };
+  }
+
+  attempts.push({ provider: alternate, ok: true, ...(alternate === 'duckduckgo' ? { resultCount: second.results.length } : {}) });
+  return {
+    ...second,
+    requestedProvider: primary,
+    fallback: true,
+    attempts,
+    auto: true,
   };
 }
 
 async function handleSearch(message) {
   const { query, count = 10 } = message;
   const limit = Math.min(count, CONFIG.SEARCH_MAX_RESULTS);
+  const isAuto = !message.provider || message.provider === 'auto';
 
-  // Resolve provider: explicit > cached/auto
-  let provider = message.provider;
-  if (!provider || provider === 'auto') {
-    provider = await detectProvider();
+  if (!isAuto) {
+    const response = await searchSingleProvider(query, limit, message.provider);
+    return {
+      ...response,
+      requestedProvider: message.provider,
+      fallback: false,
+      auto: false,
+    };
   }
 
-  return searchWithFallback(query, limit, provider);
+  return searchAuto(query, limit, await detectProvider());
 }
 
 // ============================================================

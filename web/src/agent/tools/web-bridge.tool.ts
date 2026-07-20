@@ -24,6 +24,16 @@ interface AgentWebSearchResponse {
   ok: boolean
   results: AgentWebSearchResult[]
   provider?: string
+  /** The provider the caller originally asked for (before any fallback). */
+  requestedProvider?: string
+  /** True iff `provider` differs from `requestedProvider` (i.e. a fallback occurred). */
+  fallback?: boolean
+  /** Only present when ok:false — per-provider trial log for diagnosis. */
+  attempts?: Array<{ provider: string; ok: boolean; reason?: string; resultCount?: number }>
+  /** Alternate provider callers may explicitly retry after a strict-provider failure. */
+  suggestedProvider?: string
+  /** Machine-readable failure reason supplied by the extension. */
+  reason?: string
   error?: string
 }
 
@@ -78,6 +88,14 @@ export const webSearchDefinition: ToolDefinition = {
       'Search the web. Returns a list of results with title, URL, and snippet.',
       'Use this tool to find information on the internet, look up documentation, research topics, or find specific URLs.',
       'The search engine is auto-selected based on your region (DuckDuckGo for overseas, Baidu for China).',
+      '',
+      'IMPORTANT — provider policy:',
+      '  - `provider: "auto"` may fall back between engines when one fails or returns no results.',
+      '  - An explicit `provider: "duckduckgo"` or `"baidu"` is strict and never falls back.',
+      '    If unavailable, the error supplies `suggestedProvider`; retry explicitly only if appropriate.',
+      'For automatic fallback, inspect `fallback`, `requestedProvider`, and `provider` and tell the',
+      'user which engine actually produced the results.',
+      '',
       'This tool requires the Browser Extension to be installed and active.',
     ].join('\n'),
     parameters: {
@@ -124,6 +142,21 @@ export const webSearchExecutor: ToolExecutor = async (args) => {
     const result = await bridge.search(query, { count, provider })
 
     if (!result.ok) {
+      if (result.provider && result.suggestedProvider) {
+        return toolErrorJson(
+          'web_search',
+          'SEARCH_PROVIDER_UNAVAILABLE',
+          result.error || `${result.provider} is unavailable. Try ${result.suggestedProvider}.`,
+          {
+            retryable: true,
+            details: {
+              provider: result.provider,
+              suggestedProvider: result.suggestedProvider,
+              ...(result.reason ? { reason: result.reason } : {}),
+            },
+          }
+        )
+      }
       return toolErrorJson('web_search', 'SEARCH_FAILED', result.error || 'Search returned no results', { retryable: true })
     }
 
@@ -131,6 +164,9 @@ export const webSearchExecutor: ToolExecutor = async (args) => {
       results: result.results,
       total: result.results.length,
       ...(result.provider ? { provider: result.provider } : {}),
+      ...(result.requestedProvider ? { requestedProvider: result.requestedProvider } : {}),
+      ...(typeof result.fallback === 'boolean' ? { fallback: result.fallback } : {}),
+      ...(result.attempts ? { attempts: result.attempts } : {}),
     })
   } catch (err) {
     return toolErrorJson('web_search', 'SEARCH_ERROR', (err as Error).message, { retryable: true })

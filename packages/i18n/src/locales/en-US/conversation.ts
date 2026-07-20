@@ -200,6 +200,8 @@ export const toolCallDisplay = {
     lines: "{count} lines",
     chars: "{count} chars",
     truncated: "truncated",
+    fallbackTooltip: "Requested {from}, auto-switched to {to}",
+    fallbackNotice: "Requested {from}, auto-switched to {to}",
 } as const
 
 // Question Card (ask_user_question tool)
