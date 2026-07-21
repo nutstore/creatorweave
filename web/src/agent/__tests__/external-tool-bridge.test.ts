@@ -1,0 +1,215 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mocks = vi.hoisted(() => ({
+  getMCPManager: vi.fn(),
+  getWebMCPBridge: vi.fn(),
+  getWebMCPState: vi.fn(),
+}))
+
+vi.mock('@/mcp/mcp-manager', () => ({
+  getMCPManager: mocks.getMCPManager,
+}))
+
+vi.mock('@/webmcp/bridge-client', () => ({
+  getWebMCPBridge: mocks.getWebMCPBridge,
+}))
+
+vi.mock('@/webmcp/store', () => ({
+  useWebMCPStore: { getState: mocks.getWebMCPState },
+}))
+
+import { callToolExecutor } from '../external-tool-bridge'
+
+const inputSchema = { type: 'object' as const, properties: {} }
+const toolContext = { directoryHandle: null }
+
+describe('external tool bridge error isolation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getWebMCPBridge.mockReturnValue(null)
+    mocks.getWebMCPState.mockReturnValue({
+      getEnabledTools: () => [],
+      getPreferredTabIdForTool: () => undefined,
+      recordToolInvocation: vi.fn(),
+    })
+  })
+
+  it('wraps error text returned by an untrusted MCP tool', async () => {
+    const tools = new Map([[
+      'untrusted-server',
+      [{
+        name: 'failing_tool',
+        inputSchema,
+        annotations: { untrustedContentHint: true },
+      }],
+    ]])
+    mocks.getMCPManager.mockReturnValue({
+      getAllTools: () => tools,
+      executeTool: vi.fn().mockResolvedValue({
+        isError: true,
+        content: [{ type: 'text', text: 'Remote MCP failure' }],
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'untrusted-server:failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toContain('<untrusted_external_content')
+    expect(response.error.message).toContain('Remote MCP failure')
+  })
+
+  it('wraps error text returned by an untrusted WebMCP tool', async () => {
+    const webTool = {
+      name: 'failing_tool',
+      fullName: 'failing_tool',
+      groupKey: 'example_com',
+      hostname: 'example.com',
+      description: '',
+      inputSchema,
+      toolsetSignature: 'signature',
+      apiMode: 'navigatorModelContext' as const,
+      representativeTabId: 1,
+      annotations: { untrustedContentHint: true },
+    }
+    mocks.getMCPManager.mockReturnValue({ getAllTools: () => new Map() })
+    mocks.getWebMCPState.mockReturnValue({
+      getEnabledTools: () => [webTool],
+      getPreferredTabIdForTool: () => 1,
+      recordToolInvocation: vi.fn(),
+    })
+    mocks.getWebMCPBridge.mockReturnValue({
+      webMCPInvoke: vi.fn().mockResolvedValue({
+        ok: false,
+        error: 'Remote WebMCP failure',
+        errorCode: 'REMOTE_FAILURE',
+        hostname: 'example.com',
+        toolName: 'failing_tool',
+        fullToolName: 'failing_tool',
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'example_com_failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toContain('<untrusted_external_content')
+    expect(response.error.message).toContain('Remote WebMCP failure')
+  })
+
+  it('leaves error text returned by an unmarked WebMCP tool unchanged', async () => {
+    const webTool = {
+      name: 'failing_tool',
+      fullName: 'failing_tool',
+      groupKey: 'example_com',
+      hostname: 'example.com',
+      description: '',
+      inputSchema,
+      toolsetSignature: 'signature',
+      apiMode: 'navigatorModelContext' as const,
+      representativeTabId: 1,
+    }
+    mocks.getMCPManager.mockReturnValue({ getAllTools: () => new Map() })
+    mocks.getWebMCPState.mockReturnValue({
+      getEnabledTools: () => [webTool],
+      getPreferredTabIdForTool: () => 1,
+      recordToolInvocation: vi.fn(),
+    })
+    mocks.getWebMCPBridge.mockReturnValue({
+      webMCPInvoke: vi.fn().mockResolvedValue({
+        ok: false,
+        error: 'Remote WebMCP failure',
+        errorCode: 'REMOTE_FAILURE',
+        hostname: 'example.com',
+        toolName: 'failing_tool',
+        fullToolName: 'failing_tool',
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'example_com_failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toBe('Remote WebMCP failure')
+  })
+
+  it('preserves the WebMCP error fallback when an untrusted tool returns no error text', async () => {
+    const webTool = {
+      name: 'failing_tool',
+      fullName: 'failing_tool',
+      groupKey: 'example_com',
+      hostname: 'example.com',
+      description: '',
+      inputSchema,
+      toolsetSignature: 'signature',
+      apiMode: 'navigatorModelContext' as const,
+      representativeTabId: 1,
+      annotations: { untrustedContentHint: true },
+    }
+    mocks.getMCPManager.mockReturnValue({ getAllTools: () => new Map() })
+    mocks.getWebMCPState.mockReturnValue({
+      getEnabledTools: () => [webTool],
+      getPreferredTabIdForTool: () => 1,
+      recordToolInvocation: vi.fn(),
+    })
+    mocks.getWebMCPBridge.mockReturnValue({
+      webMCPInvoke: vi.fn().mockResolvedValue({
+        ok: false,
+        errorCode: 'REMOTE_FAILURE',
+        hostname: 'example.com',
+        toolName: 'failing_tool',
+        fullToolName: 'failing_tool',
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'example_com_failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toBe('WebMCP tool invocation failed')
+  })
+
+  it('leaves error text returned by an unmarked MCP tool unchanged', async () => {
+    const tools = new Map([[
+      'trusted-server',
+      [{ name: 'failing_tool', inputSchema }],
+    ]])
+    mocks.getMCPManager.mockReturnValue({
+      getAllTools: () => tools,
+      executeTool: vi.fn().mockResolvedValue({
+        isError: true,
+        content: [{ type: 'text', text: 'Remote MCP failure' }],
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'trusted-server:failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toBe('Remote MCP failure')
+  })
+
+  it('does not wrap an MCP error when its untrusted annotation is malformed', async () => {
+    const tools = new Map([[
+      'malformed-server',
+      [{
+        name: 'failing_tool',
+        inputSchema,
+        annotations: { untrustedContentHint: 'false' as unknown as boolean },
+      }],
+    ]])
+    mocks.getMCPManager.mockReturnValue({
+      getAllTools: () => tools,
+      executeTool: vi.fn().mockResolvedValue({
+        isError: true,
+        content: [{ type: 'text', text: 'Remote MCP failure' }],
+      }),
+    })
+
+    const response = JSON.parse(await callToolExecutor({
+      full_tool_name: 'malformed-server:failing_tool',
+    }, toolContext))
+
+    expect(response.error.message).toBe('Remote MCP failure')
+  })
+})
