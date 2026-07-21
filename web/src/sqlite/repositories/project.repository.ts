@@ -5,6 +5,7 @@
  */
 
 import { generateId, getSQLiteDB } from '../sqlite-database'
+import { getProjectSecretStoragePrefix } from '@/security/secret-key-scope'
 
 export const DEFAULT_PROJECT_ID = 'default-project'
 
@@ -121,7 +122,16 @@ export class ProjectRepository {
 
   async deleteProject(id: string): Promise<void> {
     const db = getSQLiteDB()
-    await db.execute('DELETE FROM projects WHERE id = ?', [id])
+    const secretPrefix = getProjectSecretStoragePrefix(id)
+    await db.transaction(async (tx) => {
+      // Secrets are encrypted API-key records scoped with this exact prefix.
+      // substr avoids SQL LIKE wildcard handling for encoded project IDs.
+      await tx.execute(
+        'DELETE FROM api_keys WHERE substr(provider, 1, ?) = ?',
+        [secretPrefix.length, secretPrefix]
+      )
+      await tx.execute('DELETE FROM projects WHERE id = ?', [id])
+    })
   }
 
   // NOTE: The active_project singleton table was removed (PR-B: URL-driven active

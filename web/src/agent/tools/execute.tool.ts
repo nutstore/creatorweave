@@ -61,6 +61,7 @@ Important:
 - Project skill scripts in .skills/ directory are auto-synced and can be imported directly.
   Example (root "lxy"): \`exec(open('/mnt/lxy/.skills/word-processor/scripts/convert.py').read())\`
   For imports, add the matching scripts directory to \`sys.path\` first.
+- Secrets configured in Settings → Secret Manager for the current project are available as Python environment variables. Read a named secret with \`os.getenv("ASSEMBLYAI_API_KEY")\`; never put secret values in code, files, or output.
 - For packages NOT in the built-in list, use micropip to install from PyPI before importing:
   Example: \`import micropip; await micropip.install('beautifulsoup4'); from bs4 import BeautifulSoup\`
   Note: Only pure-Pinux packages work with micropip. C-extension packages must be pre-built in Pyodide.
@@ -185,6 +186,10 @@ async function executePython(
     // Take assets snapshot BEFORE execution
     const beforeAssets = await snapshotAssetsDir(assetsDirHandle)
 
+    // Load browser-local secrets for every Python execution. Their values are
+    // intentionally kept out of the agent tool schema, workspace files, and logs.
+    const runtimeSecrets = await loadRuntimeSecrets()
+
     // Execute Python code
     const result = await runtimePythonExecutor.execute({
       code,
@@ -192,7 +197,9 @@ async function executePython(
       mountDir: filesDirHandle,
       assetsDir: assetsDirHandle,
       skillsDir: skillsDirHandle,
+      runtimeSecrets,
     })
+    const safeResult = redactPythonResult(result, Object.values(runtimeSecrets))
 
     // Register OPFS delta into overlay ledger for pending/review/sync.
     await active.conversation.scanFilesWithCache()
@@ -206,17 +213,17 @@ async function executePython(
     const afterAssets = await snapshotAssetsDir(assetsDirHandle)
     const newAssets = diffAssets(beforeAssets, afterAssets)
 
-    if (result.error) {
-      return toolErrorJson(TOOL_NAME, 'EXEC_ERROR', result.error, { retryable: true })
+    if (safeResult.error) {
+      return toolErrorJson(TOOL_NAME, 'EXEC_ERROR', safeResult.error, { retryable: true })
     }
 
     // Build structured output for PythonRenderer
     const stdoutParts: string[] = []
-    if (result.stdout) {
-      stdoutParts.push(result.stdout)
+    if (safeResult.stdout) {
+      stdoutParts.push(safeResult.stdout)
     }
-    if (result.result !== undefined) {
-      stdoutParts.push(String(result.result))
+    if (safeResult.result !== undefined) {
+      stdoutParts.push(redactText(String(safeResult.result), Object.values(runtimeSecrets)))
     }
     if (detected.changes.length > 0) {
       stdoutParts.push(`[conversation] detected ${detected.changes.length} file change(s)`)
@@ -236,8 +243,8 @@ async function executePython(
 
     const data: PythonOutputData = {
       stdout: stdoutParts.join('\n') || undefined,
-      stderr: result.stderr || undefined,
-      executionTime: result.executionTime,
+      stderr: safeResult.stderr || undefined,
+      executionTime: safeResult.executionTime,
     }
 
     return toolOkJson(TOOL_NAME, data)
@@ -246,6 +253,59 @@ async function executePython(
     // Worker timeout/terminate errors are retryable — the worker will be recreated on next call.
     const isTimeout = message.includes('timeout') || message.includes('terminated')
     return toolErrorJson(TOOL_NAME, 'INTERNAL_ERROR', message, { retryable: isTimeout })
+  }
+}
+
+/** Redact configured secret values from text returned to the agent or UI. */
+function redactText(value: string, secretValues: string[]): string {
+  return secretValues.reduce(
+    (safeValue, secret) => (secret ? safeValue.split(secret).join('[REDACTED]') : safeValue),
+    value
+  )
+}
+
+function redactPythonResult<T extends { stdout?: string; stderr?: string; error?: string; result?: unknown }>(
+  result: T,
+  secretValues: string[]
+): T {
+  return {
+    ...result,
+    stdout: result.stdout === undefined ? undefined : redactText(result.stdout, secretValues),
+    stderr: result.stderr === undefined ? undefined : redactText(result.stderr, secretValues),
+    error: result.error === undefined ? undefined : redactText(result.error, secretValues),
+    result: typeof result.result === 'string' ? redactText(result.result, secretValues) : result.result,
+  }
+}
+
+/**
+ * Load all browser-local secrets into an ephemeral map for the Pyodide worker.
+ * The map is created per execution so additions, updates, and deletions in
+ * Settings → Secret Manager take effect on the next Python tool call.
+ */
+async function loadRuntimeSecrets(): Promise<Record<string, string>> {
+  try {
+    const [{ getAllSecretNames, loadSecret }, { useProjectStore }] = await Promise.all([
+      import('@/security/secret-store'),
+      import('@/store/project.store'),
+    ])
+    const projectId = useProjectStore.getState().activeProjectId
+    if (!projectId) {
+      return {}
+    }
+    const names = await getAllSecretNames(projectId)
+    const entries = await Promise.all(
+      names.map(async (name) => {
+        const value = await loadSecret(projectId, name)
+        return value === null ? null : ([name, value] as const)
+      })
+    )
+
+    return Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null))
+  } catch (error) {
+    // Secret storage must not make unrelated Python work unavailable. The next
+    // execution retries the load, and the error never includes a secret value.
+    console.warn('[execute.tool] Runtime secrets unavailable; continuing without them:', error)
+    return {}
   }
 }
 

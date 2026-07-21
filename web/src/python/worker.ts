@@ -85,6 +85,51 @@ let stdoutBuffer = []
 /** @type {string[]} */
 let stderrBuffer = []
 
+/** Names injected by the previous execution, used to remove secrets that the
+ * user has since deleted from Settings → Secret Manager. */
+let injectedRuntimeSecretNames = new Set()
+
+/**
+ * Synchronize browser-local secrets into Pyodide's process environment.
+ * Values travel through a Pyodide global rather than being interpolated into
+ * Python source code, so quote characters in a secret cannot alter the wrapper.
+ *
+ * @param {Record<string, string> | undefined} runtimeSecrets
+ */
+async function syncRuntimeSecrets(runtimeSecrets) {
+  const secrets = runtimeSecrets || {}
+  const previousNames = [...injectedRuntimeSecretNames]
+
+  pyodide.globals.set('__cw_runtime_secrets_json', JSON.stringify(secrets))
+  pyodide.globals.set('__cw_previous_runtime_secret_names_json', JSON.stringify(previousNames))
+
+  try {
+    await pyodide.runPythonAsync(`
+import json as _cw_json
+import os as _cw_os
+
+_cw_runtime_secrets = _cw_json.loads(__cw_runtime_secrets_json)
+_cw_previous_runtime_secret_names = _cw_json.loads(__cw_previous_runtime_secret_names_json)
+for _cw_name in _cw_previous_runtime_secret_names:
+    if _cw_name not in _cw_runtime_secrets:
+        _cw_os.environ.pop(_cw_name, None)
+for _cw_name, _cw_value in _cw_runtime_secrets.items():
+    _cw_os.environ[_cw_name] = _cw_value
+
+del _cw_runtime_secrets, _cw_previous_runtime_secret_names
+try:
+    del _cw_name, _cw_value
+except NameError:
+    pass
+`)
+  } finally {
+    pyodide.globals.delete('__cw_runtime_secrets_json')
+    pyodide.globals.delete('__cw_previous_runtime_secret_names_json')
+  }
+
+  injectedRuntimeSecretNames = new Set(Object.keys(secrets))
+}
+
 //=============================================================================
 // Message Handler
 //=============================================================================
@@ -686,7 +731,7 @@ async function handleMessage(/** @type {any} */ data) {
   }
 
   // Handle 'execute' type - run Python code
-  const { code, timeout = DEFAULT_TIMEOUT, mountDir, assetsDir, syncFs = true } = data
+  const { code, timeout = DEFAULT_TIMEOUT, mountDir, assetsDir, syncFs = true, runtimeSecrets } = data
 
   const startTime = performance.now()
   /** @type {number | undefined} */
@@ -712,6 +757,10 @@ async function handleMessage(/** @type {any} */ data) {
     if (data.skillsDir) {
       await ensureSkillsMounted(data.skillsDir)
     }
+
+    // Synchronize browser-local secrets immediately before loading/running the
+    // submitted code. Every Python execution receives the latest settings.
+    await syncRuntimeSecrets(runtimeSecrets)
 
     // Step 1: Load built-in Pyodide packages via import scanning
     // loadPackagesFromImports automatically scans imports and loads all built-in

@@ -45,6 +45,7 @@ import {
 import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
+import { SecretManager } from './SecretManager'
 import { OfflineQueue } from '@/components/mobile/OfflineQueue'
 import { MCPSettings } from '@/components/mcp/MCPSettings'
 import { WebMCPSettings } from '@/components/webmcp/WebMCPSettings'
@@ -91,6 +92,7 @@ type SettingsTab =
   | 'workspace-shortcuts'
   | 'workspace-data'
   | 'llm'
+  | 'secrets'
   | 'mcp'
   | 'webmcp'
   | 'extension'
@@ -1388,6 +1390,7 @@ const SettingsDialogContent = forwardRef<
     { id: 'workspace-shortcuts', label: t('workspaceSettings.tabs.shortcuts'), icon: <Keyboard className="h-4 w-4" /> },
     { id: 'workspace-data', label: t('workspaceSettings.tabs.data'), icon: <Database className="h-4 w-4" /> },
     { id: 'llm', label: t('settings.llmProvider'), icon: <Settings className="h-4 w-4" /> },
+    { id: 'secrets', label: t('settings.secrets.tab'), icon: <Lock className="h-4 w-4" /> },
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
     { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
     { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
@@ -1537,6 +1540,9 @@ const SettingsDialogContent = forwardRef<
               <ModelSettings open={open} />
             </BrandDialogBody>
           )}
+
+          {/* Secret Manager Tab */}
+          {activeTab === 'secrets' && <SecretManager />}
 
           {/* MCP Settings Tab */}
           {activeTab === 'mcp' && (

@@ -54,6 +54,14 @@ function isOPFSCorruptionError(errorMessage: string): boolean {
   )
 }
 
+/** Prevent runtime secrets from reaching browser diagnostics. */
+function redactRuntimeSecrets(value: string, runtimeSecrets?: Record<string, string>): string {
+  return Object.values(runtimeSecrets ?? {}).reduce(
+    (safeValue, secret) => (secret ? safeValue.split(secret).join('[REDACTED]') : safeValue),
+    value
+  )
+}
+
 //=============================================================================
 // Python Executor Class
 //=============================================================================
@@ -220,6 +228,11 @@ export class PythonExecutor {
     skillsDir?: FileSystemDirectoryHandle
     /** Whether to sync changes back to native filesystem after execution */
     syncFs?: boolean
+    /**
+     * Browser-local secrets injected into this execution's Python environment.
+     * Internal callers only: do not surface this through agent tool schemas.
+     */
+    runtimeSecrets?: Record<string, string>
   }): Promise<ExecuteResult> {
     // Ensure worker is initialized
     this.ensureWorker()
@@ -237,6 +250,7 @@ export class PythonExecutor {
       assetsDir: options.assetsDir,
       skillsDir: options.skillsDir,
       syncFs: options.syncFs,
+      runtimeSecrets: options.runtimeSecrets,
     }
 
     logger(`Executing Python code (id: ${id})`)
@@ -287,7 +301,7 @@ export class PythonExecutor {
     logger(`  Time: ${formatTime(response.result.executionTime)}`)
 
     if (response.result.error) {
-      logger(`  Error: ${response.result.error}`, 'error')
+      logger(`  Error: ${redactRuntimeSecrets(response.result.error, options.runtimeSecrets)}`, 'error')
 
       // Auto-recover from OPFS mount corruption.
       // When the OPFS PROXYFS mount state is corrupted (e.g. DOMException NotFoundError

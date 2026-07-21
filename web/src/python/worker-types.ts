@@ -37,6 +37,12 @@ export interface ExecuteRequest {
   skillsDir?: FileSystemDirectoryHandle
   /** Whether to sync changes back to native filesystem after execution */
   syncFs?: boolean
+  /**
+   * Browser-local secrets for this execution, mapped to Python environment
+   * variable names. This is internal runtime plumbing: never persist, log, or
+   * expose it as an agent tool parameter.
+   */
+  runtimeSecrets?: Record<string, string>
 }
 
 export interface ExecuteResult {
