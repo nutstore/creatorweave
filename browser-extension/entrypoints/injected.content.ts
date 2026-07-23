@@ -707,8 +707,45 @@ export default defineContentScript({
        * not parse). Returns `null` if the upstream tab did not expose a
        * provider, the tab is unreachable, or the request times out.
        */
-      async fetchSidePanelContext(tabId: number) {
-        return sendToBridge('requestSidePanelContext', { tabId })
+      async fetchBoundPageContext(binding: string) {
+        return sendToBridge('requestBoundPageContext', { binding })
+      },
+
+      /**
+       * Run a page-interaction action in the upstream tab's MAIN world.
+       *
+       * The extension relays `action` to `window.__cwPageAction.run(action)`
+       * inside the target tab (injected by page-action-runner.content.ts).
+       *
+       * The agent layer is responsible for authorization gating before
+       * calling this for write actions (click/fill/type/scroll/evaluate).
+       * The bridge itself is a pure transport — it does not enforce policy.
+       *
+       * `action` shape examples:
+       *   { type: 'snapshot' }
+       *   { type: 'click', locator: { ... } }
+       *   { type: 'fill', locator: { ... }, value: 'hello' }
+       *   { type: 'text_content', locator: { ... } }
+       *   { type: 'find_elements', locator: { ... } }
+       *
+       * Returns the raw runner result, always with an `ok` boolean. On
+       * failure, includes `errorCode` and `error` string.
+       */
+      async runBoundPageAction(binding: string, action: Record<string, unknown>) {
+        // Page actions (especially fill on ProseMirror/Yjs editors) can take
+        // unbounded time. Use 5 min timeout instead of the default 35s.
+        return sendToBridge('runBoundPageAction', { binding, action }, 300000)
+      },
+
+      /**
+       * Capture the visible viewport of the upstream tab as a PNG/JPEG data URL.
+       * Uses chrome.tabs.captureVisibleTab — no debugger permission, no yellow bar.
+       * Only captures the current viewport; for full-page, scroll + capture again.
+       *
+       * Returns: { ok, dataUrl, format } or { ok:false, errorCode, error }.
+       */
+      async captureBoundTab(binding: string, format?: 'png' | 'jpeg', quality?: number) {
+        return sendToBridge('captureBoundTab', { binding, format, quality })
       },
 
       /**

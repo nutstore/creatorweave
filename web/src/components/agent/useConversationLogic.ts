@@ -243,11 +243,25 @@ export function useConversationLogic() {
   }, [activeMessagesLength, status])
 
   // ── Tool results map ──
+  // Value includes the raw content string AND optional contentParts
+  // (for multimodal tool results like page_screenshot images).
   const buildToolResultsMap = useCallback((messages: Message[]) => {
     const map = new Map<string, string>()
     for (const msg of messages) {
       if (msg.role === 'tool' && msg.toolCallId) {
-        map.set(msg.toolCallId, msg.content || '')
+        // If the tool message has contentParts (e.g. screenshot images),
+        // serialize the full message (content + contentParts) as JSON so
+        // the renderer can extract the image.
+        if (msg.contentParts && msg.contentParts.length > 0) {
+          map.set(msg.toolCallId, JSON.stringify({
+            _envelope: true,
+            ok: true,
+            contentParts: msg.contentParts,
+            data: { note: msg.content?.slice(0, 200) },
+          }))
+        } else {
+          map.set(msg.toolCallId, msg.content || '')
+        }
       }
     }
     return map

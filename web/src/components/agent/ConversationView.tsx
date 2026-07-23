@@ -12,13 +12,14 @@
  */
 
 import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react'
-import { Send, StopCircle, AlertTriangle, RefreshCw, WifiOff, KeyRound } from 'lucide-react'
+import { Send, StopCircle, AlertTriangle, RefreshCw, WifiOff, KeyRound, ImageIcon, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
 import { TTSQueueIndicator } from './TTSQueueIndicator'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
-import { AgentModeSwitchCompact } from './AgentModeSwitch'
+import { AgentModeSelect } from './AgentModeSelect'
 import { useConversationLogic } from './useConversationLogic'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -35,6 +36,57 @@ import { ScrollToBottomButton } from './ScrollToBottomButton'
 import { MessageNavBar } from './MessageNavBar'
 import { AssetsPopover } from './AssetsPopover'
 import { ConversationActionContext } from './ConversationActionContext'
+import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
+import { captureTab, isPageActionAvailable } from '@/agent/tools/page-action-bridge'
+import { useAssetStore } from '@/store/asset.store'
+import { PageScreenshotCropDialog } from './PageScreenshotCropDialog'
+
+const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
+  modelName,
+  canCapture,
+  isCapturing,
+  onCapture,
+}: {
+  modelName: string
+  canCapture: boolean
+  isCapturing: boolean
+  onCapture: () => void
+}) {
+  const t = useT()
+  const supportsVision = supportsImageInput(modelName)
+  const label = !supportsVision
+    ? t('agent.vision.unsupported')
+    : canCapture
+      ? t('agent.vision.capture')
+      : t('agent.vision.supported')
+
+  return (
+    <TooltipProvider delayDuration={250}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <button
+              type="button"
+              aria-label={label}
+              disabled={!canCapture || isCapturing}
+              onClick={onCapture}
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed ${
+                supportsVision
+                  ? 'border-primary-200 bg-primary-50 text-primary-600 dark:border-primary-800/70 dark:bg-primary-950/40 dark:text-primary-300'
+                  : 'border-neutral-200 bg-neutral-50 text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600'
+              }`}
+            >
+              {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />}
+            </button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>{label}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+})
+
 /** Send / Cancel button — memoized to only re-render when its specific props change */
 const SendCancelButton = memo(function SendCancelButton({
   isProcessing,
@@ -117,8 +169,11 @@ export function ConversationView({
   const t = useT()
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
   const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
+  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null)
+  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
   const conversationMessagesRef = useRef<ConversationMessagesHandle>(null)
   const richInputRef = useRef<AgentRichInputHandle>(null)
+  const modelName = useSettingsStore((s) => s.modelName)
 
   const logic = useConversationLogic()
   const {
@@ -143,6 +198,31 @@ export function ConversationView({
     if (!convId) return
     sendMessage('继续')
   }, [convId, sendMessage])
+
+  const supportsVision = supportsImageInput(modelName)
+  const canCaptureScreenshot = supportsVision && isPageActionAvailable()
+
+  const handleCaptureScreenshot = useCallback(async () => {
+    if (!canCaptureScreenshot || isCapturingScreenshot) return
+    setIsCapturingScreenshot(true)
+    try {
+      const result = await captureTab('png')
+      if (!result.ok || !result.dataUrl) {
+        throw new Error(result.error || t('agent.pageScreenshot.captureFailed'))
+      }
+      setScreenshotDataUrl(result.dataUrl)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('agent.pageScreenshot.captureFailed'))
+    } finally {
+      setIsCapturingScreenshot(false)
+    }
+  }, [canCaptureScreenshot, isCapturingScreenshot, t])
+
+  const handleScreenshotConfirm = useCallback((file: File) => {
+    useAssetStore.getState().addFiles([file])
+    setScreenshotDataUrl(null)
+    richInputRef.current?.focus()
+  }, [])
 
   // ── File search for # file mention ──
   // isComposing ref is toggled by AgentRichInput via onSetIsComposing callback
@@ -477,7 +557,13 @@ export function ConversationView({
                 setEnableThinking={setEnableThinking}
                 setThinkingLevel={setThinkingLevel}
               />
-              <AgentModeSwitchCompact mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
+              <AgentModeSelect mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
+              <VisionCapabilityIndicator
+                modelName={modelName}
+                canCapture={canCaptureScreenshot}
+                isCapturing={isCapturingScreenshot}
+                onCapture={() => void handleCaptureScreenshot()}
+              />
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <ContextUsageBar contextWindowUsage={activeContextWindowUsage} isProcessing={isProcessing} />
@@ -485,6 +571,14 @@ export function ConversationView({
           </div>
         </div>
       </div>
+
+      {screenshotDataUrl && (
+        <PageScreenshotCropDialog
+          imageDataUrl={screenshotDataUrl}
+          onConfirm={handleScreenshotConfirm}
+          onCancel={() => setScreenshotDataUrl(null)}
+        />
+      )}
 
       <WorkflowEditorDialog
         open={workflowEditorOpen}

@@ -595,8 +595,55 @@ function applyThinkingParams(
 // Message Converters (Chat Completions format)
 // =============================================================================
 
+/**
+ * Ensure every assistant tool_call in the API message array has a matching
+ * tool result. Inserts synthetic results for orphaned tool_call ids.
+ * See sanitizeOrphanedToolCalls in llm-provider.ts for the same logic at
+ * the ChatMessage level — this is the API-level safety net.
+ */
+function sanitizeApiMessages(messages: Record<string, unknown>[]): Record<string, unknown>[] {
+  if (messages.length === 0) return messages
+
+  const resolvedIds = new Set<string>()
+  for (const msg of messages) {
+    if (msg.role === 'tool' && typeof msg.tool_call_id === 'string') {
+      resolvedIds.add(msg.tool_call_id)
+    }
+  }
+
+  const result: Record<string, unknown>[] = []
+  let patched = 0
+
+  for (const msg of messages) {
+    result.push(msg)
+
+    if (msg.role === 'assistant' && Array.isArray(msg.tool_calls)) {
+      const orphans = (msg.tool_calls as Array<{ id: string }>).filter(
+        (tc) => !resolvedIds.has(tc.id),
+      )
+      for (const orphan of orphans) {
+        result.push({
+          role: 'tool',
+          tool_call_id: orphan.id,
+          content: JSON.stringify({
+            status: 'interrupted',
+            message: 'Tool execution was interrupted before completing.',
+          }),
+        })
+        patched++
+      }
+    }
+  }
+
+  if (patched > 0) {
+    console.warn(`[convertContextMessages] Patched ${patched} orphaned tool_call(s) with synthetic results.`)
+  }
+
+  return result
+}
+
 function convertContextMessages(context: Context, model: Model<Api>): unknown[] {
-  const messages: unknown[] = []
+  const messages: Record<string, unknown>[] = []
 
   if (context.systemPrompt) {
     messages.push({
@@ -684,14 +731,30 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
     }
 
     if (message.role === 'toolResult') {
-      const text = message.content
+      const textParts = message.content
         .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
         .map((part) => part.text)
         .join('\n')
+      const imageParts = message.content
+        .filter((part): part is { type: 'image'; data: string; mimeType: string } => part.type === 'image')
 
       const toolMessage: Record<string, unknown> = {
         role: 'tool',
-        content: text || '(empty tool result)',
+        // If the tool returned images (e.g. page_screenshot), emit a
+        // multimodal content array (text + image_url parts) so vision-capable
+        // models can see the image. For text-only models, the fetch layer
+        // strips out image parts at request-build time (see model.input check
+        // in the user-content branch above).
+        content:
+          imageParts.length > 0
+            ? [
+                ...imageParts.map((p) => ({
+                  type: 'image_url' as const,
+                  image_url: { url: `data:${p.mimeType};base64,${p.data}` },
+                })),
+                ...(textParts ? [{ type: 'text' as const, text: textParts }] : []),
+              ]
+            : textParts || '(empty tool result)',
         tool_call_id: message.toolCallId,
       }
 
@@ -703,7 +766,11 @@ function convertContextMessages(context: Context, model: Model<Api>): unknown[] 
     }
   }
 
-  return messages
+  // ── Sanitize: ensure every tool_call has a matching tool result ──
+  // Strict providers (e.g. MiniMax error 2013) reject if an assistant
+  // tool_call lacks a following tool result. This happens when the agent
+  // loop is interrupted (user abort, new message) mid-execution.
+  return sanitizeApiMessages(messages)
 }
 
 // =============================================================================

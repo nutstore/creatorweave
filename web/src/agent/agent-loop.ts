@@ -24,6 +24,7 @@ import { executePiCoreLoop } from './loop/pi-core-runner'
 import { extractTextContent } from './loop/message-mappers'
 import type { AgentCallbacks, AgentLoopConfig } from './loop/types'
 import { generateId } from './message-types'
+import { ensureToolCallResults } from './loop/tool-call-results'
 
 export type {
   AfterToolCallHookContext,
@@ -38,7 +39,14 @@ export type {
 const MAX_ITERATIONS = 20
 const DEFAULT_SYSTEM_PROMPT = getUniversalSystemPrompt()
 const DEFAULT_TOOL_TIMEOUT = 30000
-const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>(['spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image', 'search_tools'])
+const TOOL_TIMEOUT_EXEMPTIONS = new Set<string>([
+  'spawn_subagent', 'batch_spawn', 'ask_user_question', 'generate_image', 'search_tools',
+  // Page action tools — interact with the upstream page which may involve
+  // complex editors (ProseMirror, Yjs协同) that take unbounded time.
+  'page_snapshot', 'page_text_content', 'page_find_elements', 'page_synthesize_locators',
+  'page_click', 'page_fill', 'page_type', 'page_scroll', 'page_evaluate',
+  'page_screenshot',
+])
 const COMPRESSED_MEMORY_PREFIX = 'Earlier conversation summary:'
 
 export class AgentLoop {
@@ -173,8 +181,9 @@ export class AgentLoop {
           reason: 'signal_aborted',
           messagesCount: allMessages.length,
         })
-        callbacks?.onComplete?.(allMessages)
-        return allMessages
+        const patched = ensureToolCallResults(allMessages)
+        callbacks?.onComplete?.(patched)
+        return patched
       }
       console.error('[#LoopStop] pi_core_run_error', {
         error: error instanceof Error ? error.message : String(error),
@@ -186,8 +195,9 @@ export class AgentLoop {
       console.warn('[#LoopStop] stop_for_elicitation', {
         messagesCount: allMessages.length,
       })
-      callbacks?.onComplete?.(allMessages)
-      return allMessages
+      const patched = ensureToolCallResults(allMessages)
+      callbacks?.onComplete?.(patched)
+      return patched
     }
 
     if (reachedMaxIterations) {
@@ -209,11 +219,12 @@ export class AgentLoop {
       }
     }
 
-    callbacks?.onComplete?.(allMessages)
+    const finalMessages = ensureToolCallResults(allMessages)
+    callbacks?.onComplete?.(finalMessages)
     console.info('[#LoopStop] completed_normally', {
-      messagesCount: allMessages.length,
+      messagesCount: finalMessages.length,
     })
-    return allMessages
+    return finalMessages
   }
 
   /**

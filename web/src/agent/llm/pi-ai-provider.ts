@@ -175,12 +175,33 @@ export class PiAIProvider implements LLMProvider {
       }
 
       if (msg.role === 'tool') {
-        const text = extractTextContent(msg.content) || ''
+        // The executor's content array may contain multimodal parts
+        // (text + image). Pass them through as-is so the fetch layer can
+        // emit image_url content parts for vision-capable models. For
+        // text-only models, the fetcher strips image parts at request-build.
+        const rawContent = Array.isArray(msg.content) ? msg.content : null
+        const text = rawContent
+          ? rawContent
+              .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+              .map((part) => part.text)
+              .join('')
+          : extractTextContent(msg.content) || ''
+        const contentParts = rawContent
+          ? rawContent.filter(
+              (part): part is { type: 'image'; data: string; mimeType: string } =>
+                part.type === 'image',
+            )
+          : undefined
         messages.push({
           role: 'toolResult',
           toolCallId: msg.tool_call_id || '',
           toolName: msg.name || 'tool',
-          content: [{ type: 'text', text }],
+          content: contentParts && contentParts.length > 0
+            ? [
+                ...contentParts,
+                ...(text ? [{ type: 'text' as const, text }] : []),
+              ]
+            : [{ type: 'text', text }],
           isError: text.startsWith('Error:'),
           timestamp: Date.now(),
         })

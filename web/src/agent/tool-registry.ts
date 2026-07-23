@@ -118,6 +118,36 @@ import {
   webBridgePromptDoc,
 } from './tools/web-bridge.tool'
 
+// Page action tools (conditional — requires Browser Extension + side panel)
+import {
+  pageSnapshotDefinition,
+  pageSnapshotExecutor,
+  pageTextContentDefinition,
+  pageTextContentExecutor,
+  pageFindElementsDefinition,
+  pageFindElementsExecutor,
+  pageSynthesizeLocatorsDefinition,
+  pageSynthesizeLocatorsExecutor,
+  pageScreenshotDefinition,
+  pageScreenshotExecutor,
+  pageReadPromptDoc,
+} from './tools/page-read.tool'
+import {
+  pageClickDefinition,
+  pageClickExecutor,
+  pageFillDefinition,
+  pageFillExecutor,
+  pageTypeDefinition,
+  pageTypeExecutor,
+  pageScrollDefinition,
+  pageScrollExecutor,
+  pageEvaluateDefinition,
+  pageEvaluateExecutor,
+  pageWritePromptDoc,
+} from './tools/page-write.tool'
+import { isPageActionAvailable } from './tools/page-action-bridge'
+import { supportsImageInput } from './llm/pi-ai-model-resolver'
+
 // Image generation tool (conditional — requires image gen model in provider cache)
 import {
   isImageGenAvailable,
@@ -214,6 +244,9 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   unifiedExternalToolsPromptDoc,
   imageGenPromptDoc,
   schedulePromptDoc,
+  // Page action tools (only rendered when available — see getAvailableToolsDoc)
+  pageReadPromptDoc,
+  pageWritePromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -273,6 +306,8 @@ export class ToolRegistry {
     for (const doc of ALL_PROMPT_DOCS) {
       // Skip web bridge tools if not available
       if (doc.category === 'web' && !isWebBridgeAvailable()) continue
+      // Skip page action tools if not available (extension + side panel)
+      if (doc.category === 'page' && !isPageActionAvailable()) continue
       // External tools doc always shown — search_tools is always useful even with 0 external tools connected
       // Skip image gen tools if image gen model is not available
       if (doc.category === 'file-ops' && doc === imageGenPromptDoc && !isImageGenAvailable()) continue
@@ -437,6 +472,98 @@ export class ToolRegistry {
   }
 
   //=============================================================================
+  // Page Action Tools (Browser Extension + side panel)
+  //=============================================================================
+
+  /**
+   * Register page_snapshot / page_text_content / page_find_elements /
+   * page_synthesize_locators (read) and page_click / page_fill / page_type /
+   * page_scroll / page_evaluate (write) tools.
+   *
+   * All page-action tools are registered together (read + write). Mode-based
+   * filtering is handled by getToolDefinitionsForMode() via TOOL_MODE_CLASSIFICATION:
+   *   - Plan mode: only read tools (snapshot/text/find/synthesize) are visible to the LLM
+   *   - Act mode: all tools (including click/fill/type/scroll/evaluate) are visible
+   *
+   * Per-call authorization (URL blacklist + session YOLO) is enforced inside
+   * each write tool's executor via page-action-auth.resolveWriteAuthorization.
+   *
+   * Safe to call multiple times.
+   */
+  registerPageActionTools(): boolean {
+    if (!isPageActionAvailable()) return false
+    if (this.has('page_snapshot')) {
+      // Already registered, but still re-check screenshot (model may have changed)
+      this.registerPageScreenshotTool()
+      return true
+    }
+
+    this.register(pageSnapshotDefinition, pageSnapshotExecutor)
+    this.register(pageTextContentDefinition, pageTextContentExecutor)
+    this.register(pageFindElementsDefinition, pageFindElementsExecutor)
+    this.register(pageSynthesizeLocatorsDefinition, pageSynthesizeLocatorsExecutor)
+
+    // Screenshot: conditional on vision support — re-evaluated on model change
+    this.registerPageScreenshotTool()
+
+    this.register(pageClickDefinition, pageClickExecutor)
+    this.register(pageFillDefinition, pageFillExecutor)
+    this.register(pageTypeDefinition, pageTypeExecutor)
+    this.register(pageScrollDefinition, pageScrollExecutor)
+    this.register(pageEvaluateDefinition, pageEvaluateExecutor)
+
+    console.log('[ToolRegistry] ✅ Page action tools registered (Browser Extension + side panel; mode-filtered)')
+    return true
+  }
+
+  /**
+   * Conditionally register/unregister page_screenshot based on whether the
+   * current model supports vision input. Called on initial registration AND
+   * whenever the model changes (via the settings subscribe listener).
+   */
+  registerPageScreenshotTool(): void {
+    const shouldHave = isPageActionAvailable() && this.isVisionModelAvailable()
+    const has = this.has('page_screenshot')
+    if (shouldHave && !has) {
+      this.register(pageScreenshotDefinition, pageScreenshotExecutor)
+      console.log('[ToolRegistry] ✅ page_screenshot registered (vision model detected)')
+    } else if (!shouldHave && has) {
+      this.unregister('page_screenshot')
+      console.log('[ToolRegistry] page_screenshot unregistered (model does not support vision)')
+    }
+  }
+
+  /**
+   * Check if the current model supports image input (vision).
+   * Uses the OpenRouter modality snapshot via supportsImageInput().
+   */
+  private isVisionModelAvailable(): boolean {
+    try {
+      const { modelName } = useSettingsStore.getState()
+      if (!modelName) return false
+      return supportsImageInput(modelName)
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Unregister page action tools (e.g. when leaving side-panel mode
+   * or when feature flags are toggled off).
+   */
+  unregisterPageActionTools(): void {
+    this.unregister('page_snapshot')
+    this.unregister('page_text_content')
+    this.unregister('page_find_elements')
+    this.unregister('page_synthesize_locators')
+    this.unregister('page_click')
+    this.unregister('page_fill')
+    this.unregister('page_type')
+    this.unregister('page_scroll')
+    this.unregister('page_evaluate')
+  }
+
+  //=============================================================================
   // Image Generation Tool (conditional — requires model in provider cache)
   //=============================================================================
 
@@ -560,6 +687,29 @@ function ensureImageGenListener(): void {
       }
     }
   })
+
+  // Re-check page_screenshot when the model name changes
+  // (vision support depends on the specific model)
+  useSettingsStore.subscribe((state, prev) => {
+    if (state.modelName !== prev.modelName) {
+      if (instance) {
+        const had = instance.has('page_screenshot')
+        instance.registerPageScreenshotTool()
+        const has = instance.has('page_screenshot')
+        if (had !== has) notifyToolsChanged()
+      }
+    }
+  })
+
+  // Also re-check when models are cached/updated (modalities may load late)
+  onModelsUpdated(() => {
+    if (instance) {
+      const had = instance.has('page_screenshot')
+      instance.registerPageScreenshotTool()
+      const has = instance.has('page_screenshot')
+      if (had !== has) notifyToolsChanged()
+    }
+  })
 }
 
 export function getToolRegistry(): ToolRegistry {
@@ -569,6 +719,8 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerSkillTools()
     // Conditionally register web bridge tools (Browser Extension)
     instance.registerWebBridgeTools()
+    // Conditionally register page action tools (Browser Extension + side panel)
+    instance.registerPageActionTools()
     // Set up listener for model cache updates (triggers image gen tool re-registration)
     ensureImageGenListener()
   } else {
@@ -576,6 +728,8 @@ export function getToolRegistry(): ToolRegistry {
     // installed after page load). registerWebBridgeTools() is idempotent — it
     // checks both availability and existing registration.
     instance.registerWebBridgeTools()
+    // Also try page action tools (side-panel mode may have just become active)
+    instance.registerPageActionTools()
     // Also re-check image gen tool on every access
     instance.registerImageGenTool()
   }

@@ -1098,6 +1098,35 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(toolMessages[0].content).toBe('README content')
   })
 
+  it('repairs a persisted orphaned tool call when cancelling a run', () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('cancel-repair-orphan')
+    const orphanedToolCall = {
+      id: 'tool-orphan-1',
+      type: 'function' as const,
+      function: { name: 'ask_user_question', arguments: '{"question":"Continue?"}' },
+    }
+
+    useConversationStore.setState((state) => {
+      const target = state.conversations.find((c) => c.id === conv.id)
+      if (!target) return state
+      target.messages = [
+        createUserMessage('hello'),
+        createAssistantMessage(null, [orphanedToolCall]),
+      ]
+      target.status = 'tool_calling'
+      target.activeRunId = 'run-orphan'
+      setAgentLoop(conv.id, { cancel: vi.fn() } as any)
+      return state
+    })
+
+    useConversationStore.getState().cancelAgent(conv.id)
+
+    const updated = useConversationStore.getState().conversations.find((c) => c.id === conv.id)
+    expect(updated?.messages.find((message) => message.role === 'tool' && message.toolCallId === orphanedToolCall.id))
+      .toMatchObject({ name: 'ask_user_question' })
+  })
+
   it('preserves in-flight spawn_subagent on cancel with synthetic interrupted result', () => {
     const store = useConversationStore.getState()
     const conv = store.createNew('cancel-spawn-subagent')

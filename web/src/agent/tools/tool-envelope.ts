@@ -3,6 +3,13 @@ export interface ToolEnvelopeSuccess<T = unknown> {
   tool: string
   version: 2
   data: T
+  /**
+   * Optional multimodal content parts (text + image). When present, the
+   * agent loop renders the tool result as a multimodal message instead of
+   * a flat text block. Used by page_screenshot to deliver images to
+   * vision-capable models.
+   */
+  contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
   meta?: Record<string, unknown>
 }
 
@@ -24,17 +31,29 @@ export interface ToolEnvelopeFailure {
 
 export type ToolEnvelopeV2<T = unknown> = ToolEnvelopeSuccess<T> | ToolEnvelopeFailure
 
+type ToolOkOptions = {
+  meta?: Record<string, unknown>
+  contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
+}
+
 export function toolOkJson<T>(
   tool: string,
   data: T,
-  meta?: Record<string, unknown>
+  options?: ToolOkOptions | Record<string, unknown>
 ): string {
+  // The previous API accepted metadata directly as the third argument.
+  // Preserve that contract while allowing the new contentParts wrapper.
+  const wrappedOptions: ToolOkOptions = options &&
+    (Object.prototype.hasOwnProperty.call(options, 'meta') || Object.prototype.hasOwnProperty.call(options, 'contentParts'))
+    ? options as ToolOkOptions
+    : { meta: options as Record<string, unknown> | undefined }
   const payload: ToolEnvelopeSuccess<T> = {
     ok: true,
     tool,
     version: 2,
     data,
-    ...(meta ? { meta } : {}),
+    ...(wrappedOptions.contentParts ? { contentParts: wrappedOptions.contentParts } : {}),
+    ...(wrappedOptions.meta ? { meta: wrappedOptions.meta } : {}),
   }
   return JSON.stringify(payload)
 }

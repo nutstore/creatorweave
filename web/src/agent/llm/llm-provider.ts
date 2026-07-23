@@ -114,7 +114,7 @@ export interface LLMProvider {
 
 /** Convert internal Message[] to ChatMessage[] for API calls */
 export function messagesToChatMessages(messages: Message[]): ChatMessage[] {
-  return messages.map((msg) => {
+  const raw = messages.map((msg) => {
     // For multimodal messages (user uploads with images), pass the content
     // array as `content` so pi-ai's openai-responses-shared handler will
     // emit `input_image` parts.  Otherwise fall back to the text content.
@@ -149,4 +149,79 @@ export function messagesToChatMessages(messages: Message[]): ChatMessage[] {
 
     return chatMsg
   })
+
+  // ── Sanitize: ensure every assistant tool_call has a matching tool result ──
+  // Some providers (e.g. MiniMax) reject requests with HTTP 400 "tool call
+  // result does not follow tool call" if an assistant message contains
+  // tool_calls but the following messages don't contain a tool result for
+  // every tool_call id. This happens when:
+  //   - The agent loop was interrupted (user sent a new message, abort, etc.)
+  //   - ask_user_question was used (its result is a user message, not a tool result)
+  //   - Network error during tool execution
+  // We insert synthetic tool results for any orphaned tool_call ids so the
+  // message sequence is always valid for strict providers.
+  return sanitizeOrphanedToolCalls(raw)
+}
+
+/**
+ * Ensure every assistant tool_call has a corresponding tool result message.
+ *
+ * Scans the message array for assistant messages containing tool_calls. For
+ * each tool_call id, checks if a subsequent `role: 'tool'` message with a
+ * matching `tool_call_id` exists. If not, inserts a synthetic tool result.
+ *
+ * This fixes HTTP 400 errors from strict providers (e.g. MiniMax error 2013:
+ * "tool call result does not follow tool call") that occur when the agent
+ * loop is interrupted mid-tool-execution (user abort, new message, timeout).
+ */
+function sanitizeOrphanedToolCalls(messages: ChatMessage[]): ChatMessage[] {
+  if (messages.length === 0) return messages
+
+  // Collect all tool_call ids that have a matching tool result
+  const resolvedToolCallIds = new Set<string>()
+  for (const msg of messages) {
+    if (msg.role === 'tool' && msg.tool_call_id) {
+      resolvedToolCallIds.add(msg.tool_call_id)
+    }
+  }
+
+  // Build the output, inserting synthetic results after orphaned assistant tool_calls
+  const result: ChatMessage[] = []
+  let insertedCount = 0
+
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i]!
+    result.push(msg)
+
+    // If this is an assistant message with tool_calls, check for orphans
+    if (msg.role === 'assistant' && msg.tool_calls && msg.tool_calls.length > 0) {
+      const orphans = msg.tool_calls.filter(
+        (tc) => !resolvedToolCallIds.has(tc.id),
+      )
+
+      if (orphans.length > 0) {
+        // Insert synthetic tool results right after this assistant message
+        for (const orphan of orphans) {
+          result.push({
+            role: 'tool',
+            tool_call_id: orphan.id,
+            content: JSON.stringify({
+              status: 'interrupted',
+              message: 'Tool execution was interrupted before completing. The user may have sent a new message or aborted the run.',
+            }),
+          })
+          insertedCount++
+        }
+      }
+    }
+  }
+
+  if (insertedCount > 0) {
+    console.warn(
+      `[messagesToChatMessages] Inserted ${insertedCount} synthetic tool result(s) for orphaned tool_call(s). ` +
+      'This happens when the agent loop is interrupted mid-execution.',
+    )
+  }
+
+  return result
 }

@@ -7,6 +7,11 @@ import { invokeWebMCPTool } from './webmcp/invoke'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
 import type { WebMCPPluginDownloadPlan } from './webmcp/types'
 import { listVoices as edgeTTSListVoices } from '../utils/tts'
+import {
+  isSidePanelBindingId,
+  isTrustedCreatorWeaveSenderUrl,
+} from '../lib/page-action-authorization'
+import { SidePanelBindingStore, type SidePanelBinding } from '../lib/side-panel-binding-store'
 
 // Config
 const CONFIG = {
@@ -18,6 +23,34 @@ const CONFIG = {
 };
 
 const completedPluginDownloads = new Map<string, { completedAt: number; savedPath?: string }>()
+
+const SIDE_PANEL_BINDINGS_STORAGE_KEY = 'cw_side_panel_bindings_v1'
+const sidePanelBindings = new SidePanelBindingStore({
+  async get() {
+    const stored = await chrome.storage.local.get(SIDE_PANEL_BINDINGS_STORAGE_KEY)
+    return (stored[SIDE_PANEL_BINDINGS_STORAGE_KEY] ?? {}) as Record<string, SidePanelBinding>
+  },
+  async set(bindings) {
+    await chrome.storage.local.set({ [SIDE_PANEL_BINDINGS_STORAGE_KEY]: bindings })
+  },
+})
+
+function rememberSidePanelBinding(bindingId: string, tabId: number): void {
+  void sidePanelBindings.remember(bindingId, tabId).catch(() => {})
+}
+
+async function resolveBoundSidePanelTab(senderUrl: string | undefined, bindingId: unknown): Promise<number | null> {
+  if (!isTrustedCreatorWeaveSenderUrl(senderUrl) || !isSidePanelBindingId(bindingId)) return null
+  const binding = await sidePanelBindings.resolve(bindingId).catch(() => null)
+  if (!binding || !Number.isSafeInteger(binding.tabId)) return null
+
+  try {
+    await chrome.tabs.get(binding.tabId)
+    return binding.tabId
+  } catch {
+    return null
+  }
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -940,10 +973,13 @@ export default defineBackground(() => {
     // Toggles: if the side panel is currently open for this tab, close it
     // (via setOptions { enabled: false }); otherwise open it.
     //
-    // URL params carry ONLY routing metadata (source / tabId / origin).
+    // URL params carry only the initial routing metadata. The web app stores
+    // that transient state in sessionStorage and removes it from the URL.
+    // The extension owns target selection through an opaque binding. The web
+    // app stores that binding in sessionStorage after cleaning the URL.
     // Page context (URL/title/selected text/business fields) is fetched
     // live per LLM call via the pull-based bridge — see
-    // `requestSidePanelContext` handler below.
+    // `requestBoundPageContext` handler below.
     if (message.type === 'cw_side_panel_toggle') {
       const tabId = _sender?.tab?.id
       if (typeof tabId !== 'number') return false
@@ -965,10 +1001,12 @@ export default defineBackground(() => {
 
       // ── Toggle open ──
       const pageUrl = typeof message.url === 'string' ? message.url : ''
+      const bindingId = crypto.randomUUID()
+      rememberSidePanelBinding(bindingId, tabId)
 
       const params = new URLSearchParams()
       params.set('source', 'side_panel')
-      params.set('tabId', String(tabId))
+      params.set('binding', bindingId)
       if (pageUrl) {
         try {
           params.set('origin', new URL(pageUrl).origin)
@@ -1035,7 +1073,7 @@ export default defineBackground(() => {
 
         // ── Workspace Assistant: pull page context from upstream tab ──
         //
-        // CreatorWeave side panel sends {type:'requestSidePanelContext', tabId}.
+        // CreatorWeave side panel sends {type:'requestBoundPageContext'}.
         // We execute in the upstream tab's MAIN world and combine two sources:
         //   - __cwUpstreamPage.{getUrl,getTitle,getSelectedText}   ← OUR content script
         //     (upstream-page.content.ts), present on ALL URLs (matches
@@ -1049,9 +1087,9 @@ export default defineBackground(() => {
         // Return shape: { url, title, selectedText, providerContext } | null
         // The split makes responsibility clear: url/title/selectedText are
         // "what we recorded", providerContext is "what the upstream site told us".
-        if (message.type === 'requestSidePanelContext') {
-          const targetTabId = message.tabId
-          if (typeof targetTabId !== 'number') {
+        if (message.type === 'requestBoundPageContext') {
+          const targetTabId = await resolveBoundSidePanelTab(_sender?.url, message.binding)
+          if (targetTabId === null) {
             sendResponse(null)
             return
           }
@@ -1127,8 +1165,137 @@ export default defineBackground(() => {
             const result = Array.isArray(results) ? results[0]?.result : null
             sendResponse(result ?? null)
           } catch (err: any) {
-            console.warn('[Background] requestSidePanelContext failed:', err?.message || err)
+            console.warn('[Background] requestBoundPageContext failed:', err?.message || err)
             sendResponse(null)
+          }
+          return
+        }
+
+        // ── Page Action Runner ─────────────────────────────────────────
+        // CreatorWeave side panel sends
+        //   { type: 'runBoundPageAction', action }
+        // where `action` is a page-interaction primitive (snapshot /
+        // click / fill / type / scroll / find_elements / text_content /
+        // evaluate) defined in page-action-runner.content.ts.
+        //
+        // We execute in the upstream tab's MAIN world, where
+        // `window.__cwPageAction.run(action)` is injected by our
+        // page-action-runner content script.
+        //
+        // The extension boundary restricts this bridge to CreatorWeave's
+        // trusted side-panel origin and extension-owned binding, preventing
+        // untrusted webpages from invoking MAIN-world page actions. The agent
+        // layer remains responsible for UI confirmation of write actions.
+        if (message.type === 'runBoundPageAction') {
+          const targetTabId = await resolveBoundSidePanelTab(_sender?.url, message.binding)
+          if (targetTabId === null) {
+            sendResponse({
+              ok: false,
+              errorCode: 'UNAUTHORIZED_TARGET',
+              error: 'Page actions require a valid side-panel binding.',
+            })
+            return
+          }
+
+          const sidePanelOptions = await chrome.sidePanel.getOptions({ tabId: targetTabId })
+          if (!sidePanelOptions.enabled) {
+            sendResponse({
+              ok: false,
+              errorCode: 'UNAUTHORIZED_TARGET',
+              error: 'Page actions require an open side panel for the target tab.',
+            })
+            return
+          }
+
+          const action = message.action
+          if (!action || typeof action !== 'object') {
+            sendResponse({ ok: false, errorCode: 'INVALID_REQUEST', error: 'runBoundPageAction requires { action: object }' })
+            return
+          }
+          try {
+            const results = await chrome.scripting.executeScript({
+              target: { tabId: targetTabId },
+              world: 'MAIN',
+              func: async (a: unknown) => {
+                const w = window as unknown as {
+                  __cwPageAction?: { ready: boolean; run: (a: unknown) => Promise<unknown> }
+                }
+                const runner = w.__cwPageAction
+                if (!runner?.ready || typeof runner.run !== 'function') {
+                  return {
+                    ok: false,
+                    errorCode: 'RUNNER_NOT_READY',
+                    error: 'Page action runner not injected in this tab. The page-action-runner content script may not have loaded (extension reload, restricted URL, or injection race).',
+                  }
+                }
+                try {
+                  return await runner.run(a)
+                } catch (err: any) {
+                  return {
+                    ok: false,
+                    errorCode: 'RUNNER_ERROR',
+                    error: err?.message || String(err),
+                  }
+                }
+              },
+              args: [action],
+            })
+            const result = Array.isArray(results) ? results[0]?.result : null
+            sendResponse(result ?? { ok: false, errorCode: 'NO_RESULT', error: 'executeScript returned no result' })
+          } catch (err: any) {
+            // Common causes: tab gone, restricted URL (chrome://, web store),
+            // host permission missing. Surface as structured error.
+            sendResponse({
+              ok: false,
+              errorCode: 'EXECUTE_SCRIPT_FAILED',
+              error: err?.message || String(err),
+            })
+          }
+          return
+        }
+
+        // ── Capture Visible Tab ───────────────────────────────────────
+        // Captures the visible area of the upstream tab as a PNG/JPEG data URL.
+        // Uses chrome.tabs.captureVisibleTab (no debugger permission needed,
+        // no yellow debug bar). Only captures the current viewport — for
+        // full-page capture, the agent should scroll + capture multiple times.
+        if (message.type === 'captureBoundTab') {
+          const targetTabId = await resolveBoundSidePanelTab(_sender?.url, message.binding)
+          if (targetTabId === null) {
+            sendResponse({ ok: false, errorCode: 'UNAUTHORIZED_TARGET', error: 'Missing or invalid side-panel binding.' })
+            return
+          }
+          const sidePanelOptions = await chrome.sidePanel.getOptions({ tabId: targetTabId })
+          if (!sidePanelOptions.enabled) {
+            sendResponse({
+              ok: false,
+              errorCode: 'UNAUTHORIZED_TARGET',
+              error: 'Screenshots require an open side panel for the target tab.',
+            })
+            return
+          }
+
+          const format = message.format === 'jpeg' ? 'jpeg' : 'png'
+          const quality = typeof message.quality === 'number' ? Math.max(0, Math.min(100, message.quality)) : undefined
+          try {
+            // Find the window that owns the target tab
+            const tab = await chrome.tabs.get(targetTabId)
+            if (!tab.active) {
+              sendResponse({ ok: false, errorCode: 'TARGET_NOT_VISIBLE', error: 'The side-panel tab is not the visible tab in its window.' })
+              return
+            }
+            const windowId = tab.windowId
+            const dataUrl = await chrome.tabs.captureVisibleTab(windowId, {
+              format,
+              ...(quality !== undefined ? { quality } : {}),
+            })
+            sendResponse({ ok: true, dataUrl, format })
+          } catch (err: any) {
+            sendResponse({
+              ok: false,
+              errorCode: 'CAPTURE_FAILED',
+              error: err?.message || String(err),
+            })
           }
           return
         }

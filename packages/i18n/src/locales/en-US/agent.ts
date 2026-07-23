@@ -14,10 +14,12 @@ export const agent = {
     mode: {
         plan: "Plan",
         act: "Act",
+        yolo: "YOLO",
         planDescription: "Read-only mode. Agent can analyze and plan but cannot modify files.",
         actDescription: "Full-access mode. Agent can read, write, and modify files.",
         planShort: "Read-only analysis",
         actShort: "Full access enabled",
+        yoloShort: "Writes auto-allowed",
         planLabel: "Read-only analysis mode",
         actLabel: "Full read/write access",
         switchTo: "Switch to",
@@ -27,6 +29,20 @@ export const agent = {
         actModeTitle: "Act Mode",
         planReadonly: "Read-only",
         actFullAccess: "Full access",
+    },
+    vision: {
+        supported: "Current model supports image input",
+        unsupported: "Current model does not support image input",
+        capture: "Capture current page",
+        screenshotUnavailable: "Use the screenshot feature from the browser side panel",
+    },
+    pageScreenshot: {
+        title: "Capture current page",
+        description: "Drag to select an area, or send the full screenshot as is",
+        cancelAria: "Cancel screenshot",
+        insert: "Insert image",
+        captureFailed: "Unable to capture the current page",
+        cropFailed: "Unable to create screenshot",
     },
 
     toolSearch: {
@@ -48,5 +64,11 @@ export const agent = {
             "AI can read and edit files in a folder you authorize, and save content locally.",
         selectFolder: "Select Folder",
         later: "Later",
+    },
+
+    pageWriteAuth: {
+        title: "AI requests to modify the current page",
+        approve: "Approve",
+        deny: "Deny",
     },
 } as const

@@ -10,11 +10,11 @@
  *     AT SYSTEM PROMPT BUILD TIME (not at load time). This avoids the
  *     race / stale-data problem entirely: every LLM call gets fresh context.
  *   - The pull goes through the existing browser extension bridge:
- *       CreatorWeave → window.__agentWeb.fetchSidePanelContext(tabId)
+ *       CreatorWeave → window.__agentWeb.fetchBoundPageContext()
  *         → injected.content.ts (MAIN world content script, matches <all_urls>)
  *           posts window.postMessage({__agentWebBridge:true,...})
  *         → content.ts (ISOLATED world content script) calls
- *             chrome.runtime.sendMessage({type:'requestSidePanelContext', tabId})
+ *             chrome.runtime.sendMessage({type:'requestBoundPageContext'})
  *         → background.ts handles it, executes
  *             `window.__sidePanelContextProvider.getContext()` in the upstream tab
  *             via chrome.scripting.executeScript({world:'MAIN'})
@@ -46,25 +46,27 @@
 
 const SIDE_PANEL_FLAG_KEY = '__cw_workspace_assistant_pending'
 const SIDE_PANEL_HOSTNAME_KEY = '__cw_workspace_assistant_hostname'
-const SIDE_PANEL_TABID_KEY = '__cw_workspace_assistant_tabid'
+const SIDE_PANEL_MODE_KEY = '__cw_workspace_assistant_mode'
+const SIDE_PANEL_BINDING_KEY = '__cw_workspace_assistant_binding'
 
 //=============================================================================
 // Module-level state
 //=============================================================================
 //
-// We only remember the routing metadata (tabId, hostname). Page context
+// We only remember the side-panel mode and routing hostname. Page context
 // is NOT stored here — it's fetched fresh each time fetchSidePanelContext()
 // is called.
 
-let _sidePanelTabId: number | null = null
+let _sidePanelBindingId: string | null = null
 let _sidePanelHostname: string | null = null
 
 export function isSidePanelMode(): boolean {
-  return _sidePanelTabId != null
+  return _sidePanelBindingId !== null
 }
 
-export function getSidePanelTabId(): number | null {
-  return _sidePanelTabId
+/** Opaque extension-generated binding; never expose the target tab id. */
+export function getSidePanelBindingId(): string | null {
+  return _sidePanelBindingId
 }
 
 export function getSidePanelHostname(): string | null {
@@ -83,9 +85,9 @@ export function getSidePanelHostname(): string | null {
 // running in a side panel — causing enhancements.ts to skip the page
 // context block silently.
 //
-// We restore tabId + hostname from sessionStorage BEFORE the IIFE runs.
+// We restore the mode + hostname from sessionStorage BEFORE the IIFE runs.
 // Then the IIFE either:
-//   - finds a fresh ?tabId= in the URL and overwrites (normal first load), OR
+//   - finds fresh side-panel metadata in the URL (normal first load), OR
 //   - sees a clean URL (HMR re-eval) and returns early, leaving the
 //     recovered state intact.
 //
@@ -93,11 +95,7 @@ export function getSidePanelHostname(): string | null {
 // owns its lifecycle (it consumes + removes that key after project routing).
 function recoverFromSessionStorage() {
   try {
-    const persistedTabId = sessionStorage.getItem(SIDE_PANEL_TABID_KEY)
-    if (persistedTabId) {
-      const n = Number(persistedTabId)
-      if (Number.isFinite(n)) _sidePanelTabId = n
-    }
+    _sidePanelBindingId = sessionStorage.getItem(SIDE_PANEL_BINDING_KEY)
     const persistedHostname = sessionStorage.getItem(SIDE_PANEL_HOSTNAME_KEY)
     if (persistedHostname) _sidePanelHostname = persistedHostname
   } catch {}
@@ -129,7 +127,7 @@ recoverFromSessionStorage()
  * (MAIN world) and `content.ts` (ISOLATED world, matches <all_urls>)
  * set up — relay: window.postMessage ↔ chrome.runtime.sendMessage.
  *
- * `background.ts` handles `requestSidePanelContext` by calling
+ * `background.ts` resolves the opaque binding sent with this request, then
  * `chrome.scripting.executeScript({world:'MAIN'})` on the upstream tab
  * to read `window.__sidePanelContextProvider.getContext()`.
  *
@@ -139,22 +137,22 @@ recoverFromSessionStorage()
 const CONTEXT_FETCH_TIMEOUT_MS = 3000
 
 export async function fetchSidePanelContext(): Promise<unknown | null> {
-  if (_sidePanelTabId == null) return null
+  if (_sidePanelBindingId === null) return null
 
   const agentWeb = (
     globalThis as {
       __agentWeb?: {
-        fetchSidePanelContext?: (tabId: number) => Promise<unknown>
+        fetchBoundPageContext?: (binding: string) => Promise<unknown>
       }
     }
   ).__agentWeb
-  if (!agentWeb?.fetchSidePanelContext) {
+  if (!agentWeb?.fetchBoundPageContext) {
     // eslint-disable-next-line no-console
     console.warn(
-      '[Workspace Assistant] window.__agentWeb.fetchSidePanelContext not available',
+      '[Workspace Assistant] window.__agentWeb.fetchBoundPageContext not available',
       {
         hasAgentWeb: !!agentWeb,
-        hasMethod: !!agentWeb?.fetchSidePanelContext,
+        hasMethod: !!agentWeb?.fetchBoundPageContext,
         hint: 'Is the CreatorWeave browser extension installed and active on this origin?',
       },
     )
@@ -163,7 +161,7 @@ export async function fetchSidePanelContext(): Promise<unknown | null> {
 
   try {
     const result = await Promise.race([
-      agentWeb.fetchSidePanelContext(_sidePanelTabId),
+      agentWeb.fetchBoundPageContext(_sidePanelBindingId),
       new Promise<unknown>((_, reject) =>
         setTimeout(
           () => reject(new Error('context fetch timeout')),
@@ -196,38 +194,26 @@ function extractHostname(originLike: string | null): string | null {
 ;(function captureTriggerOnLoad() {
   if (typeof window === 'undefined') return
 
-  const hash = window.location.hash || ''
-  const queryStart = hash.indexOf('?')
-  const params =
-    queryStart !== -1 ? new URLSearchParams(hash.slice(queryStart + 1)) : null
+  const url = new URL(window.location.href)
+  const hash = url.hash || ''
+  const legacyQueryStart = hash.indexOf('?')
+  // Support both normal-query and hash-query launch URLs while migrating
+  // extension builds. Both are cleared after this initial capture.
+  const params = url.searchParams.size > 0
+    ? url.searchParams
+    : legacyQueryStart !== -1
+      ? new URLSearchParams(hash.slice(legacyQueryStart + 1))
+      : null
 
-  // ── Diagnostic: log what the IIFE actually sees on each invocation.
-  //    Includes parsed param values so we can see why _sidePanelTabId is
-  //    null without instrumenting every call site. Fires even on early
-  //    return so we can distinguish "URL had no ?tabId=" from "tabId was
-  //    a non-numeric string".
-  // eslint-disable-next-line no-console
-  console.log('[Workspace Assistant IIFE]', {
-    hash: hash.slice(0, 120),
-    hasQuery: queryStart !== -1,
-    source: params?.get('source') ?? null,
-    tabIdStr: params?.get('tabId') ?? null,
-    origin: params?.get('origin') ?? null,
-    recoveredTabId: _sidePanelTabId,
-    recoveredHostname: _sidePanelHostname,
-  })
-
-  if (queryStart === -1) return
   if (!params || params.get('source') !== 'side_panel') return
 
-  const tabIdStr = params.get('tabId')
-  const tabId = tabIdStr ? Number(tabIdStr) : NaN
-  if (Number.isFinite(tabId)) {
-    _sidePanelTabId = tabId
-    try {
-      sessionStorage.setItem(SIDE_PANEL_TABID_KEY, String(tabId))
-    } catch {}
-  }
+  const bindingId = params.get('binding')
+  if (!bindingId) return
+  _sidePanelBindingId = bindingId
+  try {
+    sessionStorage.setItem(SIDE_PANEL_MODE_KEY, '1')
+    sessionStorage.setItem(SIDE_PANEL_BINDING_KEY, bindingId)
+  } catch {}
 
   const hostname = extractHostname(params.get('origin'))
   if (hostname) {
@@ -236,17 +222,9 @@ function extractHostname(originLike: string | null): string | null {
     sessionStorage.setItem(SIDE_PANEL_HOSTNAME_KEY, hostname)
   }
 
-  // eslint-disable-next-line no-console
-  console.log(
-    '[Workspace Assistant] Side panel mode:',
-    'hostname:',
-    hostname,
-    'tabId:',
-    _sidePanelTabId,
-  )
-
-  // Clean URL params so they don't persist on refresh
-  const cleanHash = hash.slice(0, queryStart)
+  // The binding is now in sessionStorage. Remove all transient metadata from
+  // the URL; `sender.url` is never used as binding state.
+  const cleanHash = legacyQueryStart === -1 ? hash : hash.slice(0, legacyQueryStart)
   window.history.replaceState(
     {},
     document.title,
@@ -286,9 +264,9 @@ export async function handleWorkspaceAssistantOnReady(
   const hostname = sessionStorage.getItem(SIDE_PANEL_HOSTNAME_KEY)
   sessionStorage.removeItem(SIDE_PANEL_HOSTNAME_KEY)
 
-  // Prefer hostname. Fall back to tabId only when no origin was provided
-  // (e.g. user opened CreatorWeave directly without the extension).
-  const projectKey = hostname || (_sidePanelTabId != null ? `tab-${_sidePanelTabId}` : null)
+  // Prefer hostname. A panel opened without an origin has no deterministic
+  // routing key, so leave the current project unchanged.
+  const projectKey = hostname
   if (!projectKey) return
 
   try {
@@ -397,20 +375,18 @@ export async function capturePageContext(): Promise<PageContextSnapshot | null> 
  */
 export async function capturePageUrl(): Promise<string | null> {
   if (!isSidePanelMode()) return null
-  const tabId = getSidePanelTabId()
-  if (tabId == null) return null
   try {
     // ── Forward-compatible: prefer a lightweight url-only bridge if present ──
     const agentWeb = (
       globalThis as {
         __agentWeb?: {
-          fetchSidePanelUrl?: (tabId: number) => Promise<unknown>
+          fetchBoundPageUrl?: () => Promise<unknown>
         }
       }
     ).__agentWeb
-    if (agentWeb?.fetchSidePanelUrl) {
+    if (agentWeb?.fetchBoundPageUrl) {
       const url = await Promise.race([
-        agentWeb.fetchSidePanelUrl(tabId),
+        agentWeb.fetchBoundPageUrl(),
         new Promise<null>((_, reject) =>
           setTimeout(() => reject(new Error('url fetch timeout')), 1500),
         ),

@@ -29,6 +29,13 @@ export interface ToolResult {
   toolCallId: string
   name: string
   content: string // JSON string or plain text
+  /**
+   * Optional multimodal parts (e.g. screenshot images). When present, the
+   * tool result is rendered as a multimodal message (text + image parts)
+   * so vision-capable models can see the image directly. For text-only
+   * models, the image parts are filtered out at request-build time.
+   */
+  contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
   isError?: boolean
 }
 
@@ -361,6 +368,10 @@ export function createToolMessage(result: ToolResult): Message {
     id: generateId(),
     role: 'tool',
     content: result.content,
+    // Pass through contentParts (e.g. screenshot images) so vision-capable
+    // models can see them. The agent loop's message mapper emits these as
+    // image_url content parts when the target model supports vision.
+    contentParts: result.contentParts,
     toolCallId: result.toolCallId,
     name: result.name,
     timestamp: Date.now(),

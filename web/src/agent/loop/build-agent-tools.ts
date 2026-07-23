@@ -273,7 +273,19 @@ export function buildAgentTools(input: BuildAgentToolsInput): AgentTool[] {
         }
 
         return {
-          content: [{ type: 'text', text: finalContent }],
+          content: (() => {
+            // If the envelope carried multimodal contentParts (e.g. a
+            // screenshot from page_screenshot), the text-only envelope.json
+            // string is meaningless to the model. Lift the parts out so the
+            // downstream fetcher can emit image_url content parts.
+            const parsed = finalDetails.parsed as
+              | { contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> }
+              | undefined
+            if (parsed && Array.isArray(parsed.contentParts) && parsed.contentParts.length > 0) {
+              return parsed.contentParts
+            }
+            return [{ type: 'text', text: finalContent }]
+          })(),
           details: finalDetails,
         }
       } catch (toolError) {

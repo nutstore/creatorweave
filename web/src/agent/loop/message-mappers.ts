@@ -2,6 +2,7 @@ import type { AgentMessage as PiAgentMessage } from '@earendil-works/pi-agent-co
 import type { Api, Message as PiMessage, Model } from '@earendil-works/pi-ai'
 import { createAssistantMessage, createToolMessage, type Message, type ToolCall } from '../message-types'
 import { renderPageContextBlock } from '../workspace-assistant-context'
+import { ensureToolCallResults } from './tool-call-results'
 
 /** Format file size for display in asset metadata */
 function formatAssetSize(bytes: number): string {
@@ -42,8 +43,9 @@ export function internalToPiMessages(
   model: Model<Api>,
   compressedMemoryPrefix: string
 ): PiMessage[] {
-  const lastSummaryIndex = messages.map((m) => m.kind).lastIndexOf('context_summary')
-  const modelMessages = lastSummaryIndex >= 0 ? messages.slice(lastSummaryIndex) : messages
+  const normalizedMessages = ensureToolCallResults(messages)
+  const lastSummaryIndex = normalizedMessages.map((m) => m.kind).lastIndexOf('context_summary')
+  const modelMessages = lastSummaryIndex >= 0 ? normalizedMessages.slice(lastSummaryIndex) : normalizedMessages
   return modelMessages.flatMap((msg): PiMessage[] => {
     if (msg.kind === 'context_summary') {
       // Map context_summary as a user message (system-context block) so the
@@ -206,7 +208,9 @@ export function internalToPiMessages(
           role: 'toolResult',
           toolCallId: msg.toolCallId || '',
           toolName: msg.name || 'tool',
-          content: [{ type: 'text', text: msg.content || '' }],
+          content: msg.contentParts && msg.contentParts.length > 0
+            ? msg.contentParts
+            : [{ type: 'text', text: msg.content || '' }],
           isError: msg.content?.startsWith('Error:') ?? false,
           timestamp: msg.timestamp || Date.now(),
         },
@@ -290,10 +294,27 @@ export function piToInternalMessage(message: PiAgentMessage): Message | null {
 
   if (message.role === 'toolResult') {
     const text = extractTextContent(message.content) || ''
+    // Preserve multimodal content (e.g. screenshot images from page_screenshot)
+    // so the UI renderer can display them. Without this, image data is lost
+    // when the tool result is converted to an internal Message.
+    const imageParts = Array.isArray(message.content)
+      ? message.content.filter(
+          (part): part is { type: 'image'; data: string; mimeType: string } =>
+            !!part && typeof part === 'object' && (part as { type?: unknown }).type === 'image',
+        )
+      : []
     const tool = createToolMessage({
       toolCallId: message.toolCallId,
       name: message.toolName,
       content: text,
+      ...(imageParts.length > 0
+        ? {
+            contentParts: [
+              ...imageParts,
+              ...(text ? [{ type: 'text' as const, text }] : []),
+            ],
+          }
+        : {}),
     })
     tool.timestamp = message.timestamp || tool.timestamp || now
     return tool

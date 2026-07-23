@@ -53,6 +53,7 @@ import {
   applyDraftAssistantEvent,
   createEmptyDraftAssistant,
 } from './draft-assistant'
+import { ensureToolCallResults } from '@/agent/loop/tool-call-results'
 import { useI18nStore } from '@/i18n/store'
 import { getElicitationHandler } from '@/mcp/elicitation-handler.tsx'
 
@@ -4270,6 +4271,11 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               c.draftAssistant = rtDraft
             }
             committedPartial = commitDraftToMessages(c)
+            const repairedMessages = ensureToolCallResults(c.messages)
+            if (repairedMessages !== c.messages) {
+              c.messages = repairedMessages
+              committedPartial = true
+            }
             if (committedPartial) {
               c.updatedAt = Date.now()
             }

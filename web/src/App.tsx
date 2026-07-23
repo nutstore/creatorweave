@@ -23,6 +23,7 @@ import { useLocale } from '@/i18n'
 import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionInstallGuide } from '@/components/extension'
+import { PageWriteAuthModal } from '@/components/agent/PageWriteAuthModal'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
@@ -564,6 +565,7 @@ function AppReady() {
         open={extensionGuideOpen}
         onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
       />
+      <PageWriteAuthModal />
       <Toaster position="bottom-right" />
     </>
   )

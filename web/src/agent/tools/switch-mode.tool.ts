@@ -11,6 +11,7 @@ import {
   getCurrentWorkspaceAgentMode,
   setCurrentWorkspaceAgentMode,
 } from '@/store/workspace-preferences.store'
+import { usePageActionSessionStore } from '@/store/page-action-session.store'
 
 export const switchAgentModeDefinition: ToolDefinition = {
   type: 'function',
@@ -65,6 +66,10 @@ export function createSwitchModeExecutor(opts?: {
   return async (args: Record<string, unknown>) => {
     const { mode, reason } = args as { mode: AgentMode; reason: string }
     const currentMode = getCurrentWorkspaceAgentMode()
+
+    // YOLO is an explicit user choice. An LLM-initiated mode switch may
+    // disable it, but must never preserve or enable it implicitly.
+    usePageActionSessionStore.getState().setPageActionYolo(false)
 
     if (mode === currentMode) {
       return JSON.stringify({

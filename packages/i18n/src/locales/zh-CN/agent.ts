@@ -14,10 +14,12 @@ export const agent = {
     mode: {
         plan: "计划",
         act: "执行",
+        yolo: "YOLO",
         planDescription: "只读模式。Agent 可以分析和规划，但无法修改文件。",
         actDescription: "完全访问模式。Agent 可以读取、写入和修改文件。",
         planShort: "只读分析",
         actShort: "完全访问已启用",
+        yoloShort: "写操作自动放行",
         planLabel: "只读分析模式",
         actLabel: "完整读写权限",
         switchTo: "切换到",
@@ -27,6 +29,20 @@ export const agent = {
         actModeTitle: "执行模式",
         planReadonly: "只读",
         actFullAccess: "完全访问",
+    },
+    vision: {
+        supported: "当前模型支持图片输入",
+        unsupported: "当前模型不支持图片输入",
+        capture: "截取当前页面",
+        screenshotUnavailable: "请在浏览器侧栏中使用截图功能",
+    },
+    pageScreenshot: {
+        title: "截取当前页面",
+        description: "拖拽选择区域，或直接确认发送完整截图",
+        cancelAria: "取消截图",
+        insert: "插入图片",
+        captureFailed: "无法截取当前页面",
+        cropFailed: "无法生成截图",
     },
 
     toolSearch: {
@@ -47,5 +63,11 @@ export const agent = {
         description: "选择文件夹后，AI 可以读取、编辑其中的文件，并将内容保存到本地。",
         selectFolder: "选择文件夹",
         later: "稍后",
+    },
+
+    pageWriteAuth: {
+        title: "AI 请求操作当前页面",
+        approve: "允许",
+        deny: "拒绝",
     },
 } as const

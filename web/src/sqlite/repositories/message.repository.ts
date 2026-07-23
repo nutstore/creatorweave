@@ -36,6 +36,7 @@ interface MessageMeta {
   usage?: MessageUsage
   assets?: AssetMeta[]
   images?: Array<{ data: string; mimeType: string }>
+  contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
 }
 
 interface AppSessionSerializedMessage {
@@ -250,6 +251,10 @@ export class MessageRepository {
       meta.images = message.images
       hasMeta = true
     }
+    if (message.contentParts !== undefined) {
+      meta.contentParts = message.contentParts
+      hasMeta = true
+    }
 
     return {
       contentJson,
@@ -278,6 +283,7 @@ export class MessageRepository {
       usage: meta.usage,
       assets: meta.assets,
       images: meta.images,
+      contentParts: meta.contentParts,
     }
   }
 

@@ -250,6 +250,10 @@ vi.mock('../AgentModeSwitch', () => ({
 
 vi.mock('@creatorweave/ui', () => ({
   BrandSwitch: () => null,
+  TooltipProvider: ({ children }: any) => <>{children}</>,
+  Tooltip: ({ children }: any) => <>{children}</>,
+  TooltipTrigger: ({ children }: any) => <>{children}</>,
+  TooltipContent: ({ children }: any) => <>{children}</>,
 }))
 
 describe('ConversationView runtime step placement', () => {

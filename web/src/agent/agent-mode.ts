@@ -67,6 +67,12 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   // Web bridge tools (read-only — fetch external info, requires Browser Extension)
   ['web_search', { name: 'web_search', category: 'read' }],
   ['web_fetch', { name: 'web_fetch', category: 'read' }],
+  // Page action read tools (read-only — inspect upstream page, requires Browser Extension + side panel)
+  ['page_snapshot', { name: 'page_snapshot', category: 'read' }],
+  ['page_text_content', { name: 'page_text_content', category: 'read' }],
+  ['page_find_elements', { name: 'page_find_elements', category: 'read' }],
+  ['page_synthesize_locators', { name: 'page_synthesize_locators', category: 'read' }],
+  ['page_screenshot', { name: 'page_screenshot', category: 'read' }],
   ['spawn_subagent', { name: 'spawn_subagent', category: 'read' }],
   ['batch_spawn', { name: 'batch_spawn', category: 'read' }],
   ['send_message_to_subagent', { name: 'send_message_to_subagent', category: 'read' }],
@@ -90,6 +96,13 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
 
   // Image generation (writes generated images to OPFS assets)
   ['generate_image', { name: 'generate_image', category: 'write' }],
+
+  // Page action write tools (mutate upstream page — requires Browser Extension + side panel)
+  ['page_click', { name: 'page_click', category: 'write' }],
+  ['page_fill', { name: 'page_fill', category: 'write' }],
+  ['page_type', { name: 'page_type', category: 'write' }],
+  ['page_scroll', { name: 'page_scroll', category: 'write' }],
+  ['page_evaluate', { name: 'page_evaluate', category: 'write' }],
 
   // Schedule management (creates/modifies persistent schedule configs)
   ['manage_schedule', { name: 'manage_schedule', category: 'write' }],

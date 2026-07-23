@@ -51,7 +51,7 @@ describe('message-mappers', () => {
       'Earlier conversation summary:'
     )
 
-    expect(mapped).toHaveLength(2)
+    expect(mapped).toHaveLength(3)
     expect(mapped[0]).toMatchObject({
       role: 'user',
       content: 'Earlier conversation summary:\nsummary body',
@@ -62,6 +62,111 @@ describe('message-mappers', () => {
     expect(assistant.content.find((item) => item.type === 'toolCall')).toMatchObject({
       type: 'toolCall',
       arguments: { __invalid_arguments: true },
+    })
+    expect(mapped[2]).toMatchObject({ role: 'toolResult', toolCallId: 'tc1' })
+  })
+
+  it('adds a synthetic tool result for an interrupted tool call before sending context', () => {
+    const mapped = internalToPiMessages(
+      [
+        {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: null,
+          toolCalls: [
+            {
+              id: 'call-interrupted',
+              type: 'function',
+              function: { name: 'page_click', arguments: '{"selector":"#save"}' },
+            },
+          ],
+          timestamp: 1,
+        },
+      ],
+      { api: 'openai', provider: 'openai', id: 'test-model' } as never,
+      'Earlier conversation summary:'
+    )
+
+    expect(mapped).toHaveLength(2)
+    expect(mapped[1]).toMatchObject({
+      role: 'toolResult',
+      toolCallId: 'call-interrupted',
+      toolName: 'page_click',
+    })
+  })
+
+  it('moves a delayed tool result directly after its tool call', () => {
+    const mapped = internalToPiMessages(
+      [
+        {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: null,
+          toolCalls: [
+            {
+              id: 'call-delayed',
+              type: 'function',
+              function: { name: 'read', arguments: '{"path":"README.md"}' },
+            },
+          ],
+          timestamp: 1,
+        },
+        { id: 'user-2', role: 'user', content: 'continue', timestamp: 2 },
+        {
+          id: 'tool-3',
+          role: 'tool',
+          toolCallId: 'call-delayed',
+          name: 'read',
+          content: 'README contents',
+          timestamp: 3,
+        },
+      ],
+      { api: 'openai', provider: 'openai', id: 'test-model' } as never,
+      'Earlier conversation summary:'
+    )
+
+    expect(mapped.map((message) => message.role)).toEqual(['assistant', 'toolResult', 'user'])
+    expect(mapped[1]).toMatchObject({ toolCallId: 'call-delayed', content: [{ text: 'README contents' }] })
+  })
+
+  it('preserves screenshot image parts when replaying a persisted tool result', () => {
+    const mapped = internalToPiMessages(
+      [
+        {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: null,
+          toolCalls: [
+            {
+              id: 'call-screenshot',
+              type: 'function',
+              function: { name: 'page_screenshot', arguments: '{}' },
+            },
+          ],
+          timestamp: 1,
+        },
+        {
+          id: 'tool-1',
+          role: 'tool',
+          toolCallId: 'call-screenshot',
+          name: 'page_screenshot',
+          content: 'Screenshot captured.',
+          contentParts: [
+            { type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' },
+            { type: 'text', text: 'Screenshot captured.' },
+          ],
+          timestamp: 2,
+        },
+      ],
+      { api: 'openai', provider: 'openai', id: 'test-model' } as never,
+      'Earlier conversation summary:'
+    )
+
+    expect(mapped[1]).toMatchObject({
+      role: 'toolResult',
+      content: expect.arrayContaining([
+        expect.objectContaining({ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' }),
+      ]),
     })
   })
 
