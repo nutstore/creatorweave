@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react'
+import { useCallback, useEffect, useRef, useState, forwardRef, useImperativeHandle, type ReactNode } from 'react'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import Document from '@tiptap/extension-document'
 import Paragraph from '@tiptap/extension-paragraph'
@@ -65,6 +65,8 @@ interface AgentRichInputProps {
   onDeleteAgent: (id: string) => Promise<boolean>
   /** Slash command callback (e.g. 'compact'). */
   onSlashCommand?: (command: string) => void
+  /** Optional action rendered directly below the attachment button. */
+  leadingAccessory?: ReactNode
 }
 
 // ---------------------------------------------------------------------------
@@ -322,6 +324,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   onCreateAgent,
   onDeleteAgent,
   onSlashCommand,
+  leadingAccessory,
 }: AgentRichInputProps, ref) {
   const t = useT()
   const [isFocused, setIsFocused] = useState(false)
@@ -1104,7 +1107,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           }
         }}
       />
-      <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-14 py-4 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
+      <div className="focus-within:border-primary-400 focus-within:ring-primary-400/20 min-h-[88px] w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-14 py-4 text-sm text-neutral-900 shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
             <EditorContent editor={editor} />
@@ -1198,6 +1201,11 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
         >
           <Paperclip className="h-4 w-4" />
         </button>
+        {leadingAccessory && (
+          <div className="absolute left-3 top-12 z-10">
+            {leadingAccessory}
+          </div>
+        )}
       </div>
 
       {/* Agent selector dropdown - expands downward */}

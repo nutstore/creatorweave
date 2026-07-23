@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { captureTabMock, addFilesMock, conversationState, pageActionAvailable } = vi.hoisted(() => ({
@@ -65,7 +66,9 @@ vi.mock('@/i18n', () => ({
 }))
 
 vi.mock('../agent/AgentRichInput', () => ({
-  AgentRichInput: () => <div data-testid="agent-rich-input" />,
+  AgentRichInput: ({ leadingAccessory }: { leadingAccessory?: ReactNode }) => (
+    <div data-testid="agent-rich-input">{leadingAccessory}</div>
+  ),
 }))
 
 vi.mock('../agent/PageScreenshotCropDialog', () => ({

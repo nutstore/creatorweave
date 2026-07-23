@@ -71,10 +71,10 @@ const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
               aria-label={label}
               disabled={!canCapture || isCapturing}
               onClick={onCapture}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition-colors disabled:cursor-not-allowed ${
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed ${
                 supportsVision
-                  ? 'border-primary-200 bg-primary-50 text-primary-600 dark:border-primary-800/70 dark:bg-primary-950/40 dark:text-primary-300'
-                  : 'border-neutral-200 bg-neutral-50 text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600'
+                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300'
+                  : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
               }`}
             >
               {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />}
@@ -525,6 +525,14 @@ export function ConversationView({
                 onChange={handleInputChange}
                 onSubmit={handleSendAndFocus}
                 onSlashCommand={logic.handleSlashCommand}
+                leadingAccessory={(
+                  <VisionCapabilityIndicator
+                    modelName={modelName}
+                    canCapture={canCaptureScreenshot}
+                    isCapturing={isCapturingScreenshot}
+                    onCapture={() => void handleCaptureScreenshot()}
+                  />
+                )}
               />
               <SendCancelButton
                 isProcessing={isProcessing}
@@ -558,12 +566,6 @@ export function ConversationView({
                 setThinkingLevel={setThinkingLevel}
               />
               <AgentModeSelect mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
-              <VisionCapabilityIndicator
-                modelName={modelName}
-                canCapture={canCaptureScreenshot}
-                isCapturing={isCapturingScreenshot}
-                onCapture={() => void handleCaptureScreenshot()}
-              />
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <ContextUsageBar contextWindowUsage={activeContextWindowUsage} isProcessing={isProcessing} />

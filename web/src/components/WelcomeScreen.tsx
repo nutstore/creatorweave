@@ -244,31 +244,33 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               onDeleteAgent={async () => false}
               onChange={handleInputChange}
               onSubmit={handleSubmit}
+              leadingAccessory={(
+                <TooltipProvider delayDuration={250}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <button
+                          type="button"
+                          aria-label={screenshotLabel}
+                          disabled={!canCaptureScreenshot || isCapturingScreenshot}
+                          onClick={() => void handleCaptureScreenshot()}
+                          className={`inline-flex h-8 w-8 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed ${
+                            supportsVision
+                              ? 'bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300'
+                              : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
+                          }`}
+                        >
+                          {isCapturingScreenshot
+                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                            : <ImageIcon className="h-4 w-4" aria-hidden="true" />}
+                        </button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" sideOffset={6}>{screenshotLabel}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             />
-            <TooltipProvider delayDuration={250}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="absolute bottom-4 right-14 z-10 inline-flex">
-                    <button
-                      type="button"
-                      aria-label={screenshotLabel}
-                      disabled={!canCaptureScreenshot || isCapturingScreenshot}
-                      onClick={() => void handleCaptureScreenshot()}
-                      className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border transition-colors disabled:cursor-not-allowed ${
-                        supportsVision
-                          ? 'border-primary-200 bg-primary-50 text-primary-600 dark:border-primary-800/70 dark:bg-primary-950/40 dark:text-primary-300'
-                          : 'border-neutral-200 bg-neutral-50 text-neutral-400 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-600'
-                      }`}
-                    >
-                      {isCapturingScreenshot
-                        ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                        : <ImageIcon className="h-4 w-4" aria-hidden="true" />}
-                    </button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={6}>{screenshotLabel}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
             <button
               type="button"
               onClick={handleSubmit}

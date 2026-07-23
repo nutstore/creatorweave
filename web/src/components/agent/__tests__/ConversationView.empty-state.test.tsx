@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { ConversationView } from '../ConversationView'
 
@@ -147,7 +148,9 @@ vi.mock('../AssistantTurnBubble', () => ({
 }))
 
 vi.mock('../AgentRichInput', () => ({
-  AgentRichInput: () => <div data-testid="agent-rich-input" />,
+  AgentRichInput: ({ leadingAccessory }: { leadingAccessory?: ReactNode }) => (
+    <div data-testid="agent-rich-input">{leadingAccessory}</div>
+  ),
 }))
 
 vi.mock('../WorkflowQuickActions', () => ({
@@ -181,5 +184,13 @@ describe('ConversationView empty state', () => {
     expect(screen.getByText('Start a new conversation')).toBeInTheDocument()
     expect(screen.queryByText('or select a workflow template')).not.toBeInTheDocument()
     expect(screen.queryByText('Novel Daily')).not.toBeInTheDocument()
+  })
+
+  it('places the vision capability indicator inside the message input', () => {
+    render(<ConversationView />)
+
+    const input = screen.getByTestId('agent-rich-input')
+    const indicator = screen.getByRole('button', { name: 'agent.vision.supported' })
+    expect(input.parentElement).toContainElement(indicator)
   })
 })
