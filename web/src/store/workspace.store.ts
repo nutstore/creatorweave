@@ -1396,15 +1396,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const diffs = await workspace.listOpfsOnlyFiles()
             set({ opfsOnlyFileCount: diffs.length, opfsOnlyFilesPaths: diffs })
 
-            if (diffs.length > 0) {
-              toast.info(`OPFS 中有 ${diffs.length} 个文件未同步到本地磁盘`, {
-                description: '点击同步将这些文件写入本地目录',
-                action: {
-                  label: '同步',
-                  onClick: () => get().syncOpfsOnlyFiles(),
-                },
-              })
-            }
           } catch (e) {
             console.error('[WorkspaceStore] Failed to check OPFS-only files:', e)
           }
