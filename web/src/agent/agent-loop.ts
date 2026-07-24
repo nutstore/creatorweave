@@ -69,6 +69,7 @@ export class AgentLoop {
   private convertCallCount = 0
   private lastSummaryConvertCall = Number.NEGATIVE_INFINITY
   private mode: AgentMode
+  private shouldYieldForQueue?: () => boolean
 
   constructor(config: AgentLoopConfig) {
     this.provider = config.provider
@@ -90,6 +91,7 @@ export class AgentLoop {
     this.mode = config.mode || 'act'
     this.skipEnhancements = config.skipEnhancements ?? false
     this.disableThinking = config.disableThinking ?? false
+    this.shouldYieldForQueue = config.shouldYieldForQueue
     // Keep toolContext.agentMode in sync so tools (e.g. bash) can read it
     this.toolContext.agentMode = this.mode
     // Expose provider to tool executors (e.g. search_tools subagent)
@@ -165,6 +167,7 @@ export class AgentLoop {
         onAbortRequested: () => this.abortController?.abort(),
         initialCompressionBaseline: this.compressionBaseline,
         disableThinking: this.disableThinking,
+        shouldYieldForQueue: this.shouldYieldForQueue,
       })
       allMessages = result.allMessages
       shouldStopForElicitation = result.shouldStopForElicitation

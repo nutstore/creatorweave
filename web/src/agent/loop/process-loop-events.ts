@@ -26,6 +26,18 @@ export interface ProcessPiLoopEventsInput {
   ) => void
   mapPiToInternal: (message: PiAgentMessage) => Message | null
   extractTextContent: (content: unknown) => string | null
+  /**
+   * Optional soft-interrupt hook. Called after each `tool_execution_end`
+   * event. When it returns `true`, the loop yields after the corresponding
+   * tool-result message has been committed, so the caller can dequeue and
+   * process the next user message (Codex/Claude Code-style "interrupt at
+   * tool boundary" behavior).
+   *
+   * Pending tool completions in `pendingToolCompletions` are still flushed
+   * via the cleanup loop at the bottom, so `onToolCallComplete` callbacks
+   * always fire even on yield.
+   */
+  shouldYield?: () => boolean
 }
 
 export interface ProcessPiLoopEventsResult {
@@ -53,6 +65,7 @@ export async function processPiLoopEvents(
   const toolCallIdByIndex = new Map<number, string>()
   const toolCallArgsById = new Map<string, Record<string, unknown>>()
   const pendingToolCompletions = new Map<string, { toolCall: ToolCall; resultText: string }>()
+  const toolCallIdsToYieldAfter = new Set<string>()
 
   const emitToolCallStartIfChanged = (toolCall: ToolCall) => {
     const signature = `${toolCall.function.name}:${toolCall.function.arguments}`
@@ -110,6 +123,14 @@ export async function processPiLoopEvents(
         },
         resultText,
       })
+
+      // The pi-agent loop emits the persisted tool-result message after this
+      // event. Defer the interrupt until that message is appended below;
+      // otherwise ensureToolCallResults would replace this successful result
+      // with a synthetic "interrupted" result in the next turn's context.
+      if (input.shouldYield?.()) {
+        toolCallIdsToYieldAfter.add(typedEvent.toolCallId)
+      }
     }
 
     if (typedEvent.type === 'message_end') {
@@ -152,6 +173,9 @@ export async function processPiLoopEvents(
         if (pending) {
           input.callbacks?.onToolCallComplete?.(pending.toolCall, pending.resultText)
           pendingToolCompletions.delete(mapped.toolCallId)
+        }
+        if (toolCallIdsToYieldAfter.delete(mapped.toolCallId)) {
+          break
         }
       }
     }

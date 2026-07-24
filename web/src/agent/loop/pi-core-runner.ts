@@ -98,6 +98,12 @@ export interface ExecutePiCoreLoopInput {
   initialCompressionBaseline?: CompressionBaselineState | null
   /** When true, force-disable thinking/reasoning regardless of global settings. */
   disableThinking?: boolean
+  /**
+   * Forwarded to `processPiLoopEvents`. When this returns `true` after a
+   * tool execution completes, the loop yields so the caller can consume
+   * queued user messages (see `shouldYield` on `ProcessPiLoopEventsInput`).
+   */
+  shouldYieldForQueue?: () => boolean
 }
 
 export interface ExecutePiCoreLoopResult {
@@ -270,6 +276,7 @@ export async function executePiCoreLoop(
     applyAssistantUpdate: applyPiAssistantUpdate,
     mapPiToInternal: (message) => piToInternalMessage(message),
     extractTextContent,
+    shouldYield: input.shouldYieldForQueue,
   })
   allMessages = processed.allMessages
   reachedMaxIterations = processed.reachedMaxIterations

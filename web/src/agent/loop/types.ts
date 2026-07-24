@@ -141,4 +141,15 @@ export interface AgentLoopConfig {
    * subagents (e.g. tool-searcher) that don't need deep reasoning.
    */
   disableThinking?: boolean
+  /**
+   * Optional soft-interrupt hook forwarded to `executePiCoreLoop` /
+   * `processPiLoopEvents`. When this returns `true` after a tool execution
+   * completes, the loop yields early so the caller can dequeue a queued
+   * user message and start a fresh turn (Codex/Claude Code-style
+   * "interrupt at tool boundary" behavior).
+   *
+   * Typically wired to:
+   *   useConversationRuntimeStore.getState().getQueueDepth(conversationId) > 0
+   */
+  shouldYieldForQueue?: () => boolean
 }

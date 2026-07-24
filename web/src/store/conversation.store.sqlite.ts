@@ -2927,6 +2927,13 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               await import('@/store/conversation-context.store')
             await useConversationContextStore.getState().refreshPendingChanges()
           },
+          // Soft-interrupt at tool boundaries: after each tool call completes,
+          // check whether a user message was queued. If so, yield the loop so
+          // the runAgent flow can dequeue and start a fresh turn — matching
+          // Codex/Claude Code's "interrupt at tool boundary" feel instead of
+          // waiting for the entire agent run to finish.
+          shouldYieldForQueue: () =>
+            useConversationRuntimeStore.getState().getQueueDepth(conversationId) > 0,
         })
 
         setAgentLoop(conversationId, agentLoop)
