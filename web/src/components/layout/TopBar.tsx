@@ -28,7 +28,7 @@ import type { SettingsTab } from '@/components/settings/SettingsDialog'
 import { ConversationStorageBadge } from '@/components/conversation'
 import { FolderSelector } from './FolderSelector'
 import { ModelQuickSwitch } from './ModelQuickSwitch'
-import { ImageGenDropdown } from '@/components/agent/ImageGenDropdown'
+import { ImageGenDropdown, useHasImageModels } from '@/components/agent/ImageGenDropdown'
 import { useT } from '@/i18n'
 import {
   BrandButton,
@@ -116,6 +116,7 @@ export function TopBar({
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const enableSchedules = useSettingsStore((s) => s.enableSchedules)
+  const hasImageModels = useHasImageModels()
   const t = useT()
   const conversationName = activeConversationName ?? activeWorkspaceName
 
@@ -354,6 +355,15 @@ export function TopBar({
             <div className="mb-2 rounded-lg border border-neutral-200 p-2 dark:border-neutral-700">
               <ModelQuickSwitch onManageProviders={() => openSettings('llm')} />
             </div>
+
+            {/* Image generation model + aspect ratio (combined).
+                Container hides when the current provider has no image models, so the
+                mobile "more" panel doesn't leave a blank bordered card behind. */}
+            {hasImageModels && (
+              <div className="mb-2 rounded-lg border border-neutral-200 p-2 dark:border-neutral-700">
+                <ImageGenDropdown />
+              </div>
+            )}
 
             {/* Quick actions grid */}
             <div className="grid grid-cols-2 gap-1.5">
