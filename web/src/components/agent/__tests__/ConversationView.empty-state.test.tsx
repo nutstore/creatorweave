@@ -165,10 +165,6 @@ vi.mock('../workflow-editor/WorkflowEditorDialog', () => ({
   WorkflowEditorDialog: () => null,
 }))
 
-vi.mock('../AgentModeSwitch', () => ({
-  AgentModeSwitchCompact: () => <div data-testid="agent-mode-switch" />,
-}))
-
 vi.mock('@creatorweave/ui', () => ({
   BrandSwitch: () => <button type="button">switch</button>,
   TooltipProvider: ({ children }: any) => <>{children}</>,

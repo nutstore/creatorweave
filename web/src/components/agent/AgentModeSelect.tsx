@@ -10,8 +10,7 @@
  * this component is a UI affordance that maps the three visible options to the
  * correct combination of the agent mode and page-session YOLO state.
  *
- * Design: compact pill button → popover with three options. Matches the
- * visual language of AgentModeSwitchCompact.
+ * Design: compact pill button → popover with three options.
  */
 
 import { useState, useRef, useEffect } from 'react'

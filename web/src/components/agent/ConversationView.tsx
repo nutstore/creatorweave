@@ -565,7 +565,7 @@ export function ConversationView({
                 setEnableThinking={setEnableThinking}
                 setThinkingLevel={setThinkingLevel}
               />
-              <AgentModeSelect mode={agentMode} onModeChange={setAgentMode} disabled={isProcessing} />
+              <AgentModeSelect mode={agentMode} onModeChange={setAgentMode} />
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <ContextUsageBar contextWindowUsage={activeContextWindowUsage} isProcessing={isProcessing} />

@@ -244,10 +244,6 @@ vi.mock('../workflow-editor/WorkflowEditorDialog', () => ({
   WorkflowEditorDialog: () => null,
 }))
 
-vi.mock('../AgentModeSwitch', () => ({
-  AgentModeSwitchCompact: () => null,
-}))
-
 vi.mock('@creatorweave/ui', () => ({
   BrandSwitch: () => null,
   TooltipProvider: ({ children }: any) => <>{children}</>,
