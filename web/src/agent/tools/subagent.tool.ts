@@ -7,6 +7,7 @@ import {
   validateMessage,
   validateName,
   validatePrompt,
+  validateSubagentType,
 } from './subagent-validation'
 import type { ToolDefinition, ToolExecutor } from './tool-types'
 
@@ -17,6 +18,20 @@ const TOOL_NAME_STOP = 'stop_subagent'
 const TOOL_NAME_RESUME = 'resume_subagent'
 const TOOL_NAME_GET_STATUS = 'get_subagent_status'
 const TOOL_NAME_LIST = 'list_subagents'
+
+/**
+ * Subagent type descriptions — injected into spawn_subagent / batch_spawn
+ * tool description so the main agent knows when to use each type.
+ *
+ * Modelled after codex's role description injection (see codex-rs/core/src/agent/role.rs).
+ */
+const SUBAGENT_TYPE_DESCRIPTIONS = `
+
+Available subagent types (use the subagent_type parameter to select):
+- general-purpose: Default subagent. Use when neither explorer nor worker fits.
+- explorer: Read-only investigation. Use for specific, well-scoped questions on the codebase. Explorers are fast and authoritative. They must be used to ask specific, well-scoped questions on the codebase. You are encouraged to spawn up multiple explorers in parallel when you have multiple distinct questions to ask about the codebase that can be answered independently. Reuse existing explorers for related questions.
+- worker: Code-changing subtasks. Use when the task involves modifying files. When delegating coding work, the subagent lists file paths it changed in the final answer. For coding tasks, prefer worker over explorer when the subagent can make a bounded patch in a clear write scope. Decompose work so each delegated task has a disjoint write set.
+- awaiter: For long-running commands. Note: spawn_subagent currently blocks until the subagent finishes, so awaiter mainly constrains subagent behavior (deterministic polling, no unrelated actions) rather than saving wall-clock time.`
 
 /**
  * Subagent output is no longer pre-emptively offloaded to asset files.
@@ -99,7 +114,8 @@ export const spawnSubagentDefinition: ToolDefinition = {
   function: {
     name: TOOL_NAME_SPAWN,
     description:
-      'Spawn a delegated subagent task that runs to completion. The tool blocks until the subagent finishes and returns the full result. Use for independent sub-tasks (analysis, searching, drafting).',
+      'Spawn a delegated subagent task that runs to completion. The tool blocks until the subagent finishes and returns the full result. Use for independent sub-tasks (analysis, searching, drafting).' +
+      SUBAGENT_TYPE_DESCRIPTIONS,
     parameters: {
       type: 'object',
       properties: {
@@ -120,6 +136,11 @@ export const spawnSubagentDefinition: ToolDefinition = {
           type: 'string',
           enum: ['plan', 'act'],
           description: 'Optional execution mode for the subagent.',
+        },
+        subagent_type: {
+          type: 'string',
+          enum: ['general-purpose', 'explorer', 'worker', 'awaiter'],
+          description: 'Optional subagent role. Default: general-purpose. See tool description for guidance on when to use each type.',
         },
       },
       required: ['description', 'prompt'],
@@ -164,7 +185,8 @@ export const batchSpawnDefinition: ToolDefinition = {
   function: {
     name: TOOL_NAME_BATCH_SPAWN,
     description:
-      'Launch multiple independent subagent tasks in parallel. Blocks until all tasks complete. Useful for parallelizable subtasks.',
+      'Launch multiple independent subagent tasks in parallel. Blocks until all tasks complete. Useful for parallelizable subtasks.' +
+      SUBAGENT_TYPE_DESCRIPTIONS,
     parameters: {
       type: 'object',
       properties: {
@@ -177,6 +199,11 @@ export const batchSpawnDefinition: ToolDefinition = {
               prompt: { type: 'string' },
               name: { type: 'string' },
               mode: { type: 'string', enum: ['plan', 'act'] },
+              subagent_type: {
+                type: 'string',
+                enum: ['general-purpose', 'explorer', 'worker', 'awaiter'],
+                description: 'Optional subagent role. See spawn_subagent description.',
+              },
             },
             required: ['description', 'prompt'],
           },
@@ -184,7 +211,8 @@ export const batchSpawnDefinition: ToolDefinition = {
         },
         max_concurrency: {
           type: 'number',
-          description: 'Max parallel tasks per batch (default 5, max 20).',
+          maximum: 5,
+          description: 'Max parallel tasks per batch (default 5, max 5).',
         },
       },
       required: ['tasks'],
@@ -291,12 +319,15 @@ export const spawnSubagentExecutor: ToolExecutor = async (args, context) => {
     const description = validateDescription(args.description)
     const prompt = validatePrompt(args.prompt)
     const name = validateName(args.name)
+    const subagentType = validateSubagentType(args.subagent_type)
 
     const result = await runtime.spawn({
       description,
       prompt,
       name,
       mode: args.mode === 'plan' || args.mode === 'act' ? args.mode : undefined,
+      subagent_type: subagentType,
+      parentToolCallId: context.currentToolCallId,
     })
 
     // Health check: detect suspicious low output that likely indicates an API error
@@ -330,6 +361,8 @@ export const batchSpawnExecutor: ToolExecutor = async (args, context) => {
           prompt: validatePrompt(task.prompt),
           name: validateName(task.name),
           mode: (task.mode === 'plan' || task.mode === 'act' ? task.mode : undefined) as 'plan' | 'act' | undefined,
+          subagent_type: validateSubagentType(task.subagent_type),
+          parentToolCallId: context.currentToolCallId,
         }))
       : []
     const max_concurrency = typeof args.max_concurrency === 'number' ? args.max_concurrency : undefined

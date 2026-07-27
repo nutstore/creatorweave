@@ -8,6 +8,7 @@ import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
 import { resolveVfsTarget } from './vfs-resolver'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
+import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
 
 function looksRegexLikeQuery(query: string): boolean {
   // Detect high-confidence regex signals that strongly suggest the caller intended
@@ -447,6 +448,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       }
       directoryHandle = backendHandle
     } catch (error) {
+      if (isSubagentPermissionDenied(error)) {
+        return toolErrorJson('search', SUBAGENT_PERMISSION_DENIED, error.message)
+      }
       return toolErrorJson('search', 'path_not_found', `Failed to resolve VFS path: ${error instanceof Error ? error.message : String(error)}`)
     }
   } else {

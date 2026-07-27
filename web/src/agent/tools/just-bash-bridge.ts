@@ -20,6 +20,7 @@
  */
 
 import type { VfsBackend, VfsDirEntry } from './vfs-backend'
+import { isProtectedAgentCoreFile } from './agent-file-protection'
 
 // ---------------------------------------------------------------------------
 // Types from just-bash's IFileSystem interface (inlined to avoid import cost)
@@ -103,15 +104,18 @@ export class VfsBridgeFs {
 
   /** When true, all workspace write/delete operations throw a permission error. */
   readonly readOnly: boolean
+  /** When true, delegated subagents cannot access protected files under /agents. */
+  readonly restrictAgentCoreFiles: boolean
 
   constructor(
     private readonly backend: VfsBackend,
     private readonly rootNames: string[] = [],
     private readonly assetsBackend?: VfsBackend,
     private readonly agentBackend?: VfsBackend,
-    options?: { readOnly?: boolean },
+    options?: { readOnly?: boolean; restrictAgentCoreFiles?: boolean },
   ) {
     this.readOnly = options?.readOnly ?? false
+    this.restrictAgentCoreFiles = options?.restrictAgentCoreFiles ?? false
 
     // Bootstrap essential system directories that just-bash expects
     this.ensureSysDir('/')
@@ -161,6 +165,7 @@ export class VfsBridgeFs {
 
     // Agent namespace file
     if (this.isAgentsPath(path)) {
+      this.assertAgentPathAllowed(path)
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const result = await this.agentBackend.readFile(relPath)
@@ -197,6 +202,7 @@ export class VfsBridgeFs {
 
     // Agent namespace file
     if (this.isAgentsPath(path)) {
+      this.assertAgentPathAllowed(path)
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const result = await this.agentBackend.readFile(relPath, { encoding: 'binary' })
@@ -272,6 +278,7 @@ export class VfsBridgeFs {
 
     // Agent namespace file
     if (this.isAgentsPath(path)) {
+      this.assertAgentPathAllowed(path)
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const encoding = this.normalizeWriteEncoding(options)
@@ -357,6 +364,7 @@ export class VfsBridgeFs {
 
     // Agent namespace file
     if (this.isAgentsPath(path)) {
+      this.assertAgentPathAllowed(path)
       if (!this.agentBackend) throw new Error(`ENOENT: '${path}'`)
       const relPath = this.toAgentsRelative(path)
       const encoding = this.normalizeWriteEncoding(options)
@@ -444,6 +452,7 @@ export class VfsBridgeFs {
 
     // Agent namespace
     if (this.isAgentsPath(normalized)) {
+      this.assertAgentPathAllowed(normalized)
       if (!this.agentBackend) return false
       const relPath = this.toAgentsRelative(normalized)
       if (this.agentBackend.exists) {
@@ -527,6 +536,7 @@ export class VfsBridgeFs {
 
     // Agent namespace
     if (this.isAgentsPath(normalized)) {
+      this.assertAgentPathAllowed(normalized)
       if (!this.agentBackend) throw new Error(`ENOENT: no such file or directory, stat '${path}'`)
       const relPath = this.toAgentsRelative(normalized)
       try {
@@ -649,6 +659,7 @@ export class VfsBridgeFs {
 
     // Agent namespace directory
     if (this.isAgentsPath(normalized)) {
+      this.assertAgentPathAllowed(normalized, { denyRoot: true })
       if (!this.agentBackend) throw new Error(`ENOTDIR: not a directory, scandir '${path}'`)
       const relPath = this.toAgentsRelative(normalized)
       try {
@@ -709,6 +720,7 @@ export class VfsBridgeFs {
 
     // Agent namespace file
     if (this.isAgentsPath(normalized)) {
+      this.assertAgentPathAllowed(normalized)
       if (!this.agentBackend) return
       const relPath = this.toAgentsRelative(normalized)
       if (!relPath) return
@@ -782,6 +794,7 @@ export class VfsBridgeFs {
 
     // Agent namespace source
     if (this.isAgentsPath(srcNorm)) {
+      this.assertAgentPathAllowed(srcNorm)
       if (!this.agentBackend) throw new Error(`cp: cannot stat '${src}'`)
       const srcRel = this.toAgentsRelative(srcNorm)
       try {
@@ -933,6 +946,14 @@ export class VfsBridgeFs {
   private isAgentsPath(path: string): boolean {
     const normalized = path.startsWith('/') ? path : this.normalizeAbsolutePath(path)
     return normalized === AGENTS_MOUNT || normalized.startsWith(AGENTS_MOUNT + '/')
+  }
+
+  private assertAgentPathAllowed(path: string, options?: { denyRoot?: boolean }): void {
+    if (!this.restrictAgentCoreFiles) return
+    const relativePath = this.toAgentsRelative(path)
+    if ((options?.denyRoot && !relativePath) || isProtectedAgentCoreFile(relativePath)) {
+      throw new Error(`EACCES: delegated subagent cannot access protected agent path '${path}'`)
+    }
   }
 
   /**

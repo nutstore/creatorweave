@@ -13,6 +13,7 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc, ToolContext } from './tool-types'
 import { resolveVfsTarget } from './vfs-resolver'
+import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
 import { performOcr, isOcrCompatibleImage } from '@/services/ocr.service'
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 
@@ -138,6 +139,10 @@ export const ocrExecutor: ToolExecutor = async (
   } catch (error) {
     const message =
       error instanceof Error ? error.message : String(error)
+
+    if (isSubagentPermissionDenied(error)) {
+      return toolErrorJson('ocr', SUBAGENT_PERMISSION_DENIED, message)
+    }
 
     if (
       message.includes('File not found') ||

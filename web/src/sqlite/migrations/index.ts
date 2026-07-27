@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 9
+export const BASE_SCHEMA_VERSION = 11
 
 // ============================================================================
 // Migration Registry
@@ -174,6 +174,26 @@ export const migrations: Migration[] = [
       DROP TABLE IF EXISTS active_project;
 
       PRAGMA user_version = 9;
+    `,
+  },
+  {
+    version: 10,
+    name: 'add_subagent_type_to_subagent_tasks',
+    up: `
+      ALTER TABLE subagent_tasks
+        ADD COLUMN subagent_type TEXT NOT NULL DEFAULT 'general-purpose';
+
+      PRAGMA user_version = 10;
+    `,
+  },
+  {
+    version: 11,
+    name: 'add_parent_tool_call_id_to_subagent_tasks',
+    up: `
+      ALTER TABLE subagent_tasks
+        ADD COLUMN parent_tool_call_id TEXT;
+
+      PRAGMA user_version = 11;
     `,
   },
 ]
@@ -325,11 +345,12 @@ export async function initializeSchema(
   // This is safe to run on existing databases
   db.exec(schemaSQL)
 
-  // schemaSQL sets PRAGMA user_version to BASE_SCHEMA_VERSION.
-  // Preserve previously migrated versions to avoid re-running old migrations
-  // on every app start.
-  const targetVersion = Math.max(existingVersion, BASE_SCHEMA_VERSION)
-  db.exec(`PRAGMA user_version = ${targetVersion}`)
+  // The base schema's PRAGMA describes fresh databases. On an existing
+  // database, restore its prior version so missing incremental DDL still runs.
+  // CREATE TABLE IF NOT EXISTS cannot add columns to that existing table.
+  if (existingVersion > 0) {
+    db.exec(`PRAGMA user_version = ${existingVersion}`)
+  }
 
   // Run any pending migrations
   await runPendingMigrations(db, onProgress)

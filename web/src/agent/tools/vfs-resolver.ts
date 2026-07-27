@@ -6,6 +6,9 @@ import { WorkspaceBackend } from './backends/workspace-backend'
 import { AgentBackend } from './backends/agent-backend'
 import { AssetsBackend } from './backends/assets-backend'
 import { SkillsBackend } from './backends/skills-backend'
+import { isProtectedAgentCoreFile } from './agent-file-protection'
+
+export { isProtectedAgentCoreFile } from './agent-file-protection'
 
 export type VfsAction = 'read' | 'write' | 'delete' | 'list'
 
@@ -176,16 +179,6 @@ function canWriteAgentPath(actorAgentId: string | null, targetAgentId: string): 
   return actorAgentId === targetAgentId
 }
 
-export function isProtectedAgentCoreFile(path: string): boolean {
-  return (
-    path === 'SOUL.md' ||
-    path === 'IDENTITY.md' ||
-    path === 'AGENTS.md' ||
-    path === 'USER.md' ||
-    path === 'MEMORY.md'
-  )
-}
-
 export async function resolveVfsTarget(
   rawPath: string,
   context: ToolContext,
@@ -218,6 +211,16 @@ export async function resolveVfsTarget(
       kind: 'workspace',
       path: parsed.path,
       backend: new WorkspaceBackend(context.workspaceId, context.directoryHandle, resolveProjectId(context)),
+    }
+  }
+
+  if (context.isSubagent) {
+    if (isProtectedAgentCoreFile(parsed.path)) {
+      throw new Error(`PERMISSION_DENIED: subagents cannot access protected agent file "${parsed.path}"`)
+    }
+    // Listing an agent root enables search/glob traversal over protected files.
+    if (action === 'list' && !parsed.path) {
+      throw new Error('PERMISSION_DENIED: subagents cannot enumerate an agent root')
     }
   }
 

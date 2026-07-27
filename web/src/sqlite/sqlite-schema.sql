@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 9;
+PRAGMA user_version = 11;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS subagent_tasks (
     description TEXT NOT NULL,
     status TEXT NOT NULL,                   -- 'pending' | 'running' | 'completed' | 'failed' | 'killed'
     mode TEXT NOT NULL DEFAULT 'act',       -- 'plan' | 'act'
+    subagent_type TEXT NOT NULL DEFAULT 'general-purpose',
+    parent_tool_call_id TEXT,
     messages_json TEXT NOT NULL DEFAULT '[]',
     queue_json TEXT NOT NULL DEFAULT '[]',
     usage_json TEXT,

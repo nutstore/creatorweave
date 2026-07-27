@@ -64,6 +64,10 @@ describe('subagent tools', () => {
     expect(getSubagentStatusDefinition.function.name).toBe('get_subagent_status')
   })
 
+  it('caps batch concurrency at five in its public schema', () => {
+    expect(batchSpawnDefinition.function.parameters.properties.max_concurrency.maximum).toBe(5)
+  })
+
   it('returns runtime unavailable when runtime is missing', async () => {
     const result = await spawnSubagentExecutor(
       { description: 'task', prompt: 'do it' },
@@ -78,11 +82,14 @@ describe('subagent tools', () => {
     const runtime = createMockRuntime()
     const result = await spawnSubagentExecutor(
       { description: 'task', prompt: 'do it' },
-      { directoryHandle: null, subagentRuntime: runtime } as ToolContext
+      { directoryHandle: null, subagentRuntime: runtime, currentToolCallId: 'spawn-call-a' } as ToolContext
     )
     const parsed = parseJson(result)
     expect(parsed.ok).toBe(true)
     expect((runtime.spawn as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+    expect((runtime.spawn as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({
+      parentToolCallId: 'spawn-call-a',
+    })
   })
 
   it('maps status query error to TASK_NOT_FOUND', async () => {

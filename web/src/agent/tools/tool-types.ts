@@ -14,6 +14,7 @@ export interface JSONSchemaProperty {
   properties?: Record<string, JSONSchemaProperty>
   required?: string[]
   default?: unknown
+  maximum?: number
   oneOf?: JSONSchemaProperty[]
 }
 
@@ -104,6 +105,8 @@ export interface SubagentTaskSummary {
 export interface SubagentTaskNotification {
   event_type: 'task_notification'
   agentId: string
+  /** Parent spawn_subagent / batch_spawn tool-call ID, when available. */
+  parentToolCallId?: string
   status: SubagentTaskStatus
   summary: string
   result?: string
@@ -128,9 +131,21 @@ export interface SubagentTaskNotification {
 export interface SubagentStepNotification {
   event_type: 'step_notification'
   agentId: string
+  /** Parent spawn_subagent / batch_spawn tool-call ID, when available. */
+  parentToolCallId?: string
   step: import('@/store/draft-assistant').DraftAssistantEvent
   timestamp: number
 }
+
+/**
+ * SubAgent role type — controls what kind of behavior the subagent should adopt.
+ *
+ * - 'general-purpose': default, no special behavior modification
+ * - 'explorer': read-only investigation, no file modifications
+ * - 'worker': code-changing subtask, must list modified files
+ * - 'awaiter': long-running command awaiter, no unrelated actions
+ */
+export type SubagentType = 'general-purpose' | 'explorer' | 'worker' | 'awaiter'
 
 export interface SpawnSubagentInput {
   description: string
@@ -138,6 +153,10 @@ export interface SpawnSubagentInput {
   name?: string
   mode?: 'plan' | 'act'
   timeout_ms?: number
+  /** Subagent role — controls behavior suffix appended to system prompt. */
+  subagent_type?: SubagentType
+  /** Internal UI correlation ID for the parent spawn tool call. */
+  parentToolCallId?: string
 }
 
 export interface BatchSpawnSubagentInput {
@@ -244,6 +263,8 @@ export interface ToolDefinition {
 export interface ToolContext {
   /** Root directory handle for file operations */
   directoryHandle: FileSystemDirectoryHandle | null
+  /** True when this tool call originates from a delegated subagent. */
+  isSubagent?: boolean
   /** Workspace ID bound to the current agent run */
   workspaceId?: string | null
   /** Active project ID for cross-namespace VFS routing */

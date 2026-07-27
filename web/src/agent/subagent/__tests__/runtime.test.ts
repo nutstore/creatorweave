@@ -72,6 +72,7 @@ function createStoredTask(input: {
   agentId: string
   status: 'pending' | 'running' | 'completed' | 'failed' | 'killed'
   name?: string
+  parentToolCallId?: string
   messages?: Message[]
   queue?: Array<{ message: string; enqueued_at: number }>
 }): Record<string, unknown> {
@@ -83,6 +84,8 @@ function createStoredTask(input: {
     description: 'persisted task',
     status: input.status,
     mode: 'act',
+    subagent_type: 'general-purpose',
+    parentToolCallId: input.parentToolCallId,
     messages: input.messages || [],
     queue: input.queue || [],
     usage: undefined,
@@ -167,7 +170,40 @@ describe('subagent runtime', () => {
     expect(taskNotifications(notifications).some((event) => event.status === 'completed')).toBe(true)
   })
 
-  it('releases name after spawn completes so it can be reused', async () => {
+  it('forces explorer subagents into plan mode', async () => {
+    const runtime = createRuntime(`workspace-explorer-${Date.now()}`, [])
+
+    await runtime.spawn({
+      description: 'inspect code',
+      prompt: 'find the relevant implementation',
+      mode: 'act',
+      subagent_type: 'explorer',
+    })
+
+    expect(hoisted.loopConfigs).toHaveLength(1)
+    expect(hoisted.loopConfigs[0].mode).toBe('plan')
+    expect(hoisted.loopConfigs[0].toolContext.agentMode).toBe('plan')
+    expect(hoisted.loopConfigs[0].toolContext.isSubagent).toBe(true)
+    expect(hoisted.loopConfigs[0].systemPrompt).toContain('Role: Explorer')
+  })
+
+  it('includes the owning tool-call ID in subagent notifications', async () => {
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
+    const runtime = createRuntime(`workspace-parent-call-${Date.now()}`, notifications)
+
+    await runtime.spawn({
+      description: 'correlated task',
+      prompt: 'run',
+      parentToolCallId: 'spawn-call-a',
+    })
+
+    expect(notifications.find((event) => event.event_type === 'task_notification')).toMatchObject({
+      agentId: expect.any(String),
+      parentToolCallId: 'spawn-call-a',
+    })
+  })
+
+  it('reserves a completed task name for status and resume lookup', async () => {
     const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-name-reuse-${Date.now()}`, notifications)
 
@@ -178,29 +214,24 @@ describe('subagent runtime', () => {
     })
     expect(first.status).toBe('completed')
 
-    // Name should be released — second spawn with same name should work
-    const second = await runtime.spawn({
-      description: 'second run',
-      prompt: 'do something else',
-      name: 'my-agent',
-    })
-    expect(second.status).toBe('completed')
-    expect(second.agentId).not.toBe(first.agentId)
+    await expect(
+      runtime.spawn({
+        description: 'second run',
+        prompt: 'do something else',
+        name: 'my-agent',
+      })
+    ).rejects.toMatchObject({ code: 'NAME_CONFLICT' })
   })
 
-  it('cleans up completed task from memory after spawn', async () => {
+  it('keeps completed task in memory after spawn for status lookup', async () => {
     const runtime = createRuntime(`workspace-cleanup-${Date.now()}`, [])
     const result = await runtime.spawn({
       description: 'cleanup test',
       prompt: 'run',
     })
-    // Task should be removed — getStatus should throw TASK_NOT_FOUND
-    try {
-      await runtime.getStatus({ agentId: result.agentId })
-      expect.unreachable('should have thrown')
-    } catch (e: any) {
-      expect(e.code).toBe('TASK_NOT_FOUND')
-    }
+    await expect(runtime.getStatus({ agentId: result.agentId })).resolves.toMatchObject({
+      status: 'completed',
+    })
   })
 
   it('spawn throws when subagent times out', async () => {
@@ -495,18 +526,40 @@ describe('subagent runtime', () => {
     expect(resumed.transcript_entries_recovered).toBe(2)
   })
 
-  it('rejects spawn when concurrency limit is reached', async () => {
+  it('restores the owning tool-call ID for notifications after hydration', async () => {
+    const workspaceId = `workspace-hydrate-parent-${Date.now()}`
+    hoisted.repo.findByWorkspaceId.mockResolvedValueOnce([
+      createStoredTask({
+        workspaceId,
+        agentId: 'subagent_persisted_parent',
+        status: 'failed',
+        parentToolCallId: 'persisted-tool-call',
+      }),
+    ] as any)
+    const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
+    const runtime = createRuntime(workspaceId, notifications)
+
+    await runtime.resume({ agentId: 'subagent_persisted_parent', prompt: 'continue' })
+    await waitForStatus(runtime, 'subagent_persisted_parent', 'completed')
+
+    expect(taskNotifications(notifications).at(-1)).toMatchObject({
+      parentToolCallId: 'persisted-tool-call',
+    })
+  })
+
+  it('queues a sixth spawn until one of five execution slots is released', async () => {
     const notifications: (SubagentTaskNotification | SubagentStepNotification)[] = []
     const runtime = createRuntime(`workspace-concurrency-${Date.now()}`, notifications)
 
-    // Block all runs so tasks stay in running/pending state
+    const resolveRuns: Array<() => void> = []
     hoisted.setRunImpl(
-      () => new Promise<Message[]>(() => {})
+      (messages) => new Promise<Message[]>((resolve) => {
+        resolveRuns.push(() => resolve([...messages, createAssistantMessage('done')]))
+      })
     )
 
-    // Spawn 20 tasks concurrently (each blocks but creates task synchronously)
-    const spawnPromises: Promise<any>[] = []
-    for (let i = 0; i < 20; i++) {
+    const spawnPromises: Promise<unknown>[] = []
+    for (let i = 0; i < 5; i++) {
       spawnPromises.push(
         runtime.spawn({
           description: `task-${i}`,
@@ -514,18 +567,27 @@ describe('subagent runtime', () => {
           name: `task-${i}`,
         }).catch(() => {})
       )
+      await waitForStatus(runtime, `task-${i}`, 'running')
     }
 
-    // 21st should fail — tasks are created synchronously before their first await
-    try {
-      await runtime.spawn({
-        description: 'overflow',
-        prompt: 'too many',
-      })
-      expect.unreachable('should have thrown')
-    } catch (e: any) {
-      expect(e.code).toBe('CONCURRENCY_LIMIT')
-    }
+    spawnPromises.push(
+      runtime.spawn({
+        description: 'task-5',
+        prompt: 'run 5',
+        name: 'task-5',
+      }).catch(() => {})
+    )
+    for (let i = 0; i < 20; i += 1) await Promise.resolve()
+
+    expect(hoisted.loopConfigs).toHaveLength(5)
+    expect((await runtime.getStatus({ agentId: 'task-5' })).status).toBe('pending')
+
+    resolveRuns.shift()?.()
+    await waitForStatus(runtime, 'task-5', 'running')
+    expect(hoisted.loopConfigs).toHaveLength(6)
+
+    while (resolveRuns.length > 0) resolveRuns.shift()?.()
+    await Promise.all(spawnPromises)
   })
 
   it('shutdown marks all active tasks as failed with SESSION_INTERRUPTED', async () => {

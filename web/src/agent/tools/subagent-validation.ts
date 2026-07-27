@@ -5,7 +5,7 @@
  * distinguish validation errors from runtime errors by checking `error.code`.
  */
 
-import { SubagentError, SubagentErrorCode } from './tool-types'
+import { SubagentError, SubagentErrorCode, type SubagentType } from './tool-types'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -13,8 +13,11 @@ import { SubagentError, SubagentErrorCode } from './tool-types'
 
 const NAME_PATTERN = /^[a-zA-Z0-9_-]+$/
 
-const VALID_SUBAGENT_TYPES = new Set([
+const VALID_SUBAGENT_TYPES = new Set<SubagentType>([
   'general-purpose',
+  'explorer',
+  'worker',
+  'awaiter',
 ])
 
 // ---------------------------------------------------------------------------
@@ -66,15 +69,15 @@ export function validateName(value: unknown): string | undefined {
   return trimmed
 }
 
-export function validateSubagentType(value: unknown): string {
+export function validateSubagentType(value: unknown): SubagentType {
   if (value === undefined || value === null) return 'general-purpose'
   if (typeof value !== 'string') {
     throw new SubagentError(SubagentErrorCode.INVALID_AGENT_TYPE, 'subagent_type must be a string', { field: 'subagent_type' })
   }
-  if (!VALID_SUBAGENT_TYPES.has(value)) {
+  if (!VALID_SUBAGENT_TYPES.has(value as SubagentType)) {
     throw new SubagentError(SubagentErrorCode.INVALID_AGENT_TYPE, `invalid subagent_type: "${value}"`, { field: 'subagent_type' })
   }
-  return value
+  return value as SubagentType
 }
 
 export function validateTimeoutMs(value: unknown, max = 3_600_000): number | undefined {

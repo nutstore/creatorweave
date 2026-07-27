@@ -19,6 +19,7 @@ import { VfsBridgeFs } from './just-bash-bridge'
 import { resolveVfsTarget } from './vfs-resolver'
 import { AssetsBackend } from './backends/assets-backend'
 import { AgentBackend } from './backends/agent-backend'
+import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
 
 /** Workspace mount point inside the bash sandbox (must match just-bash-bridge.ts) */
 const WORKSPACE_MOUNT = '/workspace'
@@ -272,7 +273,10 @@ export const bashToolExecutor: ToolExecutor = async (
   }
 
   // Create bridge filesystem (readOnly flag is the authoritative guard)
-  const bridgeFs = new VfsBridgeFs(effectiveBackend, rootNames, assetsBackend, agentBackend, { readOnly: isPlanMode })
+  const bridgeFs = new VfsBridgeFs(effectiveBackend, rootNames, assetsBackend, agentBackend, {
+    readOnly: isPlanMode,
+    restrictAgentCoreFiles: context.isSubagent === true,
+  })
 
   // Default cwd into the first root so relative paths always work.
   // Works for both single-root and multi-root: path always has rootName prefix.
@@ -326,6 +330,15 @@ export const bashToolExecutor: ToolExecutor = async (
         // Fall back to raw stdout if decoding fails.
       }
     }
+
+    // just-bash reports virtual filesystem failures as a non-zero command
+    // result instead of rejecting. Normalize protected delegated-agent reads
+    // into the same tool error envelope used by the other VFS tools.
+    if (result.exitCode !== 0 && isSubagentPermissionDenied(new Error(stderr))) {
+      return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, stderr, {
+        details: { command, elapsedMs },
+      })
+    }
     let truncated = false
 
     if (stdout.length > MAX_OUTPUT) {
@@ -347,6 +360,9 @@ export const bashToolExecutor: ToolExecutor = async (
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
+    if (message.startsWith('EACCES: delegated subagent')) {
+      return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, message)
+    }
     return toolErrorJson('bash', 'execution_error', `Bash execution failed: ${message}`, {
       details: { command, elapsedMs: Date.now() - startTime },
     })

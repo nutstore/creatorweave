@@ -6,8 +6,9 @@ const hoisted = vi.hoisted(() => {
     queryAll: vi.fn(),
     queryFirst: vi.fn(),
     execute: vi.fn(),
-    transaction: vi.fn(async (callback: () => Promise<void>) => callback()),
+    transaction: vi.fn(),
   }
+  db.transaction.mockImplementation(async (callback: (tx: typeof db) => Promise<void>) => callback(db))
   return { db }
 })
 
@@ -27,7 +28,7 @@ describe('SubagentRepository', () => {
     hoisted.db.queryFirst.mockReset()
     hoisted.db.execute.mockReset()
     hoisted.db.transaction.mockReset()
-    hoisted.db.transaction.mockImplementation(async (callback: () => Promise<void>) => callback())
+    hoisted.db.transaction.mockImplementation(async (callback: (tx: typeof hoisted.db) => Promise<void>) => callback(hoisted.db))
   })
 
   it('returns applied=true when CAS transition updates one row', async () => {
@@ -97,6 +98,8 @@ describe('SubagentRepository', () => {
         description: 'desc',
         status: 'pending',
         mode: 'act',
+        subagent_type: 'explorer',
+        parentToolCallId: 'tool-call-1',
         messages: [],
         queue: [],
         stopped: false,
@@ -111,5 +114,38 @@ describe('SubagentRepository', () => {
     const sql = hoisted.db.execute.mock.calls[0]?.[0] as string
     expect(sql).toContain('ON CONFLICT(agent_id) DO UPDATE SET')
     expect(sql).not.toContain('DELETE FROM subagent_tasks')
+    expect(sql).toContain('subagent_type')
+    expect(sql).toContain('parent_tool_call_id')
+    expect(hoisted.db.execute.mock.calls[0]?.[1][6]).toBe('explorer')
+    expect(hoisted.db.execute.mock.calls[0]?.[1][7]).toBe('tool-call-1')
+  })
+
+  it('restores the persisted subagent type', async () => {
+    hoisted.db.queryAll.mockResolvedValueOnce([
+      {
+        agent_id: 'a1',
+        workspace_id: 'w1',
+        name: null,
+        description: 'desc',
+        status: 'failed',
+        mode: 'act',
+        subagent_type: 'worker',
+        parent_tool_call_id: 'tool-call-2',
+        messages_json: '[]',
+        queue_json: '[]',
+        usage_json: null,
+        error_json: null,
+        stopped: 0,
+        created_at: 1,
+        updated_at: 2,
+        last_activity_at: 2,
+      },
+    ])
+
+    const repo = new SubagentRepository()
+    const [task] = await repo.findByWorkspaceId('w1')
+
+    expect(task.subagent_type).toBe('worker')
+    expect(task.parentToolCallId).toBe('tool-call-2')
   })
 })

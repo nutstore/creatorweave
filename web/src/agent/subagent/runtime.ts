@@ -14,10 +14,12 @@ import type {
   SubagentTaskStatus,
   SubagentTaskSummary,
   SubagentTaskUsage,
+  SubagentType,
   ToolContext,
 } from '@/agent/tools/tool-types'
 import { SubagentError, SubagentErrorCode } from '@/agent/tools/tool-types'
 import { TranscriptWriter, getTranscriptDir, getTranscriptFile } from './transcript'
+import { buildSubagentSystemPrompt } from './role-prompts'
 
 type SubagentTaskInternal = {
   agentId: string
@@ -46,6 +48,10 @@ type SubagentTaskInternal = {
   running_notification_armed: boolean
   run_timeout?: ReturnType<typeof setTimeout>
   transcriptWriter?: TranscriptWriter
+  /** Subagent role — controls behavior suffix appended to system prompt. */
+  subagent_type: SubagentType
+  /** Parent spawn_subagent / batch_spawn call that owns this task's UI. */
+  parentToolCallId?: string
 }
 
 type RuntimeDeps = {
@@ -89,7 +95,7 @@ const DEFAULT_MESSAGE_TIMEOUT_MS = 300000
 const SUMMARY_MAX_CHARS = 500
 const CAS_MAX_RETRIES = 3
 const CAS_RETRY_DELAY_MS = 10
-const DEFAULT_MAX_CONCURRENT = 20
+const DEFAULT_MAX_CONCURRENT = 5
 
 class SubagentRuntimeImpl implements SubagentRuntime {
   private tasks = new Map<string, SubagentTaskInternal>()
@@ -101,6 +107,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
   private reasoningBuffers = new Map<string, string>()
   private contentBuffers = new Map<string, string>()
   private toolArgBuffers = new Map<string, string>()
+  private activeExecutionSlots = 0
+  private executionWaiters: Array<() => void> = []
 
   constructor(deps: RuntimeDeps) {
     this.deps = deps
@@ -138,7 +146,11 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     const description = (input.description || '').trim()
     const prompt = (input.prompt || '').trim()
     const name = typeof input.name === 'string' ? input.name.trim() : undefined
-    const mode = input.mode || this.deps.baseToolContext.agentMode || 'act'
+    const subagentType: SubagentType = input.subagent_type ?? 'general-purpose'
+    // Explorer is a capability boundary, not just a prompt convention. Force
+    // Plan mode so write tools are never exposed, even if a caller supplies
+    // mode: 'act'.
+    const mode = subagentType === 'explorer' ? 'plan' : input.mode || this.deps.baseToolContext.agentMode || 'act'
     const timeoutMs = this.parseExecutionTimeout(input.timeout_ms)
 
     if (!description) {
@@ -152,17 +164,6 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       if (existing) {
         throw new SubagentError(SubagentErrorCode.NAME_CONFLICT, `name "${name}" already exists`)
       }
-    }
-
-    // Concurrency check — count active (pending + running) tasks
-    const activeCount = Array.from(this.tasks.values()).filter(
-      (t) => t.status === 'pending' || t.status === 'running'
-    ).length
-    if (activeCount >= DEFAULT_MAX_CONCURRENT) {
-      throw new SubagentError(
-        SubagentErrorCode.CONCURRENCY_LIMIT,
-        `maximum concurrent subagents reached (${DEFAULT_MAX_CONCURRENT})`,
-      )
     }
 
     const now = Date.now()
@@ -186,6 +187,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       stopped: false,
       lifecycle_version: 0,
       running_notification_armed: false,
+      subagent_type: subagentType,
+      parentToolCallId: input.parentToolCallId,
     }
 
     this.tasks.set(agentId, task)
@@ -484,7 +487,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     await this.ensureHydrated()
     const tasks = Array.isArray(input.tasks) ? input.tasks : []
     const maxConcurrency = Number.isFinite(input.max_concurrency)
-      ? Math.max(1, Math.min(20, Math.floor(Number(input.max_concurrency))))
+      ? Math.max(1, Math.min(DEFAULT_MAX_CONCURRENT, Math.floor(Number(input.max_concurrency))))
       : 5
 
     const completed: Array<{ task_index: number; agentId: string; content: string; usage?: SubagentTaskUsage }> = []
@@ -504,7 +507,10 @@ class SubagentRuntimeImpl implements SubagentRuntime {
           const existing = this.nameToId.get(name)
           if (existing) throw new SubagentError(SubagentErrorCode.NAME_CONFLICT, `name "${name}" already exists`)
         }
-        const mode = taskSpec.mode || this.deps.baseToolContext.agentMode || 'act'
+        const subagentType: SubagentType = taskSpec.subagent_type ?? 'general-purpose'
+        // Keep batch_spawn consistent with spawn: explorer tasks must never
+        // receive the Act-mode tool set.
+        const mode = subagentType === 'explorer' ? 'plan' : taskSpec.mode || this.deps.baseToolContext.agentMode || 'act'
         const timeoutMs = this.parseExecutionTimeout(taskSpec.timeout_ms)
         const now = Date.now()
         const agentId = `subagent_${generateId()}`
@@ -527,6 +533,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
           stopped: false,
           lifecycle_version: 0,
           running_notification_armed: false,
+          subagent_type: subagentType,
+          parentToolCallId: taskSpec.parentToolCallId,
         }
         this.tasks.set(agentId, task)
         if (name) this.nameToId.set(name, agentId)
@@ -631,12 +639,38 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       return task.processingPromise
     }
     task.processing = true
-    task.processingPromise = this.processQueue(task).finally(() => {
+    task.processingPromise = this.processWithExecutionSlot(task).finally(() => {
       task.processing = false
       task.processingPromise = undefined
       this.persistToSQLite()
     })
     return task.processingPromise
+  }
+
+  private async processWithExecutionSlot(task: SubagentTaskInternal): Promise<void> {
+    await this.acquireExecutionSlot()
+    try {
+      await this.processQueue(task)
+    } finally {
+      this.releaseExecutionSlot()
+    }
+  }
+
+  private acquireExecutionSlot(): Promise<void> {
+    if (this.activeExecutionSlots < DEFAULT_MAX_CONCURRENT) {
+      this.activeExecutionSlots += 1
+      return Promise.resolve()
+    }
+    return new Promise((resolve) => this.executionWaiters.push(resolve))
+  }
+
+  private releaseExecutionSlot(): void {
+    const next = this.executionWaiters.shift()
+    if (next) {
+      next()
+      return
+    }
+    this.activeExecutionSlots -= 1
   }
 
   private async processQueue(task: SubagentTaskInternal): Promise<void> {
@@ -883,15 +917,22 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     if (task.loop) return task.loop
 
     const contextConfig = this.deps.contextManager.getConfig()
+    // Build the role-specific system prompt by appending behavior suffix
+    // based on subagent_type. For 'general-purpose', returns base unchanged.
+    const finalSystemPrompt = buildSubagentSystemPrompt(
+      SUBAGENT_SYSTEM_PROMPT,
+      task.subagent_type ?? 'general-purpose'
+    )
     const subContextManager = new ContextManager({
       maxContextTokens: contextConfig.maxContextTokens,
       reserveTokens: contextConfig.reserveTokens,
       enableSummarization: contextConfig.enableSummarization,
       maxMessageGroups: contextConfig.maxMessageGroups,
-      systemPrompt: SUBAGENT_SYSTEM_PROMPT,
+      systemPrompt: finalSystemPrompt,
     })
     const taskContext: ToolContext = {
       ...this.deps.baseToolContext,
+      isSubagent: true,
       agentMode: task.mode,
       subagentRuntime: undefined,
       readFileState: new Map(),
@@ -901,7 +942,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       provider: this.deps.provider,
       toolRegistry: this.deps.toolRegistry,
       contextManager: subContextManager,
-      systemPrompt: SUBAGENT_SYSTEM_PROMPT,
+      systemPrompt: finalSystemPrompt,
       toolContext: taskContext,
       mode: task.mode,
       beforeToolCall: ({ toolName }) => {
@@ -1241,7 +1282,11 @@ class SubagentRuntimeImpl implements SubagentRuntime {
 
   private emitNotification(event: SubagentTaskNotification): void {
     try {
-      this.deps.onNotification?.(event)
+      const parentToolCallId = this.tasks.get(event.agentId)?.parentToolCallId
+      this.deps.onNotification?.({
+        ...event,
+        ...(parentToolCallId ? { parentToolCallId } : {}),
+      })
     } catch (error) {
       console.warn('[SubagentRuntime] task notification delivery failed', {
         agentId: event.agentId,
@@ -1260,6 +1305,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       const notification: SubagentStepNotification = {
         event_type: 'step_notification',
         agentId: task.agentId,
+        parentToolCallId: task.parentToolCallId,
         step,
         timestamp: Date.now(),
       }
@@ -1333,6 +1379,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
           running_notification_armed: false,
           run_timeout: undefined,
           transcriptWriter: undefined,
+          subagent_type: (item.subagent_type as SubagentType | undefined) ?? 'general-purpose',
+          parentToolCallId: item.parentToolCallId,
         }
         this.tasks.set(revived.agentId, revived)
         // Only register name for failed tasks (resumable); completed/killed are stale
@@ -1360,6 +1408,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
     created_at: number
     updated_at: number
     last_activity_at: number
+    subagent_type: SubagentType
+    parentToolCallId?: string
   } {
     return {
       agentId: task.agentId,
@@ -1376,6 +1426,8 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       created_at: task.created_at,
       updated_at: task.updated_at,
       last_activity_at: task.last_activity_at,
+      subagent_type: task.subagent_type,
+      parentToolCallId: task.parentToolCallId,
     }
   }
 

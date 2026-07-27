@@ -23,6 +23,7 @@ import {
 } from './loop-guard'
 import { getFormatHandler } from './format-registry'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage, isKnownBinaryExtension, tryDecodeAsText } from './io-shared'
+import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
 
 // Register built-in format handlers
 import './formats'
@@ -391,6 +392,9 @@ async function executeSingleRead(
       { retryable: true }
     )
   } catch (error) {
+    if (isSubagentPermissionDenied(error)) {
+      return toolErrorJson('read', SUBAGENT_PERMISSION_DENIED, error.message)
+    }
     if (isOPFSWorkspaceMiss(error)) {
       try {
         const target = await resolveVfsTarget(path, context, 'read')

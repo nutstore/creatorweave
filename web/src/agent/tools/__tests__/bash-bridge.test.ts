@@ -107,6 +107,21 @@ describe('VfsBridgeFs path routing', () => {
     expect(content).toBe('agent-soul')
   })
 
+  it('denies subagents access to protected files through the /agents mount', async () => {
+    const workspaceBackend = makeMockBackend()
+    const agentBackend = makeMockBackend({ 'SOUL.md': 'agent-soul' })
+    const bridge = new VfsBridgeFs(
+      workspaceBackend,
+      ['root'],
+      undefined,
+      agentBackend,
+      { restrictAgentCoreFiles: true }
+    )
+
+    await expect(bridge.readFile('/agents/SOUL.md')).rejects.toThrow('EACCES')
+    await expect(bridge.readdir('/agents')).rejects.toThrow('EACCES')
+  })
+
   it('throws ENOENT for /agents when no agentBackend', async () => {
     const backend = makeMockBackend()
     const bridge = new VfsBridgeFs(backend, ['root'])

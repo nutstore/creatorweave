@@ -283,7 +283,7 @@ function handleSubagentStepNotification(
   conversationId: string,
   event: SubagentStepNotification
 ): void {
-  const { agentId, step } = event
+  const { agentId, parentToolCallId, step } = event
 
   useConversationRuntimeStore.setState((state) => {
     // Get or create draft state for this subagent
@@ -316,7 +316,7 @@ function handleSubagentStepNotification(
   useConversationStoreSQLite.setState((state) => {
     const c = state.conversations.find((x: Conversation) => x.id === conversationId)
     if (!c || !c.draftAssistant) return
-    const targetStep = findSpawnStepInDraft(c.draftAssistant)
+    const targetStep = findSpawnStepInDraft(c.draftAssistant, parentToolCallId)
     if (!targetStep) return
     if (!targetStep.subagentEvents) targetStep.subagentEvents = []
     // Avoid duplicating the same agentId entry from step notifications
@@ -327,7 +327,7 @@ function handleSubagentStepNotification(
   useConversationRuntimeStore.setState((state) => {
     const r = state.runtimes.get(conversationId)
     if (!r || !r.draftAssistant) return
-    const targetStep = findSpawnStepInDraft(r.draftAssistant)
+    const targetStep = findSpawnStepInDraft(r.draftAssistant, parentToolCallId)
     if (!targetStep) return
     if (!targetStep.subagentEvents) targetStep.subagentEvents = []
     if (!targetStep.subagentEvents.some((e) => e.agentId === agentId)) {
@@ -336,15 +336,30 @@ function handleSubagentStepNotification(
   })
 }
 
-/** Find the active or most recent streaming spawn_subagent/batch_spawn step.
+/** Find the spawn_subagent/batch_spawn step that owns a subagent event.
+ *  Parent IDs are authoritative; the active/recent fallback only supports
+ *  legacy tasks that were created before correlation IDs existed.
  *  Accepts ReadonlyArray steps so the same helper works for plain objects,
  *  immer drafts, and Readonly drafts. Callers that need to mutate the
  *  returned step (e.g. to push into subagentEvents) should do so within an
  *  immer producer where the draft is already mutable. */
-function findSpawnStepInDraft(draft: {
+export function findSpawnStepInDraft(draft: {
   activeToolStepId?: string | null
   steps: ReadonlyArray<DraftAssistantStep>
-}): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined {
+}, parentToolCallId?: string): Extract<DraftAssistantStep, { type: 'tool_call' }> | undefined {
+  if (parentToolCallId) {
+    const step = draft.steps.find(
+      (candidate): candidate is Extract<DraftAssistantStep, { type: 'tool_call' }> =>
+        candidate.type === 'tool_call' &&
+        candidate.toolCall.id === parentToolCallId &&
+        (candidate.toolCall.function.name === 'spawn_subagent' || candidate.toolCall.function.name === 'batch_spawn')
+    )
+    // A correlated notification must never be routed to a different spawn
+    // card. If its parent step is gone, drop it rather than guessing.
+    return step
+  }
+
+  // Compatibility fallback for tasks created before parentToolCallId existed.
   if (draft.activeToolStepId) {
     const activeStep = draft.steps.find((s) => s.id === draft.activeToolStepId)
     if (activeStep && activeStep.type === 'tool_call') {
@@ -2257,6 +2272,21 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const c = state.conversations.find((x) => x.id === conversationId)
             if (!c) return
             c.messages = latestMessages
+            c.status = 'idle'
+            c.error = null
+            c.currentToolCall = null
+            c.activeToolCalls = []
+            c.streamingToolArgs = ''
+            c.streamingToolArgsByCallId = {}
+            c.streamingContent = ''
+            c.streamingReasoning = ''
+            c.completedContent = null
+            c.completedReasoning = null
+            c.isContentStreaming = false
+            c.isReasoningStreaming = false
+            c.draftAssistant = null
+            c.activeRunId = null
+            state.cancelledRunIds.delete(runId)
           })
 
           // Runtime: reset all runtime state
@@ -2806,7 +2836,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
               if (!c || !c.draftAssistant) return
-              const targetStep = findSpawnStepInDraft(c.draftAssistant)
+              const targetStep = findSpawnStepInDraft(c.draftAssistant, event.parentToolCallId)
               if (targetStep) {
                 if (!targetStep.subagentEvents) targetStep.subagentEvents = []
                 targetStep.subagentEvents.push(subagentEvent)
@@ -2817,7 +2847,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             useConversationRuntimeStore.setState((state) => {
               const r = state.runtimes.get(conversationId)
               if (!r || !r.draftAssistant) return
-              const targetStep = findSpawnStepInDraft(r.draftAssistant)
+              const targetStep = findSpawnStepInDraft(r.draftAssistant, event.parentToolCallId)
               if (targetStep) {
                 if (!targetStep.subagentEvents) targetStep.subagentEvents = []
                 targetStep.subagentEvents.push(subagentEvent)

@@ -190,7 +190,37 @@ describe('vfs-resolver', () => {
   })
 
   it('detects protected core files', () => {
-    expect(isProtectedAgentCoreFile('SOUL.md')).toBe(true)
+    for (const path of ['SOUL.md', 'IDENTITY.md', 'AGENTS.md', 'USER.md', 'MEMORY.md', 'HEARTBEAT.md']) {
+      expect(isProtectedAgentCoreFile(path)).toBe(true)
+    }
     expect(isProtectedAgentCoreFile('skills/debug.md')).toBe(false)
+  })
+
+  it('denies subagents access to protected agent core files', async () => {
+    const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
+    getProjectMock.mockResolvedValue({ agentManager })
+    const subagentContext = makeContext({ isSubagent: true } as any)
+
+    for (const path of ['SOUL.md', 'IDENTITY.md', 'AGENTS.md', 'USER.md', 'MEMORY.md', 'HEARTBEAT.md']) {
+      await expect(
+        resolveVfsTarget(`vfs://agents/default/${path}`, subagentContext, 'read')
+      ).rejects.toThrow('PERMISSION_DENIED')
+    }
+    await expect(
+      resolveVfsTarget('vfs://agents/default', subagentContext, 'list', { allowEmptyPath: true })
+    ).rejects.toThrow('PERMISSION_DENIED')
+  })
+
+  it('allows subagents to read non-core agent files', async () => {
+    const agentManager = { readPath: vi.fn(), writePath: vi.fn(), deletePath: vi.fn() }
+    getProjectMock.mockResolvedValue({ agentManager })
+
+    const result = await resolveVfsTarget(
+      'vfs://agents/default/skills/review.md',
+      makeContext({ isSubagent: true } as any),
+      'read'
+    )
+
+    expect(result.kind).toBe('agent')
   })
 })

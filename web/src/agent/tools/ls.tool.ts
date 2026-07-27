@@ -24,6 +24,7 @@ import {
   shouldSkipDirectory,
 } from './file-discovery.helpers'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
+import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
 
 const DIRECTORY_TOOL_PARAMETERS: ToolDefinition['function']['parameters'] = {
   type: 'object',
@@ -369,6 +370,9 @@ async function executeListMode(args: Record<string, unknown>, context: unknown):
     scope = await resolveDiscoveryScope(args.path, toolContext, 'list')
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (isSubagentPermissionDenied(error)) {
+      return toolErrorJson('ls', SUBAGENT_PERMISSION_DENIED, message)
+    }
     if (message === 'No directory selected.') {
       return toolErrorJson('ls', 'no_directory', message)
     }
@@ -555,6 +559,9 @@ async function executeGlobMode(
     scope = await resolveDiscoveryScope(args.path, toolContext, 'glob')
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (isSubagentPermissionDenied(error)) {
+      return toolErrorJson('ls', SUBAGENT_PERMISSION_DENIED, message)
+    }
     if (message === 'No directory selected.') {
       return toolErrorJson('ls', 'no_directory', message)
     }

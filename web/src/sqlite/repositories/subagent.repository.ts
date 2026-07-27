@@ -1,6 +1,6 @@
 import type { AgentMode } from '@/agent/agent-mode'
 import type { Message } from '@/agent/message-types'
-import type { SubagentTaskStatus, SubagentTaskUsage } from '@/agent/tools/tool-types'
+import type { SubagentTaskStatus, SubagentTaskUsage, SubagentType } from '@/agent/tools/tool-types'
 import { boolToInt, getSQLiteDB, intToBool, parseJSON, toJSON } from '../sqlite-database'
 
 interface SubagentTaskRow {
@@ -10,6 +10,8 @@ interface SubagentTaskRow {
   description: string
   status: string
   mode: string
+  subagent_type: string
+  parent_tool_call_id: string | null
   messages_json: string
   queue_json: string
   usage_json: string | null
@@ -27,6 +29,8 @@ export interface StoredSubagentTask {
   description: string
   status: SubagentTaskStatus
   mode: AgentMode
+  subagent_type: SubagentType
+  parentToolCallId?: string
   messages: Message[]
   queue: Array<{ message: string; enqueued_at: number }>
   usage?: SubagentTaskUsage
@@ -88,16 +92,18 @@ export class SubagentRepository {
       for (const task of tasks) {
         await tx.execute(
           `INSERT INTO subagent_tasks (
-              agent_id, workspace_id, name, description, status, mode,
+              agent_id, workspace_id, name, description, status, mode, subagent_type, parent_tool_call_id,
               messages_json, queue_json, usage_json, error_json, stopped,
               created_at, updated_at, last_activity_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            ON CONFLICT(agent_id) DO UPDATE SET
              workspace_id = excluded.workspace_id,
              name = excluded.name,
              description = excluded.description,
              status = excluded.status,
              mode = excluded.mode,
+             subagent_type = excluded.subagent_type,
+             parent_tool_call_id = excluded.parent_tool_call_id,
              messages_json = excluded.messages_json,
              queue_json = excluded.queue_json,
              usage_json = excluded.usage_json,
@@ -114,6 +120,8 @@ export class SubagentRepository {
             task.description,
             task.status,
             task.mode,
+            task.subagent_type,
+            task.parentToolCallId || null,
             toJSON(task.messages),
             toJSON(task.queue),
             toJSON(task.usage || null),
@@ -206,6 +214,8 @@ export class SubagentRepository {
       description: row.description,
       status: row.status as SubagentTaskStatus,
       mode: row.mode === 'plan' ? 'plan' : 'act',
+      subagent_type: row.subagent_type as SubagentType,
+      parentToolCallId: row.parent_tool_call_id || undefined,
       messages: parseJSON<Message[]>(row.messages_json, []),
       queue: parseJSON<Array<{ message: string; enqueued_at: number }>>(row.queue_json, []),
       usage: parseJSON<SubagentTaskUsage | null>(row.usage_json || '', null) || undefined,

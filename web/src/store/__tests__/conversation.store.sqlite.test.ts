@@ -24,6 +24,7 @@ vi.mock('@/streaming-bus', () => ({
 }))
 
 vi.mock('../conversation-context.store', () => ({
+  getActiveConversation: vi.fn(() => null),
   useConversationContextStore: {
     getState: vi.fn(() => ({
       activeWorkspaceId: null,
@@ -201,6 +202,7 @@ vi.mock('@/agent/agent-loop', () => {
 })
 
 import { useConversationStore } from '../conversation.store'
+import { findSpawnStepInDraft } from '../conversation.store.sqlite'
 import { clearAgentLoops, setAgentLoop } from '../agent-loop-registry'
 import { clearStreamingQueues } from '../streaming-queue-registry'
 
@@ -216,6 +218,7 @@ describe('conversation.store.sqlite tool-call routing', () => {
     messageRepoReplaceAllMock.mockResolvedValue(undefined)
     clearAgentLoops()
     clearStreamingQueues()
+    useConversationRuntimeStore.setState({ runtimes: new Map() })
     useConversationStore.setState({
       conversations: [],
       activeConversationId: null,
@@ -230,6 +233,21 @@ describe('conversation.store.sqlite tool-call routing', () => {
     delete (globalThis as any).__conversationStoreCustomRun
   })
 
+  it('routes a subagent event to its owning spawn call instead of the active one', () => {
+    const toolCallA = { id: 'spawn-a', type: 'function' as const, function: { name: 'spawn_subagent', arguments: '{}' } }
+    const toolCallB = { id: 'spawn-b', type: 'function' as const, function: { name: 'spawn_subagent', arguments: '{}' } }
+    const draft = {
+      activeToolStepId: 'step-b',
+      steps: [
+        { id: 'step-a', type: 'tool_call' as const, toolCall: toolCallA, args: '{}', streaming: true },
+        { id: 'step-b', type: 'tool_call' as const, toolCall: toolCallB, args: '{}', streaming: true },
+      ],
+    }
+
+    expect(findSpawnStepInDraft(draft, 'spawn-a')?.toolCall.id).toBe('spawn-a')
+    expect(findSpawnStepInDraft(draft, 'missing')).toBeUndefined()
+  })
+
   it('should wait for new conversation metadata before persisting the first message', async () => {
     let resolveMeta!: () => void
     const metaPersisted = new Promise<void>((resolve) => {
@@ -242,12 +260,12 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     await Promise.resolve()
     await Promise.resolve()
-    expect(messageRepoReplaceAllMock).not.toHaveBeenCalled()
+      expect(messageRepoInsertMock).not.toHaveBeenCalled()
 
     resolveMeta()
     await metaPersisted
     await vi.waitFor(() => {
-      expect(messageRepoReplaceAllMock).toHaveBeenCalledTimes(1)
+      expect(messageRepoInsertMock).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -263,16 +281,16 @@ describe('conversation.store.sqlite tool-call routing', () => {
     }> = []
 
     ;(globalThis as any).__conversationStoreTestHook = (label: string) => {
-      const c = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
-      const stepA = c?.draftAssistant?.steps.find(
-        (s) => s.id === 'tool-call_A' && s.type === 'tool_call'
+      const runtime = useConversationRuntimeStore.getState().runtimes.get(conv.id)
+      const stepA = runtime?.draftAssistant?.steps.find(
+        (s) => s.type === 'tool_call' && s.toolCall.id === 'call_A'
       ) as any
-      const stepB = c?.draftAssistant?.steps.find(
-        (s) => s.id === 'tool-call_B' && s.type === 'tool_call'
+      const stepB = runtime?.draftAssistant?.steps.find(
+        (s) => s.type === 'tool_call' && s.toolCall.id === 'call_B'
       ) as any
       snapshots.push({
         label,
-        currentToolCallId: c?.currentToolCall?.id || null,
+        currentToolCallId: runtime?.currentToolCall?.id || null,
         stepA: stepA
           ? { streaming: stepA.streaming, args: stepA.args, result: stepA.result }
           : undefined,
@@ -750,22 +768,14 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(updated?.messages[0]?.role).toBe('user')
   })
 
-  it('should set status to pending when compression starts and status is not streaming/tool_calling', async () => {
+  it('keeps the runtime status pending when compression starts before content or tool streaming', async () => {
     const store = useConversationStore.getState()
     const conv = store.createNew('compression-pending')
 
-    ;(globalThis as any).__conversationStoreBeforeCompressionStart = () => {
-      useConversationStore.setState((state) => ({
-        conversations: state.conversations.map((c) =>
-          c.id === conv.id ? { ...c, status: 'idle' } : c
-        ),
-      }))
-    }
-
     const snapshots: Array<{ label: string; status: string | undefined }> = []
     ;(globalThis as any).__conversationStoreTestHook = (label: string) => {
-      const c = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
-      snapshots.push({ label, status: c?.status })
+      const runtime = useConversationRuntimeStore.getState().runtimes.get(conv.id)
+      snapshots.push({ label, status: runtime?.status })
     }
 
     await useConversationStore
@@ -1220,15 +1230,15 @@ describe('conversation.store.sqlite tool-call routing', () => {
 
     const capture = async (label: string) => {
       await new Promise((resolve) => setTimeout(resolve, 20))
-      const c = useConversationStore.getState().conversations.find((x) => x.id === conv.id)
-      const reasoningStep = c?.draftAssistant?.steps.find((s) => s.type === 'reasoning') as
+      const runtime = useConversationRuntimeStore.getState().runtimes.get(conv.id)
+      const reasoningStep = runtime?.draftAssistant?.steps.find((s) => s.type === 'reasoning') as
         | { content: string; streaming: boolean }
         | undefined
 
       snapshots.push({
         label,
-        reasoning: c?.draftAssistant?.reasoning || '',
-        content: c?.draftAssistant?.content || '',
+        reasoning: runtime?.draftAssistant?.reasoning || '',
+        content: runtime?.draftAssistant?.content || '',
         reasoningStep: reasoningStep
           ? { content: reasoningStep.content, streaming: reasoningStep.streaming }
           : null,

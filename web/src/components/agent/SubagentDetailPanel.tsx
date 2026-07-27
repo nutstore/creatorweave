@@ -8,9 +8,10 @@
  * components so the visual presentation is identical to the main agent.
  */
 
-import { memo } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { DraftAssistantStep } from '@/agent/message-types'
+import type { DraftAssistantStep, Message } from '@/agent/message-types'
+import { getSubagentRepository } from '@/sqlite'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { ReasoningSection } from './ReasoningSection'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
@@ -97,20 +98,112 @@ function renderSubagentStep(
   )
 }
 
+function buildPersistedSteps(messages: Message[]): {
+  steps: DraftAssistantStep[]
+  toolResults: Map<string, string>
+} {
+  const toolResults = new Map<string, string>()
+  for (const message of messages) {
+    if (message.role === 'tool' && message.toolCallId) {
+      toolResults.set(message.toolCallId, message.content ?? '')
+    }
+  }
+
+  const steps: DraftAssistantStep[] = []
+  for (const message of messages) {
+    if (message.role !== 'assistant') continue
+
+    if (message.reasoning) {
+      steps.push({
+        id: `${message.id}:reasoning`,
+        type: 'reasoning',
+        content: message.reasoning,
+        streaming: false,
+      })
+    }
+    if (message.content) {
+      steps.push({
+        id: `${message.id}:content`,
+        type: 'content',
+        content: message.content,
+        streaming: false,
+      })
+    }
+    for (const toolCall of message.toolCalls ?? []) {
+      steps.push({
+        id: `${message.id}:${toolCall.id}`,
+        type: 'tool_call',
+        toolCall,
+        args: toolCall.function.arguments,
+        result: toolResults.get(toolCall.id),
+        streaming: false,
+      })
+    }
+  }
+
+  return { steps, toolResults }
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 interface SubagentDetailPanelProps {
   agentId: string
+  /** conversationId is also the workspace ID used by persisted subagent tasks. */
+  conversationId?: string
 }
 
 export const SubagentDetailPanel = memo(function SubagentDetailPanel({
   agentId,
+  conversationId,
 }: SubagentDetailPanelProps) {
   const draft = useConversationRuntimeStore(
     (state) => state.subagentDrafts.get(agentId)
   )
+  const [persistedMessages, setPersistedMessages] = useState<Message[] | null>(null)
+  const [isLoadingPersisted, setIsLoadingPersisted] = useState(false)
 
-  if (!draft) {
+  useEffect(() => {
+    if (draft || !conversationId) return
+
+    let cancelled = false
+    setIsLoadingPersisted(true)
+    void getSubagentRepository()
+      .findByWorkspaceId(conversationId)
+      .then((tasks) => {
+        if (!cancelled) {
+          setPersistedMessages(tasks.find((task) => task.agentId === agentId)?.messages ?? [])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPersistedMessages([])
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingPersisted(false)
+      })
+
+    return () => { cancelled = true }
+  }, [agentId, conversationId, draft])
+
+  const persisted = useMemo(
+    () => buildPersistedSteps(persistedMessages ?? []),
+    [persistedMessages]
+  )
+
+  const steps = draft?.steps ?? persisted.steps
+  const toolResults = draft
+    ? new Map(Object.entries(draft.toolResults))
+    : persisted.toolResults
+
+  if (!draft && isLoadingPersisted) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        <span>正在恢复已保存的执行记录...</span>
+      </div>
+    )
+  }
+
+  if (!draft && persistedMessages === null) {
     return (
       <div className="px-3 py-2 text-xs text-neutral-400">
         （中间过程数据不可用——可能是页面刷新后运行时状态已清除）
@@ -118,7 +211,14 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
     )
   }
 
-  const steps = draft.steps
+  if (!draft && steps.length === 0) {
+    return (
+      <div className="px-3 py-2 text-xs text-neutral-400">
+        （未找到该子代理的已保存执行记录）
+      </div>
+    )
+  }
+
   if (steps.length === 0) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
@@ -126,12 +226,6 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
         <span>等待响应...</span>
       </div>
     )
-  }
-
-  // Build a toolResults map from draft state
-  const toolResults = new Map<string, string>()
-  for (const [id, result] of Object.entries(draft.toolResults)) {
-    toolResults.set(id, result)
   }
 
   return (

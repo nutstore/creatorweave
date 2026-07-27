@@ -116,6 +116,21 @@ function extractSubagentDescription(parsedArgs: Record<string, unknown>): string
   return typeof parsedArgs.description === 'string' ? parsedArgs.description : undefined
 }
 
+function getSubagentTitle(toolName: string, parsedArgs: Record<string, unknown>): string {
+  if (toolName === 'batch_spawn') return 'Subagents'
+
+  switch (parsedArgs.subagent_type) {
+    case 'explorer':
+      return 'Explorer'
+    case 'worker':
+      return 'Worker'
+    case 'awaiter':
+      return 'Awaiter'
+    default:
+      return 'Subagent'
+  }
+}
+
 function parseSpawnResult(result: string | undefined): { content?: string; agentId?: string; usage?: { total_tokens?: number; duration_ms?: number } } | null {
   if (!result) return null
   try {
@@ -263,6 +278,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
         expanded={expanded}
         onToggle={() => setExpanded(!expanded)}
         subagentEvents={subagentEvents}
+        conversationId={conversationId}
         t={t}
       />
     )
@@ -371,15 +387,18 @@ function SubagentCard({
   expanded,
   onToggle,
   subagentEvents,
+  conversationId,
   t,
 }: {
   ctx: ToolRenderCtx
   expanded: boolean
   onToggle: () => void
   subagentEvents?: SubagentEvent[]
+  conversationId?: string
   t: (key: string) => string
 }) {
   const subagentDesc = extractSubagentDescription(ctx.args)
+  const subagentTitle = getSubagentTitle(ctx.toolName, ctx.args)
   const spawnResult = parseSpawnResult(ctx.rawResult)
 
   return (
@@ -395,7 +414,7 @@ function SubagentCard({
           <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
         )}
         <Bot className="h-3.5 w-3.5 text-violet-500" />
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">{ctx.toolName}</code>
+        <span className="font-medium text-neutral-700 dark:text-neutral-200">{subagentTitle}</span>
         {subagentDesc && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{subagentDesc}&quot;</span>
         )}
@@ -438,11 +457,12 @@ function SubagentCard({
               try {
                 const parsed = JSON.parse(ctx.rawResult) as Record<string, unknown>
                 const data = (parsed.data ?? parsed) as Record<string, unknown>
-                const completed = data.completed
-                if (Array.isArray(completed)) {
-                  for (const item of completed) {
-                    const aid = (item as Record<string, unknown>)?.agentId
-                    if (typeof aid === 'string') resultAgentIds.push(aid)
+                for (const batchResult of [data.completed, data.failed]) {
+                  if (Array.isArray(batchResult)) {
+                    for (const item of batchResult) {
+                      const aid = (item as Record<string, unknown>)?.agentId
+                      if (typeof aid === 'string') resultAgentIds.push(aid)
+                    }
                   }
                 }
               } catch { /* non-JSON result, skip */ }
@@ -451,7 +471,7 @@ function SubagentCard({
             if (allAgentIds.length === 0) return null
             return allAgentIds.map((agentId) => (
               <Suspense key={agentId} fallback={<div className="py-2 text-xs text-neutral-400">Loading...</div>}>
-                <SubagentDetailPanel agentId={agentId} />
+                <SubagentDetailPanel agentId={agentId} conversationId={conversationId} />
               </Suspense>
             ))
           })()}
