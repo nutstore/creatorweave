@@ -1,7 +1,7 @@
 /**
  * PDF Export Service
  *
- * Handles PDF report generation using jsPDF + html2canvas.
+ * Handles PDF report generation using jsPDF.
  * Supports Agent results, code reviews, test reports, and project analysis.
  *
  * Features:
@@ -166,7 +166,6 @@ export async function exportToPDF(
 
     // Dynamic imports for PDF libraries
     const { default: jsPDF } = await import('jspdf')
-    await import('html2canvas')
 
     onProgress?.(30, 'Generating PDF...')
 

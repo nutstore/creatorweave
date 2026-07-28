@@ -38,6 +38,7 @@ import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
+import { ShareButton } from './ShareButton'
 import { ContextSummaryCard } from './ContextSummaryCard'
 import { TTSButton } from './TTSButton'
 import { ttsQueue } from './tts-queue'
@@ -514,6 +515,9 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             {lastMessageWithContent?.content && (
               <CopyButton content={lastMessageWithContent.content} />
             )}
+            {lastMessageWithContent?.content && (
+              <ShareButton content={lastMessageWithContent.content} messageId={lastMessageWithContent.id} />
+            )}
             {enableTTS && lastMessageWithContent?.content && (
               <TTSButton content={lastMessageWithContent.content} voice={ttsVoice} />
             )}
@@ -745,6 +749,7 @@ const AssistantStep = memo(function AssistantStep({
 
           {hasContent && (
             <div
+              data-message-id={message.id}
               className={
                 isContextSummary
                   ? 'rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-base text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'

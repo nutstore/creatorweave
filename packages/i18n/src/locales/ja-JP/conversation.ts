@@ -24,6 +24,10 @@ export const conversation = {
     pageContextCollapse: "折りたたむ",
     pageContextRawData: "生データ",
     branch: "ここから分岐",
+    share: "エクスポート",
+    shareAsMarkdown: "Markdown ファイル",
+    shareAsImage: "画像",
+    exported: "エクスポート済み",
     thinkingMode: "思考モード",
     thinkingLevels: {
       minimal: "浅",

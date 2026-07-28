@@ -23,6 +23,10 @@ export const conversation = {
     pageContextCollapse: "Collapse",
     pageContextRawData: "Raw data",
     branch: "Branch from here",
+    share: "Export",
+    shareAsMarkdown: "Markdown File",
+    shareAsImage: "Image",
+    exported: "Exported",
     thinkingMode: "Thinking Mode",
     thinkingLevels: {
       minimal: "Minimal",

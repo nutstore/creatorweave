@@ -24,6 +24,10 @@ export const conversation = {
     pageContextCollapse: "접기",
     pageContextRawData: "원시 데이터",
     branch: "여기서 분기",
+    share: "내보내기",
+    shareAsMarkdown: "Markdown 파일",
+    shareAsImage: "이미지",
+    exported: "내보내기 완료",
     thinkingMode: "생각 모드",
     thinkingLevels: {
       minimal: "최소",

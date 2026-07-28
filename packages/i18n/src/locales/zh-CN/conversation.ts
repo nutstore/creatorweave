@@ -23,6 +23,10 @@ export const conversation = {
     pageContextCollapse: "收起",
     pageContextRawData: "原始数据",
     branch: "从此处分叉",
+    share: "导出",
+    shareAsMarkdown: "Markdown 文件",
+    shareAsImage: "图片",
+    exported: "已导出",
     thinkingMode: "思考模式",
     thinkingLevels: {
       minimal: "浅",
