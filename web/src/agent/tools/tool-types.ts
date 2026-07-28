@@ -14,6 +14,7 @@ export interface JSONSchemaProperty {
   properties?: Record<string, JSONSchemaProperty>
   required?: string[]
   default?: unknown
+  minimum?: number
   maximum?: number
   oneOf?: JSONSchemaProperty[]
 }

@@ -1,8 +1,15 @@
 /**
  * Search Conversations Tool
  *
- * Searches across all workspaces' chat history for a keyword/phrase.
- * Uses SQLite LIKE on messages.content_json/meta_json.
+ * Searches across all workspaces' chat history for a keyword/phrase, with optional
+ * time-window and project filters. Supports two modes:
+ *
+ *   - Keyword mode  (query is non-empty): LIKE search on messages.content_json/meta_json
+ *                                          (existing behavior, plus optional time/project filters).
+ *   - List mode    (query is empty)     : pure time-window/project listing of conversations
+ *                                          — useful for daily briefings like "最近 3 天".
+ *
+ * Time parameters use Unix epoch milliseconds.
  */
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
@@ -16,20 +23,51 @@ export const searchConversationsDefinition: ToolDefinition = {
     description:
       'Search across all workspaces chat history for a keyword or phrase. ' +
       'Returns matching conversation titles, workspace names, and project names. ' +
-      'Use this when the user asks about a topic they discussed before but cannot remember which workspace it was in.',
+      'Use this when the user asks about a topic they discussed before but cannot remember which workspace it was in. ' +
+      'Supports optional time-window filters (updated_after / updated_before, Unix epoch ms) and project filter — ' +
+      'which together enable "最近 N 天"、"今天"、"本周" type conversation briefings without multi-query fan-out.',
     parameters: {
       type: 'object',
       properties: {
         query: {
           type: 'string',
-          description: 'The keyword or phrase to search for in chat messages.',
+          description:
+            'The keyword or phrase to search for in chat messages. ' +
+            'Pass an empty string (or omit) to list conversations purely by time/project filters.',
         },
         limit: {
           type: 'number',
+          minimum: 1,
+          maximum: 50,
           description: 'Maximum number of results to return. Default 20.',
         },
+        updated_after: {
+          type: 'number',
+          description:
+            'Optional Unix epoch milliseconds (e.g. 1784995200000). ' +
+            'Only return conversations whose updated_at is >= this value. Useful for "今天" / "最近 3 天" briefings.',
+        },
+        updated_before: {
+          type: 'number',
+          description:
+            'Optional Unix epoch milliseconds. Only return conversations whose updated_at is <= this value.',
+        },
+        project: {
+          type: 'string',
+          description:
+            'Optional project name filter (exact match against `projects.name`).',
+        },
+        sort_by: {
+          type: 'string',
+          enum: ['updated_desc', 'updated_asc'],
+          description:
+            'Sort order. Default "updated_desc" (most recent first). ' +
+            'When query is non-empty, only updated_desc / updated_asc are supported.',
+        },
       },
-      required: ['query'],
+      // All parameters are optional. The executor enforces that at least one
+      // of {query, updated_after, updated_before, project} is provided.
+      required: [],
     },
   },
 }
@@ -40,7 +78,14 @@ interface SearchResultRow {
   workspaceName: string | null
   projectName: string | null
   updatedAt: number
-  matchedContentJson: string
+  matchedContentJson?: string
+}
+
+interface ProjectBreakdownRow {
+  // COALESCE handles orphan conversations (no associated project); never null at this layer.
+  projectName: string
+  conversationCount: number
+  lastActivityAt: number
 }
 
 /**
@@ -77,46 +122,172 @@ function extractSnippetFromContentJson(contentJson: string, query: string): stri
   }
 }
 
-export const searchConversationsExecutor: ToolExecutor = async (args) => {
-  const query = typeof args.query === 'string' ? args.query.trim() : ''
+/**
+ * Build the WHERE clause for the messages-table sub-query (only used in keyword mode).
+ *
+ * Note: The `messages` table only has `timestamp` (per-message time), not `updated_at`.
+ * Time-window filtering is therefore applied at the *conversation* level (c.updated_at)
+ * which represents "when the conversation was last active" — that's what users actually
+ * care about for "最近 3 天 / 今天" briefings.
+ */
+function buildMessageWhere(query: string): { sql: string; params: unknown[] } {
   if (!query) {
-    return toolErrorJson('search_conversations', 'invalid_arguments', 'query is required')
+    return { sql: '', params: [] }
   }
+  const likePattern = `%${query}%`
+  return {
+    sql: `WHERE (lower(m.content_json) LIKE lower(?) OR lower(COALESCE(m.meta_json, '') ) LIKE lower(?))`,
+    params: [likePattern, likePattern],
+  }
+}
 
-  const limit = typeof args.limit === 'number' ? Math.min(args.limit, 50) : 20
+export const searchConversationsExecutor: ToolExecutor = async (args) => {
+  const rawQuery = typeof args.query === 'string' ? args.query : ''
+  const query = rawQuery.trim()
+  const hasQuery = query.length > 0
+
+  const limit =
+    typeof args.limit === 'number' && Number.isFinite(args.limit)
+      ? Math.max(1, Math.min(Math.floor(args.limit), 50))
+      : 20
+  const updatedAfter =
+    typeof args.updated_after === 'number' && Number.isFinite(args.updated_after) ? args.updated_after : null
+  const updatedBefore =
+    typeof args.updated_before === 'number' && Number.isFinite(args.updated_before)
+      ? args.updated_before
+      : null
+  const projectFilter =
+    typeof args.project === 'string' && args.project.trim().length > 0 ? args.project.trim() : ''
+  const sortBy = args.sort_by === 'updated_asc' ? 'updated_asc' : 'updated_desc'
+
+  // At least one filter is required: keyword OR time OR project.
+  if (!hasQuery && updatedAfter === null && updatedBefore === null && !projectFilter) {
+    return toolErrorJson(
+      'search_conversations',
+      'invalid_arguments',
+      'at least one of query, updated_after, updated_before, project is required'
+    )
+  }
 
   try {
     const db = getSQLiteDB()
+    let rows: SearchResultRow[] = []
+    let projectsBreakdown: ProjectBreakdownRow[] = []
 
-    // LIKE search on messages table, then map back to conversation/project/workspace metadata
-    const likePattern = `%${query}%`
+    if (hasQuery) {
+      // ── Keyword mode ────────────────────────────────────────────────────────
+      // Strategy: filter `messages` first (optionally by time AND keyword), collapse
+      // down to (conversation_id, max(seq)) so we keep the latest matching message
+      // per conversation for snippet extraction. Then join `conversations` and apply
+      // the *conversation-level* filters (project, overall updated_at).
+      const msgWhere = buildMessageWhere(query)
 
-    const rows = await db.queryAll<SearchResultRow>(
-      `WITH matched AS (
-         SELECT
-           m.conversation_id AS conversationId,
-           MAX(m.seq) AS matchedSeq
-         FROM messages m
-         WHERE lower(m.content_json) LIKE lower(?)
-            OR lower(COALESCE(m.meta_json, '')) LIKE lower(?)
-         GROUP BY m.conversation_id
-       )
-       SELECT
-         c.id as conversationId,
-         c.title,
-         w.name as workspaceName,
-         p.name as projectName,
-         c.updated_at as updatedAt,
-         m.content_json as matchedContentJson
-       FROM conversations c
-       INNER JOIN matched mt ON mt.conversationId = c.id
-       INNER JOIN messages m ON m.conversation_id = mt.conversationId AND m.seq = mt.matchedSeq
-       LEFT JOIN workspaces w ON c.id = w.id
-       LEFT JOIN projects p ON w.project_id = p.id
-       ORDER BY c.updated_at DESC
-       LIMIT ?`,
-      [likePattern, likePattern, limit + 1] // +1 to detect if there are more results
-    )
+      const conversationConditions: string[] = []
+      const conversationParams: unknown[] = []
+      if (updatedAfter !== null) {
+        conversationConditions.push('c.updated_at >= ?')
+        conversationParams.push(updatedAfter)
+      }
+      if (updatedBefore !== null) {
+        conversationConditions.push('c.updated_at <= ?')
+        conversationParams.push(updatedBefore)
+      }
+      if (projectFilter) {
+        conversationConditions.push('p.name = ?')
+        conversationParams.push(projectFilter)
+      }
+      const conversationWhere =
+        conversationConditions.length > 0 ? `WHERE ${conversationConditions.join(' AND ')}` : ''
+
+      const orderBy = sortBy === 'updated_asc' ? 'ORDER BY c.updated_at ASC' : 'ORDER BY c.updated_at DESC'
+
+      const sql = `
+        WITH matched AS (
+          SELECT m_msg.conversation_id AS conversationId, MAX(m_msg.seq) AS matchedSeq
+          FROM messages m_msg
+          ${msgWhere.sql.replace(/m\./g, 'm_msg.')}
+          GROUP BY m_msg.conversation_id
+        )
+        SELECT
+          c.id AS conversationId,
+          c.title,
+          w.name AS workspaceName,
+          p.name AS projectName,
+          c.updated_at AS updatedAt,
+          m_match.content_json AS matchedContentJson
+        FROM conversations c
+        INNER JOIN matched mt ON mt.conversationId = c.id
+        INNER JOIN messages m_match ON m_match.conversation_id = mt.conversationId
+                                    AND m_match.seq = mt.matchedSeq
+        LEFT JOIN workspaces w ON c.id = w.id
+        LEFT JOIN projects p ON w.project_id = p.id
+        ${conversationWhere}
+        ${orderBy}
+        LIMIT ?
+      `
+
+      rows = await db.queryAll<SearchResultRow>(sql, [
+        ...msgWhere.params,
+        ...conversationParams,
+        limit + 1,
+      ])
+    } else {
+      // ── List mode (no keyword) ──────────────────────────────────────────────
+      // Pure time/project filter: directly query `conversations`.
+      const conditions: string[] = []
+      const params: unknown[] = []
+      if (updatedAfter !== null) {
+        conditions.push('c.updated_at >= ?')
+        params.push(updatedAfter)
+      }
+      if (updatedBefore !== null) {
+        conditions.push('c.updated_at <= ?')
+        params.push(updatedBefore)
+      }
+      if (projectFilter) {
+        conditions.push('p.name = ?')
+        params.push(projectFilter)
+      }
+      const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+      const orderBy = sortBy === 'updated_asc' ? 'ORDER BY c.updated_at ASC' : 'ORDER BY c.updated_at DESC'
+
+      const conversationsSql = `
+        SELECT
+          c.id AS conversationId,
+          c.title,
+          w.name AS workspaceName,
+          p.name AS projectName,
+          c.updated_at AS updatedAt,
+          '' AS matchedContentJson
+        FROM conversations c
+        LEFT JOIN workspaces w ON c.id = w.id
+        LEFT JOIN projects p ON w.project_id = p.id
+        ${where}
+        ${orderBy}
+        LIMIT ?
+      `
+      rows = await db.queryAll<SearchResultRow>(conversationsSql, [...params, limit + 1])
+
+      // ── Project breakdown (only meaningful when no `project` filter is set) ─
+      // Reuses the same WHERE so the breakdown reflects the same time window as the results.
+      // Skipped when caller already passed `project=` (breakdown would be 1 row = trivial).
+      if (!projectFilter) {
+        const breakdownSql = `
+          SELECT
+            COALESCE(p.name, '(未命名项目)') AS projectName,
+            COUNT(*) AS conversationCount,
+            MAX(c.updated_at) AS lastActivityAt
+          FROM conversations c
+          LEFT JOIN workspaces w ON c.id = w.id
+          LEFT JOIN projects p ON w.project_id = p.id
+          ${where}
+          GROUP BY p.name
+          ORDER BY conversationCount DESC, lastActivityAt DESC
+        `
+        projectsBreakdown = await db.queryAll<ProjectBreakdownRow>(breakdownSql, params)
+      }
+    }
 
     const hasMore = rows.length > limit
     const results = rows.slice(0, limit).map((row) => ({
@@ -125,14 +296,28 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
       workspaceName: row.workspaceName || '(未命名工作区)',
       projectName: row.projectName || '(未命名项目)',
       updatedAt: row.updatedAt,
-      snippet: extractSnippetFromContentJson(row.matchedContentJson, query),
+      snippet:
+        hasQuery && row.matchedContentJson
+          ? extractSnippetFromContentJson(row.matchedContentJson, query)
+          : null,
     }))
 
     return toolOkJson('search_conversations', {
-      query,
+      query: hasQuery ? query : '*',
       totalMatches: results.length,
       hasMore,
+      filters: {
+        updated_after: updatedAfter,
+        updated_before: updatedBefore,
+        project: projectFilter || null,
+        sort_by: sortBy,
+      },
+      mode: hasQuery ? 'keyword' : 'list',
       results,
+      // Project activity breakdown (list mode only; empty array in keyword mode).
+      // Lets the model see which projects have activity without requiring a separate
+      // listProjects tool — perfect for "which project should I focus on today?".
+      projects_breakdown: projectsBreakdown,
     })
   } catch (error) {
     return toolErrorJson(
@@ -148,6 +333,8 @@ export const searchConversationsPromptDoc: ToolPromptDoc = {
   category: 'search',
   section: '### Cross-Workspace Search',
   lines: [
-    '- `search_conversations(query, limit?)` - Search across all workspaces chat history for a keyword or phrase',
+    '- `search_conversations(query, limit?)` - Keyword search across all workspaces chat history.',
+    '- `search_conversations("", updated_after=<ms>, updated_before=<ms>)` - List conversations in a time window (Unix epoch ms). Useful for "最近 3 天" / "今天" / "本周" briefings.',
+    '- `search_conversations(query, project="<name>", updated_after=<ms>)` - Combine keyword + project + time filters.',
   ],
 }

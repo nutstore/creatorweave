@@ -42,6 +42,7 @@ import './tool-renderers/ExternalToolRenderers'
 import './tool-renderers/BashRenderer'
 import './tool-renderers/ImageGenRenderer'
 import './tool-renderers/PageScreenshotRenderer'
+import './tool-renderers/SearchConversationsRenderer'
 
 // ─── Subagent types (kept local) ──────────────────────────────
 
