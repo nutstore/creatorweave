@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Share2, FileText, Image as ImageIcon, Check } from 'lucide-react'
+import { Download, FileText, Image as ImageIcon, Check } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
 import { saveAs } from 'file-saver'
@@ -128,7 +128,7 @@ export function ShareButton({ content, messageId, conversationTitle, className }
         ) : busy ? (
           <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-neutral-300 border-t-neutral-500" />
         ) : (
-          <Share2 className="h-3.5 w-3.5" />
+          <Download className="h-3.5 w-3.5" />
         )}
       </button>
 
