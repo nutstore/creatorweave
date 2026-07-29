@@ -28,6 +28,7 @@ import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
 import { DocsPage } from '@/pages/docs/DocsPage'
+import { ServiceWorkerBridge } from '@/components/ServiceWorkerBridge'
 
 // ---------------------------------------------------------------------------
 // Route components — extract params from react-router and delegate to pages
@@ -559,6 +560,7 @@ function AppReady() {
           element={<NavigateToProjects />}
         />
       </Routes>
+      <ServiceWorkerBridge />
       <InstallPrompt />
       <DatabaseRefreshDialog isOpen={false} errorMessage={null} />
       <ExtensionInstallGuide

@@ -71,6 +71,10 @@ interface SettingsState {
   autoPlayTTS: boolean
   ttsVoice: string
   enableSchedules: boolean
+  agentLoopNotifications: {
+    enabled: boolean
+    onlyWhenHidden: boolean
+  }
 
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
@@ -124,6 +128,8 @@ interface SettingsState {
   setAutoPlayTTS: (v: boolean) => void
   setTTSVoice: (voice: string) => void
   setHasApiKey: (has: boolean) => void
+  setAgentLoopNotificationsEnabled: (enabled: boolean) => void
+  setAgentLoopNotificationsOnlyWhenHidden: (onlyWhenHidden: boolean) => void
   getEffectiveProviderConfig: () => EffectiveProviderConfig | null
 
   /**
@@ -235,6 +241,10 @@ export const useSettingsStore = create<SettingsState>()(
       imageGenModel: 'google/gemini-2.5-flash-image',
       imageGenAspectRatio: '1:1',
       pinnedModelsByProvider: {},
+      agentLoopNotifications: {
+        enabled: true,
+        onlyWhenHidden: true,
+      },
       _providerRefreshVersion: 0,
 
       triggerProviderRefresh: () => {
@@ -458,6 +468,14 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoPlayTTS: (autoPlayTTS) => set({ autoPlayTTS }),
       setTTSVoice: (ttsVoice) => set({ ttsVoice }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
+      setAgentLoopNotificationsEnabled: (enabled) => {
+        set((s) => ({ agentLoopNotifications: { ...s.agentLoopNotifications, enabled } }))
+      },
+      setAgentLoopNotificationsOnlyWhenHidden: (onlyWhenHidden) => {
+        set((s) => ({
+          agentLoopNotifications: { ...s.agentLoopNotifications, onlyWhenHidden },
+        }))
+      },
 
       getEffectiveProviderConfig: () => {
         const state = get()
@@ -780,7 +798,22 @@ export const useSettingsStore = create<SettingsState>()(
     }),
     {
       name: 'bfosa-settings',
-      version: 1,
+      version: 2,
+      // Migrate older persisted states forward. v1 state doesn't have
+      // agentLoopNotifications — backfill defaults on load.
+      migrate: (persistedState: any, version: number) => {
+        if (!persistedState) return persistedState
+        if (version < 2) {
+          return {
+            ...persistedState,
+            agentLoopNotifications: {
+              enabled: true,
+              onlyWhenHidden: true,
+            },
+          }
+        }
+        return persistedState
+      },
       // Don't persist hasApiKey - it's derived from SQLite
       partialize: (state) => ({
         providerType: state.providerType,
@@ -803,6 +836,7 @@ export const useSettingsStore = create<SettingsState>()(
         imageGenModel: state.imageGenModel,
         imageGenAspectRatio: state.imageGenAspectRatio,
         pinnedModelsByProvider: state.pinnedModelsByProvider,
+        agentLoopNotifications: state.agentLoopNotifications,
       }),
       // On rehydration, restore dynamic providers
       onRehydrateStorage: () => (state) => {

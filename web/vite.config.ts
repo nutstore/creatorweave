@@ -2,6 +2,7 @@ import { defineConfig, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
+import { transformSync } from 'esbuild'
 import { sqlitePlugin } from './src/sqlite/vite-plugin-sqlite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { syncGuardPlugin } from './vite-plugin-sync-guard'
@@ -93,6 +94,48 @@ function pyodideServePlugin(): Plugin {
 }
 
 /**
+ * Vite dev-server middleware that serves src/sw.ts as the Service Worker
+ * at /sw.js with the correct `application/javascript` MIME type.
+ *
+ * This replaces vite-plugin-pwa's dev middleware, which doesn't always
+ * register correctly (returns text/html instead of JS, breaking SW
+ * registration with SecurityError). Recompiles on every request — dev
+ * only, performance is irrelevant.
+ */
+function swDevMiddleware(): Plugin {
+  return {
+    name: 'sw-dev-middleware',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url ?? '').split('?')[0]
+        if (url !== '/sw.js') {
+          next()
+          return
+        }
+        try {
+          const swPath = path.resolve(__dirname, 'src/sw.ts')
+          const source = fs.readFileSync(swPath, 'utf-8')
+          const result = transformSync(source, {
+            loader: 'ts',
+            format: 'iife',
+            target: 'es2020',
+          })
+          res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+          res.setHeader('Service-Worker-Allowed', '/')
+          res.setHeader('Cache-Control', 'no-cache')
+          res.end(result.code)
+        } catch (err) {
+          console.error('[sw-dev-middleware] failed:', err)
+          res.statusCode = 500
+          res.end(`SW build failed: ${(err as Error).message}`)
+        }
+      })
+    },
+  }
+}
+
+/**
  * Vite plugin to shim `node:zlib` for browser builds.
  *
  * `just-bash` browser bundle imports `gunzipSync` from `node:zlib` for
@@ -143,6 +186,7 @@ export default defineConfig({
     syncGuardPlugin(),
     ...(isVitest ? [] : [docsSyncPlugin()]),
     ...(isVitest ? [] : [extensionServePlugin()]),
+    swDevMiddleware(),
     sqlitePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
@@ -150,8 +194,13 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       includeAssets: ['wasm/**/*.wasm', 'icon-*.png', 'icon.svg'],
-      // Disable in dev to avoid COOP/COEP conflicts
-      disable: process.env.NODE_ENV === 'development',
+      // Production SW is built by vite-plugin-pwa as usual. Dev mode is
+      // handled by swDevMiddleware() above (vite-plugin-pwa's dev middleware
+      // doesn't reliably serve sw.js with the right MIME type).
+      disable: false,
+      devOptions: {
+        enabled: false, // Disabled — swDevMiddleware handles dev /sw.js
+      },
       // We register SW manually in src/main.tsx to enforce versioned script URL.
       injectRegister: false,
       manifest: {

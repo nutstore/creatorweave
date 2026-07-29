@@ -19,6 +19,21 @@ declare global {
 const STATIC_CACHE = 'static-v2'
 const DYNAMIC_CACHE = 'dynamic-v2'
 
+// Keep this dependency-free: the development SW middleware transpiles this
+// file without bundling imports, and browser workers do not provide require().
+function buildConversationNotificationUrl(projectId: string, conversationId: string): string {
+  return `/#/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(conversationId)}`
+}
+
+// In dev mode (vite dev server), bypass precaching and fetch interception
+// so HMR + WASM bundles (Pyodide, SQLite) keep working. The SW is still
+// registered (so showNotification / notificationclick work), but acts as a
+// pass-through.
+const IS_DEV =
+  self.location.hostname === 'localhost' ||
+  self.location.hostname === '127.0.0.1' ||
+  self.location.hostname === ''
+
 const STATIC_RESOURCES = ['/manifest.json']
 
 const API_PATTERNS = [/\/api\//, /\/mcp\//]
@@ -34,6 +49,12 @@ const PRECACHE_URLS = (self.__WB_MANIFEST ?? [])
   .filter((url) => typeof url === 'string' && url.startsWith('/'))
 
 self.addEventListener('install', (event) => {
+  if (IS_DEV) {
+    // Dev mode: skip precaching entirely (avoid HMR/WASM cache conflicts)
+    event.waitUntil(self.skipWaiting())
+    return
+  }
+
   event.waitUntil(
     (async () => {
       const cache = await caches.open(STATIC_CACHE)
@@ -67,6 +88,10 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  // Dev mode: pass through. Without this early return, every HMR request
+  // and WASM bundle gets cached by SW, breaking Vite hot reload.
+  if (IS_DEV) return
+
   const { request } = event
   const url = new URL(request.url)
 
@@ -229,14 +254,14 @@ self.addEventListener('sync' as never, (event: ExtendableEvent & { tag?: string 
 })
 
 async function syncMessages(): Promise<void> {
-  console.log('[ServiceWorker] Message sync complete')
+  return
 }
 
 self.addEventListener('push', (event) => {
   let data = {
     title: 'CreatorWeave',
     body: 'You have a new notification',
-    icon: '/icons/icon-192.png',
+    icon: '/favicon.svg',
     badge: '/icons/badge-72.png',
     data: { url: '/' },
   }
@@ -269,27 +294,51 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   if (event.action === 'dismiss') return
 
-  const targetUrl = event.notification.data?.url || '/'
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) {
-        if (client.url === targetUrl && 'focus' in client) {
-          return client.focus()
+  const data = (event.notification.data ?? {}) as {
+    clientId?: string | null
+    conversationId?: string
+    projectId?: string
+  }
+  const { clientId, conversationId, projectId } = data
+
+  event.waitUntil((async () => {
+    // 1️⃣ 精准找到原 tab — focus + 让客户端 navigate 到对的会话
+    // 注意：不基于 URL 匹配，因为同 conversationId 可能跨 project，用户状态会变
+    if (clientId) {
+      try {
+        const original = await self.clients.get(clientId)
+        if (original?.type === 'window') {
+          await (original as WindowClient).focus()
+          original.postMessage({
+            type: 'NAVIGATE_TO_CONVERSATION',
+            conversationId,
+            projectId,
+            // 注意：不带 url — 客户端自己拼
+          })
+          return
         }
+      } catch (err) {
+        console.warn('[ServiceWorker] clients.get failed:', err)
       }
+    }
 
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl)
-      }
-
-      return undefined
-    })
-  )
+    // 2️⃣ 真兜底：原 tab 已关 → 开新窗口带目标 URL
+    if (self.clients.openWindow && projectId && conversationId) {
+      return self.clients.openWindow(buildConversationNotificationUrl(projectId, conversationId))
+    }
+  })())
 })
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting()
+  }
+
+  // Handle clientId request from page (used by agent-notification service)
+  if (event.data?.type === 'GET_CLIENT_ID') {
+    const clientId = (event.source as Client | null)?.id ?? null
+    event.ports[0]?.postMessage({ clientId })
+    return
   }
 
   if (event.data?.type === 'CACHE_URLS') {

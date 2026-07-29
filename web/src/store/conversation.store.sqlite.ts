@@ -414,6 +414,22 @@ import type { SubagentTaskNotification, SubagentStepNotification } from '@/agent
 // Follow-up suggestions are enabled by default
 
 //=============================================================================
+// Helpers
+//=============================================================================
+
+/**
+ * Produce a short text summary suitable for a system notification body.
+ * Trims whitespace, normalises newlines, and truncates to ~60 chars with
+ * an ellipsis. If the input is empty, returns '已完成'.
+ */
+function summarizeForNotification(content: string, maxChars = 60): string {
+  const normalised = content.replace(/\s+/g, ' ').trim()
+  if (!normalised) return '已完成'
+  if (normalised.length <= maxChars) return normalised
+  return normalised.slice(0, maxChars) + '…'
+}
+
+//=============================================================================
 // Persistence Functions (SQLite)
 //=============================================================================
 
@@ -2005,6 +2021,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         return
       }
 
+      // Mark the favicon as "in progress" so the user can see agent
+      // status from other tabs (independent of system notifications).
+      // Fires immediately; no await — canvas work is async in background.
+      try {
+        const { setFaviconState } = await import('@/services/favicon-indicator')
+        setFaviconState('running')
+      } catch {
+        // favicon-indicator unavailable — non-fatal
+      }
+
       try {
         // Ensure workspace exists and is active before the agent starts.
         // This avoids write/edit/delete tools failing with "No active workspace"
@@ -2956,6 +2982,66 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const { useConversationContextStore } =
               await import('@/store/conversation-context.store')
             await useConversationContextStore.getState().refreshPendingChanges()
+
+            // === Favicon handling ===
+            // Always reset to idle when the loop ends — the user will see
+            // the result either in-page (if viewing) or via the system
+            // notification (if not). No lingering "pending" dot.
+            try {
+              const { setFaviconState } = await import('@/services/favicon-indicator')
+              setFaviconState('idle')
+            } catch {
+              // non-fatal
+            }
+
+            // === Notification handling ===
+            // Only notify when the user is NOT actively looking at this conversation.
+            try {
+              const hash = window.location.hash
+              const match = hash.match(/\/workspaces?\/([^/?]+)/)
+              const activeWorkspaceId = match ? decodeURIComponent(match[1]) : null
+              const isVisible = document.visibilityState === 'visible'
+              const isViewingConversation = activeWorkspaceId === conversationId && isVisible
+
+              // User is viewing this conversation — don't notify.
+              if (isViewingConversation) return
+
+              const { notifyAgentComplete } = await import('@/services/agent-notification')
+              const currentConv = get().conversations.find((c) => c.id === conversationId)
+              if (!currentConv) return
+              // Project ID sources, in priority order:
+              //   1. resolvedProjectId (from workspace repo lookup at run start)
+              //   2. activeProjectId from project store (sync, always present)
+              // resolvedProjectId can be null if the workspace lookup at run
+              // start raced or failed — fall back to the active project.
+              let notifProjectId = resolvedProjectId
+              if (!notifProjectId) {
+                try {
+                  const { useProjectStore } = await import('@/store/project.store')
+                  notifProjectId = useProjectStore.getState().activeProjectId || null
+                } catch {
+                  // ignore
+                }
+              }
+              if (!notifProjectId) return
+
+              // Build a short summary from the last assistant message
+              const lastAssistant = [...currentConv.messages]
+                .reverse()
+                .find((m) => m.role === 'assistant' && (m.content || '').trim().length > 0)
+              const summary = lastAssistant
+                ? summarizeForNotification(lastAssistant.content ?? '')
+                : '已完成'
+
+              await notifyAgentComplete({
+                conversationId,
+                projectId: notifProjectId,
+                title: currentConv.title ?? 'CreatorWeave Agent',
+                body: summary,
+              })
+            } catch (err) {
+              console.warn('[conversation.store] notify failed:', err)
+            }
           },
           // Soft-interrupt at tool boundaries: after each tool call completes,
           // check whether a user message was queued. If so, yield the loop so

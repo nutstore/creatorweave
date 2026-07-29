@@ -48,7 +48,6 @@ export function registerServiceWorker(options: RegisterServiceWorkerOptions): ()
     try {
       const lastNotified = sessionStorage.getItem(SW_NOTIFIED_KEY)
       if (lastNotified === buildId) {
-        console.log('[SW] Already notified about build', buildId, '— skipping duplicate toast')
         return
       }
       sessionStorage.setItem(SW_NOTIFIED_KEY, buildId)

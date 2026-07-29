@@ -1,16 +1,3 @@
-// ============================================================================
-// Early COOP/COEP Diagnostics
-// ============================================================================
-console.log('[Main Thread] Early diagnostics:')
-console.log('[Main Thread]  - typeof SharedArrayBuffer:', typeof SharedArrayBuffer)
-console.log(
-  '[Main Thread]  - SharedArrayBuffer available:',
-  typeof SharedArrayBuffer !== 'undefined'
-)
-console.log('[Main Thread]  - crossOriginIsolated:', self.crossOriginIsolated)
-console.log('[Main Thread]  - location:', window.location.href)
-console.log('[Main Thread]  - navigator.userAgent:', navigator.userAgent)
-
 // ── Workspace Assistant: capture side panel trigger BEFORE React Router ──
 // HashRouter's catch-all redirect will destroy query params in the hash.
 // We import workspace-assistant-context early so its module-level IIFE
@@ -48,7 +35,7 @@ if (import.meta.env.DEV) {
     .then(({ scan }) => {
       scan({
         enabled: true,
-        log: true, // Also log render info to console
+        log: false,
         showToolbar: true, // Show floating toolbar for toggling
       })
     })
@@ -58,7 +45,10 @@ if (import.meta.env.DEV) {
 }
 
 const enableSwInDev = import.meta.env.VITE_ENABLE_SW_IN_DEV === 'true'
-if (import.meta.env.PROD || enableSwInDev) {
+if (import.meta.env.PROD || enableSwInDev || true) {
+  // Always register SW (including dev). The sw.ts itself detects dev mode
+  // and bypasses precaching + fetch interception so HMR/WASM still work.
+  // SW is still needed in dev for showNotification + notificationclick.
   registerServiceWorker({
     buildId: __APP_BUILD_ID__,
     onUpdateAvailable: () => {

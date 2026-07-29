@@ -17,6 +17,7 @@ import {
   Download,
   RefreshCw,
   Monitor,
+  Bell,
   Lock,
   Clock,
   Trash2,
@@ -80,6 +81,7 @@ import {
   BrandSlider,
 } from '@creatorweave/ui'
 import { KeyboardShortcutsHelp } from '@/components/workspace/KeyboardShortcutsHelp'
+import { showTestNotification } from '@/services/test-notification'
 
 // =============================================================================
 // Types
@@ -758,6 +760,122 @@ function ScheduleToggle() {
       checked={enableSchedules}
       onChange={setEnableSchedules}
     />
+  )
+}
+
+// =============================================================================
+// Notifications Section (within General tab)
+// =============================================================================
+
+/**
+ * Settings panel for agent-loop notifications. Provides:
+ *   - Master toggle (enabled)
+ *   - "Only when away from the conversation" toggle (onlyWhenHidden)
+ *   - Browser permission status display
+ *   - "Send test notification" button
+ */
+function NotificationsSection() {
+  const t = useT()
+  const enabled = useSettingsStore((s) => s.agentLoopNotifications.enabled)
+  const onlyWhenHidden = useSettingsStore((s) => s.agentLoopNotifications.onlyWhenHidden)
+  const setEnabled = useSettingsStore((s) => s.setAgentLoopNotificationsEnabled)
+  const setOnlyWhenHidden = useSettingsStore((s) => s.setAgentLoopNotificationsOnlyWhenHidden)
+
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  )
+
+  // Re-read permission when window regains focus (user may have changed it in browser settings)
+  useEffect(() => {
+    if (typeof Notification === 'undefined') return
+    const update = () => setPermission(Notification.permission)
+    update()
+    window.addEventListener('focus', update)
+    return () => window.removeEventListener('focus', update)
+  }, [])
+
+  const handleTestNotification = async () => {
+    if (typeof Notification === 'undefined') {
+      toast.error(t('settings.notifications.testUnsupported'))
+      return
+    }
+    if (Notification.permission !== 'granted') {
+      const result = await Notification.requestPermission()
+      setPermission(result)
+      if (result !== 'granted') {
+        toast.error(t('settings.notifications.testDenied'))
+        return
+      }
+    }
+    try {
+      // Test button should NOT go through notifyAgentComplete — that path
+      // respects onlyWhenHidden and may skip while the user is viewing the
+      // completed conversation. For the test button
+      // we want a direct, unconditional notification so the user can
+      // confirm the browser can actually display one.
+      //
+      await showTestNotification({
+        title: t('settings.notifications.testTitle'),
+        body: t('settings.notifications.testBody'),
+      })
+      toast.success(t('settings.notifications.testSent'))
+    } catch (err) {
+      console.warn('[Settings] test notification failed:', err)
+      toast.error(t('settings.notifications.testFailed'))
+    }
+  }
+
+  const permissionLabel =
+    permission === 'granted'
+      ? t('settings.notifications.permissionGranted')
+      : permission === 'denied'
+        ? t('settings.notifications.permissionDenied')
+        : permission === 'default'
+          ? t('settings.notifications.permissionDefault')
+          : t('settings.notifications.permissionUnsupported')
+
+  const permissionColor =
+    permission === 'granted'
+      ? 'text-green-600 dark:text-green-400'
+      : permission === 'denied'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-amber-600 dark:text-amber-400'
+
+  return (
+    <div className="space-y-3">
+      <ExperimentalToggle
+        title={t('settings.notifications.enabled')}
+        description={t('settings.notifications.enabledDesc')}
+        checked={enabled}
+        onChange={setEnabled}
+      />
+
+      <ExperimentalToggle
+        title={t('settings.notifications.onlyWhenHidden')}
+        description={t('settings.notifications.onlyWhenHiddenDesc')}
+        checked={onlyWhenHidden}
+        onChange={setOnlyWhenHidden}
+      />
+
+      <div className="flex items-start justify-between gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+            {t('settings.notifications.permissionLabel')}
+          </p>
+          <p className="mt-1 text-xs text-tertiary dark:text-neutral-400">
+            <span className={`font-medium ${permissionColor}`}>{permissionLabel}</span>
+          </p>
+        </div>
+        <BrandButton
+          variant="outline"
+          className="h-8 gap-2 text-xs"
+          onClick={handleTestNotification}
+        >
+          <Bell className="h-3.5 w-3.5" />
+          {t('settings.notifications.testButton')}
+        </BrandButton>
+      </div>
+    </div>
   )
 }
 
@@ -1530,6 +1648,16 @@ const SettingsDialogContent = forwardRef<
                   <BookOpen className="h-3.5 w-3.5" />
                   {t('settings.docs')}
                 </BrandButton>
+              </div>
+
+              {/* Notifications Section */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Bell className="h-4 w-4 text-tertiary" />
+                  <h3 className="text-sm font-medium text-secondary">{t('settings.notifications.title')}</h3>
+                </div>
+                <p className="text-xs text-tertiary">{t('settings.notifications.description')}</p>
+                <NotificationsSection />
               </div>
             </div>
           )}

@@ -430,6 +430,9 @@ importers:
       docx-preview:
         specifier: ^0.3.6
         version: 0.3.7
+      esbuild:
+        specifier: ^0.21.5
+        version: 0.21.5
       fflate:
         specifier: ^0.8.2
         version: 0.8.2
@@ -442,9 +445,6 @@ importers:
       html-to-image:
         specifier: ^1.11.13
         version: 1.11.13
-      html2canvas:
-        specifier: ^1.4.1
-        version: 1.4.1
       idb:
         specifier: ^8.0.0
         version: 8.0.3
@@ -13605,7 +13605,8 @@ snapshots:
 
   balanced-match@1.0.2: {}
 
-  base64-arraybuffer@1.0.2: {}
+  base64-arraybuffer@1.0.2:
+    optional: true
 
   base64-js@1.5.1: {}
 
@@ -14023,6 +14024,7 @@ snapshots:
   css-line-break@2.1.0:
     dependencies:
       utrie: 1.0.2
+    optional: true
 
   css-select@5.2.2:
     dependencies:
@@ -15145,6 +15147,7 @@ snapshots:
     dependencies:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
+    optional: true
 
   htmlparser2@10.1.0:
     dependencies:
@@ -18047,6 +18050,7 @@ snapshots:
   text-segmentation@1.0.3:
     dependencies:
       utrie: 1.0.2
+    optional: true
 
   text-table@0.2.0: {}
 
@@ -18401,6 +18405,7 @@ snapshots:
   utrie@1.0.2:
     dependencies:
       base64-arraybuffer: 1.0.2
+    optional: true
 
   uuid@13.0.2: {}
 
