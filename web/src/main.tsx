@@ -29,21 +29,6 @@ import { RootErrorBoundary } from '@/components/error/RootErrorBoundary'
 // Import Python module to initialize window.pythonExecutor
 import '@/python'
 
-// React Scan - Visualize unnecessary re-renders in dev
-if (import.meta.env.DEV) {
-  import('react-scan')
-    .then(({ scan }) => {
-      scan({
-        enabled: true,
-        log: false,
-        showToolbar: true, // Show floating toolbar for toggling
-      })
-    })
-    .catch((err) => {
-      console.warn('React Scan failed to load (can be ignored):', err.message)
-    })
-}
-
 const enableSwInDev = import.meta.env.VITE_ENABLE_SW_IN_DEV === 'true'
 if (import.meta.env.PROD || enableSwInDev || true) {
   // Always register SW (including dev). The sw.ts itself detects dev mode
