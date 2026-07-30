@@ -124,11 +124,11 @@ registerRenderer({
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
-          <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+          <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {mode}
           </span>
           {query && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500">"{truncate(query, 30)}"</span>
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">"{truncate(query, 30)}"</span>
           )}
           {typeof ctx.args.updated_after === 'number' && (
             <span className="text-xs text-neutral-400">· last {relativeTime(ctx.args.updated_after as number)} →</span>
@@ -151,14 +151,14 @@ registerRenderer({
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
-        <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {mode}
         </span>
         {mode === 'keyword' && data.query && data.query !== '*' && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">"{truncate(data.query, 30)}"</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">"{truncate(data.query, 30)}"</span>
         )}
         {chips.length > 0 && (
-          <span className="truncate text-xs text-neutral-400 dark:text-neutral-500">
+          <span className="truncate text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {chips.join(' · ')}
           </span>
         )}
@@ -209,7 +209,7 @@ registerRenderer({
 
     if (results.length === 0) {
       return (
-        <div className="px-3 py-3 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="px-3 py-3 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           No conversations matched.
         </div>
       )
@@ -219,7 +219,7 @@ registerRenderer({
       <div className="px-3 py-2 space-y-2">
         {/* Filter summary line */}
         {(filters.updated_after || filters.updated_before || filters.project || mode === 'keyword') && (
-          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {mode === 'keyword' && data.query && data.query !== '*' && (
               <span className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded px-1.5 py-0.5">
                 <Search className="h-2.5 w-2.5" />
@@ -245,14 +245,14 @@ registerRenderer({
         {/* Project breakdown table — only when meaningful (multi-project list mode) */}
         {breakdown.length > 1 && (
           <div className="rounded border border-neutral-200 dark:border-neutral-700 overflow-hidden">
-            <div className="bg-neutral-50 dark:bg-neutral-800/50 px-2 py-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+            <div className="bg-neutral-50 dark:bg-neutral-800/50 px-2 py-1 text-[10px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               Projects ({breakdown.length})
             </div>
             <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {breakdown.map((p) => (
                 <div key={p.projectName} className="flex items-center gap-2 px-2 py-1 text-xs">
                   <ProjectBadge name={p.projectName} />
-                  <span className="text-neutral-500 dark:text-neutral-400">{p.conversationCount}</span>
+                  <span className="text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{p.conversationCount}</span>
                   <span className="ml-auto text-[10px] text-neutral-400">{relativeTime(p.lastActivityAt)}</span>
                 </div>
               ))}
@@ -270,7 +270,7 @@ registerRenderer({
             >
               <MessageSquare className="h-3 w-3 text-neutral-400 shrink-0" />
               <span
-                className="text-neutral-600 dark:text-neutral-300 truncate flex-1"
+                className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1"
                 title={r.title}
               >
                 {r.title || '(untitled)'}
@@ -283,12 +283,12 @@ registerRenderer({
 
         {/* Overflow indicator */}
         {results.length > maxShow && (
-          <div className="text-[10px] text-neutral-400 dark:text-neutral-600">
+          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
             +{results.length - maxShow} more ({total} total{data.hasMore ? ', has more' : ''})
           </div>
         )}
         {data.hasMore && results.length <= maxShow && (
-          <div className="text-[10px] text-neutral-400 dark:text-neutral-600">more results available</div>
+          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">more results available</div>
         )}
       </div>
     )

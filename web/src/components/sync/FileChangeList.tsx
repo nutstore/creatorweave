@@ -67,7 +67,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
         <div className="w-16 h-16 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
           <svg
-            className="w-8 h-8 text-neutral-400 dark:text-neutral-500"
+            className="w-8 h-8 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -81,7 +81,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
           </svg>
         </div>
         <h3 className="text-lg font-medium text-foreground mb-2">{t('settings.syncPanel.fileChangeList.noFileChanges')}</h3>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm">
+        <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 max-w-sm">
           {t('settings.syncPanel.fileChangeList.noChangesDescription')}
         </p>
       </div>
@@ -101,9 +101,9 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-medium text-foreground">{t('settings.pendingSyncPanel.title')}</h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{summaryText}</p>
+            <p className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 mt-1">{summaryText}</p>
           </div>
-          <div className="text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('settings.syncPanel.fileChangeList.totalCount', { count: totalChanges })}
           </div>
         </div>
@@ -141,14 +141,14 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                     >
                       {style.label}
                     </span>
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500">•</span>
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400" title={change.path}>
+                    <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">•</span>
+                    <span className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400" title={change.path}>
                       {change.path.length > 50
                         ? `...${change.path.slice(-47)}`
                         : change.path}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+                  <div className="flex items-center gap-4 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     <span>{t('settings.syncPanel.fileChangeList.size', { size: formatFileSize(change.size) })}</span>
                     {change.mtime && (
                       <>

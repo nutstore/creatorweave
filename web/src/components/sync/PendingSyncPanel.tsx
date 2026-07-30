@@ -662,7 +662,7 @@ export function PendingSyncPanel() {
                 </span>
 
                 {/* File Name */}
-                <span className="flex-1 text-xs font-medium text-primary truncate min-w-0" title={change.path}>
+                <span className="flex-1 text-xs font-medium text-secondary truncate min-w-0" title={change.path}>
                   {change.path.split('/').pop() || change.path}
                 </span>
 
@@ -742,7 +742,7 @@ export function PendingSyncPanel() {
         <div className="flex items-center gap-2 px-3 pb-2">
           <BrandButton
             variant="outline"
-            className="h-8 flex-1 text-xs"
+            className="h-8 flex-1 text-xs text-secondary"
             onClick={() => setShowClearConfirm(true)}
             disabled={isSyncing || selectedCount === 0}
             aria-label={t('settings.pendingSyncPanel.rejectAll')}

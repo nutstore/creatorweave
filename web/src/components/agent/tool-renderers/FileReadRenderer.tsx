@@ -19,7 +19,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">read</code>
         {path && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{shortPath(path)}</span>
         )}
         {ctx.isExecuting ? (
           <span className="ml-auto text-blue-500 text-xs shrink-0">reading...</span>
@@ -55,15 +55,15 @@ registerRenderer({
     return (
       <div className="px-3 py-2 space-y-2">
         {path && (
-          <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono">{path}</div>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 font-mono">{path}</div>
         )}
         <div className="rounded-md bg-white dark:bg-neutral-900 border border-neutral-100 dark:border-neutral-800 overflow-x-auto">
-          <pre className="p-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400 font-mono">
+          <pre className="p-2 text-xs leading-5 text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 font-mono">
             {head.map((line, i) => (
               <Line key={i} num={i + 1} width={lnWidth}>{line}</Line>
             ))}
             {truncated && (
-              <div className="text-neutral-300 dark:text-neutral-700 select-none py-0.5">
+              <div className="text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700 select-none py-0.5">
                 {' '.repeat(lnWidth + 1)}... {hidden} lines hidden
               </div>
             )}
@@ -83,7 +83,7 @@ registerRenderer({
 function Line({ num, width, children }: { num: number; width: number; children: string }) {
   return (
     <div>
-      <span className="select-none text-neutral-300 dark:text-neutral-700" style={{ minWidth: width + 'ch', display: 'inline-block', textAlign: 'right', marginRight: '12px' }}>{num}</span>
+      <span className="select-none text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700" style={{ minWidth: width + 'ch', display: 'inline-block', textAlign: 'right', marginRight: '12px' }}>{num}</span>
       {children}
     </div>
   )
@@ -140,7 +140,7 @@ function extractErrorMessage(error: unknown): string {
 function NoResultDetail({ ctx }: { ctx: ToolRenderCtx }) {
   return (
     <div className="px-3 py-2">
-      <div className="text-xs text-neutral-400 dark:text-neutral-500">No content returned</div>
+      <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No content returned</div>
       <RawJsonFallback args={ctx.args} rawResult={ctx.rawResult} />
     </div>
   )
@@ -151,12 +151,12 @@ function RawJsonFallback({ args, rawResult }: { args: Record<string, unknown>; r
     <div className="space-y-2 mt-2">
       <div>
         <div className="text-[10px] text-neutral-400 mb-1">Arguments</div>
-        <pre className="max-h-32 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 dark:text-neutral-400">{JSON.stringify(args, null, 2)}</pre>
+        <pre className="max-h-32 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{JSON.stringify(args, null, 2)}</pre>
       </div>
       {rawResult && (
         <div>
           <div className="text-[10px] text-neutral-400 mb-1">Result</div>
-          <pre className="max-h-32 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 dark:text-neutral-400">{rawResult}</pre>
+          <pre className="max-h-32 overflow-auto rounded bg-neutral-50 dark:bg-neutral-900 p-2 text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{rawResult}</pre>
         </div>
       )}
     </div>

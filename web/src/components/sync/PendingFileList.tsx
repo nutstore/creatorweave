@@ -351,7 +351,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
 
                         {/* File name */}
                         <span
-                          className="min-w-0 flex-1 cursor-pointer truncate text-sm text-primary"
+                          className="min-w-0 flex-1 cursor-pointer truncate text-sm text-secondary"
                           onClick={() => onSelectFile?.(change)}
                           title={change.path}
                         >
@@ -417,7 +417,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
           {/* Inspect Element */}
           {isHtmlFile(contextMenu.change.path) && contextMenu.change.type !== 'delete' && (
             <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
               onClick={() => handleInspectElement(contextMenu.change)}
             >
               <MousePointer2 className="h-4 w-4 text-emerald-500" />
@@ -426,7 +426,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
           )}
           {/* Copy Path */}
           <button
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
             onClick={() => {
               navigator.clipboard.writeText(contextMenu.change.path).catch(() => {})
               setContextMenu(null)
@@ -438,7 +438,7 @@ export const PendingFileList: React.FC<PendingFileListProps> = ({
           {/* Copy File Content */}
           {contextMenu.change.type !== 'delete' && getFileContentType(contextMenu.change.path) === 'text' && (
             <button
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
               onClick={async () => {
                 try {
                   const activeConversation = await getActiveConversation()

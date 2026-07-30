@@ -51,23 +51,23 @@ export function DatabaseRefreshDialog({ isOpen, errorMessage }: DatabaseRefreshD
           <h3 className="text-lg font-semibold text-foreground">
             {t('app.databaseConnectionLost')}
           </h3>
-          <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-400">
+          <p className="mt-1.5 text-sm text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('app.willAutoRecoverAfterRefresh')}
           </p>
         </div>
 
         {/* Body — minimal. Data safety + technical details only. */}
         <div className="px-6 pb-4">
-          <p className="text-center text-xs text-neutral-500 dark:text-neutral-400">
+          <p className="text-center text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('app.dataStoredInOPFS')}
           </p>
 
           {errorMessage && (
             <details className="mt-3 text-left">
-              <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground">
+              <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-foreground">
                 {t('app.showTechnicalDetails')}
               </summary>
-              <pre className="mt-2 max-h-32 overflow-auto rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
+              <pre className="mt-2 max-h-32 overflow-auto rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                 {errorMessage}
               </pre>
             </details>

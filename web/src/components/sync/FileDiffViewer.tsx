@@ -542,7 +542,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             />
           </svg>
         </div>
-        <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">{t('sidebar.fileDiffViewer.selectFile')}</h3>
+        <h3 className="mb-2 text-lg font-medium text-secondary dark:text-foreground">{t('sidebar.fileDiffViewer.selectFile')}</h3>
         <p className="max-w-sm text-sm text-tertiary dark:text-muted">{t('sidebar.fileDiffViewer.selectFileHint')}</p>
       </div>
     )
@@ -573,7 +573,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
               />
             </svg>
           </div>
-          <h3 className="mb-2 text-lg font-medium text-primary dark:text-primary-foreground">{t('sidebar.fileDiffViewer.loadFailed')}</h3>
+          <h3 className="mb-2 text-lg font-medium text-secondary dark:text-foreground">{t('sidebar.fileDiffViewer.loadFailed')}</h3>
           <p className="text-sm text-tertiary dark:text-muted">{content.error}</p>
         </div>
       </div>
@@ -736,18 +736,18 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           {composer && (
             <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
               <div className="flex items-center gap-2 px-3 py-1.5">
-                <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+                <span className="shrink-0 text-[11px] font-medium text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   {composer.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 dark:text-neutral-600">
+                <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
                   L{composer.startLine}{composer.startLine !== composer.endLine && `-${composer.endLine}`}
                 </span>
                 <div className="flex-1" />
-                <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+                <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500">⌘↵</kbd>
                 <button
                   type="button"
                   onClick={() => setComposer(null)}
-                  className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                  className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -825,18 +825,18 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
         {composer && (
           <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
             <div className="flex items-center gap-2 px-3 py-1.5">
-              <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+              <span className="shrink-0 text-[11px] font-medium text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {composer.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}
               </span>
-              <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 dark:text-neutral-600">
+              <span className="shrink-0 text-[11px] tabular-nums text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
                 L{composer.startLine}{composer.startLine !== composer.endLine && `-${composer.endLine}`}
               </span>
               <div className="flex-1" />
-              <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+              <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500">⌘↵</kbd>
               <button
                 type="button"
                 onClick={() => setComposer(null)}
-                className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -886,7 +886,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
           }`}>
             {fileChange.type === 'add' ? 'A' : fileChange.type === 'delete' ? 'D' : 'M'}
           </span>
-          <span className="min-w-0 truncate font-mono text-[13px] text-neutral-700 dark:text-neutral-300" title={fileChange.path}>
+          <span className="min-w-0 truncate font-mono text-[13px] text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={fileChange.path}>
             {fileChange.path}
           </span>
           {/* Copy file path button */}
@@ -899,7 +899,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                 setTimeout(() => setCopiedPath(false), 1500)
               })
             }}
-            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+            className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200/60 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
           >
             {copiedPath ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
           </button>
@@ -917,18 +917,18 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                   })
                 }
               }}
-              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200/60 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+              className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200/60 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
             >
               {copiedContent ? <Check className="h-3 w-3 text-emerald-500" /> : <ClipboardCopy className="h-3 w-3" />}
             </button>
           )}
           {fileChange.size ? (
-            <span className="shrink-0 text-xs tabular-nums text-neutral-400 dark:text-neutral-500">
+            <span className="shrink-0 text-xs tabular-nums text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {(fileChange.size / 1024).toFixed(1)}k
             </span>
           ) : null}
           {currentFileComments.length > 0 && (
-            <span className="shrink-0 text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500">
+            <span className="shrink-0 text-[11px] tabular-nums text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('sidebar.fileDiffViewer.commentsCount', { count: currentFileComments.length })}
             </span>
           )}
@@ -944,7 +944,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                   <button
                     type="button"
                     onClick={() => downloadFile(fileChange.path)}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
                   >
                     <Download className="h-3.5 w-3.5" />
                   </button>
@@ -954,7 +954,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
             </TooltipProvider>
           )}
           {isSnapshotMode && (
-            <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+            <span className="text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {snapshotDiff?.snapshotTitle || t('sidebar.fileDiffViewer.binarySnapshot')} · {formatTime(snapshotDiff?.capturedAt)}
             </span>
           )}
@@ -1005,7 +1005,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                       className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] transition-colors ${
                         useFullEditor
                           ? 'text-blue-600 hover:bg-blue-100/60 hover:text-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:hover:text-blue-300'
-                          : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300'
+                          : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300'
                       }`}
                     >
                       <FileText className="h-3 w-3" />
@@ -1024,7 +1024,7 @@ export const FileDiffViewer: React.FC<FileDiffViewerProps> = ({ fileChange, snap
                     <button
                       type="button"
                       onClick={() => setIsSplitView((v) => !v)}
-                      className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                      className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
                     >
                       {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
                     </button>

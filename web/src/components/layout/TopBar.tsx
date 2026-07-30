@@ -345,7 +345,7 @@ export function TopBar({
         >
             {/* Workspace settings */}
             <div className="mb-2 rounded-lg border border-neutral-200 bg-neutral-50/60 p-2 dark:border-neutral-700 dark:bg-neutral-800/60">
-              <div className="mb-1.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+              <div className="mb-1.5 text-[11px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('topbar.mobile.workDirectory')}
               </div>
               <FolderSelector buttonRef={folderButtonRef} />

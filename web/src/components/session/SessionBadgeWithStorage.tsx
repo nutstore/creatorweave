@@ -119,7 +119,7 @@ const ConversationDropdown: React.FC<ConversationDropdownProps> = ({
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="text-tertiary shrink-0 text-xs font-medium">{t('workspaceStorage.currentConversation')}</span>
           {activeConversationId && (
-            <span className="min-w-0 truncate text-xs font-semibold text-primary-600">
+            <span className="min-w-0 truncate text-xs font-semibold text-primary-700">
               {currentConversationTitle}
             </span>
           )}
@@ -229,7 +229,7 @@ const ConversationDropdown: React.FC<ConversationDropdownProps> = ({
                   >
                     {/* First row: name + size */}
                     <div className="flex w-full min-w-0 items-center gap-2">
-                      <span className="truncate text-xs font-medium text-primary">
+                      <span className="truncate text-xs font-medium text-secondary">
                         {conversationTitles.find((c) => c.id === conversation.id)?.title ?? conversation.name}
                       </span>
                       <span className="shrink-0 text-[10px] tabular-nums text-muted">

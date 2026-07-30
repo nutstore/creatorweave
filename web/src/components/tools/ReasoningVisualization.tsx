@@ -261,7 +261,7 @@ export function ReasoningVisualization({
           ) : (
             <AlertCircle className="h-4 w-4 text-red-600" />
           )}
-          <span className="text-sm font-medium text-primary dark:text-primary-foreground">
+          <span className="text-sm font-medium text-secondary dark:text-foreground">
             {status === 'thinking' || status === 'reasoning'
               ? 'Thinking...'
               : status === 'tool_calling'
@@ -327,7 +327,7 @@ export function ReasoningVisualization({
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-sm font-medium ${
-                      step.status === 'in_progress' ? 'text-primary-700 dark:text-primary-700' : 'text-primary dark:text-primary-foreground'
+                      step.status === 'in_progress' ? 'text-primary-700 dark:text-primary-700' : 'text-secondary dark:text-foreground'
                     }`}
                   >
                     {step.title}

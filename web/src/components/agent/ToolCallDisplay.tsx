@@ -83,7 +83,7 @@ function SubagentStatusBadge({ status }: { status: string }) {
     case 'killed':
       return <span className={`${base} bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300`}>killed</span>
     default:
-      return <span className={`${base} bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300`}>{status}</span>
+      return <span className={`${base} bg-neutral-100 text-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300`}>{status}</span>
   }
 }
 
@@ -96,7 +96,7 @@ function SubagentProgressSection({ events }: { events: SubagentEvent[] }) {
   const uniqueEvents = Array.from(latestByAgent.values())
   return (
     <div className="mb-2 rounded border border-neutral-200 bg-white p-2 dark:border-neutral-600 dark:bg-neutral-850">
-      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400">
+      <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
         <Bot className="h-3 w-3" />
         <span>SubAgent</span>
       </div>
@@ -105,7 +105,7 @@ function SubagentProgressSection({ events }: { events: SubagentEvent[] }) {
           <div key={ev.agentId} className="flex items-center gap-2 text-xs">
             <SubagentStatusBadge status={ev.status} />
             {ev.status === 'running' && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
-            <span className="truncate text-neutral-600 dark:text-neutral-300">{ev.summary}</span>
+            <span className="truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">{ev.summary}</span>
           </div>
         ))}
       </div>
@@ -336,7 +336,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
         <Wrench className="h-3.5 w-3.5 text-neutral-500" />
         <code className="font-medium text-neutral-700 dark:text-foreground">{toolName}</code>
         {typeof ctx.args.path === 'string' && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">{ctx.args.path as string}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{ctx.args.path as string}</span>
         )}
         <span className="ml-auto">
           <StatusIcon ctx={ctx} executingText={t('toolCallDisplay.executing')} />
@@ -346,12 +346,12 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <div className="mb-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
+              <span className="text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
               <CopyIconButton
                 content={Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
               />
             </div>
-            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
               {ctx.isStreaming && (
                 <span className="inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
@@ -361,10 +361,10 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
           {result && (
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
+                <span className="text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
                 <CopyIconButton content={result} />
               </div>
-              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                 {result}
               </pre>
             </div>
@@ -417,7 +417,7 @@ function SubagentCard({
         <Bot className="h-3.5 w-3.5 text-violet-500" />
         <span className="font-medium text-neutral-700 dark:text-foreground">{subagentTitle}</span>
         {subagentDesc && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{subagentDesc}&quot;</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">&quot;{subagentDesc}&quot;</span>
         )}
         <span className="ml-auto">
           <StatusIcon ctx={ctx} executingText={t('toolCallDisplay.executing')} />
@@ -481,7 +481,7 @@ function SubagentCard({
 
       {expanded && spawnResult?.content && !ctx.isExecuting && (
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
-          <div className="rounded bg-white p-2 text-xs text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+          <div className="rounded bg-white p-2 text-xs text-neutral-700 dark:bg-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             <div className="prose-sm max-w-none break-words">
               <MarkdownContent content={spawnResult.content} />
             </div>
@@ -503,12 +503,12 @@ function SubagentCard({
         <div className="border-t border-neutral-200 px-3 py-2 dark:border-neutral-700">
           <div className="mb-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
+              <span className="text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('toolCallDisplay.arguments')}</span>
               <CopyIconButton
                 content={Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
               />
             </div>
-            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+            <pre className="max-h-40 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {Object.keys(ctx.args).length > 0 ? JSON.stringify(ctx.args, null, 2) : ctx.rawArgs}
               {ctx.isStreaming && (
                 <span className="inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
@@ -518,10 +518,10 @@ function SubagentCard({
           {ctx.rawResult && (
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
+                <span className="text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('toolCallDisplay.result')}</span>
                 <CopyIconButton content={ctx.rawResult} />
               </div>
-              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-300">
+              <pre className="max-h-60 overflow-auto rounded bg-white p-2 text-xs text-neutral-600 dark:bg-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                 {ctx.rawResult}
               </pre>
             </div>

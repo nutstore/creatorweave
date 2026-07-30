@@ -65,7 +65,7 @@ registerRenderer({
         <div className="px-3 py-2 space-y-2">
           {code && (
             <div>
-              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+              <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
                 code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
               </div>
               <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
@@ -87,7 +87,7 @@ registerRenderer({
           {/* Code being executed */}
           {code && (
             <div>
-              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+              <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
                 code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
               </div>
               <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
@@ -108,7 +108,7 @@ registerRenderer({
         <div className="px-3 py-2 space-y-2">
           {code && (
             <div>
-              <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+              <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
                 code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
               </div>
               <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
@@ -116,7 +116,7 @@ registerRenderer({
               </div>
             </div>
           )}
-          <div className="text-xs text-neutral-400 dark:text-neutral-500">No output</div>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No output</div>
         </div>
       )
     }
@@ -126,7 +126,7 @@ registerRenderer({
         {/* Executed code */}
         {code && (
           <div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+            <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
               code{codeLines > 1 ? ` (${codeLines} lines)` : ''}
             </div>
             <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-64">
@@ -138,7 +138,7 @@ registerRenderer({
         {/* Stdout */}
         {output.stdout && (
           <div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">stdout</div>
+            <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">stdout</div>
             <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-48">
               <pre className="text-[11px] leading-5 font-mono text-emerald-400 whitespace-pre-wrap">{output.stdout}</pre>
             </div>
@@ -148,7 +148,7 @@ registerRenderer({
         {/* Stderr */}
         {output.stderr && (
           <div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">stderr</div>
+            <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">stderr</div>
             <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-32">
               <pre className="text-[11px] leading-5 font-mono text-red-400 whitespace-pre-wrap">{output.stderr}</pre>
             </div>
@@ -158,7 +158,7 @@ registerRenderer({
         {/* Error */}
         {output.errorText && !output.stderr && (
           <div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">error</div>
+            <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">error</div>
             <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-32">
               <pre className="text-[11px] leading-5 font-mono text-red-300 whitespace-pre-wrap">{output.errorText}</pre>
             </div>

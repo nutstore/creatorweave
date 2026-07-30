@@ -60,7 +60,7 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
         </svg>
       </div>
       <h2 className="text-xl font-semibold text-foreground mb-3">{t('settings.syncPanel.syncPreview.emptyStateTitle')}</h2>
-      <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
+      <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 max-w-md leading-relaxed">
         {t('settings.syncPanel.syncPreview.emptyStateDescription')}
       </p>
       <div className="mt-8 grid grid-cols-1 gap-4 max-w-sm">
@@ -72,7 +72,7 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
             <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step1Title')}
             </h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+            <p className="text-xs text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('settings.syncPanel.syncPreview.step1Desc')}
             </p>
           </div>
@@ -85,7 +85,7 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
             <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step2Title')}
             </h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+            <p className="text-xs text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('settings.syncPanel.syncPreview.step2Desc')}
             </p>
           </div>
@@ -98,7 +98,7 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
             <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step3Title')}
             </h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400">
+            <p className="text-xs text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('settings.syncPanel.syncPreview.step3Desc')}
             </p>
           </div>
@@ -734,11 +734,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
                       {item.side === 'modified' ? t('sidebar.fileDiffViewer.modified') : t('sidebar.fileDiffViewer.current')}{' '}
                       {item.startLine === item.endLine ? `L${item.startLine}` : `L${item.startLine}-L${item.endLine}`}
                     </span>
-                    <span className="max-w-[240px] truncate text-neutral-700 dark:text-neutral-300" title={item.text}>
+                    <span className="max-w-[240px] truncate text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={item.text}>
                       {item.text}
                     </span>
                     <button
-                      className="shrink-0 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+                      className="shrink-0 text-neutral-400 hover:text-red-500 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-red-400"
                       onClick={() => removeComment(item.id)}
                     >
                       ×

@@ -141,7 +141,7 @@ export function ShareButton({ content, messageId, conversationTitle, className }
             type="button"
             role="menuitem"
             onClick={handleMarkdown}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             <FileText className="h-3.5 w-3.5" />
             {t('conversation.shareAsMarkdown')}
@@ -150,7 +150,7 @@ export function ShareButton({ content, messageId, conversationTitle, className }
             type="button"
             role="menuitem"
             onClick={handleImage}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
           >
             <ImageIcon className="h-3.5 w-3.5" />
             {t('conversation.shareAsImage')}

@@ -161,7 +161,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
           </BrandDialogTitle>
         </BrandDialogHeader>
 
-        <BrandDialogBody className="space-y-4 text-primary dark:text-primary-foreground">
+        <BrandDialogBody className="space-y-4 text-secondary dark:text-foreground">
           {/* Search input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary dark:text-muted" />
@@ -203,7 +203,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
                       >
                         {command.icon && <span className="flex-shrink-0">{command.icon}</span>}
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-primary dark:text-primary-foreground">
+                          <div className="truncate font-medium text-secondary dark:text-foreground">
                             {command.label}
                           </div>
                           {command.description && (

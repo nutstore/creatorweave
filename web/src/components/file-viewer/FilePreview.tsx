@@ -870,7 +870,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <span className="truncate text-xs font-medium text-neutral-700 dark:text-foreground" title={filePath}>
             {fileName}
           </span>
-          <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-500">{formatBytes(fileSize)}</span>
+          <span className="shrink-0 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{formatBytes(fileSize)}</span>
           {/* Comment count badge */}
           {comments.length > 0 && (
             <span className="shrink-0 inline-flex items-center gap-0.5 rounded bg-amber-100 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
@@ -891,7 +891,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
                   className={`${i === 0 ? 'rounded-l' : 'rounded-r'} px-1.5 py-0.5 text-[10px] ${
                     formatViewMode === mode.id
                       ? 'bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-800'
-                      : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                      : 'text-neutral-500 hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800'
                   }`}
                   title={mode.id === 'text' ? 'Text view (supports comments)' : `${mode.label} view`}
                 >
@@ -912,7 +912,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
                   toast.error(t('filePreview.openInNewTabFailed', { error: err instanceof Error ? err.message : String(err) }))
                 }
               }}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               title={t('filePreview.openInNewTab')}
             >
               <ExternalLink className="h-3 w-3" />
@@ -924,7 +924,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               type="button"
               onClick={handleRefresh}
               disabled={loading}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               title={t('filePreview.refresh')}
             >
               <RefreshCw className="h-3 w-3" />
@@ -932,7 +932,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           )}
           {/* Comment hint for text files */}
           {isCommentable && !composer && !editMode && (
-            <span className="hidden shrink-0 text-[10px] text-neutral-300 dark:text-neutral-600 sm:inline">
+            <span className="hidden shrink-0 text-[10px] text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600 sm:inline">
               {t('filePreview.selectToComment')}
             </span>
           )}
@@ -940,7 +940,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
             <button
               type="button"
               onClick={handleCopy}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               title={t('filePreview.copyContent')}
             >
               {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
@@ -950,7 +950,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
             <button
               type="button"
               onClick={handleDownload}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               title={t('filePreview.download') ?? 'Download file'}
             >
               <Download className="h-3 w-3" />
@@ -975,7 +975,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                 editMode
                   ? 'bg-blue-600 text-white'
-                  : 'text-neutral-500 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                  : 'text-neutral-500 hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800'
               }`}
               title={editMode ? t('filePreview.previewMode') : t('filePreview.editMode')}
             >
@@ -1003,7 +1003,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <button
             type="button"
             onClick={() => setFilePreviewMode(filePreviewMode === 'split' ? 'overlay' : 'split')}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             title={filePreviewMode === 'split' ? t('filePreview.switchToOverlay') : t('filePreview.switchToSplit')}
           >
             {filePreviewMode === 'split' ? <Maximize2 className="h-3 w-3" /> : <PanelRightClose className="h-3 w-3" />}
@@ -1011,7 +1011,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           <button
             type="button"
             onClick={handleClose}
-            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
             title={t('filePreview.close')}
           >
             <X className="h-3 w-3" />
@@ -1104,20 +1104,20 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-850">
           <div className="flex items-center gap-2 px-3 py-1.5">
             <MessageSquare className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-            <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+            <span className="shrink-0 text-[11px] font-medium text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {composer.startLine === composer.endLine
                 ? `L${composer.startLine}`
                 : `L${composer.startLine}-L${composer.endLine}`}
             </span>
             <div className="flex-1" />
-            <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+            <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500">⌘↵</kbd>
             <button
               type="button"
               onClick={() => {
                 setComposer(null)
                 anchorLineRef.current = null
               }}
-              className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+              className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -1202,11 +1202,11 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
                 <span className="shrink-0 font-mono text-[10px] text-amber-600 dark:text-amber-400">
                   {item.startLine === item.endLine ? `L${item.startLine}` : `L${item.startLine}-L${item.endLine}`}
                 </span>
-                <span className="max-w-[240px] truncate text-neutral-700 dark:text-neutral-300" title={item.text}>
+                <span className="max-w-[240px] truncate text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={item.text}>
                   {item.text}
                 </span>
                 <button
-                  className="shrink-0 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+                  className="shrink-0 text-neutral-400 hover:text-red-500 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-red-400"
                   onClick={() => removeComment(item.id)}
                 >
                   ×

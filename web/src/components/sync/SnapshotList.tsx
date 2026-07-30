@@ -395,7 +395,7 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
-                  className="min-w-0 flex-1 truncate text-left text-xs font-medium text-primary hover:underline"
+                  className="min-w-0 flex-1 truncate text-left text-xs font-medium text-secondary hover:underline"
                   title={item.summary || item.id}
                   onClick={() => toggleExpand(item.id)}
                 >
@@ -471,7 +471,7 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
                           }
                         >
                           <span className="min-w-0 flex-1 text-left">
-                            <span className="block truncate text-primary" title={file.path}>
+                            <span className="block truncate text-secondary" title={file.path}>
                               {file.path}
                             </span>
                             <span className="block text-[10px] text-secondary">

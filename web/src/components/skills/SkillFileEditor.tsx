@@ -237,14 +237,14 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
           <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
             <FileIcon className="h-4.5 w-4.5 text-blue-500" />
             {skill.name}
-            <span className="text-xs font-normal dark:text-neutral-500">
+            <span className="text-xs font-normal text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {isReadOnly ? t('skillFileEditor.readonly') : t('skillFileEditor.fileEditor')}
             </span>
             {hasUnsavedChanges && (
               <Circle className="ml-0.5 h-2 w-2 fill-amber-500 text-amber-500" />
             )}
           </BrandDialogTitle>
-          <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+          <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
             <X className="h-5 w-5" />
           </BrandDialogClose>
         </BrandDialogHeader>
@@ -255,7 +255,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
           <div className="flex w-60 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-700">
             {/* Sidebar header */}
             <div className="flex h-9 shrink-0 items-center border-b border-neutral-200 px-3 dark:border-neutral-700">
-              <span className="text-xs font-medium dark:text-neutral-400">
+              <span className="text-xs font-medium text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('skillFileEditor.files')}
               </span>
               {!isReadOnly && (
@@ -288,10 +288,10 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
             {/* Tree */}
             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto py-1 text-[13px] leading-relaxed">
               {loading && (
-                <div className="px-3 py-2 text-xs dark:text-neutral-500">{t('common.loading')}</div>
+                <div className="px-3 py-2 text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('common.loading')}</div>
               )}
               {!loading && tree.length === 0 && (
-                <div className="px-3 py-2 text-xs dark:text-neutral-500">{t('skillFileEditor.empty')}</div>
+                <div className="px-3 py-2 text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('skillFileEditor.empty')}</div>
               )}
               {tree.map((node) => (
                 <FileTreeNode
@@ -345,7 +345,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
               {activeFile ? (
                 <>
                   <FileIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate text-xs dark:text-neutral-300">
+                  <span className="truncate text-xs text-neutral-300 text-neutral-300 dark:text-neutral-300">
                     {activeFile.split('/').slice(1).join('/') || activeFile}
                   </span>
                   {hasUnsavedChanges && (
@@ -353,7 +353,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                   )}
                 </>
               ) : (
-                <span className="text-xs dark:text-neutral-500">{t('skillFileEditor.selectFile')}</span>
+                <span className="text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('skillFileEditor.selectFile')}</span>
               )}
               {!isReadOnly && activeFile && (
                 <div className="ml-auto">
@@ -394,8 +394,8 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
               ) : (
                 <div className="flex h-full items-center justify-center bg-neutral-50 dark:bg-neutral-800/50">
                   <div className="text-center">
-                    <FileIcon className="mx-auto mb-2 h-10 w-10 dark:text-neutral-600" />
-                    <p className="text-sm dark:text-neutral-500">{t('skillFileEditor.selectFilePrompt')}</p>
+                    <FileIcon className="mx-auto mb-2 h-10 w-10 text-neutral-600 text-neutral-600 dark:text-neutral-600" />
+                    <p className="text-sm text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('skillFileEditor.selectFilePrompt')}</p>
                   </div>
                 </div>
               )}
@@ -467,7 +467,7 @@ function FileTreeNode({
           'group relative flex cursor-pointer items-center py-[3px] pr-2 transition-colors',
           isActive
             ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300'
-            : 'hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+            : 'hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-800'
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleClick}
@@ -587,7 +587,7 @@ function ContextMenu({
     zIndex: 9999,
   }
 
-  const itemClass = 'flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700'
+  const itemClass = 'flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:bg-neutral-100 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700'
 
   return (
     <div

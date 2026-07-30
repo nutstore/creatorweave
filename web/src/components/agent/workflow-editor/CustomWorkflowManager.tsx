@@ -116,7 +116,7 @@ export function CustomWorkflowManager({
               <h1 className="text-lg font-semibold text-foreground">
                 {t('customWorkflowManager.title')}
               </h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+              <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('customWorkflowManager.subtitle')}
               </p>
             </div>
@@ -156,7 +156,7 @@ export function CustomWorkflowManager({
                   <h3 className="text-sm font-medium text-foreground">
                     {searchQuery ? t('customWorkflowManager.noResultsWithSearch') : t('customWorkflowManager.noResultsWithoutSearch')}
                   </h3>
-                  <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                  <p className="mt-1 text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {searchQuery
                       ? t('customWorkflowManager.tryDifferentKeyword')
                       : t('customWorkflowManager.clickToCreateFirst')}
@@ -187,13 +187,13 @@ export function CustomWorkflowManager({
                             {workflow.name}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                            <span className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                               {domainLabels[workflow.domain] || t('customWorkflowManager.generic')}
                             </span>
-                            <span className="text-xs text-neutral-300 dark:text-neutral-600">
+                            <span className="text-xs text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
                               •
                             </span>
-                            <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                            <span className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                               {t('customWorkflowManager.nodesCount', { count: workflow.nodes.length })}
                             </span>
                           </div>
@@ -228,13 +228,13 @@ export function CustomWorkflowManager({
 
                     {/* Workflow description */}
                     {workflow.description && (
-                      <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400 line-clamp-2">
+                      <p className="mt-3 text-sm text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 line-clamp-2">
                         {workflow.description}
                       </p>
                     )}
 
                     {/* Footer */}
-                    <div className="mt-3 flex items-center justify-between text-xs text-neutral-400 dark:text-neutral-500">
+                    <div className="mt-3 flex items-center justify-between text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                       <div className="flex items-center gap-1">
                         <span className={`h-2 w-2 rounded-full ${workflow.enabled ? 'bg-emerald-500' : 'bg-neutral-300 dark:bg-neutral-600'}`} />
                         {workflow.enabled ? t('customWorkflowManager.enabled') : t('customWorkflowManager.disabled')}
@@ -255,7 +255,7 @@ export function CustomWorkflowManager({
               <h3 className="text-sm font-medium text-foreground">
                 {t('customWorkflowManager.confirmDelete')}
               </h3>
-              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+              <p className="mt-2 text-sm text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('customWorkflowManager.deleteConfirmMessage', { name: workflows.find((w) => w.id === deleteConfirmId)?.name ?? '' })}
               </p>
               <div className="mt-4 flex justify-end gap-2">
@@ -279,7 +279,7 @@ export function CustomWorkflowManager({
 
         {/* Footer */}
         <footer className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-200 bg-neutral-50 px-6 dark:border-neutral-800 dark:bg-neutral-900">
-          <span className="text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('customWorkflowManager.totalWorkflows', { count: workflows.length })}
           </span>
           <BrandDialogClose asChild>

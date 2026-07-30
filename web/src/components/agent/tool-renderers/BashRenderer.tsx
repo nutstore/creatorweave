@@ -22,7 +22,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
           {cmd && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               {cmd}
             </span>
           )}
@@ -36,7 +36,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
           {cmd && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               {cmd}
             </span>
           )}
@@ -62,7 +62,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
         {cmd && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
             {cmd}
           </span>
         )}
@@ -72,7 +72,7 @@ registerRenderer({
           </span>
         ) : (
           parts.length > 0 && (
-            <span className="ml-auto text-xs text-neutral-400 dark:text-neutral-500 shrink-0">
+            <span className="ml-auto text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 shrink-0">
               {parts.join(' · ')}
             </span>
           )
@@ -119,7 +119,7 @@ registerRenderer({
       return (
         <div className="px-3 py-2 space-y-2">
           {cmd && <CommandBlock command={cmd} />}
-          <div className="text-xs text-neutral-400 dark:text-neutral-500">No output</div>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No output</div>
         </div>
       )
     }
@@ -160,7 +160,7 @@ registerRenderer({
 
         {/* Footer: exit code + elapsed + copy */}
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-3 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <span className="flex items-center gap-3 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {output.exitCode !== undefined && (
               <span className={output.exitCode === 0 ? 'text-emerald-500' : 'text-red-400'}>
                 exit {output.exitCode}
@@ -190,7 +190,7 @@ function CommandBlock({ command }: { command: string }) {
 
   return (
     <div>
-      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">command</div>
+      <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">command</div>
       <div className="rounded-md bg-black dark:bg-neutral-950 p-2 overflow-x-auto max-h-32">
         <pre className="text-[11px] leading-5 font-mono text-sky-300 whitespace-pre-wrap">
           {isMultiline ? command : firstLine}
@@ -202,7 +202,7 @@ function CommandBlock({ command }: { command: string }) {
 
 function OutputHeader({ label, lineCount }: { label: string; lineCount?: number }) {
   return (
-    <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">
+    <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
       {label}
       {lineCount !== undefined && lineCount > 1 && ` (${lineCount} lines)`}
     </div>

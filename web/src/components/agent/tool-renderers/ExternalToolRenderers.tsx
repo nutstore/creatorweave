@@ -23,9 +23,9 @@ registerRenderer({
 
     return (
       <>
-        <code className="shrink-0 font-medium text-neutral-600 dark:text-neutral-300">search_tools</code>
+        <code className="shrink-0 font-medium text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">search_tools</code>
         {displayText && (
-          <span className="truncate min-w-0 text-neutral-400 dark:text-neutral-500">
+          <span className="truncate min-w-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             "{displayText}"
           </span>
         )}
@@ -35,7 +35,7 @@ registerRenderer({
               {results.length === 0 ? '0 matches' : `${results.length} tool${results.length !== 1 ? 's' : ''}`}
             </span>
             {searchMode && searchDurationMs !== undefined && (
-              <span className="ml-2 text-[10px] font-mono shrink-0 text-neutral-400 dark:text-neutral-500">
+              <span className="ml-2 text-[10px] font-mono shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {formatSearchMode(searchMode)} · {formatDuration(searchDurationMs)}
               </span>
             )}
@@ -59,7 +59,7 @@ registerRenderer({
 
     if (results.length === 0) {
       return (
-        <div className="px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
+        <div className="px-3 py-2 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           No tools matched "{displayText}".
         </div>
       )
@@ -67,12 +67,12 @@ registerRenderer({
 
     return (
       <div className="px-2 py-2 sm:px-3">
-        <div className="text-[11px] text-neutral-400 dark:text-neutral-500 mb-2 flex items-center gap-2 flex-wrap">
+        <div className="text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-2 flex items-center gap-2 flex-wrap">
           <span>
             {results.length} result{results.length !== 1 ? 's' : ''} for "{displayText}"
           </span>
           {searchMode && searchDurationMs !== undefined && (
-            <span className="font-mono text-neutral-400 dark:text-neutral-500">
+            <span className="font-mono text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               · {formatSearchMode(searchMode)} · {formatDuration(searchDurationMs)}
             </span>
           )}
@@ -82,14 +82,14 @@ registerRenderer({
             <div key={tool.fullName}>
               {/* Tool name: server.tool format */}
               <div className="text-[13px] font-medium text-neutral-700 dark:text-foreground mb-1">
-                <span className="text-neutral-400 dark:text-neutral-500 font-normal">
+                <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 font-normal">
                   {tool.sourceId}.
                 </span>
                 {tool.name}
               </div>
               {/* Description */}
               {tool.description && (
-                <div className="text-[12px] text-neutral-600 dark:text-neutral-300 mb-1.5 leading-relaxed">
+                <div className="text-[12px] text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 mb-1.5 leading-relaxed">
                   {tool.description}
                 </div>
               )}
@@ -115,7 +115,7 @@ registerRenderer({
       <>
         <code className="shrink-0 font-medium text-neutral-700 dark:text-foreground">call_tool</code>
         {fullName && (
-          <span className="truncate min-w-0 text-neutral-400 dark:text-neutral-500">
+          <span className="truncate min-w-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {shortToolName(fullName)}
           </span>
         )}
@@ -162,7 +162,7 @@ registerRenderer({
                 {sourceForBadge}
               </span>
             )}
-            <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">
+            <span className="text-xs font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate">
               {shortToolName(fullName)}
             </span>
           </div>
@@ -201,7 +201,7 @@ registerRenderer({
             {pluginDownload && (
               <div className="rounded border border-blue-100 dark:border-blue-900/30 bg-blue-50/50 dark:bg-blue-900/10 p-2">
                 <div className="text-[10px] text-blue-500 dark:text-blue-400 mb-0.5">File Downloaded</div>
-                <div className="text-xs text-neutral-700 dark:text-neutral-300">
+                <div className="text-xs text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {typeof pluginDownload.fileName === 'string' ? pluginDownload.fileName : 'file'}
                 </div>
                 {typeof pluginDownload.size === 'number' && (
@@ -213,8 +213,8 @@ registerRenderer({
             {/* Result preview */}
             {result !== undefined && result !== null && !pluginDownload && (
               <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
-                <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+                <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">Result</div>
+                <pre className="text-[11px] text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
                   {typeof result === 'string' ? result.slice(0, 800) : JSON.stringify(result, null, 2).slice(0, 800)}
                 </pre>
               </div>
@@ -223,8 +223,8 @@ registerRenderer({
             {/* Text result (MCP tools often return { text }) */}
             {text && !result && !pluginDownload && (
               <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-                <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Result</div>
-                <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+                <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">Result</div>
+                <pre className="text-[11px] text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
                   {text.slice(0, 800)}
                 </pre>
               </div>
@@ -250,8 +250,8 @@ registerRenderer({
 function ArgsBlock({ toolArgs }: { toolArgs: Record<string, unknown> }) {
   return (
     <div className="rounded border border-neutral-100 dark:border-neutral-800 p-1.5">
-      <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-1">Arguments</div>
-      <pre className="text-[11px] text-neutral-600 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all">
+      <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">Arguments</div>
+      <pre className="text-[11px] text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 overflow-x-auto whitespace-pre-wrap break-all">
         {JSON.stringify(toolArgs, null, 2).slice(0, 500)}
       </pre>
     </div>
@@ -273,15 +273,15 @@ function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unkn
         const type = typeof prop.type === 'string' ? prop.type : ''
         return (
           <div key={key} className="text-[11px] font-mono leading-relaxed">
-            <span className="text-neutral-600 dark:text-neutral-300">
+            <span className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {key}
               {isRequired && <span className="text-neutral-500">*</span>}
             </span>
             {type && (
-              <span className="text-neutral-400 dark:text-neutral-500 ml-1.5">: {type}</span>
+              <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 ml-1.5">: {type}</span>
             )}
             {typeof prop.description === 'string' && prop.description && (
-              <span className="text-neutral-400 dark:text-neutral-500 ml-2 font-sans">
+              <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 ml-2 font-sans">
                 — {prop.description.length > 40 ? prop.description.slice(0, 40) + '…' : prop.description}
               </span>
             )}
@@ -289,7 +289,7 @@ function SchemaParamsPreview({ inputSchema }: { inputSchema: Record<string, unkn
         )
       })}
       {overflow > 0 && (
-        <div className="text-[11px] text-neutral-400 dark:text-neutral-500">+ {overflow} more</div>
+        <div className="text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">+ {overflow} more</div>
       )}
     </div>
   )

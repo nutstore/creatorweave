@@ -539,13 +539,13 @@ export function PdfPreview({ blob, fileName, fileSize }: {
         {/* File info */}
         <div className="flex items-center gap-1.5">
           <FileText className="h-3.5 w-3.5 text-red-500" />
-          <span className="max-w-[160px] truncate text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+          <span className="max-w-[160px] truncate text-[11px] font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             {fileName}
           </span>
           <span className="text-[10px] text-neutral-400">({formatBytes(fileSize)})</span>
         </div>
 
-        <span className="text-[10px] text-neutral-300 dark:text-neutral-700">|</span>
+        <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
 
         {/* Page navigation */}
         <div className="flex items-center gap-1">
@@ -565,7 +565,7 @@ export function PdfPreview({ blob, fileName, fileSize }: {
               onChange={handlePageInputChange}
               onKeyDown={handlePageInputKeyDown}
               onBlur={handlePageInputCommit}
-              className="w-8 rounded border border-neutral-200 bg-transparent text-center text-[11px] text-neutral-700 dark:border-neutral-700 dark:text-neutral-300"
+              className="w-8 rounded border border-neutral-200 bg-transparent text-center text-[11px] text-neutral-700 dark:border-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300"
               style={{ lineHeight: '18px' }}
             />
             <span className="text-neutral-400">/</span>
@@ -582,7 +582,7 @@ export function PdfPreview({ blob, fileName, fileSize }: {
           </button>
         </div>
 
-        <span className="text-[10px] text-neutral-300 dark:text-neutral-700">|</span>
+        <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
 
         {/* Zoom controls */}
         <div className="flex items-center gap-1">

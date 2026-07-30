@@ -95,7 +95,7 @@ export function CanvasContextMenu({
     >
       {menu.type === 'pane' ? (
         <>
-          <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.addNodes')}
           </div>
           {kindOrder.map((kind) => {
@@ -125,7 +125,7 @@ export function CanvasContextMenu({
           <button
             type="button"
             onClick={() => { onFitView(); onClose() }}
-            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
             <Maximize className="h-3.5 w-3.5" />
             {t('workflowEditor.fitView')}
@@ -137,7 +137,7 @@ export function CanvasContextMenu({
             <button
               type="button"
               onClick={() => { onEditNode(menu.nodeId!); onClose() }}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               {t('workflowEditor.editProperties')}
             </button>
@@ -146,7 +146,7 @@ export function CanvasContextMenu({
             <button
               type="button"
               onClick={() => { onSetEntry(menu.nodeId!); onClose() }}
-              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs text-neutral-600 transition-colors hover:bg-neutral-50 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-800"
             >
               {t('workflowEditor.setAsEntry')}
             </button>

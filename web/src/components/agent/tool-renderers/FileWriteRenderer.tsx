@@ -28,7 +28,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">write</code>
         {path && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{shortPath(path)}</span>
         )}
         {!ctx.isStreaming && !ctx.isExecuting && (
           <span className="ml-auto flex items-center gap-1 text-xs text-neutral-400 shrink-0">
@@ -66,7 +66,7 @@ registerRenderer({
             {errMsg}
           </div>
           {hint && (
-            <div className="mt-1.5 rounded-md bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-700 p-2 text-xs text-neutral-600 dark:text-neutral-400 whitespace-pre-wrap font-mono">
+            <div className="mt-1.5 rounded-md bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-100 dark:border-neutral-700 p-2 text-xs text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 whitespace-pre-wrap font-mono">
               {hint}
             </div>
           )}
@@ -217,7 +217,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
     <div className="px-3 py-2 space-y-2">
       {singlePath && (
         <div className="flex items-center gap-2">
-          <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono truncate flex-1">{singlePath}</div>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 font-mono truncate flex-1">{singlePath}</div>
           <button
             type="button"
             onClick={() => setIsFullscreen(true)}
@@ -248,7 +248,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                         ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
                         : isCommented
                           ? 'text-amber-500 dark:text-amber-400 font-bold hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                          : 'text-neutral-300 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                          : 'text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                     }`}
                     style={{ minWidth: lnWidth + 'ch' }}
                     title="点击选中行，Shift+点击多行选中"
@@ -264,8 +264,8 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                     isSelected || isComposerTarget
                       ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/15 dark:text-blue-300'
                       : isCommented
-                        ? 'bg-amber-50/50 text-neutral-600 dark:bg-amber-950/10 dark:text-neutral-400'
-                        : 'text-neutral-600 dark:text-neutral-400'
+                        ? 'bg-amber-50/50 text-neutral-600 dark:bg-amber-950/10 text-neutral-400 text-neutral-400 dark:text-neutral-400'
+                        : 'text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400'
                   }`}>{line || '\u00A0'}</span>
                 </div>
 
@@ -302,11 +302,11 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                           : `L${composerRange.start + 1}-${composerRange.end + 1}`}
                       </span>
                       <div className="flex-1" />
-                      <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+                      <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500">⌘↵</kbd>
                       <button
                         type="button"
                         onClick={() => { setComposerRange(null); setComposerText(''); setSelectedRange(null) }}
-                        className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                        className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
                       >
                         <X className="h-3 w-3" />
                       </button>
@@ -374,10 +374,10 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
               <div className="flex flex-wrap gap-1.5 min-w-0">
                 {comments.map(item => (
                   <div key={item.id} className="inline-flex items-center gap-1 rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-xs">
-                    <span className="font-medium text-neutral-500 dark:text-neutral-400 shrink-0">
+                    <span className="font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 shrink-0">
                       {item.startLine === item.endLine ? `L${item.startLine + 1}` : `L${item.startLine + 1}-${item.endLine + 1}`}
                     </span>
-                    <span className="max-w-[200px] truncate text-neutral-600 dark:text-neutral-300" title={item.text}>{item.text}</span>
+                    <span className="max-w-[200px] truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={item.text}>{item.text}</span>
                     <button
                       className="text-neutral-400 hover:text-red-500 shrink-0"
                       onClick={() => removeComment(item.id)}
@@ -414,7 +414,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
             {/* Header */}
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-neutral-100 dark:border-neutral-800">
               <FilePlus className="h-4 w-4 text-neutral-400 shrink-0" />
-              <span className="font-mono text-sm text-neutral-600 dark:text-neutral-300 truncate flex-1">{singlePath ?? 'file'}</span>
+              <span className="font-mono text-sm text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1">{singlePath ?? 'file'}</span>
               <span className="text-xs text-neutral-400 shrink-0">{total} lines</span>
               {/* Fullscreen comments bar */}
               {comments.length > 0 && (
@@ -422,10 +422,10 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                   <div className="flex flex-wrap gap-1.5">
                     {comments.map(item => (
                       <div key={item.id} className="inline-flex items-center gap-1 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-2 py-1 text-xs">
-                        <span className="font-medium text-neutral-500 dark:text-neutral-400 shrink-0">
+                        <span className="font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 shrink-0">
                           {item.startLine === item.endLine ? `L${item.startLine + 1}` : `L${item.startLine + 1}-${item.endLine + 1}`}
                         </span>
-                        <span className="max-w-[160px] truncate text-neutral-600 dark:text-neutral-300" title={item.text}>{item.text}</span>
+                        <span className="max-w-[160px] truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={item.text}>{item.text}</span>
                         <button
                           className="text-neutral-400 hover:text-red-500 shrink-0"
                           onClick={() => removeComment(item.id)}
@@ -475,7 +475,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                             ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400'
                             : isCommented
                               ? 'text-amber-500 dark:text-amber-400 font-bold hover:bg-neutral-100 dark:hover:bg-neutral-800'
-                              : 'text-neutral-300 dark:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800'
+                              : 'text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800'
                         }`}
                         style={{ minWidth: lnWidth + 'ch' }}
                         title="点击选中行，Shift+点击多行选中"
@@ -491,8 +491,8 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                         isSelected || isComposerTarget
                           ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/15 dark:text-blue-300'
                           : isCommented
-                            ? 'bg-amber-50/50 text-neutral-600 dark:bg-amber-950/10 dark:text-neutral-400'
-                            : 'text-neutral-600 dark:text-neutral-400'
+                            ? 'bg-amber-50/50 text-neutral-600 dark:bg-amber-950/10 text-neutral-400 text-neutral-400 dark:text-neutral-400'
+                            : 'text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400'
                       }`}>{line || '\u00A0'}</span>
                     </div>
 
@@ -529,11 +529,11 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                               : `L${composerRange.start + 1}-${composerRange.end + 1}`}
                           </span>
                           <div className="flex-1" />
-                          <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 dark:text-neutral-500">⌘↵</kbd>
+                          <kbd className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400 dark:border-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500">⌘↵</kbd>
                           <button
                             type="button"
                             onClick={() => { setComposerRange(null); setComposerText(''); setSelectedRange(null) }}
-                            className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
+                            className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-200 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300"
                           >
                             <X className="h-3 w-3" />
                           </button>

@@ -435,11 +435,11 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Iteration limit reached hint (only when not processing) */}
         {!isProcessing && !isWaiting && iterationLimitReached && (
-          <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-relaxed dark:text-neutral-500">
+          <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-relaxed text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
               {t('conversation.iterationLimit.reached', { count: iterationLimitReached })}
-              <span className="ml-1 dark:text-neutral-550">
+              <span className="ml-1 dark:text-neutral-500">
                 {t('conversation.iterationLimit.hint')}
               </span>
             </span>
@@ -447,7 +447,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               <button
                 type="button"
                 onClick={() => conversationActions.sendMessage!('继续')}
-                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/30 dark:hover:text-neutral-300"
+                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-neutral-100 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800/30 dark:hover:text-neutral-300"
               >
                 {t('conversation.iterationLimit.continue')}
               </button>

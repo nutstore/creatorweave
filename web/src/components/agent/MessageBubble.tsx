@@ -123,11 +123,11 @@ export const MessageBubble = memo(function MessageBubble({
             <Forward className="h-3.5 w-3.5" />
             <span>Delegated by {note.fromAgentName ?? note.fromAgentId}</span>
           </div>
-          <div className="whitespace-pre-wrap break-words dark:text-neutral-300">
+          <div className="whitespace-pre-wrap break-words text-neutral-300 text-neutral-300 dark:text-neutral-300">
             {note.task}
           </div>
           {note.reason && (
-            <div className="mt-1 text-xs italic dark:text-neutral-400">
+            <div className="mt-1 text-xs italic text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {note.reason}
             </div>
           )}

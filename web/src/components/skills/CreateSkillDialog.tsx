@@ -115,7 +115,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
             <FileCode className="h-4.5 w-4.5 text-blue-500" />
             {t('skillEditor.createSkill')}
           </BrandDialogTitle>
-          <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+          <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
             <X className="h-5 w-5" />
           </BrandDialogClose>
         </BrandDialogHeader>
@@ -131,7 +131,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
           <div className="space-y-5">
             {/* Skill name (also used as directory name) */}
             <div>
-              <label className="mb-1.5 flex items-center text-sm font-medium dark:text-neutral-400">
+              <label className="mb-1.5 flex items-center text-sm font-medium text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('skillEditor.skillName')}
                 <span className="ml-1 text-red-500">*</span>
               </label>
@@ -151,7 +151,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
                   {nameError}
                 </p>
               ) : (
-                <p className="mt-1.5 text-xs dark:text-neutral-500">
+                <p className="mt-1.5 text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   {t('skillEditor.skillNameHelp')}
                 </p>
               )}
@@ -159,7 +159,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
 
             {/* Description */}
             <div>
-              <label className="mb-1.5 flex items-center text-sm font-medium dark:text-neutral-400">
+              <label className="mb-1.5 flex items-center text-sm font-medium text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('skillEditor.description')}
                 <span className="ml-1 text-red-500">*</span>
               </label>

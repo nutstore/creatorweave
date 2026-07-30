@@ -387,7 +387,7 @@ export function CsvPreview({ blob, fileName, fileSize }: {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white p-6 dark:bg-neutral-950">
           <FileText className="h-10 w-10 text-neutral-300" />
           <div className="text-center">
-            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <p className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {fileName}
             </p>
             <p className="mt-1 text-[10px] text-neutral-400">
@@ -398,7 +398,7 @@ export function CsvPreview({ blob, fileName, fileSize }: {
             <p className="text-xs text-amber-700 dark:text-amber-300">
               数据量过大（{state.totalRows.toLocaleString()} 行），本地渲染可能卡顿
             </p>
-            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+            <p className="mt-1 text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               💡 切换到 <strong>Text</strong> 视图查看摘要，或用 Python 分析：{' '}
               <code className="rounded bg-neutral-100 px-1 text-[10px] dark:bg-neutral-800">
                 pd.read_csv('...')
@@ -415,7 +415,7 @@ export function CsvPreview({ blob, fileName, fileSize }: {
           {state.headers.length > 0 && (
             <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-1.5 dark:border-neutral-700 dark:bg-neutral-900">
               <Table className="h-3.5 w-3.5 text-neutral-400" />
-              <span className="text-[11px] text-neutral-500 dark:text-neutral-400">
+              <span className="text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {state.rows.length} row{state.rows.length !== 1 ? 's' : ''} × {state.headers.length} column{state.headers.length !== 1 ? 's' : ''}
               </span>
               {fallbackTruncated > 0 && (
@@ -423,7 +423,7 @@ export function CsvPreview({ blob, fileName, fileSize }: {
                   (showing first {MAX_FALLBACK_ROWS.toLocaleString()} of {state.rows.length.toLocaleString()})
                 </span>
               )}
-              <span className="text-[11px] text-neutral-300 dark:text-neutral-600">
+              <span className="text-[11px] text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
                 (simplified view)
               </span>
             </div>
@@ -434,13 +434,13 @@ export function CsvPreview({ blob, fileName, fileSize }: {
               <table className="csv-preview-table w-full border-collapse text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr>
-                    <th className="w-10 min-w-[2.5rem] bg-neutral-100 px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500">
+                    <th className="w-10 min-w-[2.5rem] bg-neutral-100 px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 dark:bg-neutral-800 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                       #
                     </th>
                     {state.headers.map((h, i) => (
                       <th
                         key={i}
-                        className="whitespace-nowrap bg-neutral-100 px-3 py-1.5 text-left text-[11px] font-semibold text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+                        className="whitespace-nowrap bg-neutral-100 px-3 py-1.5 text-left text-[11px] font-semibold text-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300"
                         title={h}
                       >
                         {h}
@@ -456,13 +456,13 @@ export function CsvPreview({ blob, fileName, fileSize }: {
                         ? 'bg-white dark:bg-neutral-950'
                         : 'bg-neutral-50/50 dark:bg-neutral-900/50'}
                     >
-                      <td className="px-2 py-1 text-center text-[10px] text-neutral-300 dark:text-neutral-600">
+                      <td className="px-2 py-1 text-center text-[10px] text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
                         {ri + 1}
                       </td>
                       {state.headers.map((_, ci) => (
                         <td
                           key={ci}
-                          className="max-w-[300px] truncate px-3 py-1 text-neutral-700 dark:text-neutral-300"
+                          className="max-w-[300px] truncate px-3 py-1 text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300"
                           title={row[ci] ?? ''}
                         >
                           {row[ci] ?? ''}

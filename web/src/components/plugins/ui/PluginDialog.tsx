@@ -86,7 +86,7 @@ export function PluginDialog({
 
         {/* Content */}
         <div className="px-6 py-4">
-          <p className="whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">{message}</p>
+          <p className="whitespace-pre-wrap text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">{message}</p>
         </div>
 
         {/* Footer */}

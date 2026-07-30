@@ -96,7 +96,7 @@ export function ToolRecommendations({
             <Lightbulb className="h-4 w-4 text-warning" />
           </div>
           <div>
-            <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">{t('tools.recommendedTools')}</h3>
+            <h3 className="text-sm font-medium text-secondary dark:text-foreground">{t('tools.recommendedTools')}</h3>
             <p className="text-xs text-tertiary dark:text-muted">
               {t('tools.basedOnMessage')}
             </p>
@@ -120,7 +120,7 @@ export function ToolRecommendations({
               {/* Tool Info */}
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2">
-                  <span className="font-mono text-sm font-medium text-primary dark:text-primary-foreground">
+                  <span className="font-mono text-sm font-medium text-secondary dark:text-foreground">
                     {rec.displayName}
                   </span>
                   {/* Relevance indicator */}

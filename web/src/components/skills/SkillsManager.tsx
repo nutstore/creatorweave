@@ -230,7 +230,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
             <BrandDialogTitle className="text-lg font-semibold">
               {t('skills.title')}
             </BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -267,11 +267,11 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
           {/* Skills List */}
           <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-5">
             {totalFiltered === 0 && (debouncedQuery || filterType !== 'all') ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-16 dark:text-neutral-500">
+              <div className="flex flex-col items-center justify-center gap-2 py-16 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 <Inbox className="h-8 w-8 opacity-40" />
                 <p className="text-sm">{t('skills.noResults') || 'No skills match your search'}</p>
                 {debouncedQuery && (
-                  <p className="text-xs dark:text-neutral-600">&quot;{debouncedQuery}&quot;</p>
+                  <p className="text-xs text-neutral-600 text-neutral-600 dark:text-neutral-600">&quot;{debouncedQuery}&quot;</p>
                 )}
               </div>
             ) : (
@@ -301,7 +301,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
 
           {/* Footer */}
           <div className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-200 px-6 dark:border-neutral-700">
-            <span className="text-sm dark:text-neutral-400">
+            <span className="text-sm text-neutral-400 text-neutral-400 dark:text-neutral-400">
               <span className="font-medium dark:text-foreground">{enabledCount}</span>
               {' / '}
               {totalCount} {t('skills.enabled').toLowerCase()}
@@ -361,7 +361,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
             <BrandDialogTitle className="text-lg font-semibold">
               {t('skills.importSkill') || 'Import Project Skill'}
             </BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -376,7 +376,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
             <BrandDialogTitle className="text-lg font-semibold">
               {(t('skillUpload.importUserSkill') || 'Import My Skill')}
             </BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -426,12 +426,12 @@ function SkillSection({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex items-center gap-2 text-sm font-medium dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-foreground transition-colors"
+          className="flex items-center gap-2 text-sm font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-foreground transition-colors"
         >
           {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           {icon}
           {label}
-          <span className="text-xs tabular-nums dark:text-neutral-500">({skills.length})</span>
+          <span className="text-xs tabular-nums text-neutral-500 text-neutral-500 dark:text-neutral-500">({skills.length})</span>
         </button>
 
         {/* Action buttons */}
@@ -443,7 +443,7 @@ function SkillSection({
               'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
               action.primary
                 ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
-                : 'ml-auto hover:text-neutral-700 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800'
+                : 'ml-auto hover:text-neutral-700 hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800'
             )}
           >
             {action.icon}
@@ -455,7 +455,7 @@ function SkillSection({
             type="button"
             onClick={secondaryAction.onClick}
             className={cn(
-              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:text-neutral-700 hover:bg-neutral-100 transition-colors dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800',
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:text-neutral-700 hover:bg-neutral-100 transition-colors text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800',
               !action && 'ml-auto'
             )}
           >
@@ -469,7 +469,7 @@ function SkillSection({
       {!isCollapsed && (
         <div className="mt-2.5 space-y-2 pl-6">
           {skills.length === 0 ? (
-            <div className="flex items-center gap-2 py-3 dark:text-neutral-500">
+            <div className="flex items-center gap-2 py-3 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               <Inbox className="h-4 w-4 opacity-40" />
               <p className="text-xs">{t('skills.empty')}</p>
             </div>

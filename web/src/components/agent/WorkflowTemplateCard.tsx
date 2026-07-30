@@ -74,7 +74,7 @@ export function WorkflowTemplateCard({
                     className={cn(
                       'inline-flex items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium',
                       cfg?.bg || 'bg-neutral-100 dark:bg-neutral-700',
-                      cfg?.color || 'text-neutral-600 dark:text-neutral-300'
+                      cfg?.color || 'text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300'
                     )}
                   >
                     {Icon && <Icon className="h-2.5 w-2.5" />}
@@ -113,7 +113,7 @@ export function WorkflowTemplateCard({
             return (
               <span key={`${kind}-${i}`} className="flex items-center gap-1">
                 {i > 0 && (
-                  <span className="text-[10px] text-neutral-300 dark:text-neutral-600">→</span>
+                  <span className="text-[10px] text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">→</span>
                 )}
                 <span
                   className={cn(
@@ -142,7 +142,7 @@ export function WorkflowTemplateCard({
             'border border-neutral-200 bg-neutral-50 text-neutral-700',
             'hover:border-neutral-300 hover:bg-neutral-100',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'dark:border-neutral-600 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:border-neutral-500 dark:hover:bg-neutral-650'
+            'dark:border-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:border-neutral-500 dark:hover:bg-neutral-650'
           )}
         >
           <Play className="h-3 w-3" />

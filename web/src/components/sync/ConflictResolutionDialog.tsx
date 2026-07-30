@@ -272,7 +272,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                 </svg>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-primary dark:text-primary-foreground">{cr.title}</h2>
+                <h2 className="text-lg font-semibold text-secondary dark:text-foreground">{cr.title}</h2>
                 <p className="text-sm text-tertiary dark:text-muted mt-0.5">
                   {cr.conflictDescription(conflict.path)}
                 </p>
@@ -297,14 +297,14 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           <div className="mt-4 flex items-center gap-6 text-sm">
             <div className="flex items-center gap-2">
               <span className="text-tertiary dark:text-muted">{cr.opfsVersionTime}</span>
-              <span className="font-medium text-primary dark:text-primary-foreground">
+              <span className="font-medium text-secondary dark:text-foreground">
                 {formatTimestamp(conflict.opfsVersion.mtime)}
               </span>
             </div>
             {conflict.nativeVersion.mtime && (
               <div className="flex items-center gap-2">
                 <span className="text-tertiary dark:text-muted">{cr.nativeVersionTime}</span>
-                <span className="font-medium text-primary dark:text-primary-foreground">
+                <span className="font-medium text-secondary dark:text-foreground">
                   {formatTimestamp(conflict.nativeVersion.mtime)}
                 </span>
               </div>
@@ -339,7 +339,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                         className={`text-sm font-medium ${
                           selectedOption === option.value
                             ? `text-${option.color}-900`
-                            : 'text-primary dark:text-primary-foreground'
+                            : 'text-secondary dark:text-foreground'
                         }`}
                       >
                         {option.label}

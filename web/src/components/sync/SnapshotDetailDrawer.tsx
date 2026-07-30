@@ -238,7 +238,7 @@ export const SnapshotDetailDrawer: React.FC<SnapshotDetailDrawerProps> = ({
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                 </span>
                 {getOpIcon(file.opType)}
-                <span className="min-w-0 flex-1 truncate text-left text-primary" title={file.path}>
+                <span className="min-w-0 flex-1 truncate text-left text-secondary" title={file.path}>
                   {file.path}
                 </span>
                 <span className={`shrink-0 rounded px-1 py-0.5 text-[9px] font-medium ${getOpBadgeCls(file.opType)}`}>

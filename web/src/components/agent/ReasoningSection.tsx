@@ -28,7 +28,7 @@ export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`flex w-full items-center gap-2 bg-neutral-50 px-3 py-2 text-left text-xs text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:bg-neutral-800 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 ${
+        className={`flex w-full items-center gap-2 bg-neutral-50 px-3 py-2 text-left text-xs text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:bg-neutral-800 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 ${
           open
             ? 'rounded-t border border-b-0 border-neutral-200 dark:border-neutral-700'
             : 'rounded border border-neutral-200 dark:border-neutral-700'
@@ -39,7 +39,7 @@ export function ReasoningSection({ reasoning, streaming }: ReasoningSectionProps
         <span>{streaming ? t('workflow.thinking') : t('workflow.thinkingProcess')}</span>
       </button>
       {open && (
-        <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+        <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {reasoning}
         </div>
       )}

@@ -31,7 +31,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   security: 'border-yellow-300 bg-yellow-50 text-yellow-700 dark:border-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-300',
   performance: 'border-pink-300 bg-pink-50 text-pink-700 dark:border-pink-700 dark:bg-pink-950/40 dark:text-pink-300',
   architecture: 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300',
-  general: 'border-neutral-300 bg-neutral-50 text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
+  general: 'border-neutral-300 bg-neutral-50 text-neutral-700 dark:border-neutral-600 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300',
 }
 
 const CATEGORY_KEYS: Record<string, string> = {
@@ -87,7 +87,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
                 'truncate text-sm font-medium',
                 skill.enabled
                   ? 'text-foreground'
-                  : 'text-neutral-500 dark:text-neutral-400'
+                  : 'text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400'
               )}
             >
               {skill.name}
@@ -106,8 +106,8 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
         className={cn(
           'mt-1.5 line-clamp-2 text-xs leading-relaxed',
           skill.enabled
-            ? 'text-neutral-600 dark:text-neutral-300'
-            : 'text-neutral-400 dark:text-neutral-500'
+            ? 'text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300'
+            : 'text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500'
         )}
       >
         {skill.description}
@@ -127,29 +127,29 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
         {skill.tags.slice(0, 3).map((tag) => (
           <span
             key={tag}
-            className="inline-flex items-center rounded-md bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300"
+            className="inline-flex items-center rounded-md bg-neutral-100 px-1.5 py-0.5 text-xs text-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300"
           >
             {tag}
           </span>
         ))}
         {skill.tags.length > 3 && (
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">+{skill.tags.length - 3}</span>
+          <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">+{skill.tags.length - 3}</span>
         )}
       </div>
 
       {/* Footer: Metadata + Actions */}
       <div className="mt-3 flex items-center justify-between">
-        <div className="flex items-center gap-3 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="flex items-center gap-3 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {skill.author !== 'Unknown' && <span>{skill.author}</span>}
           {skill.source === 'project' && (
             <>
-              <span className="text-neutral-200 dark:text-neutral-700">|</span>
+              <span className="text-neutral-200 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
               <span>{t('skillCard.project')}</span>
             </>
           )}
           {skill.updatedAt > 0 && (
             <>
-              <span className="text-neutral-200 dark:text-neutral-700">|</span>
+              <span className="text-neutral-200 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
               <span title={new Date(skill.updatedAt).toLocaleString()}>
                 {t('skillCard.updated')} {formatRelativeTime(skill.updatedAt)}
               </span>
@@ -160,7 +160,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           {/* View - read-only preview */}
           <BrandButton
             iconButton
-            className="h-7 w-7 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400"
+            className="h-7 w-7 text-neutral-400 hover:text-blue-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-blue-400"
             onClick={() => onView(skill)}
             title={t('skillCard.viewDetails')}
           >
@@ -170,7 +170,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           {!isReadOnly && (
             <BrandButton
               iconButton
-              className="h-7 w-7 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-foreground"
+              className="h-7 w-7 text-neutral-400 hover:text-neutral-700 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-foreground"
               onClick={() => onEdit(skill)}
               title={t('skillCard.edit')}
             >
@@ -181,7 +181,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           {onExport && (
             <BrandButton
               iconButton
-              className="h-7 w-7 text-neutral-400 hover:text-blue-600 dark:text-neutral-500 dark:hover:text-blue-400"
+              className="h-7 w-7 text-neutral-400 hover:text-blue-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-blue-400"
               onClick={() => onExport(skill)}
               title={t('skillCard.export')}
             >
@@ -192,7 +192,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           {onDelete && (
             <BrandButton
               iconButton
-              className="h-7 w-7 text-neutral-400 hover:text-red-500 dark:text-neutral-500 dark:hover:text-red-400"
+              className="h-7 w-7 text-neutral-400 hover:text-red-500 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-red-400"
               onClick={() => onDelete(skill.id)}
               title={t('skillCard.delete')}
             >

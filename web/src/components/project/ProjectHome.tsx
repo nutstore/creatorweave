@@ -729,7 +729,7 @@ export function ProjectHome({
               aria-label={t('projectHome.project.openProject', { name: project.name })}
             >
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground truncate group-hover:text-primary/70 transition-colors">
+                <h3 className="home-title-sans text-base text-secondary dark:text-foreground truncate group-hover:text-primary/70 transition-colors">
                   {project.name}
                 </h3>
                 {isArchived && (
@@ -860,7 +860,7 @@ export function ProjectHome({
           </div>
 
           <h1 className="home-title-serif home-reveal home-delay-1">
-            <span className="block text-4xl sm:text-5xl lg:text-6xl text-primary dark:text-primary-foreground leading-tight">
+            <span className="block text-4xl sm:text-5xl lg:text-6xl text-secondary dark:text-foreground leading-tight">
               {t('projectHome.hero.title')}
             </span>
           </h1>
@@ -873,12 +873,12 @@ export function ProjectHome({
           {/* Quick stats */}
           <div className="home-reveal home-delay-3 mt-8 flex items-center gap-6">
             <div className="home-mono text-sm">
-              <span className="text-primary dark:text-primary-foreground font-medium">{totalProjects}</span>
+              <span className="text-secondary dark:text-foreground font-medium">{totalProjects}</span>
               <span className="text-tertiary dark:text-muted ml-1">{t('projectHome.hero.projectCount', { count: '' }).trim()}</span>
             </div>
             <div className="w-px h-4 bg-border" />
             <div className="home-mono text-sm">
-              <span className="text-primary dark:text-primary-foreground font-medium">{totalWorkspaces}</span>
+              <span className="text-secondary dark:text-foreground font-medium">{totalWorkspaces}</span>
               <span className="text-tertiary dark:text-muted ml-1">{t('projectHome.hero.workspaceCount', { count: '' }).trim()}</span>
             </div>
           </div>
@@ -897,7 +897,7 @@ export function ProjectHome({
                   {t('projectHome.sidebar.continueWork')}
                 </span>
               </div>
-              <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground mb-1 truncate">
+              <h3 className="home-title-sans text-base text-secondary dark:text-foreground mb-1 truncate">
                 {recentProject.name}
               </h3>
               <p className="home-body text-xs text-tertiary dark:text-muted mb-4">
@@ -928,7 +928,7 @@ export function ProjectHome({
                     {t('projectHome.sidebar.continueWork')}
                   </span>
                 </div>
-                <h3 className="home-title-sans text-base text-primary dark:text-primary-foreground mb-1 truncate">
+                <h3 className="home-title-sans text-base text-secondary dark:text-foreground mb-1 truncate">
                   {recentProject.name}
                 </h3>
                 <p className="home-body text-xs text-tertiary dark:text-muted mb-4">
@@ -1199,7 +1199,7 @@ export function ProjectHome({
                     onClick={() => setStatusFilter(filter)}
                     className={`home-body px-3 py-1.5 text-xs rounded-md transition-all ${
                       statusFilter === filter
-                        ? 'bg-card dark:bg-card text-primary dark:text-primary-foreground shadow-sm'
+                        ? 'bg-card dark:bg-card text-secondary dark:text-foreground shadow-sm'
                         : 'text-tertiary dark:text-muted hover:text-secondary dark:hover:text-secondary-foreground'
                     }`}
                   >

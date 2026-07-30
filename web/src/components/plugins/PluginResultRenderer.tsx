@@ -187,16 +187,16 @@ function AutoRenderer({ pluginResult, fileResults }: PluginResultRendererProps) 
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b">
-              <th className="py-2 text-left font-medium text-neutral-700 dark:text-neutral-300">File</th>
-              <th className="py-2 text-right font-medium text-neutral-700 dark:text-neutral-300">Size</th>
-              <th className="py-2 text-center font-medium text-neutral-700 dark:text-neutral-300">Status</th>
+              <th className="py-2 text-left font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">File</th>
+              <th className="py-2 text-right font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">Size</th>
+              <th className="py-2 text-center font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">Status</th>
             </tr>
           </thead>
           <tbody>
             {fileResults.map((file, i) => (
               <tr key={i} className="border-b last:border-0">
                 <td className="py-2 text-foreground">{file.name}</td>
-                <td className="py-2 text-right text-neutral-600 dark:text-neutral-300">
+                <td className="py-2 text-right text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {formatCellValue(file.size, 'bytes')}
                 </td>
                 <td className="py-2 text-center">
@@ -230,7 +230,7 @@ function TableRenderer({
   fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No file results to display</p>
+    return <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">No file results to display</p>
   }
 
   const getNestedValue = (obj: unknown, key: string): unknown => {
@@ -250,7 +250,7 @@ function TableRenderer({
             {schema.columns.map((col) => (
               <th
                 key={col.key}
-                className="px-4 py-3 text-left font-medium text-neutral-700 dark:text-neutral-300"
+                className="px-4 py-3 text-left font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300"
                 style={{ width: col.width }}
               >
                 {col.label}
@@ -299,7 +299,7 @@ function CardsRenderer({
   fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No file results to display</p>
+    return <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">No file results to display</p>
   }
 
   return (
@@ -317,7 +317,7 @@ function CardsRenderer({
               {title}
             </h4>
             {subtitle.length > 0 && (
-              <p className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={subtitle}>
+              <p className="truncate text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400" title={subtitle}>
                 {subtitle}
               </p>
             )}
@@ -343,7 +343,7 @@ function KeyValueRenderer({
   data?: unknown
 }) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No metrics available</p>
+    return <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">No metrics available</p>
   }
   const metrics = data as Record<string, unknown>
 
@@ -354,7 +354,7 @@ function KeyValueRenderer({
         return (
           <div key={key} className="flex items-center gap-3 rounded-lg border bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="flex-1">
-              <p className="text-xs text-neutral-600 dark:text-neutral-400">{label}</p>
+              <p className="text-xs text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">{label}</p>
               <p className="text-sm font-semibold text-foreground">{formatCellValue(value, type)}</p>
             </div>
           </div>
@@ -387,7 +387,7 @@ function JsonRenderer({ data, collapsible = true }: { data: unknown; collapsible
 
   return (
     <details open={!collapsible} className="group">
-      <summary className="cursor-pointer text-sm font-medium text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-foreground">
+      <summary className="cursor-pointer text-sm font-medium text-neutral-700 hover:text-neutral-900 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:text-foreground">
         Raw JSON
       </summary>
       <pre className="mt-3 overflow-x-auto rounded-lg bg-neutral-100 p-4 text-xs dark:bg-neutral-800">
@@ -409,7 +409,7 @@ function ChartRenderer({
   fileResults?: FileResultRow[]
 }) {
   if (!fileResults || fileResults.length === 0) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No data to display</p>
+    return <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">No data to display</p>
   }
 
   const maxValue = Math.max(
@@ -429,7 +429,7 @@ function ChartRenderer({
 
         return (
           <div key={i} className="flex items-center gap-3">
-            <div className="w-32 flex-shrink-0 truncate text-sm text-neutral-700 dark:text-neutral-300" title={label}>
+            <div className="w-32 flex-shrink-0 truncate text-sm text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300" title={label}>
               {label}
             </div>
             <div className="h-6 flex-1 overflow-hidden rounded bg-neutral-100 dark:bg-neutral-800">

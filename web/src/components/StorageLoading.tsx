@@ -69,12 +69,12 @@ export function StorageLoading({
             <div className="space-y-4 px-6 pb-6">
               {canReset && (
                 <>
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                  <p className="text-sm text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {t('app.databaseResetExplanation')}
                   </p>
                   {/* Hint about the most common cause (cleaner tools wiping OPFS).
                       Kept short so the page doesn't feel like a wall of text. */}
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  <p className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {t('app.databaseCorruptedHint')}
                   </p>
                   {onExport && (
@@ -111,7 +111,7 @@ export function StorageLoading({
             </div>
           </BrandCard>
 
-          <p className="mt-4 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('app.productName')}</p>
+          <p className="mt-4 text-center text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('app.productName')}</p>
         </div>
       </div>
     )
@@ -163,7 +163,7 @@ export function StorageLoading({
           </div>
         </BrandCard>
 
-        <p className="mt-4 text-center text-xs text-neutral-400 dark:text-neutral-500">{t('app.productName')}</p>
+        <p className="mt-4 text-center text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{t('app.productName')}</p>
       </div>
     </div>
   )

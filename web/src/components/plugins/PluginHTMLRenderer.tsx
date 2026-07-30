@@ -185,7 +185,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
                 isReady ? 'bg-green-500' : 'bg-yellow-500'
               }`}
             />
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">{isReady ? 'Ready' : 'Loading...'}</span>
+            <span className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{isReady ? 'Ready' : 'Loading...'}</span>
           </div>
         </div>
       )}
@@ -203,7 +203,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">Plugin API v2.0</span>
+          <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">Plugin API v2.0</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload() // Force reload
             }}
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
+            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Refresh
           </button>
@@ -223,7 +223,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
                 setHeight(result.height || 400)
               }
             }}
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
+            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Reset Size
           </button>

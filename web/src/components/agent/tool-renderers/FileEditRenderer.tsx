@@ -64,7 +64,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">edit</code>
         {path && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{shortPath(path)}</span>
         )}
         {ctx.isStreaming && hasChanges && (
           <span className="ml-auto flex items-center gap-1 shrink-0">
@@ -135,7 +135,7 @@ registerRenderer({
             <div key={i}>
               {entries.length > 1 && (
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-medium text-neutral-400 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] font-medium text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">
                     Edit {i + 1} of {entries.length}
                   </span>
                   {!hasChanges && (
@@ -174,7 +174,7 @@ registerRenderer({
 
 function PathHeader({ path, replaceAll }: { path: string; replaceAll: boolean }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
+    <div className="flex items-center gap-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
       <span className="font-mono">{path}</span>
       {replaceAll && <span className="text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded">replace all</span>}
     </div>
@@ -190,7 +190,7 @@ function DiffBlock({ diff }: { diff: DiffLine[] }) {
           <div key={i} className={
             d.type === 'add' ? 'bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-400' :
             d.type === 'del' ? 'bg-red-50 dark:bg-red-900/10 text-red-700 dark:text-red-400' :
-            'text-neutral-400 dark:text-neutral-500'
+            'text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500'
           }>
             <span className="select-none mr-1">{d.type === 'add' ? '+' : d.type === 'del' ? '-' : ' '}</span>
             <span className="whitespace-pre-wrap break-all">{d.text || '\u00A0'}</span>

@@ -73,7 +73,7 @@ export function SnapshotApprovalDialog({
                 // max-h-[40vh] + overflow-auto keeps the container bounded so the dialog
                 // doesn't grow with the streamed content.
                 <div
-                  className="w-full min-h-[10rem] max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary whitespace-pre-wrap break-words"
+                  className="w-full min-h-[10rem] max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-foreground whitespace-pre-wrap break-words"
                 >
                   {summary || ''}
                   <span className="inline-block w-[2px] h-[1em] bg-primary align-text-bottom animate-pulse" />
@@ -86,7 +86,7 @@ export function SnapshotApprovalDialog({
                   value={summary}
                   onChange={(e) => onSummaryChange(e.target.value)}
                   rows={8}
-                  className="w-full resize-y max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-primary focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full resize-y max-h-[40vh] overflow-auto rounded-md border border-subtle bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder={t('sidebar.snapshotApproval.summaryPlaceholder')}
                 />
               )}

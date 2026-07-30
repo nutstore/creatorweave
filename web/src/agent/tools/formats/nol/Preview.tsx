@@ -258,7 +258,7 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
             mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded
             transition-colors duration-75
             ${hasChildren
-              ? 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
+              ? 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300'
               : 'text-transparent'
             }
           `}
@@ -279,7 +279,7 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
           </span>
         ) : isParent ? (
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-            <Minus className="h-3 w-3 text-neutral-300 dark:text-neutral-600" />
+            <Minus className="h-3 w-3 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600" />
           </span>
         ) : (
           <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
@@ -293,9 +293,9 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
             text-[13px] leading-relaxed
             ${isParent
               ? 'font-medium text-foreground'
-              : 'text-neutral-700 dark:text-neutral-300'
+              : 'text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300'
             }
-            ${isCompleted ? 'text-neutral-400 line-through dark:text-neutral-500' : ''}
+            ${isCompleted ? 'text-neutral-400 line-through text-neutral-500 text-neutral-500 dark:text-neutral-500' : ''}
           `}>
             {renderHtmlContent(node.content || '')}
           </div>
@@ -430,10 +430,10 @@ export function NolPreview({ blob, fileSize }: { blob: Blob; fileName: string; f
       <div className="flex items-center gap-3 border-b border-neutral-100 px-4 py-2 dark:border-neutral-800">
         <div className="flex items-center gap-1.5">
           <List className="h-3.5 w-3.5 text-neutral-400" />
-          <span className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">Outline</span>
+          <span className="text-[11px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">Outline</span>
         </div>
 
-        <span className="text-[10px] text-neutral-300 dark:text-neutral-700">|</span>
+        <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
 
         <span className="text-[10px] tabular-nums text-neutral-400">
           {nodeCount} nodes · {formatBytes(fileSize)}
@@ -441,7 +441,7 @@ export function NolPreview({ blob, fileSize }: { blob: Blob; fileName: string; f
 
         {mediaFiles.length > 0 && (
           <>
-            <span className="text-[10px] text-neutral-300 dark:text-neutral-700">·</span>
+            <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">·</span>
             <span className="flex items-center gap-0.5 text-[10px] text-neutral-400">
               <Image className="h-2.5 w-2.5" />
               {mediaFiles.length}
@@ -458,8 +458,8 @@ export function NolPreview({ blob, fileSize }: { blob: Blob; fileName: string; f
             rounded-md px-2 py-1 text-[10px] font-medium
             transition-colors duration-75
             ${expandAll
-              ? 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-              : 'text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-300'
+              ? 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300'
+              : 'text-neutral-400 hover:bg-neutral-50 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800/50 dark:hover:text-neutral-300'
             }
           `}
         >

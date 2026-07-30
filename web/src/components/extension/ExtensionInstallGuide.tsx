@@ -101,10 +101,10 @@ function StepIntro() {
       </div>
 
       <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-        <div className="flex items-center gap-2 text-xs text-tertiary dark:text-neutral-400">
+        <div className="flex items-center gap-2 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
           <span className="font-medium">⏱</span> {t('extension.estimatedTime')}
         </div>
-        <div className="flex items-center gap-2 text-xs text-tertiary dark:text-neutral-400">
+        <div className="flex items-center gap-2 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
           <span className="font-medium">📋</span> {t('extension.prerequisite')}
         </div>
       </div>
@@ -198,7 +198,7 @@ function StepExtract() {
             key={inst.label}
             className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800"
           >
-            <span className="shrink-0 rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+            <span className="shrink-0 rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {inst.label}
             </span>
             <span className="text-sm text-secondary dark:text-foreground">{inst.text}</span>
@@ -209,7 +209,7 @@ function StepExtract() {
       <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
         <div className="flex items-center gap-2 text-xs text-neutral-500">
           <span className="font-mono text-neutral-400">📁</span>
-          <span className="dark:text-neutral-400">
+          <span className="text-neutral-400 text-neutral-400 dark:text-neutral-400">
             chrome-extension.zip → 📁 chrome-extension/
           </span>
         </div>
@@ -297,7 +297,7 @@ function StepInstall() {
         </div>
         <div className="ml-7">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-tertiary dark:text-neutral-400">OFF</span>
+            <span className="text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">OFF</span>
             <div className="h-5 w-9 rounded-full bg-neutral-200 dark:bg-neutral-600" />
             <span className="text-xs font-medium text-blue-600 dark:text-blue-400">ON</span>
           </div>
@@ -314,7 +314,7 @@ function StepInstall() {
             {t('extension.installStepC')}
           </span>
         </div>
-        <div className="ml-7 text-xs text-tertiary dark:text-neutral-400">
+        <div className="ml-7 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {t('extension.installStepCSelect')}
         </div>
       </div>
@@ -348,7 +348,7 @@ function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
         <h3 className="text-lg font-semibold text-secondary">
           {t('extension.refreshTitle')}
         </h3>
-        <p className="mt-2 text-sm text-secondary dark:text-neutral-300">
+        <p className="mt-2 text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">
           {t('extension.refreshDescription')}
         </p>
       </div>
@@ -445,7 +445,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
                 className={`shrink-0 rounded-md px-2 py-1 text-xs transition-colors ${
                   installGuideStep === i + 1
                     ? 'bg-blue-100 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                    : 'text-tertiary hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                    : 'text-tertiary hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800'
                 }`}
               >
                 {label}
@@ -468,7 +468,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
           <button
             type="button"
             onClick={installGuideStep > 1 ? () => goToStep(installGuideStep - 1) : handleClose}
-            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-neutral-100 hover:text-secondary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-neutral-100 hover:text-secondary text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
             {installGuideStep > 1 ? t('extension.prevStep') : t('extension.skip')}

@@ -203,10 +203,10 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
       <PopoverTrigger asChild>
         <BrandButton variant="outline" className="h-8 max-w-[280px] justify-between gap-2 px-2.5 text-xs">
           <span className="flex min-w-0 items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 shrink-0" />
-            <span className="truncate">{currentLabel}</span>
+            <Sparkles className="h-3.5 w-3.5 shrink-0 text-tertiary" />
+            <span className="truncate text-secondary">{currentLabel}</span>
           </span>
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-tertiary" />
         </BrandButton>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[360px] p-3">
@@ -320,7 +320,7 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                       ) : (
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-tertiary" />
                       )}
-                      <span className="truncate text-[13px] font-semibold text-primary">
+                      <span className="truncate text-[13px] font-semibold text-secondary">
                         {provider.displayName}
                       </span>
                       {isCurrentProvider ? (

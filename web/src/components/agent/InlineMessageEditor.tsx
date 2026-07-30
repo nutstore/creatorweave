@@ -569,7 +569,7 @@ export function InlineMessageEditor({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="max-w-[140px] truncate text-xs font-medium dark:text-neutral-300">
+                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300">
                         {asset.name}
                       </div>
                       <div className="text-[10px]">
@@ -593,7 +593,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="absolute left-3 top-4 rounded p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className="absolute left-3 top-4 rounded p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           title="Attach files"
         >
           <Paperclip className="h-4 w-4" />
@@ -605,7 +605,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
         >
           {cancelLabel}
         </button>
@@ -630,7 +630,7 @@ export function InlineMessageEditor({
             <>
               <span className="font-medium">@{candidate.id}</span>
               {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs dark:text-neutral-400">
+                <span className="truncate pl-3 text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   {candidate.name}
                 </span>
               )}
@@ -650,7 +650,7 @@ export function InlineMessageEditor({
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file) => (
             <>
-              <span className="mt-0.5 shrink-0 dark:text-neutral-500">
+              <span className="mt-0.5 shrink-0 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {file.isDirectory ? (
                   <FolderIcon className="h-3.5 w-3.5" />
                 ) : (
@@ -659,12 +659,12 @@ export function InlineMessageEditor({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium leading-5">{file.name}</div>
-                <div className="truncate text-[11px] leading-4 dark:text-neutral-500">
+                <div className="truncate text-[11px] leading-4 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}

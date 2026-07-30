@@ -106,7 +106,7 @@ export function AssetCard({ asset, compact = false, onRemove, onPreview }: Asset
   if (compact) {
     return (
       <>
-        <div className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
+        <div className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-2 py-1 text-xs text-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
           {isImage && imageUrl ? (
             <button
               type="button"

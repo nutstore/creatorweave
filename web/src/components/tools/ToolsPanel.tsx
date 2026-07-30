@@ -156,7 +156,7 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
               <Wrench className="h-4 w-4 text-primary-600 dark:text-primary-500" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-primary dark:text-primary-foreground">
+              <h2 className="text-base font-semibold text-secondary dark:text-foreground">
                 {t('tools.availableTools')}
               </h2>
               <p className="text-xs text-tertiary dark:text-muted">
@@ -215,7 +215,7 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
                           <Code className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">{category.name}</h3>
+                          <h3 className="text-sm font-medium text-secondary dark:text-foreground">{category.name}</h3>
                           <p className="text-xs text-tertiary dark:text-muted">
                             {t('tools.toolCountInCategory', { count: category.tools.length })}
                           </p>
@@ -243,7 +243,7 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
                               <Code className="mt-0.5 h-4 w-4 flex-shrink-0 text-tertiary" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-sm font-medium text-primary dark:text-primary-foreground">
+                                  <span className="font-mono text-sm font-medium text-secondary dark:text-foreground">
                                     {tool.name}
                                   </span>
                                 </div>
@@ -306,7 +306,7 @@ function ToolDetailModal({ tool, onClose }: ToolDetailModalProps) {
               <div className="shrink-0 rounded-lg bg-primary-50 p-2 dark:bg-primary-100/30">
                 <Code className="h-4 w-4 text-primary-600 dark:text-primary-500" />
               </div>
-              <h3 className="truncate font-mono text-sm font-semibold text-primary dark:text-primary-foreground">{tool.name}</h3>
+              <h3 className="truncate font-mono text-sm font-semibold text-secondary dark:text-foreground">{tool.name}</h3>
             </div>
             <button
               onClick={onClose}
@@ -339,7 +339,7 @@ function ToolDetailModal({ tool, onClose }: ToolDetailModalProps) {
                       className="rounded-lg border border-border bg-muted/50 px-4 py-3 dark:bg-muted/50"
                     >
                       <div className="mb-1 flex items-center gap-2">
-                        <code className="text-sm font-medium text-primary dark:text-primary-foreground">{name}</code>
+                        <code className="text-sm font-medium text-secondary dark:text-foreground">{name}</code>
                         <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-tertiary dark:bg-muted dark:text-muted">
                           {param.type}
                         </span>

@@ -716,7 +716,7 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
     <div className="flex items-start justify-between gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-secondary dark:text-foreground">{title}</p>
-        <p className="mt-1 text-xs text-tertiary dark:text-neutral-400">{description}</p>
+        <p className="mt-1 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">{description}</p>
       </div>
       <BrandSwitch checked={checked} onCheckedChange={onChange} />
     </div>
@@ -852,7 +852,7 @@ function NotificationsSection() {
           <p className="text-sm font-medium text-secondary dark:text-foreground">
             {t('settings.notifications.permissionLabel')}
           </p>
-          <p className="mt-1 text-xs text-tertiary dark:text-neutral-400">
+          <p className="mt-1 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
             <span className={`font-medium ${permissionColor}`}>{permissionLabel}</span>
           </p>
         </div>
@@ -895,7 +895,7 @@ function ExtensionSettingsPanel() {
             {isInstalled ? (
               <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
             ) : (
-              <Puzzle className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+              <Puzzle className="h-4 w-4 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
             )}
           </div>
           <div>
@@ -917,7 +917,7 @@ function ExtensionSettingsPanel() {
         <div className="space-y-1.5">
           {/* Latest available version */}
           <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
-            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.settingsLatestVersion')}</span>
+            <span className="text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">{t('extension.settingsLatestVersion')}</span>
             <span className="font-mono text-sm font-medium text-secondary dark:text-foreground">{latestVersion}</span>
           </div>
           {/* Currently installed version */}
@@ -926,7 +926,7 @@ function ExtensionSettingsPanel() {
               ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20'
               : 'border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-800'
           }`}>
-            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.settingsCurrentVersion')}</span>
+            <span className="text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">{t('extension.settingsCurrentVersion')}</span>
             <div className="flex items-center gap-2">
               {isInstalled && outdated && (
                 <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
@@ -953,20 +953,20 @@ function ExtensionSettingsPanel() {
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
             <Search className="h-4 w-4 text-blue-500" />
-            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.featureSearch')}</span>
+            <span className="text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">{t('extension.featureSearch')}</span>
             {isInstalled ? (
               <CheckCircle2 className="ml-auto h-4 w-4 text-green-500" />
             ) : (
-              <XCircle className="ml-auto h-4 w-4 text-neutral-300 dark:text-neutral-600" />
+              <XCircle className="ml-auto h-4 w-4 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600" />
             )}
           </div>
           <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
             <FileText className="h-4 w-4 text-blue-500" />
-            <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.featureFetch')}</span>
+            <span className="text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">{t('extension.featureFetch')}</span>
             {isInstalled ? (
               <CheckCircle2 className="ml-auto h-4 w-4 text-green-500" />
             ) : (
-              <XCircle className="ml-auto h-4 w-4 text-neutral-300 dark:text-neutral-600" />
+              <XCircle className="ml-auto h-4 w-4 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600" />
             )}
           </div>
         </div>
@@ -1013,7 +1013,7 @@ function WebContainerSettingsPanel() {
       <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-700">
-            <Terminal className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
+            <Terminal className="h-4 w-4 text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300" />
           </div>
           <div>
             <p className="text-sm font-medium text-secondary dark:text-foreground">
@@ -1062,7 +1062,7 @@ function WorkspaceLayoutPanel() {
   return (
     <div className="space-y-6 py-1">
       <div>
-        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+        <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
           {t('workspaceSettings.layout.title')}
         </h3>
         <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -1138,7 +1138,7 @@ function WorkspaceEditorPanel() {
   return (
     <div className="space-y-6 py-1">
       <div>
-        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+        <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
           {t('workspaceSettings.display.editorTitle')}
         </h3>
         <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -1199,7 +1199,7 @@ function WorkspaceShortcutsPanel({ onShowHelp }: { onShowHelp: () => void }) {
   return (
     <div className="space-y-6 py-1">
       <div>
-        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+        <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
           {t('workspaceSettings.shortcuts.title')}
         </h3>
         <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -1210,7 +1210,7 @@ function WorkspaceShortcutsPanel({ onShowHelp }: { onShowHelp: () => void }) {
       <div className="space-y-2">
         <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
           <div>
-            <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+            <div className="text-sm font-medium text-secondary dark:text-foreground">
               {t('workspaceSettings.shortcuts.showAllTitle')}
             </div>
             <div className="text-xs text-tertiary dark:text-muted">
@@ -1258,7 +1258,7 @@ function WorkspaceDataPanel() {
   return (
     <div className="space-y-6 py-1">
       <div>
-        <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+        <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
           {t('workspaceSettings.data.title')}
         </h3>
         <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -1269,7 +1269,7 @@ function WorkspaceDataPanel() {
       <div className="space-y-4">
         <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
           <div>
-            <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+            <div className="text-sm font-medium text-secondary dark:text-foreground">
               {t('workspaceSettings.data.recentFilesTitle')}
             </div>
             <div className="text-xs text-tertiary dark:text-muted">
@@ -1295,7 +1295,7 @@ function WorkspaceDataPanel() {
         </div>
 
         <div className="border-subtle border-t pt-4">
-          <h4 className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">
+          <h4 className="mb-2 text-sm font-medium text-secondary dark:text-foreground">
             {t('workspaceSettings.data.resetAllTitle')}
           </h4>
           <p className="mb-3 text-xs text-tertiary dark:text-muted">

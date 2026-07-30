@@ -305,15 +305,15 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
       <div key={entry.name} style={{ paddingLeft: depth * 16 }}>
         <div className="flex items-center gap-1.5 py-0.5 text-sm">
           {entry.kind === 'directory' ? (
-            <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+            <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
           ) : (
-            <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+            <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
           )}
           <span className={cn(
             'truncate',
             entry.name.toLowerCase() === 'skill.md'
               ? 'font-medium text-blue-600 dark:text-blue-400'
-              : 'text-neutral-600 dark:text-neutral-400',
+              : 'text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400',
           )}>
             {entry.name}
           </span>
@@ -331,7 +331,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
       {status === 'confirm' && pending ? (
         <div className="space-y-3">
           {/* Source badge (folder vs zip) */}
-          <div className="flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center gap-1.5 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {pending.isZip ? (
               <><FileArchive className="h-3.5 w-3.5" /> ZIP archive</>
             ) : (
@@ -342,7 +342,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
           {/* Target path */}
           {pending.isBundle ? (
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {t('skillUpload.confirmTarget') || 'Import Target'}
               </p>
               <p className="text-sm text-neutral-800 dark:text-foreground">
@@ -352,7 +352,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
             </div>
           ) : (
             <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {t('skillUpload.confirmTarget') || 'Import Target'}
               </p>
               <p className="font-mono text-sm text-neutral-800 dark:text-foreground">
@@ -379,19 +379,19 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
                 <FolderOpen className="h-4 w-4 text-neutral-500" />
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {pending.bundleSkills?.length ?? 0} {t('skillUpload.skillsLabel') || 'skills'}
                 </span>
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   ({pending.fileCount} {t('skillUpload.files') || 'files'})
                 </span>
               </div>
               <div className="max-h-40 space-y-1 overflow-y-auto p-3">
                 {pending.bundleSkills?.map((s) => (
                   <div key={s.dirName} className="flex items-center gap-1.5 py-0.5 text-sm">
-                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
-                    <span className="font-mono text-neutral-700 dark:text-neutral-300">{s.dirName}</span>
-                    <span className="text-xs text-neutral-400 dark:text-neutral-500">({s.fileCount})</span>
+                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+                    <span className="font-mono text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">{s.dirName}</span>
+                    <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">({s.fileCount})</span>
                   </div>
                 ))}
               </div>
@@ -400,10 +400,10 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
                 <FolderOpen className="h-4 w-4 text-neutral-500" />
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {pending.dirName}
                 </span>
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   ({pending.fileCount} {t('skillUpload.files') || 'files'})
                 </span>
               </div>
@@ -422,7 +422,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
           )}
         >
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-500" />
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('skillUpload.uploading') || 'Importing...'}
           </p>
         </div>
@@ -454,7 +454,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
         >
           <AlertCircle className="h-8 w-8 text-red-500" />
           <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>
-          <p className="text-xs text-neutral-400 dark:text-neutral-500">
+          <p className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('skillUpload.retryHint') || 'Click to try again'}
           </p>
         </div>
@@ -478,16 +478,16 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
               'h-8 w-8 transition-colors',
               status === 'dragover'
                 ? 'text-blue-500'
-                : 'text-neutral-400 dark:text-neutral-500',
+                : 'text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500',
             )}
           />
           <div className="text-center">
-            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <p className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {status === 'dragover'
                 ? (t('skillUpload.dropHere') || 'Drop skill folder or .zip here')
                 : (t('skillUpload.dropOrClick') || 'Drop a skill folder or .zip here, or click to browse')}
             </p>
-            <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+            <p className="mt-1 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('skillUpload.requirement') || 'Must contain a SKILL.md file'}
             </p>
           </div>

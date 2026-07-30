@@ -264,7 +264,7 @@ function WorkflowEditorInner({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
+            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             {t('workflowEditorDialog.back')}
@@ -284,7 +284,7 @@ function WorkflowEditorInner({
           {templateId && (
             <>
               <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700" />
-              <span className="text-xs text-neutral-400 dark:text-neutral-500">
+              <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {getDisplayName()}
               </span>
             </>
@@ -314,7 +314,7 @@ function WorkflowEditorInner({
                 {customWorkflows.length > 0 && (
                   <>
                     <BrandSelectGroup>
-                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                         {t('workflowEditorDialog.myWorkflows')}
                       </div>
                       {customWorkflows.map((workflow) => (
@@ -335,7 +335,7 @@ function WorkflowEditorInner({
 
                 {/* Built-in templates group */}
                 <BrandSelectGroup>
-                  <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                  <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                     {t('workflowEditorDialog.builtInTemplates')}
                   </div>
                   {builtInTemplates.map((template) => (
@@ -351,7 +351,7 @@ function WorkflowEditorInner({
           <BrandDialogClose asChild>
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
               aria-label={t('workflowEditorDialog.close')}
             >
               <X className="h-4 w-4" />

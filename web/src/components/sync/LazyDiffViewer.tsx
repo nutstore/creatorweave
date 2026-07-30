@@ -343,7 +343,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
   function renderToolbar() {
     return (
       <div className="flex h-8 shrink-0 items-center gap-2 border-b border-subtle bg-neutral-50/50 px-2 dark:bg-neutral-900/50">
-        <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
+        <span className="text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {stats.hunks === 1
             ? t('sidebar.lazyDiffViewer.oneChangeBlock', { additions: stats.additions, deletions: stats.deletions })
             : t('sidebar.lazyDiffViewer.changeBlocks', { count: stats.hunks, additions: stats.additions, deletions: stats.deletions })
@@ -357,7 +357,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
                 <button
                   type="button"
                   onClick={onToggleSplitView}
-                  className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
                 >
                   {isSplitView ? <UnfoldVertical className="h-3.5 w-3.5" /> : <Columns2 className="h-3.5 w-3.5" />}
                 </button>
@@ -375,7 +375,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
                 <button
                   type="button"
                   onClick={onSwitchToMonaco}
-                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
+                  className="inline-flex h-6 items-center gap-1 rounded px-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-200/60 hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700/60 dark:hover:text-neutral-300"
                 >
                   <Code className="h-3 w-3" />
                   {t('sidebar.lazyDiffViewer.fullEditor')}
@@ -402,7 +402,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
         key={`load-${direction}-${hunkIndex}`}
         type="button"
         onClick={() => expandContext(hunkIndex, direction)}
-        className="flex w-full items-center justify-center gap-1.5 py-1.5 text-[11px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+        className="flex w-full items-center justify-center gap-1.5 py-1.5 text-[11px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
       >
         {direction === 'above' ? (
           <ChevronUp className="h-3 w-3" />
@@ -410,7 +410,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
           <ChevronDown className="h-3 w-3" />
         )}
         {t('sidebar.lazyDiffViewer.loadMore', { count: loadCount })}
-        <span className="text-neutral-300 dark:text-neutral-600">
+        <span className="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
           ({remaining} {t('sidebar.lazyDiffViewer.remaining')})
         </span>
       </button>
@@ -494,21 +494,21 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
             }`}
           >
             <span
-              className={lineNoClassName('original', lineNo, 'text-neutral-300 dark:text-neutral-600')}
+              className={lineNoClassName('original', lineNo, 'text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600')}
               onClick={(e) => handleLineClick('original', lineNo, e)}
             >
               {lineNo}
             </span>
             <span
-              className={lineNoClassName('modified', lineNo, 'text-neutral-300 dark:text-neutral-600')}
+              className={lineNoClassName('modified', lineNo, 'text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600')}
               onClick={(e) => handleLineClick('modified', lineNo, e)}
             >
               {lineNo}
             </span>
-            <span className="w-5 shrink-0 select-none text-center text-neutral-300 dark:text-neutral-600">
+            <span className="w-5 shrink-0 select-none text-center text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
               {commented && <MessageSquare className="inline h-2.5 w-2.5 text-amber-400 dark:text-amber-500" />}
             </span>
-            <span className="whitespace-pre-wrap break-all text-neutral-500 dark:text-neutral-400">
+            <span className="whitespace-pre-wrap break-all text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {oldLines[idx]}
             </span>
           </div>
@@ -529,21 +529,21 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
             }`}
           >
             <span
-              className={lineNoClassName('original', lineNo, 'text-neutral-300 dark:text-neutral-600')}
+              className={lineNoClassName('original', lineNo, 'text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600')}
               onClick={(e) => handleLineClick('original', lineNo, e)}
             >
               {lineNo}
             </span>
             <span
-              className={lineNoClassName('modified', lineNo, 'text-neutral-300 dark:text-neutral-600')}
+              className={lineNoClassName('modified', lineNo, 'text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600')}
               onClick={(e) => handleLineClick('modified', lineNo, e)}
             >
               {lineNo}
             </span>
-            <span className="w-5 shrink-0 select-none text-center text-neutral-300 dark:text-neutral-600">
+            <span className="w-5 shrink-0 select-none text-center text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">
               {commented && <MessageSquare className="inline h-2.5 w-2.5 text-amber-400 dark:text-amber-500" />}
             </span>
-            <span className="whitespace-pre-wrap break-all text-neutral-500 dark:text-neutral-400">
+            <span className="whitespace-pre-wrap break-all text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {oldLines[idx]}
             </span>
           </div>
@@ -665,7 +665,7 @@ const LazyDiffViewer: React.FC<LazyDiffViewerProps> = ({
     return (
       <div className="flex h-full flex-col">
         {renderToolbar()}
-        <div className="flex flex-1 items-center justify-center text-sm text-neutral-400 dark:text-neutral-500">
+        <div className="flex flex-1 items-center justify-center text-sm text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {t('sidebar.lazyDiffViewer.noChanges')}
         </div>
       </div>

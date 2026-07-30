@@ -493,7 +493,7 @@ export function ActivityHeatmap() {
                     onClick={() => handleRangeChange(r)}
                     className={`home-body px-2 sm:px-2.5 py-1 text-[11px] rounded-md transition-all ${
                       isActive
-                        ? 'bg-card dark:bg-card text-primary dark:text-primary-foreground shadow-sm'
+                        ? 'bg-card dark:bg-card text-secondary dark:text-foreground shadow-sm'
                         : 'text-tertiary dark:text-muted hover:text-secondary dark:hover:text-secondary-foreground'
                     }`}
                   >
@@ -509,7 +509,7 @@ export function ActivityHeatmap() {
                 {totalDocs > 0 && (
                   <div className="flex items-center gap-1">
                     <FileText className="w-3 h-3 text-primary/70" />
-                    <span className="home-mono text-sm font-medium text-primary dark:text-primary-foreground">
+                    <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
                       {totalDocs}
                     </span>
                     <span className="home-mono text-[10px] text-tertiary dark:text-muted">
@@ -522,7 +522,7 @@ export function ActivityHeatmap() {
                     <div className="w-px h-3 bg-border" />
                     <div className="flex items-center gap-1">
                       <MessageSquare className="w-3 h-3 text-primary/70" />
-                      <span className="home-mono text-sm font-medium text-primary dark:text-primary-foreground">
+                      <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
                         {totalChats}
                       </span>
                       <span className="home-mono text-[10px] text-tertiary dark:text-muted">
@@ -535,7 +535,7 @@ export function ActivityHeatmap() {
                   <>
                     <div className="w-px h-3 bg-border" />
                     <div className="flex items-center gap-1">
-                      <span className="home-mono text-sm font-medium text-primary dark:text-primary-foreground">
+                      <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
                         {activeDays}
                       </span>
                       <span className="home-mono text-[10px] text-tertiary dark:text-muted">
@@ -762,7 +762,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
         style={{ animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
-          <span className="home-body text-sm font-medium text-primary dark:text-primary-foreground">
+          <span className="home-body text-sm font-medium text-secondary dark:text-foreground">
             {cell.date}
           </span>
           <button
@@ -811,7 +811,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
               </div>
             </div>
             {item.badge && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary dark:text-primary-foreground shrink-0">
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-secondary dark:text-foreground shrink-0">
                 {item.badge}
               </span>
             )}
@@ -832,7 +832,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
       style={{ animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
     >
       <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
-        <span className="home-body text-sm font-medium text-primary dark:text-primary-foreground">
+        <span className="home-body text-sm font-medium text-secondary dark:text-foreground">
           {t('projectHome.activity.dayWork', { date: cell.date })}
         </span>
         <button

@@ -14,7 +14,7 @@ export function SidebarPanelHeader({ title, leftExtra, right }: SidebarPanelHead
   return (
     <div className="border-subtle flex h-9 items-center justify-between border-b bg-elevated px-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-xs font-semibold uppercase tracking-wider text-primary">{title}</span>
+        <span className="truncate text-xs font-semibold uppercase tracking-wider text-secondary">{title}</span>
         {leftExtra}
       </div>
       {right}

@@ -305,7 +305,7 @@ export function FileComparison({
     return (
       <div className="flex flex-col">
         <div className="flex border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800">
-          <div className="flex-1 border-r border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 dark:text-neutral-300">
+          <div className="flex-1 border-r border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:border-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             Original
           </div>
           <div className="flex-1 px-3 py-1.5 text-xs font-medium text-neutral-700">Modified</div>

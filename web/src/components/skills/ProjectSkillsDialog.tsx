@@ -36,11 +36,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   testing: 'border-success-200 bg-success-50 text-success-text dark:border-green-900/40 dark:bg-green-950/20 dark:text-green-300',
   debugging: 'border-danger-200 bg-danger-50 text-danger dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300',
   refactoring: 'border-warning-200 bg-warning-50 text-warning dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300',
-  documentation: 'border-neutral-200 bg-secondary text-text-secondary dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+  documentation: 'border-neutral-200 bg-secondary text-text-secondary dark:border-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300',
   security: 'border-danger-200 bg-danger-50 text-danger dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300',
   performance: 'border-primary-100 bg-primary-50 text-primary-600 dark:border-primary-100/40 dark:bg-primary-50/20 dark:text-primary-700',
   architecture: 'border-primary-100 bg-primary-50 text-primary-600 dark:border-primary-100/40 dark:bg-primary-50/20 dark:text-primary-700',
-  general: 'border-neutral-200 bg-secondary text-text-secondary dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
+  general: 'border-neutral-200 bg-secondary text-text-secondary dark:border-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300',
 }
 
 export function ProjectSkillsDialog({
@@ -138,7 +138,7 @@ export function ProjectSkillsDialog({
               <BrandDialogTitle className="px-0 text-base font-semibold">
                 {t('skills.projectDialog.title')}
               </BrandDialogTitle>
-              <p className="mt-1 text-xs leading-relaxed dark:text-neutral-400">
+              <p className="mt-1 text-xs leading-relaxed text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('skills.projectDialog.description', { count: skills.length })}
               </p>
             </div>
@@ -150,7 +150,7 @@ export function ProjectSkillsDialog({
           <button
             type="button"
             onClick={toggleAll}
-            className="flex items-center gap-2 text-sm transition-colors hover:text-neutral-900 focus:outline-none dark:text-neutral-300 dark:hover:text-foreground"
+            className="flex items-center gap-2 text-sm transition-colors hover:text-neutral-900 focus:outline-none text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:text-foreground"
           >
             <div
               className={cn(
@@ -172,9 +172,9 @@ export function ProjectSkillsDialog({
               ? t('skills.projectDialog.deselectAll')
               : t('skills.projectDialog.selectAll')}
           </button>
-          <span className="text-xs dark:text-neutral-500">
+          <span className="text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('skills.projectDialog.selected')}{' '}
-            <span className="font-medium dark:text-neutral-300">{selectedIds.size}</span> / {skills.length}
+            <span className="font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300">{selectedIds.size}</span> / {skills.length}
           </span>
         </div>
 
@@ -272,12 +272,12 @@ function SkillListItem({
           <p
             className={cn(
               'mt-1.5 line-clamp-2 text-xs leading-relaxed',
-              selected ? 'dark:text-neutral-300' : 'dark:text-neutral-400'
+              selected ? 'text-neutral-300 text-neutral-300 dark:text-neutral-300' : 'text-neutral-400 text-neutral-400 dark:text-neutral-400'
             )}
           >
             {skill.description}
           </p>
-        <div className="mt-2.5 flex items-center gap-1.5 text-xs dark:text-neutral-500">
+        <div className="mt-2.5 flex items-center gap-1.5 text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">
           <FolderOpen className="h-3.5 w-3.5" />
           <span className="font-mono">{getPath(skill.id)}</span>
         </div>

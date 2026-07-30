@@ -30,7 +30,7 @@ export function UnsupportedBrowser() {
               <h3 className="text-xl font-semibold text-foreground">Browser Not Supported</h3>
             </div>
 
-            <p className="mb-6 text-neutral-700 dark:text-neutral-300">
+            <p className="mb-6 text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               Your browser does not support the File System Access API. Please use one of the
               following browsers:
             </p>

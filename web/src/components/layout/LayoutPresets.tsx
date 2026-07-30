@@ -171,7 +171,7 @@ export function AnalystLayout({ sidebar, conversation, dataView, chartView }: An
           {chartView ? (
             <div className="h-full bg-neutral-50 p-4 dark:bg-neutral-900">{chartView}</div>
           ) : (
-            <div className="flex h-full items-center justify-center bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-500">
+            <div className="flex h-full items-center justify-center bg-neutral-50 text-neutral-400 dark:bg-neutral-900 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               <span>Chart (coming soon)</span>
             </div>
           )}
@@ -220,7 +220,7 @@ export function ReaderLayout({ sidebar, conversation, document, notes }: ReaderL
           {notes ? (
             <div className="h-full overflow-auto bg-yellow-50 p-4 dark:bg-amber-950/20">{notes}</div>
           ) : (
-            <div className="flex h-full items-center justify-center bg-yellow-50 text-neutral-400 dark:bg-amber-950/20 dark:text-neutral-500">
+            <div className="flex h-full items-center justify-center bg-yellow-50 text-neutral-400 dark:bg-amber-950/20 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               <span>Notes (coming soon)</span>
             </div>
           )}

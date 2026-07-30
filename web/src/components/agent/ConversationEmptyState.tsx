@@ -18,7 +18,7 @@ export function ConversationEmptyState() {
           <h3 className="mb-2 text-lg font-semibold text-foreground">
             {t('conversation.empty.title')}
           </h3>
-          <p className="max-w-md text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+          <p className="max-w-md text-sm leading-relaxed text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('conversation.empty.description')}
           </p>
         </div>

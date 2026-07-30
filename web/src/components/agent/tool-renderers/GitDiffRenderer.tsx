@@ -89,7 +89,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
           {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
-          {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
+          {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
         </>
       )
@@ -101,7 +101,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
         {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
-        {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
+        {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1 shrink-0">
           <span className="text-xs text-neutral-400">{filesChanged} file{filesChanged !== 1 ? 's' : ''}</span>
           {insertions > 0 && <span className="text-xs text-green-500 dark:text-green-400">+{insertions}</span>}
@@ -118,13 +118,13 @@ registerRenderer({
     if (!diff) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">No changes</div>
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No changes</div>
       )
     }
 
     if (diff.files.length === 0) {
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">No changes</div>
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No changes</div>
       )
     }
 
@@ -132,7 +132,7 @@ registerRenderer({
 
     return (
       <div className="px-3 py-2 space-y-2">
-        <div className="flex items-center gap-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="flex items-center gap-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {MODE_LABELS[mode] && <span>{MODE_LABELS[mode]}</span>}
           {path && <span className="font-mono truncate">{path}</span>}
         </div>
@@ -147,7 +147,7 @@ registerRenderer({
                   status === 'D' ? 'text-red-500' :
                   'text-yellow-500'
                 }>{status}</span>
-                <span className="truncate text-neutral-600 dark:text-neutral-300">{f.path}</span>
+                <span className="truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">{f.path}</span>
                 {(f.additions ?? 0) > 0 && <span className="text-green-500 text-[10px] ml-auto">+{f.additions}</span>}
                 {(f.deletions ?? 0) > 0 && <span className="text-red-400 text-[10px]">-{f.deletions}</span>}
               </div>

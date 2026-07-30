@@ -99,7 +99,7 @@ export function AddNodeToolbar() {
           'dark:border-neutral-700/60 dark:bg-neutral-900/95'
         )}
       >
-        <span className="px-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+        <span className="px-1.5 text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {t('workflowEditor.add')}
         </span>
 

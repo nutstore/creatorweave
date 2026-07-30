@@ -46,7 +46,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
   return (
     <div className="mt-1 w-full max-w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-left dark:border-neutral-700 dark:bg-neutral-800/50">
       {/* Header */}
-      <div className="flex items-center gap-1.5 border-b border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
+      <div className="flex items-center gap-1.5 border-b border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
         <Globe className="h-3.5 w-3.5 shrink-0 text-primary-500 dark:text-primary-500" />
         <span>{t('conversation.pageContextTitle')}</span>
       </div>
@@ -55,18 +55,18 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
       <dl className="space-y-1 px-3 py-2 text-[11px] leading-relaxed">
         {hostname && (
           <div className="flex items-start gap-1.5">
-            <Globe className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 dark:text-neutral-500" />
-            <dt className="shrink-0 text-neutral-400 dark:text-neutral-500">
+            <Globe className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+            <dt className="shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('conversation.pageContextWebsite')}:
             </dt>
-            <dd className="min-w-0 break-all text-neutral-700 dark:text-neutral-300">{hostname}</dd>
+            <dd className="min-w-0 break-all text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">{hostname}</dd>
           </div>
         )}
 
         {url && (
           <div className="flex items-start gap-1.5">
-            <Link2 className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 dark:text-neutral-500" />
-            <dt className="shrink-0 text-neutral-400 dark:text-neutral-500">
+            <Link2 className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+            <dt className="shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('conversation.pageContextUrl')}:
             </dt>
             <dd className="min-w-0 flex-1">
@@ -85,21 +85,21 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
 
         {title && (
           <div className="flex items-start gap-1.5">
-            <Type className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 dark:text-neutral-500" />
-            <dt className="shrink-0 text-neutral-400 dark:text-neutral-500">
+            <Type className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+            <dt className="shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('conversation.pageContextPageTitle')}:
             </dt>
-            <dd className="min-w-0 break-all text-neutral-700 dark:text-neutral-300">{title}</dd>
+            <dd className="min-w-0 break-all text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">{title}</dd>
           </div>
         )}
 
         {selectedText && (
           <div className="flex items-start gap-1.5">
-            <TextQuote className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 dark:text-neutral-500" />
-            <dt className="shrink-0 text-neutral-400 dark:text-neutral-500">
+            <TextQuote className="mt-0.5 h-3 w-3 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+            <dt className="shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('conversation.pageContextSelectedText')}:
             </dt>
-            <dd className="min-w-0 flex-1 text-neutral-700 dark:text-neutral-300">
+            <dd className="min-w-0 flex-1 text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               <span className="break-words">
                 {showFullText ? selectedText : truncatedText}
               </span>
@@ -124,7 +124,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
         <div className="border-t border-neutral-200 dark:border-neutral-700">
           <button
             type="button"
-            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+            className="flex w-full items-center gap-1.5 px-3 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
             onClick={() => setShowRaw((v) => !v)}
             aria-expanded={showRaw}
           >
@@ -137,7 +137,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
             <span>{t('conversation.pageContextRawData')}</span>
           </button>
           {showRaw && (
-            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words px-3 pb-2 text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words px-3 pb-2 text-[10px] leading-relaxed text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {typeof pageContext.providerContext === 'string'
                 ? pageContext.providerContext
                 : JSON.stringify(pageContext.providerContext, null, 2)}

@@ -138,10 +138,10 @@ export function KeyboardShortcutsHelp({
                       key={`${category}-${idx}`}
                       className="flex items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
                     >
-                      <span className="text-neutral-700 dark:text-neutral-300">
+                      <span className="text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                         {shortcut.description}
                       </span>
-                      <kbd className="border-subtle rounded border bg-white px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400">
+                      <kbd className="border-subtle rounded border bg-white px-2 py-0.5 text-xs text-neutral-600 dark:bg-neutral-900 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                         {formatShortcutKey(shortcut)}
                       </kbd>
                     </div>

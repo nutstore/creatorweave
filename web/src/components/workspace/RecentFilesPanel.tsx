@@ -65,7 +65,7 @@ export function RecentFilesPanel({ onFileSelect, className = '' }: RecentFilesPa
     <div className={`flex flex-col ${className}`}>
       {/* Header */}
       <div className="border-subtle flex items-center justify-between border-b px-3 py-2">
-        <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">
+        <h3 className="text-sm font-semibold text-secondary dark:text-foreground">
           {t('recentFiles.title') || 'Recent Files'}
         </h3>
         <BrandButton

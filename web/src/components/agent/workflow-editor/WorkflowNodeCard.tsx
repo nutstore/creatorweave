@@ -94,7 +94,7 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
             <div className={cn('text-[11px] font-semibold tracking-wide', config.color)}>
               {getKindLabel(kind, t)}
             </div>
-            <div className="truncate text-[10px] text-neutral-400 dark:text-neutral-500">
+            <div className="truncate text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {data.agentRole}
             </div>
           </div>
@@ -113,7 +113,7 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
         {/* Task preview */}
         {data.taskInstruction && (
           <div className="px-4 pb-2.5 pt-0.5">
-            <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+            <p className="line-clamp-2 text-[10px] leading-relaxed text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {data.taskInstruction}
             </p>
           </div>
@@ -121,14 +121,14 @@ function WorkflowNodeCard({ data, selected }: NodeProps<Node<WorkflowNodeData>>)
 
         {/* Config summary */}
         <div className="flex items-center gap-2 border-t border-neutral-100 px-4 py-1.5 dark:border-neutral-800">
-          <div className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center gap-1 text-[9px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <span>{t('workflowEditor.retry')}</span>
-            <span className="font-medium text-neutral-500 dark:text-neutral-400">{data.maxRetries}</span>
+            <span className="font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{data.maxRetries}</span>
           </div>
           <div className="h-2 w-px bg-neutral-100 dark:bg-neutral-800" />
-          <div className="flex items-center gap-1 text-[9px] text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center gap-1 text-[9px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <span>{t('workflowEditor.timeoutSec')}</span>
-            <span className="font-medium text-neutral-500 dark:text-neutral-400">
+            <span className="font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {data.timeoutMs >= 1000 ? `${data.timeoutMs / 1000}s` : `${data.timeoutMs}ms`}
             </span>
           </div>

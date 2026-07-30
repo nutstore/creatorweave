@@ -79,7 +79,7 @@ registerRenderer({
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">page_screenshot</code>
-        <span className="text-neutral-400 dark:text-neutral-500 text-xs">viewport</span>
+        <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 text-xs">viewport</span>
         {img && (
           <span className="ml-auto text-neutral-400 text-xs shrink-0">
             {format.toUpperCase()} · {formatBytes(img.data)}
@@ -107,13 +107,13 @@ registerRenderer({
     if (!img) {
       if (ctx.isExecuting) {
         return (
-          <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
+          <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             Capturing screenshot…
           </div>
         )
       }
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           No screenshot data available
         </div>
       )
@@ -134,7 +134,7 @@ registerRenderer({
             style={{ opacity: loaded ? 1 : 0.5, transition: 'opacity 200ms' }}
           />
         </div>
-        <div className="flex items-center justify-between text-[10px] text-neutral-400 dark:text-neutral-500">
+        <div className="flex items-center justify-between text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           <span>
             {img.mimeType} · {formatBytes(img.data)}
           </span>

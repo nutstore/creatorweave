@@ -176,7 +176,7 @@ registerRenderer({
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
-          {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
+          {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
         </>
       )
@@ -185,7 +185,7 @@ registerRenderer({
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
-        {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
+        {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1.5 shrink-0">
           <span className="text-xs text-neutral-400">{log.commits.length}{log.hasMore ? '+' : ''} commits</span>
         </span>
@@ -198,11 +198,11 @@ registerRenderer({
 
     if (!log) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
-      return <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">No commits found</div>
+      return <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No commits found</div>
     }
 
     if (log.commits.length === 0) {
-      return <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">No commits yet</div>
+      return <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">No commits yet</div>
     }
 
     const outputText = extractOutputText(ctx)
@@ -233,11 +233,11 @@ registerRenderer({
                 <span className={statusColor(commit.status)}>{commit.status}</span>
               </div>
               {/* Second line: meta */}
-              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 <span className="font-mono">{shortId(commit.id)}</span>
                 <span>{fmtDate(commit.createdAt)}</span>
                 {commit.workspaceName && (
-                  <span className="px-1 py-0 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 truncate max-w-[150px]">
+                  <span className="px-1 py-0 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 truncate max-w-[150px]">
                     {commit.workspaceName}
                   </span>
                 )}
@@ -249,7 +249,7 @@ registerRenderer({
         ))}
 
         {log.hasMore && (
-          <div className="flex items-center gap-1 text-[10px] text-neutral-400 dark:text-neutral-500 pt-1">
+          <div className="flex items-center gap-1 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 pt-1">
             <MoreHorizontal className="w-3 h-3" />
             <span>more commits available</span>
           </div>
@@ -280,7 +280,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
           {snapshotId && (
-            <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
+            <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {shortId(snapshotId)}
             </span>
           )}
@@ -295,7 +295,7 @@ registerRenderer({
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
-        <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
+        <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {shortId(show.id)}
         </span>
         <span className="ml-auto flex items-center gap-1 shrink-0">
@@ -312,7 +312,7 @@ registerRenderer({
 
     if (!show) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
-      return <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">Commit not found</div>
+      return <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">Commit not found</div>
     }
 
     const outputText = extractOutputText(ctx)
@@ -332,10 +332,10 @@ registerRenderer({
               {show.summary.split('\n')[0]}
             </div>
           )}
-          <div className="flex items-center gap-2 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center gap-2 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <span>{fmtDate(show.createdAt)}</span>
             {show.workspaceName && (
-              <span className="px-1 py-0 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400">
+              <span className="px-1 py-0 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {show.workspaceName}
               </span>
             )}
@@ -344,7 +344,7 @@ registerRenderer({
 
         {/* Changed files */}
         <div className="space-y-0.5">
-          <div className="text-[10px] text-neutral-400 dark:text-neutral-500 mb-0.5">
+          <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-0.5">
             Changed files ({show.files.length})
           </div>
           {show.files.map((f, i) => {
@@ -357,7 +357,7 @@ registerRenderer({
                 style={{ animation: `tool-row-in .2s ease-out ${i * 30}ms backwards` }}
               >
                 <span className={opTypeColor(f.opType)}>{code}</span>
-                <span className="truncate text-neutral-600 dark:text-neutral-300">{f.path}</span>
+                <span className="truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">{f.path}</span>
                 {/* Size change or diff stats */}
                 {diffFile ? (
                   <>

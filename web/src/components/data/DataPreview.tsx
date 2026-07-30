@@ -80,7 +80,7 @@ function StatsPanel({ columns, stats }: { columns: ColumnInfo[]; stats: Map<stri
               className="rounded-md border border bg-card p-3 text-xs dark:border-border dark:bg-card"
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className="font-medium text-primary dark:text-primary-foreground">{column.name}</span>
+                <span className="font-medium text-secondary dark:text-foreground">{column.name}</span>
                 <span
                   className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${getTypeColor(column.type)}`}
                 >
@@ -269,7 +269,7 @@ export function DataPreview({ data, fileType, onError }: DataPreviewProps) {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">Data Preview</h3>
+          <h3 className="text-lg font-semibold text-secondary dark:text-foreground">Data Preview</h3>
           <p className="text-sm text-tertiary dark:text-muted">
             {parsedData.rowCount} rows × {parsedData.columnCount} columns
           </p>

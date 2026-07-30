@@ -1131,7 +1131,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
           <span className="text-sm font-medium dark:text-foreground">{result.title}</span>
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isReady ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="text-xs dark:text-neutral-400">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
+            <span className="text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
           </div>
         </div>
       )}
@@ -1149,7 +1149,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs dark:text-neutral-500">Plugin API v1.0</span>
+          <span className="text-xs text-neutral-500 text-neutral-500 dark:text-neutral-500">Plugin API v1.0</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1158,7 +1158,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload()
             }}
-            className="text-xs hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
+            className="text-xs hover:text-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Refresh
           </button>
@@ -1175,7 +1175,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
               </h3>
               <button
                 onClick={() => setModalContent(null)}
-                className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
                 ✕
               </button>

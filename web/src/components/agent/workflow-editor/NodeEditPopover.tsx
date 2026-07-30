@@ -108,7 +108,7 @@ export function NodeEditPopover({
       <div className="space-y-2.5 p-3">
         {/* Kind selector */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.kind')}
           </label>
           <BrandSelect
@@ -130,7 +130,7 @@ export function NodeEditPopover({
 
         {/* Agent Role */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.role')}
           </label>
           <BrandInput
@@ -143,7 +143,7 @@ export function NodeEditPopover({
 
         {/* Output Key */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.outputKey')}
           </label>
           <BrandInput
@@ -155,7 +155,7 @@ export function NodeEditPopover({
 
         {/* Task Instruction */}
         <div>
-          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+          <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.taskInstruction')}
           </label>
           <BrandTextarea
@@ -164,7 +164,7 @@ export function NodeEditPopover({
             rows={3}
             className="min-h-[64px] resize-y px-2.5 py-1.5 text-xs leading-relaxed"
           />
-          <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <p className="mt-1 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.taskInstructionHint')}
           </p>
         </div>
@@ -175,7 +175,7 @@ export function NodeEditPopover({
             checked={data.isEntry}
             onCheckedChange={(checked) => handleChange({ isEntry: checked === true })}
           />
-          <label className="text-xs text-neutral-600 dark:text-neutral-300">
+          <label className="text-xs text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             {t('workflowEditor.setAsWorkflowEntry')}
           </label>
         </div>
@@ -183,7 +183,7 @@ export function NodeEditPopover({
         {/* Retry + Timeout row */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('workflowEditor.maxRetries')}
             </label>
             <BrandInput
@@ -196,7 +196,7 @@ export function NodeEditPopover({
             />
           </div>
           <div>
-            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('workflowEditor.timeout')}
             </label>
             <BrandInput

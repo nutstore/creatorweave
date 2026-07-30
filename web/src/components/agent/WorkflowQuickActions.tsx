@@ -61,7 +61,7 @@ function MiniPipeline({ kinds }: { kinds: string[] }) {
               className={cn(
                 'inline-flex items-center gap-0.5 rounded px-1 py-px text-[10px] font-medium',
                 cfg?.bg || 'bg-neutral-100 dark:bg-neutral-700',
-                cfg?.color || 'text-neutral-600 dark:text-neutral-300'
+                cfg?.color || 'text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300'
               )}
             >
               {Icon && <Icon className="h-2.5 w-2.5" />}
@@ -237,7 +237,7 @@ export function WorkflowQuickActions({
             'hover:border-neutral-300 hover:bg-neutral-100',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700',
+            'dark:border-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:border-neutral-600 dark:hover:bg-neutral-700',
             popoverOpen && 'border-neutral-300 bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-700'
           )}
         >
@@ -257,7 +257,7 @@ export function WorkflowQuickActions({
           {/* Header */}
           <div>
             <h4 className="text-sm font-medium text-foreground">{t('workflow.label')}</h4>
-            <p className="mt-0.5 text-[11px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+            <p className="mt-0.5 text-[11px] leading-relaxed text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('workflow.description')}
             </p>
           </div>
@@ -307,7 +307,7 @@ export function WorkflowQuickActions({
                   return (
                     <span key={`detail-${kind}-${i}`} className="flex items-center gap-1">
                       {i > 0 && (
-                        <span className="text-[10px] text-neutral-300 dark:text-neutral-600">→</span>
+                        <span className="text-[10px] text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">→</span>
                       )}
                       <span
                         className={cn(
@@ -331,7 +331,7 @@ export function WorkflowQuickActions({
             <button
               type="button"
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+              className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-[11px] text-neutral-500 transition-colors hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
             >
               <Settings2 className="h-3 w-3" />
               <span>{t('workflow.advancedSettings')}</span>
@@ -349,7 +349,7 @@ export function WorkflowQuickActions({
                     onCheckedChange={(checked) => setCustomRubricEnabled(checked === true)}
                     size="sm"
                   />
-                  <label htmlFor="wf-custom-rubric" className="text-[11px] text-neutral-600 dark:text-neutral-300">
+                  <label htmlFor="wf-custom-rubric" className="text-[11px] text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                     {t('workflow.enableCustomRubric')}
                   </label>
                 </div>
@@ -390,7 +390,7 @@ export function WorkflowQuickActions({
                       </div>
                     </div>
 
-                    <div className="space-y-1 text-[11px] text-neutral-600 dark:text-neutral-300">
+                    <div className="space-y-1 text-[11px] text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                       <div className="flex items-center gap-2">
                         <BrandCheckbox
                           id="wf-rule-paragraph"
@@ -487,7 +487,7 @@ export function WorkflowQuickActions({
                 'flex w-full items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs text-neutral-600 transition-colors',
                 'hover:border-neutral-400 hover:bg-neutral-100',
                 'disabled:cursor-not-allowed disabled:opacity-50',
-                'dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:border-neutral-500 dark:hover:bg-neutral-700'
+                'dark:border-neutral-600 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:border-neutral-500 dark:hover:bg-neutral-700'
               )}
             >
               <Workflow className="h-3.5 w-3.5" />
@@ -508,7 +508,7 @@ export function WorkflowQuickActions({
                 'flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-neutral-500 transition-colors',
                 'hover:bg-neutral-100 hover:text-neutral-700',
                 'disabled:cursor-not-allowed disabled:opacity-50',
-                'dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground'
+                'text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground'
               )}
             >
               <FolderOpen className="h-3.5 w-3.5" />

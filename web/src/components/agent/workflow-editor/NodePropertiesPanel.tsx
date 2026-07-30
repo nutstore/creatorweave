@@ -94,7 +94,7 @@ export function NodePropertiesPanel({
       <div className="flex h-full flex-col">
         {/* Header */}
         <div className="shrink-0 border-b border-neutral-200/80 px-3 py-2.5 dark:border-neutral-700/80">
-          <h3 className="text-[11px] font-semibold text-neutral-400 dark:text-neutral-500">
+          <h3 className="text-[11px] font-semibold text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.properties')}
           </h3>
         </div>
@@ -102,12 +102,12 @@ export function NodePropertiesPanel({
         {/* Empty state */}
         <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 text-center">
           <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
-            <MousePointer className="h-4 w-4 text-neutral-400 dark:text-neutral-500" />
+            <MousePointer className="h-4 w-4 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
           </div>
-          <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400">
+          <p className="text-[11px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('workflowEditor.selectNodeToEdit')}
           </p>
-          <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <p className="mt-1 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('workflowEditor.clickCanvasNode')}
           </p>
         </div>
@@ -141,7 +141,7 @@ export function NodePropertiesPanel({
             <h3 className="truncate text-[11px] font-semibold text-neutral-700 dark:text-foreground">
               {t(config.labelKey)}
             </h3>
-            <p className="text-[9px] text-neutral-400 dark:text-neutral-500">
+            <p className="text-[9px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {selectedNode.id.slice(0, 12)}...
             </p>
           </div>
@@ -211,7 +211,7 @@ export function NodePropertiesPanel({
             />
             <label
               htmlFor="is-entry"
-              className="cursor-pointer text-[11px] text-neutral-600 dark:text-neutral-300"
+              className="cursor-pointer text-[11px] text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300"
             >
               {t('workflowEditor.setAsWorkflowEntry')}
             </label>
@@ -248,7 +248,7 @@ export function NodePropertiesPanel({
           {/* Advanced Configuration Divider */}
           <div className="my-2 flex items-center gap-2">
             <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
-            <span className="text-[9px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            <span className="text-[9px] font-medium uppercase tracking-wider text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('workflowEditor.advancedConfig')}
             </span>
             <div className="h-px flex-1 bg-neutral-200 dark:bg-neutral-700" />
@@ -346,7 +346,7 @@ export function NodePropertiesPanel({
               <button
                 type="button"
                 onClick={() => handleChange({ modelConfig: undefined })}
-                className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                className="text-[10px] text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
                 {t('workflowEditor.resetToDefault')}
               </button>
@@ -372,7 +372,7 @@ export function NodePropertiesPanel({
                 />
               </Field>
               <div className="rounded-md bg-neutral-50 px-2 py-1.5 dark:bg-neutral-800">
-                <p className="text-[9px] text-neutral-500 dark:text-neutral-400">
+                <p className="text-[9px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   {t('workflowEditor.availableVariables')}{' '}
                   <code className="text-[9px] text-violet-600 dark:text-violet-400">
                     {'{{input}}'}
@@ -383,7 +383,7 @@ export function NodePropertiesPanel({
               <button
                 type="button"
                 onClick={() => handleChange({ promptTemplate: undefined })}
-                className="text-[10px] text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300"
+                className="text-[10px] text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300"
               >
                 {t('workflowEditor.useDefaultTemplate')}
               </button>
@@ -420,11 +420,11 @@ function Field({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <label className="text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        <label className="text-[10px] font-medium uppercase tracking-wider text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {label}
         </label>
         {hint && (
-          <span className="text-[9px] text-neutral-400 dark:text-neutral-500">{hint}</span>
+          <span className="text-[9px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{hint}</span>
         )}
       </div>
       {children}
@@ -454,8 +454,8 @@ function CollapsibleSection({
         className="flex w-full items-center justify-between px-2.5 py-2 text-left transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800"
       >
         <div className="flex items-center gap-1.5">
-          <Icon className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
-          <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300">
+          <Icon className="h-3 w-3 text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400" />
+          <span className="text-[10px] font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             {title}
           </span>
         </div>

@@ -62,7 +62,7 @@ export function ContextUsageBar({
       </span>
 
       <span
-        className="text-[11px] tabular-nums text-neutral-400 dark:text-neutral-500"
+        className="text-[11px] tabular-nums text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500"
         title={t('conversation.tokenBudget', { effectiveBudget: contextWindowUsage.maxTokens, modelMaxTokens, reserveTokens })}
       >
         {formatTokenCompact(contextWindowUsage.usedTokens)}

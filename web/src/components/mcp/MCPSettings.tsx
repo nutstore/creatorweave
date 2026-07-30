@@ -451,7 +451,7 @@ export function MCPSettings() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Plug className="h-4 w-4 text-secondary" />
-          <h3 className="text-sm font-semibold text-primary dark:text-primary-foreground">
+          <h3 className="text-sm font-semibold text-secondary dark:text-foreground">
             {tf('mcp.title', 'MCP Servers')}
           </h3>
           <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-secondary dark:bg-neutral-800 dark:text-muted">
@@ -704,7 +704,7 @@ export function MCPSettings() {
         </div>
       ) : servers.length === 0 && !showAddForm ? (
         <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-neutral-200 py-12 dark:border-neutral-700">
-          <Globe className="mb-3 h-8 w-8 text-neutral-300 dark:text-neutral-600" />
+          <Globe className="mb-3 h-8 w-8 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600" />
           <p className="text-sm font-medium text-secondary">{tf('mcp.empty.title', 'No MCP servers yet')}</p>
           <p className="mt-1 text-xs text-tertiary">{tf('mcp.empty.hint', 'Add a server to get started')}</p>
           <button
@@ -744,7 +744,7 @@ export function MCPSettings() {
                   {/* Name + meta */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className={`truncate text-sm font-medium ${!server.enabled ? 'text-tertiary line-through' : 'text-primary dark:text-primary-foreground'}`}>
+                      <span className={`truncate text-sm font-medium ${!server.enabled ? 'text-tertiary line-through' : 'text-secondary dark:text-foreground'}`}>
                         {server.name}
                       </span>
                       {server.type === 'builtin' && (
@@ -755,11 +755,11 @@ export function MCPSettings() {
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-tertiary">
                       <span className="truncate font-mono">{server.url}</span>
-                      <span className="shrink-0 text-neutral-300 dark:text-neutral-600">·</span>
+                      <span className="shrink-0 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">·</span>
                       <span className="shrink-0">{transportLabels[server.transport as TransportType] || server.transport}</span>
                       {isConnected && toolCount > 0 && (
                         <>
-                          <span className="shrink-0 text-neutral-300 dark:text-neutral-600">·</span>
+                          <span className="shrink-0 text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">·</span>
                           <span className="flex shrink-0 items-center gap-0.5 text-success">
                             <Zap className="h-3 w-3" />
                             {toolCount} {tf('mcp.toolsLabel', 'tools')}
@@ -777,7 +777,7 @@ export function MCPSettings() {
                       className={`flex h-7 w-7 items-center justify-center rounded-md transition-all ${
                         server.enabled
                           ? 'text-success hover:bg-success/10'
-                          : 'text-neutral-300 hover:bg-neutral-100 dark:text-neutral-600 dark:hover:bg-neutral-700'
+                          : 'text-neutral-300 hover:bg-neutral-100 text-neutral-600 text-neutral-600 dark:text-neutral-600 dark:hover:bg-neutral-700'
                       }`}
                       title={server.enabled ? tf('mcp.actions.clickToDisable', 'Disable') : tf('mcp.actions.clickToEnable', 'Enable')}
                     >

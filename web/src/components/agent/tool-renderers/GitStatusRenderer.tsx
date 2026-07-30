@@ -206,7 +206,7 @@ registerRenderer({
     if (entries.length === 0) {
       if (ctx.isExecuting) return <StreamingPlaceholder />
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           Working tree clean
           {branch && <span className="ml-1">on <strong>{branch}</strong></span>}
         </div>
@@ -221,8 +221,8 @@ registerRenderer({
     return (
       <div className="px-3 py-2 space-y-2">
         {branch && (
-          <div className="text-xs text-neutral-400 dark:text-neutral-500 mb-1">
-            On branch <strong className="text-neutral-600 dark:text-neutral-300">{branch}</strong>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 mb-1">
+            On branch <strong className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">{branch}</strong>
           </div>
         )}
 
@@ -271,7 +271,7 @@ function FileLine({ entry, showError }: { entry: StatusEntry; showError?: boolea
       <span className={stageColors[entry.stage] ?? 'text-neutral-400'}>
         {entry.code.padEnd(2)}
       </span>
-      <span className="truncate text-neutral-600 dark:text-neutral-300">{entry.path}</span>
+      <span className="truncate text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">{entry.path}</span>
       {showError && entry.error && (
         <span className="truncate text-red-400 text-[10px]">— {entry.error}</span>
       )}

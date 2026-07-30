@@ -126,7 +126,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
           {prompt && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               &quot;{truncatePrompt(prompt)}&quot;
             </span>
           )}
@@ -140,7 +140,7 @@ registerRenderer({
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
           {prompt && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               &quot;{truncatePrompt(prompt)}&quot;
             </span>
           )}
@@ -161,7 +161,7 @@ registerRenderer({
         <>
           <code className="font-medium text-red-600 dark:text-red-400">generate_image</code>
           {prompt && (
-            <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[160px] inline-block align-bottom">
+            <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[160px] inline-block align-bottom">
               &quot;{truncatePrompt(prompt)}&quot;
             </span>
           )}
@@ -177,7 +177,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
         {prompt && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
             &quot;{truncatePrompt(prompt)}&quot;
           </span>
         )}
@@ -197,7 +197,7 @@ registerRenderer({
     if (ctx.isExecuting) {
       return (
         <div className="px-3 py-4 space-y-3">
-          <div className="text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {prompt}
             {aspectRatio && <span className="ml-2 text-neutral-400">({aspectRatio})</span>}
           </div>
@@ -215,7 +215,7 @@ registerRenderer({
       const errMsg = (ctx.result?.error as Record<string, unknown>)?.message
       return (
         <div className="px-3 py-2 space-y-2">
-          <div className="text-xs text-neutral-500 dark:text-neutral-400">
+          <div className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {prompt}
             {aspectRatio && <span className="ml-2 text-neutral-400">({aspectRatio})</span>}
           </div>
@@ -228,7 +228,7 @@ registerRenderer({
 
     if (!result || result.paths.length === 0) {
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           No image output
         </div>
       )
@@ -239,7 +239,7 @@ registerRenderer({
     return (
       <div className="px-3 py-2 space-y-3">
         {/* Prompt info */}
-        <div className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+        <div className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 leading-relaxed">
           {prompt}
           {aspectRatio && <span className="ml-2 text-neutral-400">({aspectRatio})</span>}
         </div>
@@ -260,7 +260,7 @@ registerRenderer({
         {/* Markdown reference hint */}
         {result.message && (
           <div className="flex items-start justify-between gap-2">
-            <code className="text-[10px] text-neutral-400 dark:text-neutral-500 break-all">
+            <code className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 break-all">
               ![{result.description || 'image'}]({result.path})
             </code>
             <CopyIconButton content={`![${result.description || 'image'}](${result.path})`} />
@@ -288,13 +288,13 @@ function ImageWithActions({ assetPath, alt, index, total }: {
   return (
     <div className="space-y-1.5">
       {label && (
-        <div className="text-[10px] text-neutral-400 dark:text-neutral-500">{label}</div>
+        <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{label}</div>
       )}
       <div className="relative inline-block">
         <InlineImage assetPath={assetPath} alt={alt} />
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">
+        <span className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 truncate">
           {fileNameFromPath(assetPath)}
         </span>
         <button

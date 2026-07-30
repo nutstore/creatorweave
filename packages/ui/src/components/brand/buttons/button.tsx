@@ -14,7 +14,7 @@ const buttonVariants = cva(
         secondary:
           "border border-gray-200 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-neutral-700 dark:bg-primary-100/25 dark:text-primary-700 dark:hover:bg-primary-100/40 font-semibold",
         outline:
-          "border border-gray-200 bg-transparent text-primary hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium",
+          "border border-gray-200 bg-transparent text-secondary hover:bg-gray-50 hover:text-primary dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium",
         ghost:
           "gap-1.5 bg-transparent text-tertiary hover:bg-gray-100 hover:text-primary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium",
         danger:

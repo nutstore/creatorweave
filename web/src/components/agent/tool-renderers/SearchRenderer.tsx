@@ -63,7 +63,7 @@ registerRenderer({
         <code className="font-medium text-neutral-700 dark:text-foreground">search</code>
         {query && (
           <span
-            className="truncate max-w-[320px] text-neutral-400 dark:text-neutral-500"
+            className="truncate max-w-[320px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500"
             title={query}
           >
             &quot;{query}&quot;
@@ -128,7 +128,7 @@ registerRenderer({
       if (ctx.isExecuting) return <StreamingPlaceholder />
       return (
         <div className="px-3 py-2 space-y-2">
-          <div className="text-xs text-neutral-400 dark:text-neutral-500">
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             No matches found for &quot;{query}&quot;
           </div>
           {params.length > 0 && <SearchParamsBar params={params} />}
@@ -146,7 +146,7 @@ registerRenderer({
         {params.length > 0 && <SearchParamsBar params={params} />}
         <FileResultList files={fileResults} searchCtx={ctx} query={query} />
         {hasMoreHits && (
-          <div className="text-[10px] text-neutral-400 dark:text-neutral-500 px-0.5">
+          <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 px-0.5">
             Each file shows only the best match. Click "+N more" to expand, or use the read tool for full context.
           </div>
         )}
@@ -186,7 +186,7 @@ function FileResultList({ files, searchCtx, query }: { files: FileResult[]; sear
       {showAll && files.length > INITIAL_FILES_SHOWN && (
         <button
           type="button"
-          className="text-[10px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 pl-5 cursor-pointer"
+          className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 pl-5 cursor-pointer"
           onClick={() => setExpanded(false)}
         >
           Show less
@@ -299,27 +299,27 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
 
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400 mb-1">
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 mb-1">
         <FileIcon />
         <span className="font-mono truncate">{file.path}</span>
-        <span className="text-neutral-300 dark:text-neutral-600">·</span>
+        <span className="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">·</span>
         <span className="text-neutral-400">{file.matchCount} match{file.matchCount !== 1 ? 'es' : ''}</span>
         {titleBadge}
       </div>
       <div className="ml-5 space-y-0.5">
         {/* Best preview line (always visible) */}
-        <div className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+        <div className="text-xs font-mono text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 flex">
           {file.bestLine > 0 && (
-            <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{file.bestLine}</span>
+            <span className="select-none text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{file.bestLine}</span>
           )}
           <span className="truncate">{highlightMatch(file.bestPreview, query)}</span>
         </div>
 
         {/* Preloaded extra lines (single-file search: tool gave all hits) */}
         {preloadedHits.map((m, i) => (
-          <div key={`pre-${i}`} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+          <div key={`pre-${i}`} className="text-xs font-mono text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 flex">
             {m.line != null && (
-              <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
+              <span className="select-none text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
             )}
             <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
           </div>
@@ -327,9 +327,9 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
 
         {/* Extra lines loaded on demand (multi-file: only best hit was kept) */}
         {expandState.loaded && expandState.expanded && expandState.extraHits.map((m, i) => (
-          <div key={i} className="text-xs font-mono text-neutral-400 dark:text-neutral-500 flex">
+          <div key={i} className="text-xs font-mono text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 flex">
             {m.line != null && (
-              <span className="select-none text-neutral-300 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
+              <span className="select-none text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700 w-8 text-right mr-2 shrink-0">L{m.line}</span>
             )}
             <span className="truncate">{highlightMatch(m.preview ?? m.match ?? '', query)}</span>
           </div>
@@ -360,7 +360,7 @@ function FileResultItem({ file, searchCtx, query }: { file: FileResult; searchCt
         {expandState.loaded && expandState.expanded && extraCount > 0 && (
           <button
             type="button"
-            className="text-[10px] text-neutral-400 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 cursor-pointer"
+            className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 hover:text-neutral-500 dark:hover:text-neutral-400 cursor-pointer"
             onClick={() => setExpandState(prev => ({ ...prev, expanded: false }))}
           >
             Show less
@@ -599,7 +599,7 @@ function ErrorDetail({ ctx }: { ctx: ToolRenderCtx }) {
           </div>
         )}
         {hint && (
-          <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+          <div className="text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             💡 {hint}
           </div>
         )}

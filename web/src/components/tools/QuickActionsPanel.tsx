@@ -313,7 +313,7 @@ export function QuickActionsPanel({
               <Zap className="h-4 w-4 text-primary-600 dark:text-primary-500" />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-primary dark:text-primary-foreground">{t('tools.quickActions')}</h2>
+              <h2 className="text-base font-semibold text-secondary dark:text-foreground">{t('tools.quickActions')}</h2>
               <p className="text-xs text-tertiary dark:text-muted">{t('tools.commonTasks')}</p>
             </div>
           </div>
@@ -417,7 +417,7 @@ export function QuickActionsPanel({
                         <Icon className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-primary dark:text-primary-foreground">{t(action.labelKey)}</p>
+                        <p className="text-sm font-medium text-secondary dark:text-foreground">{t(action.labelKey)}</p>
                         <p className="mt-0.5 text-xs text-tertiary dark:text-muted">{t(action.descriptionKey)}</p>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 text-tertiary" />
@@ -513,7 +513,7 @@ export function QuickActionsPanel({
                         <Sparkles className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-primary dark:text-primary-foreground">{suggestion.title}</p>
+                        <p className="text-sm font-medium text-secondary dark:text-foreground">{suggestion.title}</p>
                         <p className="mt-0.5 text-xs text-tertiary dark:text-muted">{suggestion.description}</p>
                       </div>
                       <ChevronRight className="mt-1 h-4 w-4 text-tertiary" />
@@ -562,7 +562,7 @@ export function QuickActionsPanel({
               {/* Folder Selection */}
               <div className="mb-4 rounded-xl border-2 border-dashed border-border bg-muted/50 p-6 text-center dark:bg-muted/50">
                 <FolderOpen className="mx-auto mb-3 h-10 w-10 text-tertiary dark:text-muted" />
-                <p className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">{t('tools.selectProjectFolder')}</p>
+                <p className="mb-2 text-sm font-medium text-secondary dark:text-foreground">{t('tools.selectProjectFolder')}</p>
                 <p className="mb-4 text-xs text-tertiary dark:text-muted">
                   {t('tools.chooseFolderToAnalyze')}
                 </p>

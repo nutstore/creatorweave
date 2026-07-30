@@ -1134,7 +1134,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1">
-                        <div className="max-w-[140px] truncate text-xs font-medium dark:text-neutral-300">
+                        <div className="max-w-[140px] truncate text-xs font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300">
                           {asset.name}
                         </div>
                         {/* OCR status indicator */}
@@ -1171,10 +1171,10 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           // (just describe the action — kbd chip shows the keypress) so they
           // fit comfortably even when wrapping.
           <div className="pointer-events-none absolute inset-x-0 top-4 px-11">
-            <div className="truncate text-sm dark:text-neutral-500">
+            <div className="truncate text-sm text-muted">
               {placeholder}
             </div>
-            <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] leading-none dark:text-neutral-600">
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] leading-none text-muted">
               <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 <kbd className="shrink-0 rounded border border-neutral-200 bg-neutral-100 px-1 py-px font-mono text-[10px] dark:border-neutral-700 dark:bg-neutral-800">#</kbd>
                 <span>{t('conversation.input.hints.fileMention')}</span>
@@ -1196,7 +1196,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="absolute left-3 top-4 rounded-lg p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className="absolute left-3 top-4 rounded-lg p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           title="Attach files"
         >
           <Paperclip className="h-4 w-4" />
@@ -1239,7 +1239,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       @{agent.id}
                     </span>
                     {agent.name && agent.name !== agent.id && (
-                      <span className="truncate text-xs dark:text-neutral-400">
+                      <span className="truncate text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
                         {agent.name}
                       </span>
                     )}
@@ -1251,7 +1251,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                     <button
                       type="button"
                       onClick={(e) => void handleDeleteAgent(agent.id, e)}
-                      className="rounded p-1 hover:bg-neutral-200 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400"
+                      className="rounded p-1 hover:bg-neutral-200 hover:text-red-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400"
                       title={`Delete ${agent.id}`}
                     >
                       <Trash2 className="h-3 w-3" />
@@ -1295,7 +1295,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
               <button
                 type="button"
                 onClick={() => setIsCreatingAgent(true)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>{t('agent.createNew')}</span>
@@ -1316,7 +1316,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             <>
               <span className="font-medium">@{candidate.id}</span>
               {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs dark:text-neutral-400">
+                <span className="truncate pl-3 text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   {candidate.name}
                 </span>
               )}
@@ -1336,7 +1336,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file, _selected) => (
             <>
-              <span className="mt-0.5 shrink-0 dark:text-neutral-500">
+              <span className="mt-0.5 shrink-0 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {file.isDirectory ? (
                   <FolderIcon className="h-3.5 w-3.5" />
                 ) : (
@@ -1345,12 +1345,12 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium leading-5">{file.name}</div>
-                <div className="truncate text-[11px] leading-4 dark:text-neutral-500">
+                <div className="truncate text-[11px] leading-4 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}
@@ -1368,9 +1368,9 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           onSelect={(cmd) => slashSuggestionCommand?.(cmd)}
           width="w-auto"
           renderItem={(cmd, _selected) => (
-            <span className="text-neutral-700 dark:text-neutral-300">
+            <span className="text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               /{cmd.id}
-              <span className="ml-2 dark:text-neutral-500">
+              <span className="ml-2 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                 {cmd.description}
               </span>
             </span>

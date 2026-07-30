@@ -369,7 +369,7 @@ export function OfflineQueue({
             <p className="text-sm font-medium text-foreground">
               {isOnline ? t('offlineQueue.connectedToNetwork') : t('offlineQueue.offlineMode')}
             </p>
-            <p className="text-xs text-slate-500 dark:text-neutral-400">
+            <p className="text-xs text-slate-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {isOnline ? t('offlineQueue.tasksWillSyncAutomatically') : t('offlineQueue.tasksWillSyncWhenReconnected')}
             </p>
           </div>

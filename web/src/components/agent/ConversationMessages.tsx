@@ -354,7 +354,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
                       useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, idx)
                     }
                   }}
-                  className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-neutral-500 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-500 group-hover/queued:flex group-hover/queued:opacity-100 dark:bg-neutral-700 dark:text-neutral-400 dark:hover:bg-red-900/60 dark:hover:text-red-400"
+                  className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-neutral-500 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-500 group-hover/queued:flex group-hover/queued:opacity-100 dark:bg-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-red-900/60 dark:hover:text-red-400"
                   title={t('conversation.queue.remove')}
                 >
                   <X className="h-3 w-3" />

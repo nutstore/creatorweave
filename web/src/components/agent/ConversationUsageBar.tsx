@@ -178,19 +178,19 @@ export function ConversationUsageBar({ messages }: ConversationUsageBarProps) {
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
         {/* Left: label + breakdown */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="inline-flex items-center gap-1 font-medium text-neutral-600 dark:text-neutral-300">
+          <span className="inline-flex items-center gap-1 font-medium text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             <TrendingUp className="h-3 w-3" />
             {t('conversation.usageBar.title')}
           </span>
           <span
-            className="inline-flex items-center gap-1 text-neutral-600 dark:text-neutral-400"
+            className="inline-flex items-center gap-1 text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400"
             title={t('conversation.usage.input')}
           >
             <span className="h-2 w-2 rounded-full bg-blue-500" />
             ↑{formatTokens(usage.input)}
           </span>
           <span
-            className="inline-flex items-center gap-1 text-neutral-600 dark:text-neutral-400"
+            className="inline-flex items-center gap-1 text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400"
             title={t('conversation.usage.output')}
           >
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -198,7 +198,7 @@ export function ConversationUsageBar({ messages }: ConversationUsageBarProps) {
           </span>
           {usage.cache > 0 && (
             <span
-              className="inline-flex items-center gap-1 text-neutral-600 dark:text-neutral-400"
+              className="inline-flex items-center gap-1 text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400"
               title={t('conversation.usage.cache')}
             >
               <Database className="h-3 w-3 text-violet-500" />
@@ -208,7 +208,7 @@ export function ConversationUsageBar({ messages }: ConversationUsageBarProps) {
         </div>
 
         {/* Right: cost */}
-        <div className="flex items-center gap-1 text-neutral-500 tabular-nums dark:text-neutral-400">
+        <div className="flex items-center gap-1 text-neutral-500 tabular-nums text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {cost ? (
             <span title={t('conversation.usageBar.costBreakdown', {
               input: formatCost(cost.input),

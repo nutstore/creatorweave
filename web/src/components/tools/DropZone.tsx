@@ -313,7 +313,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
                 className={`h-6 w-6 ${isDragOver ? 'text-primary-600' : 'text-tertiary dark:text-muted'}`}
               />
             </div>
-            <p className="text-sm font-medium text-primary dark:text-primary-foreground">
+            <p className="text-sm font-medium text-secondary dark:text-foreground">
               {isDragOver ? 'Drop files here' : 'Drag files or click to upload'}
             </p>
             <p className="mt-1 text-xs text-tertiary dark:text-muted">Supports code, data, and document files</p>
@@ -339,7 +339,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
           // Has items
           <div>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-sm font-medium text-primary dark:text-primary-foreground">
+              <p className="text-sm font-medium text-secondary dark:text-foreground">
                 {droppedItems.length} file{droppedItems.length > 1 ? 's' : ''} selected
               </p>
               <button
@@ -361,7 +361,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
                       <Icon className="h-4 w-4 text-secondary dark:text-muted" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-primary dark:text-primary-foreground">{item.name}</p>
+                      <p className="truncate text-sm font-medium text-secondary dark:text-foreground">{item.name}</p>
                       <p className="text-xs text-tertiary dark:text-muted">{formatFileSize(item.size)}</p>
                     </div>
                     <button

@@ -154,7 +154,7 @@ export function ImagePreview({ blob, fileName, fileSize }: ImagePreviewProps) {
       <div className="flex shrink-0 items-center gap-2 border-b border-neutral-200 bg-white px-3 py-1.5 dark:border-neutral-800 dark:bg-neutral-950">
         <div className="flex items-center gap-1.5">
           <ImageIcon className="h-3.5 w-3.5 text-blue-500" />
-          <span className="max-w-[160px] truncate text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+          <span className="max-w-[160px] truncate text-[11px] font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
             {fileName}
           </span>
           <span className="text-[10px] text-neutral-400">({formatBytes(fileSize)})</span>
@@ -162,14 +162,14 @@ export function ImagePreview({ blob, fileName, fileSize }: ImagePreviewProps) {
 
         {naturalSize && (
           <>
-            <span className="text-[10px] text-neutral-300 dark:text-neutral-700">|</span>
-            <span className="text-[10px] text-neutral-500 dark:text-neutral-400">
+            <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
+            <span className="text-[10px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {naturalSize.width} × {naturalSize.height}
             </span>
           </>
         )}
 
-        <span className="text-[10px] text-neutral-300 dark:text-neutral-700">|</span>
+        <span className="text-[10px] text-neutral-300 text-neutral-700 text-neutral-700 dark:text-neutral-700">|</span>
 
         {/* Zoom controls */}
         <div className="flex items-center gap-1">

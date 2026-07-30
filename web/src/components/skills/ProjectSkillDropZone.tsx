@@ -385,15 +385,15 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
       <div key={entry.name} style={{ paddingLeft: depth * 16 }}>
         <div className="flex items-center gap-1.5 py-0.5 text-sm">
           {entry.kind === 'directory' ? (
-            <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+            <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
           ) : (
-            <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
+            <FileText className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
           )}
           <span className={cn(
             'truncate',
             entry.name.toLowerCase() === 'skill.md'
               ? 'font-medium text-blue-600 dark:text-blue-400'
-              : 'text-neutral-600 dark:text-neutral-400'
+              : 'text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400'
           )}>
             {entry.name}
           </span>
@@ -410,7 +410,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
       {/* Root selector for multi-root — always visible when multiple roots */}
       {isMultiRoot && (
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-600 dark:text-neutral-400">
+          <label className="mb-1.5 block text-sm font-medium text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('skillUpload.targetRoot') || 'Target Root'}
           </label>
           <div className="flex gap-2">
@@ -424,7 +424,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
                   'flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
                   selectedRoot === root.name
                     ? 'border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-950/30 dark:text-blue-300'
-                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:border-neutral-600',
+                    : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:border-neutral-600',
                   status === 'uploading' && 'pointer-events-none opacity-50'
                 )}
               >
@@ -441,7 +441,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
         <div className="space-y-3">
           {/* Target path */}
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
-            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('skillUpload.confirmTarget') || 'Upload Target'}
             </p>
             <p className="font-mono text-sm text-neutral-800 dark:text-foreground">
@@ -468,7 +468,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
 
           {/* ZIP source indicator */}
           {pending.isZip && (
-            <div className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               <FileArchive className="h-3.5 w-3.5" />
               {t('skillUpload.zipSource') || 'Importing from ZIP archive'}
             </div>
@@ -479,18 +479,18 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
             <div className="rounded-lg border border-neutral-200 dark:border-neutral-700">
               <div className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
                 <FileArchive className="h-4 w-4 text-neutral-500" />
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {pending.bundleSkills.length} {t('skillUpload.skills') || 'skills'}
                 </span>
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   ({pending.fileCount} {t('skillUpload.files') || 'files'})
                 </span>
               </div>
               <div className="max-h-40 overflow-y-auto p-3 space-y-1">
                 {pending.bundleSkills.map((s) => (
                   <div key={s.dirName} className="flex items-center gap-1.5 text-sm">
-                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 dark:text-neutral-500" />
-                    <span className="text-neutral-700 dark:text-neutral-300">{s.dirName}</span>
+                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+                    <span className="text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">{s.dirName}</span>
                     <span className="text-xs text-neutral-400">({s.fileCount})</span>
                   </div>
                 ))}
@@ -505,10 +505,10 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
                 ) : (
                   <FolderOpen className="h-4 w-4 text-neutral-500" />
                 )}
-                <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                <span className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
                   {pending.dirName}
                 </span>
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                <span className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
                   ({pending.fileCount} {t('skillUpload.files') || 'files'})
                 </span>
               </div>
@@ -527,7 +527,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
           )}
         >
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-500" />
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">
+          <p className="text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
             {t('skillUpload.uploading') || 'Uploading...'}
           </p>
         </div>
@@ -559,7 +559,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
         >
           <AlertCircle className="h-8 w-8 text-red-500" />
           <p className="text-sm text-red-600 dark:text-red-400">{errorMsg}</p>
-          <p className="text-xs text-neutral-400 dark:text-neutral-500">
+          <p className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('skillUpload.retryHint') || 'Click to try again'}
           </p>
         </div>
@@ -583,16 +583,16 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
               'h-8 w-8 transition-colors',
               status === 'dragover'
                 ? 'text-blue-500'
-                : 'text-neutral-400 dark:text-neutral-500'
+                : 'text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500'
             )}
           />
           <div className="text-center">
-            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <p className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {status === 'dragover'
                 ? (t('skillUpload.dropHere') || 'Drop skill folder here')
                 : (t('skillUpload.dropOrClick') || 'Drop a skill folder here, or click to browse')}
             </p>
-            <p className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+            <p className="mt-1 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {t('skillUpload.requirement') || 'Folder must contain a SKILL.md file'}
             </p>
           </div>

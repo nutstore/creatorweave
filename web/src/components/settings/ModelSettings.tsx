@@ -255,7 +255,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
     <div ref={rootRef} className="space-y-6">
       {/* ── Section 1: Default Model Selection ── */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-primary">
+        <label className="text-sm font-medium text-secondary">
           {t('settings.defaultModel.title')}
         </label>
         <Select value={currentSelectValue} onValueChange={handleSelectChange}>
@@ -312,7 +312,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             {/* Temperature */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-primary">
+                <label className="text-sm font-medium text-secondary">
                   {t('settings.temperature')}
                 </label>
                 <span className="text-sm text-secondary">{temperature}</span>
@@ -331,7 +331,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
 
             {/* Max Tokens */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-primary">{t('settings.maxTokens')}</label>
+              <label className="text-sm font-medium text-secondary">{t('settings.maxTokens')}</label>
               <BrandInput
                 type="number"
                 value={maxTokens}
@@ -346,7 +346,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
             {/* Max Iterations */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-primary">{t('settings.maxIterations')}</label>
+                <label className="text-sm font-medium text-secondary">{t('settings.maxIterations')}</label>
                 <div className="flex items-center gap-2">
                   <span
                     className={`text-sm font-medium tabular-nums ${
@@ -385,7 +385,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Brain className="h-4 w-4 text-secondary" />
-                  <label className="text-sm font-medium text-primary">{t('settings.thinkingMode')}</label>
+                  <label className="text-sm font-medium text-secondary">{t('settings.thinkingMode')}</label>
                 </div>
                 <BrandSwitch
                   checked={enableThinking}
@@ -435,7 +435,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
 
       {/* ── Token Usage Stats ── */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-primary">{t('settings.tokenStats.title')}</h4>
+        <h4 className="text-sm font-medium text-secondary">{t('settings.tokenStats.title')}</h4>
         <TokenStatsDisplay />
       </div>
     </div>

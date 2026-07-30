@@ -37,7 +37,7 @@ registerRenderer({
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">web_search</code>
-        {query && <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{query}&quot;</span>}
+        {query && <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">&quot;{query}&quot;</span>}
         {!ctx.isExecuting && !ctx.isStreaming && (
           <>
             {provider && (
@@ -52,7 +52,7 @@ registerRenderer({
                   🟡 {PROVIDER_SHORT[requestedProvider!] || requestedProvider} → {PROVIDER_LABELS[provider] || provider}
                 </span>
               ) : (
-                <span className="text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
+                <span className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 shrink-0">
                   {PROVIDER_LABELS[provider] || provider}
                 </span>
               )
@@ -88,13 +88,13 @@ registerRenderer({
         {results.slice(0, 6).map((r, i) => (
           <div key={i} className="space-y-0.5">
             <div className="text-xs font-medium text-neutral-800 dark:text-foreground truncate">{r.title}</div>
-            <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">{r.url}</div>
-            {r.snippet && <div className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-2">{r.snippet}</div>}
+            <div className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 truncate">{r.url}</div>
+            {r.snippet && <div className="text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 line-clamp-2">{r.snippet}</div>}
           </div>
         ))}
         {results.length > 6 && <div className="text-[10px] text-neutral-400">{t('toolCallDisplay.moreCount', { count: results.length - 6 })}</div>}
         <div className="flex items-center justify-between">
-          {provider && <span className="text-[10px] text-neutral-400 dark:text-neutral-500">via {PROVIDER_LABELS[provider] || provider}</span>}
+          {provider && <span className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">via {PROVIDER_LABELS[provider] || provider}</span>}
           <CopyIconButton content={results.map(r => `${r.title}\n${r.url}\n${r.snippet}`).join('\n\n')} />
         </div>
       </div>
@@ -115,9 +115,9 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">web_fetch</code>
         {meta.title ? (
-          <span className="truncate text-neutral-500 dark:text-neutral-400 max-w-[260px]">{meta.title}</span>
+          <span className="truncate text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 max-w-[260px]">{meta.title}</span>
         ) : (
-          <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px]">{shortUrl(url)}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 max-w-[200px]">{shortUrl(url)}</span>
         )}
         {ctx.isExecuting ? (
           <span className="ml-auto flex items-center gap-1.5 shrink-0">
@@ -128,7 +128,7 @@ registerRenderer({
             <span className="text-blue-500 text-xs">{t('toolCallDisplay.fetching')}</span>
           </span>
         ) : (
-          <span className="ml-auto text-[10px] text-neutral-400 dark:text-neutral-500 shrink-0">
+          <span className="ml-auto text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 shrink-0">
             {[meta.siteName, meta.lineCount ? t('toolCallDisplay.lines', { count: meta.lineCount }) : ''].filter(Boolean).join(' · ')}
           </span>
         )}
@@ -158,13 +158,13 @@ registerRenderer({
             {meta.title && (
               <div className="text-[13px] font-medium text-neutral-800 dark:text-foreground leading-snug line-clamp-2">{meta.title}</div>
             )}
-            <div className="flex items-center gap-2 text-[10px] text-neutral-400 dark:text-neutral-500">
+            <div className="flex items-center gap-2 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               <span className="truncate">{meta.siteName || shortUrl(url)}</span>
-              {meta.byline && <><span className="text-neutral-300 dark:text-neutral-600">·</span><span className="truncate">{meta.byline}</span></>}
+              {meta.byline && <><span className="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">·</span><span className="truncate">{meta.byline}</span></>}
             </div>
           </div>
           <a href={url} target="_blank" rel="noopener noreferrer"
-            className="shrink-0 mt-0.5 p-1.5 rounded-md text-neutral-300 hover:text-neutral-500 hover:bg-neutral-50 dark:text-neutral-600 dark:hover:text-neutral-400 dark:hover:bg-neutral-800/50 transition-colors">
+            className="shrink-0 mt-0.5 p-1.5 rounded-md text-neutral-300 hover:text-neutral-500 hover:bg-neutral-50 text-neutral-600 text-neutral-600 dark:text-neutral-600 dark:hover:text-neutral-400 dark:hover:bg-neutral-800/50 transition-colors">
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
@@ -176,7 +176,7 @@ registerRenderer({
 
         {/* Footer */}
         <div className="px-4 pb-2.5 flex items-center justify-between">
-          <span className="text-[10px] text-neutral-400 dark:text-neutral-500">
+          <span className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('toolCallDisplay.chars', { count: charLabel })}{meta.truncated ? ` · ${t('toolCallDisplay.truncated')}` : ''}
           </span>
           <CopyIconButton content={meta.body} />
@@ -199,7 +199,7 @@ function MarkdownBody({ body }: { body: string }) {
 
   return (
     <div>
-      <div className={`text-[11px] leading-[21px] font-mono text-neutral-500 dark:text-neutral-400 whitespace-pre-wrap break-words ${!open && overflow ? 'max-h-[252px] overflow-hidden relative' : 'max-h-[600px] overflow-auto'}`}>
+      <div className={`text-[11px] leading-[21px] font-mono text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 whitespace-pre-wrap break-words ${!open && overflow ? 'max-h-[252px] overflow-hidden relative' : 'max-h-[600px] overflow-auto'}`}>
         {!open && overflow && <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white dark:from-neutral-900/80 to-transparent pointer-events-none" />}
         {visible.map((line, i) => (
           <MarkdownLine key={i}>{line}</MarkdownLine>
@@ -227,18 +227,18 @@ function renderLine(line: string): string {
   if (s.startsWith('### ')) return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
   if (s.startsWith('## '))  return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
   if (s.startsWith('# '))   return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
-  if (s.startsWith('> '))   return `<span class="text-neutral-400 dark:text-neutral-500 pl-2 border-l-2 border-neutral-200 dark:border-neutral-700">${s.slice(2)}</span>`
-  if (s.match(/^- /))       return `<span class="text-neutral-300 dark:text-neutral-600 select-none mr-2">·</span>${renderInline(s.slice(2))}`
-  if (s.match(/^\d+\. /))   return `<span class="text-neutral-300 dark:text-neutral-600 select-none mr-1">${s.match(/^(\d+\.)/)![1]}</span>${renderInline(s.replace(/^\d+\. /, ''))}`
+  if (s.startsWith('> '))   return `<span class="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 pl-2 border-l-2 border-neutral-200 dark:border-neutral-700">${s.slice(2)}</span>`
+  if (s.match(/^- /))       return `<span class="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600 select-none mr-2">·</span>${renderInline(s.slice(2))}`
+  if (s.match(/^\d+\. /))   return `<span class="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600 select-none mr-1">${s.match(/^(\d+\.)/)![1]}</span>${renderInline(s.replace(/^\d+\. /, ''))}`
   if (s.match(/^---+$/))    return `<div class="my-1 border-t border-neutral-100 dark:border-neutral-800"></div>`
   return renderInline(s)
 }
 
 function renderInline(s: string): string {
   let out = s
-  out = out.replace(/\*\*(.+?)\*\*/g, '<strong class="font-medium text-neutral-700 dark:text-neutral-300">$1</strong>')
-  out = out.replace(/`([^`]+)`/g, '<code class="text-[10px] text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 rounded px-1 py-px">$1</code>')
-  out = out.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="text-neutral-500 dark:text-neutral-400">$1</span>')
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong class="font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">$1</strong>')
+  out = out.replace(/`([^`]+)`/g, '<code class="text-[10px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 rounded px-1 py-px">$1</code>')
+  out = out.replace(/\[([^\]]+)\]\([^)]+\)/g, '<span class="text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">$1</span>')
   return out
 }
 

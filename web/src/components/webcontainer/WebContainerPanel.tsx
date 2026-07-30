@@ -158,7 +158,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
               <h2 className="text-base font-semibold text-foreground">
                 WebContainer
               </h2>
-              <p className="mt-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
+              <p className="mt-1 truncate text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {packageName || t('webContainer.unrecognisedProject')}
                 {packageManager ? ` · ${packageManager}` : ''}
                 {startScriptName ? ` · script=${startScriptName}` : ''}
@@ -192,14 +192,14 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
               <BrandCardTitle className="text-sm font-semibold text-foreground">
                 {t('webContainer.startupConfig')}
               </BrandCardTitle>
-              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+              <p className="text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('webContainer.startupConfigHelp')}
               </p>
             </BrandCardHeader>
             <BrandCardContent className="space-y-3 px-4 py-3">
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                  <label className="mb-1 block text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {t('webContainer.directorySelect')}
                   </label>
                   <div className="space-y-2">
@@ -213,13 +213,13 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                       {t('webContainer.selectDirectory')}
                     </BrandButton>
                     <div className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 dark:border-neutral-700 dark:bg-neutral-800/60">
-                      <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+                      <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                         {t('webContainer.currentStartupDir')}
                       </div>
                       <div className="mt-0.5 truncate text-sm font-semibold text-foreground">
                         {startupPath}
                       </div>
-                      <div className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                      <div className="mt-1 text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                         {t('webContainer.dirChangeRequiresRestart')}
                       </div>
                     </div>
@@ -241,7 +241,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                   </button>
                   {showAdvanced && (
                     <div className="mt-2 space-y-1">
-                      <label className="block text-xs text-neutral-500 dark:text-neutral-400">
+                      <label className="block text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                         {t('webContainer.startupDirManual')}
                       </label>
                       <BrandInput
@@ -257,7 +257,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
 
               <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs text-neutral-500 dark:text-neutral-400">
+                  <label className="mb-1 block text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {t('webContainer.startupScript')}
                   </label>
                   <BrandSelect
@@ -356,7 +356,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
         <div className="min-h-0 min-w-0 flex-1">
           <div className="flex h-full min-h-0 min-w-0 flex-col">
             <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-700">
-              <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              <div className="text-xs font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('webContainer.logOutput', { count: logCount })}
               </div>
               <div className="flex items-center gap-2">
@@ -435,7 +435,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
             </div>
 
             <div className="flex items-center justify-between border-t border-neutral-200 px-4 py-3 dark:border-neutral-700">
-              <div className="truncate text-xs text-neutral-500 dark:text-neutral-400">
+              <div className="truncate text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {t('webContainer.selected', { path: pendingStartupPath || '.' })}
               </div>
               <div className="flex items-center gap-2">

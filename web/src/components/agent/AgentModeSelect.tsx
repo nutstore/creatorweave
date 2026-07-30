@@ -150,7 +150,7 @@ function ModeOption({
         <div className={`text-xs font-bold uppercase tracking-wide ${config.textLight} ${config.textDark}`}>
           {label}
         </div>
-        <div className="mt-0.5 text-[11px] leading-tight text-neutral-500 dark:text-neutral-400">
+        <div className="mt-0.5 text-[11px] leading-tight text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {description}
         </div>
       </div>

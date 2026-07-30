@@ -152,7 +152,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
           <h1 className="mb-2 text-3xl font-semibold text-foreground">
             {t('welcome.title')}
           </h1>
-          <p className="text-base text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
+          <p className="text-base text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('welcome.tagline')}</p>
         </div>
 
         {isLoading ? (
@@ -162,8 +162,8 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
             aria-live="polite"
             className="flex h-32 items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <Loader2 className="h-4 w-4 animate-spin text-neutral-400 dark:text-neutral-500" />
-            <span className="ml-2 text-sm text-neutral-500 dark:text-neutral-400">
+            <Loader2 className="h-4 w-4 animate-spin text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+            <span className="ml-2 text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('welcome.checkingConfig')}
             </span>
           </div>
@@ -201,7 +201,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                       {t('welcome.setupGatewayRecommend')}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  <p className="mt-0.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                     {t('welcome.setupGatewayDesc')}
                   </p>
                 </div>
@@ -216,13 +216,13 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/60 dark:hover:bg-neutral-900/40"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
-                <KeyRound className="h-[18px] w-[18px] text-neutral-600 dark:text-neutral-400" />
+                <KeyRound className="h-[18px] w-[18px] text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400" />
               </div>
               <div className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-foreground">
                   {t('welcome.setupApiKeyTitle')}
                 </span>
-                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                <p className="mt-0.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                   {t('welcome.setupApiKeyDesc')}
                 </p>
               </div>
@@ -257,7 +257,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                           className={`inline-flex h-8 w-8 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed ${
                             supportsVision
                               ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
-                              : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
+                              : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 text-neutral-600 text-neutral-600 dark:text-neutral-600'
                           }`}
                         >
                           {isCapturingScreenshot
@@ -303,7 +303,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               <FolderOpen className="h-4 w-4" />
               {t('onboarding.steps.files.title')}
             </button>
-            <p className="mt-2 text-center text-xs text-neutral-500 dark:text-neutral-400">
+            <p className="mt-2 text-center text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               {t('agent.folderTip.description')}
             </p>
           </div>
@@ -311,7 +311,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
 
       {/* Local-first privacy hint is supporting information, not the primary action. */}
       {!isLoading && (
-        <p className="mt-7 text-center text-[11px] text-neutral-400 dark:text-neutral-500">
+        <p className="mt-7 text-center text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {t('welcome.setupLocalFirstHint')}
         </p>
       )}

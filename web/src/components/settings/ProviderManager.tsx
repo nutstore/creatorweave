@@ -398,7 +398,7 @@ function ProviderCard({
               boxShadow: hasKey ? '0 0 6px var(--brand,#0d9488)' : 'none',
             }}
           />
-          <span className="text-[13px] font-semibold text-primary">{displayName}</span>
+          <span className="text-[13px] font-semibold text-secondary">{displayName}</span>
         </div>
         <div className="flex items-center gap-2">
           {hasKey ? (
@@ -541,7 +541,7 @@ function ProviderCard({
 
           {/* API Key */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-primary">{t('settings.apiKey')}</label>
+            <label className="text-[12px] font-medium text-secondary">{t('settings.apiKey')}</label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input
@@ -587,7 +587,7 @@ function ProviderCard({
           {/* My Models (pinned) — works for both built-in and custom providers */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[12px] font-medium text-primary">
+              <label className="text-[12px] font-medium text-secondary">
                 {t('settings.pinnedModels.title')}
               </label>
               <div className="flex items-center gap-2">
@@ -764,7 +764,7 @@ function ProviderCard({
                       >
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
-                            <span className="truncate text-[12px] text-primary">
+                            <span className="truncate text-[12px] text-secondary">
                               {model.name}
                             </span>
                             {model.hasVision ? (
@@ -1168,7 +1168,7 @@ function LLMGatewayCard({
               boxShadow: isLoggedIn ? '0 0 6px var(--brand,#0d9488)' : 'none',
             }}
           />
-          <span className="text-[13px] font-semibold text-primary">坚果云 AI</span>
+          <span className="text-[13px] font-semibold text-secondary">坚果云 AI</span>
 
         </div>
         <div className="flex items-center gap-2">
@@ -1202,7 +1202,7 @@ function LLMGatewayCard({
               {/* Pinned models (user's selected models) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-[12px] font-medium text-primary">
+                  <label className="text-[12px] font-medium text-secondary">
                     {t('settings.pinnedModels.title')}
                   </label>
                   <span className="text-[10px] font-medium text-tertiary">
@@ -1332,7 +1332,7 @@ function LLMGatewayCard({
                           >
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
-                                <span className="truncate text-[12px] text-primary">{m.name}</span>
+                                <span className="truncate text-[12px] text-secondary">{m.name}</span>
                                 {m.hasVision ? (
                                   <Eye
                                     className="h-3 w-3 shrink-0 text-[var(--brand,#0d9488)]"
@@ -1514,7 +1514,7 @@ function LLMGatewayCard({
                   <div className="flex items-start gap-2 py-1">
                     <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[12px] font-medium text-primary">登录失败</p>
+                      <p className="text-[12px] font-medium text-secondary">登录失败</p>
                       <p className="text-[11px] text-secondary">{authState.error}</p>
                     </div>
                   </div>
@@ -1572,7 +1572,7 @@ const groupedProviders = useMemo(
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-primary">
+        <label className="text-sm font-medium text-secondary">
           {t('settings.providerManager.title')}
         </label>
         <button

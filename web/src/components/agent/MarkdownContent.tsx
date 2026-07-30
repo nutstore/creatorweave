@@ -214,7 +214,7 @@ function CodeBlock({
   return (
     <div className="my-2 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
       <div className="flex items-center justify-between bg-neutral-100 px-3 py-1 dark:bg-neutral-800">
-        <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+        <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
           {language || 'code'}
         </span>
         <button
@@ -229,8 +229,8 @@ function CodeBlock({
             </>
           ) : (
             <>
-              <Copy className="h-3 w-3 text-neutral-400 dark:text-neutral-500" />
-              <span className="text-neutral-400 dark:text-neutral-500">Copy</span>
+              <Copy className="h-3 w-3 text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
+              <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">Copy</span>
             </>
           )}
         </button>

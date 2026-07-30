@@ -191,8 +191,8 @@ export const MessageNavBar = memo(function MessageNavBar({
                       style={{ width: isActive ? 7 : 6, height: isActive ? 7 : 6 }}
                     />
                     {/* Tooltip — appears to the left */}
-                    <div className="pointer-events-none absolute right-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 opacity-0 shadow-sm transition-opacity group-hover/dot:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-                      <span className="text-neutral-400 dark:text-neutral-500">#{item.number}</span> {item.preview}
+                    <div className="pointer-events-none absolute right-[calc(100%+8px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-600 opacity-0 shadow-sm transition-opacity group-hover/dot:opacity-100 dark:border-neutral-700 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                      <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">#{item.number}</span> {item.preview}
                     </div>
                   </div>
                 )

@@ -192,7 +192,7 @@ export function XlsxPreview({ blob, fileName, fileSize }: {
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white p-6 dark:bg-neutral-950">
           <FileText className="h-10 w-10 text-neutral-300" />
           <div className="text-center">
-            <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            <p className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
               {fileName}
             </p>
             <p className="mt-1 text-[10px] text-neutral-400">
@@ -203,7 +203,7 @@ export function XlsxPreview({ blob, fileName, fileSize }: {
             <p className="text-xs text-amber-700 dark:text-amber-300">
               数据量过大（{state.totalRows.toLocaleString()} 行），本地渲染可能卡顿
             </p>
-            <p className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+            <p className="mt-1 text-[11px] text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
               💡 切换到 <strong>Text</strong> 视图查看摘要，或用 Python 分析：{' '}
               <code className="rounded bg-neutral-100 px-1 text-[10px] dark:bg-neutral-800">
                 pd.read_excel('...')

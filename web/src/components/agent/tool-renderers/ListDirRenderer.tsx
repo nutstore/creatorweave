@@ -31,7 +31,7 @@ registerRenderer({
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">ls</code>
         {dirPath && (
-          <span className="truncate text-neutral-400 dark:text-neutral-500">{dirPath}</span>
+          <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{dirPath}</span>
         )}
         {errMsg && !ctx.isExecuting && !ctx.isStreaming && (
           <span className="ml-auto text-xs text-red-400 dark:text-red-400/80 shrink-0 truncate max-w-[60%]">{errMsg}</span>
@@ -61,7 +61,7 @@ registerRenderer({
         )
       }
       return (
-        <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">
+        <div className="px-3 py-2 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {dirPath ? `${dirPath} is empty` : 'No entries'}
         </div>
       )
@@ -80,14 +80,14 @@ registerRenderer({
         )}
 
         {dirPath && (
-          <div className="text-xs text-neutral-400 dark:text-neutral-500 font-mono mb-1">{dirPath}</div>
+          <div className="text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 font-mono mb-1">{dirPath}</div>
         )}
 
         {/* Directories first */}
         {dirs.slice(0, maxShow).map((entry, i) => (
           <div key={`d-${i}`} className="flex items-center gap-2 text-xs" style={{ animation: `tool-row-in .2s ease-out ${i * 20}ms backwards` }}>
             <FolderIcon />
-            <span className="text-neutral-600 dark:text-neutral-300 font-medium truncate" title={entry.path || entry.name}>{(entry.path || entry.name)}/</span>
+            <span className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 font-medium truncate" title={entry.path || entry.name}>{(entry.path || entry.name)}/</span>
           </div>
         ))}
 
@@ -95,12 +95,12 @@ registerRenderer({
         {files.slice(0, maxShow - dirs.length).map((entry, i) => (
           <div key={`f-${i}`} className="flex items-center gap-2 text-xs" style={{ animation: `tool-row-in .2s ease-out ${(dirs.length + i) * 20}ms backwards` }}>
             <FileIcon name={entry.name} />
-            <span className="text-neutral-500 dark:text-neutral-400 truncate" title={entry.path || entry.name}>{entry.path || entry.name}</span>
+            <span className="text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400 truncate" title={entry.path || entry.name}>{entry.path || entry.name}</span>
           </div>
         ))}
 
         {(dirs.length + files.length > maxShow) && (
-          <div className="text-[10px] text-neutral-400 dark:text-neutral-600">
+          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
             +{dirs.length + files.length - maxShow} more items
           </div>
         )}

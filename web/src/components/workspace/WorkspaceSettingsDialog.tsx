@@ -111,7 +111,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
         <BrandDialogContent className="max-w-3xl dark:border-border dark:bg-card overflow-hidden">
           <BrandDialogHeader>
             <BrandDialogTitle className="text-base font-semibold">{t('workspaceSettings.title')}</BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -171,7 +171,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
               {activeTab === 'layout' && (
                 <div id="tabpanel-layout" role="tabpanel" aria-labelledby="tab-layout" className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+                    <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
                       {t('workspaceSettings.layout.title')}
                     </h3>
                     <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -250,7 +250,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
               {activeTab === 'display' && (
                 <div id="tabpanel-display" role="tabpanel" aria-labelledby="tab-display" className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+                    <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
                       {t('workspaceSettings.display.themeTitle')}
                     </h3>
                     <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -275,7 +275,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                   </div>
 
                   <div className="border-subtle border-t pt-6">
-                    <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+                    <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
                       {t('workspaceSettings.display.editorTitle')}
                     </h3>
                     <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -345,7 +345,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
               {activeTab === 'shortcuts' && (
                 <div id="tabpanel-shortcuts" role="tabpanel" aria-labelledby="tab-shortcuts" className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+                    <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
                       {t('workspaceSettings.shortcuts.title')}
                     </h3>
                     <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -356,7 +356,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                   <div className="space-y-2">
                     <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
                       <div>
-                        <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+                        <div className="text-sm font-medium text-secondary dark:text-foreground">
                           {t('workspaceSettings.shortcuts.showAllTitle')}
                         </div>
                         <div className="text-xs text-tertiary dark:text-muted">
@@ -387,7 +387,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
               {activeTab === 'data' && (
                 <div id="tabpanel-data" role="tabpanel" aria-labelledby="tab-data" className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold text-primary dark:text-primary-foreground">
+                    <h3 className="text-lg font-semibold text-secondary dark:text-foreground">
                       {t('workspaceSettings.data.title')}
                     </h3>
                     <p className="mt-1 text-sm text-tertiary dark:text-muted">
@@ -398,7 +398,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                   <div className="space-y-4">
                     <div className="border-subtle flex items-center justify-between rounded-md border px-4 py-3">
                       <div>
-                        <div className="text-sm font-medium text-primary dark:text-primary-foreground">
+                        <div className="text-sm font-medium text-secondary dark:text-foreground">
                           {t('workspaceSettings.data.recentFilesTitle')}
                         </div>
                         <div className="text-xs text-tertiary dark:text-muted">
@@ -430,7 +430,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                     </div>
 
                     <div className="border-subtle border-t pt-4">
-                      <h4 className="mb-2 text-sm font-medium text-primary dark:text-primary-foreground">
+                      <h4 className="mb-2 text-sm font-medium text-secondary dark:text-foreground">
                         {t('workspaceSettings.data.resetAllTitle')}
                       </h4>
                       <p className="mb-3 text-xs text-tertiary dark:text-muted">

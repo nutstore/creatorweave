@@ -67,7 +67,7 @@ const segmentStyles = {
   pending: {
     block: 'bg-neutral-50 dark:bg-neutral-800/30',
     dot: 'bg-neutral-300 dark:bg-neutral-600',
-    label: 'text-neutral-400 dark:text-neutral-500',
+    label: 'text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500',
     connector: 'bg-neutral-200 dark:bg-neutral-700',
   },
 } as const
@@ -90,13 +90,13 @@ function NodeStepReasoning({ step }: { step: Extract<WorkflowNodeStep, { type: '
 
   return (
     <div className="space-y-0">
-      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-neutral-400 dark:text-neutral-500">
+      <div className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
         <Brain className="h-3 w-3" />
         <span>{step.streaming ? t('workflow.thinking') : t('workflow.thinkingProcess')}</span>
       </div>
       <div
         ref={contentRef}
-        className="max-h-32 overflow-y-auto whitespace-pre-wrap px-3 pb-2 text-[11px] leading-relaxed text-neutral-400 dark:text-neutral-500"
+        className="max-h-32 overflow-y-auto whitespace-pre-wrap px-3 pb-2 text-[11px] leading-relaxed text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500"
       >
         {step.content}
         {step.streaming && (
@@ -121,7 +121,7 @@ function NodeStepContent({ step }: { step: Extract<WorkflowNodeStep, { type: 'co
   return (
     <div
       ref={contentRef}
-      className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 py-2 text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300"
+      className="max-h-40 overflow-y-auto whitespace-pre-wrap px-3 py-2 text-[11px] leading-relaxed text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300"
     >
       {step.content}
       {step.streaming && (
@@ -213,8 +213,8 @@ function PipelineSegment({
         {isInteractive && (
           <ChevronDown
             className={cn(
-              'h-2.5 w-2.5 shrink-0 text-neutral-300 transition-transform duration-200 dark:text-neutral-600',
-              isExpanded && 'rotate-180 text-neutral-500 dark:text-neutral-400',
+              'h-2.5 w-2.5 shrink-0 text-neutral-300 transition-transform duration-200 text-neutral-600 text-neutral-600 dark:text-neutral-600',
+              isExpanded && 'rotate-180 text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400',
             )}
           />
         )}
@@ -262,7 +262,7 @@ function PipelineSegment({
           {/* Fallback: completed with output but no steps */}
           {node.status === 'completed' && node.output && !hasAnyStepContent && (
             <div className="max-h-28 overflow-y-auto px-3 py-2.5">
-              <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-neutral-600 dark:text-neutral-400">
+              <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400">
                 {node.output.length > 600
                   ? `${node.output.slice(0, 600)}...`
                   : node.output}
@@ -346,7 +346,7 @@ export function WorkflowExecutionProgress({
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <div className="flex items-center gap-2 text-[10px] text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-center gap-2 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <span>
               {completedCount}/{totalCount}
             </span>
@@ -361,7 +361,7 @@ export function WorkflowExecutionProgress({
             <button
               type="button"
               onClick={onStop}
-              className="rounded-md p-1 text-neutral-300 transition-colors hover:bg-red-50 hover:text-red-500 dark:text-neutral-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              className="rounded-md p-1 text-neutral-300 transition-colors hover:bg-red-50 hover:text-red-500 text-neutral-600 text-neutral-600 dark:text-neutral-600 dark:hover:bg-red-500/10 dark:hover:text-red-400"
               title={t('workflow.stopRunning')}
             >
               <StopCircle className="h-3.5 w-3.5" />

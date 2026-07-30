@@ -110,7 +110,7 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
         <button
           type="button"
           onClick={loadPreview}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-neutral-100 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-200 dark:bg-neutral-800 text-neutral-300 text-neutral-300 dark:text-neutral-300 dark:hover:bg-neutral-700"
         >
           <RefreshCw className="h-3 w-3" />
           {t('officePreview.retry', { defaultValue: '重试' })}
@@ -123,7 +123,7 @@ export function OfficePreview({ blob, fileName, fileSize }: OfficePreviewProps) 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 p-4">
       <FileText className="h-10 w-10 text-neutral-300" />
-      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+      <p className="text-sm font-medium text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
         {fileName}
       </p>
       <p className="text-[10px] text-neutral-400">

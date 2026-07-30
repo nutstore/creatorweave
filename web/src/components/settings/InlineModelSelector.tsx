@@ -116,7 +116,7 @@ export function InlineModelSelector() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-primary">
+        <label className="text-sm font-medium text-secondary">
           {t('settings.defaultModel.title')}
         </label>
         <span className="text-[11px] text-tertiary">{t('settings.defaultModel.description')}</span>
@@ -125,7 +125,7 @@ export function InlineModelSelector() {
       {/* 当前选择状态 */}
       <div className="flex items-center gap-2 rounded-lg border border-border/60 px-3 py-2">
         <Sparkles className="h-4 w-4 shrink-0 text-[var(--brand,#0d9488)]" />
-        <span className="text-sm font-medium text-primary truncate">
+        <span className="text-sm font-medium text-secondary truncate">
           {!hasApiKey || !providerType || !modelName
             ? t('topbar.modelSwitcher.unavailable')
             : `${currentProvider?.displayName || getProviderMeta(providerType)?.displayName || providerType} / ${selectedModel?.name || modelName}`}
@@ -204,7 +204,7 @@ export function InlineModelSelector() {
                   ) : (
                     <ChevronDown className="h-3.5 w-3.5 text-tertiary" />
                   )}
-                  <span className="text-[13px] font-semibold text-primary">{provider.displayName}</span>
+                  <span className="text-[13px] font-semibold text-secondary">{provider.displayName}</span>
                   {isCurrentProvider && (
                     <span className="text-[10px] text-[var(--brand-light,#14b8a6)]">●</span>
                   )}

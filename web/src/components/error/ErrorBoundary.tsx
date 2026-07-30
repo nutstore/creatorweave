@@ -41,7 +41,7 @@ function DefaultFallback({ error, resetError, t }: { error: Error | null; resetE
 
         {error && (
           <details className="mb-4">
-            <summary className="cursor-pointer text-xs font-medium text-tertiary hover:text-secondary dark:text-neutral-400 dark:hover:text-primary-foreground">
+            <summary className="cursor-pointer text-xs font-medium text-tertiary hover:text-secondary text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-primary-foreground">
               {t('errorBoundary.errorDetails')}
             </summary>
             <pre className="mt-2 max-h-40 overflow-auto rounded bg-muted p-2 text-xs text-secondary dark:bg-muted dark:text-muted">
