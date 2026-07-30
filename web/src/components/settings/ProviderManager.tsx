@@ -846,16 +846,17 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
   const { createCustomProvider } = useSettingsStore()
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
+  const [apiMode, setApiMode] = useState<import('@/store/settings.store').CustomApiMode>('chat-completions')
 
   const handleCreate = useCallback(() => {
-    const ok = createCustomProvider({ name, baseUrl })
+    const ok = createCustomProvider({ name, baseUrl, apiMode })
     if (!ok) {
       toast.error(t('settings.toast.providerNameRequired'))
       return
     }
     toast.success(t('settings.toast.customProviderAdded'))
     onClose()
-  }, [createCustomProvider, name, baseUrl, t, onClose])
+  }, [createCustomProvider, name, baseUrl, apiMode, t, onClose])
 
   return (
     <div
@@ -885,6 +886,44 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
             placeholder={t('settings.customBaseUrl.placeholder')}
             className="h-9 font-mono text-[12px]"
           />
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-medium text-secondary">{t('settings.apiMode.label')}</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              className={`flex-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                apiMode === 'chat-completions'
+                  ? 'text-white'
+                  : 'text-tertiary border border-border hover:bg-muted'
+              }`}
+              style={
+                apiMode === 'chat-completions'
+                  ? { background: 'var(--brand, #0d9488)' }
+                  : undefined
+              }
+              onClick={() => setApiMode('chat-completions')}
+            >
+              Chat Completions
+            </button>
+            <button
+              type="button"
+              className={`flex-1 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                apiMode === 'responses'
+                  ? 'text-white'
+                  : 'text-tertiary border border-border hover:bg-muted'
+              }`}
+              style={
+                apiMode === 'responses'
+                  ? { background: 'var(--brand, #0d9488)' }
+                  : undefined
+              }
+              onClick={() => setApiMode('responses')}
+            >
+              Responses API
+            </button>
+          </div>
+          <p className="mt-1 text-[10px] text-tertiary">{t('settings.apiMode.hint')}</p>
         </div>
       </div>
       <div className="flex justify-end gap-2 border-t border-t pt-3 dark:border-t">

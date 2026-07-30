@@ -102,7 +102,7 @@ interface SettingsState {
   setProviderType: (type: LLMProviderType) => void
   setModelName: (name: string) => void
   setCustomBaseUrl: (url: string) => void
-  createCustomProvider: (input: { name: string; baseUrl: string; model?: string }) => boolean
+  createCustomProvider: (input: { name: string; baseUrl: string; apiMode?: CustomApiMode }) => boolean
   updateCustomProvider: (
     providerId: string,
     patch: { name?: string; baseUrl?: string }
@@ -264,10 +264,9 @@ export const useSettingsStore = create<SettingsState>()(
       },
       setCustomBaseUrl: (customBaseUrl) => set({ customBaseUrl }),
 
-      createCustomProvider: ({ name, baseUrl, model }) => {
+      createCustomProvider: ({ name, baseUrl, apiMode }) => {
         const trimmedName = name.trim()
         const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, '')
-        const trimmedModel = model?.trim() ?? ''
         if (!trimmedName || !trimmedBaseUrl) return false
 
         const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -276,8 +275,8 @@ export const useSettingsStore = create<SettingsState>()(
           id,
           name: trimmedName,
           baseUrl: trimmedBaseUrl,
-          models: trimmedModel ? [trimmedModel] : [],
-          apiMode: 'chat-completions',
+          models: [],
+          apiMode: apiMode || 'chat-completions',
           createdAt: now,
           updatedAt: now,
         }
