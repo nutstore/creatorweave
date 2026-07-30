@@ -97,7 +97,7 @@ The project is also exploring multi-agent collaboration workflows for content cr
 ### Prerequisites
 
 - Node.js (18+)
-- pnpm (recommended) or npm/yarn
+- pnpm 10.21.0 (managed with [mise](https://mise.jdx.dev/) or Corepack)
 - A modern browser with File System Access API support
 
 ### Quick Start
@@ -107,7 +107,11 @@ The project is also exploring multi-agent collaboration workflows for content cr
 git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
 
-# Install dependencies
+# Install the pinned pnpm version (recommended)
+mise install
+
+# Alternative without mise: enable Corepack, then install dependencies
+# corepack enable
 pnpm install
 
 # Start desktop web app

@@ -43,13 +43,19 @@ CreatorWeave 是一款 **本地优先的 AI 原生创作平台**。它将本地�
 
 - Rust 1.75+
 - Node.js 18+
-- pnpm（推荐）
+- pnpm 10.21.0（推荐通过 [mise](https://mise.jdx.dev/) 或 Corepack 管理）
 
 ### 安装
 
 ```bash
 git clone https://github.com/nutstore/creatorweave.git
 cd creatorweave
+
+# 推荐：按项目配置安装 pnpm 10.21.0
+mise install
+
+# 未安装 mise 时，可先启用 Corepack
+# corepack enable
 pnpm install
 ```
 
