@@ -279,7 +279,7 @@ const MARKDOWN_COMPONENTS = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-primary-600 dark:text-primary-400 underline hover:text-primary-700 dark:hover:text-primary-300"
+        className="text-primary-600 dark:text-primary-500 underline hover:text-primary-700 dark:hover:text-primary-700"
       >
         {children}
       </a>

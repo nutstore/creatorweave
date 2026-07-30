@@ -107,7 +107,7 @@ export function DeviceCodeFlowDialog({
                   {t('welcome.gateway.authCodeLabel')}
                 </p>
                 <div className="flex items-center justify-center gap-2">
-                  <span className="font-mono text-2xl font-bold tracking-[0.15em] text-neutral-900 dark:text-neutral-100">
+                  <span className="font-mono text-2xl font-bold tracking-[0.15em] text-foreground">
                     {authState.userCode}
                   </span>
                   <button

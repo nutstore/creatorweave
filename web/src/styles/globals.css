@@ -110,19 +110,19 @@
     --background: 200 10% 4%; /* #0A0D0E */
     --foreground: 210 8% 92%; /* #E8ECEF */
 
-    --card: 200 8% 6%;
+    --card: 200 8% 9%;
     --card-foreground: 210 8% 92%;
 
-    --popover: 200 8% 6%;
+    --popover: 200 8% 9%;
     --popover-foreground: 210 8% 92%;
 
-    --secondary: 170 15% 8%; /* #121A1B */
+    --secondary: 170 15% 11%; /* #16201F */
     --secondary-foreground: 210 8% 92%;
 
-    --muted: 170 15% 8%;
-    --muted-foreground: 210 6% 55%;
+    --muted: 170 15% 11%;
+    --muted-foreground: 210 4% 70%; /* #B1B7BD - 8:1 (was #A3A8AD) */
 
-    --accent: 200 8% 9%;
+    --accent: 200 8% 12%;
     --accent-foreground: 210 10% 92%;
 
     --destructive: 15 74% 67%; /* #F59E6B */
@@ -132,8 +132,8 @@
     --accent-warm: 38 70% 60%; /* dark mode 增亮 */
 
     /* Border - subtle tint */
-    --border: 210 10% 18%; /* #1E2529 */
-    --input: 210 10% 18%;
+    --border: 210 10% 22%; /* #2A3035 */
+    --input: 210 10% 22%;
     --ring: 174 50% 58%; /* Teal - dark mode primary */
 
     /* Primary - Muted Teal for dark (option B) */
@@ -177,18 +177,18 @@
     --danger-border: 15 45% 45%; /* #A05540 */
 
     /* Extended - neutral dark */
-    --bg-tertiary: 210 8% 8%; /* #141A1D */
-    --bg-elevated: 210 6% 10%; /* #1A1F22 */
-    --bg-hover: 210 8% 14%; /* #1F2528 */
+    --bg-tertiary: 210 8% 11%; /* #1A2024 */
+    --bg-elevated: 210 6% 14%; /* #21282C */
+    --bg-hover: 210 8% 17%; /* #252C30 */
 
-    /* Text - neutral warm whites */
-    --text-primary: 210 8% 92%; /* #E8ECEF */
-    --text-secondary: 210 5% 65%; /* #A3A9AE */
-    --text-tertiary: 210 4% 50%; /* #7A8087 */
-    --text-muted: 210 3% 40%; /* #5A6269 */
+    /* Text - neutral warm whites (all pass WCAG AA on card bg) */
+    --text-primary: 210 8% 92%; /* #E8ECEF - 13:1 */
+    --text-secondary: 210 5% 70%; /* #B0B6BB - 8:1 */
+    --text-tertiary: 210 4% 62%; /* #979DA3 - 5.5:1 */
+    --text-muted: 210 3% 55%; /* #868C92 - 4.5:1 (WCAG AA pass) */
 
-    --border-strong: 210 10% 22%; /* #2A3033 */
-    --border-subtle: 210 10% 12%; /* #1A1E21 */
+    --border-strong: 210 10% 28%; /* #353C42 */
+    --border-subtle: 210 10% 18%; /* #262D32 */
 
     /* Brand-tinted Muted Surface (dark) */
     --brand-muted: 174 18% 28%;    /* #2E4241 - dark */
@@ -220,7 +220,7 @@
 
   /* Text colors */
   .text-primary {
-    color: hsl(var(--text-primary));
+    color: hsl(var(--primary));
   }
   .text-secondary {
     color: hsl(var(--text-secondary));
@@ -240,8 +240,17 @@
   .text-success-text {
     color: hsl(var(--success-text));
   }
+  .text-primary-500 {
+    color: hsl(var(--primary-500));
+  }
   .text-primary-600 {
     color: hsl(var(--primary-600));
+  }
+  .text-primary-700 {
+    color: hsl(var(--primary-700));
+  }
+  .text-primary-800 {
+    color: hsl(var(--primary-800));
   }
 
   /* Background colors */
@@ -622,7 +631,7 @@
   }
 
   blockquote {
-    background-color: hsl(var(--primary-900) / 30);
+    background-color: hsl(var(--primary-100) / 30);
     border-left-color: hsl(var(--primary-500));
   }
 

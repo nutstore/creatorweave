@@ -297,7 +297,7 @@ export function ReasoningVisualization({
               key={step.id}
               className={`rounded-lg border ${
                 step.status === 'in_progress'
-                  ? 'border-primary-300 bg-primary-50'
+                  ? 'border-primary-100 bg-primary-50'
                   : 'border border-border dark:border-border bg-white dark:border-border dark:bg-card'
               } transition-colors`}
             >
@@ -327,7 +327,7 @@ export function ReasoningVisualization({
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-sm font-medium ${
-                      step.status === 'in_progress' ? 'text-primary-900 dark:text-primary-200' : 'text-primary dark:text-primary-foreground'
+                      step.status === 'in_progress' ? 'text-primary-700 dark:text-primary-700' : 'text-primary dark:text-primary-foreground'
                     }`}
                   >
                     {step.title}
@@ -368,23 +368,23 @@ export function ReasoningVisualization({
           return (
             <div
               key={toolCallStep.id}
-              className="border-primary-300 rounded-lg border bg-primary-50 p-3 dark:border-primary-900/40 dark:bg-primary-950/20"
+              className="border-primary-100 rounded-lg border bg-primary-50 p-3 dark:border-primary-100/40 dark:bg-primary-50/20"
             >
             <div className="flex items-start gap-3">
-              <div className="rounded-full bg-primary-100 p-1 dark:bg-primary-900/30">
+              <div className="rounded-full bg-primary-100 p-1 dark:bg-primary-100/30">
                 {(() => {
                   const Icon = getToolIcon(tool.name)
                   return <Icon className="h-3.5 w-3.5 animate-pulse text-primary-600" />
                 })()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-primary-900 text-sm font-medium dark:text-primary-200">{toolCallStep.title}</p>
-                <p className="mt-1 text-xs text-primary-700 dark:text-primary-300">{toolCallStep.description}</p>
+                <p className="text-primary-700 text-sm font-medium dark:text-primary-700">{toolCallStep.title}</p>
+                <p className="mt-1 text-xs text-primary-700 dark:text-primary-700">{toolCallStep.description}</p>
 
                 {/* Tool args preview */}
                 {argsText && (
                   <div className="mt-2 rounded bg-white/50 p-2 dark:bg-card/60">
-                    <p className="font-mono text-xs text-primary-800 dark:text-primary-300">
+                    <p className="font-mono text-xs text-primary-800 dark:text-primary-700">
                       {argsText}
                     </p>
                   </div>
@@ -428,7 +428,7 @@ export function InlineReasoning({ reasoning, isStreaming }: InlineReasoningProps
 
   return (
     <details
-      className={`group my-2 rounded-lg border ${isStreaming ? 'border-primary-300 bg-primary-50 dark:border-primary-900/40 dark:bg-primary-950/20' : 'border border-border dark:border-border bg-muted dark:bg-muted dark:border-border dark:bg-card'}`}
+      className={`group my-2 rounded-lg border ${isStreaming ? 'border-primary-100 bg-primary-50 dark:border-primary-100/40 dark:bg-primary-50/20' : 'border border-border dark:border-border bg-muted dark:bg-muted dark:border-border dark:bg-card'}`}
       open={isExpanded}
       onToggle={(e) => setIsExpanded(e.currentTarget.open)}
     >
@@ -436,7 +436,7 @@ export function InlineReasoning({ reasoning, isStreaming }: InlineReasoningProps
         <Brain
           className={`h-4 w-4 ${isStreaming ? 'animate-pulse text-primary-600' : 'text-tertiary dark:text-muted'}`}
         />
-        <span className={isStreaming ? 'text-primary-900 font-medium dark:text-primary-200' : 'text-secondary dark:text-muted'}>
+        <span className={isStreaming ? 'text-primary-700 font-medium dark:text-primary-700' : 'text-secondary dark:text-muted'}>
           {isStreaming ? 'Thinking...' : 'Thought Process'}
         </span>
         <ChevronRight

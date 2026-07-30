@@ -44,9 +44,9 @@ import { createUserMessage } from '@/agent/message-types'
 function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
   return (
     <div className="flex flex-col items-center justify-center h-full text-center py-16 px-6">
-      <div className="w-16 h-16 rounded-xl bg-primary-50/80 dark:bg-primary-950/20 flex items-center justify-center mb-4 shadow-sm">
+      <div className="w-16 h-16 rounded-xl bg-primary-50/80 dark:bg-primary-50/20 flex items-center justify-center mb-4 shadow-sm">
         <svg
-          className="w-10 h-10 text-primary-500 dark:text-primary-400"
+          className="w-10 h-10 text-primary-500 dark:text-primary-500"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -59,17 +59,17 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
           />
         </svg>
       </div>
-      <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 mb-3">{t('settings.syncPanel.syncPreview.emptyStateTitle')}</h2>
+      <h2 className="text-xl font-semibold text-foreground mb-3">{t('settings.syncPanel.syncPreview.emptyStateTitle')}</h2>
       <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-md leading-relaxed">
         {t('settings.syncPanel.syncPreview.emptyStateDescription')}
       </p>
       <div className="mt-8 grid grid-cols-1 gap-4 max-w-sm">
-        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-950/20 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-300 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-50/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-100/40 flex items-center justify-center text-primary-600 dark:text-primary-700 text-sm font-medium">
             1
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
+            <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step1Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
@@ -77,12 +77,12 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-950/20 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-300 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-50/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-100/40 flex items-center justify-center text-primary-600 dark:text-primary-700 text-sm font-medium">
             2
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
+            <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step2Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">
@@ -90,12 +90,12 @@ function EmptyState({ t }: { t: ReturnType<typeof useT> }): React.ReactNode {
             </p>
           </div>
         </div>
-        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-950/20 rounded-lg">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-primary-600 dark:text-primary-300 text-sm font-medium">
+        <div className="flex items-start gap-3 p-4 bg-primary-50 dark:bg-primary-50/20 rounded-lg">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-100/40 flex items-center justify-center text-primary-600 dark:text-primary-700 text-sm font-medium">
             3
           </div>
           <div className="text-left">
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-1">
+            <h3 className="text-sm font-medium text-foreground mb-1">
               {t('settings.syncPanel.syncPreview.step3Title')}
             </h3>
             <p className="text-xs text-neutral-600 dark:text-neutral-400">

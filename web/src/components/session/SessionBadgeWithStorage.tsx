@@ -531,7 +531,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       className={cn(
                         'flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors',
                         cleanupScope === 'old'
-                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                           : 'text-secondary hover:bg-muted dark:hover:bg-muted'
                       )}
                     >
@@ -551,7 +551,7 @@ export const ConversationStorageBadge: React.FC<ConversationStorageBadgeProps> =
                       className={cn(
                         'flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs transition-colors',
                         cleanupScope === 'all'
-                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                           : 'text-secondary hover:bg-muted dark:hover:bg-muted'
                       )}
                     >

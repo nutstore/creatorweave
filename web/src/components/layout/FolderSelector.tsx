@@ -198,7 +198,7 @@ export function FolderSelector({ buttonRef }: FolderSelectorProps = {}) {
           ref={setButtonRef}
           className={cn(
             'flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-border',
-            'text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600',
+            'text-secondary transition-colors hover:border-primary-100 hover:bg-primary-50 hover:text-primary-600',
             'dark:border-border dark:hover:border-primary-600 dark:hover:bg-muted',
             isAdding && 'cursor-wait opacity-70'
           )}

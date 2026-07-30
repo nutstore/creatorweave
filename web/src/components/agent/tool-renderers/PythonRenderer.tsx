@@ -18,7 +18,7 @@ registerRenderer({
     if (ctx.isExecuting && !ctx.isStreaming) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">python</code>
           <span className="text-xs text-blue-500">running...</span>
         </>
       )
@@ -28,7 +28,7 @@ registerRenderer({
     if (ctx.isStreaming) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">python</code>
           {codeLines > 0 && (
             <span className="ml-auto text-xs text-neutral-400 shrink-0">{codeLines} lines…</span>
           )}
@@ -45,7 +45,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">python</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">python</code>
         {hasError ? (
           <span className="ml-auto text-xs text-red-400 shrink-0">error</span>
         ) : parts.length > 0 ? (

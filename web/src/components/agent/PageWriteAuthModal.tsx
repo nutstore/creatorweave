@@ -32,9 +32,9 @@ export function PageWriteAuthModal() {
         {/* Header */}
         <div className="border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-950/50">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-50/50">
               <svg
-                className="h-5 w-5 text-primary-600 dark:text-primary-400"
+                className="h-5 w-5 text-primary-600 dark:text-primary-500"
                 viewBox="0 0 20 20"
                 fill="currentColor"
               >
@@ -50,7 +50,7 @@ export function PageWriteAuthModal() {
                 {t('agent.pageWriteAuth.title')}
               </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-primary-600 dark:text-primary-400">
+                <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-primary-600 dark:text-primary-500">
                   {pending.toolName}
                 </code>
               </p>

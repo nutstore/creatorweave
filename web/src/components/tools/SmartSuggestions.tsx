@@ -189,10 +189,10 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
     >
       {/* Drag overlay */}
       {isDragOver && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/70 transition-colors dark:border-primary-900/50 dark:bg-primary-950/10">
+        <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/70 transition-colors dark:border-primary-100/50 dark:bg-primary-50/10">
           <div className="text-center">
             <Upload className="mx-auto mb-2 h-8 w-8 text-primary-600" />
-            <p className="text-sm font-medium text-primary-900 dark:text-primary-200">{t('tools.dropFilesToAnalyze')}</p>
+            <p className="text-sm font-medium text-primary-700 dark:text-primary-700">{t('tools.dropFilesToAnalyze')}</p>
           </div>
         </div>
       )}
@@ -220,13 +220,13 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
             <button
               key={item.id}
               onClick={() => handleSuggestionClick(item)}
-              className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary-300 hover:bg-primary-50/50 hover:shadow-sm dark:border-border dark:bg-card dark:hover:bg-neutral-800"
+              className="group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-3 text-left transition-all hover:border-primary-100 hover:bg-primary-50/50 hover:shadow-sm dark:border-border dark:bg-card dark:hover:bg-neutral-800"
             >
               <div
                 className={`rounded-lg p-2 ${
                   item.type === 'upload'
-                    ? 'bg-primary-100 group-hover:bg-primary-200 dark:bg-primary-900/30 dark:group-hover:bg-primary-900/40'
-                    : 'bg-muted dark:bg-muted group-hover:bg-primary-100 dark:bg-muted dark:group-hover:bg-primary-900/30'
+                    ? 'bg-primary-100 group-hover:bg-primary-100 dark:bg-primary-100/30 dark:group-hover:bg-primary-100/40'
+                    : 'bg-muted dark:bg-muted group-hover:bg-primary-100 dark:bg-muted dark:group-hover:bg-primary-100/30'
                 } transition-colors`}
               >
                 <Icon
@@ -238,7 +238,7 @@ export function SmartSuggestions({ onExecutePrompt, className }: SmartSuggestion
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-primary group-hover:text-primary-900 dark:text-primary-foreground dark:group-hover:text-primary-200">
+                <p className="text-sm font-medium text-primary group-hover:text-primary-700 dark:text-primary-foreground dark:group-hover:text-primary-700">
                   {item.title}
                 </p>
                 <p className="mt-0.5 line-clamp-1 text-xs text-tertiary dark:text-muted">{item.description}</p>
@@ -325,7 +325,7 @@ export function InlineSuggestions({ userInput, onSelect, isVisible }: InlineSugg
           <button
             key={idx}
             onClick={() => onSelect(suggestion)}
-            className="rounded-lg bg-card px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-primary-50 hover:text-primary-700 dark:bg-card dark:text-muted dark:hover:bg-primary-900/30 dark:hover:text-primary-200"
+            className="rounded-lg bg-card px-3 py-1.5 text-xs font-medium text-secondary transition-colors hover:bg-primary-50 hover:text-primary-700 dark:bg-card dark:text-muted dark:hover:bg-primary-100/30 dark:hover:text-primary-700"
           >
             {suggestion}
           </button>

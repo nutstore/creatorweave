@@ -195,7 +195,7 @@ function AutoRenderer({ pluginResult, fileResults }: PluginResultRendererProps) 
           <tbody>
             {fileResults.map((file, i) => (
               <tr key={i} className="border-b last:border-0">
-                <td className="py-2 text-neutral-900 dark:text-neutral-100">{file.name}</td>
+                <td className="py-2 text-foreground">{file.name}</td>
                 <td className="py-2 text-right text-neutral-600 dark:text-neutral-300">
                   {formatCellValue(file.size, 'bytes')}
                 </td>
@@ -264,7 +264,7 @@ function TableRenderer({
               {schema.columns.map((col) => {
                 const value = getNestedValue(file, col.key)
                 return (
-                  <td key={col.key} className="px-4 py-3 text-neutral-900 dark:text-neutral-100">
+                  <td key={col.key} className="px-4 py-3 text-foreground">
                     {col.type === 'badge' ? (
                       <span
                         dangerouslySetInnerHTML={{ __html: formatCellValue(value, col.type) }}
@@ -313,7 +313,7 @@ function CardsRenderer({
 
         return (
           <div key={i} className="rounded-lg border bg-white p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900">
-            <h4 className="truncate font-medium text-neutral-900 dark:text-neutral-100" title={title}>
+            <h4 className="truncate font-medium text-foreground" title={title}>
               {title}
             </h4>
             {subtitle.length > 0 && (
@@ -322,7 +322,7 @@ function CardsRenderer({
               </p>
             )}
             {metric !== null && (
-              <p className="mt-2 text-lg font-semibold text-neutral-900 dark:text-neutral-100">{toDisplayString(metric)}</p>
+              <p className="mt-2 text-lg font-semibold text-foreground">{toDisplayString(metric)}</p>
             )}
           </div>
         )
@@ -355,7 +355,7 @@ function KeyValueRenderer({
           <div key={key} className="flex items-center gap-3 rounded-lg border bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="flex-1">
               <p className="text-xs text-neutral-600 dark:text-neutral-400">{label}</p>
-              <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{formatCellValue(value, type)}</p>
+              <p className="text-sm font-semibold text-foreground">{formatCellValue(value, type)}</p>
             </div>
           </div>
         )
@@ -373,7 +373,7 @@ function CodeRenderer({ data }: { data: unknown }) {
 
   return (
     <pre className="overflow-x-auto rounded-lg bg-neutral-900 p-4">
-      <code className="text-sm text-neutral-100 dark:text-neutral-200">{code}</code>
+      <code className="text-sm text-white">{code}</code>
     </pre>
   )
 }
@@ -387,11 +387,11 @@ function JsonRenderer({ data, collapsible = true }: { data: unknown; collapsible
 
   return (
     <details open={!collapsible} className="group">
-      <summary className="cursor-pointer text-sm font-medium text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100">
+      <summary className="cursor-pointer text-sm font-medium text-neutral-700 hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-foreground">
         Raw JSON
       </summary>
       <pre className="mt-3 overflow-x-auto rounded-lg bg-neutral-100 p-4 text-xs dark:bg-neutral-800">
-        <code className="text-neutral-800 dark:text-neutral-200">{json}</code>
+        <code className="text-neutral-800 dark:text-foreground">{json}</code>
       </pre>
     </details>
   )
@@ -438,7 +438,7 @@ function ChartRenderer({
                 style={{ width: `${percent}%` }}
               />
             </div>
-            <div className="w-16 flex-shrink-0 text-right text-sm font-medium text-neutral-900 dark:text-neutral-100">
+            <div className="w-16 flex-shrink-0 text-right text-sm font-medium text-foreground">
               {typeof rawValue === 'number' ? rawValue.toLocaleString() : toDisplayString(rawValue)}
             </div>
           </div>

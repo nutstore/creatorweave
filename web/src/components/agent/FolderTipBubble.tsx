@@ -92,7 +92,7 @@ export function FolderTipBubble({
 
       <div className="mb-2 flex items-center gap-2">
         <FolderOpen className="h-4 w-4 text-primary-600" />
-        <span className="text-[13px] font-medium text-neutral-900 dark:text-neutral-100">
+        <span className="text-[13px] font-medium text-foreground">
           {t('agent.folderTip.title')}
         </span>
       </div>

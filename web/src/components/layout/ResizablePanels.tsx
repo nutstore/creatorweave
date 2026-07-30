@@ -237,10 +237,10 @@ export function ResizablePanels({
           onMouseDown={handleDividerMouseDown}
           className={`${
             isHorizontal
-              ? 'hover:bg-primary-300 w-1 cursor-col-resize'
-              : 'hover:bg-primary-300 h-1 cursor-row-resize'
+              ? 'hover:bg-primary-100 w-1 cursor-col-resize'
+              : 'hover:bg-primary-100 h-1 cursor-row-resize'
           } pointer-events-auto flex-shrink-0 select-none bg-neutral-200 transition-colors ${
-            isDragging ? 'bg-primary-400 cursor-grabbing' : ''
+            isDragging ? 'bg-primary-500 cursor-grabbing' : ''
           }`}
           style={{ [isHorizontal ? 'height' : 'width']: '100%' }}
         />

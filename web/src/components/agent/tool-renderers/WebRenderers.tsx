@@ -36,7 +36,7 @@ registerRenderer({
     const fallback = provider && requestedProvider && provider !== requestedProvider
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">web_search</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">web_search</code>
         {query && <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{query}&quot;</span>}
         {!ctx.isExecuting && !ctx.isStreaming && (
           <>
@@ -87,7 +87,7 @@ registerRenderer({
         )}
         {results.slice(0, 6).map((r, i) => (
           <div key={i} className="space-y-0.5">
-            <div className="text-xs font-medium text-neutral-800 dark:text-neutral-200 truncate">{r.title}</div>
+            <div className="text-xs font-medium text-neutral-800 dark:text-foreground truncate">{r.title}</div>
             <div className="text-[10px] text-neutral-400 dark:text-neutral-500 truncate">{r.url}</div>
             {r.snippet && <div className="text-[11px] text-neutral-500 dark:text-neutral-400 line-clamp-2">{r.snippet}</div>}
           </div>
@@ -113,7 +113,7 @@ registerRenderer({
     const meta = extractMeta(ctx)
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">web_fetch</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">web_fetch</code>
         {meta.title ? (
           <span className="truncate text-neutral-500 dark:text-neutral-400 max-w-[260px]">{meta.title}</span>
         ) : (
@@ -156,7 +156,7 @@ registerRenderer({
         <div className="px-4 pt-3 pb-2.5 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1 space-y-1.5">
             {meta.title && (
-              <div className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200 leading-snug line-clamp-2">{meta.title}</div>
+              <div className="text-[13px] font-medium text-neutral-800 dark:text-foreground leading-snug line-clamp-2">{meta.title}</div>
             )}
             <div className="flex items-center gap-2 text-[10px] text-neutral-400 dark:text-neutral-500">
               <span className="truncate">{meta.siteName || shortUrl(url)}</span>
@@ -224,9 +224,9 @@ function MarkdownLine({ children: line }: { children: string }) {
 
 function renderLine(line: string): string {
   const s = esc(line)
-  if (s.startsWith('### ')) return `<span class="font-semibold text-neutral-800 dark:text-neutral-200" style="font-size:12px">${s}</span>`
-  if (s.startsWith('## '))  return `<span class="font-semibold text-neutral-800 dark:text-neutral-200" style="font-size:12px">${s}</span>`
-  if (s.startsWith('# '))   return `<span class="font-semibold text-neutral-800 dark:text-neutral-200" style="font-size:12px">${s}</span>`
+  if (s.startsWith('### ')) return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
+  if (s.startsWith('## '))  return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
+  if (s.startsWith('# '))   return `<span class="font-semibold text-neutral-800 dark:text-foreground" style="font-size:12px">${s}</span>`
   if (s.startsWith('> '))   return `<span class="text-neutral-400 dark:text-neutral-500 pl-2 border-l-2 border-neutral-200 dark:border-neutral-700">${s.slice(2)}</span>`
   if (s.match(/^- /))       return `<span class="text-neutral-300 dark:text-neutral-600 select-none mr-2">·</span>${renderInline(s.slice(2))}`
   if (s.match(/^\d+\. /))   return `<span class="text-neutral-300 dark:text-neutral-600 select-none mr-1">${s.match(/^(\d+\.)/)![1]}</span>${renderInline(s.replace(/^\d+\. /, ''))}`

@@ -86,7 +86,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
               className={cn(
                 'truncate text-sm font-medium',
                 skill.enabled
-                  ? 'text-neutral-900 dark:text-neutral-100'
+                  ? 'text-foreground'
                   : 'text-neutral-500 dark:text-neutral-400'
               )}
             >
@@ -170,7 +170,7 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           {!isReadOnly && (
             <BrandButton
               iconButton
-              className="h-7 w-7 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-200"
+              className="h-7 w-7 text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-foreground"
               onClick={() => onEdit(skill)}
               title={t('skillCard.edit')}
             >

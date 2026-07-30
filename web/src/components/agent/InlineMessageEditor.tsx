@@ -79,7 +79,7 @@ const SuggestionDropdown = forwardRef(
       onSelect,
       renderItem,
       width = 'w-72',
-      selectedColor = 'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-200',
+      selectedColor = 'bg-primary-50 text-primary-700 dark:bg-primary-100/40 dark:text-primary-700',
     }: SuggestionDropdownProps<T>,
     ref: React.Ref<SuggestionDropdownHandle>,
   ) {
@@ -143,7 +143,7 @@ const SuggestionDropdown = forwardRef(
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   selected
                     ? selectedColor
-                    : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800'
+                    : 'hover:bg-neutral-100 dark:text-foreground dark:hover:bg-neutral-800'
                 }`}
                 onMouseDown={(e) => {
                   e.preventDefault()
@@ -296,7 +296,7 @@ export function InlineMessageEditor({
       Mention.configure({
         HTMLAttributes: {
           class:
-            'inline-flex items-center rounded px-1.5 py-0.5 bg-primary-100 text-primary-800 text-sm font-medium dark:bg-primary-900/60 dark:text-primary-200',
+            'inline-flex items-center rounded px-1.5 py-0.5 bg-primary-100 text-primary-800 text-sm font-medium dark:bg-primary-100/60 dark:text-primary-700',
         },
         suggestion: {
           char: '@',
@@ -524,8 +524,8 @@ export function InlineMessageEditor({
       onDrop={handleDrop}
     >
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-400 bg-primary-50/80 dark:bg-primary-900/30">
-          <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-300">
+        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/80 dark:bg-primary-100/30">
+          <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
             <Paperclip className="h-8 w-8" />
             <span className="text-sm font-medium">Drop files here</span>
           </div>
@@ -546,7 +546,7 @@ export function InlineMessageEditor({
       />
 
       {/* Editor container — adapted from AgentRichInput but slightly more compact */}
-      <div className="relative w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-3 py-3 text-sm text-neutral-900 shadow-sm transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 dark:border-neutral-600 dark:bg-neutral-900 dark:text-neutral-100 dark:focus-within:border-primary-500">
+      <div className="relative w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-3 py-3 text-sm shadow-sm transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 dark:border-neutral-600 dark:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
             <EditorContent editor={editor} />
@@ -565,14 +565,14 @@ export function InlineMessageEditor({
                       />
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">
-                        <ImageIcon className="h-4 w-4 text-neutral-400" />
+                        <ImageIcon className="h-4 w-4" />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                      <div className="max-w-[140px] truncate text-xs font-medium dark:text-neutral-300">
                         {asset.name}
                       </div>
-                      <div className="text-[10px] text-neutral-400">
+                      <div className="text-[10px]">
                         {formatFileSize(asset.size)}
                       </div>
                     </div>
@@ -582,7 +582,7 @@ export function InlineMessageEditor({
                       onClick={() => removePendingAsset(asset.id)}
                       aria-label={`Remove ${asset.name}`}
                     >
-                      <X className="h-3.5 w-3.5 text-neutral-500" />
+                      <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 ))}
@@ -593,7 +593,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="absolute left-3 top-4 rounded p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className="absolute left-3 top-4 rounded p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           title="Attach files"
         >
           <Paperclip className="h-4 w-4" />
@@ -605,7 +605,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-md px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
         >
           {cancelLabel}
         </button>
@@ -630,7 +630,7 @@ export function InlineMessageEditor({
             <>
               <span className="font-medium">@{candidate.id}</span>
               {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs text-neutral-500 dark:text-neutral-400">
+                <span className="truncate pl-3 text-xs dark:text-neutral-400">
                   {candidate.name}
                 </span>
               )}
@@ -650,7 +650,7 @@ export function InlineMessageEditor({
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file) => (
             <>
-              <span className="mt-0.5 shrink-0 text-neutral-400 dark:text-neutral-500">
+              <span className="mt-0.5 shrink-0 dark:text-neutral-500">
                 {file.isDirectory ? (
                   <FolderIcon className="h-3.5 w-3.5" />
                 ) : (
@@ -659,12 +659,12 @@ export function InlineMessageEditor({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium leading-5">{file.name}</div>
-                <div className="truncate text-[11px] leading-4 text-neutral-400 dark:text-neutral-500">
+                <div className="truncate text-[11px] leading-4 dark:text-neutral-500">
                   {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}

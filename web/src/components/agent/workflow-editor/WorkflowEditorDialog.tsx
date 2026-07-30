@@ -264,7 +264,7 @@ function WorkflowEditorInner({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
             {t('workflowEditorDialog.back')}
@@ -276,7 +276,7 @@ function WorkflowEditorInner({
             <div className="flex h-6 w-6 items-center justify-center rounded-md bg-neutral-100 dark:bg-neutral-800">
               <div className="h-3 w-3 rounded-sm bg-neutral-400 dark:bg-neutral-500" />
             </div>
-            <h1 className="text-[13px] font-semibold tracking-tight text-neutral-900 dark:text-neutral-100">
+            <h1 className="text-[13px] font-semibold tracking-tight text-foreground">
               {t('workflowEditorDialog.workflowEditor')}
             </h1>
           </div>

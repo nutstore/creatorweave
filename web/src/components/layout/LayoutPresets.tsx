@@ -120,7 +120,7 @@ export function DeveloperLayout({
 
           {/* Terminal (optional) */}
           {terminal ? (
-            <div className="h-full bg-neutral-900 text-neutral-100">{terminal}</div>
+            <div className="h-full bg-neutral-900 text-white">{terminal}</div>
           ) : (
             <div className="flex h-full items-center justify-center bg-neutral-50 text-neutral-400">
               <span>Terminal (coming soon)</span>

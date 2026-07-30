@@ -9,11 +9,11 @@ const textareaVariants = cva(
     variants: {
       state: {
         default:
-          "border-gray-200 bg-transparent focus-visible:border-primary-600 focus-visible:shadow-[0_0_6px_rgba(13,148,136,0.13)] dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
+          "border-gray-200 bg-transparent focus-visible:border-primary-600 focus-visible:shadow-[0_0_6px_rgba(13,148,136,0.13)] dark:border-neutral-700 dark:bg-neutral-900",
         error:
-          "border-[1.5px] border-danger-solid bg-danger-bg focus-visible:border-danger-solid focus-visible:shadow-none dark:bg-danger-bg/40 dark:text-neutral-100",
+          "border-[1.5px] border-danger-solid bg-danger-bg focus-visible:border-danger-solid focus-visible:shadow-none dark:bg-danger-bg/40",
         filled:
-          "border-gray-200 bg-transparent dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100",
+          "border-gray-200 bg-transparent dark:border-neutral-700 dark:bg-neutral-900",
         disabled:
           "border-gray-200 bg-gray-100 text-muted placeholder:text-muted dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-500 dark:placeholder:text-neutral-500",
       },

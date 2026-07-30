@@ -319,7 +319,7 @@ export function DataPreview({ data, fileType, onError }: DataPreviewProps) {
               setCurrentPage(1)
             }}
             placeholder="Search data..."
-            className="focus:border-primary-300 w-full rounded-lg border border bg-muted py-2 pl-10 pr-4 text-sm focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+            className="focus:border-primary-100 w-full rounded-lg border border bg-muted py-2 pl-10 pr-4 text-sm focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
           />
         </div>
         <span className="text-sm text-tertiary dark:text-muted">

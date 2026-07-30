@@ -53,7 +53,7 @@ export function WebMCPSetupGuideCard({ t }: WebMCPSetupGuideCardProps) {
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
-      <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+      <p className="text-sm font-medium text-secondary dark:text-foreground">
         {t('settings.webMCPSetupTitle')}
       </p>
       <p className="mt-1 text-xs text-tertiary">

@@ -185,8 +185,8 @@ export const MessageNavBar = memo(function MessageNavBar({
                       className={[
                         'rounded-full border-0 ring-2 ring-background transition-all duration-200',
                         isActive
-                          ? 'bg-primary-500 dark:bg-primary-400'
-                          : 'bg-primary-300/60 hover:bg-primary-500 dark:bg-primary-700/60 dark:hover:bg-primary-400',
+                          ? 'bg-primary-500 dark:bg-primary-500'
+                          : 'bg-primary-100/60 hover:bg-primary-500 dark:bg-primary-700/60 dark:hover:bg-primary-500',
                       ].filter(Boolean).join(' ')}
                       style={{ width: isActive ? 7 : 6, height: isActive ? 7 : 6 }}
                     />

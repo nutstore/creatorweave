@@ -157,7 +157,7 @@ const ConversationItem = memo(function ConversationItem({
           aria-label={workspaceLabel}
           className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
             isActive
-              ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              ? 'bg-primary-50 font-semibold text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : 'hover:bg-hover text-secondary'
           }`}
           onClick={() => {
@@ -190,7 +190,7 @@ const ConversationItem = memo(function ConversationItem({
           {!isEditing && (
             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md border border-neutral-200 bg-neutral-100 p-0.5 opacity-0 shadow-sm group-hover:opacity-100 focus-within:opacity-100 transition-opacity dark:border-neutral-600 dark:bg-neutral-700">
               <button
-                className="rounded p-0.5 text-secondary transition-colors hover:bg-neutral-200 hover:text-primary dark:hover:bg-neutral-600 dark:hover:text-primary-300"
+                className="rounded p-0.5 text-secondary transition-colors hover:bg-neutral-200 hover:text-primary dark:hover:bg-neutral-600 dark:hover:text-primary-700"
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
@@ -236,7 +236,7 @@ const ConversationItem = memo(function ConversationItem({
               }}
               onBlur={onRenameBlur}
               onClick={(e) => e.stopPropagation()}
-              className="min-w-0 flex-1 rounded border border-primary-300 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
+              className="min-w-0 flex-1 rounded border border-primary-100 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
               maxLength={100}
             />
           ) : (
@@ -251,7 +251,7 @@ const ConversationItem = memo(function ConversationItem({
             </span>
           )}
           {hasSchedule && !isEditing && (
-            <Clock className="h-3 w-3 shrink-0 text-primary-400" />
+            <Clock className="h-3 w-3 shrink-0 text-primary-500" />
           )}
         </div>
       </ContextMenuTrigger>
@@ -500,7 +500,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           variant="ghost"
           className={`h-7 gap-1 px-2 py-1 text-xs ${
             resourceTab === 'files'
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : ''
           }`}
           onClick={() => onTabChange('files')}
@@ -512,7 +512,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           variant="ghost"
           className={`h-7 gap-1 px-2 py-1 text-xs ${
             resourceTab === 'pending'
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : ''
           }`}
           onClick={async () => {
@@ -532,7 +532,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           variant="ghost"
           className={`h-7 gap-1 px-2 py-1 text-xs ${
             resourceTab === 'snapshots'
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : ''
           }`}
           onClick={() => onTabChange('snapshots')}
@@ -545,7 +545,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           variant="ghost"
           className={`h-7 gap-1 px-2 py-1 text-xs ${
             resourceTab === 'plugins'
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+              ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               : ''
           }`}
           onClick={() => onTabChange('plugins')}
@@ -1266,7 +1266,7 @@ export const Sidebar = memo(function Sidebar({
               title={t('sidebar.dragToResizeHeight')}
             >
               {/* center dot */}
-              <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
+              <div className="group-hover:bg-primary-500 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
             </div>
           )}
 
@@ -1393,7 +1393,7 @@ export const Sidebar = memo(function Sidebar({
           title={t('sidebar.dragToResizeWidth')}
         >
           {/* center dot */}
-          <div className="group-hover:bg-primary-400 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
+          <div className="group-hover:bg-primary-500 h-1 w-1 rounded-full bg-neutral-300 transition-colors" />
         </div>
       )}
 

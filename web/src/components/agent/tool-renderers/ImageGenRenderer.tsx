@@ -124,7 +124,7 @@ registerRenderer({
     if (ctx.isStreaming) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">generate_image</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
           {prompt && (
             <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               &quot;{truncatePrompt(prompt)}&quot;
@@ -138,7 +138,7 @@ registerRenderer({
     if (ctx.isExecuting) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">generate_image</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
           {prompt && (
             <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               &quot;{truncatePrompt(prompt)}&quot;
@@ -175,7 +175,7 @@ registerRenderer({
     // Success
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">generate_image</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">generate_image</code>
         {prompt && (
           <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
             &quot;{truncatePrompt(prompt)}&quot;

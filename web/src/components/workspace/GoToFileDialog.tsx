@@ -200,7 +200,7 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
       <div className="relative z-10 flex w-[min(600px,90vw)] flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-800">
         {/* Search input */}
         <div className="flex items-center gap-2 border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
-          <Search className="h-4 w-4 shrink-0 text-neutral-400" />
+          <Search className="h-4 w-4 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -208,14 +208,14 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('goToFile.placeholder')}
-            className="min-w-0 flex-1 bg-transparent text-sm text-neutral-900 outline-none placeholder:text-neutral-400 dark:text-neutral-100"
+            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-neutral-400"
           />
           {isIndexing && (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-neutral-400" />
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           )}
           {query && (
             <button
-              className="shrink-0 rounded p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+              className="shrink-0 rounded p-0.5 hover:text-neutral-600 dark:hover:text-neutral-300"
               onClick={() => setQuery('')}
             >
               <X className="h-3.5 w-3.5" />
@@ -229,23 +229,23 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
           className="custom-scrollbar max-h-[50vh] overflow-y-auto py-1"
         >
           {isIndexing && allPaths.length === 0 && (
-            <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm text-neutral-400">
+            <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm">
               <Loader2 className="h-4 w-4 animate-spin" />
               {t('goToFile.scanning')}
             </div>
           )}
           {results.length === 0 && !isIndexing && query.trim() && (
-            <div className="px-4 py-8 text-center text-sm text-neutral-400">
+            <div className="px-4 py-8 text-center text-sm">
               {t('goToFile.noMatch')}
             </div>
           )}
           {results.length === 0 && !query.trim() && allPaths.length > 0 && (
-            <div className="px-4 py-8 text-center text-sm text-neutral-400">
+            <div className="px-4 py-8 text-center text-sm">
               {t('goToFile.typeToSearch')}
             </div>
           )}
           {allPaths.length === 0 && indexDone && !isIndexing && (
-            <div className="px-4 py-8 text-center text-sm text-neutral-400">
+            <div className="px-4 py-8 text-center text-sm">
               {t('goToFile.noAccess')}
             </div>
           )}
@@ -259,16 +259,16 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
                 key={result.path}
                 className={`flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors ${
                   isSelected
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-                    : 'text-neutral-700 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700/50'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
+                    : 'hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-700/50'
                 }`}
                 onClick={() => handleSelect(result.path)}
                 onMouseEnter={() => setSelectedIndex(index)}
               >
-                <File className="h-4 w-4 shrink-0 text-neutral-400" />
+                <File className="h-4 w-4 shrink-0" />
                 <span className="min-w-0 truncate font-medium">{fileName}</span>
                 {dirPath && (
-                  <span className="min-w-0 shrink-0 text-xs text-neutral-400">
+                  <span className="min-w-0 shrink-0 text-xs">
                     {dirPath}
                   </span>
                 )}
@@ -279,7 +279,7 @@ export function GoToFileDialog({ open, onClose, onSelectFile }: GoToFileDialogPr
 
         {/* Footer hint */}
         <div className="border-t border-neutral-200 px-4 py-2 dark:border-neutral-700">
-          <p className="text-[11px] text-neutral-400">
+          <p className="text-[11px]">
             {t('goToFile.footer.select')} · {t('goToFile.footer.open')} · {t('goToFile.footer.close')} · {allPaths.length > 100
               ? t('goToFile.footer.truncated', { count: allPaths.length })
               : t('goToFile.footer.total', { count: allPaths.length })}

@@ -208,7 +208,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
           placeholder="*.ts, src/**/*.tsx, **/*.test.ts"
           disabled={state.isRunning}
         />
-        <p className="mt-1 text-xs text-neutral-500">Glob pattern to match files</p>
+        <p className="mt-1 text-xs">Glob pattern to match files</p>
       </div>
 
       <div>
@@ -281,7 +281,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
           onChange={(e) => setReadPaths(e.target.value)}
           placeholder="src/index.ts&#10;src/utils.ts&#10;README.md"
           disabled={state.isRunning}
-          className="min-h-[120px] w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+          className="min-h-[120px] w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-neutral-600 dark:bg-neutral-800"
         />
       </div>
 
@@ -374,7 +374,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
                       {result.success && <Badge variant="success">Read</Badge>}
                       {result.error && <Badge variant="error">Error</Badge>}
                       {result.size && (
-                        <span className="text-xs text-neutral-500">{result.size} bytes</span>
+                        <span className="text-xs">{result.size} bytes</span>
                       )}
                     </div>
                     {result.content && (
@@ -434,7 +434,7 @@ export function BatchOperationsPanel({ onExecute, onUndo, className }: BatchOper
         {state.isRunning && (
           <div className="mb-4">
             <Progress value={state.progress} className="h-2" />
-            <p className="mt-1 text-xs text-neutral-500">Processing operation...</p>
+            <p className="mt-1 text-xs">Processing operation...</p>
           </div>
         )}
 

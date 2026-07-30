@@ -604,7 +604,7 @@ export const SessionSyncDialog: React.FC<SessionSyncDialogProps> = ({
                     {sessions.map((session) => (
                       <li
                         key={session.syncId}
-                        className="hover:border-primary-200 group flex items-center gap-3 rounded-lg border border p-3 transition-colors hover:bg-primary-50/50"
+                        className="hover:border-primary-100 group flex items-center gap-3 rounded-lg border border p-3 transition-colors hover:bg-primary-50/50"
                       >
                         {/* Session Icon */}
                         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100">

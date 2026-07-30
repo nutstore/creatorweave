@@ -388,7 +388,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   return (
     <div className={showAvatar ? 'flex gap-3' : ''}>
       {showAvatar && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100">
           <Bot className="h-4 w-4" />
         </div>
       )}
@@ -413,7 +413,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Waiting indicator */}
         {isWaiting && !currentToolCall && !isStreamingReasoning && !isStreamingContent && (
-          <div className="inline-block rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+          <div className="inline-block rounded-lg bg-white px-4 py-2 text-base shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:ring-neutral-700">
             <span className="flex items-center gap-1.5">
               <span
                 className="h-1.5 w-1.5 animate-pulse rounded-full bg-neutral-400 dark:bg-neutral-500"
@@ -435,11 +435,11 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Iteration limit reached hint (only when not processing) */}
         {!isProcessing && !isWaiting && iterationLimitReached && (
-          <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-relaxed text-neutral-400 dark:text-neutral-500">
+          <div className="flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs leading-relaxed dark:text-neutral-500">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
               {t('conversation.iterationLimit.reached', { count: iterationLimitReached })}
-              <span className="ml-1 text-neutral-350 dark:text-neutral-550">
+              <span className="ml-1 dark:text-neutral-550">
                 {t('conversation.iterationLimit.hint')}
               </span>
             </span>
@@ -447,7 +447,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               <button
                 type="button"
                 onClick={() => conversationActions.sendMessage!('继续')}
-                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/30 dark:hover:text-neutral-300"
+                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/30 dark:hover:text-neutral-300"
               >
                 {t('conversation.iterationLimit.continue')}
               </button>
@@ -457,7 +457,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Summary footer (only when not processing) */}
         {!isProcessing && !isWaiting && (
-          <div className="flex items-center gap-2 text-xs text-neutral-400">
+          <div className="flex items-center gap-2 text-xs">
             <span>
               {new Date(turn.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
@@ -476,7 +476,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
                   const cache = turn.totalUsage.accumulatedCacheTokens ?? turn.totalUsage.cacheReadTokens
                   return cache ? (
                     <span className="inline-flex items-center gap-0.5" title={t('conversation.usage.cache') || 'cache hit'}>
-                      <Database className="h-3 w-3 text-neutral-400" />{formatTokens(cache)}
+                      <Database className="h-3 w-3" />{formatTokens(cache)}
                     </span>
                   ) : null
                 })()}
@@ -492,7 +492,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               type="button"
               onClick={handleBranch}
               disabled={isBranching || !conversationId}
-              className={`inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50`}
+              className={`inline-flex items-center rounded p-1 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50`}
               title={t('conversation.branch') || 'Branch from here'}
               aria-label={t('conversation.branch') || 'Branch from here'}
             >
@@ -657,7 +657,7 @@ const StreamingContentSection = memo(function StreamingContentSection({
 
       {/* Content */}
       {content && (
-        <div className="rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
+        <div className="rounded-lg bg-white px-4 py-2 text-base shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:ring-neutral-700">
           {lightweight ? (
             <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
           ) : (
@@ -724,7 +724,7 @@ const AssistantStep = memo(function AssistantStep({
                     ? 'rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-base text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100'
                     : isWorkflowRealRun
                       ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100'
-                      : 'rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
+                      : 'rounded-lg bg-white px-4 py-2 text-base shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:ring-neutral-700'
               }
             >
               {isContextSummary && <ContextSummaryCard content={message.content!} />}
@@ -776,7 +776,7 @@ const AssistantStep = memo(function AssistantStep({
                   <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                     <button
                       type="button"
-                      className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
+                      className="rounded-md bg-white/90 p-1.5 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-foreground dark:hover:bg-neutral-700"
                       title={t('conversation.imageGen.downloadImage')}
                       aria-label={t('conversation.imageGen.downloadImage')}
                       onClick={() => downloadImage(img.data, img.mimeType, `image-${idx + 1}`)}

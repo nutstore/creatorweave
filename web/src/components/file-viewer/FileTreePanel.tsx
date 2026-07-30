@@ -7,7 +7,7 @@
  * - Border radius: rounded-md (6px)
  * - Colors: Uses brand semantic colors (primary, secondary, danger, etc.)
  * - Hover state: bg-hover (hsl(var(--bg-hover)))
- * - Selected state: bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300
+ * - Selected state: bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700
  *
  * Phase 3 Integration:
  * - Shows file modification status from OPFS pending changes
@@ -319,7 +319,7 @@ const TreeNodeRow = memo(function TreeNodeRow({
         data-tree-path={node.path}
         className={`group flex cursor-pointer items-center gap-2 rounded-md h-7 pr-3 text-xs transition-colors ${
           selected
-            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+            ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
             : 'hover:bg-hover text-secondary'
         }`}
         style={{ paddingLeft: `${indent + 4}px` }}

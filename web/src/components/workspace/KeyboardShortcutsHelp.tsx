@@ -129,7 +129,7 @@ export function KeyboardShortcutsHelp({
           <div className="max-h-[60vh] space-y-6 overflow-y-auto">
             {Array.from(shortcutsByCategory.entries()).map(([category, shortcuts]) => (
               <div key={category}>
-                <h3 className="mb-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <h3 className="mb-2 text-sm font-semibold text-foreground">
                   {category}
                 </h3>
                 <div className="space-y-1">

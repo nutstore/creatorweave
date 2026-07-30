@@ -83,7 +83,7 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
                   onClick={() => handleThemeSelect(themeMode)}
                   className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors ${
                     isActive
-                      ? 'dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700'
+                      ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
                       : 'text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
                   }`}
                 >

@@ -867,7 +867,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
               {t('filePreview.conflict')}
             </span>
           )}
-          <span className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200" title={filePath}>
+          <span className="truncate text-xs font-medium text-neutral-700 dark:text-foreground" title={filePath}>
             {fileName}
           </span>
           <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-500">{formatBytes(fileSize)}</span>
@@ -1138,7 +1138,7 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
           )}
           <div className="flex items-start gap-2 px-3 pb-2.5">
             <textarea
-              className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-neutral-500"
+              className="min-h-[48px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-[13px] leading-snug text-neutral-800 outline-none focus:border-neutral-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-foreground dark:focus:border-neutral-500"
               placeholder={t('filePreview.addComment')}
               autoFocus
               rows={2}

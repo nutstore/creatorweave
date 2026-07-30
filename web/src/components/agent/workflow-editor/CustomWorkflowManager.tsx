@@ -113,7 +113,7 @@ export function CustomWorkflowManager({
               <FolderOpen className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+              <h1 className="text-lg font-semibold text-foreground">
                 {t('customWorkflowManager.title')}
               </h1>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
@@ -153,7 +153,7 @@ export function CustomWorkflowManager({
                   <FolderOpen className="h-8 w-8 text-neutral-400" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  <h3 className="text-sm font-medium text-foreground">
                     {searchQuery ? t('customWorkflowManager.noResultsWithSearch') : t('customWorkflowManager.noResultsWithoutSearch')}
                   </h3>
                   <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
@@ -183,7 +183,7 @@ export function CustomWorkflowManager({
                           <FileText className="h-5 w-5 text-neutral-500" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                          <h3 className="text-sm font-medium text-foreground">
                             {workflow.name}
                           </h3>
                           <div className="flex items-center gap-2 mt-1">
@@ -252,7 +252,7 @@ export function CustomWorkflowManager({
         {deleteConfirmId && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm dark:bg-black/40">
             <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-xl dark:border-neutral-700 dark:bg-neutral-800">
-              <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+              <h3 className="text-sm font-medium text-foreground">
                 {t('customWorkflowManager.confirmDelete')}
               </h3>
               <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">

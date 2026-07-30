@@ -175,7 +175,7 @@ registerRenderer({
     if (!log) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">git_log</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
           {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
         </>
@@ -184,7 +184,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">git_log</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
         {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1.5 shrink-0">
           <span className="text-xs text-neutral-400">{log.commits.length}{log.hasMore ? '+' : ''} commits</span>
@@ -227,7 +227,7 @@ registerRenderer({
             <div className="min-w-0 flex-1">
               {/* First line: summary */}
               <div className="flex items-center gap-1.5">
-                <span className="truncate text-neutral-700 dark:text-neutral-200">
+                <span className="truncate text-neutral-700 dark:text-foreground">
                   {commit.summary || '(no message)'}
                 </span>
                 <span className={statusColor(commit.status)}>{commit.status}</span>
@@ -278,7 +278,7 @@ registerRenderer({
     if (!show) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">git_show</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
           {snapshotId && (
             <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
               {shortId(snapshotId)}
@@ -294,7 +294,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">git_show</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
         <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">
           {shortId(show.id)}
         </span>
@@ -328,7 +328,7 @@ registerRenderer({
             <span className="text-[10px]">{sourceIcon(show.source)}</span>
           </div>
           {show.summary && (
-            <div className="text-xs text-neutral-700 dark:text-neutral-200 whitespace-pre-wrap">
+            <div className="text-xs text-neutral-700 dark:text-foreground whitespace-pre-wrap">
               {show.summary.split('\n')[0]}
             </div>
           )}

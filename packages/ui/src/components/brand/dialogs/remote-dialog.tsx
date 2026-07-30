@@ -113,7 +113,7 @@ const RemoteDialogContent = React.forwardRef<
         {/* Connection Status */}
         {connected ? (
           <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg bg-success-bg border border-success-200">
-            <div className="h-2 w-2 rounded-full bg-success-500" />
+            <div className="h-2 w-2 rounded-full bg-success" />
             <span className="text-sm font-medium text-success-foreground">已连接</span>
             <span className="text-xs text-success-foreground">{connectedDevices} 个设备</span>
             <Lock className="h-3 w-3 text-success-foreground" />

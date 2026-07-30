@@ -178,7 +178,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
       {/* Header bar */}
       {result.title && (
         <div className="flex items-center justify-between rounded-t-lg border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{result.title}</span>
+          <span className="text-sm font-medium text-neutral-700 dark:text-foreground">{result.title}</span>
           <div className="flex items-center gap-2">
             <div
               className={`h-2 w-2 rounded-full transition-colors ${
@@ -212,7 +212,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload() // Force reload
             }}
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Refresh
           </button>
@@ -223,7 +223,7 @@ export function PluginHTMLRenderer({ result, onAction, analysisData }: PluginHTM
                 setHeight(result.height || 400)
               }
             }}
-            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-xs text-neutral-500 transition-colors hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Reset Size
           </button>

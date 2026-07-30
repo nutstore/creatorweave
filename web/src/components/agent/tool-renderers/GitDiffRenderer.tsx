@@ -87,7 +87,7 @@ registerRenderer({
     if (!diff) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">git_diff</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
           {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
           {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
@@ -99,7 +99,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">git_diff</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">git_diff</code>
         {MODE_LABELS[mode] && <span className="text-xs text-neutral-400">{MODE_LABELS[mode]}</span>}
         {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1 shrink-0">

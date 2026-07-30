@@ -183,7 +183,7 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
         <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
           <div className="flex items-center gap-2">
             <List className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-            <h2 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-neutral-900 dark:text-neutral-100">
+            <h2 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">
               {renderHtmlContent(node.content || 'Untitled')}
             </h2>
             {hasChildren && (
@@ -292,7 +292,7 @@ function TreeNode({ node, allNodes, depth, defaultExpanded, imageUrls, isRoot, o
           <div className={`
             text-[13px] leading-relaxed
             ${isParent
-              ? 'font-medium text-neutral-900 dark:text-neutral-100'
+              ? 'font-medium text-foreground'
               : 'text-neutral-700 dark:text-neutral-300'
             }
             ${isCompleted ? 'text-neutral-400 line-through dark:text-neutral-500' : ''}

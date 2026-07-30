@@ -26,7 +26,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">write</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">write</code>
         {path && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
         )}
@@ -329,7 +329,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                         placeholder="添加评论…"
                         autoFocus
                         rows={2}
-                        className="min-h-[44px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2 py-1 text-[13px] leading-snug text-neutral-800 outline-none focus:border-blue-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-blue-500"
+                        className="min-h-[44px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2 py-1 text-[13px] leading-snug text-neutral-800 outline-none focus:border-blue-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-foreground dark:focus:border-blue-500"
                       />
                       <button
                         type="button"
@@ -555,7 +555,7 @@ function ContentPreview({ singlePath, content, isStreaming }: { singlePath?: str
                             placeholder="添加评论…"
                             autoFocus
                             rows={2}
-                            className="min-h-[44px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2 py-1 text-[13px] leading-snug text-neutral-800 outline-none focus:border-blue-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200 dark:focus:border-blue-500"
+                            className="min-h-[44px] flex-1 resize-none rounded border border-neutral-200 bg-white px-2 py-1 text-[13px] leading-snug text-neutral-800 outline-none focus:border-blue-400 dark:border-neutral-600 dark:bg-neutral-800 dark:text-foreground dark:focus:border-blue-500"
                           />
                           <button
                             type="button"

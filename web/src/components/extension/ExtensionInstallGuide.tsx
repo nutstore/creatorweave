@@ -83,7 +83,7 @@ function StepIntro() {
       </div>
 
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-secondary dark:text-neutral-100">
+        <h3 className="text-lg font-semibold text-secondary">
           {t('extension.guideSubtitle')}
         </h3>
       </div>
@@ -95,7 +95,7 @@ function StepIntro() {
             className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800"
           >
             <span className="text-green-600 dark:text-green-400">{f.icon}</span>
-            <span className="text-sm text-secondary dark:text-neutral-200">{f.text}</span>
+            <span className="text-sm text-secondary dark:text-foreground">{f.text}</span>
           </div>
         ))}
       </div>
@@ -139,7 +139,7 @@ function StepDownload() {
         </div>
       </div>
 
-      <p className="text-center text-sm text-secondary dark:text-neutral-200">
+      <p className="text-center text-sm text-secondary dark:text-foreground">
         {t('extension.stepDownloadDesc')} ({t('extension.downloadSize')})
       </p>
 
@@ -188,7 +188,7 @@ function StepExtract() {
         </div>
       </div>
 
-      <h3 className="text-center text-sm font-medium text-secondary dark:text-neutral-200">
+      <h3 className="text-center text-sm font-medium text-secondary dark:text-foreground">
         {t('extension.extractTitle')}
       </h3>
 
@@ -201,7 +201,7 @@ function StepExtract() {
             <span className="shrink-0 rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">
               {inst.label}
             </span>
-            <span className="text-sm text-secondary dark:text-neutral-200">{inst.text}</span>
+            <span className="text-sm text-secondary dark:text-foreground">{inst.text}</span>
           </div>
         ))}
       </div>
@@ -255,7 +255,7 @@ function StepInstall() {
         </div>
       </div>
 
-      <h3 className="text-center text-sm font-medium text-secondary dark:text-neutral-200">
+      <h3 className="text-center text-sm font-medium text-secondary dark:text-foreground">
         {t('extension.stepInstallDesc')}
       </h3>
 
@@ -265,7 +265,7 @@ function StepInstall() {
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
             A
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-neutral-200">
+          <span className="text-sm font-medium text-secondary dark:text-foreground">
             {t('extension.installStepA')}
           </span>
         </div>
@@ -291,7 +291,7 @@ function StepInstall() {
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
             B
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-neutral-200">
+          <span className="text-sm font-medium text-secondary dark:text-foreground">
             {t('extension.installStepB')}
           </span>
         </div>
@@ -310,7 +310,7 @@ function StepInstall() {
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
             C
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-neutral-200">
+          <span className="text-sm font-medium text-secondary dark:text-foreground">
             {t('extension.installStepC')}
           </span>
         </div>
@@ -345,7 +345,7 @@ function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
       </div>
 
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-secondary dark:text-neutral-100">
+        <h3 className="text-lg font-semibold text-secondary">
           {t('extension.refreshTitle')}
         </h3>
         <p className="mt-2 text-sm text-secondary dark:text-neutral-300">
@@ -468,7 +468,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
           <button
             type="button"
             onClick={installGuideStep > 1 ? () => goToStep(installGuideStep - 1) : handleClose}
-            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-neutral-100 hover:text-secondary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-200"
+            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-neutral-100 hover:text-secondary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
           >
             <ChevronLeft className="h-4 w-4" />
             {installGuideStep > 1 ? t('extension.prevStep') : t('extension.skip')}

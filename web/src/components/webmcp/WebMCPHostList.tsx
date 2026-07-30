@@ -67,7 +67,7 @@ export function WebMCPHostList({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Globe className="h-4 w-4 text-primary-600" />
-                  <p className="truncate font-mono text-sm text-secondary dark:text-neutral-200">
+                  <p className="truncate font-mono text-sm text-secondary dark:text-foreground">
                     {host.hostname}
                   </p>
                 </div>
@@ -97,7 +97,7 @@ export function WebMCPHostList({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <Layers3 className="mt-0.5 h-4 w-4 text-primary-600" />
-                          <p className="truncate text-sm font-medium text-secondary dark:text-neutral-100">
+                          <p className="truncate text-sm font-medium text-secondary">
                             {group.displayName}
                           </p>
                         </div>

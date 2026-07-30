@@ -138,7 +138,7 @@ export function NodePropertiesPanel({
             <Icon className={cn('h-3 w-3', config.color)} />
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="truncate text-[11px] font-semibold text-neutral-700 dark:text-neutral-200">
+            <h3 className="truncate text-[11px] font-semibold text-neutral-700 dark:text-foreground">
               {t(config.labelKey)}
             </h3>
             <p className="text-[9px] text-neutral-400 dark:text-neutral-500">

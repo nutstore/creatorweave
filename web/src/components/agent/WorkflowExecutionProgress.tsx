@@ -49,19 +49,19 @@ const segmentStyles = {
   completed: {
     block: 'bg-emerald-50/80 dark:bg-emerald-950/20',
     dot: 'bg-emerald-500',
-    label: 'text-neutral-800 dark:text-neutral-200',
+    label: 'text-neutral-800 dark:text-foreground',
     connector: 'bg-emerald-400/40 dark:bg-emerald-600/30',
   },
   running: {
-    block: 'bg-primary-50/60 dark:bg-primary-950/15',
+    block: 'bg-primary-50/60 dark:bg-primary-50/15',
     dot: 'bg-primary-500',
-    label: 'text-neutral-800 dark:text-neutral-200',
+    label: 'text-neutral-800 dark:text-foreground',
     connector: 'bg-neutral-200 dark:bg-neutral-700',
   },
   failed: {
     block: 'bg-red-50/80 dark:bg-red-950/20',
     dot: 'bg-red-500',
-    label: 'text-neutral-800 dark:text-neutral-200',
+    label: 'text-neutral-800 dark:text-foreground',
     connector: 'bg-neutral-200 dark:bg-neutral-700',
   },
   pending: {
@@ -125,7 +125,7 @@ function NodeStepContent({ step }: { step: Extract<WorkflowNodeStep, { type: 'co
     >
       {step.content}
       {step.streaming && (
-        <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary-400 align-text-bottom" />
+        <span className="ml-0.5 inline-block h-3.5 w-[2px] animate-pulse bg-primary-500 align-text-bottom" />
       )}
     </div>
   )
@@ -253,7 +253,7 @@ function PipelineSegment({
           {node.status === 'running' && !hasAnyStepContent && (
             <div className="flex items-center gap-2 px-3 py-2.5">
               <Loader2 className="h-3 w-3 animate-spin text-primary-500" />
-              <span className="text-[11px] text-primary-600 dark:text-primary-400">
+              <span className="text-[11px] text-primary-600 dark:text-primary-500">
                 {t('workflow.executing')}
               </span>
             </div>
@@ -321,12 +321,12 @@ export function WorkflowExecutionProgress({
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="truncate text-[13px] font-semibold text-neutral-800 dark:text-neutral-200">
+          <span className="truncate text-[13px] font-semibold text-neutral-800 dark:text-foreground">
             {execution.label}
           </span>
 
           {hasRunning && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-500/10 dark:text-primary-500">
               <Loader2 className="h-2.5 w-2.5 animate-spin" />
               {t('workflow.running')}
             </span>

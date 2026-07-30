@@ -62,7 +62,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">edit</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">edit</code>
         {path && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">{shortPath(path)}</span>
         )}

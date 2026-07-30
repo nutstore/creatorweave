@@ -121,7 +121,7 @@ function TokenStatsDisplay() {
   if (stats.requestCount === 0) {
     return (
       <div className="rounded-lg border border bg-muted p-3 dark:border-border dark:bg-muted/50">
-        <div className="flex items-center gap-2 text-sm text-tertiary dark:text-muted">
+        <div className="flex items-center gap-2 text-sm text-tertiary dark:text-tertiary">
           <Info className="h-4 w-4" />
           <span>{t('settings.tokenStats.noUsage')}</span>
         </div>
@@ -133,28 +133,28 @@ function TokenStatsDisplay() {
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.totalTokens')}</p>
-          <p className="mt-1 text-lg font-semibold text-secondary dark:text-muted">
+          <p className="text-xs text-tertiary dark:text-tertiary">{t('settings.tokenStats.totalTokens')}</p>
+          <p className="mt-1 text-lg font-semibold text-secondary dark:text-secondary">
             {stats.totalTokens.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.requestCount')}</p>
-          <p className="mt-1 text-lg font-semibold text-secondary dark:text-muted">
+          <p className="text-xs text-tertiary dark:text-tertiary">{t('settings.tokenStats.requestCount')}</p>
+          <p className="mt-1 text-lg font-semibold text-secondary dark:text-secondary">
             {stats.requestCount.toLocaleString()}
           </p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.inputTokens')}</p>
-          <p className="mt-1 text-sm font-medium text-secondary dark:text-muted">
+          <p className="text-xs text-tertiary dark:text-tertiary">{t('settings.tokenStats.inputTokens')}</p>
+          <p className="mt-1 text-sm font-medium text-secondary dark:text-secondary">
             {stats.promptTokens.toLocaleString()}
           </p>
         </div>
         <div className="rounded-lg border border p-3 dark:border-border">
-          <p className="text-xs text-tertiary dark:text-muted">{t('settings.tokenStats.outputTokens')}</p>
-          <p className="mt-1 text-sm font-medium text-secondary dark:text-muted">
+          <p className="text-xs text-tertiary dark:text-tertiary">{t('settings.tokenStats.outputTokens')}</p>
+          <p className="mt-1 text-sm font-medium text-secondary dark:text-secondary">
             {stats.completionTokens.toLocaleString()}
           </p>
         </div>
@@ -299,7 +299,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex w-full items-center gap-2 text-sm font-medium text-secondary hover:text-secondary dark:text-muted dark:hover:text-muted"
+          className="flex w-full items-center gap-2 text-sm font-medium text-secondary hover:text-secondary dark:text-secondary dark:hover:text-muted"
         >
           <ChevronDown
             className={`h-4 w-4 transition-transform ${showAdvanced ? 'rotate-180' : ''}`}
@@ -397,7 +397,7 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                 <div className="space-y-2.5 pl-6">
                   <div className="relative">
                     {/* Intensity gradient track */}
-                    <div className="h-1.5 rounded-full bg-gradient-to-r from-primary-200 via-primary-400 to-primary-600 dark:from-primary-800 dark:via-primary-600 dark:to-primary-400" />
+                    <div className="h-1.5 rounded-full bg-gradient-to-r from-primary-100 via-primary-500 to-primary-600 dark:from-primary-800 dark:via-primary-600 dark:to-primary-500" />
                     {/* Level pills */}
                     <div className="mt-2 flex gap-1">
                       {([

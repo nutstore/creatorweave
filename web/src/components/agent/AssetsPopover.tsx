@@ -131,7 +131,7 @@ function AssetRow({
 
       {/* File name + meta */}
       <div className="min-w-0 flex-1">
-        <div className="truncate text-xs font-medium text-neutral-700 dark:text-neutral-200">
+        <div className="truncate text-xs font-medium text-neutral-700 dark:text-foreground">
           {asset.name}
         </div>
         {asset.path !== asset.name && (

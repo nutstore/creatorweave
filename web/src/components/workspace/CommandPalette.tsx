@@ -195,7 +195,7 @@ export function CommandPalette({ open, onOpenChange, commands }: CommandPaletteP
                         disabled={command.disabled}
                         className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left text-sm transition-colors ${
                           isSelected
-                            ? 'dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700'
+                            ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
                             : command.disabled
                               ? 'cursor-not-allowed opacity-50'
                               : 'text-secondary hover:bg-muted dark:text-muted dark:hover:bg-muted'

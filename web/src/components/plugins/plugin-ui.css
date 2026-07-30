@@ -28,8 +28,8 @@
   /* Colors - Primary Blue */
   --color-primary-50: #eff6ff;
   --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-400: #60a5fa;
+  --color-primary-100: #bfdbfe;
+  --color-primary-500: #60a5fa;
   --color-primary-500: #3b82f6;
   --color-primary-600: #2563eb;
   --color-primary-700: #1d4ed8;
@@ -72,8 +72,8 @@
 .dark {
   --color-primary-50: #0b223f;
   --color-primary-100: #163a63;
-  --color-primary-200: #1f4f84;
-  --color-primary-400: #60a5fa;
+  --color-primary-100: #1f4f84;
+  --color-primary-500: #60a5fa;
   --color-primary-500: #3b82f6;
   --color-primary-600: #4f9cff;
   --color-primary-700: #7fb6ff;
@@ -294,7 +294,7 @@
 }
 
 .upload-zone:hover {
-  border-color: var(--color-primary-400, #60a5fa);
+  border-color: var(--color-primary-500, #60a5fa);
   background: var(--color-primary-50, #eff6ff);
 }
 
@@ -447,7 +447,7 @@
 
 .plugin-card:hover {
   box-shadow: var(--shadow-lg, 0 10px 15px rgba(0, 0, 0, 0.1));
-  border-color: var(--color-primary-200, #bfdbfe);
+  border-color: var(--color-primary-100, #bfdbfe);
 }
 
 .plugin-card--selected {

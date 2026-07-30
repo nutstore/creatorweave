@@ -15,7 +15,7 @@ export function ConversationEmptyState() {
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-xl shadow-primary-500/20">
             <MessageSquare className="h-8 w-8 text-white" />
           </div>
-          <h3 className="mb-2 text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          <h3 className="mb-2 text-lg font-semibold text-foreground">
             {t('conversation.empty.title')}
           </h3>
           <p className="max-w-md text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">

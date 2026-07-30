@@ -444,7 +444,7 @@ export function ProjectSkillDropZone({ roots, onUploaded, onClose }: ProjectSkil
             <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
               {t('skillUpload.confirmTarget') || 'Upload Target'}
             </p>
-            <p className="font-mono text-sm text-neutral-800 dark:text-neutral-200">
+            <p className="font-mono text-sm text-neutral-800 dark:text-foreground">
               {pending.isBundle ? (
                 <>{targetRootName}/.skills/ <span className="font-semibold text-blue-600 dark:text-blue-400">({pending.dirName})</span>/</>
               ) : (

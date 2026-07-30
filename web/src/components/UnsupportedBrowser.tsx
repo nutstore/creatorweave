@@ -27,7 +27,7 @@ export function UnsupportedBrowser() {
           <CardContent className="p-8">
             <div className="mb-4 flex items-center gap-3">
               <AlertTriangle className="h-8 w-8 text-warning" />
-              <h3 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Browser Not Supported</h3>
+              <h3 className="text-xl font-semibold text-foreground">Browser Not Supported</h3>
             </div>
 
             <p className="mb-6 text-neutral-700 dark:text-neutral-300">
@@ -47,7 +47,7 @@ export function UnsupportedBrowser() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">{browser.icon}</span>
-                      <span className="font-medium text-neutral-900 dark:text-neutral-100">{browser.name}</span>
+                      <span className="font-medium text-foreground">{browser.name}</span>
                     </div>
                     <ExternalLink className="h-4 w-4 text-neutral-400" />
                   </div>

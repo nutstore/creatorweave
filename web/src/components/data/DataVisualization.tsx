@@ -184,7 +184,7 @@ function TableViewer({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search table..."
-            className="focus:border-primary-300 w-full rounded-lg border border bg-muted py-2 pl-10 pr-4 text-sm focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+            className="focus:border-primary-100 w-full rounded-lg border border bg-muted py-2 pl-10 pr-4 text-sm focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
           />
         </div>
         <span className="text-sm text-tertiary dark:text-muted">
@@ -571,7 +571,7 @@ export function DataVisualization({ data, onClose, onExport }: DataVisualization
       {/* Header */}
       <div className="flex items-center justify-between border-b border border-border dark:border-border px-6 py-4 dark:border-border">
         <div>
-          <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{data.title || 'Data Visualization'}</h3>
+          <h3 className="font-semibold text-foreground">{data.title || 'Data Visualization'}</h3>
           <p className="mt-0.5 text-sm capitalize text-tertiary dark:text-muted">
             {data.type} {data.type === 'image' && data.imageFilename && `• ${data.imageFilename}`}
           </p>

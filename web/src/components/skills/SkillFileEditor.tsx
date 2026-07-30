@@ -234,10 +234,10 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
       <BrandDialogContent className="flex h-[90vh] max-w-5xl flex-col overflow-hidden p-0">
         {/* Header — standard app style */}
         <BrandDialogHeader>
-          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
             <FileIcon className="h-4.5 w-4.5 text-blue-500" />
             {skill.name}
-            <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500">
+            <span className="text-xs font-normal dark:text-neutral-500">
               {isReadOnly ? t('skillFileEditor.readonly') : t('skillFileEditor.fileEditor')}
             </span>
             {hasUnsavedChanges && (
@@ -255,7 +255,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
           <div className="flex w-60 shrink-0 flex-col border-r border-neutral-200 dark:border-neutral-700">
             {/* Sidebar header */}
             <div className="flex h-9 shrink-0 items-center border-b border-neutral-200 px-3 dark:border-neutral-700">
-              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+              <span className="text-xs font-medium dark:text-neutral-400">
                 {t('skillFileEditor.files')}
               </span>
               {!isReadOnly && (
@@ -263,21 +263,21 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                   <button
                     onClick={() => handleCreateNew('file', skillDir || '')}
                     title={t('skillFileEditor.newFile')}
-                    className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+                    className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-foreground"
                   >
                     <FilePlus className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => handleCreateNew('folder', skillDir || '')}
                     title={t('skillFileEditor.newFolder')}
-                    className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+                    className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-foreground"
                   >
                     <FolderPlus className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => void reload()}
                     title={t('common.refresh')}
-                    className="flex h-6 w-6 items-center justify-center rounded text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-neutral-200"
+                    className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-700 dark:hover:text-foreground"
                   >
                     <RefreshCw className="h-3 w-3" />
                   </button>
@@ -288,10 +288,10 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
             {/* Tree */}
             <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto py-1 text-[13px] leading-relaxed">
               {loading && (
-                <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">{t('common.loading')}</div>
+                <div className="px-3 py-2 text-xs dark:text-neutral-500">{t('common.loading')}</div>
               )}
               {!loading && tree.length === 0 && (
-                <div className="px-3 py-2 text-xs text-neutral-400 dark:text-neutral-500">{t('skillFileEditor.empty')}</div>
+                <div className="px-3 py-2 text-xs dark:text-neutral-500">{t('skillFileEditor.empty')}</div>
               )}
               {tree.map((node) => (
                 <FileTreeNode
@@ -317,9 +317,9 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                 <div className="flex items-center gap-1.5 py-0.5" style={{ paddingLeft: '0.75rem' }}>
                   <span className="w-3.5 shrink-0" />
                   {showNewFileInput.type === 'file' ? (
-                    <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                    <FileIcon className="h-3.5 w-3.5 shrink-0" />
                   ) : (
-                    <Folder className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                    <Folder className="h-3.5 w-3.5 shrink-0" />
                   )}
                   <input
                     autoFocus
@@ -331,7 +331,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                     }}
                     onBlur={() => setShowNewFileInput(null)}
                     placeholder={showNewFileInput.type === 'file' ? t('skillFileEditor.fileNamePlaceholder') : t('skillFileEditor.folderNamePlaceholder')}
-                    className="flex-1 rounded border border-blue-300 bg-white px-1.5 py-0.5 text-xs outline-none dark:border-blue-600 dark:bg-neutral-800 dark:text-neutral-100"
+                    className="flex-1 rounded border border-blue-300 bg-white px-1.5 py-0.5 text-xs outline-none dark:border-blue-600 dark:bg-neutral-800"
                   />
                 </div>
               )}
@@ -344,8 +344,8 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
             <div className="flex h-9 shrink-0 items-center gap-2 border-b border-neutral-200 px-3 dark:border-neutral-700">
               {activeFile ? (
                 <>
-                  <FileIcon className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
-                  <span className="truncate text-xs text-neutral-600 dark:text-neutral-300">
+                  <FileIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate text-xs dark:text-neutral-300">
                     {activeFile.split('/').slice(1).join('/') || activeFile}
                   </span>
                   {hasUnsavedChanges && (
@@ -353,7 +353,7 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
                   )}
                 </>
               ) : (
-                <span className="text-xs text-neutral-400 dark:text-neutral-500">{t('skillFileEditor.selectFile')}</span>
+                <span className="text-xs dark:text-neutral-500">{t('skillFileEditor.selectFile')}</span>
               )}
               {!isReadOnly && activeFile && (
                 <div className="ml-auto">
@@ -394,8 +394,8 @@ export function SkillFileEditor({ skill, open, onClose }: SkillFileEditorProps) 
               ) : (
                 <div className="flex h-full items-center justify-center bg-neutral-50 dark:bg-neutral-800/50">
                   <div className="text-center">
-                    <FileIcon className="mx-auto mb-2 h-10 w-10 text-neutral-300 dark:text-neutral-600" />
-                    <p className="text-sm text-neutral-400 dark:text-neutral-500">{t('skillFileEditor.selectFilePrompt')}</p>
+                    <FileIcon className="mx-auto mb-2 h-10 w-10 dark:text-neutral-600" />
+                    <p className="text-sm dark:text-neutral-500">{t('skillFileEditor.selectFilePrompt')}</p>
                   </div>
                 </div>
               )}
@@ -467,7 +467,7 @@ function FileTreeNode({
           'group relative flex cursor-pointer items-center py-[3px] pr-2 transition-colors',
           isActive
             ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300'
-            : 'text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
+            : 'hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800'
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
         onClick={handleClick}
@@ -478,9 +478,9 @@ function FileTreeNode({
         {node.kind === 'directory' ? (
           <>
             {node.expanded ? (
-              <ChevronDown className="mr-0.5 h-3 w-3 shrink-0 text-neutral-400" />
+              <ChevronDown className="mr-0.5 h-3 w-3 shrink-0" />
             ) : (
-              <ChevronRight className="mr-0.5 h-3 w-3 shrink-0 text-neutral-400" />
+              <ChevronRight className="mr-0.5 h-3 w-3 shrink-0" />
             )}
             {node.expanded ? (
               <FolderOpen className="h-3.5 w-3.5 shrink-0 text-amber-500" />
@@ -505,7 +505,7 @@ function FileTreeNode({
             }}
             onBlur={onCancelRename}
             onClick={(e) => e.stopPropagation()}
-            className="ml-1.5 flex-1 rounded border border-blue-300 bg-white px-1 py-0 text-[13px] outline-none dark:border-blue-600 dark:bg-neutral-800 dark:text-neutral-100"
+            className="ml-1.5 flex-1 rounded border border-blue-300 bg-white px-1 py-0 text-[13px] outline-none dark:border-blue-600 dark:bg-neutral-800"
           />
         ) : (
           <span className="ml-1.5 truncate">{node.name}</span>
@@ -513,14 +513,14 @@ function FileTreeNode({
         {!isReadOnly && !isRenaming && hovered && (
           <div className="absolute right-1 flex items-center gap-0.5">
             <button
-              className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400"
+              className="flex h-5 w-5 items-center justify-center rounded hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400"
               onClick={(e) => { e.stopPropagation(); onRename(node) }}
               title={t('skillFileEditor.rename')}
             >
               <Pencil className="h-3 w-3" />
             </button>
             <button
-              className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              className="flex h-5 w-5 items-center justify-center rounded hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
               onClick={(e) => { e.stopPropagation(); void onDelete(node) }}
               title={t('skillFileEditor.confirmDelete')}
             >
@@ -587,7 +587,7 @@ function ContextMenu({
     zIndex: 9999,
   }
 
-  const itemClass = 'flex w-full items-center gap-2.5 px-3 py-1.5 text-xs text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700'
+  const itemClass = 'flex w-full items-center gap-2.5 px-3 py-1.5 text-xs transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-700'
 
   return (
     <div
@@ -598,10 +598,10 @@ function ContextMenu({
       {!isReadOnly && node.kind === 'directory' && (
         <>
           <button className={itemClass} onClick={() => { onNewFile(node.path); onClose() }}>
-            <FilePlus className="h-3.5 w-3.5 text-neutral-400" /> {t('skillFileEditor.newFile')}
+            <FilePlus className="h-3.5 w-3.5" /> {t('skillFileEditor.newFile')}
           </button>
           <button className={itemClass} onClick={() => { onNewFolder(node.path); onClose() }}>
-            <FolderPlus className="h-3.5 w-3.5 text-neutral-400" /> {t('skillFileEditor.newFolder')}
+            <FolderPlus className="h-3.5 w-3.5" /> {t('skillFileEditor.newFolder')}
           </button>
           <div className="my-1 border-t border-neutral-200 dark:border-neutral-600" />
         </>
@@ -611,13 +611,13 @@ function ContextMenu({
           {node.kind === 'file' && (
             <>
               <button className={itemClass} onClick={() => { onNewFile(parentForNew); onClose() }}>
-                <FilePlus className="h-3.5 w-3.5 text-neutral-400" /> {t('skillFileEditor.newFileSibling')}
+                <FilePlus className="h-3.5 w-3.5" /> {t('skillFileEditor.newFileSibling')}
               </button>
               <div className="my-1 border-t border-neutral-200 dark:border-neutral-600" />
             </>
           )}
           <button className={itemClass} onClick={() => { onRename(); onClose() }}>
-            <Pencil className="h-3.5 w-3.5 text-neutral-400" /> {t('skillFileEditor.rename')}
+            <Pencil className="h-3.5 w-3.5" /> {t('skillFileEditor.rename')}
           </button>
           <button className={cn(itemClass, 'hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400')} onClick={() => { onDelete(); onClose() }}>
             <Trash2 className="h-3.5 w-3.5" /> {t('skillFileEditor.confirmDelete')}

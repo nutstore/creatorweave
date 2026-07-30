@@ -72,7 +72,7 @@ const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
               onClick={onCapture}
               className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed ${
                 supportsVision
-                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300'
+                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
                   : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
               }`}
             >

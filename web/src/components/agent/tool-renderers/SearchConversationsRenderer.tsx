@@ -111,7 +111,7 @@ registerRenderer({
     if (ctx.isError) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">search_conversations</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
           <span className="ml-auto shrink-0 text-xs text-red-500">failed</span>
         </>
       )
@@ -123,7 +123,7 @@ registerRenderer({
       const mode = query ? 'keyword' : 'list'
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">search_conversations</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
           <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
             {mode}
           </span>
@@ -150,7 +150,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">search_conversations</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
         <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
           {mode}
         </span>

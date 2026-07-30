@@ -334,7 +334,7 @@ export const ToolCallDisplay = memo(function ToolCallDisplay(props: ToolCallDisp
           <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
         )}
         <Wrench className="h-3.5 w-3.5 text-neutral-500" />
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">{toolName}</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">{toolName}</code>
         {typeof ctx.args.path === 'string' && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">{ctx.args.path as string}</span>
         )}
@@ -415,7 +415,7 @@ function SubagentCard({
           <ChevronRight className="h-3.5 w-3.5 text-neutral-400" />
         )}
         <Bot className="h-3.5 w-3.5 text-violet-500" />
-        <span className="font-medium text-neutral-700 dark:text-neutral-200">{subagentTitle}</span>
+        <span className="font-medium text-neutral-700 dark:text-foreground">{subagentTitle}</span>
         {subagentDesc && (
           <span className="truncate text-neutral-400 dark:text-neutral-500">&quot;{subagentDesc}&quot;</span>
         )}

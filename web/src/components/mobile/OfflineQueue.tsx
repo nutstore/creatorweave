@@ -264,7 +264,7 @@ function CompactView({ onClick, t }: CompactViewProps) {
           )}
         </div>
         <div className="text-left">
-          <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">{isOnline ? t('offlineQueue.online') : t('offlineQueue.offline')}</p>
+          <p className="text-sm font-medium text-foreground">{isOnline ? t('offlineQueue.online') : t('offlineQueue.offline')}</p>
           {totalPending > 0 && (
             <p className="text-xs text-slate-500">
               {counts.syncing > 0 && `${t('offlineQueue.syncingCount', { count: counts.syncing })}, `}
@@ -366,7 +366,7 @@ export function OfflineQueue({
             )}
           </div>
           <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-neutral-100">
+            <p className="text-sm font-medium text-foreground">
               {isOnline ? t('offlineQueue.connectedToNetwork') : t('offlineQueue.offlineMode')}
             </p>
             <p className="text-xs text-slate-500 dark:text-neutral-400">

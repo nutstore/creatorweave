@@ -257,7 +257,7 @@ export function TopBar({
                 <button
                   type="button"
                   onClick={() => openSettings()}
-                  className="hover:bg-warning-100 focus:ring-warning-500 inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
+                  className="hover:bg-warning-100 focus:ring-warning inline-flex h-8 items-center gap-1.5 rounded-md border border-warning-200 bg-warning-50 px-2.5 text-xs font-medium text-warning focus:outline-none focus:ring-2"
                 >
                   <KeyRound className="h-4 w-4" />
                   <span>{t('topbar.noApiKey')}</span>

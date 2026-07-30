@@ -42,7 +42,7 @@ const tabsTriggerVariants = cva(
         underline:
           "border-b-2 border-transparent py-2.5 text-text-secondary data-[state=active]:border-primary-600 data-[state=active]:text-primary-600 data-[state=active]:bg-transparent -mb-px",
         segment:
-          "rounded-md py-2 text-neutral-600 dark:text-neutral-300 data-[state=active]:bg-white data-[state=active]:text-primary-600 data-[state=active]:shadow-[0_1px_2px_rgba(0,0,0,0.05)] dark:data-[state=active]:bg-neutral-900 dark:data-[state=active]:text-primary-300",
+          "rounded-md py-2 text-neutral-600 dark:text-neutral-300 data-[state=active]:bg-white data-[state=active]:text-primary-600 data-[state=active]:shadow-[0_1px_2px_rgba(0,0,0,0.05)] dark:data-[state=active]:bg-neutral-900 dark:data-[state=active]:text-primary-700",
       },
     },
     defaultVariants: {

@@ -20,7 +20,7 @@ registerRenderer({
     if (ctx.isStreaming) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">bash</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
           {cmd && (
             <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               {cmd}
@@ -34,7 +34,7 @@ registerRenderer({
     if (ctx.isExecuting) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">bash</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
           {cmd && (
             <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
               {cmd}
@@ -60,7 +60,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">bash</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">bash</code>
         {cmd && (
           <span className="truncate text-neutral-400 dark:text-neutral-500 max-w-[200px] inline-block align-bottom">
             {cmd}

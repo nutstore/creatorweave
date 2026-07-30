@@ -152,8 +152,8 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-900/30">
-              <Wrench className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+            <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-100/30">
+              <Wrench className="h-4 w-4 text-primary-600 dark:text-primary-500" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-primary dark:text-primary-foreground">
@@ -181,7 +181,7 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t('tools.searchTools')}
-              className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary placeholder:text-tertiary focus:border-primary-300 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+              className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary placeholder:text-tertiary focus:border-primary-100 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
             />
           </div>
         </div>
@@ -211,8 +211,8 @@ export function ToolsPanel({ isOpen, onClose }: ToolsPanelProps) {
                       className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted dark:hover:bg-muted"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-900/30">
-                          <Code className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                        <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-100/30">
+                          <Code className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                         </div>
                         <div>
                           <h3 className="text-sm font-medium text-primary dark:text-primary-foreground">{category.name}</h3>
@@ -303,8 +303,8 @@ function ToolDetailModal({ tool, onClose }: ToolDetailModalProps) {
           {/* Header */}
           <div className="flex items-center justify-between gap-2 border-b border-border px-5 py-4">
             <div className="flex min-w-0 flex-1 items-center gap-3">
-              <div className="shrink-0 rounded-lg bg-primary-50 p-2 dark:bg-primary-900/30">
-                <Code className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+              <div className="shrink-0 rounded-lg bg-primary-50 p-2 dark:bg-primary-100/30">
+                <Code className="h-4 w-4 text-primary-600 dark:text-primary-500" />
               </div>
               <h3 className="truncate font-mono text-sm font-semibold text-primary dark:text-primary-foreground">{tool.name}</h3>
             </div>

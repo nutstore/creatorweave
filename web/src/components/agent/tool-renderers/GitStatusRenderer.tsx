@@ -177,7 +177,7 @@ registerRenderer({
     if (ctx.isExecuting) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-neutral-200">git_status</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">git_status</code>
           <span className="text-xs text-blue-500">loading...</span>
         </>
       )
@@ -193,7 +193,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">{label}</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">{label}</code>
         <span className="ml-auto text-xs text-neutral-400 shrink-0">
           {parts.length > 0 ? parts.join(', ') : 'clean'}
         </span>

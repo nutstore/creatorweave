@@ -149,7 +149,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
           <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50/80 shadow-sm">
             <Sparkles className="h-6 w-6 text-primary-600" />
           </div>
-          <h1 className="mb-2 text-3xl font-semibold text-neutral-900 dark:text-neutral-100">
+          <h1 className="mb-2 text-3xl font-semibold text-foreground">
             {t('welcome.title')}
           </h1>
           <p className="text-base text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
@@ -189,12 +189,12 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                 disabled={isGatewayLoginRunning}
                 className="flex w-full items-center gap-3 border-b border-amber-200/60 px-4 py-3.5 text-left transition-colors hover:bg-white/60 disabled:opacity-60 dark:border-amber-800/40 dark:hover:bg-neutral-900/40"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-950/40">
-                  <Shield className="h-[18px] w-[18px] text-primary-600 dark:text-primary-400" />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-50/40">
+                  <Shield className="h-[18px] w-[18px] text-primary-600 dark:text-primary-500" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    <span className="text-sm font-semibold text-foreground">
                       {t('welcome.setupGatewayTitle')}
                     </span>
                     <span className="rounded-full bg-primary-600 px-2 py-0.5 text-[10px] font-semibold text-white">
@@ -219,7 +219,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                 <KeyRound className="h-[18px] w-[18px] text-neutral-600 dark:text-neutral-400" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <span className="block text-sm font-semibold text-foreground">
                   {t('welcome.setupApiKeyTitle')}
                 </span>
                 <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
@@ -256,7 +256,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                           onClick={() => void handleCaptureScreenshot()}
                           className={`inline-flex h-8 w-8 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed ${
                             supportsVision
-                              ? 'bg-primary-50 text-primary-600 dark:bg-primary-950/40 dark:text-primary-300'
+                              ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
                               : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
                           }`}
                         >
@@ -298,7 +298,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               type="button"
               onClick={handleSelectFolder}
               data-tour="welcome-open-folder"
-              className="flex h-9 items-center gap-2 rounded-lg border border-primary-200 bg-primary-50/70 px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:border-primary-300 hover:bg-primary-100/70 dark:border-primary-800/70 dark:bg-primary-950/30 dark:text-primary-300 dark:hover:bg-primary-950/50"
+              className="flex h-9 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:border-primary-100 hover:bg-primary-100/70 dark:border-primary-800/70 dark:bg-primary-50/30 dark:text-primary-700 dark:hover:bg-primary-50/50"
             >
               <FolderOpen className="h-4 w-4" />
               {t('onboarding.steps.files.title')}

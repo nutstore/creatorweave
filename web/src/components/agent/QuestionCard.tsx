@@ -300,8 +300,8 @@ function YesNoInput({
           className={
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed ' +
             (noIsDefault
-              ? 'bg-neutral-300 text-neutral-900 ring-2 ring-neutral-500 hover:bg-neutral-400 focus:ring-neutral-400 dark:bg-neutral-600 dark:text-neutral-100 dark:ring-neutral-400 dark:hover:bg-neutral-500'
-              : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300 focus:ring-neutral-400 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600')
+              ? 'bg-neutral-300 ring-2 ring-neutral-500 hover:bg-neutral-400 focus:ring-neutral-400 dark:bg-neutral-600 dark:ring-neutral-400 dark:hover:bg-neutral-500'
+              : 'bg-neutral-200 hover:bg-neutral-300 focus:ring-neutral-400 dark:bg-neutral-700 dark:text-foreground dark:hover:bg-neutral-600')
           }
         >
           {t('questionCard.no')}
@@ -313,7 +313,7 @@ function YesNoInput({
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 ' +
             (showCustom
               ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-400 dark:bg-amber-900/40 dark:text-amber-300 dark:ring-amber-600'
-              : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700')
+              : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700')
           }
           title={t('questionCard.customInputHint')}
           aria-label={t('questionCard.customInputHint')}
@@ -329,7 +329,7 @@ function YesNoInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
           />
           <div className="mt-1.5 flex items-center justify-between">
             <span className="text-[10px] text-amber-500 dark:text-amber-400">
@@ -444,7 +444,7 @@ function SingleChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
           />
         </div>
       )}
@@ -565,7 +565,7 @@ function MultiChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
           />
         </div>
       )}
@@ -614,7 +614,7 @@ function FreeTextInput({
         onKeyDown={handleKeyDown}
         placeholder={t('questionCard.placeholder')}
         rows={3}
-        className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+        className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
       />
       <div className="mt-1.5 flex items-center justify-between">
         <span className="text-[10px] text-amber-500 dark:text-amber-400">

@@ -79,7 +79,7 @@ export function StorageLoading({
                   </p>
                   {onExport && (
                     <button
-                      className="border-primary-300 text-primary-700 hover:bg-primary-50 flex w-full items-center justify-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium transition-colors dark:border-primary-700 dark:text-primary-200 dark:hover:bg-primary-950/30"
+                      className="border-primary-100 text-primary-700 hover:bg-primary-50 flex w-full items-center justify-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium transition-colors dark:border-primary-700 dark:text-primary-700 dark:hover:bg-primary-50/30"
                       onClick={onExport}
                     >
                       <Download className="h-4 w-4" />

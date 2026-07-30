@@ -51,7 +51,7 @@ export function LanguageSwitcher() {
               onClick={() => handleSelect(key)}
               className={cn(
                 'flex w-full items-center justify-between gap-4 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800',
-                locale === key && 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                locale === key && 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
               )}
             >
               <span>{LOCALE_LABELS[key]}</span>

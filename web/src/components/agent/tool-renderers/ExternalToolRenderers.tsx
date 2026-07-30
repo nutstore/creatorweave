@@ -81,7 +81,7 @@ registerRenderer({
           {results.map((tool) => (
             <div key={tool.fullName}>
               {/* Tool name: server.tool format */}
-              <div className="text-[13px] font-medium text-neutral-700 dark:text-neutral-200 mb-1">
+              <div className="text-[13px] font-medium text-neutral-700 dark:text-foreground mb-1">
                 <span className="text-neutral-400 dark:text-neutral-500 font-normal">
                   {tool.sourceId}.
                 </span>
@@ -113,7 +113,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="shrink-0 font-medium text-neutral-700 dark:text-neutral-200">call_tool</code>
+        <code className="shrink-0 font-medium text-neutral-700 dark:text-foreground">call_tool</code>
         {fullName && (
           <span className="truncate min-w-0 text-neutral-400 dark:text-neutral-500">
             {shortToolName(fullName)}

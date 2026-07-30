@@ -389,7 +389,7 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
               role="listitem"
               aria-current={currentSnapshotId === item.id ? 'true' : undefined}
               className={`rounded-md px-2 py-1.5 ${
-                currentSnapshotId === item.id ? 'bg-primary-50/50 dark:bg-primary-900/20' : 'hover:bg-hover'
+                currentSnapshotId === item.id ? 'bg-primary-50/50 dark:bg-primary-100/20' : 'hover:bg-hover'
               }`}
             >
               <div className="flex items-center justify-between gap-2">

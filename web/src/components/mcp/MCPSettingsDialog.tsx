@@ -39,7 +39,7 @@ const MCPSettingsDialogContent = forwardRef<
           <BrandDialogTitle>{t('mcp.dialog.title')}</BrandDialogTitle>
         </div>
         <BrandDialogClose asChild>
-          <button className="text-tertiary transition-colors hover:text-primary dark:hover:text-neutral-200">
+          <button className="text-tertiary transition-colors hover:text-primary dark:hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </BrandDialogClose>

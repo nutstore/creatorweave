@@ -634,7 +634,7 @@ function SyncPanel({ deviceId, browserInfo, relayUrl = 'http://localhost:3001' }
                 {sessions.map((session) => (
                   <li
                     key={session.syncId}
-                    className="hover:border-primary-200 group flex cursor-pointer items-center gap-3 rounded-lg border border p-3 transition-colors hover:bg-primary-50/50"
+                    className="hover:border-primary-100 group flex cursor-pointer items-center gap-3 rounded-lg border border p-3 transition-colors hover:bg-primary-50/50"
                     onClick={() => handleDownload(session.syncId)}
                   >
                     {/* Session Icon */}
@@ -715,7 +715,7 @@ function ExperimentalToggle({ title, description, checked, onChange }: Experimen
   return (
     <div className="flex items-start justify-between gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-secondary dark:text-neutral-200">{title}</p>
+        <p className="text-sm font-medium text-secondary dark:text-foreground">{title}</p>
         <p className="mt-1 text-xs text-tertiary dark:text-neutral-400">{description}</p>
       </div>
       <BrandSwitch checked={checked} onCheckedChange={onChange} />
@@ -849,7 +849,7 @@ function NotificationsSection() {
 
       <div className="flex items-start justify-between gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-700">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+          <p className="text-sm font-medium text-secondary dark:text-foreground">
             {t('settings.notifications.permissionLabel')}
           </p>
           <p className="mt-1 text-xs text-tertiary dark:text-neutral-400">
@@ -899,7 +899,7 @@ function ExtensionSettingsPanel() {
             )}
           </div>
           <div>
-            <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+            <p className="text-sm font-medium text-secondary dark:text-foreground">
               {isInstalled ? t('extension.settingsInstalled') : t('extension.settingsNotInstalled')}
             </p>
             {isInstalled && (
@@ -911,14 +911,14 @@ function ExtensionSettingsPanel() {
 
       {/* Version Info */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-secondary dark:text-neutral-200">
+        <h4 className="text-sm font-medium text-secondary dark:text-foreground">
           {t('extension.settingsVersionTitle')}
         </h4>
         <div className="space-y-1.5">
           {/* Latest available version */}
           <div className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800">
             <span className="text-sm text-secondary dark:text-neutral-300">{t('extension.settingsLatestVersion')}</span>
-            <span className="font-mono text-sm font-medium text-secondary dark:text-neutral-200">{latestVersion}</span>
+            <span className="font-mono text-sm font-medium text-secondary dark:text-foreground">{latestVersion}</span>
           </div>
           {/* Currently installed version */}
           <div className={`flex items-center justify-between rounded-lg border px-3 py-2 ${
@@ -936,7 +936,7 @@ function ExtensionSettingsPanel() {
               <span className={`font-mono text-sm font-medium ${
                 isInstalled && outdated
                   ? 'text-amber-700 dark:text-amber-400'
-                  : 'text-secondary dark:text-neutral-200'
+                  : 'text-secondary dark:text-foreground'
               }`}>
                 {isInstalled && extensionVersion ? extensionVersion : '—'}
               </span>
@@ -947,7 +947,7 @@ function ExtensionSettingsPanel() {
 
       {/* Capabilities */}
       <div className="space-y-2">
-        <h4 className="text-sm font-medium text-secondary dark:text-neutral-200">
+        <h4 className="text-sm font-medium text-secondary dark:text-foreground">
           {t('extension.settingsCapabilities')}
         </h4>
         <div className="space-y-1.5">
@@ -1016,7 +1016,7 @@ function WebContainerSettingsPanel() {
             <Terminal className="h-4 w-4 text-neutral-600 dark:text-neutral-300" />
           </div>
           <div>
-            <p className="text-sm font-medium text-secondary dark:text-neutral-200">
+            <p className="text-sm font-medium text-secondary dark:text-foreground">
               WebContainer
             </p>
             <p className="text-xs text-tertiary">
@@ -1158,7 +1158,7 @@ function WorkspaceEditorPanel() {
                 onClick={() => setFontSize(size)}
                 className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                   display.fontSize === size
-                    ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    ? 'border-primary-100 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                     : 'border-neutral-200 text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
                 }`}
               >
@@ -1225,7 +1225,7 @@ function WorkspaceShortcutsPanel({ onShowHelp }: { onShowHelp: () => void }) {
       </div>
 
       <div className="border-subtle flex items-start gap-3 rounded-md border bg-muted p-4 dark:bg-muted">
-        <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-500 dark:text-primary-400" />
+        <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-500 dark:text-primary-500" />
         <p className="text-sm text-secondary dark:text-muted">
           <strong>{t('workspaceSettings.shortcuts.tipLabel')}</strong>{' '}
           <kbd className="border-subtle rounded border bg-card px-1.5 py-0.5 font-mono text-xs dark:bg-card">
@@ -1405,7 +1405,7 @@ const SettingsDialogContent = forwardRef<
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full ${
                   activeTab === tab.id
-                    ? 'dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700'
+                    ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
                     : 'text-secondary hover:bg-muted dark:text-tertiary dark:hover:bg-muted'
                 }`}
               >
@@ -1452,7 +1452,7 @@ const SettingsDialogContent = forwardRef<
                       onClick={() => setLocale(code as typeof locale)}
                       className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                         locale === code
-                          ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'border-primary-100 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                           : 'border-neutral-200 text-secondary hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
                       }`}
                     >
@@ -1478,7 +1478,7 @@ const SettingsDialogContent = forwardRef<
                       onClick={() => setTheme(opt.value)}
                       className={`flex flex-col items-center gap-1.5 rounded-lg border px-3 py-3 text-sm transition-colors ${
                         themeMode === opt.value
-                          ? 'border-primary-300 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'border-primary-100 bg-primary-50 font-medium text-primary-700 dark:border-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                           : 'border-neutral-200 text-secondary hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800'
                       }`}
                     >

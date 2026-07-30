@@ -78,7 +78,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-neutral-200">page_screenshot</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">page_screenshot</code>
         <span className="text-neutral-400 dark:text-neutral-500 text-xs">viewport</span>
         {img && (
           <span className="ml-auto text-neutral-400 text-xs shrink-0">

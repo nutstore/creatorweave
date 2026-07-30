@@ -200,7 +200,7 @@ export function ImageGenDropdown() {
                   onClick={() => handleSelectModel(m.id)}
                   className={`flex w-full items-center rounded-md px-2 py-1.5 text-left text-[11px] transition-colors ${
                     imageGenModel === m.id
-                      ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                      ? 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                       : 'text-secondary hover:bg-muted'
                   }`}
                 >
@@ -229,7 +229,7 @@ export function ImageGenDropdown() {
                 onClick={() => handleSelectRatio(value)}
                 className={`rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${
                   imageGenAspectRatio === value
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                     : 'text-secondary hover:bg-muted'
                 }`}
               >

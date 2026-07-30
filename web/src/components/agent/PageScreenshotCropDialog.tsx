@@ -128,7 +128,7 @@ export function PageScreenshotCropDialog({ imageDataUrl, onConfirm, onCancel }: 
       <section className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <header className="flex items-center justify-between border-b border-border px-5 py-3.5 text-foreground">
           <div className="flex items-center gap-2.5">
-            <Crop className="h-4 w-4 text-primary-300" />
+            <Crop className="h-4 w-4 text-primary-700" />
             <div>
               <h2 className="text-sm font-semibold">{t('agent.pageScreenshot.title')}</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">{t('agent.pageScreenshot.description')}</p>
@@ -148,7 +148,7 @@ export function PageScreenshotCropDialog({ imageDataUrl, onConfirm, onCancel }: 
           >
             <img ref={imageRef} src={imageDataUrl} alt="当前页面截图" draggable={false} className="block max-h-[60vh] max-w-full" />
             {hasUserCrop && (
-              <div className="pointer-events-none absolute border-2 border-primary-300 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)]" style={cropStyle} />
+              <div className="pointer-events-none absolute border-2 border-primary-100 shadow-[0_0_0_9999px_rgba(0,0,0,0.52)]" style={cropStyle} />
             )}
           </div>
         </div>

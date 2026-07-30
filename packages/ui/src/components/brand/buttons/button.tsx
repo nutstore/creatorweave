@@ -12,11 +12,11 @@ const buttonVariants = cva(
         primary:
           "bg-primary-600 text-white shadow-[0_1px_3px_0_rgba(13,148,136,0.3)] hover:bg-primary-700 dark:bg-primary-700 dark:text-primary-50 dark:shadow-[0_1px_3px_0_rgba(13,148,136,0.2)] dark:hover:bg-primary-600 font-semibold",
         secondary:
-          "border border-gray-200 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-neutral-700 dark:bg-primary-900/25 dark:text-primary-300 dark:hover:bg-primary-900/40 font-semibold",
+          "border border-gray-200 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-neutral-700 dark:bg-primary-100/25 dark:text-primary-700 dark:hover:bg-primary-100/40 font-semibold",
         outline:
-          "border border-gray-200 bg-transparent text-primary hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 font-medium",
+          "border border-gray-200 bg-transparent text-primary hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium",
         ghost:
-          "gap-1.5 bg-transparent text-tertiary hover:bg-gray-100 hover:text-primary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100 font-medium",
+          "gap-1.5 bg-transparent text-tertiary hover:bg-gray-100 hover:text-primary dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium",
         danger:
           "border border-danger-border bg-danger-bg text-danger hover:opacity-90 dark:bg-danger-bg/25 dark:text-red-300 font-semibold",
       },
@@ -41,7 +41,7 @@ const iconButtonVariants = cva(
         default:
           "border border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800",
         primary:
-          "border border-primary-600 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-primary-700 dark:bg-primary-900/25 dark:text-primary-300 dark:hover:bg-primary-900/40",
+          "border border-primary-600 bg-primary-50 text-primary-600 hover:bg-primary-100 dark:border-primary-700 dark:bg-primary-100/25 dark:text-primary-700 dark:hover:bg-primary-100/40",
         danger:
           "border border-danger-border bg-danger-bg text-danger hover:opacity-90 dark:bg-danger-bg/25 dark:text-red-300",
         ghost: "text-tertiary hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800",

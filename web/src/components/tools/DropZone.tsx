@@ -306,7 +306,7 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
           <div className="text-center">
             <div
               className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
-                isDragOver ? 'bg-primary-200' : 'bg-muted dark:bg-muted'
+                isDragOver ? 'bg-primary-100' : 'bg-muted dark:bg-muted'
               } transition-colors`}
             >
               <Upload

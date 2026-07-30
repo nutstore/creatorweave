@@ -151,7 +151,7 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
       <BrandDialogContent className="flex max-h-[85vh] max-w-xl flex-col overflow-hidden p-0">
         {/* Header — consistent with system BrandDialogHeader */}
         <BrandDialogHeader>
-          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-foreground">
             {readOnly ? (
               <Eye className="h-4.5 w-4.5 text-blue-500" />
             ) : (
@@ -159,7 +159,7 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
             )}
             {dialogTitle}
             {readOnly && (
-              <Lock className="h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500" />
+              <Lock className="h-3.5 w-3.5 dark:text-neutral-500" />
             )}
           </BrandDialogTitle>
           <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
@@ -180,22 +180,22 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
             <div className="space-y-5">
               {skill?.description && (
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                  <label className="mb-1 block text-xs font-medium dark:text-neutral-400">
                     {t('skillEditor.description')}
                   </label>
-                  <p className="text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+                  <p className="text-sm leading-relaxed dark:text-neutral-300">
                     {skill.description}
                   </p>
                 </div>
               )}
               {instruction && (
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                  <label className="mb-2 block text-xs font-medium dark:text-neutral-400">
                     {t('skillEditor.instruction')}
                   </label>
                   <div className="overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700">
                     <div className="bg-white p-4 dark:bg-neutral-800/50">
-                      <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+                      <div className="whitespace-pre-wrap font-mono text-sm leading-relaxed dark:text-neutral-300">
                         {instruction}
                       </div>
                     </div>
@@ -210,7 +210,7 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={t('skillEditor.skillNamePlaceholder')}
-                  className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:text-neutral-100 dark:focus:bg-neutral-700"
+                  className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:focus:bg-neutral-700"
                 />
               </FormField>
 
@@ -219,7 +219,7 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={t('skillEditor.descriptionPlaceholder')}
-                  className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:text-neutral-100 dark:focus:bg-neutral-700"
+                  className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:focus:bg-neutral-700"
                 />
               </FormField>
 
@@ -306,7 +306,7 @@ function TextareaWithLines({
       {/* Line numbers */}
       <div
         ref={lineNumbersRef}
-        className="flex shrink-0 select-none flex-col items-end overflow-hidden bg-neutral-50 px-2 py-3 text-right font-mono text-xs leading-[1.625rem] text-neutral-300 dark:bg-neutral-800 dark:text-neutral-600"
+        className="flex shrink-0 select-none flex-col items-end overflow-hidden bg-neutral-50 px-2 py-3 text-right font-mono text-xs leading-[1.625rem] dark:bg-neutral-800 dark:text-neutral-600"
         aria-hidden="true"
       >
         {Array.from({ length: displayLines }, (_, i) => (
@@ -325,7 +325,7 @@ function TextareaWithLines({
         placeholder={placeholder}
         rows={rows}
         className={cn(
-          'flex-1 resize-none bg-white px-4 py-3 font-mono text-sm leading-[1.625rem] text-neutral-800 dark:bg-neutral-900 dark:text-neutral-200',
+          'flex-1 resize-none bg-white px-4 py-3 font-mono text-sm leading-[1.625rem] dark:bg-neutral-900 dark:text-foreground',
           'placeholder:text-neutral-400 dark:placeholder:text-neutral-500',
           'focus:outline-none'
         )}
@@ -345,7 +345,7 @@ function FormField({ label, required, children }: {
 }) {
   return (
     <div>
-      <label className="mb-1.5 flex items-center text-sm font-medium text-neutral-600 dark:text-neutral-400">
+      <label className="mb-1.5 flex items-center text-sm font-medium dark:text-neutral-400">
         {label}
         {required && <span className="ml-1 text-red-500">*</span>}
       </label>

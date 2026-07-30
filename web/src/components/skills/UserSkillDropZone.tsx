@@ -345,7 +345,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
                 {t('skillUpload.confirmTarget') || 'Import Target'}
               </p>
-              <p className="text-sm text-neutral-800 dark:text-neutral-200">
+              <p className="text-sm text-neutral-800 dark:text-foreground">
                 {(t('skillUpload.bundleDetected') || '{count} skills detected — all will be imported to .skills/user/')
                   .replace('{count}', String(pending.bundleSkills?.length ?? 0))}
               </p>
@@ -355,7 +355,7 @@ export function UserSkillDropZone({ onImported, onClose }: UserSkillDropZoneProp
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
                 {t('skillUpload.confirmTarget') || 'Import Target'}
               </p>
-              <p className="font-mono text-sm text-neutral-800 dark:text-neutral-200">
+              <p className="font-mono text-sm text-neutral-800 dark:text-foreground">
                 .skills/user/<span className="font-semibold text-blue-600 dark:text-blue-400">{pending.dirName}</span>/
               </p>
             </div>

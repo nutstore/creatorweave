@@ -1128,10 +1128,10 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
       {/* Header bar */}
       {result.title && (
         <div className="flex items-center justify-between rounded-t-lg border-b border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
-          <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200">{result.title}</span>
+          <span className="text-sm font-medium dark:text-foreground">{result.title}</span>
           <div className="flex items-center gap-2">
             <div className={`h-2 w-2 rounded-full ${isReady ? 'bg-green-500' : 'bg-yellow-500'}`} />
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
+            <span className="text-xs dark:text-neutral-400">{isReady ? 'Plugin Ready' : 'Loading...'}</span>
           </div>
         </div>
       )}
@@ -1149,7 +1149,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
       {/* Footer with controls */}
       <div className="flex items-center justify-between rounded-b-lg border-t border-neutral-200 bg-white px-4 py-2 dark:border-neutral-700 dark:bg-neutral-800">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 dark:text-neutral-500">Plugin API v1.0</span>
+          <span className="text-xs dark:text-neutral-500">Plugin API v1.0</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -1158,7 +1158,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
               const iframe = iframeRef.current
               iframe?.contentWindow?.location.reload()
             }}
-            className="text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-xs hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground"
           >
             Refresh
           </button>
@@ -1170,7 +1170,7 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="mx-4 w-full max-w-lg rounded-lg bg-white shadow-xl dark:bg-neutral-900">
             <div className="flex items-center justify-between border-b p-4">
-              <h3 className="text-lg font-semibold dark:text-neutral-100">
+              <h3 className="text-lg font-semibold">
                 {modalContent.options.title || 'Plugin Modal'}
               </h3>
               <button
@@ -1180,11 +1180,11 @@ export function PluginHostAPIRenderer({ result, onAction, analysisData }: Plugin
                 ✕
               </button>
             </div>
-            <div className="p-4 dark:text-neutral-200" dangerouslySetInnerHTML={{ __html: modalContent.content }} />
+            <div className="p-4 dark:text-foreground" dangerouslySetInnerHTML={{ __html: modalContent.content }} />
             <div className="flex justify-end gap-2 border-t p-4">
               <button
                 onClick={() => setModalContent(null)}
-                className="rounded px-4 py-2 text-neutral-700 hover:bg-neutral-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                className="rounded px-4 py-2 hover:bg-neutral-100 dark:text-foreground dark:hover:bg-neutral-800"
               >
                 Close
               </button>

@@ -78,7 +78,7 @@ export function AgentDropdown({
                     className="min-w-0 flex-1 text-left"
                   >
                     <span
-                      className={`font-medium ${isActive ? 'dark:text-primary-400 text-primary-600' : 'text-neutral-700 dark:text-neutral-300'}`}
+                      className={`font-medium ${isActive ? 'dark:text-primary-500 text-primary-600' : 'text-neutral-700 dark:text-neutral-300'}`}
                     >
                       @{agent.id}
                     </span>

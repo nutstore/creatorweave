@@ -33,7 +33,7 @@ function SubagentStreamingContent({
     <>
       {reasoning && <ReasoningSection reasoning={reasoning} streaming={isStreamingReasoning} />}
       {content && (
-        <div className="rounded-lg bg-white px-3 py-1.5 text-sm text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100">
+        <div className="rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-neutral-800">
           <div className="max-w-prose whitespace-pre-wrap break-words">
             {content}
             {isStreamingContent && (
@@ -196,7 +196,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && isLoadingPersisted) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
+      <div className="flex items-center gap-2 px-3 py-2 text-xs">
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>正在恢复已保存的执行记录...</span>
       </div>
@@ -205,7 +205,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && persistedMessages === null) {
     return (
-      <div className="px-3 py-2 text-xs text-neutral-400">
+      <div className="px-3 py-2 text-xs">
         （中间过程数据不可用——可能是页面刷新后运行时状态已清除）
       </div>
     )
@@ -213,7 +213,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && steps.length === 0) {
     return (
-      <div className="px-3 py-2 text-xs text-neutral-400">
+      <div className="px-3 py-2 text-xs">
         （未找到该子代理的已保存执行记录）
       </div>
     )
@@ -221,7 +221,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (steps.length === 0) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
+      <div className="flex items-center gap-2 px-3 py-2 text-xs">
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>等待响应...</span>
       </div>

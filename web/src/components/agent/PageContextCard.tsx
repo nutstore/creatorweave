@@ -47,7 +47,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
     <div className="mt-1 w-full max-w-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 text-left dark:border-neutral-700 dark:bg-neutral-800/50">
       {/* Header */}
       <div className="flex items-center gap-1.5 border-b border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:border-neutral-700 dark:text-neutral-300">
-        <Globe className="h-3.5 w-3.5 shrink-0 text-primary-500 dark:text-primary-400" />
+        <Globe className="h-3.5 w-3.5 shrink-0 text-primary-500 dark:text-primary-500" />
         <span>{t('conversation.pageContextTitle')}</span>
       </div>
 
@@ -74,7 +74,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-0.5 break-all text-primary-600 underline-offset-2 hover:underline dark:text-primary-400"
+                className="inline-flex items-center gap-0.5 break-all text-primary-600 underline-offset-2 hover:underline dark:text-primary-500"
               >
                 <span className="min-w-0 truncate">{url}</span>
                 <ExternalLink className="h-2.5 w-2.5 shrink-0" />
@@ -106,7 +106,7 @@ export function PageContextCard({ pageContext }: PageContextCardProps) {
               {selectedText.length > SELECTED_TEXT_TRUNCATE && (
                 <button
                   type="button"
-                  className="ml-1 inline text-primary-600 hover:underline dark:text-primary-400"
+                  className="ml-1 inline text-primary-600 hover:underline dark:text-primary-500"
                   onClick={() => setShowFullText((v) => !v)}
                 >
                   {showFullText

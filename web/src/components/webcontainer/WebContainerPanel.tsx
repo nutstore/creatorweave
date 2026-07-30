@@ -155,7 +155,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
         <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
           <div className="flex items-start justify-between">
             <div className="min-w-0">
-              <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
+              <h2 className="text-base font-semibold text-foreground">
                 WebContainer
               </h2>
               <p className="mt-1 truncate text-xs text-neutral-500 dark:text-neutral-400">
@@ -189,7 +189,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
         <div className="space-y-3 border-b border-neutral-200 p-4 dark:border-neutral-700">
           <BrandCard variant="content" className="rounded-xl">
             <BrandCardHeader className="space-y-1 border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
-              <BrandCardTitle className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <BrandCardTitle className="text-sm font-semibold text-foreground">
                 {t('webContainer.startupConfig')}
               </BrandCardTitle>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -216,7 +216,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                       <div className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
                         {t('webContainer.currentStartupDir')}
                       </div>
-                      <div className="mt-0.5 truncate text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                      <div className="mt-0.5 truncate text-sm font-semibold text-foreground">
                         {startupPath}
                       </div>
                       <div className="mt-1 text-[11px] text-neutral-500 dark:text-neutral-400">
@@ -229,7 +229,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
                 <div>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between rounded-md border border-neutral-200 px-2.5 py-2 text-left text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                    className="flex w-full items-center justify-between rounded-md border border-neutral-200 px-2.5 py-2 text-left text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:text-foreground dark:hover:bg-neutral-800"
                     onClick={() => setShowAdvanced((prev) => !prev)}
                   >
                     <span>{t('webContainer.advancedOptions')}</span>
@@ -395,7 +395,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
             </div>
             <pre
               ref={logRef}
-              className="h-full min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 px-4 py-3 text-xs leading-5 text-neutral-100"
+              className="h-full min-w-0 flex-1 overflow-auto whitespace-pre-wrap break-all bg-neutral-950 px-4 py-3 text-xs leading-5 text-white"
             >
               {logsText || t('webContainer.noOutputYet')}
             </pre>
@@ -407,7 +407,7 @@ export function WebContainerPanel({ isOpen, onClose }: WebContainerPanelProps) {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/35 p-4">
           <div className="flex h-[70vh] w-full max-w-[760px] min-w-0 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-700 dark:bg-neutral-900">
             <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3 dark:border-neutral-700">
-              <div className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              <div className="text-sm font-semibold text-foreground">
                 {t('webContainer.selectStartupDir')}
               </div>
               <BrandButton

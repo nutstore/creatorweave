@@ -309,8 +309,8 @@ export function QuickActionsPanel({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-900/30">
-              <Zap className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+            <div className="rounded-lg bg-primary-50 p-2 dark:bg-primary-100/30">
+              <Zap className="h-4 w-4 text-primary-600 dark:text-primary-500" />
             </div>
             <div>
               <h2 className="text-base font-semibold text-primary dark:text-primary-foreground">{t('tools.quickActions')}</h2>
@@ -331,7 +331,7 @@ export function QuickActionsPanel({
             onClick={() => setActiveTab('actions')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'actions'
-                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-500'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
@@ -342,7 +342,7 @@ export function QuickActionsPanel({
             onClick={() => setActiveTab('smart')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'smart'
-                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-500'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
@@ -353,7 +353,7 @@ export function QuickActionsPanel({
             onClick={() => setActiveTab('upload')}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors ${
               activeTab === 'upload'
-                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-400'
+                ? 'border-b-2 border-primary-500 text-primary-600 dark:text-primary-500'
                 : 'text-secondary hover:text-primary dark:text-muted dark:hover:text-primary-foreground'
             }`}
           >
@@ -376,7 +376,7 @@ export function QuickActionsPanel({
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('tools.searchActions')}
-                    className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary placeholder:text-tertiary focus:border-primary-300 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
+                    className="w-full rounded-lg border border-border bg-muted py-2 pl-10 pr-4 text-sm text-primary placeholder:text-tertiary focus:border-primary-100 focus:bg-card focus:outline-none focus:ring-2 focus:ring-primary-100 dark:border-border dark:bg-muted dark:text-primary-foreground dark:placeholder:text-muted dark:focus:bg-card"
                   />
                 </div>
               </div>
@@ -392,7 +392,7 @@ export function QuickActionsPanel({
                       onClick={() => setSelectedCategory(cat.id as ActionCategory)}
                       className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                          ? 'bg-primary-100 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                           : 'text-secondary hover:bg-muted dark:text-muted dark:hover:bg-muted'
                       }`}
                     >
@@ -411,10 +411,10 @@ export function QuickActionsPanel({
                     <button
                       key={action.id}
                       onClick={() => handleActionClick(action)}
-                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-900/20"
+                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-100 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-100/20"
                     >
-                      <div className="mt-0.5 rounded-lg bg-primary-50 p-2 dark:bg-primary-900/20">
-                        <Icon className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                      <div className="mt-0.5 rounded-lg bg-primary-50 p-2 dark:bg-primary-100/20">
+                        <Icon className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-primary dark:text-primary-foreground">{t(action.labelKey)}</p>
@@ -507,10 +507,10 @@ export function QuickActionsPanel({
                         }
                         onClose()
                       }}
-                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-300 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-900/20"
+                      className="flex w-full items-start gap-3 rounded-xl border border-border p-3 text-left transition-colors hover:border-primary-100 hover:bg-primary-50/50 dark:border-border dark:hover:bg-primary-100/20"
                     >
-                      <div className="mt-0.5 rounded-lg bg-primary-50/60 p-2 dark:bg-primary-900/20">
-                        <Sparkles className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                      <div className="mt-0.5 rounded-lg bg-primary-50/60 p-2 dark:bg-primary-100/20">
+                        <Sparkles className="h-4 w-4 text-primary-600 dark:text-primary-500" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-primary dark:text-primary-foreground">{suggestion.title}</p>

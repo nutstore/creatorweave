@@ -48,7 +48,7 @@ export function DatabaseRefreshDialog({ isOpen, errorMessage }: DatabaseRefreshD
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950/40">
             <RefreshCw className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
-          <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+          <h3 className="text-lg font-semibold text-foreground">
             {t('app.databaseConnectionLost')}
           </h3>
           <p className="mt-1.5 text-sm text-neutral-600 dark:text-neutral-400">
@@ -64,7 +64,7 @@ export function DatabaseRefreshDialog({ isOpen, errorMessage }: DatabaseRefreshD
 
           {errorMessage && (
             <details className="mt-3 text-left">
-              <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
+              <summary className="cursor-pointer text-xs font-medium text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-foreground">
                 {t('app.showTechnicalDetails')}
               </summary>
               <pre className="mt-2 max-h-32 overflow-auto rounded-md bg-neutral-100 p-3 text-xs text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">

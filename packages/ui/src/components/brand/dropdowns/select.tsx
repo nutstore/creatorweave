@@ -29,7 +29,7 @@ const BrandSelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm text-neutral-900 placeholder:text-tertiary focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100 [&>span]:line-clamp-1",
+      "flex h-10 w-full items-center justify-between rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 [&>span]:line-clamp-1",
       className
     )}
     {...props}
@@ -79,7 +79,7 @@ const BrandSelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold text-neutral-700 dark:text-neutral-300", className)}
+    className={cn("py-1.5 pl-8 pr-2 text-sm font-semibold dark:text-neutral-300", className)}
     {...props}
   />
 ))
@@ -92,7 +92,7 @@ const BrandSelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-sm text-neutral-700 outline-none focus:bg-primary-50 focus:text-primary-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-neutral-200 dark:focus:bg-primary-900/30 dark:focus:text-primary-300",
+      "relative flex w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-sm outline-none focus:bg-primary-50 focus:text-primary-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:text-foreground dark:focus:bg-primary-100/30 dark:focus:text-primary-700",
       className
     )}
     {...props}

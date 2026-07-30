@@ -152,11 +152,11 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                     onClick={() => handleTabChange(tab.id)}
                     className={`group flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 ${
                       activeTab === tab.id
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700'
                         : 'text-secondary hover:text-foreground dark:text-muted dark:hover:text-foreground'
                     }`}
                   >
-                    <span className={`transition-colors duration-150 ${activeTab === tab.id ? 'text-primary-600 dark:text-primary-400' : 'text-secondary dark:text-muted group-hover:text-primary-600 dark:group-hover:text-primary-400'}`}>
+                    <span className={`transition-colors duration-150 ${activeTab === tab.id ? 'text-primary-600 dark:text-primary-500' : 'text-secondary dark:text-muted group-hover:text-primary-600 dark:group-hover:text-primary-500'}`}>
                       {tab.icon}
                     </span>
                     <span className="truncate">{tab.label}</span>
@@ -265,8 +265,8 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                         onClick={() => setTheme(themeMode)}
                         className={`rounded-lg border-2 p-4 text-center capitalize transition-all duration-200 ${
                           mode === themeMode
-                            ? 'dark:bg-primary-900/30 dark:text-primary-300 border-primary-500 bg-primary-50 text-primary-700'
-                            : 'border-subtle hover:border-primary-300 hover:scale-[1.02] dark:hover:border-border'
+                            ? 'dark:bg-primary-100/30 dark:text-primary-700 border-primary-500 bg-primary-50 text-primary-700'
+                            : 'border-subtle hover:border-primary-100 hover:scale-[1.02] dark:hover:border-border'
                         }`}
                       >
                         {t(`workspaceSettings.display.theme.${themeMode}`)}
@@ -371,7 +371,7 @@ export function WorkspaceSettingsDialog({ open, onOpenChange }: WorkspaceSetting
                   </div>
 
                   <div className="flex items-start gap-3 border-subtle rounded-md border bg-muted p-4 dark:bg-muted">
-                    <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-500 dark:text-primary-400" />
+                    <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-500 dark:text-primary-500" />
                     <p className="text-sm text-secondary dark:text-muted">
                       <strong>{t('workspaceSettings.shortcuts.tipLabel')}</strong>{' '}
                       <kbd className="border-subtle rounded border bg-card px-1.5 py-0.5 font-mono text-xs dark:bg-card">

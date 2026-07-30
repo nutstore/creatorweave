@@ -54,7 +54,7 @@ export function ThinkingDropdown({
         onClick={() => setIsOpen((v) => !v)}
         className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
           enableThinking
-            ? 'border-primary-200 dark:bg-primary-900/30 dark:text-primary-300 bg-primary-50 text-primary-700 dark:border-primary-800'
+            ? 'border-primary-100 dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700 dark:border-primary-800'
             : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-500'
         }`}
       >

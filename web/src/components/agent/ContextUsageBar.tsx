@@ -71,7 +71,7 @@ export function ContextUsageBar({
       </span>
 
       {isProcessing && (
-        <span className="dark:bg-primary-400 h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500" />
+        <span className="dark:bg-primary-500 h-1.5 w-1.5 animate-pulse rounded-full bg-primary-500" />
       )}
     </div>
   )

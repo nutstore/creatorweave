@@ -344,7 +344,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
             {/* Queued message bubbles */}
             {queuedMessages.map((msg, idx) => (
               <div key={`queued-${idx}-${msg.enqueuedAt}`} className="group/queued relative">
-                <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-blue-50 px-4 py-2.5 text-sm text-neutral-800 opacity-60 dark:bg-blue-900/30 dark:text-neutral-200 dark:opacity-70">
+                <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-blue-50 px-4 py-2.5 text-sm text-neutral-800 opacity-60 dark:bg-blue-900/30 dark:text-foreground dark:opacity-70">
                   <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                 </div>
                 <button

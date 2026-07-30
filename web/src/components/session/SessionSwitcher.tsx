@@ -124,7 +124,7 @@ export const ConversationSwitcher: React.FC<ConversationSwitcherProps> = ({
                       <li
                         key={conversation.id}
                         className={`flex items-center gap-2 px-3 py-2 hover:bg-muted dark:hover:bg-muted ${
-                          isActive ? 'bg-primary-50 dark:bg-primary-950/30' : ''
+                          isActive ? 'bg-primary-50 dark:bg-primary-50/30' : ''
                         }`}
                       >
                         {/* Conversation selector */}

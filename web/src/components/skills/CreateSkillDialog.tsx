@@ -111,7 +111,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
     <BrandDialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
       <BrandDialogContent className="flex max-h-[85vh] max-w-xl flex-col overflow-hidden p-0">
         <BrandDialogHeader>
-          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold text-neutral-900 dark:text-neutral-100">
+          <BrandDialogTitle className="flex items-center gap-2 text-base font-semibold">
             <FileCode className="h-4.5 w-4.5 text-blue-500" />
             {t('skillEditor.createSkill')}
           </BrandDialogTitle>
@@ -131,7 +131,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
           <div className="space-y-5">
             {/* Skill name (also used as directory name) */}
             <div>
-              <label className="mb-1.5 flex items-center text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1.5 flex items-center text-sm font-medium dark:text-neutral-400">
                 {t('skillEditor.skillName')}
                 <span className="ml-1 text-red-500">*</span>
               </label>
@@ -140,7 +140,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('skillEditor.skillNamePlaceholder')}
                 className={cn(
-                  'bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:text-neutral-100 dark:focus:bg-neutral-700',
+                  'bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:focus:bg-neutral-700',
                   nameError && 'border-red-400 focus-visible:ring-red-400'
                 )}
                 autoFocus
@@ -151,7 +151,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
                   {nameError}
                 </p>
               ) : (
-                <p className="mt-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+                <p className="mt-1.5 text-xs dark:text-neutral-500">
                   {t('skillEditor.skillNameHelp')}
                 </p>
               )}
@@ -159,7 +159,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
 
             {/* Description */}
             <div>
-              <label className="mb-1.5 flex items-center text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              <label className="mb-1.5 flex items-center text-sm font-medium dark:text-neutral-400">
                 {t('skillEditor.description')}
                 <span className="ml-1 text-red-500">*</span>
               </label>
@@ -167,7 +167,7 @@ export function CreateSkillDialog({ open, onClose, onCreated }: CreateSkillDialo
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder={t('skillEditor.descriptionPlaceholder')}
-                className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:text-neutral-100 dark:focus:bg-neutral-700"
+                className="bg-neutral-50 focus:bg-white dark:bg-neutral-800 dark:focus:bg-neutral-700"
               />
             </div>
           </div>

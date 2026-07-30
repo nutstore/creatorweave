@@ -363,7 +363,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
             <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* OPFS Version Preview */}
               <div className="flex flex-col bg-muted dark:bg-muted rounded-lg overflow-hidden">
-                <div className="px-3 py-2 border-b border dark:border-border bg-primary-50 dark:bg-primary-900/30">
+                <div className="px-3 py-2 border-b border dark:border-border bg-primary-50 dark:bg-primary-100/30">
                   <h4 className="text-sm font-medium text-primary-700">
                     {cr.opfsVersion}
                   </h4>
@@ -387,7 +387,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
 
               {/* Native Version Preview */}
               <div className="flex flex-col bg-muted dark:bg-muted rounded-lg overflow-hidden">
-                <div className="px-3 py-2 border-b border dark:border-border bg-success-bg dark:bg-success-950/30">
+                <div className="px-3 py-2 border-b border dark:border-border bg-success-bg dark:bg-success-200/10">
                   <h4 className="text-sm font-medium text-green-900">
                     {cr.nativeVersion}
                   </h4>
@@ -412,7 +412,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
           </div>
 
           {/* Conflict explanation */}
-          <div className="bg-warning-bg dark:bg-warning-950/20 border border-warning dark:border-warning-900 rounded-lg p-4">
+          <div className="bg-warning-bg dark:bg-warning-bg border border-warning dark:border-warning rounded-lg p-4">
             <div className="flex items-start gap-3">
               <svg
                 className="w-5 h-5 text-warning flex-shrink-0 mt-0.5"
@@ -431,7 +431,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
                 <h4 className="text-sm font-medium text-warning dark:text-warning-200 mb-1">
                   {cr.whyConflict}
                 </h4>
-                <p className="text-xs text-warning dark:text-warning-300 leading-relaxed">
+                <p className="text-xs text-warning dark:text-warning leading-relaxed">
                   {cr.conflictExplanation}
                   {conflict.nativeVersion.exists
                     ? cr.ifKeepNativeExists
@@ -461,7 +461,7 @@ export const ConflictResolutionDialog: React.FC<ConflictResolutionDialogProps> =
               <button
                 onClick={handleResolve}
                 disabled={!selectedOption}
-                className="px-5 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:bg-primary-300 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                className="px-5 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:bg-primary-100 disabled:cursor-not-allowed transition-all flex items-center gap-2"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

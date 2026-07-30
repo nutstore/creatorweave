@@ -51,12 +51,12 @@ export function WorkflowTemplateCard({
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/20',
           'disabled:cursor-not-allowed disabled:opacity-50',
           selected
-            ? 'border-primary-300 bg-primary-50 dark:border-primary-700 dark:bg-primary-950/30'
+            ? 'border-primary-100 bg-primary-50 dark:border-primary-700 dark:bg-primary-50/30'
             : 'border-neutral-200 bg-white hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-neutral-600 dark:hover:bg-neutral-750'
         )}
       >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">
+          <span className="text-xs font-medium text-foreground">
             {template.label}
           </span>
           {selected && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" />}
@@ -94,12 +94,12 @@ export function WorkflowTemplateCard({
     <div
       className={cn(
         'group relative rounded-xl border p-4 transition-all',
-        'border-neutral-200 bg-white hover:border-primary-200 hover:shadow-sm',
+        'border-neutral-200 bg-white hover:border-primary-100 hover:shadow-sm',
         'dark:border-neutral-700 dark:bg-neutral-800 dark:hover:border-primary-800',
         disabled && 'cursor-not-allowed opacity-50'
       )}
     >
-      <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+      <h4 className="text-sm font-medium text-foreground">
         {template.label}
       </h4>
 

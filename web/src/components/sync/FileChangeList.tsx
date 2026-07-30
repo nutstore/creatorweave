@@ -80,7 +80,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
             />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-neutral-900 dark:text-neutral-100 mb-2">{t('settings.syncPanel.fileChangeList.noFileChanges')}</h3>
+        <h3 className="text-lg font-medium text-foreground mb-2">{t('settings.syncPanel.fileChangeList.noFileChanges')}</h3>
         <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm">
           {t('settings.syncPanel.fileChangeList.noChangesDescription')}
         </p>
@@ -100,7 +100,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
       <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{t('settings.pendingSyncPanel.title')}</h3>
+            <h3 className="text-sm font-medium text-foreground">{t('settings.pendingSyncPanel.title')}</h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">{summaryText}</p>
           </div>
           <div className="text-xs text-neutral-500 dark:text-neutral-400">
@@ -121,7 +121,7 @@ export const FileChangeList: React.FC<FileChangeListProps> = ({
                 key={`${change.path}-${index}`}
                 onClick={() => onSelectFile?.(change)}
                 className={`w-full px-4 py-3 flex items-start gap-3 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors ${
-                  isSelected ? 'bg-primary-50 dark:bg-primary-950/20 border-l-4 border-primary-500' : ''
+                  isSelected ? 'bg-primary-50 dark:bg-primary-50/20 border-l-4 border-primary-500' : ''
                 }`}
                 aria-label={t('settings.syncPanel.fileChangeList.viewChange', { path: change.path })}
               >
