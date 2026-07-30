@@ -354,8 +354,6 @@ export const settings = {
       emptyHint: "点击\"新增服务商\"接入 OpenAI 兼容的 API",
       providerName: "服务商名称",
       providerNamePlaceholder: "如：Ollama 本地、我的中转站",
-      defaultModel: "默认模型",
-      defaultModelPlaceholder: "如 gpt-4o, deepseek-chat",
       save: "保存",
       add: "新增服务商",
       cancel: "取消",

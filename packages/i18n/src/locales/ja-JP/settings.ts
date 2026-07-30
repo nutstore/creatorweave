@@ -367,8 +367,6 @@ export const settings = {
       emptyHint: "「プロバイダーを追加」をクリックして OpenAI 互換 API に接続",
       providerName: "プロバイダー名",
       providerNamePlaceholder: "例：Ollama ローカル、マイリレー",
-      defaultModel: "デフォルトモデル",
-      defaultModelPlaceholder: "例：gpt-4o, deepseek-chat",
       save: "保存",
       add: "プロバイダーを追加",
       cancel: "キャンセル",

@@ -360,8 +360,6 @@ export const settings = {
       emptyHint: "\"서비스 추가\"를 클릭하여 OpenAI 호환 API에 연결",
       providerName: "서비스 이름",
       providerNamePlaceholder: "예: Ollama 로컬, 내 릴레이",
-      defaultModel: "기본 모델",
-      defaultModelPlaceholder: "예: gpt-4o, deepseek-chat",
       save: "저장",
       add: "서비스 추가",
       cancel: "취소",

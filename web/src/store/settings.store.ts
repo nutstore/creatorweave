@@ -105,7 +105,7 @@ interface SettingsState {
   createCustomProvider: (input: { name: string; baseUrl: string; model?: string }) => boolean
   updateCustomProvider: (
     providerId: string,
-    patch: { name?: string; baseUrl?: string; model?: string }
+    patch: { name?: string; baseUrl?: string }
   ) => boolean
   removeCustomProvider: (providerId: string) => void
   addCustomProviderModel: (providerId: string, model: string) => boolean
@@ -298,24 +298,17 @@ export const useSettingsStore = create<SettingsState>()(
 
         const nextName = patch.name?.trim()
         const nextBaseUrl = patch.baseUrl?.trim().replace(/\/+$/, '')
-        const nextModel = patch.model?.trim()
 
         if (patch.name !== undefined && !nextName) return false
         if (patch.baseUrl !== undefined && !nextBaseUrl) return false
-        // model is optional — allow empty value to clear the default model
 
         set((state) => ({
           customProviders: state.customProviders.map((provider) => {
             if (provider.id !== providerId) return provider
-            const mergedModels =
-              nextModel && !provider.models.includes(nextModel)
-                ? [nextModel, ...provider.models]
-                : provider.models
             return {
               ...provider,
               name: nextName ?? provider.name,
               baseUrl: nextBaseUrl ?? provider.baseUrl,
-              models: mergedModels,
               updatedAt: Date.now(),
             }
           }),
@@ -333,7 +326,6 @@ export const useSettingsStore = create<SettingsState>()(
           if (refreshed) {
             set({
               customBaseUrl: refreshed.baseUrl,
-              modelName: nextModel ?? get().modelName,
             })
           }
         }

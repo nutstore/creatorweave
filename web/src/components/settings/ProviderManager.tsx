@@ -121,7 +121,6 @@ function ProviderCard({
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState('')
   const [editBaseUrl, setEditBaseUrl] = useState('')
-  const [editDefaultModel, setEditDefaultModel] = useState('')
 
   // Add model dialog state
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
@@ -249,7 +248,6 @@ function ProviderCard({
     if (isEditing && customProvider) {
       setEditName(customProvider.name)
       setEditBaseUrl(customProvider.baseUrl)
-      setEditDefaultModel(customProvider.models[0] || '')
     }
   }, [isEditing, customProvider])
 
@@ -368,7 +366,6 @@ function ProviderCard({
     const ok = updateCustomProvider(customProvider.id, {
       name: editName,
       baseUrl: editBaseUrl,
-      model: editDefaultModel,
     })
     if (!ok) {
       toast.error(t('settings.toast.invalidProviderInfo'))
@@ -376,7 +373,7 @@ function ProviderCard({
     }
     setIsEditing(false)
     toast.success(t('settings.toast.customProviderUpdated'))
-  }, [customProvider, editName, editBaseUrl, editDefaultModel, updateCustomProvider, t])
+  }, [customProvider, editName, editBaseUrl, updateCustomProvider, t])
 
   return (
     <div className="rounded-lg border border-border/60 overflow-hidden">
@@ -506,14 +503,6 @@ function ProviderCard({
                       </button>
                     </div>
                     <p className="mt-1 text-[10px] text-tertiary">{t('settings.apiMode.hint')}</p>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-[11px] font-medium text-secondary">{t('settings.modelManagement.defaultModel')}</label>
-                    <BrandInput
-                      value={editDefaultModel}
-                      onChange={(e) => setEditDefaultModel(e.target.value)}
-                      className="h-9 text-[13px]"
-                    />
                   </div>
                   <div className="flex justify-end gap-2 pt-1">
                     <BrandButton variant="outline" className="h-8 text-[12px]" onClick={() => setIsEditing(false)}>

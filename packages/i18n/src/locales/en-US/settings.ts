@@ -363,8 +363,6 @@ export const settings = {
       emptyHint: "Click \"Add Provider\" to connect an OpenAI-compatible API",
       providerName: "Provider Name",
       providerNamePlaceholder: "e.g. Ollama Local, My Relay",
-      defaultModel: "Default Model",
-      defaultModelPlaceholder: "e.g. gpt-4o, deepseek-chat",
       save: "Save",
       add: "Add Provider",
       cancel: "Cancel",
