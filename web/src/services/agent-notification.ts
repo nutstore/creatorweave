@@ -132,6 +132,12 @@ export async function notifyAgentComplete(params: NotifyAgentCompleteParams): Pr
         { action: 'dismiss', title: '稍后' },
       ],
     }
+    // TODO(Limitation): This uses the Web Notification API via Web Service Worker.
+    // Limitation: If the agent runs inside the CreatorWeave Extension's Side Panel,
+    // clicking this notification will NOT be able to focus the host browser tab.
+    // Web SWs lack the browser privilege to steal focus/activate tabs.
+    // To support Side Panel tab-switching, this must be routed through the
+    // browser extension's background script (chrome.notifications + chrome.tabs.update).
     await registration.showNotification(title, options)
   } catch (err) {
     console.warn('[AgentNotification] notifyAgentComplete failed:', err)

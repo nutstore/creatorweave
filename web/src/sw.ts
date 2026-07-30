@@ -302,8 +302,18 @@ self.addEventListener('notificationclick', (event) => {
   const { clientId, conversationId, projectId } = data
 
   event.waitUntil((async () => {
-    // 1️⃣ 精准找到原 tab — focus + 让客户端 navigate 到对的会话
-    // 注意：不基于 URL 匹配，因为同 conversationId 可能跨 project，用户状态会变
+    // 1️⃣ Find the exact original tab — focus it and let the client navigate
+    // to the correct conversation.
+    // Note: We do NOT match by URL because the same conversationId can exist
+    // across multiple projects, and user state might change.
+    //
+    // TODO(Limitation): If the agent finished running inside the browser's
+    // Side Panel, `original.focus()` here will fail or have no effect.
+    // Reason: Due to security restrictions, Web Service Workers do not have
+    // the privilege to forcibly switch focus to or activate the browser's
+    // main tab (user focus cannot be hijacked by web APIs).
+    // The solution requires relying on the browser extension's background
+    // script (chrome.tabs.update).
     if (clientId) {
       try {
         const original = await self.clients.get(clientId)

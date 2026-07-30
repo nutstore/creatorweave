@@ -930,6 +930,29 @@ export default defineContentScript({
       async scheduleShowNotification(title: string, body: string): Promise<{ ok: boolean }> {
         return sendToBridge('cw_schedule_show_notification', { title, body });
       },
+
+      // TODO(Future Enhancement): Agent Loop Notifications via Extension
+      // ------------------------------------------------------------------
+      // Currently, agent loop notifications are handled entirely by the Web App's
+      // Service Worker (web/src/sw.ts). This works perfectly for standard web tabs.
+      //
+      // LIMITATION:
+      // If the user is running the agent inside THIS extension's Side Panel,
+      // clicking the Web SW notification will fail to focus/switch back to the
+      // host browser tab (Web SWs cannot steal tab focus).
+      //
+      // FUTURE API TO ADD HERE:
+      //   async showAgentNotification(data: {
+      //     conversationId: string; projectId: string; title: string; body: string
+      //   }): Promise<{ ok: boolean }>
+      //
+      // It should send a message to `background.ts`, which will call
+      // `chrome.notifications.create()`, and listen for
+      // `chrome.notifications.onClicked` to execute
+      // `chrome.tabs.update(senderTabId, { active: true })`.
+      //
+      // The Web App (`agent-notification.ts`) will then check for
+      // `window.__agentWeb?.showAgentNotification` and prefer it over the Web SW.
     };
 
     ;(window as any).__agentWebBridgeState = {
