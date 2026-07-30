@@ -302,7 +302,7 @@ export const AssetsPopover = memo(function AssetsPopover({ convId, onPreviewAsse
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-700 px-3 py-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+            <span className="text-xs font-semibold uppercase tracking-wider text-secondary">
               {t('assets.title', { defaultValue: 'Assets' })}
             </span>
             <div className="flex items-center gap-1">

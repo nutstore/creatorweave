@@ -1129,7 +1129,7 @@ export const Sidebar = memo(function Sidebar({
         {!collapsed && <>
         {/* Collapse button */}
         <div className="border-subtle flex items-center justify-between border-b bg-white px-2 py-1 dark:bg-card">
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">{t('sidebar.workspace')}</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-secondary">{t('sidebar.workspace')}</span>
           <div className="flex items-center gap-1">
             <BrandButton
               variant="ghost"
