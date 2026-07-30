@@ -33,13 +33,6 @@ export const agent = {
         aiSearchBadge: "AI セマンティック検索",
         bm25Fallback: "BM25 フォールバック",
     },
-    ttsQueue: {
-        playing: "再生中...",
-        playingWithQueue: "再生中 ({count} 件待ち)",
-        queued: "{count} 件待ち",
-        stop: "停止してキューをクリア",
-        clear: "キューをクリア",
-    },
     folderTip: {
         title: "ローカルフォルダを開く",
         description:

@@ -24,7 +24,7 @@
  *   Only committed messages are rendered (no runtime steps).
  */
 
-import { Fragment, memo, type ReactNode, useContext, useEffect, useRef, useState } from 'react'
+import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Bot, Database, GitFork, AlertTriangle, Download } from 'lucide-react'
 import type { Turn } from './group-messages'
@@ -40,13 +40,10 @@ import { MarkdownContent } from './MarkdownContent'
 import { CopyButton } from './CopyButton'
 import { ShareButton } from './ShareButton'
 import { ContextSummaryCard } from './ContextSummaryCard'
-import { TTSButton } from './TTSButton'
-import { ttsQueue } from './tts-queue'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
 import { useConversationStore } from '@/store/conversation.store'
-import { useSettingsStore } from '@/store/settings.store'
 import { ConversationActionContext } from './ConversationActionContext'
 import { downloadImage } from './image-utils'
 import { Lightbox } from './Lightbox'
@@ -347,33 +344,6 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   // Lightbox state for image click-to-enlarge
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
 
-  // TTS settings
-  const enableTTS = useSettingsStore((s) => s.enableTTS)
-  const autoPlayTTS = useSettingsStore((s) => s.autoPlayTTS)
-  const ttsVoice = useSettingsStore((s) => s.ttsVoice)
-
-  // ── Auto-play TTS when assistant turn completes ──
-  // Track the previous isProcessing state to detect the transition
-  const prevIsProcessingRef = useRef(isProcessing)
-  useEffect(() => {
-    // Detect transition: processing → not processing (turn just finished)
-    if (prevIsProcessingRef.current && !isProcessing) {
-      // Find the last message with content to enqueue
-      const lastContent = [...turn.messages].reverse().find((msg) => msg.content)?.content
-      if (lastContent && conversationId && enableTTS && autoPlayTTS) {
-        // Use last message ID as dedup key
-        const lastMsgId = [...turn.messages].reverse().find((msg) => msg.content)?.id || String(turn.timestamp)
-        ttsQueue.enqueue(
-          conversationId,
-          lastContent,
-          ttsVoice,
-          `${conversationId}:${lastMsgId}`,
-        )
-      }
-    }
-    prevIsProcessingRef.current = isProcessing
-  }, [isProcessing, turn.messages, conversationId, enableTTS, autoPlayTTS, ttsVoice, turn.timestamp])
-
   // Build unified timeline
   const timeline = buildTimeline(
     turn.messages,
@@ -517,9 +487,6 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
             )}
             {lastMessageWithContent?.content && (
               <ShareButton content={lastMessageWithContent.content} messageId={lastMessageWithContent.id} />
-            )}
-            {enableTTS && lastMessageWithContent?.content && (
-              <TTSButton content={lastMessageWithContent.content} voice={ttsVoice} />
             )}
             <button
               type="button"

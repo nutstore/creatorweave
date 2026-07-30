@@ -67,9 +67,6 @@ interface SettingsState {
   // 实验性功能 (Experimental features, disabled by default)
   enableBatchSpawn: boolean
   enableWebMCP: boolean
-  enableTTS: boolean
-  autoPlayTTS: boolean
-  ttsVoice: string
   enableSchedules: boolean
   agentLoopNotifications: {
     enabled: boolean
@@ -124,9 +121,6 @@ interface SettingsState {
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
   setEnableSchedules: (v: boolean) => void
-  setEnableTTS: (v: boolean) => void
-  setAutoPlayTTS: (v: boolean) => void
-  setTTSVoice: (voice: string) => void
   setHasApiKey: (has: boolean) => void
   setAgentLoopNotificationsEnabled: (enabled: boolean) => void
   setAgentLoopNotificationsOnlyWhenHidden: (onlyWhenHidden: boolean) => void
@@ -230,9 +224,6 @@ export const useSettingsStore = create<SettingsState>()(
       thinkingLevel: 'medium' as ThinkingLevel,
       enableBatchSpawn: false,
       enableWebMCP: true,
-      enableTTS: false,
-      autoPlayTTS: true,
-      ttsVoice: 'zh-CN-XiaoxiaoNeural',
       enableSchedules: false,
       hasApiKey: false,
       hasApiKeyLoaded: false,
@@ -464,9 +455,6 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
       setEnableSchedules: (enableSchedules) => set({ enableSchedules }),
-      setEnableTTS: (enableTTS) => set({ enableTTS }),
-      setAutoPlayTTS: (autoPlayTTS) => set({ autoPlayTTS }),
-      setTTSVoice: (ttsVoice) => set({ ttsVoice }),
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
       setAgentLoopNotificationsEnabled: (enabled) => {
         set((s) => ({ agentLoopNotifications: { ...s.agentLoopNotifications, enabled } }))
@@ -827,9 +815,6 @@ export const useSettingsStore = create<SettingsState>()(
         thinkingLevel: state.thinkingLevel,
         enableBatchSpawn: state.enableBatchSpawn,
         enableWebMCP: state.enableWebMCP,
-        enableTTS: state.enableTTS,
-        autoPlayTTS: state.autoPlayTTS,
-        ttsVoice: state.ttsVoice,
         enableSchedules: state.enableSchedules,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,

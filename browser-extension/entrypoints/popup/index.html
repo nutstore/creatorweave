@@ -1,3 +1,5 @@
+[HTML] index.html
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,175 +10,177 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: 320px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      font-size: 13px;
-      color: #1f2937;
-      background: #fff;
+      min-height: 260px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      display: flex;
+      flex-direction: column;
     }
     .header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid #f3f4f6;
+      gap: 10px;
+      padding: 14px 16px 12px;
+      background: linear-gradient(135deg, #14B8A6, #0D9488);
+      color: #fff;
     }
-    .logo-text {
+    .logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.18);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .title-wrap {
+      flex: 1;
+      min-width: 0;
+    }
+    .title {
       font-size: 15px;
       font-weight: 700;
-      background: linear-gradient(135deg, #0d9488, #115e59);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      line-height: 1.2;
     }
-    .version {
+    .subtitle {
+      margin-top: 2px;
       font-size: 11px;
-      color: #9ca3af;
+      opacity: 0.92;
     }
     .build-mode {
       font-size: 10px;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-weight: 600;
-      margin-left: auto;
-      margin-right: 6px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.28);
+      background: rgba(255,255,255,0.12);
     }
-    .build-mode.dev {
-      background: #fef3c7;
-      color: #b45309;
-    }
-    .build-mode.prod {
-      background: #f0fdfa;
-      color: #0d9488;
-    }
+    .build-mode.dev { color: #fef3c7; }
+    .build-mode.prod { color: #dcfce7; }
     .main {
-      padding: 14px 16px;
-    }
-    .desc {
-      font-size: 12px;
-      color: #6b7280;
-      line-height: 1.6;
-      margin-bottom: 14px;
-    }
-    .desc code {
-      background: #f0fdfa;
-      color: #0d9488;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-    .api-list {
+      padding: 14px 16px 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-    }
-    .api-item {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-      padding: 10px 12px;
-      background: #f9fafb;
-      border-radius: 8px;
-      border: 1px solid #f3f4f6;
-    }
-    .api-name {
-      font-size: 12px;
-      font-weight: 600;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      color: #0d9488;
-      word-break: break-all;
-    }
-    .api-desc {
-      font-size: 11px;
-      color: #9ca3af;
-    }
-    .footer {
-      display: flex;
-      gap: 16px;
-      justify-content: center;
-      padding: 10px 16px 14px;
-      border-top: 1px solid #f3f4f6;
-    }
-    .footer a {
-      font-size: 12px;
-      color: #0d9488;
-      text-decoration: none;
-      cursor: pointer;
-    }
-    .footer a:hover {
-      text-decoration: underline;
+      gap: 12px;
     }
     .status {
       display: flex;
       align-items: center;
-      gap: 6px;
-      margin-bottom: 14px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 1px solid #f3f4f6;
-      font-size: 12px;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
     }
     .status-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #d1d5db;
-      flex-shrink: 0;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #94a3b8;
+      flex: 0 0 auto;
     }
-    .status-dot.active { background: #22c55e; }
-    .status-dot.inactive { background: #eab308; }
-    .status-dot.disabled { background: #ef4444; }
-    .status.active { background: #f0fdf4; border-color: #bbf7d0; }
-    .status.inactive { background: #fefce8; border-color: #fde68a; }
-    .status.disabled { background: #fef2f2; border-color: #fecaca; }
-    .status-text { color: #6b7280; }
+    .status.active .status-dot { background: #22c55e; }
+    .status.inactive .status-dot { background: #f59e0b; }
+    .status.disabled .status-dot { background: #94a3b8; }
+    .status-text { font-size: 12px; color: #334155; }
+    .desc {
+      font-size: 12px;
+      line-height: 1.6;
+      color: #475569;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: #e2e8f0;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-size: 11px;
+    }
+    .api-list {
+      display: grid;
+      gap: 8px;
+    }
+    .api-item {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .api-name {
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+    .api-desc {
+      display: block;
+      font-size: 12px;
+      line-height: 1.45;
+      color: #475569;
+    }
     .codex-box {
-      margin-top: 12px;
-      padding: 10px;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      background: #f9fafb;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px;
     }
     .codex-btn {
       width: 100%;
-      border: 0;
+      border: none;
       border-radius: 8px;
-      padding: 8px 10px;
+      background: #0f766e;
+      color: #fff;
+      padding: 9px 12px;
       font-size: 12px;
       font-weight: 600;
-      color: white;
-      background: #0d9488;
       cursor: pointer;
+      margin-top: 8px;
     }
     .codex-btn.secondary {
-      margin-top: 8px;
-      background: #6b7280;
+      background: #e2e8f0;
+      color: #334155;
     }
     .codex-log {
-      margin-top: 8px;
-      font-size: 11px;
-      color: #4b5563;
+      margin-top: 10px;
       white-space: pre-wrap;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #475569;
       max-height: 120px;
       overflow: auto;
+    }
+    a { color: #0f766e; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .footer {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .footer-link {
+      flex: 1;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      color: #334155;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .footer-link:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
     }
   </style>
 </head>
 <body>
   <header class="header">
-    <svg width="22" height="22" viewBox="0 0 512 512" fill="none">
-      <rect width="512" height="512" rx="108" fill="url(#bg)"/>
-      <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#14B8A6"/><stop offset="100%" stop-color="#0D7377"/></linearGradient></defs>
-      <g stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.9">
-        <path d="M100 100C180 180 220 220 256 256"/><path d="M256 256C292 292 332 332 412 412"/>
-      </g>
-      <g stroke="white" stroke-width="18" stroke-linecap="round" fill="none" opacity="0.75">
-        <path d="M100 412C180 332 220 292 256 256"/><path d="M256 256C292 220 332 180 412 100"/>
-      </g>
-      <circle cx="256" cy="256" r="20" fill="#FBBF24" opacity="0.95"/>
-    </svg>
-    <span class="logo-text">CreatorWeave</span>
-    <span class="build-mode" id="buildMode"></span>
-    <span class="version" id="version"></span>
+    <div class="logo">CW</div>
+    <div class="title-wrap">
+      <div class="title">CreatorWeave</div>
+      <div class="subtitle">Browser bridge for side panel, web search, fetch, and Codex auth</div>
+    </div>
+    <div id="buildMode" class="build-mode">PROD</div>
   </header>
 
   <main class="main">
@@ -190,19 +194,11 @@
     <div class="api-list">
       <div class="api-item">
         <code class="api-name">__agentWeb.search(query)</code>
-        <span class="api-desc">DuckDuckGo 搜索，返回标题、链接、摘要</span>
+        <span class="api-desc">DuckDuckGo / Baidu 搜索，返回标题、链接、摘要</span>
       </div>
       <div class="api-item">
         <code class="api-name">__agentWeb.fetch(url, options?)</code>
-        <span class="api-desc">网页抓取，支持 raw / text / readability</span>
-      </div>
-      <div class="api-item">
-        <code class="api-name">__agentWeb.ttsSynthesize(text, options?)</code>
-        <span class="api-desc">Edge TTS 语音合成，返回 MP3 base64</span>
-      </div>
-      <div class="api-item">
-        <code class="api-name">__agentWeb.ttsListVoices()</code>
-        <span class="api-desc">列出可用的 TTS 语音（400+ 种）</span>
+        <span class="api-desc">网页抓取，支持 raw / readability / JS 渲染回退</span>
       </div>
     </div>
 
@@ -212,7 +208,6 @@
         <span id="codexStatusText">Checking auth status…</span>
       </div>
 
-      <!-- Usage display -->
       <div id="codexUsage" style="display:none; margin-bottom: 10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
           <div style="font-size: 11px; font-weight: 600; color: #374151;">Codex Usage</div>
@@ -223,7 +218,6 @@
         <div id="usageUpdated" style="font-size: 10px; color: #9ca3af;"></div>
       </div>
 
-      <!-- Device code display (shown during auth flow) -->
       <div id="deviceCodeBox" style="display:none; margin-bottom: 10px; padding: 8px 10px; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px;">
         <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;">Device Code</div>
         <div style="display: flex; align-items: center; gap: 8px;">
@@ -237,12 +231,12 @@
       <button id="codexResetBtn" class="codex-btn secondary">重新开始（清除状态）</button>
       <div id="codexLog" class="codex-log"></div>
     </div>
-  </main>
 
-  <footer class="footer">
-    <a id="openDocs">使用文档</a>
-    <a id="openGithub">GitHub</a>
-  </footer>
+    <footer class="footer">
+      <button id="openDocs" class="footer-link">使用文档</button>
+      <button id="openGithub" class="footer-link">GitHub</button>
+    </footer>
+  </main>
 
   <script type="module" src="./main.ts"></script>
 </body>

@@ -51,13 +51,6 @@ export const agent = {
         aiSearchBadge: "AI 语义搜索",
         bm25Fallback: "BM25 回退",
     },
-    ttsQueue: {
-        playing: "正在朗读...",
-        playingWithQueue: "正在朗读 ({count} 个排队中)",
-        queued: "{count} 个排队中",
-        stop: "停止并清空队列",
-        clear: "清空队列",
-    },
     folderTip: {
         title: "打开本地文件夹",
         description: "选择文件夹后，AI 可以读取、编辑其中的文件，并将内容保存到本地。",

@@ -8,7 +8,7 @@
  * - Cross-device session synchronization
  */
 
-import { useState, useEffect, useCallback, useMemo, useRef, forwardRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, forwardRef } from 'react'
 import {
   Settings,
   X,
@@ -35,7 +35,6 @@ import {
   CheckCircle2,
   XCircle,
   Terminal,
-  Volume2,
   LayoutDashboard,
   RotateCcw,
   AlertTriangle,
@@ -60,15 +59,6 @@ import {
 } from '@creatorweave/ui'
 import { BrandButton } from '@creatorweave/ui'
 import { BrandSwitch } from '@creatorweave/ui'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@creatorweave/ui'
 import { useSettingsStore } from '@/store/settings.store'
 import { useTheme, type ThemeMode } from '@/store/theme.store'
 import { useExtensionStore } from '@/store/extension.store'
@@ -880,140 +870,6 @@ function NotificationsSection() {
 }
 
 // =============================================================================
-// TTS Settings Panel (within Experimental tab)
-// =============================================================================
-
-function TTSSettingsPanel() {
-  const rootRef = useRef<HTMLDivElement>(null)
-  const t = useT()
-  const enableTTS = useSettingsStore((s) => s.enableTTS)
-  const autoPlayTTS = useSettingsStore((s) => s.autoPlayTTS)
-  const ttsVoice = useSettingsStore((s) => s.ttsVoice)
-  const setEnableTTS = useSettingsStore((s) => s.setEnableTTS)
-  const setAutoPlayTTS = useSettingsStore((s) => s.setAutoPlayTTS)
-  const setTTSVoice = useSettingsStore((s) => s.setTTSVoice)
-
-  const [voices, setVoices] = useState<Array<{ ShortName: string; FriendlyName: string; Locale: string; Gender: string }>>([])
-  const [voicesLoading, setVoicesLoading] = useState(false)
-  const [voicesError, setVoicesError] = useState<string | null>(null)
-
-  const loadVoices = useCallback(async () => {
-    const bridge = (window as any).__agentWeb
-    if (!bridge?.ttsListVoices) {
-      setVoicesError('Browser extension not installed')
-      return
-    }
-
-    setVoicesLoading(true)
-    setVoicesError(null)
-    try {
-      const result = await bridge.ttsListVoices()
-      if (result?.ok && Array.isArray(result.voices)) {
-        const sorted = [...result.voices].sort((a: any, b: any) => {
-          const localeA = a.Locale || ''
-          const localeB = b.Locale || ''
-          if (localeA !== localeB) return localeA.localeCompare(localeB)
-          return (a.ShortName || '').localeCompare(b.ShortName || '')
-        })
-        setVoices(sorted)
-      } else {
-        setVoicesError(result?.error || 'Failed to load voices')
-      }
-    } catch (err) {
-      setVoicesError(err instanceof Error ? err.message : 'Failed to load voices')
-    } finally {
-      setVoicesLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (enableTTS && voices.length === 0) {
-      loadVoices()
-    }
-  }, [enableTTS, voices.length, loadVoices])
-
-  return (
-    <div ref={rootRef} className="space-y-3">
-      <ExperimentalToggle
-        title={t('settings.ttsToggle')}
-        description={t('settings.ttsToggleDesc')}
-        checked={enableTTS}
-        onChange={setEnableTTS}
-      />
-
-      {enableTTS && (
-        <div className="space-y-2 pl-1">
-          <div className="flex items-center gap-2">
-            <Volume2 className="h-4 w-4 text-tertiary" />
-            <span className="text-sm font-medium text-secondary dark:text-neutral-200">
-              {t('settings.ttsVoice')}
-            </span>
-          </div>
-
-          {voicesLoading && (
-            <p className="text-xs text-tertiary">{t('settings.ttsLoading')}</p>
-          )}
-
-          {voicesError && (
-            <div className="flex items-center gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
-              {voicesError}
-              <button
-                type="button"
-                onClick={loadVoices}
-                className="ml-auto text-red-500 hover:underline"
-              >
-                Retry
-              </button>
-            </div>
-          )}
-
-          {!voicesLoading && voices.length > 0 && (
-            <Select value={ttsVoice} onValueChange={setTTSVoice}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select voice..." />
-              </SelectTrigger>
-              <SelectContent container={rootRef.current} className="max-h-[280px]">
-                {(() => {
-                  const groups = new Map<string, typeof voices>()
-                  for (const v of voices) {
-                    const locale = v.Locale || 'Other'
-                    if (!groups.has(locale)) groups.set(locale, [])
-                    groups.get(locale)!.push(v)
-                  }
-                  return Array.from(groups.entries()).map(([locale, items]) => (
-                    <SelectGroup key={locale}>
-                      <SelectLabel>{locale}</SelectLabel>
-                      {items.map((v) => (
-                        <SelectItem key={v.ShortName} value={v.ShortName}>
-                          {v.FriendlyName}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))
-                })()}
-              </SelectContent>
-            </Select>
-          )}
-
-          {!voicesLoading && voices.length === 0 && !voicesError && (
-            <p className="text-xs text-tertiary">
-              {t('settings.ttsNoVoices')}
-            </p>
-          )}
-
-          <ExperimentalToggle
-            title={t('settings.ttsAutoPlay')}
-            description={t('settings.ttsAutoPlayDesc')}
-            checked={autoPlayTTS}
-            onChange={setAutoPlayTTS}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// =============================================================================
 // Extension Settings Panel
 // =============================================================================
 
@@ -1725,8 +1581,6 @@ const SettingsDialogContent = forwardRef<
               {/* Schedules toggle */}
               <ScheduleToggle />
 
-              {/* TTS toggle + voice selection */}
-              <TTSSettingsPanel />
             </div>
           )}
 

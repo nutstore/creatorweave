@@ -33,13 +33,6 @@ export const agent = {
         aiSearchBadge: "AI 시맨틱 검색",
         bm25Fallback: "BM25 대체",
     },
-    ttsQueue: {
-        playing: "재생 중...",
-        playingWithQueue: "재생 중 ({count}개 대기)",
-        queued: "{count}개 대기",
-        stop: "정지하고 대기열 지우기",
-        clear: "대기열 지우기",
-    },
     folderTip: {
         title: "로컬 폴더 열기",
         description:

@@ -7,7 +7,7 @@ export default defineConfig({
     name: 'CreatorWeave',
     description: 'Provides web_search and web_fetch capabilities for in-browser Agents',
     version: pkg.version,
-    permissions: ['scripting', 'tabs', 'storage', 'alarms', 'declarativeNetRequest', 'declarativeNetRequestFeedback', 'offscreen', 'notifications', 'sidePanel'],
+    permissions: ['scripting', 'tabs', 'storage', 'alarms', 'notifications', 'sidePanel'],
     host_permissions: ['<all_urls>'],
     // No global side_panel config — side panel is only enabled per-tab
     // via setOptions({ tabId }) when user clicks the workspace assistant button.

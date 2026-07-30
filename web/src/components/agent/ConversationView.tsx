@@ -17,7 +17,6 @@ import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
-import { TTSQueueIndicator } from './TTSQueueIndicator'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSelect } from './AgentModeSelect'
 import { useConversationLogic } from './useConversationLogic'
@@ -493,7 +492,6 @@ export function ConversationView({
 
         {/* Input area */}
         <div className="shrink-0 border-t border-neutral-200 bg-white px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900 sm:px-4 sm:py-3">
-          <TTSQueueIndicator />
           <div className="mx-auto flex max-w-3xl flex-col">
             <div className="relative">
               <AgentRichInput

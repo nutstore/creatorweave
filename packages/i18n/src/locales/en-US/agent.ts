@@ -51,13 +51,6 @@ export const agent = {
         aiSearchBadge: "AI semantic search",
         bm25Fallback: "BM25 fallback",
     },
-    ttsQueue: {
-        playing: "Playing...",
-        playingWithQueue: "Playing ({count} queued)",
-        queued: "{count} queued",
-        stop: "Stop and clear queue",
-        clear: "Clear queue",
-    },
     folderTip: {
         title: "Open Local Folder",
         description:

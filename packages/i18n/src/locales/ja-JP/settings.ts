@@ -108,13 +108,6 @@ export const settings = {
     batchSpawnDesc: "AIが複数のサブタスクを並列で起動できるようにします。高い同時接続数をサポートするプロバイダーが必要です。そうでない場合、レート制限エラーが発生する可能性があります。",
     scheduleToggle: "スケジュール (Schedules)",
     scheduleToggleDesc: "cron 式によるスケジュールタスクを有効にします。オンにするとトップバーにスケジュールボタンが表示され、エージェントは manage_schedule ツールを使用できるようになります。",
-    ttsToggle: "テキスト読み上げ (Edge TTS)",
-    ttsToggleDesc: "Edge TTS による高品質なニューラル音声合成を有効にします。ブラウザ拡張機能が必要です。",
-    ttsVoice: "音声",
-    ttsLoading: "音声を読み込み中...",
-    ttsAutoPlay: "自動再生",
-    ttsAutoPlayDesc: "AIの返信完了時に自動的に音声で読み上げます。アクティブなワークスペースでのみ再生します。",
-    ttsNoVoices: "音声は利用可能になり次第自動的に読み込まれます。",
 
     // Sync panel
     syncPanel: {
