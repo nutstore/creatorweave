@@ -475,7 +475,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
                 {(() => {
                   const cache = turn.totalUsage.accumulatedCacheTokens ?? turn.totalUsage.cacheReadTokens
                   return cache ? (
-                    <span className="inline-flex items-center gap-0.5" title={t('conversation.usage.cache') || 'cache hit'}>
+                    <span className="inline-flex items-center gap-0.5 text-tertiary" title={t('conversation.usage.cache') || 'cache hit'}>
                       <Database className="h-3 w-3" />{formatTokens(cache)}
                     </span>
                   ) : null
