@@ -75,6 +75,8 @@ export const projectHome = {
       dayWork: "{date} の作業",
       moreItems: "件…",
       emptyHint: "まだ作業記録がありません、最初のプロジェクトを作成しましょう",
+      loadFailed: "アクティビティの読み込みに失敗しました",
+      retry: "再試行",
       range: {
         label: "期間",
         "1m": "最近1ヶ月",
@@ -134,7 +136,10 @@ export const projectHome = {
       startFreshConfirmHint:
         "確認のため「最初からやり直す」と入力してください：",
       startFreshConfirmPlaceholder: "最初からやり直す",
+      clearCacheUnavailable: "Service Worker がまだ有効化されていません。ページを更新してもう一度お試しください。",
+      diagnosticsRunning: "実行中…",
       confirmReset: "リセットを確認",
+      retry: "再試行",
       resetting: "リセット中...",
       diagnosticsTitle: "診断レポート",
       diagnosticsRunning: "診断情報を収集中...",

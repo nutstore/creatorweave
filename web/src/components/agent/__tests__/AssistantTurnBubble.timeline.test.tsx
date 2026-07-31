@@ -67,6 +67,32 @@ describe('AssistantTurnBubble timeline ordering', () => {
     expect(toolIndex).toBeGreaterThan(compressionIndex)
   })
 
+  it('shows the final reasoning duration from a committed assistant message', () => {
+    const { container } = render(
+      <AssistantTurnBubble
+        turn={{
+          type: 'assistant',
+          messages: [
+            {
+              id: 'assistant-reasoning',
+              role: 'assistant',
+              content: 'Done',
+              reasoning: 'Inspecting the data flow.',
+              reasoningDurationMs: 2_500,
+              timestamp: 100,
+            },
+          ],
+          timestamp: 100,
+          totalUsage: null,
+        }}
+        toolResults={new Map()}
+      />
+    )
+
+    expect(container.textContent).toContain('workflow.thinkingProcess')
+    expect(container.textContent).toContain('2common.seconds')
+  })
+
   it('does not render bot avatar when showAvatar is false', () => {
     const { container } = render(
       <AssistantTurnBubble

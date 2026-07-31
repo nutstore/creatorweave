@@ -174,6 +174,9 @@ function syncDraftTextStepContent(
   if (step.type !== 'reasoning' && step.type !== 'content') return
   step.content = content
   step.streaming = streaming
+  if (step.type === 'reasoning' && !streaming && typeof step.timestamp === 'number') {
+    step.durationMs = Math.max(0, Date.now() - step.timestamp)
+  }
 }
 
 function hasExplicitReasoningStep(draft: DraftAssistantState): boolean {

@@ -123,11 +123,11 @@ export const MessageBubble = memo(function MessageBubble({
             <Forward className="h-3.5 w-3.5" />
             <span>Delegated by {note.fromAgentName ?? note.fromAgentId}</span>
           </div>
-          <div className="whitespace-pre-wrap break-words text-neutral-300 text-neutral-300 dark:text-neutral-300">
+          <div className="whitespace-pre-wrap break-words text-neutral-700 dark:text-neutral-300">
             {note.task}
           </div>
           {note.reason && (
-            <div className="mt-1 text-xs italic text-neutral-400 text-neutral-400 dark:text-neutral-400">
+            <div className="mt-1 text-xs italic text-neutral-500 dark:text-neutral-400">
               {note.reason}
             </div>
           )}
@@ -141,7 +141,7 @@ export const MessageBubble = memo(function MessageBubble({
     return (
       <div className="flex flex-row-reverse gap-3">
         {/* Avatar */}
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-100/30 dark:text-primary-700">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300">
           <User className="h-4 w-4" />
         </div>
 
@@ -177,7 +177,7 @@ export const MessageBubble = memo(function MessageBubble({
           )}
 
           {/* Timestamp + Copy + Delete buttons */}
-          <div className="mt-1 flex items-center justify-end gap-2 text-xs">
+          <div className="mt-1 flex items-center justify-end gap-2 text-xs text-neutral-400">
             <span>
               {new Date(message.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
@@ -188,7 +188,7 @@ export const MessageBubble = memo(function MessageBubble({
             {message.pageContext && (
               <button
                 type="button"
-                className="inline-flex items-center gap-0.5 rounded p-1 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                className="inline-flex items-center gap-0.5 rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                 onClick={() => setShowPageContext((v) => !v)}
                 title={showPageContext ? t('conversation.hidePageContext') : t('conversation.viewPageContext')}
                 aria-label={t('conversation.viewPageContext')}
@@ -201,7 +201,7 @@ export const MessageBubble = memo(function MessageBubble({
             {onEditAndResend && !isEditing && (
               <button
                 type="button"
-                className="inline-flex items-center rounded p-1 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                className="inline-flex items-center rounded p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                 disabled={isProcessing}
                 onClick={handleStartEdit}
                 title={t('conversation.editAndResend')}
@@ -225,7 +225,7 @@ export const MessageBubble = memo(function MessageBubble({
             {onDeleteAgentLoop && !isEditing && (
               <button
                 type="button"
-                className="rounded p-1 hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
                 disabled={disableDeleteActions}
                 onClick={() => onDeleteAgentLoop(message.id)}
                 title={t('conversation.buttons.deleteTurn')}
@@ -250,7 +250,7 @@ export const MessageBubble = memo(function MessageBubble({
     <div className="flex gap-3">
       {/* Avatar */}
       {showAvatar && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
           <Bot className="h-4 w-4" />
         </div>
       )}
@@ -259,12 +259,16 @@ export const MessageBubble = memo(function MessageBubble({
       <div className="min-w-0 w-[90%] space-y-2">
         {/* Reasoning */}
         {hasReasoning && (
-          <ReasoningSection reasoning={message.reasoning!} streaming={isStreamingReasoning} />
+          <ReasoningSection
+            reasoning={message.reasoning!}
+            streaming={isStreamingReasoning}
+            durationMs={message.reasoningDurationMs}
+          />
         )}
 
         {/* Content */}
         {hasContent && (
-          <div className="inline-block max-w-full rounded-lg bg-white px-4 py-2 text-base shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:ring-neutral-700">
+          <div className="inline-block max-w-full rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
             <div className="prose max-w-none break-words overflow-x-auto">
               <MarkdownContent content={message.content!} />
             </div>
@@ -293,7 +297,7 @@ export const MessageBubble = memo(function MessageBubble({
                 <div className="absolute inset-0 flex items-end justify-end gap-1.5 bg-gradient-to-t from-black/40 via-transparent to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
                   <button
                     type="button"
-                    className="rounded-md bg-white/90 p-1.5 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-foreground dark:hover:bg-neutral-700"
+                    className="rounded-md bg-white/90 p-1.5 text-neutral-700 shadow-sm backdrop-blur-sm transition-colors hover:bg-white dark:bg-neutral-800/90 dark:text-neutral-200 dark:hover:bg-neutral-700"
                     title={t('conversation.imageGen.downloadImage')}
                     aria-label={t('conversation.imageGen.downloadImage')}
                     onClick={() => downloadImage(img.data, img.mimeType, `image-${idx + 1}`)}
@@ -322,7 +326,7 @@ export const MessageBubble = memo(function MessageBubble({
 
         {/* Token usage (only show for completed messages, not streaming) */}
         {!isStreamingReasoning && !isStreamingContent && message.usage && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-2 text-xs text-neutral-400">
             <span
               title={t('conversation.usage.tokenUsage', { promptTokens: message.usage.promptTokens, completionTokens: message.usage.completionTokens, totalTokens: message.usage.totalTokens })}
             >

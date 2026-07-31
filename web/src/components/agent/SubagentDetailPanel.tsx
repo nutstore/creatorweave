@@ -20,20 +20,31 @@ import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 
 function SubagentStreamingContent({
   reasoning,
+  reasoningStartedAt,
+  reasoningDurationMs,
   content,
   isStreamingReasoning,
   isStreamingContent,
 }: {
   reasoning?: string
+  reasoningStartedAt?: number
+  reasoningDurationMs?: number
   content?: string
   isStreamingReasoning: boolean
   isStreamingContent: boolean
 }) {
   return (
     <>
-      {reasoning && <ReasoningSection reasoning={reasoning} streaming={isStreamingReasoning} />}
+      {reasoning && (
+        <ReasoningSection
+          reasoning={reasoning}
+          streaming={isStreamingReasoning}
+          startedAt={reasoningStartedAt}
+          durationMs={reasoningDurationMs}
+        />
+      )}
       {content && (
-        <div className="rounded-lg bg-white px-3 py-1.5 text-sm dark:bg-neutral-800">
+        <div className="rounded-lg bg-white px-3 py-1.5 text-sm text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100">
           <div className="max-w-prose whitespace-pre-wrap break-words">
             {content}
             {isStreamingContent && (
@@ -66,6 +77,8 @@ function renderSubagentStep(
     return (
       <SubagentStreamingContent
         reasoning={step.content}
+        reasoningStartedAt={step.timestamp}
+        reasoningDurationMs={step.durationMs}
         isStreamingReasoning={step.streaming}
         isStreamingContent={false}
       />
@@ -118,6 +131,8 @@ function buildPersistedSteps(messages: Message[]): {
         id: `${message.id}:reasoning`,
         type: 'reasoning',
         content: message.reasoning,
+        timestamp: message.timestamp,
+        durationMs: message.reasoningDurationMs,
         streaming: false,
       })
     }
@@ -196,7 +211,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && isLoadingPersisted) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+      <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>正在恢复已保存的执行记录...</span>
       </div>
@@ -205,7 +220,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && persistedMessages === null) {
     return (
-      <div className="px-3 py-2 text-xs">
+      <div className="px-3 py-2 text-xs text-neutral-400">
         （中间过程数据不可用——可能是页面刷新后运行时状态已清除）
       </div>
     )
@@ -213,7 +228,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (!draft && steps.length === 0) {
     return (
-      <div className="px-3 py-2 text-xs">
+      <div className="px-3 py-2 text-xs text-neutral-400">
         （未找到该子代理的已保存执行记录）
       </div>
     )
@@ -221,7 +236,7 @@ export const SubagentDetailPanel = memo(function SubagentDetailPanel({
 
   if (steps.length === 0) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs">
+      <div className="flex items-center gap-2 px-3 py-2 text-xs text-neutral-400">
         <Loader2 className="h-3 w-3 animate-spin" />
         <span>等待响应...</span>
       </div>

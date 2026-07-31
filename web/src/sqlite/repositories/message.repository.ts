@@ -30,6 +30,7 @@ interface MessageMeta {
   workflowDryRun?: unknown
   workflowRealRun?: unknown
   reasoning?: string | null
+  reasoningDurationMs?: number
   toolCalls?: ToolCall[]
   toolCallId?: string
   name?: string
@@ -227,6 +228,10 @@ export class MessageRepository {
       meta.reasoning = message.reasoning
       hasMeta = true
     }
+    if (message.reasoningDurationMs !== undefined) {
+      meta.reasoningDurationMs = message.reasoningDurationMs
+      hasMeta = true
+    }
     if (message.toolCalls !== undefined) {
       meta.toolCalls = message.toolCalls
       hasMeta = true
@@ -276,6 +281,7 @@ export class MessageRepository {
       workflowDryRun: meta.workflowDryRun as Message['workflowDryRun'],
       workflowRealRun: meta.workflowRealRun as Message['workflowRealRun'],
       reasoning: meta.reasoning,
+      reasoningDurationMs: meta.reasoningDurationMs,
       toolCalls: meta.toolCalls,
       toolCallId: meta.toolCallId,
       name: meta.name,

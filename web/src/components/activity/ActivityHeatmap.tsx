@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom'
 import { getSQLiteDB } from '@/sqlite/sqlite-database'
 import { useT } from '@/i18n'
 import { useTheme } from '@/store/theme.store'
-import { FileText, MessageSquare, X } from 'lucide-react'
+import { AlertCircle, FileText, MessageSquare, X } from 'lucide-react'
 
 //-----------------------------------------------------------------------------
 // Types
@@ -287,9 +287,12 @@ export function ActivityHeatmap() {
   const [hoveredCell, setHoveredCell] = useState<DayCell | null>(null)
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; flipped: boolean } | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [retryKey, setRetryKey] = useState(0)
 
   useEffect(() => {
     setLoaded(false)
+    setLoadError(false)
     let cancelled = false
     fetchActivityData(range)
       .then((d) => {
@@ -299,12 +302,17 @@ export function ActivityHeatmap() {
       })
       .catch(() => {
         if (cancelled) return
+        setLoadError(true)
         setLoaded(true)
       })
     return () => {
       cancelled = true
     }
-  }, [range])
+  }, [range, retryKey])
+
+  const handleRetry = useCallback(() => {
+    setRetryKey((k) => k + 1)
+  }, [])
 
   const handleRangeChange = useCallback((next: ActivityRange) => {
     if (next === range) return
@@ -425,6 +433,33 @@ export function ActivityHeatmap() {
     [navigate]
   )
 
+  if (loadError) {
+    return (
+      <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="home-mono text-[11px] uppercase tracking-wider text-secondary dark:text-secondary-foreground">
+            {t('projectHome.activity.title')}
+          </span>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <div className="w-10 h-10 rounded-full bg-danger/10 flex items-center justify-center mb-3">
+            <AlertCircle className="w-4 h-4 text-danger/80" />
+          </div>
+          <p className="home-body text-sm text-tertiary dark:text-muted max-w-xs mb-4">
+            {t('projectHome.activity.loadFailed')}
+          </p>
+          <button
+            type="button"
+            onClick={handleRetry}
+            className="home-body min-h-[32px] px-4 text-xs rounded-md bg-card border border-border text-secondary dark:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            {t('projectHome.activity.retry')}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (!loaded) {
     return (
       <div className="home-reveal rounded-xl border border-border/60 bg-card/60 p-5">
@@ -444,9 +479,8 @@ export function ActivityHeatmap() {
   const isEmpty = totalDocs === 0 && totalChats === 0
   if (isEmpty) {
     return (
-      <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm p-5">
+      <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 p-5">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-4 rounded-full bg-primary/60" />
           <span className="home-mono text-[11px] uppercase tracking-wider text-secondary dark:text-secondary-foreground">
             {t('projectHome.activity.title')}
           </span>
@@ -465,11 +499,10 @@ export function ActivityHeatmap() {
 
   return (
     <>
-      <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 backdrop-blur-sm p-5">
+      <div className="home-reveal home-delay-3 rounded-xl border border-border/60 bg-card/60 p-5">
         {/* Header with range selector and stats */}
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-1 h-4 rounded-full bg-primary/60" />
             <span className="home-mono text-[11px] uppercase tracking-wider text-secondary dark:text-secondary-foreground">
               {t('projectHome.activity.title')}
             </span>
@@ -491,7 +524,7 @@ export function ActivityHeatmap() {
                     role="radio"
                     aria-checked={isActive}
                     onClick={() => handleRangeChange(r)}
-                    className={`home-body px-2 sm:px-2.5 py-1 text-[11px] rounded-md transition-all ${
+                    className={`home-body min-h-[32px] sm:min-h-[24px] px-2 sm:px-2.5 text-[11px] rounded-md transition-all ${
                       isActive
                         ? 'bg-card dark:bg-card text-secondary dark:text-foreground shadow-sm'
                         : 'text-tertiary dark:text-muted hover:text-secondary dark:hover:text-secondary-foreground'
@@ -505,14 +538,14 @@ export function ActivityHeatmap() {
 
             {/* P0: Summary stats — comprehensible metrics */}
             {(totalDocs > 0 || totalChats > 0) && (
-              <div className="hidden sm:flex items-center gap-3">
+              <div className="hidden sm:flex flex-wrap items-center gap-x-3 gap-y-1.5">
                 {totalDocs > 0 && (
                   <div className="flex items-center gap-1">
                     <FileText className="w-3 h-3 text-primary/70" />
-                    <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
+                    <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
                       {totalDocs}
                     </span>
-                    <span className="home-mono text-[10px] text-tertiary dark:text-muted">
+                    <span className="home-mono text-[11px] text-muted-foreground">
                       {t('projectHome.activity.docsLabel')}
                     </span>
                   </div>
@@ -522,10 +555,10 @@ export function ActivityHeatmap() {
                     <div className="w-px h-3 bg-border" />
                     <div className="flex items-center gap-1">
                       <MessageSquare className="w-3 h-3 text-primary/70" />
-                      <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
+                      <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
                         {totalChats}
                       </span>
-                      <span className="home-mono text-[10px] text-tertiary dark:text-muted">
+                      <span className="home-mono text-[11px] text-muted-foreground">
                         {t('projectHome.activity.chatsLabel')}
                       </span>
                     </div>
@@ -535,10 +568,10 @@ export function ActivityHeatmap() {
                   <>
                     <div className="w-px h-3 bg-border" />
                     <div className="flex items-center gap-1">
-                      <span className="home-mono text-sm font-medium text-secondary dark:text-foreground">
+                      <span className="home-mono text-base font-semibold tabular-nums text-secondary dark:text-foreground">
                         {activeDays}
                       </span>
-                      <span className="home-mono text-[10px] text-tertiary dark:text-muted">
+                      <span className="home-mono text-[11px] text-muted-foreground">
                         {t('projectHome.activity.activeDaysLabel')}
                       </span>
                     </div>
@@ -560,7 +593,7 @@ export function ActivityHeatmap() {
               {dayLabels.map((label, i) => (
                 <div
                   key={i}
-                  className="text-[10px] leading-none text-tertiary/70 dark:text-muted/70 select-none"
+                  className="text-[10px] leading-none text-muted-foreground select-none"
                   style={{ height: CELL_SIZE, width: 20, textAlign: 'right', lineHeight: `${CELL_SIZE}px` }}
                 >
                   {label}
@@ -570,7 +603,7 @@ export function ActivityHeatmap() {
 
             <div>
               {/* Month labels */}
-              <div className="flex text-[10px] text-tertiary/70 dark:text-muted/70 mb-1 select-none">
+              <div className="flex text-[10px] text-muted-foreground mb-1 select-none">
                 {monthLabels.map((m, i) => (
                   <div key={i} style={{ width: m.span * (CELL_SIZE + CELL_GAP), textAlign: 'left' }}>
                     {m.name}
@@ -620,7 +653,7 @@ export function ActivityHeatmap() {
 
         {/* Legend */}
         <div className="flex items-center justify-end gap-1.5 mt-3">
-          <span className="home-mono text-[10px] text-tertiary/60 dark:text-muted/60">
+          <span className="home-mono text-[10px] text-muted-foreground">
             {t('projectHome.activity.less')}
           </span>
           {levelColors.map((c, i) => (
@@ -630,7 +663,7 @@ export function ActivityHeatmap() {
               style={{ width: CELL_SIZE, height: CELL_SIZE, backgroundColor: c, borderRadius: CELL_RADIUS - 0.5 }}
             />
           ))}
-          <span className="home-mono text-[10px] text-tertiary/60 dark:text-muted/60">
+          <span className="home-mono text-[10px] text-muted-foreground">
             {t('projectHome.activity.more')}
           </span>
         </div>
@@ -647,23 +680,7 @@ export function ActivityHeatmap() {
           />
         )}
 
-        {/* Cell animation + hover styles */}
-        <style>{`
-          @keyframes heatCellIn {
-            from { opacity: 0; transform: scale(0.3); }
-            to   { opacity: 1; transform: scale(1); }
-          }
-          .heat-cell {
-            animation: heatCellIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-            transition: transform 0.15s ease-out;
-          }
-          .heat-cell:hover {
-            transform: scale(1.4);
-            z-index: 10;
-            position: relative;
-          }
-        `}</style>
-      </div>
+        </div>
 
       {/* Tooltip rendered outside the card to avoid overflow clipping */}
       {hoveredCell && tooltipPos && (
@@ -757,11 +774,8 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
 
   if (docItems.length === 0 && chatItems.length === 0) {
     return (
-      <div
-        className="mt-4 rounded-lg border border-primary/20 bg-primary/5 overflow-hidden"
-        style={{ animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
+      <div className="mt-4 pt-4 border-t border-border/60 heat-panel-slide">
+        <div className="flex items-center justify-between mb-4">
           <span className="home-body text-sm font-medium text-secondary dark:text-foreground">
             {cell.date}
           </span>
@@ -773,7 +787,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
-        <div className="px-4 py-6 text-center text-sm text-tertiary dark:text-muted">
+        <div className="py-4 text-center text-sm text-tertiary dark:text-muted">
           {t('projectHome.activity.noActivity')}
         </div>
       </div>
@@ -827,11 +841,8 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
   }
 
   return (
-    <div
-      className="mt-4 rounded-lg border border-primary/20 bg-primary/5 overflow-hidden"
-      style={{ animation: 'slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
-    >
-      <div className="flex items-center justify-between px-4 py-3 border-b border-primary/20">
+    <div className="mt-4 pt-4 border-t border-border/60 heat-panel-slide">
+      <div className="flex items-center justify-between mb-4">
         <span className="home-body text-sm font-medium text-secondary dark:text-foreground">
           {t('projectHome.activity.dayWork', { date: cell.date })}
         </span>
@@ -843,7 +854,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
-      <div className="px-4 py-3">
+      <div>
         {renderItems(
           docItems,
           <FileText className="w-3.5 h-3.5 text-primary" />,
@@ -857,13 +868,7 @@ function DayDetailPanel({ cell, onClose, onJump }: DayDetailPanelProps) {
           t('projectHome.activity.chatsLabel')
         )}
       </div>
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-    </div>
+      </div>
   )
 }
 
@@ -912,12 +917,7 @@ function MobileBarChart({ weeks, colors, selectedDate, onSelect, dayLabels, t }:
     const dow = new Date(cell.date + 'T00:00:00').getDay()
     const dayShort = fullDayLabels[dow] || String(dow)
 
-    // Stacked bar: docs on bottom (filled), chats on top (hatched/transparent).
-    // Each metric scales to its own max so neither dominates.
-    const docsPct = hasActivity ? Math.max(8, docsScale(cell.docs)) : 0
-    const chatsPct = hasActivity ? Math.max(8, chatsScale(cell.chats)) : 0
-    // Total visible height (clamped so empty days still show a tiny nub)
-    const totalPct = hasActivity ? Math.max(docsPct + chatsPct, 8) : 4
+
 
     return (
       <button
@@ -928,34 +928,34 @@ function MobileBarChart({ weeks, colors, selectedDate, onSelect, dayLabels, t }:
         className={`flex flex-col items-center gap-1 flex-1 min-w-0 ${hasActivity ? 'cursor-pointer' : 'cursor-default'} ${isSelected ? 'opacity-100' : 'opacity-80'}`}
         aria-label={`${cell.date}, ${cell.docs} ${t('projectHome.activity.docsLabel')}, ${cell.chats} ${t('projectHome.activity.chatsLabel')}`}
       >
-        <div className="w-full flex flex-col items-stretch justify-end gap-px" style={{ height: 36 }}>
-          {cell.chats > 0 && (
+        <div className="w-full flex items-end justify-center gap-0.5" style={{ height: 36 }}>
+          {cell.docs > 0 && (
             <div
-              className={`w-full max-w-[14px] mx-auto rounded-t-sm transition-all`}
+              className={`w-[5px] rounded-sm transition-all ${isSelected ? 'ring-1 ring-primary ring-offset-1 ring-offset-background' : ''}`}
               style={{
-                height: `${(chatsPct / totalPct) * 100}%`,
-                backgroundColor: colors[3],
-                opacity: 0.6,
+                height: `${Math.max(8, docsScale(cell.docs))}%`,
+                backgroundColor: colors[cell.level],
               }}
             />
           )}
-          {cell.docs > 0 && (
+          {cell.chats > 0 && (
             <div
-              className={`w-full max-w-[14px] mx-auto rounded-b-sm transition-all ${isSelected ? 'ring-1 ring-primary ring-offset-1 ring-offset-background' : ''}`}
+              className="w-[5px] rounded-sm transition-all"
               style={{
-                height: `${(docsPct / totalPct) * 100}%`,
+                height: `${Math.max(8, chatsScale(cell.chats))}%`,
                 backgroundColor: colors[cell.level],
+                opacity: 0.55,
               }}
             />
           )}
           {!hasActivity && (
             <div
-              className="w-full max-w-[14px] mx-auto rounded-sm"
+              className="w-[5px] rounded-sm"
               style={{ height: '15%', backgroundColor: colors[0] }}
             />
           )}
         </div>
-        <span className={`text-[9px] ${hasActivity ? 'text-tertiary dark:text-muted' : 'text-tertiary/40 dark:text-muted/40'}`}>
+        <span className={`text-[9px] text-muted-foreground ${hasActivity ? '' : 'opacity-50'}`}>
           {dayShort}
         </span>
       </button>
@@ -976,16 +976,25 @@ function MobileBarChart({ weeks, colors, selectedDate, onSelect, dayLabels, t }:
         ))}
       </div>
       {/* Mini legend */}
-      <div className="flex items-center justify-center gap-1.5 mt-2">
-        <span className="home-mono text-[9px] text-tertiary/60 dark:text-muted/60">
+      <div className="flex items-center justify-center gap-1.5 mt-2 flex-wrap">
+        <span className="home-mono text-[9px] text-muted-foreground">
           {t('projectHome.activity.less')}
         </span>
         {colors.map((c, i) => (
           <div key={i} className="rounded-[2px]" style={{ width: 8, height: 8, backgroundColor: c }} />
         ))}
-        <span className="home-mono text-[9px] text-tertiary/60 dark:text-muted/60">
+        <span className="home-mono text-[9px] text-muted-foreground">
           {t('projectHome.activity.more')}
         </span>
+        <div className="w-px h-3 bg-border mx-0.5" />
+        <div className="flex items-center gap-1">
+          <div className="w-[5px] h-2 rounded-sm" style={{ backgroundColor: colors[3] }} />
+          <span className="home-mono text-[9px] text-muted-foreground">{t('projectHome.activity.docsLabel')}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-[5px] h-2 rounded-sm" style={{ backgroundColor: colors[3], opacity: 0.55 }} />
+          <span className="home-mono text-[9px] text-muted-foreground">{t('projectHome.activity.chatsLabel')}</span>
+        </div>
       </div>
     </div>
   )

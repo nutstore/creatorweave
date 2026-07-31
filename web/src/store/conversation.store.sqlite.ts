@@ -108,6 +108,30 @@ function i18nText(key: string, fallback: string): string {
   return translated === key ? fallback : translated
 }
 
+/** Add completed reasoning durations to freshly committed assistant messages. */
+function attachReasoningDurations(
+  messages: Message[],
+  draft?: { steps: DraftAssistantStep[] } | null
+): Message[] {
+  if (!draft) return messages
+
+  return messages.map((message) => {
+    if (message.role !== 'assistant' || !message.reasoning || message.reasoningDurationMs !== undefined) {
+      return message
+    }
+    const step = [...draft.steps]
+      .reverse()
+      .find(
+        (candidate) =>
+          candidate.type === 'reasoning' &&
+          !candidate.streaming &&
+          candidate.content === message.reasoning &&
+          candidate.durationMs !== undefined
+      )
+    return step?.durationMs === undefined ? message : { ...message, reasoningDurationMs: step.durationMs }
+  })
+}
+
 /**
  * Commit completed draft assistant content + tool calls into conversation messages.
  * Used both when starting a new assistant message (onMessageStart) and when cancelling.
@@ -188,18 +212,18 @@ function commitDraftToMessages(conv: {
   // (read, search, ...) are discarded on cancel by design.
   const allToolCalls = [...completedToolCalls, ...inFlightPreservedCalls]
 
-  conv.messages.push(
-    createAssistantMessage(
-      draft.content || null,
-      allToolCalls.length > 0 ? allToolCalls : undefined,
-      fallbackUsage,
-      draft.reasoning || null,
-      undefined,
-      undefined,
-      undefined,
-      collectedAssets
-    )
+  const assistantMessage = createAssistantMessage(
+    draft.content || null,
+    allToolCalls.length > 0 ? allToolCalls : undefined,
+    fallbackUsage,
+    draft.reasoning || null,
+    undefined,
+    undefined,
+    undefined,
+    collectedAssets
   )
+  const [assistantWithReasoningDuration] = attachReasoningDurations([assistantMessage], draft)
+  conv.messages.push(assistantWithReasoningDuration)
   for (const tc of completedToolCalls) {
     conv.messages.push(
       createToolMessage({
@@ -682,10 +706,17 @@ function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Mes
   if (incoming.length === 0) return previous
   if (previous.length === 0) return incoming
 
-  const previousIds = new Set(previous.map((m) => m.id))
+  const previousById = new Map(previous.map((message) => [message.id, message]))
+  const mergeReasoningDuration = (message: Message): Message => {
+    const previousMessage = previousById.get(message.id)
+    return previousMessage?.reasoningDurationMs !== undefined && message.reasoningDurationMs === undefined
+      ? { ...message, reasoningDurationMs: previousMessage.reasoningDurationMs }
+      : message
+  }
+  const previousIds = new Set(previousById.keys())
   const overlap = incoming.reduce((count, m) => count + (previousIds.has(m.id) ? 1 : 0), 0)
   if (overlap === incoming.length && incoming.length >= previous.length) {
-    return incoming
+    return incoming.map(mergeReasoningDuration)
   }
 
   // If there is no overlap at all, we must determine whether incoming is a
@@ -697,9 +728,9 @@ function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Mes
     // If incoming is large relative to previous, treat it as a replacement
     // snapshot rather than a tiny fragment to append.
     if (previous.length > 0 && incoming.length >= previous.length * 0.5) {
-      return incoming
+      return incoming.map(mergeReasoningDuration)
     }
-    return [...previous, ...incoming]
+    return [...previous, ...incoming.map(mergeReasoningDuration)]
   }
 
   // Partial overlap: update matching messages and append unseen ones without
@@ -712,7 +743,7 @@ function reconcileMessageSnapshot(previous: Message[], incoming: Message[]): Mes
       merged.push(msg)
       indexById.set(msg.id, merged.length - 1)
     } else {
-      merged[idx] = msg
+      merged[idx] = mergeReasoningDuration(msg)
     }
   }
   return merged
@@ -3862,7 +3893,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           onMessagesUpdated: (msgs: Message[]) => {
             if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
-            const reconciled = reconcileMessageSnapshot(previous, msgs)
+            const currentDraft = useConversationRuntimeStore.getState().runtimes.get(conversationId)?.draftAssistant
+            const messagesWithReasoningDurations = attachReasoningDurations(msgs, currentDraft)
+            const reconciled = reconcileMessageSnapshot(previous, messagesWithReasoningDurations)
             latestMessages = reconciled
             set((state) => {
               const c = state.conversations.find((x) => x.id === conversationId)
@@ -3987,7 +4020,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           onComplete: async (msgs: Message[]) => {
             if (!isCurrentRun() && !isCurrentRunEpoch()) return
             const previous = get().conversations.find((x) => x.id === conversationId)?.messages || []
-            const reconciled = reconcileMessageSnapshot(previous, msgs)
+            const currentDraft = useConversationRuntimeStore.getState().runtimes.get(conversationId)?.draftAssistant
+            const messagesWithReasoningDurations = attachReasoningDurations(msgs, currentDraft)
+            const reconciled = reconcileMessageSnapshot(previous, messagesWithReasoningDurations)
             console.info('[#LoopStop] store_onComplete', {
               conversationId,
               runId,
@@ -4056,7 +4091,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
         })
-        latestMessages = resultMessages
+        const previousMessages = get().conversations.find((x) => x.id === conversationId)?.messages || []
+        latestMessages = reconcileMessageSnapshot(previousMessages, resultMessages)
         await finalizeRun('idle', latestMessages)
 
         // ─── delegate_to handoff ───────────────────────────────────────────

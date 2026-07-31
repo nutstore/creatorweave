@@ -18,7 +18,9 @@ vi.mock('../ToolCallDisplay', () => ({
 }))
 
 vi.mock('../ReasoningSection', () => ({
-  ReasoningSection: ({ reasoning }: { reasoning: string }) => <div>{reasoning}</div>,
+  ReasoningSection: ({ reasoning, durationMs }: { reasoning: string; durationMs?: number }) => (
+    <div>{`${reasoning}${durationMs === undefined ? '' : ` (${durationMs})`}`}</div>
+  ),
 }))
 
 describe('SubagentDetailPanel', () => {
@@ -41,5 +43,27 @@ describe('SubagentDetailPanel', () => {
 
     expect(await screen.findByText('刷新后恢复的回答')).toBeInTheDocument()
     expect(findByWorkspaceId).toHaveBeenCalledWith('conversation-1')
+  })
+
+  it('passes a persisted reasoning duration to the reasoning section', async () => {
+    findByWorkspaceId.mockResolvedValueOnce([
+      {
+        agentId: 'subagent-1',
+        messages: [
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Done',
+            reasoning: 'Analyzing',
+            reasoningDurationMs: 2_500,
+            timestamp: 1,
+          },
+        ],
+      },
+    ])
+
+    render(<SubagentDetailPanel agentId="subagent-1" conversationId="conversation-1" />)
+
+    expect(await screen.findByText('Analyzing (2500)')).toBeInTheDocument()
   })
 })

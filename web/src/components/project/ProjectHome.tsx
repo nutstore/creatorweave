@@ -45,6 +45,7 @@ import {
   Check,
   Download,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react'
 import { useTheme, ACCENT_COLORS, type AccentColor } from '@/store/theme.store'
 import { useT, useLocale, LOCALE_LABELS, type Locale } from '@/i18n'
@@ -136,6 +137,12 @@ const designStyles = `
     .home-float,
     .home-grain::before {
       animation: none;
+    }
+    .home-timeline-item::before,
+    .home-action-card::before,
+    .home-action-card:hover {
+      transition: none;
+      transform: none;
     }
   }
 
@@ -250,7 +257,7 @@ const designStyles = `
     border-radius: 50%;
     background: hsl(var(--background));
     border: 2px solid hsl(var(--border));
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
   }
 
   .home-timeline-item:hover::before {
@@ -264,7 +271,8 @@ const designStyles = `
   }
 
   .home-timeline-item.is-archived {
-    opacity: 0.5;
+    /* archived state is expressed via muted text color in JSX (not opacity),
+       so child text contrast stays ≥4.5:1 (WCAG AA). */
   }
 
   .home-timeline-item.is-archived::before {
@@ -275,7 +283,7 @@ const designStyles = `
   .home-action-card {
     position: relative;
     overflow: hidden;
-    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .home-action-card::before {
@@ -305,7 +313,7 @@ const designStyles = `
   .home-search-input {
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
-    transition: all 0.2s ease;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .home-search-input:focus {
@@ -482,7 +490,10 @@ export function ProjectHome({
 
   // Clear Service Worker cache and reload
   const handleClearCache = async () => {
-    if (!navigator.serviceWorker.controller) return
+    if (!navigator.serviceWorker.controller) {
+      toast.error(t('projectHome.dialogs.clearCacheUnavailable'))
+      return
+    }
     setIsClearingCache(true)
     navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHE' })
     // Wait a bit for SW to process, then reload
@@ -501,7 +512,13 @@ export function ProjectHome({
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       console.error('[ProjectHome] Failed to export OPFS backup:', error)
-      toast.error(t('app.backupFailed', { error: errorMsg }), { id: toastId })
+      toast.error(t('app.backupFailed', { error: errorMsg }), {
+        id: toastId,
+        action: {
+          label: t('projectHome.dialogs.retry'),
+          onClick: () => void handleExportBackup(),
+        },
+      })
     } finally {
       setIsExportingDB(false)
     }
@@ -729,7 +746,9 @@ export function ProjectHome({
               aria-label={t('projectHome.project.openProject', { name: project.name })}
             >
               <div className="flex items-center gap-2 mb-1">
-                <h3 className="home-title-sans text-base text-secondary dark:text-foreground truncate group-hover:text-primary/70 transition-colors">
+                <h3 className={`home-title-sans text-base truncate group-hover:text-primary/70 transition-colors ${
+                  isArchived ? 'text-muted-foreground' : 'text-secondary dark:text-foreground'
+                }`}>
                   {project.name}
                 </h3>
                 {isArchived && (
@@ -738,7 +757,9 @@ export function ProjectHome({
                   </span>
                 )}
               </div>
-              <div className="home-body flex items-center gap-3 text-xs text-tertiary dark:text-muted">
+              <div className={`home-body flex items-center gap-3 text-xs ${
+                isArchived ? 'text-muted-foreground' : 'text-tertiary dark:text-muted'
+              }`}>
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {formatRelativeTime(activityAt)}
@@ -751,15 +772,6 @@ export function ProjectHome({
             </button>
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <BrandButton
-              onClick={() => handleOpenProject(project.id)}
-              variant="ghost"
-              disabled={isLoading || isActionSubmitting}
-              className="home-body text-xs"
-            >
-              {t('projectHome.project.open')}
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </BrandButton>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <BrandButton
@@ -829,7 +841,7 @@ export function ProjectHome({
         <div className="relative z-10 max-w-5xl mx-auto px-6 pt-8 pb-8 sm:pt-10 sm:pb-10">
           <div className="home-reveal">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary-50 border border-primary/10 dark:border-primary/20">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 dark:bg-primary/10 border border-primary/10 dark:border-primary/20">
                 <Shield className="w-3.5 h-3.5 text-primary-600 dark:text-primary-600" />
                 <span className="home-body text-xs text-primary-600 dark:text-primary-600 font-medium">
                   {t('projectHome.hero.badge')}
@@ -893,7 +905,7 @@ export function ProjectHome({
             <div className="home-reveal home-delay-3 home-action-card rounded-xl border border-border bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-600" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary dark:text-muted">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.continueWork')}
                 </span>
               </div>
@@ -924,7 +936,7 @@ export function ProjectHome({
               <div className="hidden lg:block home-reveal home-delay-3 home-action-card rounded-xl border border-border bg-card p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-4 h-4 text-primary-600 dark:text-primary-600" />
-                  <span className="home-mono text-xs uppercase tracking-wider text-tertiary dark:text-muted">
+                  <span className="home-mono text-xs font-medium text-muted-foreground">
                     {t('projectHome.sidebar.continueWork')}
                   </span>
                 </div>
@@ -947,22 +959,16 @@ export function ProjectHome({
             )}
 
             {/* Create new project */}
-            <div
-              className="home-reveal home-delay-4 home-action-card rounded-xl border border-border bg-card p-5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              role="button"
-              tabIndex={0}
-              aria-label={t('projectHome.dialogs.createProject')}
+            <button
+              type="button"
               onClick={openCreateDialog}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault()
-                  openCreateDialog()
-                }
-              }}
+              disabled={isLoading}
+              className="home-reveal home-delay-4 home-action-card rounded-xl border border-border bg-card p-5 text-left w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              aria-label={t('projectHome.dialogs.createProject')}
             >
               <div className="flex items-center gap-2 mb-3">
                 <Plus className="w-4 h-4 text-primary-600 dark:text-primary-600" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary dark:text-muted">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.createNew')}
                 </span>
               </div>
@@ -970,24 +976,19 @@ export function ProjectHome({
                 {t('projectHome.sidebar.createNewDescription')}
               </p>
               <p className="home-mono text-[11px] text-tertiary dark:text-muted mb-3">{t('projectHome.sidebar.shortcutHint')}</p>
-              <BrandButton
-                variant="outline"
-                className="w-full"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  openCreateDialog()
-                }}
-                disabled={isLoading || isCreating}
+              <div
+                className="inline-flex items-center justify-center w-full h-10 px-5 text-sm rounded-md border border-border bg-transparent text-secondary font-medium pointer-events-none"
+                aria-hidden="true"
               >
                 {t('projectHome.sidebar.createProject')}
-              </BrandButton>
-            </div>
+              </div>
+            </button>
 
             {/* Appearance settings */}
-            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Palette className="w-4 h-4 text-tertiary" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.appearance')}
                 </span>
               </div>
@@ -998,9 +999,9 @@ export function ProjectHome({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setTheme('light')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 min-h-[32px] sm:min-h-[28px] px-3 rounded-lg text-xs transition-all ${
                       themeMode === 'light'
-                        ? 'bg-primary-50 dark:bg-primary-50 text-primary-600 dark:text-primary-600 border border-primary/20'
+                        ? 'bg-primary-50 dark:bg-primary/10 text-primary-600 dark:text-primary-600 border border-primary/20'
                         : 'bg-muted/30 dark:bg-muted/30 text-tertiary dark:text-muted hover:bg-muted/50'
                     }`}
                   >
@@ -1009,9 +1010,9 @@ export function ProjectHome({
                   </button>
                   <button
                     onClick={() => setTheme('dark')}
-                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 min-h-[32px] sm:min-h-[28px] px-3 rounded-lg text-xs transition-all ${
                       themeMode === 'dark'
-                        ? 'bg-primary-50 dark:bg-primary-50 text-primary-600 dark:text-primary-600 border border-primary/20'
+                        ? 'bg-primary-50 dark:bg-primary/10 text-primary-600 dark:text-primary-600 border border-primary/20'
                         : 'bg-muted/30 dark:bg-muted/30 text-tertiary dark:text-muted hover:bg-muted/50'
                     }`}
                   >
@@ -1029,9 +1030,9 @@ export function ProjectHome({
                     <button
                       key={lang}
                       onClick={() => setLocale(lang)}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs transition-all ${
+                      className={`flex items-center justify-center gap-1.5 min-h-[32px] sm:min-h-[28px] px-3 rounded-lg text-xs transition-all ${
                         locale === lang
-                          ? 'bg-primary-50 dark:bg-primary-50 text-primary-600 dark:text-primary-600 border border-primary/20'
+                          ? 'bg-primary-50 dark:bg-primary/10 text-primary-600 dark:text-primary-600 border border-primary/20'
                           : 'bg-muted/30 dark:bg-muted/30 text-tertiary dark:text-muted hover:bg-muted/50'
                       }`}
                     >
@@ -1045,7 +1046,7 @@ export function ProjectHome({
               {/* Accent color selection */}
               <div>
                 <p className="home-body text-xs text-tertiary dark:text-muted mb-2">{t('projectHome.theme.accentColorTitle')}</p>
-                <div className="grid grid-cols-6 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                   {(Object.keys(ACCENT_COLORS) as AccentColor[]).map((color) => {
                     const config = ACCENT_COLORS[color]
                     const isSelected = currentAccentColor === color
@@ -1054,10 +1055,10 @@ export function ProjectHome({
                       <button
                         key={color}
                         onClick={() => setAccentColor(color)}
-                        className={`w-full aspect-square rounded-lg transition-all ${
+                        className={`min-h-[44px] p-1 rounded-lg transition-all ${
                           isSelected
                             ? 'ring-2 ring-offset-2 ring-offset-background'
-                            : 'hover:scale-110'
+                            : 'hover:ring-1 hover:ring-muted'
                         }`}
                         style={{
                           backgroundColor: `hsl(${config.hue}, ${config.saturation}%, ${config.lightness}%)`,
@@ -1080,8 +1081,12 @@ export function ProjectHome({
                 className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-muted/30"
               >
                 <div className="flex items-center gap-2">
-                  <span className="home-mono text-[11px] uppercase tracking-wider text-tertiary">
+                  <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0" />
+                  <span className="home-mono text-xs font-medium text-muted-foreground">
                     {t('projectHome.sidebar.advanced')}
+                  </span>
+                  <span className="text-[10px] text-warning/80 italic hidden sm:inline">
+                    — {t('projectHome.sidebar.advancedHint')}
                   </span>
                 </div>
                 <ChevronDown
@@ -1094,7 +1099,7 @@ export function ProjectHome({
                   <div className="rounded-lg border border-border/40 bg-card/30 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <RotateCcw className="w-3.5 h-3.5 text-tertiary" />
-                      <span className="home-mono text-[10px] uppercase tracking-wider text-tertiary">
+                      <span className="home-mono text-xs font-medium text-muted-foreground">
                         {t('projectHome.sidebar.startFresh')}
                       </span>
                     </div>
@@ -1112,10 +1117,10 @@ export function ProjectHome({
                   </div>
 
             {/* Clear cache */}
-            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <RefreshCw className="w-4 h-4 text-tertiary" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.cache')}
                 </span>
               </div>
@@ -1133,10 +1138,10 @@ export function ProjectHome({
             </div>
 
             {/* Data backup */}
-            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Download className="w-4 h-4 text-tertiary" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.backup')}
                 </span>
               </div>
@@ -1155,10 +1160,10 @@ export function ProjectHome({
             </div>
 
             {/* Diagnostics */}
-            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card/50 p-5">
+            <div className="home-reveal home-delay-6 rounded-xl border border-border/60 bg-card p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Stethoscope className="w-4 h-4 text-tertiary" />
-                <span className="home-mono text-xs uppercase tracking-wider text-tertiary">
+                <span className="home-mono text-xs font-medium text-muted-foreground">
                   {t('projectHome.sidebar.diagnostics')}
                 </span>
               </div>
@@ -1169,9 +1174,12 @@ export function ProjectHome({
                 variant="ghost"
                 className="w-full text-tertiary hover:text-primary hover:border-primary/50"
                 onClick={() => void handleRunDiagnostics()}
+                disabled={diagRunning}
               >
                 <Stethoscope className="w-3.5 h-3.5 mr-1.5" />
-                {t('projectHome.sidebar.runDiagnostics')}
+                {diagRunning
+                  ? t('projectHome.dialogs.diagnosticsRunning')
+                  : t('projectHome.sidebar.runDiagnostics')}
               </BrandButton>
             </div>
                 </div>
@@ -1197,7 +1205,7 @@ export function ProjectHome({
                   <button
                     key={filter}
                     onClick={() => setStatusFilter(filter)}
-                    className={`home-body px-3 py-1.5 text-xs rounded-md transition-all ${
+                    className={`home-body min-h-[32px] sm:min-h-[24px] px-3 text-xs rounded-md transition-all ${
                       statusFilter === filter
                         ? 'bg-card dark:bg-card text-secondary dark:text-foreground shadow-sm'
                         : 'text-tertiary dark:text-muted hover:text-secondary dark:hover:text-secondary-foreground'
@@ -1217,7 +1225,7 @@ export function ProjectHome({
 
                 return (
                   <div key={group} className="mb-8 last:mb-0">
-                    <h2 className="home-reveal home-delay-5 home-mono text-[11px] uppercase tracking-widest text-tertiary dark:text-muted mb-4 pl-9">
+                    <h2 className="home-reveal home-delay-5 home-body text-xs font-medium text-muted-foreground mb-4 pl-9">
                       {timeGroupLabels[group]}
                     </h2>
                     <div className="divide-y divide-border/50">

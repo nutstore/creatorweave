@@ -700,3 +700,49 @@
 .dark .cw-pdf-text-layer ::selection {
   background: rgba(107, 153, 157, 0.35); /* primary-600 with alpha */
 }
+
+/* ── Activity Heatmap: cell entrance + hover/focus, panel slide-in ── */
+@keyframes heat-cell-in {
+  from { opacity: 0; transform: scale(0.3); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes heat-panel-slide-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.heat-cell {
+  animation: heat-cell-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transition: transform 0.15s ease-out;
+}
+
+.heat-cell:hover {
+  transform: scale(1.4);
+  z-index: 10;
+  position: relative;
+  box-shadow: 0 0 0 1px var(--primary, currentColor);
+}
+
+.heat-cell:focus-visible {
+  outline: 2px solid var(--primary, currentColor);
+  outline-offset: 2px;
+  z-index: 11;
+}
+
+.heat-panel-slide {
+  animation: heat-panel-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heat-cell {
+    animation: none;
+    transition: none;
+  }
+  .heat-cell:hover {
+    transform: none;
+  }
+  .heat-panel-slide {
+    animation: none;
+  }
+}

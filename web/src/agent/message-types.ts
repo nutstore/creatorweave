@@ -129,6 +129,8 @@ export interface Message {
   workflowRealRun?: WorkflowRealRunPayload
   /** Chain-of-thought reasoning content (GLM-4.7+), not sent back to API */
   reasoning?: string | null
+  /** Elapsed wall-clock time for this message's reasoning block, in milliseconds. */
+  reasoningDurationMs?: number
   toolCalls?: ToolCall[]
   toolCallId?: string // For tool role messages
   name?: string // Tool name for tool role messages
@@ -179,6 +181,8 @@ export type DraftAssistantStep =
       type: 'reasoning'
       content: string
       streaming: boolean
+      /** Frozen when the reasoning stream completes; absent while still streaming. */
+      durationMs?: number
     }
   | {
       id: string
