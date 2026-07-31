@@ -4,8 +4,9 @@ import pkg from './package.json';
 export default defineConfig({
   outDir: 'dist',
   manifest: {
-    name: 'CreatorWeave',
-    description: 'Provides web_search and web_fetch capabilities for in-browser Agents',
+    name: '__MSG_extensionName__',
+    description: '__MSG_extensionDescription__',
+    default_locale: 'en',
     version: pkg.version,
     permissions: ['scripting', 'tabs', 'storage', 'alarms', 'notifications', 'sidePanel'],
     host_permissions: ['<all_urls>'],

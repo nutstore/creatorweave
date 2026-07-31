@@ -1,5 +1,3 @@
-[HTML] index.html
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -124,6 +122,34 @@
       max-height: 120px;
       overflow: auto;
     }
+    .reset-credit-box {
+      display: none;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+    }
+    .reset-credit-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 11px;
+      color: #92400e;
+    }
+    .reset-credit-meta {
+      margin-top: 4px;
+      font-size: 10px;
+      color: #a16207;
+    }
+    .reset-credit-btn {
+      width: auto;
+      margin-top: 8px;
+      padding: 6px 9px;
+      background: #d97706;
+      font-size: 11px;
+    }
     a { color: #0f766e; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .footer {
@@ -153,7 +179,7 @@
     <div class="logo">CW</div>
     <div class="title-wrap">
       <div class="title">CreatorWeave</div>
-      <div class="subtitle">网页搜索与内容抓取服务</div>
+      <div class="subtitle" data-i18n="popupSubtitle">网页搜索与内容抓取服务</div>
     </div>
     <div id="buildMode" class="build-mode">PROD</div>
   </header>
@@ -161,17 +187,17 @@
   <main class="main">
     <div class="status" id="status">
       <span class="status-dot" id="statusDot"></span>
-      <span class="status-text" id="statusText">检测中…</span>
+      <span class="status-text" id="statusText" data-i18n="checking">检测中…</span>
     </div>
     <div class="codex-box">
       <div id="codexStatus" style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
         <span id="codexStatusDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#d1d5db;vertical-align:middle;margin-right:6px;"></span>
-        <span id="codexStatusText">Checking auth status…</span>
+        <span id="codexStatusText" data-i18n="checkingAuthStatus">Checking auth status…</span>
       </div>
 
       <div id="codexUsage" style="display:none; margin-bottom: 10px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-          <div style="font-size: 11px; font-weight: 600; color: #374151;">Codex Usage</div>
+          <div style="font-size: 11px; font-weight: 600; color: #374151;" data-i18n="codexUsage">Codex Usage</div>
           <span id="usagePlan" style="font-size:10px;padding:1px 6px;border-radius:4px;background:#f0fdfa;color:#0d9488;font-weight:500;"></span>
         </div>
         <div id="usagePrimary" style="margin-bottom: 6px;"></div>
@@ -179,23 +205,32 @@
         <div id="usageUpdated" style="font-size: 10px; color: #9ca3af;"></div>
       </div>
 
+      <div id="resetCreditBox" class="reset-credit-box">
+        <div class="reset-credit-summary">
+          <span data-i18n="resetCreditsAvailable">手动重置额度</span>
+          <strong id="resetCreditCount"></strong>
+        </div>
+        <div id="resetCreditMeta" class="reset-credit-meta"></div>
+        <button id="resetCreditBtn" class="codex-btn reset-credit-btn" data-i18n="useResetCredit">使用一次重置</button>
+      </div>
+
       <div id="deviceCodeBox" style="display:none; margin-bottom: 10px; padding: 8px 10px; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px;">
-        <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;">Device Code</div>
+        <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;" data-i18n="deviceCode">Device Code</div>
         <div style="display: flex; align-items: center; gap: 8px;">
           <code id="deviceCodeText" style="flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #0d9488; font-family: 'SF Mono', 'Fira Code', monospace;"></code>
-          <button id="copyCodeBtn" style="border: none; background: none; cursor: pointer; padding: 2px 6px; color: #6b7280; font-size: 11px; border-radius: 4px; transition: all 0.15s;" title="Copy code">📋</button>
+          <button id="copyCodeBtn" style="border: none; background: none; cursor: pointer; padding: 2px 6px; color: #6b7280; font-size: 11px; border-radius: 4px; transition: all 0.15s;" data-i18n-title="copyCode" title="Copy code">📋</button>
         </div>
         <div id="deviceCodeLink" style="font-size: 10px; margin-top: 4px;"></div>
       </div>
 
-      <button id="codexLoginBtn" class="codex-btn">Start Device Code Login</button>
-      <button id="codexResetBtn" class="codex-btn secondary">重新开始（清除状态）</button>
+      <button id="codexLoginBtn" class="codex-btn" data-i18n="startDeviceCodeLogin">Start Device Code Login</button>
+      <button id="codexResetBtn" class="codex-btn secondary" data-i18n="resetLogin">重新开始（清除状态）</button>
       <div id="codexLog" class="codex-log"></div>
     </div>
 
     <footer class="footer">
-      <button id="openDocs" class="footer-link">使用文档</button>
-      <button id="openGithub" class="footer-link">GitHub</button>
+      <button id="openDocs" class="footer-link" data-i18n="documentation">使用文档</button>
+      <button id="openGithub" class="footer-link" data-i18n="github">GitHub</button>
     </footer>
   </main>
 

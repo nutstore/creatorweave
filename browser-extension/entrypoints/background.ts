@@ -488,6 +488,9 @@ const DEVICEAUTH_TOKEN_URL = 'https://auth.openai.com/api/accounts/deviceauth/to
 const OAUTH_TOKEN_URL = 'https://auth.openai.com/oauth/token';
 const DEVICE_VERIFY_URL = 'https://auth.openai.com/codex/device';
 const CODEX_RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses';
+const CODEX_BACKEND_API_URL = 'https://chatgpt.com/backend-api';
+const CODEX_RESET_CREDITS_URL = `${CODEX_BACKEND_API_URL}/wham/rate-limit-reset-credits`;
+const CODEX_RESET_CONSUME_URL = `${CODEX_RESET_CREDITS_URL}/consume`;
 const CODEX_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CODEX_REDIRECT_URI = 'https://auth.openai.com/deviceauth/callback';
 const CODEX_PENDING_AUTH_KEY = 'codex_pending_auth';
@@ -593,6 +596,65 @@ async function refreshCodexAccessToken(tokens: any) {
   };
   await saveCodexTokens(merged);
   return merged;
+}
+
+type CodexResetCreditsResponse = {
+  credits?: Array<{
+    id?: string;
+    status?: string;
+    reset_type?: string;
+    granted_at?: string;
+    expires_at?: string;
+    title?: string;
+  }>;
+  available_count?: number;
+};
+
+async function codexBackendJsonRequest<T>(
+  url: string,
+  tokens: any,
+  init: RequestInit = {},
+): Promise<T> {
+  const request = (accessToken: string) => fetch(url, {
+    ...init,
+    headers: {
+      ...codexHeaders(accessToken, {
+        accept: 'application/json',
+        ...(init.headers as Record<string, string> || {}),
+      }),
+    },
+  });
+
+  let response = await request(tokens.access_token);
+  if (response.status === 401 && tokens.refresh_token) {
+    tokens = await refreshCodexAccessToken(tokens);
+    response = await request(tokens.access_token);
+  }
+
+  const { text, json } = await parseJsonSafe(response);
+  if (!response.ok) {
+    throw new Error(`Codex request failed (${response.status}): ${JSON.stringify(json || text)}`);
+  }
+  return (json ?? {}) as T;
+}
+
+async function getCodexResetCredits(tokens: any): Promise<CodexResetCreditsResponse> {
+  return codexBackendJsonRequest<CodexResetCreditsResponse>(CODEX_RESET_CREDITS_URL, tokens);
+}
+
+async function consumeCodexResetCredit(tokens: any, creditId: string) {
+  const redeemRequestId = typeof crypto?.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return codexBackendJsonRequest<{ code?: string; windows_reset?: number; credit?: unknown }>(
+    CODEX_RESET_CONSUME_URL,
+    tokens,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ credit_id: creditId, redeem_request_id: redeemRequestId }),
+    },
+  );
 }
 
 async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
@@ -1286,6 +1348,11 @@ export default defineBackground(() => {
             }
           } else if (pending && pending.expires_at && pending.expires_at > Date.now()) {
             authState = 'pending';
+          } else if (pending) {
+            // Remove expired/orphaned device-code state so the popup cannot
+            // keep polling an old login attempt forever.
+            await clearPendingCodexAuth();
+            if (tokens && !tokens.access_token) authState = 'expired';
           } else if (tokens && !tokens.access_token) {
             authState = 'expired';
           }
@@ -1305,6 +1372,41 @@ export default defineBackground(() => {
         if (message.type === 'codex_get_usage') {
           const { codex_usage } = await chrome.storage.local.get('codex_usage');
           sendResponse({ ok: true, data: codex_usage || null });
+          return;
+        }
+
+        if (message.type === 'codex_get_reset_credits') {
+          const tokens = await getCodexTokens();
+          if (!tokens?.access_token) {
+            sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
+            return;
+          }
+          try {
+            const data = await getCodexResetCredits(tokens);
+            sendResponse({ ok: true, data });
+          } catch (err: any) {
+            sendResponse({ ok: false, errorCode: 'RESET_CREDITS_UNAVAILABLE', status: 502, message: String(err?.message || err) });
+          }
+          return;
+        }
+
+        if (message.type === 'codex_consume_reset_credit') {
+          const tokens = await getCodexTokens();
+          const creditId = typeof message.creditId === 'string' ? message.creditId : '';
+          if (!tokens?.access_token) {
+            sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
+            return;
+          }
+          if (!creditId) {
+            sendResponse({ ok: false, errorCode: 'MISSING_CREDIT_ID', status: 400, message: 'Missing reset credit id.' });
+            return;
+          }
+          try {
+            const data = await consumeCodexResetCredit(tokens, creditId);
+            sendResponse({ ok: true, data });
+          } catch (err: any) {
+            sendResponse({ ok: false, errorCode: 'RESET_CREDIT_CONSUME_FAILED', status: 502, message: String(err?.message || err) });
+          }
           return;
         }
 

@@ -1,3 +1,17 @@
+function t(key: string, substitutions?: string | string[]): string {
+  return chrome.i18n.getMessage(key as any, substitutions) || key;
+}
+
+function localizeStaticContent(): void {
+  document.querySelectorAll<HTMLElement>('[data-i18n]').forEach(function (element) {
+    element.textContent = t(element.dataset.i18n || '');
+  });
+  document.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach(function (element) {
+    element.title = t(element.dataset.i18nTitle || '');
+  });
+}
+
+localizeStaticContent();
 try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
 
 // Show build mode (dev/prod)
@@ -27,12 +41,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     var tab = tabs && tabs[0];
     if (!tab || !tab.id) {
-      setStatus('disabled', '无法访问当前页面');
+      setStatus('disabled', t('cannotAccessCurrentPage'));
       return;
     }
     var url = tab.url || '';
     if (url.indexOf('chrome') === 0 || url.indexOf('about:') === 0) {
-      setStatus('disabled', '浏览器内部页面，不支持注入');
+      setStatus('disabled', t('browserInternalPage'));
       return;
     }
     chrome.scripting.executeScript({
@@ -41,13 +55,13 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       func: function () { return !!(window.__agentWeb && (window.__agentWeb as any).ready); }
     }, function (results) {
       if (chrome.runtime.lastError) {
-        setStatus('disabled', '检测失败');
+        setStatus('disabled', t('injectionCheckFailed'));
         return;
       }
       if (results && results[0] && results[0].result === true) {
-        setStatus('active', 'API 已注入，可以使用');
+        setStatus('active', t('apiReady'));
       } else {
-        setStatus('inactive', '未注入，刷新页面后生效');
+        setStatus('inactive', t('apiInactive'));
       }
     });
   });
@@ -57,7 +71,11 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   var logEl = document.getElementById('codexLog')!;
   var btn = document.getElementById('codexLoginBtn')!;
   var resetBtn = document.getElementById('codexResetBtn')!;
-  if (!logEl || !btn || !resetBtn) return;
+  var resetCreditBox = document.getElementById('resetCreditBox')!;
+  var resetCreditCount = document.getElementById('resetCreditCount')!;
+  var resetCreditMeta = document.getElementById('resetCreditMeta')!;
+  var resetCreditBtn = document.getElementById('resetCreditBtn')!;
+  if (!logEl || !btn || !resetBtn || !resetCreditBox || !resetCreditCount || !resetCreditMeta || !resetCreditBtn) return;
 
   function sleep(ms: number) { return new Promise<void>(function (r) { setTimeout(r, ms); }); }
   function log(line: string) { logEl.textContent += (logEl.textContent ? '\n' : '') + line; }
@@ -111,22 +129,22 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   // Check current auth status from background on popup open
   sendMessage({ type: 'codex_get_status' }).then(function (resp) {
     if (!resp || !resp.ok || !resp.data) {
-      setCodexStatus('error', 'Status check failed');
+      setCodexStatus('error', t('statusCheckFailed'));
       return;
     }
     var d = resp.data;
     switch (d.authState) {
       case 'authorized':
-        setCodexStatus('authorized', '✅ Authorized');
+        setCodexStatus('authorized', t('authorized'));
         break;
       case 'pending':
-        setCodexStatus('pending', '⏳ Authorization pending…');
+        setCodexStatus('pending', t('authorizationPending'));
         break;
       case 'expired':
-        setCodexStatus('expired', '⚠️ Token expired, please re-authorize');
+        setCodexStatus('expired', t('tokenExpired'));
         break;
       default:
-        setCodexStatus('idle', 'Not authorized. Click below to start.');
+        setCodexStatus('idle', t('notAuthorized'));
     }
 
     // Load usage data if authorized
@@ -134,11 +152,13 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       loadUsageData();
     }
 
-    // If pending auth exists, proactively poll now (background alarm may have missed it)
-    if (d.authState !== 'authorized') {
+    // Only poll when the background explicitly reports a pending device-code
+    // authorization. An expired/missing token must not revive a stale pending
+    // record left by an earlier login attempt.
+    if (d.authState === 'pending') {
       loadPendingAuth().then(function (p) {
         if (p && p.device_auth_id && p.user_code && p.expires_at && p.expires_at > Date.now()) {
-          setCodexStatus('pending', '⏳ Checking authorization status…');
+          setCodexStatus('pending', t('waitingForAuthorization'));
           // Start polling every 5 seconds within the popup
           var pollInterval = setInterval(function () {
             sendMessage({
@@ -148,29 +168,33 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
             }).then(function (pollResp) {
               if (pollResp && pollResp.done) {
                 clearInterval(pollInterval);
-                setCodexStatus('authorized', '✅ Authorized! You can now use Codex.');
+                setCodexStatus('authorized', t('authorizedCanUseCodex'));
                 document.getElementById('deviceCodeBox')!.style.display = 'none';
                 loadUsageData();
               } else if (pollResp && pollResp.pending) {
-                setCodexStatus('pending', '⏳ Waiting for authorization…');
+                setCodexStatus('pending', t('waitingForAuthorization'));
               } else if (!pollResp || !pollResp.ok) {
                 clearInterval(pollInterval);
-                setCodexStatus('error', '❌ Authorization failed');
+                setCodexStatus('error', t('authorizationFailed'));
               }
-            }).catch(function () {
+            }).catch(function (err: any) {
               clearInterval(pollInterval);
+              // Do not leave the popup stuck on “checking” when the
+              // background service worker is unavailable or the message fails.
+              setCodexStatus('error', t('authorizationFailed'));
+              log(t('pollError', String(err?.message || err)));
             });
             // Stop polling if expired
             if (p.expires_at && p.expires_at <= Date.now()) {
               clearInterval(pollInterval);
-              setCodexStatus('expired', '⚠️ Authorization code expired. Please try again.');
+              setCodexStatus('expired', t('authorizationCodeExpired'));
             }
           }, 5000);
         }
       });
     }
   }).catch(function () {
-    setCodexStatus('error', 'Failed to check status');
+    setCodexStatus('error', t('failedToCheckStatus'));
   });
 
   loadPendingAuth().then(function (p) {
@@ -200,12 +224,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     if (!resetAt) return '';
     var d = new Date(resetAt * 1000);
     var now = Date.now();
-    if (d.getTime() <= now) return 'resetting...';
+    if (d.getTime() <= now) return t('resetting');
     var hh = String(d.getHours()).padStart(2, '0');
     var mm = String(d.getMinutes()).padStart(2, '0');
     var today = new Date(now);
     if (d.toDateString() === today.toDateString()) {
-      return 'today ' + hh + ':' + mm;
+      return t('todayAt', hh + ':' + mm);
     }
     var month = d.getMonth() + 1;
     var day = d.getDate();
@@ -230,10 +254,10 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
         '<div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">' +
           '<div style="height:100%;width:' + Math.min(100, remaining) + '%;background:' + color + ';border-radius:3px;transition:width 0.3s;"></div>' +
         '</div>' +
-        '<span style="font-size:10px;font-weight:600;color:' + color + ';min-width:36px;text-align:right;">' + Math.round(remaining) + '% left</span>' +
+        '<span style="font-size:10px;font-weight:600;color:' + color + ';min-width:36px;text-align:right;">' + t('percentLeft', String(Math.round(remaining))) + '</span>' +
       '</div>' +
       (resetLabel ?
-        '<div style="font-size:10px;color:#9ca3af;margin-left:30px;">resets ' + resetLabel + '</div>'
+        '<div style="font-size:10px;color:#9ca3af;margin-left:30px;">' + t('resetsAt', resetLabel) + '</div>'
         : '');
   }
 
@@ -267,7 +291,36 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     });
   });
 
+  function loadResetCredits() {
+    sendMessage({ type: 'codex_get_reset_credits' }).then(function (resp) {
+      if (!resp || !resp.ok || !resp.data) {
+        resetCreditBox.style.display = 'none';
+        return;
+      }
+      var credits = Array.isArray(resp.data.credits) ? resp.data.credits : [];
+      var available = credits.filter(function (credit: any) { return credit && credit.status === 'available' && credit.id; });
+      var count = typeof resp.data.available_count === 'number' ? resp.data.available_count : available.length;
+      if (count <= 0 || available.length === 0) {
+        resetCreditBox.style.display = 'none';
+        return;
+      }
+      resetCreditBox.style.display = 'block';
+      resetCreditCount.textContent = t('availableCount', String(count));
+      var expiresAt = available
+        .map(function (credit: any) { return credit.expires_at ? new Date(credit.expires_at).getTime() : Infinity; })
+        .filter(function (value: number) { return isFinite(value); })
+        .sort(function (a: number, b: number) { return a - b; })[0];
+      resetCreditMeta.textContent = isFinite(expiresAt)
+        ? t('resetCreditExpires', new Date(expiresAt).toLocaleDateString())
+        : '';
+      resetCreditBtn.dataset.creditId = available[0].id;
+    }).catch(function () {
+      resetCreditBox.style.display = 'none';
+    });
+  }
+
   function loadUsageData() {
+    loadResetCredits();
     sendMessage({ type: 'codex_get_usage' }).then(function (resp) {
       if (!resp || !resp.ok || !resp.data) return;
       var usage = resp.data;
@@ -288,18 +341,39 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 
       if (usage.updatedAt) {
         var updatedEl = document.getElementById('usageUpdated')!;
-        if (updatedEl) updatedEl.textContent = 'Updated ' + new Date(usage.updatedAt).toLocaleTimeString();
+        if (updatedEl) updatedEl.textContent = t('updatedAt', new Date(usage.updatedAt).toLocaleTimeString());
       }
     }).catch(function () {});
   }
 
+  resetCreditBtn.addEventListener('click', async function () {
+    var creditId = resetCreditBtn.dataset.creditId || '';
+    if (!creditId) return;
+    if (!window.confirm(t('useResetCreditConfirm'))) return;
+    resetCreditBtn.disabled = true;
+    try {
+      var resp = await sendMessage({ type: 'codex_consume_reset_credit', creditId: creditId });
+      if (!resp || !resp.ok) {
+        log(t('resetCreditFailed', String(resp?.message || resp?.errorCode || 'unknown error')));
+        return;
+      }
+      log(t('resetCreditUsed'));
+      resetCreditBox.style.display = 'none';
+      loadUsageData();
+    } catch (err: any) {
+      log(t('resetCreditFailed', String(err?.message || err)));
+    } finally {
+      resetCreditBtn.disabled = false;
+    }
+  });
+
   resetBtn.addEventListener('click', async function () {
     await chrome.storage.local.remove(['codex_pending_auth', 'codex_tokens', 'codex_token_saved_at', 'codex_usage']);
     logEl.textContent = '';
-    setCodexStatus('idle', 'Not authorized. Click below to start.');
+    setCodexStatus('idle', t('notAuthorized'));
     var usageEl = document.getElementById('codexUsage')!;
     if (usageEl) usageEl.style.display = 'none';
-    log('🧹 已清除登录状态，请重新点击 Start Device Code Login');
+    log(t('loginStateCleared'));
   });
 
   btn.addEventListener('click', async function () {
@@ -317,22 +391,22 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
         expires_in: Math.max(1, Math.floor((pending.expires_at - Date.now()) / 1000)),
         interval: 5,
       };
-      log('继续上次登录流程');
+      log(t('resumingLogin'));
       showDeviceCode(d.user_code, d.verification_uri_complete || d.verification_uri);
     } else {
       var start;
       try {
         start = await sendMessage({ type: 'codex_auth_start' });
       } catch (err: any) {
-        log('start error: ' + String((err && err.message) || err || 'runtime sendMessage failed'));
+        log(t('startError', String((err && err.message) || err || 'runtime sendMessage failed')));
         return;
       }
       if (!start) {
-        log('start error: no response from background (please reload extension after npm run watch)');
+        log(t('noBackgroundResponse'));
         return;
       }
       if (!start.ok) {
-        log('start error: ' + JSON.stringify(start.error || start));
+        log(t('startError', JSON.stringify(start.error || start)));
         return;
       }
 
@@ -364,26 +438,26 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       });
 
       if (!poll || !poll.ok) {
-        log('poll error: ' + JSON.stringify(poll && poll.error ? poll.error : poll));
+        log(t('pollError', JSON.stringify(poll && poll.error ? poll.error : poll)));
         return;
       }
 
       if (poll.done) {
         await clearPendingAuth();
-        log('✅ Authorized!');
-        setCodexStatus('authorized', '✅ Authorized! You can now use Codex in the web app.');
+        log(t('authorizationSucceeded'));
+        setCodexStatus('authorized', t('authorizedCanUseWebApp'));
         document.getElementById('deviceCodeBox')!.style.display = 'none';
         return;
       }
 
       if (poll.pending) {
-        log('pending: ' + poll.code);
+        log(t('authorizationPendingLog', String(poll.code)));
         if (poll.code === 'slow_down') intervalMs += 2000;
       }
     }
 
     await clearPendingAuth();
-    log('❌ expired, retry please');
+    log(t('authorizationExpiredLog'));
   });
 })();
 
