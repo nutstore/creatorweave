@@ -457,15 +457,15 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
 
         {/* Summary footer (only when not processing) */}
         {!isProcessing && !isWaiting && (
-          <div className="flex items-center gap-2 text-xs">
-            <span>
+          <div className="flex items-center gap-2 text-xs text-neutral-500">
+            <span className="text-neutral-500">
               {new Date(turn.timestamp).toLocaleTimeString('zh-CN', {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
             </span>
             {turn.totalUsage && (
-              <span className="inline-flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 text-neutral-600">
                 <span title={t('conversation.usage.input') || 'input (excl. cache)'}>
                   ↑{formatTokens(turn.totalUsage.accumulatedPromptTokens ?? turn.totalUsage.promptTokens)}
                 </span>
@@ -492,7 +492,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               type="button"
               onClick={handleBranch}
               disabled={isBranching || !conversationId}
-              className={`inline-flex items-center rounded p-1 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50`}
+              className={`inline-flex items-center rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-neutral-300 disabled:cursor-not-allowed disabled:opacity-50`}
               title={t('conversation.branch') || 'Branch from here'}
               aria-label={t('conversation.branch') || 'Branch from here'}
             >
