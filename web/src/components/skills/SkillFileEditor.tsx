@@ -27,6 +27,7 @@ import { useSkillsFiles, type SkillFileNode } from '@/skills/use-skills-files'
 import { useThemeStore } from '@/store/theme.store'
 import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
+import '@/lib/monaco-setup'
 
 let _loaderConfigured = false
 if (!_loaderConfigured) {

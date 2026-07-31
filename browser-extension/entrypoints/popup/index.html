@@ -86,37 +86,12 @@
     .status.inactive .status-dot { background: #f59e0b; }
     .status.disabled .status-dot { background: #94a3b8; }
     .status-text { font-size: 12px; color: #334155; }
-    .desc {
-      font-size: 12px;
-      line-height: 1.6;
-      color: #475569;
-    }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       background: #e2e8f0;
       border-radius: 4px;
       padding: 1px 4px;
       font-size: 11px;
-    }
-    .api-list {
-      display: grid;
-      gap: 8px;
-    }
-    .api-item {
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 10px 12px;
-    }
-    .api-name {
-      display: inline-block;
-      margin-bottom: 6px;
-    }
-    .api-desc {
-      display: block;
-      font-size: 12px;
-      line-height: 1.45;
-      color: #475569;
     }
     .codex-box {
       background: #fff;
@@ -178,7 +153,7 @@
     <div class="logo">CW</div>
     <div class="title-wrap">
       <div class="title">CreatorWeave</div>
-      <div class="subtitle">Browser bridge for side panel, web search, fetch, and Codex auth</div>
+      <div class="subtitle">网页搜索与内容抓取服务</div>
     </div>
     <div id="buildMode" class="build-mode">PROD</div>
   </header>
@@ -188,20 +163,6 @@
       <span class="status-dot" id="statusDot"></span>
       <span class="status-text" id="statusText">检测中…</span>
     </div>
-    <p class="desc">
-      为页面注入 <code>__agentWeb</code> API，提供网页搜索和内容抓取能力。
-    </p>
-    <div class="api-list">
-      <div class="api-item">
-        <code class="api-name">__agentWeb.search(query)</code>
-        <span class="api-desc">DuckDuckGo / Baidu 搜索，返回标题、链接、摘要</span>
-      </div>
-      <div class="api-item">
-        <code class="api-name">__agentWeb.fetch(url, options?)</code>
-        <span class="api-desc">网页抓取，支持 raw / readability / JS 渲染回退</span>
-      </div>
-    </div>
-
     <div class="codex-box">
       <div id="codexStatus" style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
         <span id="codexStatusDot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#d1d5db;vertical-align:middle;margin-right:6px;"></span>

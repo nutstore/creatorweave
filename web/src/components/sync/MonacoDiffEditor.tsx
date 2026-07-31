@@ -3,6 +3,7 @@ import * as monaco from 'monaco-editor'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useT } from '@/i18n'
 import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
+import '@/lib/monaco-setup'
 
 let loaderConfigured = false
 

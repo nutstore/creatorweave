@@ -29,7 +29,9 @@ import { createUserMessage } from '@/agent/message-types'
 import type { ConversationStatus } from '@/agent/message-types'
 import { toast } from 'sonner'
 import { OfficePreview, OFFICE_EXTS, getEo2EditorUrl } from './OfficePreview'
+import '@/agent/tools/formats'
 import { getFormatUIHandler } from '@/agent/tools/format-registry'
+import '@/lib/monaco-setup'
 
 // Configure Monaco loader to use the locally bundled monaco-editor package
 // instead of loading from CDN. Without this, the Editor component will try
@@ -640,12 +642,15 @@ export function FilePreview({ filePath, fileHandle, onClose, blob: externalBlob 
         setImageUrl(objectUrlRef.current)
       } else if (fileType === 'office' && blob) {
         setOfficeBlob(blob)
-      } else if (fileType === 'format' && blob) {
-        setFormatBlob(blob)
+      } else if (fileType === 'format' && (blob || text !== undefined)) {
+        // OPFS classifies HTML and other textual formats as strings. Normalize
+        // them to a Blob so every registered format can use its PreviewComponent.
+        const formatBlob = blob ?? new Blob([text!], { type: 'text/plain' })
+        setFormatBlob(formatBlob)
         // Also render as text for text view mode
         if (formatUI?.renderTextContent) {
           try {
-            const arrayBuffer = await blob.arrayBuffer()
+            const arrayBuffer = await formatBlob.arrayBuffer()
             const bytes = new Uint8Array(arrayBuffer)
             const renderedText = await formatUI.renderTextContent(bytes, path)
             setFormatTextContent(renderedText)
