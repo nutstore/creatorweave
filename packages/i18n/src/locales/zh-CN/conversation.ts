@@ -55,8 +55,16 @@ export const conversation = {
         fileMention: "引用文件",
         agentMention: "指定 Agent",
         slashCommand: "快捷指令",
+        shortcutsHint: "↑↓ 历史  Shift+Enter 换行",
       },
       dropFilesHere: "拖拽文件到此处",
+      attachFiles: "添加附件",
+      agentIdPlaceholder: "agent-id",
+      createAgent: "创建",
+      agentCreateFailed: "创建失败 — ID 可能已存在",
+      ocrSuccess: "文字已提取",
+      ocrFailed: "无法提取文字 — 图片仍已附加",
+      ocrTimeout: "提取超时 — 点击重试",
     },
     // 按钮
     buttons: {

@@ -11,6 +11,7 @@ export const projectRoots = {
     permissionDenied: "权限被拒绝",
     permissionFailed: "恢复权限失败",
     permissionRestored: "权限已恢复",
+    menuLabel: "文件夹操作",
     enableWrite: "启用写入权限",
     makeReadOnly: "设为只读",
     setAsDefault: "设为默认",

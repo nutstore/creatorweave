@@ -12,6 +12,7 @@
  */
 
 import { useEffect, useCallback, useRef, useId } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
@@ -38,6 +39,11 @@ const FOCUSABLE_elements = [
   'select:not([disabled])',
   'textarea:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
+  // Rich text editors (e.g. Tiptap/ProseMirror)
+  '[contenteditable]:not([contenteditable="false"])',
+  // Media elements with controls attribute
+  'audio[controls]',
+  'video[controls]',
 ].join(', ')
 
 /**
@@ -140,7 +146,7 @@ export function Drawer({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <>
       {/* Backdrop */}
       <div
@@ -171,29 +177,25 @@ export function Drawer({
         // Make drawer focusable for focus trap fallback
         tabIndex={-1}
       >
-        {/* Header */}
-        {title && (
-          <div
-            className="flex items-center justify-between border-b px-4 py-3 shrink-0"
-            id={titleId}
+        {/* Header — always rendered so close button is available, even without title */}
+        <div className="flex items-center justify-between border-b px-4 py-3 shrink-0">
+          {title && <h2 id={titleId} className="text-lg font-semibold truncate">{title}</h2>}
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t('common.close')}
           >
-            <h2 className="text-lg font-semibold truncate">{title}</h2>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-md hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label={t('common.close')}
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Content */}
         <div className="flex-1 overflow-hidden focus-visible:outline-none">
           {children}
         </div>
       </div>
-    </>
+    </>,
+    document.body
   )
 }

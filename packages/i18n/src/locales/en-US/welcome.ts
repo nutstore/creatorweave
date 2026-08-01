@@ -25,6 +25,23 @@ export const welcome = {
     setupApiKeyTitle: "Configure Your Own API Key",
     setupApiKeyDesc: "Supports OpenAI, OpenRouter, Anthropic, and more",
     setupLocalFirstHint: "All data is stored locally in your browser, never uploaded",
+    // 3-step onboarding
+    step1Of3: "Step 1 of 3",
+    step2Of3: "Step 2 of 3",
+    step3Of3: "Step 3 of 3",
+    welcomeHeading: "Welcome to CreatorWeave",
+    welcomeSubtitle: "Your local AI workspace for files, code, and creation",
+    continueButton: "Continue",
+    skipButton: "Skip for now",
+    mountFolderTitle: "Mount a local folder",
+    mountFolderDesc: "AI can read and write your files. Files never leave your browser.",
+    mountFolderButton: "Select folder",
+    mountFolderBack: "Back",
+    mountFolderMounted: "Mounted folders",
+    quickStartTitle: "Try one of these:",
+    quickStartEmail: "Help me write an email",
+    quickStartSummary: "Summarize my notes",
+    quickStartCode: "Explain code in my-project",
     personas: {
       developer: {
         title: "Developer",

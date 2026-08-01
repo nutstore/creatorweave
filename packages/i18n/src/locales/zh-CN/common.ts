@@ -21,4 +21,5 @@ export const common = {
     expandToViewFull: "点击展开查看完整内容",
     seconds: "秒",
     minutes: "分钟",
+    skipToContent: "跳到主要内容",
 } as const

@@ -20,4 +20,5 @@ export const common = {
     expandToViewFull: "Click to view full content",
     seconds: "s",
     minutes: "min",
+    skipToContent: "Skip to main content",
 } as const

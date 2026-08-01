@@ -3,6 +3,7 @@ import { app } from './app'
 import { topbar } from './topbar'
 import { folderSelector } from './folderSelector'
 import { settings } from './settings'
+import { projectRoots } from './projectRoots'
 import { workspaceSettings } from './workspaceSettings'
 import { welcome } from './welcome'
 import { skills, skillCard, skillEditor, skillUpload, skillDetail, skillFileEditor } from './skills'
@@ -37,6 +38,7 @@ export const koKR = {
   app,
   topbar,
   folderSelector,
+  projectRoots,
   settings,
   workspaceSettings,
   welcome,

@@ -10,6 +10,7 @@ export const sidebar = {
     archivedTab: "已归档",
     newWorkspace: "新对话",
     workspaceLabel: "对话: {name}",
+    running: "运行中",
     pendingReviewCount: "{count} 个修改待确认",
     hasSchedule: "此对话有定时任务",
     workspaceDeleted: "对话已删除",

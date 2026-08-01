@@ -1,3 +1,10 @@
+// ── react-grab: dev-only DOM/context picker for AI agents ──
+// Reads source location from each rendered element via React internals
+// so agents can reference the actual component file instead of guessing.
+if (import.meta.env.DEV) {
+  void import('react-grab')
+}
+
 // ── Workspace Assistant: capture side panel trigger BEFORE React Router ──
 // HashRouter's catch-all redirect will destroy query params in the hash.
 // We import workspace-assistant-context early so its module-level IIFE

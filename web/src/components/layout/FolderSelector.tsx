@@ -243,9 +243,11 @@ function RootChip({
       <button
         type="button"
         onClick={onToggle}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
         className={cn(
           'flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-normal',
-          'transition-colors focus:outline-none',
+          'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1',
           needsActivation
             ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/30'
             : isReady
@@ -267,15 +269,18 @@ function RootChip({
       {/* Dropdown menu */}
       {isOpen && (
         <div
-          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-border bg-white py-1 shadow-lg dark:border-border dark:bg-card"
+          role="menu"
+          aria-label={t('projectRoots.menuLabel')}
+          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] whitespace-nowrap rounded-lg border border-border bg-card py-1 shadow-lg dark:border-border dark:bg-card"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Restore permission */}
           {needsActivation && (
             <button
               type="button"
+              role="menuitem"
               onClick={onRestorePermission}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 focus-visible:outline-none focus-visible:bg-amber-100 dark:focus-visible:bg-amber-900/30"
             >
               <RefreshCw className="h-4 w-4" />
               <span>{t('projectRoots.restorePermission')}</span>
@@ -285,8 +290,9 @@ function RootChip({
           {/* Toggle read-only */}
           <button
             type="button"
+            role="menuitem"
             onClick={onToggleReadOnly}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-muted dark:hover:bg-muted"
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-secondary hover:bg-muted dark:hover:bg-muted focus-visible:outline-none focus-visible:bg-muted"
           >
             <Lock className="h-4 w-4" />
             <span>{root.readOnly ? t('projectRoots.enableWrite') : t('projectRoots.makeReadOnly')}</span>
@@ -295,8 +301,9 @@ function RootChip({
           {/* Remove */}
           <button
             type="button"
+            role="menuitem"
             onClick={onRemove}
-            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/5"
+            className="flex w-full items-center gap-2 px-3 py-2 text-sm text-danger hover:bg-danger/5 focus-visible:outline-none focus-visible:bg-danger/10"
           >
             <X className="h-4 w-4" />
             <span>{t('projectRoots.removeRoot')}</span>

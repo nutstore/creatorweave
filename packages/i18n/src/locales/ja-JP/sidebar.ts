@@ -8,6 +8,7 @@ export const sidebar = {
     clear: "クリア",
     newWorkspace: "新しいチャット",
     workspaceLabel: "チャット: {name}",
+    running: "実行中",
     pendingReviewCount: "{count}件の変更が確認待ち",
     hasSchedule: "このチャットにはスケジュールされたタスクがあります",
     workspaceDeleted: "チャットが削除されました",

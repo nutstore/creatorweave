@@ -166,19 +166,26 @@ export function TopBar({
               : 'h-[52px] px-4'
           }`}
         >
+          {/* Skip link — first focusable element for keyboard / screen reader users */}
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:text-primary-foreground focus:shadow-lg focus:outline-none"
+          >
+            {t('common.skipToContent')}
+          </a>
         {/* Left: Menu button (mobile) + Logo + Name */}
         <div className={`flex min-w-0 items-center ${isMobile ? 'gap-1 flex-1' : 'flex-1 gap-2'}`}>
           {onBackToProjects && (
             <ActionTooltip label={t('topbar.tooltips.backToProjects')}>
               <BrandButton iconButton onClick={onBackToProjects} className={isMobile ? 'h-7 w-7 shrink-0' : ''}>
-                <ArrowLeft className={isMobile ? 'h-[13px] w-[13px]' : 'h-[14px] w-[14px]'} />
+                <ArrowLeft className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
           )}
           {isMobile && (
             <ActionTooltip label={t('topbar.tooltips.menu')}>
               <BrandButton iconButton onClick={onMenuOpen} data-tour="menu" className="h-7 w-7 shrink-0">
-                <Menu className="h-[13px] w-[13px]" />
+                <Menu className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
           )}
@@ -198,7 +205,7 @@ export function TopBar({
                     <>
                       <span className="text-xs text-tertiary dark:text-muted">/</span>
                       <ActionTooltip label={t('topbar.workspaceLabel', { name: conversationName })}>
-                        <span className="max-w-[200px] truncate rounded-md bg-muted px-2 py-1 text-xs text-secondary dark:bg-muted dark:text-muted">
+                        <span className="max-w-[200px] truncate rounded-md bg-muted px-2 py-1 text-xs text-secondary dark:bg-muted/50 dark:text-muted-foreground">
                           {conversationName}
                         </span>
                       </ActionTooltip>
@@ -219,16 +226,17 @@ export function TopBar({
                 iconButton
                 className="h-7 w-7"
                 onClick={() => onNewConversation?.()}
+                aria-label={t('sidebar.newWorkspace')}
               >
-                <SquarePen className="h-[15px] w-[15px]" />
+                <SquarePen className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
 
             {/* API key warning badge — can't hide this in more menu */}
             {hasApiKeyLoaded && !hasApiKey && (
               <ActionTooltip label={t('topbar.tooltips.openApiKeySettings')}>
-                <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7">
-                  <KeyRound className="h-[13px] w-[13px]" />
+                <BrandButton iconButton onClick={() => openSettings()} className="h-7 w-7" aria-label={t('topbar.tooltips.openApiKeySettings')}>
+                  <KeyRound className="h-[14px] w-[14px]" />
                 </BrandButton>
               </ActionTooltip>
             )}
@@ -239,8 +247,9 @@ export function TopBar({
                 iconButton
                 className="h-7 w-7"
                 onClick={() => setMobileMoreOpen(true)}
+                aria-label={t('topbar.tooltips.appSettings')}
               >
-                <MoreHorizontal className="h-[15px] w-[15px]" />
+                <MoreHorizontal className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
           </div>

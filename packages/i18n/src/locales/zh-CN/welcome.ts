@@ -24,6 +24,23 @@ export const welcome = {
     setupApiKeyTitle: "配置自己的 API Key",
     setupApiKeyDesc: "支持 OpenAI、OpenRouter、Anthropic 等自定义模型",
     setupLocalFirstHint: "所有数据存储在本地浏览器中，不会上传到服务器",
+    // 3-step onboarding
+    step1Of3: "步骤 1 / 3",
+    step2Of3: "步骤 2 / 3",
+    step3Of3: "步骤 3 / 3",
+    welcomeHeading: "欢迎使用 CreatorWeave",
+    welcomeSubtitle: "本地 AI 创作工坊，文件和代码都在浏览器中",
+    continueButton: "继续",
+    skipButton: "暂时跳过",
+    mountFolderTitle: "挂载本地文件夹",
+    mountFolderDesc: "AI 可以直接读写你的文件。文件不离开浏览器。",
+    mountFolderButton: "选择文件夹",
+    mountFolderBack: "上一步",
+    mountFolderMounted: "已挂载的文件夹",
+    quickStartTitle: "试试这些：",
+    quickStartEmail: "帮我写一封邮件",
+    quickStartSummary: "总结我的笔记",
+    quickStartCode: "解释 my-project 里的代码",
     personas: {
       developer: {
         title: "开发者",

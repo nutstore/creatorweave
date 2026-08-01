@@ -10,6 +10,8 @@ export const projectRoots = {
     restorePermission: "Restore permission",
     permissionDenied: "Permission denied",
     permissionFailed: "Failed to restore permission",
+    permissionRestored: "Permission restored",
+    menuLabel: "Folder actions",
     enableWrite: "Enable write access",
     makeReadOnly: "Make read-only",
     setAsDefault: "Set as default",

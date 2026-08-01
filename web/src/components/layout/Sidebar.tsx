@@ -15,7 +15,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
 import { useShallow } from 'zustand/react/shallow'
 import { useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
@@ -151,9 +151,9 @@ const ConversationItem = memo(function ConversationItem({
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
-          role="button"
+          role="listitem"
           tabIndex={0}
-          aria-pressed={isActive}
+          aria-current={isActive ? 'page' : undefined}
           aria-label={workspaceLabel}
           className={`group relative flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 ${
             isActive
@@ -183,14 +183,19 @@ const ConversationItem = memo(function ConversationItem({
 
           {/* Running status indicator */}
           {isRunning && (
-            <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-warning" />
+            <span role="status" aria-label={t('sidebar.running')} className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-warning" />
           )}
 
           {/* Action buttons - visible on hover */}
           {!isEditing && (
-            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md border border-neutral-200 bg-neutral-100 p-0.5 opacity-0 shadow-sm group-hover:opacity-100 focus-within:opacity-100 transition-opacity dark:border-neutral-600 dark:bg-neutral-700">
+            <div className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center rounded-md border border-border bg-muted p-0.5 shadow-sm transition-opacity ${
+                              isActive
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'
+                            }`}>
               <button
-                className="rounded p-0.5 text-secondary transition-colors hover:bg-neutral-200 hover:text-primary dark:hover:bg-neutral-600 dark:hover:text-primary-700"
+                type="button"
+                className="rounded p-1 text-secondary transition-colors hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:text-primary-700"
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
@@ -199,21 +204,21 @@ const ConversationItem = memo(function ConversationItem({
                 title={t('sidebar.renameWorkspace')}
                 aria-label={t('sidebar.renameWorkspace')}
               >
-                <Pencil className="h-3 w-3" />
+                <Pencil className="h-3.5 w-3.5" />
               </button>
-              <div className="mx-0.5 h-3 w-px bg-neutral-300 dark:bg-neutral-500" />
+              <div className="mx-0.5 h-3 w-px bg-border" />
               <button
-                className="rounded p-0.5 text-secondary transition-colors hover:bg-danger/10 hover:text-danger dark:hover:bg-danger/20"
+                type="button"
+                className="rounded p-1 text-secondary transition-colors hover:bg-danger/10 hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-danger/20"
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  const rect = e.currentTarget.getBoundingClientRect()
-                  onDeleteClick(id, rect.left, rect.top)
+                  onDelete(id)
                 }}
                 title={t('sidebar.deleteWorkspace')}
                 aria-label={t('sidebar.deleteWorkspace')}
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </div>
           )}
@@ -236,7 +241,7 @@ const ConversationItem = memo(function ConversationItem({
               }}
               onBlur={onRenameBlur}
               onClick={(e) => e.stopPropagation()}
-              className="min-w-0 flex-1 rounded border border-primary-100 bg-white px-1.5 py-0.5 text-xs text-primary outline-none focus:ring-1 focus:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
+              className="min-w-0 flex-1 rounded border border-primary-100 bg-card px-1.5 py-0.5 text-xs text-primary outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-600 dark:bg-card dark:text-primary"
               maxLength={100}
             />
           ) : (
@@ -244,7 +249,7 @@ const ConversationItem = memo(function ConversationItem({
           )}
           {pendingReviewCount > 0 && !isEditing && (
             <span
-              className="shrink-0 rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning"
+              className="shrink-0 rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-semibold leading-none text-warning"
               title={t('sidebar.pendingReviewCount', { count: pendingReviewCount })}
             >
               {pendingReviewCount}
@@ -286,13 +291,6 @@ const ConversationItem = memo(function ConversationItem({
             : <Archive className="mr-2 h-3.5 w-3.5" />
           }
           {isArchived ? t('sidebar.unarchiveWorkspace') : t('sidebar.archiveWorkspace')}
-        </ContextMenuItem>
-        <ContextMenuItem
-          className="text-danger focus:text-danger"
-          onClick={() => onDelete(id)}
-        >
-          <Trash2 className="mr-2 h-3.5 w-3.5" />
-          {t('sidebar.deleteWorkspace')}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
@@ -523,7 +521,7 @@ const ResourceTabPanel = memo(function ResourceTabPanel({
           <Clock className="h-3 w-3" />
           {t('sidebar.changes')}
           {currentPendingCount > 0 && (
-            <span className="min-w-[1.1rem] rounded-full bg-warning/20 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-warning">
+            <span className="min-w-[1.1rem] rounded-full bg-warning/20 px-1.5 py-0.5 text-xs font-semibold leading-none text-warning">
               {currentPendingCount}
             </span>
           )}
@@ -717,6 +715,7 @@ export const Sidebar = memo(function Sidebar({
   const width = panelSizes.sidebarWidth
   const [resourceTab, setResourceTab] = useState<ResourceTab>('files')
   const [workspaceTab, setWorkspaceTab] = useState<'active' | 'archived'>('active')
+  const reduceMotion = useReducedMotion()
 
   // Pin state from workspace store
   const pinnedIds = useWorkspaceStore((state) => state.pinnedWorkspaceIds)
@@ -1195,7 +1194,7 @@ export const Sidebar = memo(function Sidebar({
             >
               {t('sidebar.archivedTab')}
               {archivedCount > 0 && (
-                <span className="ml-0.5 text-[10px] text-tertiary">({archivedCount})</span>
+                <span className="ml-0.5 text-xs text-tertiary">({archivedCount})</span>
               )}
             </button>
           </div>
@@ -1219,8 +1218,8 @@ export const Sidebar = memo(function Sidebar({
               return (
                 <motion.div
                   key={conv.id}
-                  layout
-                  transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 0.8 }}
+                  layout={reduceMotion ? false : 'position'}
+                  transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 35, mass: 0.8 }}
                   className="mb-0.5"
                 >
                 <ConversationItem
@@ -1352,6 +1351,7 @@ export const Sidebar = memo(function Sidebar({
           </p>
           <div className="flex gap-2">
             <button
+              type="button"
               className="rounded border border-danger/30 bg-danger/10 px-3 py-1 text-xs text-danger hover:bg-danger/20"
               onClick={async () => {
                 try {
@@ -1371,6 +1371,7 @@ export const Sidebar = memo(function Sidebar({
               {t('fileTree.deleteFile')}
             </button>
             <button
+              type="button"
               className="rounded border border-neutral-200 bg-white px-3 py-1 text-xs text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
               onClick={() => {
                 setDeleteFileDialogOpen(false)
@@ -1423,6 +1424,7 @@ export const Sidebar = memo(function Sidebar({
           </p>
           <div className="flex gap-2">
             <button
+              type="button"
               className="rounded border border-danger/30 bg-danger/10 px-3 py-1 text-xs text-danger hover:bg-danger/20"
               onClick={async () => {
                 if (confirmDeleteId) {
@@ -1447,6 +1449,7 @@ export const Sidebar = memo(function Sidebar({
               {t('common.delete')}
             </button>
             <button
+              type="button"
               className="rounded border border-neutral-200 bg-white px-3 py-1 text-xs text-secondary hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700"
               onClick={() => {
                 setConfirmDeleteId(null)

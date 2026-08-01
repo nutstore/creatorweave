@@ -745,4 +745,50 @@
   .heat-panel-slide {
     animation: none;
   }
+
+  /* Radix / shadcn UI animation classes (used by Popover, Dialog, Tooltip, etc.) */
+  .animate-in,
+  .animate-out,
+  .fade-in,
+  .fade-in-0,
+  .fade-out,
+  .fade-out-0,
+  .zoom-in,
+  .zoom-in-95,
+  .zoom-out,
+  .zoom-out-95,
+  .slide-in-from-top,
+  .slide-in-from-top-1,
+  .slide-in-from-top-2,
+  .slide-in-from-right,
+  .slide-in-from-right-1,
+  .slide-in-from-right-2,
+  .slide-in-from-bottom,
+  .slide-in-from-bottom-1,
+  .slide-in-from-bottom-2,
+  .slide-in-from-left,
+  .slide-in-from-left-1,
+  .slide-in-from-left-2,
+  .slide-out-to-top,
+  .slide-out-to-top-1,
+  .slide-out-to-top-2,
+  .slide-out-to-right,
+  .slide-out-to-right-1,
+  .slide-out-to-right-2,
+  .slide-out-to-bottom,
+  .slide-out-to-bottom-1,
+  .slide-out-to-bottom-2,
+  .slide-out-to-left,
+  .slide-out-to-left-1,
+  .slide-out-to-left-2 {
+    animation: none !important;
+  }
+
+  /* Tailwind animate-* utilities — also disable continuous / looping animations */
+  .animate-pulse,
+  .animate-spin,
+  .animate-bounce,
+  .animate-ping {
+    animation: none !important;
+  }
 }

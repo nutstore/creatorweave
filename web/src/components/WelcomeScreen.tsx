@@ -1,17 +1,15 @@
 /**
- * WelcomeScreen - Clean onboarding screen with rich text input
+ * WelcomeScreen - 3-step onboarding with local folder mount
  *
- * Uses AgentRichInput (same as workspace bottom input) for consistent UX.
- * File attachments are stored in useAssetStore and carried over when
- * the conversation starts.
- *
- * When no API key is configured, shows a model setup card instead of a
- * disabled input — guiding users to either login with 坚果云 AI or
- * configure their own API Key.
+ * State machine: welcome → api-key → mount-folder → ready
+ * - welcome: shown only to first-time users (no project created + not seen)
+ * - api-key: shown when no API key configured
+ * - mount-folder: shown when API key ok but no folder mounted
+ * - ready: shows quick-start prompts + rich input
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon } from 'lucide-react'
+import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon, ArrowRight, Check, FileText, Code2, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
@@ -27,12 +25,25 @@ import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
 import { captureTab, isPageActionAvailable } from '@/agent/tools/page-action-bridge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creatorweave/ui'
 
+type OnboardingStep = 'welcome' | 'api-key' | 'mount-folder' | 'ready'
+
+function getInitialStep(
+  hasApiKey: boolean,
+  folderCount: number,
+  hasCreatedProject: boolean
+): OnboardingStep {
+  const welcomeSeen = typeof window !== 'undefined'
+    && localStorage.getItem('creatorweave:onboarding:welcome-seen') === 'true'
+
+  if (!hasCreatedProject && !welcomeSeen) return 'welcome'
+  if (!hasApiKey) return 'api-key'
+  if (folderCount === 0) return 'mount-folder'
+  return 'ready'
+}
+
 interface WelcomeScreenProps {
   onStartConversation: (text: string) => void
-  /** Open the settings dialog, optionally jumping to a specific tab
-   *  (e.g. 'llm' for API key configuration). */
   onOpenSettings?: (tab?: SettingsTab) => void
-  /** Called after gateway login succeeds so parent can trigger onboarding */
   onGatewayLoginSuccess?: () => void
 }
 
@@ -41,17 +52,9 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null)
   const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
   const hasApiKey = useSettingsStore((s) => s.hasApiKey)
-  // `hasApiKeyLoaded` distinguishes "we know there's no API key" from
-  // "we haven't checked yet (default false)". Without this gate the setup
-  // card would flash briefly during the initial async check before
-  // `hasApiKey` is reconciled with the SQLite-backed truth.
   const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const checkHasApiKey = useSettingsStore((s) => s.checkHasApiKey)
   const modelName = useSettingsStore((s) => s.modelName)
-  // Folder state lives in useFolderAccessStore (single source of truth shared
-  // with TopBar's FolderSelector + WorkspaceLayout's FolderTipBubble). Using
-  // useAgentStore.directoryHandle here was a dead write — nobody else read
-  // it, so the button click was silently dropped.
   const folderRoots = useFolderAccessStore((s) => s.roots)
   const addRoot = useFolderAccessStore((s) => s.addRoot)
   const t = useT()
@@ -64,26 +67,46 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
       ? t('agent.vision.capture')
       : t('agent.vision.supported')
 
-  // Self-trigger the API-key check on mount. We can't rely on TopBar's
-  // `useHasApiKey()` hook to do it for us, because that hook may run on
-  // a later tick (or not at all if TopBar isn't mounted yet). The check
-  // itself is idempotent — it caches results in `apiKeyCache`.
+  const hasCreatedProject = typeof window !== 'undefined'
+    && localStorage.getItem('creatorweave:auto-default-project-created') === '1'
+
+  const [step, setStep] = useState<OnboardingStep>(() =>
+    getInitialStep(hasApiKey, folderRoots.length, hasCreatedProject)
+  )
+
   useEffect(() => {
     void checkHasApiKey().catch((err) => {
-      // eslint-disable-next-line no-console
       console.error('[WelcomeScreen] checkHasApiKey failed:', err)
     })
   }, [checkHasApiKey])
 
   const { authState, isRunning: isGatewayLoginRunning, login: gatewayLogin, reset: resetGatewayLogin } = useGatewayLogin()
 
+  // Auto-advance step when API key / folder state changes
+  useEffect(() => {
+    if (!hasApiKeyLoaded) return
+    setStep((prev) => {
+      if (prev === 'welcome') return prev
+      if (!hasApiKey) return 'api-key'
+      if (folderRoots.length === 0) return 'mount-folder'
+      return 'ready'
+    })
+  }, [hasApiKey, hasApiKeyLoaded, folderRoots.length])
+
+  const advanceFromWelcome = useCallback(() => {
+    localStorage.setItem('creatorweave:onboarding:welcome-seen', 'true')
+    if (!hasApiKey) setStep('api-key')
+    else if (folderRoots.length === 0) setStep('mount-folder')
+    else setStep('ready')
+  }, [hasApiKey, folderRoots.length])
+
+  const advanceFromMount = useCallback(() => {
+    setStep('ready')
+  }, [])
+
   const handleSubmit = useCallback(() => {
     const text = inputValue.trim()
     if (!text) return
-    // Do NOT increment resetToken here — that would trigger clearAll() on
-    // pending assets. Since the welcome screen unmounts immediately after
-    // starting a conversation, the assets are preserved in useAssetStore
-    // and picked up by useInitialMessage in ConversationView.
     onStartConversation(text)
     setInputValue('')
   }, [inputValue, onStartConversation])
@@ -124,25 +147,15 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
     setScreenshotDataUrl(null)
   }, [])
 
-  // Minimal file search handler — returns empty for welcome screen
-  // (file search requires an active conversation workspace)
   const handleSearchFiles = useCallback(
     async (_query: string): Promise<FileMentionItem[]> => [],
     [],
   )
 
-  // ── Render state machine ─────────────────────────────────────────────
-  // Three exclusive states:
-  //   - loading   : checkHasApiKey is in-flight; show a small spinner.
-  //   - setupCard : check complete and there is no API key → show the
-  //                 gateway-login / API-key options.
-  //   - input     : check complete and an API key is configured → show
-  //                 the rich input.
   const isLoading = !hasApiKeyLoaded
-  const showSetupCard = hasApiKeyLoaded && !hasApiKey
 
   return (
-    <div className="flex h-full flex-col items-center justify-center bg-white px-4 dark:bg-neutral-950">
+    <main className="flex h-full flex-col items-center justify-center bg-background px-4 dark:bg-neutral-950">
       <div className="w-full max-w-2xl">
         {/* Logo & Tagline */}
         <div className="mb-6 text-center">
@@ -152,33 +165,66 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
           <h1 className="mb-2 text-3xl font-semibold text-foreground">
             {t('welcome.title')}
           </h1>
-          <p className="text-base text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">{t('welcome.tagline')}</p>
+          <p className="text-base text-neutral-500 dark:text-neutral-400">{t('welcome.tagline')}</p>
         </div>
 
         {isLoading ? (
-          /* ── Loading state — check is still in-flight ── */
+          /* ── Loading state ── */
           <div
             role="status"
             aria-live="polite"
-            className="flex h-32 items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 dark:border-neutral-800 dark:bg-neutral-900"
+            className="flex h-32 items-center justify-center rounded-xl border border-neutral-200 bg-card px-4 dark:border-neutral-800 dark:bg-neutral-900"
           >
-            <Loader2 className="h-4 w-4 animate-spin text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500" />
-            <span className="ml-2 text-sm text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+            <Loader2 className="h-4 w-4 animate-spin text-neutral-400 dark:text-neutral-500" />
+            <span className="ml-2 text-sm text-neutral-500 dark:text-neutral-400">
               {t('welcome.checkingConfig')}
             </span>
           </div>
-        ) : showSetupCard ? (
-          /* ── Model Setup Card ── */
+        ) : step === 'welcome' ? (
+          /* ── Step 1/3: Welcome ── */
+          <div className="rounded-xl border border-border bg-card p-6 text-center">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary-600">
+              {t('welcome.step1Of3')}
+            </p>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              {t('welcome.welcomeHeading')}
+            </h2>
+            <p className="mb-6 text-sm text-neutral-500 dark:text-neutral-400">
+              {t('welcome.welcomeSubtitle')}
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={advanceFromWelcome}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                {t('welcome.continueButton')}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={advanceFromWelcome}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-border px-5 text-sm font-medium text-secondary transition-colors hover:bg-muted"
+              >
+                {t('welcome.skipButton')}
+              </button>
+            </div>
+          </div>
+        ) : step === 'api-key' ? (
+          /* ── Step 2/3: API Key Setup ── */
           <div className="overflow-hidden rounded-xl border border-amber-200 bg-amber-50/50 text-left dark:border-amber-800/50 dark:bg-amber-950/10">
-            {/* Header */}
-            <div className="flex items-center gap-2 border-b border-amber-200/60 px-4 py-3 dark:border-amber-800/40">
-              <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
-                {t('welcome.setupCardTitle')}
-              </p>
+            <div className="flex items-center justify-between border-b border-amber-200/60 px-4 py-3 dark:border-amber-800/40">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
+                  {t('welcome.setupCardTitle')}
+                </p>
+              </div>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                {t('welcome.step2Of3')}
+              </span>
             </div>
 
-            {/* Option A: 坚果云 AI login (only when gateway configured) */}
             {gatewayAvailable && (
               <button
                 type="button"
@@ -201,7 +247,7 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
                       {t('welcome.setupGatewayRecommend')}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                  <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                     {t('welcome.setupGatewayDesc')}
                   </p>
                 </div>
@@ -209,112 +255,180 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
               </button>
             )}
 
-            {/* Option B: Configure API Key */}
             <button
               type="button"
               onClick={() => onOpenSettings?.('llm')}
               className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/60 dark:hover:bg-neutral-900/40"
             >
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-100 dark:bg-neutral-800">
-                <KeyRound className="h-[18px] w-[18px] text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400" />
+                <KeyRound className="h-[18px] w-[18px] text-neutral-600 dark:text-neutral-400" />
               </div>
               <div className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-foreground">
                   {t('welcome.setupApiKeyTitle')}
                 </span>
-                <p className="mt-0.5 text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
                   {t('welcome.setupApiKeyDesc')}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-neutral-400" />
             </button>
           </div>
-        ) : (
-          /* ── Active input (API key configured) ── */
-          <div className="relative mb-6" data-tour="welcome-input">
-            <AgentRichInput
-              placeholder={t('welcome.placeholder')}
-              ariaLabel={t('conversation.input.ariaLabel')}
-              agents={[]}
-              onSearchFiles={handleSearchFiles}
-              activeAgentId={null}
-              allAgents={[]}
-              onSetActiveAgent={async () => {}}
-              onCreateAgent={async (_id: string): Promise<AgentInfo | null> => null}
-              onDeleteAgent={async () => false}
-              onChange={handleInputChange}
-              onSubmit={handleSubmit}
-              leadingAccessory={(
-                <TooltipProvider delayDuration={250}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <button
-                          type="button"
-                          aria-label={screenshotLabel}
-                          disabled={!canCaptureScreenshot || isCapturingScreenshot}
-                          onClick={() => void handleCaptureScreenshot()}
-                          className={`inline-flex h-8 w-8 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed ${
-                            supportsVision
-                              ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
-                              : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 text-neutral-600 text-neutral-600 dark:text-neutral-600'
-                          }`}
-                        >
-                          {isCapturingScreenshot
-                            ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                            : <ImageIcon className="h-4 w-4" aria-hidden="true" />}
-                        </button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" sideOffset={6}>{screenshotLabel}</TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            />
+        ) : step === 'mount-folder' ? (
+          /* ── Step 3/3: Mount Local Folder ── */
+          <div className="rounded-xl border border-border bg-card p-6 text-center">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary-600">
+              {t('welcome.step3Of3')}
+            </p>
+            <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50/80 shadow-sm">
+              <FolderOpen className="h-6 w-6 text-primary-600" />
+            </div>
+            <h2 className="mb-2 text-xl font-semibold text-foreground">
+              {t('welcome.mountFolderTitle')}
+            </h2>
+            <p className="mx-auto mb-6 max-w-md text-sm text-neutral-500 dark:text-neutral-400">
+              {t('welcome.mountFolderDesc')}
+            </p>
             <button
               type="button"
-              onClick={handleSubmit}
-              disabled={!inputValue.trim()}
-              className="absolute bottom-4 right-4 z-10 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-30 disabled:hover:bg-primary-600"
-              title={t('welcome.send')}
-            >
-              <Send className="h-4 w-4" />
-            </button>
-          </div>
-      )}
-
-      {screenshotDataUrl && (
-        <PageScreenshotCropDialog
-          imageDataUrl={screenshotDataUrl}
-          onConfirm={handleScreenshotConfirm}
-          onCancel={() => setScreenshotDataUrl(null)}
-        />
-      )}
-
-      {/* Optional file context — placed directly after the primary input. */}
-      {showSetupCard ? null : hasApiKey && folderRoots.length === 0 && (
-          <div className="mt-5 flex flex-col items-center">
-            <button
-              type="button"
-              onClick={handleSelectFolder}
+              onClick={() => void handleSelectFolder()}
               data-tour="welcome-open-folder"
-              className="flex h-9 items-center gap-2 rounded-lg border border-primary-100 bg-primary-50/70 px-4 py-2 text-sm font-medium text-primary-700 transition-colors hover:border-primary-100 hover:bg-primary-100/70 dark:border-primary-800/70 dark:bg-primary-50/30 dark:text-primary-700 dark:hover:bg-primary-50/50"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary-600 px-5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
             >
               <FolderOpen className="h-4 w-4" />
-              {t('onboarding.steps.files.title')}
+              {t('welcome.mountFolderButton')}
             </button>
-            <p className="mt-2 text-center text-xs text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
-              {t('agent.folderTip.description')}
-            </p>
+            {/* Already mounted folders */}
+            {folderRoots.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+                  {t('welcome.mountFolderMounted')}
+                </p>
+                {folderRoots.map((root) => (
+                  <div key={root.id} className="flex items-center justify-center gap-2 text-xs text-secondary">
+                    <Check className="h-3 w-3 text-success" />
+                    <span className="truncate">{root.name}</span>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={advanceFromMount}
+                  className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-4 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
+                >
+                  {t('welcome.continueButton')}
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+            {/* Skip + Back */}
+            <div className="mt-6 flex justify-center gap-4">
+              <button
+                type="button"
+                onClick={() => setStep('api-key')}
+                className="inline-flex h-8 items-center text-xs text-neutral-500 transition-colors hover:text-foreground"
+              >
+                {t('welcome.mountFolderBack')}
+              </button>
+              <button
+                type="button"
+                onClick={advanceFromMount}
+                className="inline-flex h-8 items-center text-xs text-neutral-500 transition-colors hover:text-foreground"
+              >
+                {t('welcome.skipButton')}
+              </button>
+            </div>
           </div>
+        ) : (
+          /* ── Ready: Active input ── */
+          <>
+            {/* Quick-start prompts */}
+            <div className="mb-4 flex flex-wrap justify-center gap-2">
+              <span className="w-full text-center text-xs text-neutral-500 dark:text-neutral-400">
+                {t('welcome.quickStartTitle')}
+              </span>
+              {[
+                { icon: <Mail className="h-3 w-3" />, text: t('welcome.quickStartEmail') },
+                { icon: <FileText className="h-3 w-3" />, text: t('welcome.quickStartSummary') },
+                { icon: <Code2 className="h-3 w-3" />, text: t('welcome.quickStartCode') },
+              ].map((prompt, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setInputValue(prompt.text)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-50/30"
+                >
+                  {prompt.icon}
+                  {prompt.text}
+                </button>
+              ))}
+            </div>
+            <div className="relative mb-6" data-tour="welcome-input">
+              <AgentRichInput
+                placeholder={t('welcome.placeholder')}
+                ariaLabel={t('conversation.input.ariaLabel')}
+                agents={[]}
+                onSearchFiles={handleSearchFiles}
+                activeAgentId={null}
+                allAgents={[]}
+                onSetActiveAgent={async () => {}}
+                onCreateAgent={async (_id: string): Promise<AgentInfo | null> => null}
+                onDeleteAgent={async () => false}
+                onChange={handleInputChange}
+                onSubmit={handleSubmit}
+                leadingAccessory={(
+                  <TooltipProvider delayDuration={250}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <button
+                            type="button"
+                            aria-label={screenshotLabel}
+                            disabled={!canCaptureScreenshot || isCapturingScreenshot}
+                            onClick={() => void handleCaptureScreenshot()}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-xl transition-colors disabled:cursor-not-allowed ${
+                              supportsVision
+                                ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
+                                : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 text-neutral-600'
+                            }`}
+                          >
+                            {isCapturingScreenshot
+                              ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                              : <ImageIcon className="h-4 w-4" aria-hidden="true" />}
+                          </button>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" sideOffset={6}>{screenshotLabel}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              />
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!inputValue.trim()}
+                className="absolute bottom-4 right-4 z-10 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700 disabled:opacity-30 disabled:hover:bg-primary-600"
+                title={t('welcome.send')}
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+          </>
         )}
 
-      {/* Local-first privacy hint is supporting information, not the primary action. */}
-      {!isLoading && (
-        <p className="mt-7 text-center text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
-          {t('welcome.setupLocalFirstHint')}
-        </p>
-      )}
+        {screenshotDataUrl && (
+          <PageScreenshotCropDialog
+            imageDataUrl={screenshotDataUrl}
+            onConfirm={handleScreenshotConfirm}
+            onCancel={() => setScreenshotDataUrl(null)}
+          />
+        )}
+
+        {/* Local-first privacy hint */}
+        {!isLoading && step !== 'welcome' && (
+          <p className="mt-7 text-center text-[11px] text-neutral-400 dark:text-neutral-500">
+            {t('welcome.setupLocalFirstHint')}
+          </p>
+        )}
 
       </div>
 
@@ -324,6 +438,6 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
         authState={authState}
         onClose={resetGatewayLogin}
       />
-    </div>
+    </main>
   )
 }

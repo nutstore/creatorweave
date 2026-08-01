@@ -27,6 +27,23 @@ export const welcome = {
     setupApiKeyTitle: "独自の API Key を構成",
     setupApiKeyDesc: "OpenAI、OpenRouter、Anthropic などに対応",
     setupLocalFirstHint: "すべてのデータはブラウザにローカル保存され、サーバーにアップロードされません",
+    // 3-step onboarding
+    step1Of3: "ステップ 1 / 3",
+    step2Of3: "ステップ 2 / 3",
+    step3Of3: "ステップ 3 / 3",
+    welcomeHeading: "CreatorWeave へようこそ",
+    welcomeSubtitle: "ローカル AI ワークスペース、ファイルとコードはブラウザ内に",
+    continueButton: "続ける",
+    skipButton: "今はスキップ",
+    mountFolderTitle: "ローカルフォルダをマウント",
+    mountFolderDesc: "AI がファイルを直接読み書きできます。ファイルはブラウザから出ません。",
+    mountFolderButton: "フォルダを選択",
+    mountFolderBack: "戻る",
+    mountFolderMounted: "マウント済みフォルダ",
+    quickStartTitle: "試してみる:",
+    quickStartEmail: "メールを書くのを手伝って",
+    quickStartSummary: "メモを要約して",
+    quickStartCode: "my-project のコードを説明して",
     personas: {
       developer: {
         title: "開発者",

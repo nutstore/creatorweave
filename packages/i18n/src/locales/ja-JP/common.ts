@@ -19,4 +19,5 @@ export const common = {
     summary: "要約",
     collapse: "折りたたむ",
     expandToViewFull: "全文を表示する",
+    skipToContent: "メインコンテンツへスキップ",
 } as const

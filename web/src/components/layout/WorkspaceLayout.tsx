@@ -885,7 +885,7 @@ export function WorkspaceLayout({
         {/* Main area: conversation + optional sync preview panel */}
         <div ref={splitContainerRef} className="flex min-w-0 flex-1 overflow-hidden">
           {/* Conversation / Welcome */}
-          <main className="min-w-0 flex-1 overflow-hidden">
+          <main id="main-content" className="min-w-0 flex-1 overflow-hidden">
             {hasActiveConversation ? (
               <ConversationView
                 initialMessage={pendingMessage}

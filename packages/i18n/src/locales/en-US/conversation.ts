@@ -55,8 +55,16 @@ export const conversation = {
         fileMention: "Reference file",
         agentMention: "Mention agent",
         slashCommand: "Slash command",
+        shortcutsHint: "{arrow} history  Shift+Enter newline",
       },
       dropFilesHere: "Drop files here",
+      attachFiles: "Attach files",
+      agentIdPlaceholder: "agent-id",
+      createAgent: "Create",
+      agentCreateFailed: "Couldn't create agent — ID may already exist",
+      ocrSuccess: "Text extracted",
+      ocrFailed: "Couldn't extract text — image still attached",
+      ocrTimeout: "Text extraction timed out — tap to retry",
     },
     // Buttons
     buttons: {

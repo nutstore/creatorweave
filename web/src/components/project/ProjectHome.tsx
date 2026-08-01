@@ -728,6 +728,7 @@ export function ProjectHome({
     const stats = projectStats[project.id]
     const isArchived = project.status === 'archived'
     const isProjectActionPending = pendingProjectAction?.projectId === project.id
+    const isRenamePending = isProjectActionPending && pendingProjectAction?.type === 'rename'
     const activityAt = getProjectActivityAt(project)
 
     return (
@@ -777,18 +778,19 @@ export function ProjectHome({
                 <BrandButton
                   variant="ghost"
                   iconButton
-                  disabled={isProjectActionPending || isActionSubmitting}
+                  disabled={isProjectActionPending}
+                  aria-label={t('projectHome.project.moreActions')}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </BrandButton>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuContent align="end" className="min-w-[10rem] max-w-[14rem]">
                 <DropdownMenuItem
                   onSelect={() => handleRenameOpen(project)}
                   disabled={isProjectActionPending || isActionSubmitting}
                 >
                   <Pencil className="mr-2 h-4 w-4" />
-                  {isProjectActionPending && pendingProjectAction?.type === 'rename'
+                  {isRenamePending
                     ? t('common.processing')
                     : t('projectHome.project.rename')}
                 </DropdownMenuItem>
@@ -815,7 +817,7 @@ export function ProjectHome({
                     setDeleteConfirmText('')
                   }}
                   disabled={isProjectActionPending || isActionSubmitting}
-                  className="text-danger focus:text-danger"
+                  className="text-danger hover:bg-danger/10 hover:text-danger focus:text-danger focus:bg-danger/10"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   {t('projectHome.project.delete')}
@@ -862,9 +864,9 @@ export function ProjectHome({
                   href="https://github.com/nutstore/creatorweave"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 h-9 px-3 text-xs rounded-md border border-border bg-card hover:bg-muted/50 transition-colors text-secondary dark:text-secondary-foreground"
+                  className="inline-flex items-center gap-1.5 h-9 px-3 text-xs rounded-lg border border-gray-200 bg-transparent text-secondary hover:bg-gray-50 hover:text-primary dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-foreground font-medium transition-colors"
                 >
-                  <Github className="w-3.5 h-3.5" />
+                  <Github className="w-3.5 h-3.5 mr-1.5" />
                   GitHub
                 </a>
               </div>
@@ -1096,14 +1098,14 @@ export function ProjectHome({
               {showAdvanced && (
                 <div className="space-y-4 border-t border-border/40 p-4">
                   {/* Start fresh (moved here from above) */}
-                  <div className="rounded-lg border border-border/40 bg-card/30 p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <RotateCcw className="w-3.5 h-3.5 text-tertiary" />
+                  <div className="rounded-xl border border-border/60 bg-card p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <RotateCcw className="w-4 h-4 text-tertiary" />
                       <span className="home-mono text-xs font-medium text-muted-foreground">
                         {t('projectHome.sidebar.startFresh')}
                       </span>
                     </div>
-                    <p className="home-body text-xs text-secondary dark:text-secondary-foreground mb-3">
+                    <p className="home-body text-sm text-secondary dark:text-secondary-foreground mb-4">
                       {t('projectHome.sidebar.startFreshDescription')}
                     </p>
                     <BrandButton
@@ -1178,7 +1180,7 @@ export function ProjectHome({
               >
                 <Stethoscope className="w-3.5 h-3.5 mr-1.5" />
                 {diagRunning
-                  ? t('projectHome.dialogs.diagnosticsRunning')
+                  ? t('projectHome.dialogs.diagnosticsInProgress')
                   : t('projectHome.sidebar.runDiagnostics')}
               </BrandButton>
             </div>

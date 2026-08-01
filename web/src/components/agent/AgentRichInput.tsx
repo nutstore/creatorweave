@@ -160,7 +160,9 @@ const SuggestionDropdown = forwardRef(
 
     return (
       <div
-        className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
+        role="listbox"
+        aria-label="Suggestions"
+        className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-card shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
       >
         <div ref={scrollContainerRef} className="max-h-96 overflow-y-auto py-1">
           {items.map((item, idx) => {
@@ -170,6 +172,8 @@ const SuggestionDropdown = forwardRef(
                 key={getItemKey(item)}
                 data-idx={idx}
                 type="button"
+                role="option"
+                aria-selected={selected}
                 className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
                   selected
                     ? selectedColor
@@ -955,12 +959,18 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
     }
   }, [editor, onSetIsComposing])
 
+  const [agentCreateError, setAgentCreateError] = useState(false)
+
   // ---- Agent selector handlers -------------------------------------------
   const handleCreateAgent = useCallback(async () => {
     const id = newAgentInput.trim()
     if (!id) return
+    setAgentCreateError(false)
     const created = await onCreateAgent(id)
-    if (!created) return
+    if (!created) {
+      setAgentCreateError(true)
+      return
+    }
     await onSetActiveAgent(created.id)
     setNewAgentInput('')
     setIsCreatingAgent(false)
@@ -1085,7 +1095,11 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
     >
       {/* Drag overlay */}
       {isDragOver && (
-        <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/80 dark:bg-primary-100/30">
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-xl border-2 border-dashed border-primary-500 bg-primary-50/80 dark:bg-primary-100/30"
+        >
           <div className="flex flex-col items-center gap-1 text-primary-600 dark:text-primary-700">
             <Paperclip className="h-8 w-8" />
             <span className="text-sm font-medium">{t('conversation.input.dropFilesHere')}</span>
@@ -1107,7 +1121,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           }
         }}
       />
-      <div className="focus-within:border-primary-500 focus-within:ring-primary-500/20 min-h-[88px] w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-14 py-4 text-sm shadow-sm transition-all hover:border-neutral-400 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:border-neutral-500 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
+      <div className="focus-within:border-primary-500 focus-within:ring-primary-500/20 min-h-[88px] w-full rounded-xl border border-neutral-300 bg-card pl-11 pr-14 py-4 text-sm shadow-sm transition-all hover:border-primary-300 focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-offset-1 dark:border-neutral-600 dark:bg-neutral-900 dark:hover:border-primary-700 dark:focus-within:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
             <EditorContent editor={editor} />
@@ -1124,8 +1138,16 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       <img
                         src={asset.previewUrl}
                         alt={asset.name}
+                        role="button"
+                        tabIndex={0}
                         className="h-8 w-8 rounded object-cover cursor-zoom-in"
                         onClick={() => setLightboxSrc(asset.previewUrl ?? null)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setLightboxSrc(asset.previewUrl ?? null)
+                          }
+                        }}
                       />
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">
@@ -1134,28 +1156,28 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1">
-                        <div className="max-w-[140px] truncate text-xs font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300">
+                        <div className="max-w-[140px] truncate text-xs font-medium text-neutral-600 dark:text-neutral-300">
                           {asset.name}
                         </div>
                         {/* OCR status indicator */}
                         {(asset.ocrStatus === 'loading' || asset.ocrStatus === 'processing') && (
-                          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-blue-500" />
+                          <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary-500" />
                         )}
                       </div>
-                      <div className="text-[10px]">
+                      <div className="text-[10px] text-neutral-500 dark:text-neutral-400">
                         {formatFileSize(asset.size)}
-                        {asset.ocrStatus === 'done' && asset.ocrText && ' · OCR ✓'}
-                        {asset.ocrStatus === 'failed' && ' · OCR ✗'}
-                        {asset.ocrStatus === 'timeout' && ' · OCR timeout'}
+                        {asset.ocrStatus === 'done' && asset.ocrText && ` · ${t('conversation.input.ocrSuccess')}`}
+                        {asset.ocrStatus === 'failed' && ` · ${t('conversation.input.ocrFailed')}`}
+                        {asset.ocrStatus === 'timeout' && ` · ${t('conversation.input.ocrTimeout')}`}
                       </div>
                     </div>
                     <button
                       type="button"
-                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-200 dark:hover:bg-neutral-600"
+                      className="shrink-0 rounded p-1 opacity-60 transition-opacity hover:bg-neutral-200 hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:hover:bg-neutral-600"
                       onClick={() => removeAsset(asset.id)}
                       aria-label={`Remove ${asset.name}`}
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -1164,6 +1186,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           </>
         )}
         {!isFocused && isEmpty && (
+          // Full hints shown when input is empty and unfocused
           // Pin both edges so the absolute box covers the parent input's width
           // (and lets the hint chips track along with it on resize) instead of
           // sizing to shrink-to-fit content. Chips wrap to a second line on
@@ -1191,13 +1214,22 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           </div>
         )}
 
+        {/* Persistent shortcut hints — always visible at bottom of input */}
+        {(isFocused || !isEmpty) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-1.5 flex justify-center">
+            <span className="text-[9px] text-neutral-400 dark:text-neutral-500">
+              {t('conversation.input.hints.shortcutsHint')}
+            </span>
+          </div>
+        )}
+
         {/* Upload attachment button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled}
-          className="absolute left-3 top-4 rounded-lg p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-30 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-          title="Attach files"
+          className="absolute left-3 top-4 rounded-lg p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          title={t('conversation.input.attachFiles')}
         >
           <Paperclip className="h-4 w-4" />
         </button>
@@ -1210,7 +1242,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
 
       {/* Agent selector dropdown - expands downward */}
       {showAgentSelector && (
-        <div className="agent-selector-dropdown absolute top-full left-0 z-20 mt-1 w-60 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="agent-selector-dropdown absolute top-full left-0 z-20 mt-1 w-60 overflow-hidden rounded-lg border border-neutral-200 bg-card shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           <div className="max-h-[280px] overflow-y-auto py-1">
             {allAgents.map((agent, idx) => {
               const isActive = agent.id === activeAgentId
@@ -1227,7 +1259,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                   <button
                     type="button"
                     onClick={() => void handleSelectAgent(agent.id)}
-                    className="flex flex-1 items-center gap-2 text-left"
+                    className="flex flex-1 items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1"
                   >
                     <span
                       className={`text-sm font-medium ${
@@ -1239,7 +1271,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       @{agent.id}
                     </span>
                     {agent.name && agent.name !== agent.id && (
-                      <span className="truncate text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                      <span className="truncate text-xs text-neutral-400 dark:text-neutral-400">
                         {agent.name}
                       </span>
                     )}
@@ -1251,10 +1283,10 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                     <button
                       type="button"
                       onClick={(e) => void handleDeleteAgent(agent.id, e)}
-                      className="rounded p-1 hover:bg-neutral-200 hover:text-red-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400"
+                      className="rounded p-1.5 hover:bg-neutral-200 hover:text-red-600 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-700 dark:hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1"
                       title={`Delete ${agent.id}`}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   )}
                 </div>
@@ -1278,9 +1310,9 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       setNewAgentInput('')
                     }
                   }}
-                  placeholder="agent-id"
+                  placeholder={t('conversation.input.agentIdPlaceholder')}
                   autoFocus
-                  className="h-7 flex-1 rounded border border-neutral-300 bg-white px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800"
+                  className="h-7 flex-1 rounded border border-neutral-300 bg-card px-2 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-neutral-600 dark:bg-neutral-800"
                 />
                 <button
                   type="button"
@@ -1288,14 +1320,17 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                   disabled={!newAgentInput.trim()}
                   className="rounded bg-primary-600 px-2 py-1 text-xs text-white hover:bg-primary-700 disabled:opacity-40"
                 >
-                  Create
+                  {t('conversation.input.createAgent')}
                 </button>
+                {agentCreateError && (
+                  <span className="text-[10px] text-danger">{t('conversation.input.agentCreateFailed')}</span>
+                )}
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => setIsCreatingAgent(true)}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-neutral-100 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>{t('agent.createNew')}</span>
@@ -1316,7 +1351,7 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             <>
               <span className="font-medium">@{candidate.id}</span>
               {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                <span className="truncate pl-3 text-xs text-neutral-400 dark:text-neutral-400">
                   {candidate.name}
                 </span>
               )}
@@ -1333,10 +1368,10 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           getItemKey={(f) => f.path}
           onSelect={(f) => fileSuggestionCommand?.(f)}
           width="w-[26rem]"
-          selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
+          selectedColor="bg-primary-50 text-primary-700 dark:bg-primary-100/40 dark:text-primary-700"
           renderItem={(file, _selected) => (
             <>
-              <span className="mt-0.5 shrink-0 text-neutral-500 text-neutral-500 dark:text-neutral-500">
+              <span className="mt-0.5 shrink-0 text-neutral-500 dark:text-neutral-500">
                 {file.isDirectory ? (
                   <FolderIcon className="h-3.5 w-3.5" />
                 ) : (
@@ -1345,12 +1380,12 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium leading-5">{file.name}</div>
-                <div className="truncate text-[11px] leading-4 text-neutral-500 text-neutral-500 dark:text-neutral-500">
+                <div className="truncate text-[11px] leading-4 text-neutral-500 dark:text-neutral-500">
                   {file.path}{file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 text-neutral-400 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}
@@ -1368,9 +1403,9 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
           onSelect={(cmd) => slashSuggestionCommand?.(cmd)}
           width="w-auto"
           renderItem={(cmd, _selected) => (
-            <span className="text-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
+            <span className="text-neutral-700 dark:text-neutral-300">
               /{cmd.id}
-              <span className="ml-2 text-neutral-500 text-neutral-500 dark:text-neutral-500">
+              <span className="ml-2 text-neutral-500 dark:text-neutral-500">
                 {cmd.description}
               </span>
             </span>

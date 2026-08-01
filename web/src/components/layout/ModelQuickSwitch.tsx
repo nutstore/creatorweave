@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Eye, Search, Settings, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Circle, Eye, Search, Settings, Sparkles } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
 import type { LLMProviderType } from '@/agent/providers/types'
 import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
@@ -40,6 +40,7 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
   const [query, setQuery] = useState('')
   const [collapsedProviders, setCollapsedProviders] = useState<Record<string, boolean>>({})
   const [visionOnly, setVisionOnly] = useState(false)
+  const [searchResultIdx, setSearchResultIdx] = useState(0)
 
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -52,6 +53,8 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
         if (!cancelled) {
           setProviders(result)
         }
+      } catch (err) {
+        console.error('[ModelQuickSwitch] Failed to load providers:', err)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -180,11 +183,12 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
     }))
   }
 
-  // Keyboard: Enter selects the first matched model, Esc clears or closes
+  // Keyboard: Enter selects the first matched model, Esc clears or closes,
+  // ArrowUp/ArrowDown navigates search results.
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && isSearching && filteredFlatModels.length > 0) {
       e.preventDefault()
-      const { provider, model } = filteredFlatModels[0]
+      const { provider, model } = filteredFlatModels[Math.min(searchResultIdx, filteredFlatModels.length - 1)]
       handleSelect(provider, model.id)
     } else if (e.key === 'Escape') {
       if (isSearching) {
@@ -192,6 +196,12 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
         setQuery('')
       }
       // If not searching, let the popover handle Esc (closes naturally)
+    } else if (e.key === 'ArrowDown' && isSearching && filteredFlatModels.length > 0) {
+      e.preventDefault()
+      setSearchResultIdx((prev) => Math.min(prev + 1, filteredFlatModels.length - 1))
+    } else if (e.key === 'ArrowUp' && isSearching && filteredFlatModels.length > 0) {
+      e.preventDefault()
+      setSearchResultIdx((prev) => Math.max(prev - 1, 0))
     }
   }
 
@@ -202,9 +212,9 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <BrandButton variant="outline" className="h-8 max-w-[280px] justify-between gap-2 px-2.5 text-xs">
-          <span className="flex min-w-0 items-center gap-1.5">
+          <span className="flex min-w-0 items-center gap-2">
             <Sparkles className="h-3.5 w-3.5 shrink-0 text-tertiary" />
-            <span className="truncate text-secondary">{currentLabel}</span>
+            <span className="truncate text-secondary" title={currentLabel}>{currentLabel}</span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0 text-tertiary" />
         </BrandButton>
@@ -226,7 +236,8 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 placeholder={t('topbar.modelSwitcher.searchPlaceholder')}
-                className="w-full rounded-md border border-border/60 bg-transparent py-1.5 pl-8 pr-2 text-sm outline-none placeholder:text-tertiary focus:border-primary/40"
+                className="w-full rounded-md border border-border/60 bg-transparent py-2 pl-8 pr-2 text-sm outline-none placeholder:text-tertiary focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                aria-label={t('topbar.modelSwitcher.searchPlaceholder')}
               />
             </div>
             <button
@@ -235,9 +246,9 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
               title={t('topbar.modelSwitcher.visionOnlyTooltip')}
               aria-label={t('topbar.modelSwitcher.visionOnlyTooltip')}
               aria-pressed={visionOnly}
-              className={`flex shrink-0 items-center gap-1 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+              className={`flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-2 text-xs transition-colors ${
                 visionOnly
-                  ? 'border-[var(--brand,#0d9488)] bg-[var(--brand,#0d9488)]/10 text-[var(--brand,#0d9488)]'
+                  ? 'border-primary bg-primary/10 text-primary'
                   : 'border-border/60 text-tertiary hover:bg-muted'
               }`}
             >
@@ -248,12 +259,26 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
         )}
 
         {loading ? (
-          <div className="px-2 py-4 text-center text-xs text-tertiary">
-            ...
+          <div className="space-y-2 py-2">
+            <div className="h-9 animate-pulse rounded-lg border border-border/60 bg-muted/40" />
+            <div className="h-7 animate-pulse rounded-md bg-muted/30" />
+            <div className="h-7 animate-pulse rounded-md bg-muted/30" />
           </div>
         ) : enrichedProviders.length === 0 ? (
-          <div className="px-2 py-4 text-center text-xs text-tertiary">
-            {t('topbar.modelSwitcher.noPinnedModels')}
+          <div className="flex flex-col items-center gap-3 px-2 py-6 text-center">
+            <span className="text-xs text-tertiary">{t('topbar.modelSwitcher.noPinnedModels')}</span>
+            {onManageProviders && (
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false)
+                  onManageProviders()
+                }}
+                className="rounded-md bg-primary-600 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                {t('topbar.modelSwitcher.manageProviders')}
+              </button>
+            )}
           </div>
         ) : isSearching ? (
           /* Search mode: flat list, each item tagged with provider name */
@@ -262,22 +287,24 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
               {t('topbar.modelSwitcher.noResults')}
             </div>
           ) : (
-            <div className="max-h-[320px] space-y-0.5 overflow-auto pr-1">
-              {filteredFlatModels.map(({ provider, model }) => {
+            <div className="max-h-[320px] space-y-1 overflow-auto pr-1">
+              {filteredFlatModels.map(({ provider, model }, idx) => {
                 const selected =
                   provider.providerType === providerType && model.id === modelName
+                const isActive = idx === searchResultIdx
                 return (
                   <button
                     key={`${provider.providerKey}:${model.id}`}
                     type="button"
                     onClick={() => handleSelect(provider, model.id)}
-                    className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-muted"
-                  >
-                    <span className="flex min-w-0 items-baseline gap-1.5">
-                      <span className="truncate">{model.name}</span>
+                    className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm ${
+                      isActive ? 'bg-primary/10' : 'hover:bg-muted'
+                    }`}>
+                    <span className="flex min-w-0 items-baseline gap-2">
+                      <span className="truncate" title={model.name}>{model.name}</span>
                       {model.hasVision ? (
                         <Eye
-                          className="h-3.5 w-3.5 shrink-0 text-[var(--brand,#0d9488)]"
+                          className="h-3.5 w-3.5 shrink-0 text-primary"
                           aria-label={t('topbar.modelSwitcher.visionCapable')}
                         />
                       ) : null}
@@ -306,7 +333,7 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
               return (
                 <div
                   key={provider.providerKey}
-                  className="overflow-hidden rounded-lg border border-border/60 bg-background/60"
+                  className="overflow-hidden rounded-lg"
                 >
                   <button
                     type="button"
@@ -320,14 +347,14 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                       ) : (
                         <ChevronDown className="h-3.5 w-3.5 shrink-0 text-tertiary" />
                       )}
-                      <span className="truncate text-[13px] font-semibold text-secondary">
+                      <span className="truncate text-sm font-semibold text-secondary" title={provider.displayName}>
                         {provider.displayName}
                       </span>
                       {isCurrentProvider ? (
-                        <span className="text-[10px] text-[var(--brand,#0d9488)]">●</span>
+                        <Circle className="h-2 w-2 fill-current text-primary" aria-label="Current provider" />
                       ) : null}
                     </span>
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-tertiary">
+                    <span className="shrink-0 rounded-full bg-muted px-1.5 py-1 text-xs text-tertiary">
                       {visibleModels.length}
                       {visionOnly && visibleModels.length !== provider.models.length ? (
                         <span className="ml-0.5 text-tertiary/60">/{provider.models.length}</span>
@@ -335,7 +362,7 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                     </span>
                   </button>
                   {!isCollapsed ? (
-                    <div className="space-y-0.5 border-t border-border/40 px-2 py-1.5">
+                    <div className="space-y-1 border-t border-border/40 px-2 py-2">
                       {visibleModels.map((model) => {
                         const selected = isCurrentProvider && model.id === modelName
                         return (
@@ -343,13 +370,13 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                             key={`${provider.providerKey}:${model.id}`}
                             type="button"
                             onClick={() => handleSelect(provider, model.id)}
-                            className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm transition-colors ${selected ? 'bg-muted/60' : 'hover:bg-muted'}`}
+                            className={`flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm transition-colors ${selected ? 'bg-muted/60' : 'hover:bg-muted'}`}
                           >
-                            <span className="flex min-w-0 items-center gap-1.5">
-                              <span className="truncate">{model.name}</span>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span className="truncate" title={model.name}>{model.name}</span>
                               {model.hasVision ? (
                                 <Eye
-                                  className="h-3.5 w-3.5 shrink-0 text-[var(--brand,#0d9488)]"
+                                  className="h-3.5 w-3.5 shrink-0 text-primary"
                                   aria-label={t('topbar.modelSwitcher.visionCapable')}
                                 />
                               ) : null}
@@ -376,7 +403,7 @@ export function ModelQuickSwitch({ onManageProviders }: ModelQuickSwitchProps = 
                 setOpen(false)
                 onManageProviders()
               }}
-              className="mt-1.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-secondary transition-colors hover:bg-muted"
+              className="mt-2 flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-secondary transition-colors hover:bg-muted"
             >
               <Settings className="h-3.5 w-3.5 shrink-0 text-tertiary" />
               {t('topbar.modelSwitcher.manageProviders')}

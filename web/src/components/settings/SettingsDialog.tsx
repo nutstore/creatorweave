@@ -1154,6 +1154,7 @@ function WorkspaceEditorPanel() {
           <div className="grid grid-cols-3 gap-2">
             {(['small', 'medium', 'large'] as const).map((size) => (
               <button
+                type="button"
                 key={size}
                 onClick={() => setFontSize(size)}
                 className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -1397,13 +1398,18 @@ const SettingsDialogContent = forwardRef<
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Sidebar tabs */}
         <div className="border-subtle shrink-0 border-b p-2 md:w-44 md:border-b-0 md:border-r md:p-2">
-          <nav className="flex gap-1 overflow-x-auto md:block md:space-y-1">
+          <nav role="tablist" aria-label="Settings tabs" aria-orientation="vertical" className="flex gap-1 overflow-x-auto md:block md:space-y-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                id={`settings-tab-${tab.id}`}
+                aria-selected={activeTab === tab.id}
+                aria-controls={`settings-tabpanel-${tab.id}`}
+                tabIndex={activeTab === tab.id ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full ${
+                className={`flex shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors md:w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                   activeTab === tab.id
                     ? 'dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700'
                     : 'text-secondary hover:bg-muted dark:text-tertiary dark:hover:bg-muted'
@@ -1417,7 +1423,13 @@ const SettingsDialogContent = forwardRef<
         </div>
 
         {/* Tab content */}
-        <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
+        <div
+          role="tabpanel"
+          id={`settings-tabpanel-${activeTab}`}
+          aria-labelledby={`settings-tab-${activeTab}`}
+          tabIndex={0}
+          className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-4"
+        >
           {/* Workspace Layout Tab (merged from WorkspaceSettingsDialog) */}
           {activeTab === 'workspace-layout' && <WorkspaceLayoutPanel />}
 
