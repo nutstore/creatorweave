@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
-import { Plus, Search, RefreshCw, FolderOpen, User, Building, X, Inbox, Upload, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, FolderOpen, User, Building, X, Inbox, Upload, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   BrandDialog,
   BrandDialogContent,
@@ -16,7 +16,6 @@ import {
   BrandDialogFooter,
   BrandDialogClose,
   BrandButton,
-  BrandInput,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -28,6 +27,7 @@ import { CreateSkillDialog } from './CreateSkillDialog'
 import { ProjectSkillDropZone } from './ProjectSkillDropZone'
 import { UserSkillDropZone } from './UserSkillDropZone'
 import { SkillDiscover } from './SkillDiscover'
+import { SkillSearchInput, SkillSegmentFilter, SkillRefreshButton } from './SkillToolbar'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { cn } from '@/lib/utils'
@@ -35,6 +35,7 @@ import { useT } from '@/i18n'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useProjectStore } from '@/store/project.store'
 import { exportSkillAsZip } from '@/skills/skill-export'
+import type { SkillFilterOption } from './SkillToolbar'
 
 interface SkillsManagerProps {
   open: boolean
@@ -48,10 +49,14 @@ type EditorMode = 'view' | 'edit' | undefined
 type ViewMode = 'manage' | 'discover'
 
 export function SkillsManager({ open, onClose, directoryHandle = null, roots = [] }: SkillsManagerProps) {
-  const skillsStore = useSkillsStore()
-  // Subscribe to loadSkills directly — Zustand action references are stable
-  // (they don't change on state updates), so this won't cause infinite loops.
+  // Select narrow slices from the store to avoid re-rendering the whole
+  // component on any unrelated store change. Zustand selectors are referentially
+  // stable when their slice is unchanged.
+  const skills = useSkillsStore((s) => s.skills)
   const loadSkills = useSkillsStore((s) => s.loadSkills)
+  const bumpSkillsScanVersion = useSkillsStore((s) => s.bumpSkillsScanVersion)
+  const toggleSkill = useSkillsStore((s) => s.toggleSkill)
+  const deleteSkill = useSkillsStore((s) => s.deleteSkill)
   const activeProjectId = useProjectStore((s) => s.activeProjectId || null)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -92,7 +97,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   }, [open, loadSkills])
 
   const { projectSkills, userSkills, builtinSkills, totalFiltered } = useMemo(() => {
-    let filtered = skillsStore.skills
+    let filtered = skills
     if (debouncedQuery) {
       const query = debouncedQuery.toLowerCase()
       filtered = filtered.filter(
@@ -107,7 +112,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       builtinSkills: filtered.filter((s) => s.source === 'builtin'),
       totalFiltered: filtered.length,
     }
-  }, [skillsStore.skills, debouncedQuery, filterType])
+  }, [skills, debouncedQuery, filterType])
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true)
@@ -116,14 +121,14 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
         const manager = getSkillManager()
         await manager.scanProject(directoryHandle, activeProjectId)
       }
-      await skillsStore.loadSkills()
+      await loadSkills()
     } finally { setRefreshing(false) }
-  }, [directoryHandle, skillsStore, activeProjectId])
+  }, [directoryHandle, loadSkills, activeProjectId])
 
-  const handleToggle = useCallback(async (id: string, enabled: boolean) => { await skillsStore.toggleSkill(id, enabled) }, [skillsStore])
+  const handleToggle = useCallback(async (id: string, enabled: boolean) => { await toggleSkill(id, enabled) }, [loadSkills, bumpSkillsScanVersion])
   const handleDeleteConfirm = useCallback(async () => {
-    if (deleteTarget) { await skillsStore.deleteSkill(deleteTarget.id); setDeleteTarget(null) }
-  }, [skillsStore, deleteTarget])
+    if (deleteTarget) { await deleteSkill(deleteTarget.id); setDeleteTarget(null) }
+  }, [deleteSkill, deleteTarget])
   // Determine which editor to use based on skill source.
   // user/builtin → SkillFileEditor (VSCode-style file tree + Monaco)
   // project/import → SkillEditor (form-based, since files are on native FS not OPFS)
@@ -145,19 +150,19 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   // create and edit experience through the same SkillFileEditor.
   const handleCreated = useCallback((skillId: string) => {
     setCreateDialogOpen(false)
-    const created = skillsStore.skills.find((s) => s.id === skillId)
+    const created = skills.find((s) => s.id === skillId)
     if (created) {
       setEditingSkill(created)
       setEditorMode('edit')
       setFileEditorOpen(true)
     }
-  }, [skillsStore.skills])
+  }, [skills])
   const handleUploadDone = useCallback(() => {
-    setUploadOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
-  }, [skillsStore])
+    setUploadOpen(false); bumpSkillsScanVersion(); void loadSkills()
+  }, [loadSkills, bumpSkillsScanVersion])
   const handleUserImportDone = useCallback(() => {
-    setUserImportOpen(false); skillsStore.bumpSkillsScanVersion(); void skillsStore.loadSkills()
-  }, [skillsStore])
+    setUserImportOpen(false); bumpSkillsScanVersion(); void loadSkills()
+  }, [loadSkills, bumpSkillsScanVersion])
   const handleEditorClose = useCallback(() => { setFileEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
   const handleFormEditorClose = useCallback(() => { setFormEditorOpen(false); setEditingSkill(undefined); setEditorMode(undefined) }, [])
   const handleExport = useCallback(async (skill: SkillMetadata) => {
@@ -173,7 +178,15 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
 
-  const totalCount = skillsStore.skills.length
+  const totalCount = skills.length
+  const enabledCount = skills.filter((s) => s.enabled).length
+  const disabledCount = totalCount - enabledCount
+
+  const filterOptions: SkillFilterOption[] = [
+    { value: 'all', label: t('skills.filterAll'), count: totalCount },
+    { value: 'enabled', label: t('skills.filterEnabled'), count: enabledCount },
+    { value: 'disabled', label: t('skills.filterDisabled'), count: disabledCount },
+  ]
 
   const sections: Array<{
     key: string
@@ -193,7 +206,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       skills: projectSkills,
       isReadOnly: true,
       onDelete: (id) => {
-        const skill = skillsStore.skills.find((s) => s.id === id)
+        const skill = skills.find((s) => s.id === id)
         if (skill) setDeleteTarget({ id, name: skill.name })
       },
       onExport: handleExport,
@@ -207,7 +220,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       label: t('skills.mySkills'),
       skills: userSkills,
       onDelete: (id) => {
-        const skill = skillsStore.skills.find((s) => s.id === id)
+        const skill = skills.find((s) => s.id === id)
         if (skill) setDeleteTarget({ id, name: skill.name })
       },
       onExport: handleExport,
@@ -234,7 +247,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
                 {t('skills.title')}
               </BrandDialogTitle>
             </div>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <BrandDialogClose className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
@@ -252,83 +265,71 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
           </Tabs>
 
           {/* Body content based on viewMode */}
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="flex min-h-0 flex-1 flex-col">
-            {viewMode === 'manage' ? (
-              <>
-                {/* Search & Filter */}
-                <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-6 py-3 dark:border-neutral-700">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-                    <BrandInput
-                      placeholder={t('skills.searchPlaceholder')}
-                      value={searchQuery}
-                      onChange={(e) => handleSearchChange(e.target.value)}
-                      className="!h-9 !py-2 pl-9"
-                    />
-                  </div>
-                  <Tabs value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
-                    <TabsList variant="segment" className="h-9">
-                      <TabsTrigger variant="segment" value="all" className="text-sm">
-                        {t('skills.filterAll')} ({totalCount})
-                      </TabsTrigger>
-                      <TabsTrigger variant="segment" value="enabled" className="text-sm">
-                        {t('skills.filterEnabled')}
-                      </TabsTrigger>
-                      <TabsTrigger variant="segment" value="disabled" className="text-sm">
-                        {t('skills.filterDisabled')}
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  <BrandButton iconButton onClick={handleRefresh} disabled={refreshing} title={t('common.refresh')}>
-                    <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-                  </BrandButton>
-                </div>
-
-          {/* Skills List */}
-          <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-5">
-            {totalFiltered === 0 && (debouncedQuery || filterType !== 'all') ? (
-              <div className="flex flex-col items-center justify-center gap-2 py-16 text-neutral-500 text-neutral-500 dark:text-neutral-500">
-                <Inbox className="h-8 w-8 opacity-40" />
-                <p className="text-sm">{t('skills.noResults') || 'No skills match your search'}</p>
-                {debouncedQuery && (
-                  <p className="text-xs text-neutral-600 text-neutral-600 dark:text-neutral-600">&quot;{debouncedQuery}&quot;</p>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {sections.map((section) => (
-                  <SkillSection
-                    key={section.key}
-                    icon={section.icon}
-                    label={section.label}
-                    skills={section.skills}
-                    isCollapsed={collapsed[section.key] ?? false}
-                    onToggleCollapse={() => toggleCollapse(section.key)}
-                    isReadOnly={section.isReadOnly}
-                    onToggle={handleToggle}
-                    onView={handleView}
-                    onEdit={handleEdit}
-                    onDelete={section.onDelete}
-                    onExport={section.onExport}
-                    action={section.action}
-                    secondaryAction={section.secondaryAction}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-              </>
-            ) : (
-              <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-4">
-                <SkillDiscover
-                  onInstalled={() => {
-                    void loadSkills()
-                  }}
+          {viewMode === 'manage' ? (
+            <>
+              {/* Toolbar — search + filter + refresh */}
+              <div className="flex items-center gap-2 px-6 py-3">
+                <SkillSearchInput
+                  value={searchQuery}
+                  onChange={handleSearchChange}
+                  placeholder={t('skills.searchPlaceholder')}
+                />
+                <SkillSegmentFilter
+                  value={filterType}
+                  onChange={(v) => setFilterType(v as FilterType)}
+                  options={filterOptions}
+                />
+                <SkillRefreshButton
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  label={t('common.refresh')}
                 />
               </div>
-            )}
-          </Tabs>
+
+              {/* Skills List */}
+              <div className="custom-scrollbar flex-1 overflow-y-auto px-6 pb-5">
+                {totalFiltered === 0 && (debouncedQuery || filterType !== 'all') ? (
+                  <div className="flex flex-col items-center justify-center gap-2 py-16 text-xs text-neutral-500 dark:text-neutral-500">
+                    <Inbox className="h-8 w-8 opacity-40" />
+                    <p>{t('skills.noResults')}</p>
+                    {debouncedQuery && (
+                      <p className="text-xs text-neutral-600 dark:text-neutral-400">&quot;{debouncedQuery}&quot;</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {sections.map((section) => (
+                      <SkillSection
+                        key={section.key}
+                        icon={section.icon}
+                        label={section.label}
+                        skills={section.skills}
+                        isCollapsed={collapsed[section.key] ?? false}
+                        onToggleCollapse={() => toggleCollapse(section.key)}
+                        isReadOnly={section.isReadOnly}
+                        onToggle={handleToggle}
+                        onView={handleView}
+                        onEdit={handleEdit}
+                        onDelete={section.onDelete}
+                        onExport={section.onExport}
+                        action={section.action}
+                        secondaryAction={section.secondaryAction}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-4">
+              <SkillDiscover
+                onInstalled={() => {
+                  void loadSkills()
+                }}
+              />
+            </div>
+          )}
 
         </BrandDialogContent>
       </BrandDialog>
@@ -375,34 +376,22 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       </BrandDialog>
 
       {/* Upload Dialog */}
-      <BrandDialog open={uploadOpen} onOpenChange={(isOpen) => { if (!isOpen) setUploadOpen(false) }}>
-        <BrandDialogContent className="max-w-lg p-0">
-          <BrandDialogHeader>
-            <BrandDialogTitle className="text-lg font-semibold">
-              {t('skills.importSkill') || 'Import Project Skill'}
-            </BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
-              <X className="h-5 w-5" />
-            </BrandDialogClose>
-          </BrandDialogHeader>
-          <ProjectSkillDropZone roots={roots} onUploaded={handleUploadDone} onClose={handleUploadDone} />
-        </BrandDialogContent>
-      </BrandDialog>
+      <ImportDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        title={t('skills.importSkill')}
+      >
+        <ProjectSkillDropZone roots={roots} onUploaded={handleUploadDone} onClose={handleUploadDone} />
+      </ImportDialog>
 
       {/* User Skill Import Dialog — imports a folder into OPFS .skills/user/ */}
-      <BrandDialog open={userImportOpen} onOpenChange={(isOpen) => { if (!isOpen) setUserImportOpen(false) }}>
-        <BrandDialogContent className="max-w-lg p-0">
-          <BrandDialogHeader>
-            <BrandDialogTitle className="text-lg font-semibold">
-              {(t('skillUpload.importUserSkill') || 'Import My Skill')}
-            </BrandDialogTitle>
-            <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
-              <X className="h-5 w-5" />
-            </BrandDialogClose>
-          </BrandDialogHeader>
-          <UserSkillDropZone onImported={handleUserImportDone} onClose={handleUserImportDone} />
-        </BrandDialogContent>
-      </BrandDialog>
+      <ImportDialog
+        open={userImportOpen}
+        onOpenChange={setUserImportOpen}
+        title={t('skillUpload.importUserSkill')}
+      >
+        <UserSkillDropZone onImported={handleUserImportDone} onClose={handleUserImportDone} />
+      </ImportDialog>
     </>
   )
 }
@@ -416,6 +405,30 @@ interface SkillSectionAction {
   icon: React.ReactNode
   onClick: () => void
   primary?: boolean
+}
+
+/** Common wrapper for skill import dialogs (project + user). */
+interface ImportDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  children: React.ReactNode
+}
+
+function ImportDialog({ open, onOpenChange, title, children }: ImportDialogProps) {
+  return (
+    <BrandDialog open={open} onOpenChange={onOpenChange}>
+      <BrandDialogContent className="max-w-lg p-0">
+        <BrandDialogHeader>
+          <BrandDialogTitle className="text-lg font-semibold">{title}</BrandDialogTitle>
+          <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 dark:text-neutral-500 dark:hover:text-neutral-300">
+            <X className="h-5 w-5" />
+          </BrandDialogClose>
+        </BrandDialogHeader>
+        {children}
+      </BrandDialogContent>
+    </BrandDialog>
+  )
 }
 
 interface SkillSectionProps {
@@ -440,30 +453,32 @@ function SkillSection({
   isReadOnly, onToggle, onView, onEdit, onDelete, onExport, action, secondaryAction, t,
 }: SkillSectionProps) {
   return (
-    <div>
-      {/* Section header — a proper row, no accordion hacks */}
-      <div className="flex items-center gap-2.5">
+    <section>
+      {/* Section header: collapse toggle, title + count, action buttons */}
+      <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex items-center gap-2 text-sm font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-foreground transition-colors"
+          aria-expanded={!isCollapsed}
+          className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
-          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
           {icon}
           {label}
-          <span className="text-xs tabular-nums text-neutral-500 text-neutral-500 dark:text-neutral-500">({skills.length})</span>
+          <span className="text-xs font-normal text-neutral-500 dark:text-neutral-500">
+            {skills.length}
+          </span>
         </button>
 
-        {/* Action buttons */}
         {action && (
           <button
             type="button"
             onClick={action.onClick}
             className={cn(
-              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+              'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
               action.primary
-                ? 'text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
-                : 'ml-auto hover:text-neutral-700 hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800'
+                ? 'ml-auto text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30'
+                : 'ml-auto text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800',
             )}
           >
             {action.icon}
@@ -474,10 +489,7 @@ function SkillSection({
           <button
             type="button"
             onClick={secondaryAction.onClick}
-            className={cn(
-              'flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium hover:text-neutral-700 hover:bg-neutral-100 transition-colors text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:text-neutral-300 dark:hover:bg-neutral-800',
-              !action && 'ml-auto'
-            )}
+            className="ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800"
           >
             {secondaryAction.icon}
             {secondaryAction.label}
@@ -487,11 +499,11 @@ function SkillSection({
 
       {/* Card list */}
       {!isCollapsed && (
-        <div className="mt-2.5 space-y-2 pl-6">
+        <div className="mt-1.5 space-y-1.5">
           {skills.length === 0 ? (
-            <div className="flex items-center gap-2 py-3 text-neutral-500 text-neutral-500 dark:text-neutral-500">
-              <Inbox className="h-4 w-4 opacity-40" />
-              <p className="text-xs">{t('skills.empty')}</p>
+            <div className="flex items-center gap-2 py-3 text-[10px] text-neutral-500 dark:text-neutral-500">
+              <Inbox className="h-3.5 w-3.5 opacity-40" />
+              <p>{t('skills.empty')}</p>
             </div>
           ) : (
             skills.map((skill) => (
@@ -509,6 +521,6 @@ function SkillSection({
           )}
         </div>
       )}
-    </div>
+    </section>
   )
 }

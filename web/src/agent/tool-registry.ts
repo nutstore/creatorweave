@@ -49,6 +49,12 @@ import {
   skillPromptDoc,
 } from '@/skills/skill-tools'
 
+// Skill search tool (Skill Store discovery)
+import { searchSkillsDefinition, searchSkillsExecutor, searchSkillsPromptDoc } from './tools/skill-search.tool'
+
+// Skill install tool (installs from Skill Store after user consent)
+import { installSkillDefinition, installSkillExecutor, installSkillPromptDoc } from './tools/install-skill.tool'
+
 // Sync-to-OPFS tool
 import { syncToOPFSDefinition, syncToOPFSExecutor, syncPromptDoc } from './tools/sync-opfs.tool'
 
@@ -241,6 +247,8 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   delegateToPromptDoc,
   webBridgePromptDoc,
   skillPromptDoc,
+  searchSkillsPromptDoc,
+  installSkillPromptDoc,
   unifiedExternalToolsPromptDoc,
   imageGenPromptDoc,
   schedulePromptDoc,
@@ -604,6 +612,8 @@ export class ToolRegistry {
   registerSkillTools(): void {
     this.register(readSkillDefinition, readSkillExecutor)
     this.register(readSkillResourceDefinition, readSkillResourceExecutor)
+    this.register(searchSkillsDefinition, searchSkillsExecutor)
+    this.register(installSkillDefinition, installSkillExecutor)
   }
 
   /**

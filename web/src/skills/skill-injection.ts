@@ -49,6 +49,14 @@ How to use skills:
 - Only use skills listed in <available_skills> below
 - Do not invoke a skill that is already loaded in your context
 - Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry
+
+Discovering NEW skills:
+- If no skill above matches the user's task, call search_skills(query) to search the Skill Store
+- The Skill Store contains installable skills NOT listed here (code review, design audit, writing, reading analysis, etc.)
+- When search_skills finds a matching skill, use ask_user_question to ask the user if they want to install it
+- ONLY after the user confirms, call install_skill(dirName) to install it
+- After installation, call read_skill immediately to load the skill — it is available right away
+- Proactively call search_skills when the user's task clearly matches a domain (code review, design, writing, reading, etc.) but no matching skill is installed
 </usage>
 
 <available_skills>

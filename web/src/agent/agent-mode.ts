@@ -56,6 +56,7 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   // Skill tools (read-only)
   ['read_skill', { name: 'read_skill', category: 'read' }],
   ['read_skill_resource', { name: 'read_skill_resource', category: 'read' }],
+  ['search_skills', { name: 'search_skills', category: 'read' }],
   // Meta tools (read-only — no file modifications)
   ['ask_user_question', { name: 'ask_user_question', category: 'read' }],
   ['delegate_to', { name: 'delegate_to', category: 'read' }],

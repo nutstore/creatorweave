@@ -123,7 +123,7 @@ export async function scanInstalledDirNames(): Promise<Set<string>> {
     return new Set(
       state.skills
         .filter((s) => s.source === 'user')
-        .map((s) => s.dirName ?? s.id),
+        .map((s) => s.id),
     )
   }
 }
@@ -134,7 +134,7 @@ export function getInstalledDirNames(): Set<string> {
   return new Set(
     state.skills
       .filter((s) => s.source === 'user')
-      .map((s) => s.dirName ?? s.id),
+      .map((s) => s.id),
   )
 }
 
@@ -191,7 +191,7 @@ export async function installSkillFromUrl(
   // Find manifest entry (best effort — caller may not have it)
   const manifest: SkillStoreEntry = {
     id: preview.skill?.dirName ?? filename.replace(/\.zip$/, ''),
-    name: preview.skill?.skillName ?? filename.replace(/\.zip$/, ''),
+    name: preview.skill?.dirName ?? filename.replace(/\.zip$/, ''),
     dirName: preview.skill?.dirName ?? filename.replace(/\.zip$/, ''),
     description: '',
     category: '',

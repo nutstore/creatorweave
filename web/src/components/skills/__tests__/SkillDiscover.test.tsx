@@ -8,6 +8,26 @@ vi.mock('@/i18n', () => ({
   useT: () => (key: string) => key,
 }))
 
+// SkillToolbar: stub the shared toolbar primitives so the test stays focused
+// on SkillDiscover behaviour rather than toolbar internals.
+vi.mock('../SkillToolbar', () => ({
+  SkillSearchInput: ({ placeholder, ariaLabel }: { placeholder: string; ariaLabel?: string }) => (
+    <input type="search" placeholder={placeholder} aria-label={ariaLabel} />
+  ),
+  SkillSegmentFilter: ({ options }: { options: Array<{ value: string; label: string }> }) => (
+    <div>
+      {options.map((o) => (
+        <span key={o.value}>{o.label}</span>
+      ))}
+    </div>
+  ),
+  SkillRefreshButton: ({ label, ariaLabel }: { label: string; ariaLabel?: string }) => (
+    <button type="button" title={label} aria-label={ariaLabel ?? label}>
+      refresh
+    </button>
+  ),
+}))
+
 // BrandButton: minimal stub matching the props SkillDiscover uses.
 vi.mock('@creatorweave/ui', () => ({
   BrandButton: ({
@@ -22,21 +42,6 @@ vi.mock('@creatorweave/ui', () => ({
     'aria-label'?: string
   }) => (
     <button type="button" disabled={disabled} onClick={onClick} aria-label={ariaLabel}>
-      {children}
-    </button>
-  ),
-  Tabs: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsList: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TabsTrigger: ({
-    children,
-    value,
-    onClick,
-  }: {
-    children: React.ReactNode
-    value: string
-    onClick?: () => void
-  }) => (
-    <button type="button" data-value={value} onClick={onClick}>
       {children}
     </button>
   ),
@@ -57,7 +62,12 @@ vi.mock('@/skills/skill-store', () => ({
 
 describe('SkillDiscover', () => {
   beforeEach(() => {
-    vi.mocked(fetchSkillStoreManifest).mockResolvedValue({ skills: [] })
+    vi.mocked(fetchSkillStoreManifest).mockResolvedValue({
+      version: '1',
+      generated: '2026-08-04T00:00:00.000Z',
+      count: 0,
+      skills: [],
+    })
   })
 
   it('renders search input and install-state filter after manifest loads', async () => {
@@ -75,12 +85,17 @@ describe('SkillDiscover', () => {
 
   it('renders an installable skill card', async () => {
     vi.mocked(fetchSkillStoreManifest).mockResolvedValue({
+      version: '1',
+      generated: '2026-08-04T00:00:00.000Z',
+      count: 1,
       skills: [{
+        id: 'demo-skill',
         dirName: 'demo-skill',
         name: 'Demo skill',
         description: 'A skill used to verify the discovery card.',
         category: 'general',
         tags: [],
+        version: '1.0.0',
         zipUrl: 'https://example.test/demo-skill.zip',
       }],
     })

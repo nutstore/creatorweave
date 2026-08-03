@@ -7,8 +7,8 @@
 // ============================================================
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Loader2, Download, Check, AlertCircle, RefreshCw, Search } from 'lucide-react'
-import { BrandButton, Tabs, TabsList, TabsTrigger } from '@creatorweave/ui'
+import { Loader2, Download, Check, AlertCircle, Trash2 } from 'lucide-react'
+import { BrandButton } from '@creatorweave/ui'
 import { useT } from '@/i18n'
 import { useSkillsStore } from '@/store/skills.store'
 import {
@@ -20,6 +20,8 @@ import {
   type SkillStoreEntry,
   type InstallProgress,
 } from '@/skills/skill-store'
+import { SkillSearchInput, SkillSegmentFilter, SkillRefreshButton } from './SkillToolbar'
+import type { SkillFilterOption } from './SkillToolbar'
 
 const CATEGORY_COLORS: Record<string, string> = {
   general: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
@@ -50,7 +52,7 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
   const bumpScanVersion = useSkillsStore((s) => s.bumpSkillsScanVersion)
 
   const [manifest, setManifest] = useState<SkillStoreEntry[] | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [installing, setInstalling] = useState<string | null>(null)
   const [progress, setProgress] = useState<InstallProgress | null>(null)
@@ -65,7 +67,9 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
   }, [])
 
   const loadManifest = async (force = false) => {
-    setLoading(true)
+    // Only show loading spinner on explicit refresh (force=true).
+    // First load stays completely silent — no empty→loading→populated flash.
+    if (force) setLoading(true)
     setError(null)
     if (force) invalidateSkillStoreCache()
     try {
@@ -81,59 +85,64 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
   }
 
   useEffect(() => {
-    void loadManifest()
+    void loadManifest(false)
   }, [])
 
   const handleInstall = async (entry: SkillStoreEntry) => {
-    if (installing) return
-    setInstalling(entry.dirName)
-    setProgress({ phase: 'fetching', message: t('skills.discover.progressPreparing') })
-    try {
-      await installSkillFromUrl(entry.zipUrl, setProgress)
-      // Re-annotate from OPFS (the source of truth).
-      const installed = await scanInstalledDirNames()
-      setManifest((prev) =>
-        prev ? prev.map((e) => (e.dirName === entry.dirName ? { ...e, installed: installed.has(e.dirName) } : e)) : null,
-      )
-      bumpScanVersion()
-      onInstalled?.()
-    } catch (err) {
-      setProgress({
-        phase: 'error',
-        message: (err as Error).message || t('skills.discover.progressInstallFailed'),
-      })
-    } finally {
-      setInstalling(null)
-      // 进度条 2 秒后自动消失
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); dismissTimerRef.current = setTimeout(() => setProgress(null), 2000)
-    }
+    await runOperation(entry, 'install')
   }
 
   const handleUninstall = async (entry: SkillStoreEntry) => {
+    await runOperation(entry, 'uninstall')
+  }
+
+  /**
+   * Shared driver for install / uninstall. Both ops follow the same shape:
+   *   1. Show progress (operation-specific message)
+   *   2. Run the op (network or store)
+   *   3. Re-annotate from OPFS and patch manifest
+   *   4. Show success / error toast
+   */
+  async function runOperation(
+    entry: SkillStoreEntry,
+    op: 'install' | 'uninstall',
+  ): Promise<void> {
     if (installing) return
     setInstalling(entry.dirName)
-    setProgress({ phase: 'fetching', message: t('skills.discover.progressUninstalling') })
+    const phasePreparing = op === 'install' ? 'progressPreparing' : 'progressUninstalling'
+    const phaseDone = op === 'install' ? 'progressInstallDone' : 'progressUninstallDone'
+    const phaseFailed = op === 'install' ? 'progressInstallFailed' : 'progressUninstallFailed'
+    setProgress({ phase: 'fetching', message: t(`skills.discover.${phasePreparing}`) })
     try {
-      // Store keys user skills by `user:<dirName>`. deleteSkill handles the
-      // OPFS removal and bumps the scan version automatically.
-      const skillsStore = useSkillsStore.getState()
-      await skillsStore.deleteSkill(`user:${entry.dirName}`)
+      if (op === 'install') {
+        await installSkillFromUrl(entry.zipUrl, setProgress)
+      } else {
+        // Store keys user skills by `user:<dirName>`. deleteSkill handles the
+        // OPFS removal and bumps the scan version automatically.
+        const skillsStore = useSkillsStore.getState()
+        await skillsStore.deleteSkill(`user:${entry.dirName}`)
+      }
       // Re-annotate from OPFS (the source of truth).
       const installed = await scanInstalledDirNames()
       setManifest((prev) =>
-        prev ? prev.map((e) => (e.dirName === entry.dirName ? { ...e, installed: installed.has(e.dirName) } : e)) : null,
+        prev
+          ? prev.map((e) =>
+              e.dirName === entry.dirName ? { ...e, installed: installed.has(e.dirName) } : e,
+            )
+          : null,
       )
       bumpScanVersion()
       onInstalled?.()
-      setProgress({ phase: 'done', message: t('skills.discover.progressUninstallDone') })
+      setProgress({ phase: 'done', message: t(`skills.discover.${phaseDone}`) })
     } catch (err) {
       setProgress({
         phase: 'error',
-        message: (err as Error).message || t('skills.discover.progressUninstallFailed'),
+        message: (err as Error).message || t(`skills.discover.${phaseFailed}`),
       })
     } finally {
       setInstalling(null)
-      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current); dismissTimerRef.current = setTimeout(() => setProgress(null), 2000)
+      if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = setTimeout(() => setProgress(null), 2000)
     }
   }
 
@@ -187,50 +196,36 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
       }
     : { all: 0, uninstalled: 0, installed: 0 }
 
+  const filterOptions: SkillFilterOption[] = [
+    { value: 'all', label: t('skills.discover.filterAll'), count: counts.all },
+    { value: 'uninstalled', label: t('skills.discover.filterUninstalled'), count: counts.uninstalled },
+    { value: 'installed', label: t('skills.discover.filterInstalled'), count: counts.installed },
+  ]
+
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: REDUCED_MOTION_CSS }} />
       <div className="space-y-4">
-      {/* Toolbar */}
+      {/* Toolbar — search + filter + refresh in one row */}
       <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t('skills.discover.searchPlaceholder')}
-            aria-label={t('skills.discover.searchAriaLabel')}
-            className="h-8 w-full rounded-md border border-neutral-200 bg-white pl-8 pr-3 text-xs text-neutral-900 placeholder:text-neutral-400 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-100"
-          />
-        </div>
-        <BrandButton
-          variant="ghost"
-          size="sm"
-          iconButton
+        <SkillSearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder={t('skills.discover.searchPlaceholder')}
+          ariaLabel={t('skills.discover.searchAriaLabel')}
+        />
+        <SkillSegmentFilter
+          value={filter}
+          onChange={(v) => setFilter(v as typeof filter)}
+          options={filterOptions}
+        />
+        <SkillRefreshButton
           onClick={() => void loadManifest(true)}
           disabled={loading}
-          title={t('skills.discover.checkUpdatesTitle')}
-          aria-label={t('skills.discover.checkUpdatesAria')}
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-        </BrandButton>
+          label={t('skills.discover.checkUpdatesTitle')}
+          ariaLabel={t('skills.discover.checkUpdatesAria')}
+        />
       </div>
-
-      {/* Install-state filter */}
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-        <TabsList variant="segment" className="h-8">
-          <TabsTrigger variant="segment" value="all" className="text-[11px]">
-            {t('skills.discover.filterAll')} <span className="ml-1 opacity-60">{counts.all}</span>
-          </TabsTrigger>
-          <TabsTrigger variant="segment" value="uninstalled" className="text-[11px]">
-            {t('skills.discover.filterUninstalled')} <span className="ml-1 opacity-60">{counts.uninstalled}</span>
-          </TabsTrigger>
-          <TabsTrigger variant="segment" value="installed" className="text-[11px]">
-            {t('skills.discover.filterInstalled')} <span className="ml-1 opacity-60">{counts.installed}</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       {/* Error */}
       {error && (
@@ -269,15 +264,6 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
         </StatusBanner>
       )}
 
-      {/* Loading skeleton */}
-      {loading && !manifest && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="h-32 animate-pulse rounded-md bg-neutral-50 dark:bg-neutral-800/40" />
-          ))}
-        </div>
-      )}
-
       {/* Skill list grouped by category */}
       {groupedSkills && Object.keys(groupedSkills).length > 0 && (
         <>
@@ -285,9 +271,12 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
             .sort(([a], [b]) => a.localeCompare(b))
             .map(([category, entries]) => (
               <div key={category} className="space-y-1.5">
-                <div className="text-[10px] uppercase tracking-wide text-neutral-400 dark:text-neutral-500">
-                  {category} · {entries.length}
-                </div>
+                <h3 className="flex items-center gap-2 text-[13px] font-semibold text-neutral-900 dark:text-neutral-100">
+                  {category}
+                  <span className="text-xs font-normal text-neutral-500 dark:text-neutral-500">
+                    {entries.length}
+                  </span>
+                </h3>
                 <ul className="divide-y divide-neutral-100 rounded-md border border-neutral-200 bg-white dark:divide-neutral-800 dark:border-neutral-700 dark:bg-neutral-900/40">
                   {entries.map((entry) => (
                     <li key={entry.dirName}>
@@ -317,7 +306,6 @@ export function SkillDiscover({ onInstalled }: SkillDiscoverProps) {
         <div className="flex justify-center">
           <BrandButton
             variant="ghost"
-            size="sm"
             onClick={() => setDisplayCount((n) => n + 10)}
           >
             {t('skills.discover.loadMore', { remaining })}
@@ -401,7 +389,7 @@ function DiscoverCard({ entry, installing, onInstall, onUninstall }: DiscoverCar
     <article
       role="group"
       aria-label={statusText}
-      className="group/skill flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-neutral-50/60 dark:hover:bg-neutral-800/30"
+      className="group/skill flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-neutral-50/60 dark:hover:bg-neutral-800/30"
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex items-center gap-2">
@@ -414,14 +402,14 @@ function DiscoverCard({ entry, installing, onInstall, onUninstall }: DiscoverCar
               {t('skills.discover.installedBadge')}
             </span>
           )}
-          <div className="flex shrink-0 items-center gap-1.5">
-            <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${catClass}`}>
-              {entry.category}
-            </span>
-            {entry.version && (
-              <span className="text-[10px] text-neutral-400 dark:text-neutral-500">v{entry.version}</span>
-            )}
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 text-[10px]">
+          <span className={`inline-block rounded px-1.5 py-0.5 font-medium ${catClass}`}>
+            {entry.category}
+          </span>
+          {entry.version && (
+            <span className="text-neutral-400 dark:text-neutral-500">v{entry.version}</span>
+          )}
         </div>
         {entry.description && (
           <div className="space-y-0.5">
@@ -448,8 +436,7 @@ function DiscoverCard({ entry, installing, onInstall, onUninstall }: DiscoverCar
         )}
       </div>
       <BrandButton
-        variant={entry.installed ? 'ghost' : 'outline'}
-        size="sm"
+        variant="outline"
         onClick={handleClick}
         disabled={installing}
         aria-label={buttonLabel}
@@ -459,7 +446,10 @@ function DiscoverCard({ entry, installing, onInstall, onUninstall }: DiscoverCar
         {installing ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
         ) : entry.installed ? (
-          t('skills.discover.uninstall')
+          <>
+            <Trash2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            {t('skills.discover.uninstall')}
+          </>
         ) : (
           <>
             <Download className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
