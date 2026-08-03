@@ -19,16 +19,16 @@ export function ContextUsageBar({
 
   const getUsageToneClass = (usagePercent: number): { text: string; label: string } => {
     if (usagePercent >= 95) {
-      return { text: 'text-red-600 dark:text-red-400', label: t('conversation.usage.highRisk') }
+      return { text: 'text-danger dark:text-danger', label: t('conversation.usage.highRisk') }
     }
     if (usagePercent >= 85) {
       return {
-        text: 'text-amber-600 dark:text-amber-400',
+        text: 'text-warning dark:text-warning',
         label: t('conversation.usage.nearLimit'),
       }
     }
     return {
-      text: 'text-emerald-600 dark:text-emerald-400',
+      text: 'text-neutral-600 dark:text-neutral-300',
       label: t('conversation.usage.comfortable'),
     }
   }
@@ -51,7 +51,7 @@ export function ContextUsageBar({
         <div
           className={cn(
             'h-full rounded-full transition-all duration-500',
-            displayPercent >= 95 ? 'bg-red-500' : displayPercent >= 85 ? 'bg-amber-500' : 'bg-emerald-500'
+            displayPercent >= 95 ? 'bg-danger' : displayPercent >= 85 ? 'bg-warning' : 'bg-primary-500'
           )}
           style={{ width: `${Math.min(displayPercent, 100)}%` }}
         />
@@ -62,7 +62,7 @@ export function ContextUsageBar({
       </span>
 
       <span
-        className="text-[11px] tabular-nums text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500"
+        className="text-[11px] tabular-nums text-neutral-500 dark:text-neutral-400"
         title={t('conversation.tokenBudget', { effectiveBudget: contextWindowUsage.maxTokens, modelMaxTokens, reserveTokens })}
       >
         {formatTokenCompact(contextWindowUsage.usedTokens)}

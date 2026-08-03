@@ -148,6 +148,10 @@ function sourceIcon(source: string): string {
   return source === 'tool' ? '🔧' : source === 'review' ? '📝' : '👤'
 }
 
+function getSnapshotDisplayTitle(summary: string | null, opCount: number): string {
+  return summary || `Saved ${opCount} file${opCount === 1 ? '' : 's'}`
+}
+
 // ── Streaming placeholder ──
 
 function StreamingPlaceholder() {
@@ -228,7 +232,7 @@ registerRenderer({
               {/* First line: summary */}
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-neutral-700 dark:text-foreground">
-                  {commit.summary || '(no message)'}
+                  {getSnapshotDisplayTitle(commit.summary, commit.opCount)}
                 </span>
                 <span className={statusColor(commit.status)}>{commit.status}</span>
               </div>
@@ -327,11 +331,9 @@ registerRenderer({
             <span className={statusColor(show.status)}>{show.status}</span>
             <span className="text-[10px]">{sourceIcon(show.source)}</span>
           </div>
-          {show.summary && (
-            <div className="text-xs text-neutral-700 dark:text-foreground whitespace-pre-wrap">
-              {show.summary.split('\n')[0]}
-            </div>
-          )}
+          <div className="text-xs text-neutral-700 dark:text-foreground whitespace-pre-wrap">
+            {getSnapshotDisplayTitle(show.summary, show.opCount).split('\n')[0]}
+          </div>
           <div className="flex items-center gap-2 text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             <span>{fmtDate(show.createdAt)}</span>
             {show.workspaceName && (

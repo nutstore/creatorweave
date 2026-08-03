@@ -87,7 +87,7 @@ export const sidebar = {
       committed: "Committed",
       draft: "Draft",
       rolledBack: "Rolled Back",
-      unnamedSnapshot: "Unnamed Save Record",
+      autoSnapshotTitle: "Saved {count} files",
       processing: "Processing {current}/{total}",
       loadingDetails: "Loading details...",
       noDetails: "No file details for this save record",
@@ -97,17 +97,11 @@ export const sidebar = {
 
     // Snapshot Approval Dialog
     snapshotApproval: {
-      title: "Create Save Record",
+      title: "Save Changes",
       description:
-        'Will confirm and save <span class="font-semibold">{count}</span> file changes to your local disk.',
-      summaryLabel: "Save Description",
-      generateAI: "AI Generate",
-      generating: "Generating...",
-      summaryPlaceholder:
-        "Enter a description for this save (multi-line, first line can be used as title)",
-      summaryError: "Summary generation failed",
+        'Will save <span class="font-semibold">{count}</span> file changes to your local disk.',
       cancel: "Cancel",
-      confirm: "Confirm & Save to Disk",
+      confirm: "Save to Disk",
       processing: "Saving...",
     },
     plugins: "Plugins",

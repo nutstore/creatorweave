@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Brain, ChevronDown, ChevronRight } from 'lucide-react'
 import { useT } from '@/i18n'
+import { MarkdownContent } from './MarkdownContent'
 
 interface ReasoningSectionProps {
   reasoning: string
@@ -67,8 +68,8 @@ export function ReasoningSection({ reasoning, streaming, startedAt, durationMs }
         {elapsedMs !== undefined && <span className="text-neutral-300 dark:text-neutral-600">· {formatElapsedTime(elapsedMs, t)}</span>}
       </button>
       {open && (
-        <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-          {reasoning}
+        <div className="max-h-48 overflow-y-auto rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+          <MarkdownContent content={reasoning} />
         </div>
       )}
     </>

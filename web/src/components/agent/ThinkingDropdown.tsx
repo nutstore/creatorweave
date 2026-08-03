@@ -52,10 +52,10 @@ export function ThinkingDropdown({
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+        className={`inline-flex min-h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
           enableThinking
-            ? 'border-primary-100 dark:bg-primary-100/30 dark:text-primary-700 bg-primary-50 text-primary-700 dark:border-primary-800'
-            : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 text-neutral-500 text-neutral-500 dark:text-neutral-500'
+            ? 'border-neutral-200 bg-neutral-50 text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+            : 'border-neutral-200 bg-neutral-50 text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400'
         }`}
       >
         <Brain className="h-3 w-3" />
@@ -73,7 +73,7 @@ export function ThinkingDropdown({
       {isOpen && (
         <div className="absolute bottom-full right-0 z-50 mb-1.5 w-52 overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900">
           <div className="flex items-center justify-between px-3 py-2">
-            <span className="text-xs font-medium text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">
+            <span className="text-xs font-medium text-secondary">
               {t('conversation.thinkingMode')}
             </span>
             <BrandSwitch
@@ -97,7 +97,7 @@ export function ThinkingDropdown({
                     className={`rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
                       thinkingLevel === value
                         ? 'bg-primary-600 text-white'
-                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                        : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
                     }`}
                   >
                     {label}

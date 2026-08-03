@@ -83,7 +83,7 @@ export const sidebar = {
       committed: "已提交",
       draft: "草稿",
       rolledBack: "已回滚",
-      unnamedSnapshot: "未命名保存记录",
+      autoSnapshotTitle: "保存 {count} 个文件",
       processing: "处理中 {current}/{total}",
       loadingDetails: "加载详情中...",
       noDetails: "该保存记录暂无文件详情",
@@ -93,16 +93,11 @@ export const sidebar = {
 
     // Snapshot Approval Dialog
     snapshotApproval: {
-      title: "创建保存记录",
+      title: "保存修改",
       description:
-        '将确认保存 <span class="font-semibold">{count}</span> 个文件修改，并创建一条保存记录。点击确认后，修改才会写入本地磁盘。',
-      summaryLabel: "保存说明",
-      generateAI: "AI 生成",
-      generating: "生成中...",
-      summaryPlaceholder: "输入本次保存的说明（可多行，首行可作为标题）",
-      summaryError: "摘要生成失败",
+        '即将将 <span class="font-semibold">{count}</span> 个文件修改写入本地磁盘。',
       cancel: "取消",
-      confirm: "确认保存到本地",
+      confirm: "保存到本地",
       processing: "保存中...",
     },
     plugins: "插件",

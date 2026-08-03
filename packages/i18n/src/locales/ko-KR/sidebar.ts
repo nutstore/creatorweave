@@ -78,7 +78,7 @@ export const sidebar = {
       committed: "커밋됨",
       draft: "초안",
       rolledBack: "롤백됨",
-      unnamedSnapshot: "이름 없는 저장 기록",
+      autoSnapshotTitle: "{count}개 파일 저장",
       processing: "처리 중 {current}/{total}",
       loadingDetails: "상세 정보 로드 중...",
       noDetails: "이 저장 기록의 파일 상세 정보가 없습니다",
@@ -88,17 +88,11 @@ export const sidebar = {
 
     // Snapshot Approval Dialog
     snapshotApproval: {
-      title: "저장 기록 만들기",
+      title: "변경 사항 저장",
       description:
-        '<span class="font-semibold">{count}</span>개의 파일 변경을 확인하고 로컬 디스크에 저장합니다.',
-      summaryLabel: "저장 설명",
-      generateAI: "AI 생성",
-      generating: "생성 중...",
-      summaryPlaceholder:
-        "저장 설명 입력 (여러 줄 가능, 첫 줄을 제목으로 사용)",
-      summaryError: "요약 생성 실패",
+        '<span class="font-semibold">{count}</span>개의 파일 변경을 로컬 디스크에 저장합니다.',
       cancel: "취소",
-      confirm: "확인 및 디스크에 저장",
+      confirm: "디스크에 저장",
       processing: "저장 중...",
     },
     plugins: "플러그인",

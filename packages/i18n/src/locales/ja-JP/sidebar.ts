@@ -78,7 +78,7 @@ export const sidebar = {
       committed: "コミット済み",
       draft: "下書き",
       rolledBack: "ロールバック済み",
-      unnamedSnapshot: "名前なし保存記録",
+      autoSnapshotTitle: "{count}件のファイルを保存",
       processing: "処理中 {current}/{total}",
       loadingDetails: "詳細を読み込み中...",
       noDetails: "この保存記録には詳細がありません",
@@ -88,17 +88,11 @@ export const sidebar = {
 
     // Snapshot Approval Dialog
     snapshotApproval: {
-      title: "保存記録を作成",
+      title: "変更を保存",
       description:
-        '<span class="font-semibold">{count}</span>件のファイル変更を確認し、ローカルディスクに保存します。',
-      summaryLabel: "保存説明",
-      generateAI: "AI 生成",
-      generating: "生成中...",
-      summaryPlaceholder:
-        "保存の説明を入力（複数行可、最初の一行をタイトルとして使用）",
-      summaryError: "サマリー生成に失敗しました",
+        '<span class="font-semibold">{count}</span>件のファイル変更をローカルディスクに保存します。',
       cancel: "キャンセル",
-      confirm: "確認してディスクに保存",
+      confirm: "ディスクに保存",
       processing: "保存中...",
     },
     plugins: "プラグイン",

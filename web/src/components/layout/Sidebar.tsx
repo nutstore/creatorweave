@@ -130,7 +130,7 @@ const ConversationItem = memo(function ConversationItem({
   hasSchedule,
   onSelect,
   onStartRename,
-  onDeleteClick,
+  onDeleteClick: _onDeleteClick,
   onTogglePin,
   onExport,
   onArchive,
