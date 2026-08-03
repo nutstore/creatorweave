@@ -32,7 +32,7 @@
   "availableCount": { "message": "$COUNT$ available", "placeholders": { "count": { "content": "$1" } } },
   "resetCreditExpires": { "message": "Expires $DATE$", "placeholders": { "date": { "content": "$1" } } },
   "useResetCredit": { "message": "Use one reset" },
-  "useResetCreditConfirm": { "message": "Use one Codex reset credit now? This restores the current 5-hour and weekly usage windows." },
+  "useResetCreditConfirm": { "message": "Use one Codex reset credit now? This restores your weekly usage window." },
   "resetCreditUsed": { "message": "Reset credit used successfully." },
   "resetCreditFailed": { "message": "Could not use the reset credit: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
   "resetting": { "message": "resetting…" },

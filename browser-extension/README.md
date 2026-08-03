@@ -79,7 +79,7 @@ The extension enables using OpenAI Codex models directly from CreatorWeave, with
 | `gpt-5.4-mini` | GPT-5.4 Mini | 128K |
 | `gpt-5.5` | GPT-5.5 | 200K |
 
-**Usage display:** After the first request, the popup shows rate-limit usage — primary (5h window) and secondary (weekly window) with progress bars and reset times.
+**Usage display:** After the first request, the popup shows rate-limit usage windows with progress bars and reset times. Each window's label (e.g. `5h` / `Wk` / `Mo`) is derived from the duration reported by the server, and windows that the server does not return are hidden automatically.
 
 **Security:** OAuth tokens never leave the extension boundary. The web app only communicates through the extension bridge (`window.__agentWeb`).
 

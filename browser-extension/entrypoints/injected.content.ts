@@ -529,7 +529,20 @@ export default defineContentScript({
           };
         }
 
+        // Helper: decide whether the response body is HTML that benefits from
+        // Readability + Turndown extraction. JSON / XML / plain text / images
+        // are returned as-is so structured data is never corrupted by HTML
+        // parsing (DOMParser('text/html') would strip `<`/`>` inside data values).
+        function isHtmlResponse(response: any): boolean {
+          const ct = (response.headers?.['content-type'] || response.headers?.['Content-Type'] || '').toLowerCase();
+          // Only treat genuine HTML as HTML. Anything else (JSON, XML, text/*,
+          // images, octet-stream, etc.) is returned verbatim.
+          return ct.includes('text/html') || ct.includes('application/xhtml');
+        }
+
         // ── Force render mode ──
+        // Hidden-tab rendering always yields HTML, so it always goes through
+        // the Markdown pipeline.
         if (opts.render === true) {
           const response = await getRawHtml(true);
           if (!response.ok) return response;
@@ -548,7 +561,14 @@ export default defineContentScript({
           return response;
         }
 
-        // Extract content, then check if it looks like an SPA shell.
+        // Non-HTML responses (JSON, XML, plain text, images, etc.) are returned
+        // verbatim. This preserves structured data — DOMParser('text/html')
+        // would otherwise corrupt values containing `<`, `>`, or `&`.
+        if (!isHtmlResponse(response)) {
+          return response;
+        }
+
+        // HTML response: extract main content, then check if it looks like an SPA shell.
         // We measure Readability-extracted text length (not raw HTML bytes)
         // because SPA shells often have large HTML but near-zero readable text.
         const extracted = toMarkdown(response);

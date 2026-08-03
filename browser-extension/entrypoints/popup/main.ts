@@ -213,11 +213,33 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     if (!isFinite(pct)) return null;
     var winStr = headers[prefix + '-window-minutes'];
     var resetStr = headers[prefix + '-reset-at'];
+    var windowMinutes = winStr ? parseInt(winStr, 10) || null : null;
+    var resetAt = resetStr ? parseInt(resetStr, 10) || null : null;
+    // codex-rs `has_data` guard: a window whose fields are all zero/empty is
+    // a placeholder the server emits when no secondary limit applies, not a
+    // real 100%-remaining bar. Drop it so we don't render a phantom row.
+    var hasData = pct !== 0 || (windowMinutes != null && windowMinutes !== 0) || resetAt != null;
+    if (!hasData) return null;
     return {
       usedPercent: pct,
-      windowMinutes: winStr ? parseInt(winStr, 10) || null : null,
-      resetAt: resetStr ? parseInt(resetStr, 10) || null : null,
+      windowMinutes: windowMinutes,
+      resetAt: resetAt,
     };
+  }
+
+  // Ported from codex-rs `get_limits_duration` (tui/src/chatwidget.rs).
+  // Derives a short label from the window duration so the popup stays correct
+  // no matter which windows OpenAI returns (5h / weekly / monthly / ...).
+  function formatDurationLabel(windowMinutes: number | null, fallback: string): string {
+    var M = 60, D = 24 * M, W = 7 * D, MO = 30 * D, BIAS = 3;
+    if (windowMinutes == null || windowMinutes < 0) return fallback;
+    if (windowMinutes <= D + BIAS) {
+      var hours = Math.max(1, Math.floor((windowMinutes + BIAS) / M));
+      return hours + 'h';
+    }
+    if (windowMinutes <= W + BIAS) return 'Wk';
+    if (windowMinutes <= MO + BIAS) return 'Mo';
+    return 'Yr';
   }
 
   function formatResetTime(resetAt: number) {
@@ -325,6 +347,10 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       if (!resp || !resp.ok || !resp.data) return;
       var usage = resp.data;
       var headers = usage.headers || {};
+      // Both windows are optional — render whichever the server returns and
+      // hide the other. Labels are derived from each window's `window-minutes`
+      // (matching codex-rs), so this stays correct if OpenAI re-enables the
+      // 5-hour window or changes durations later.
       var primary = parseWindow(headers, 'x-codex-primary');
       var secondary = parseWindow(headers, 'x-codex-secondary');
       if (!primary && !secondary) return;
@@ -336,8 +362,8 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       var planEl = document.getElementById('usagePlan')!;
       if (planEl && planType) planEl.textContent = planType;
 
-      renderWindow('usagePrimary', '5h', primary);
-      renderWindow('usageSecondary', 'Wk', secondary);
+      renderWindow('usagePrimary', formatDurationLabel(primary && primary.windowMinutes, '5h'), primary);
+      renderWindow('usageSecondary', formatDurationLabel(secondary && secondary.windowMinutes, 'Wk'), secondary);
 
       if (usage.updatedAt) {
         var updatedEl = document.getElementById('usageUpdated')!;

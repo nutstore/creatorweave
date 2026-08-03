@@ -32,7 +32,7 @@
   "availableCount": { "message": "可用 $COUNT$ 次", "placeholders": { "count": { "content": "$1" } } },
   "resetCreditExpires": { "message": "有效期至 $DATE$", "placeholders": { "date": { "content": "$1" } } },
   "useResetCredit": { "message": "使用一次重置" },
-  "useResetCreditConfirm": { "message": "现在使用一次 Codex 手动重置吗？这会恢复当前 5 小时和周额度窗口。" },
+  "useResetCreditConfirm": { "message": "现在使用一次 Codex 手动重置吗？这会恢复当前的周额度窗口。" },
   "resetCreditUsed": { "message": "手动重置已成功使用。" },
   "resetCreditFailed": { "message": "使用手动重置失败：$ERROR$", "placeholders": { "error": { "content": "$1" } } },
   "resetting": { "message": "正在重置…" },

@@ -142,10 +142,6 @@ registerRenderer({
 
     if (ctx.isExecuting) return <FetchSkeleton />
 
-    if (!meta.body) {
-      return <div className="px-4 py-3 text-xs text-neutral-400">{t('toolCallDisplay.noContent')}</div>
-    }
-
     const charLabel = meta.charCount > 1000
       ? `${(meta.charCount / 1000).toFixed(1)}k`
       : String(meta.charCount)
@@ -169,17 +165,24 @@ registerRenderer({
           </a>
         </div>
 
+        {/* Request params */}
+        <RequestParams args={ctx.args} />
+
         {/* Content */}
-        <div className="px-4 pb-3">
-          <MarkdownBody body={meta.body} />
-        </div>
+        {meta.body ? (
+          <div className="px-4 pb-3">
+            <MarkdownBody body={meta.body} />
+          </div>
+        ) : (
+          <div className="px-4 pb-3 text-xs text-neutral-400">{t('toolCallDisplay.noContent')}</div>
+        )}
 
         {/* Footer */}
         <div className="px-4 pb-2.5 flex items-center justify-between">
           <span className="text-[10px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
             {t('toolCallDisplay.chars', { count: charLabel })}{meta.truncated ? ` · ${t('toolCallDisplay.truncated')}` : ''}
           </span>
-          <CopyIconButton content={meta.body} />
+          {meta.body && <CopyIconButton content={meta.body} />}
         </div>
       </div>
     )
@@ -187,6 +190,60 @@ registerRenderer({
 })
 
 // ── Components ────────────────────────────────────────────────────
+
+/** Compact, minimalist request-params panel for web_fetch.
+ * Shows method (when not GET) + url + headers + body. Secrets already
+ * appear as `${NAME}` templates (values never reach the UI), so headers/body
+ * can be shown safely. Collapsible when long. */
+function RequestParams({ args }: { args: Record<string, unknown> }) {
+  const method = typeof args.method === 'string' ? args.method : 'GET'
+  const url = typeof args.url === 'string' ? args.url : ''
+  const headers = (args.headers && typeof args.headers === 'object'
+    ? args.headers as Record<string, string>
+    : {})
+  const body = typeof args.body === 'string' ? args.body : ''
+
+  // Nothing non-default to show (GET + url only is already in the Summary/meta)
+  const hasHeaders = Object.keys(headers).length > 0
+  const isNonGet = method !== 'GET'
+  if (!hasHeaders && !body && !isNonGet) return null
+
+  const headerEntries = Object.entries(headers)
+  const bodyIsJson = body.trim().startsWith('{') || body.trim().startsWith('[')
+
+  return (
+    <div className="px-4 py-2.5 space-y-1 border-y border-neutral-100 dark:border-neutral-800/60 bg-neutral-50/40 dark:bg-neutral-900/30">
+      {/* method + url row (only when non-GET; url is already shown in meta) */}
+      {isNonGet && (
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="font-mono font-medium text-blue-500 shrink-0">{method}</span>
+          <span className="font-mono text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 truncate">{shortUrl(url)}</span>
+        </div>
+      )}
+      {/* headers */}
+      {hasHeaders && headerEntries.map(([k, v]) => (
+        <div key={k} className="flex items-start gap-1.5 text-[10px] leading-[18px] font-mono">
+          <span className="text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500 shrink-0">{k}<span className="text-neutral-300 text-neutral-600 text-neutral-600 dark:text-neutral-600">:</span></span>
+          <span className="text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 break-all">{v}</span>
+        </div>
+      ))}
+      {/* body */}
+      {body && (
+        <div className="pt-0.5">
+          <div className="text-[9px] uppercase tracking-wide text-neutral-300 text-neutral-500 text-neutral-500 dark:text-neutral-600 mb-0.5">body</div>
+          <div className={`text-[10px] leading-[18px] font-mono text-neutral-600 text-neutral-400 text-neutral-400 dark:text-neutral-400 whitespace-pre-wrap break-words ${body.length > 200 ? 'line-clamp-4' : ''}`}>
+            {bodyIsJson ? prettyJson(body) : body}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Pretty-print JSON body if possible; fall back to raw on parse failure. */
+function prettyJson(raw: string): string {
+  try { return JSON.stringify(JSON.parse(raw), null, 2) } catch { return raw }
+}
 
 /** Markdown preview: plain text with subtle formatting, no line numbers */
 function MarkdownBody({ body }: { body: string }) {
