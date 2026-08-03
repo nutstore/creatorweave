@@ -10,7 +10,7 @@
 
 import { getRecommendationEngine } from './tools/tool-recommendation'
 import { ProjectManager, type AgentInfo } from '@/opfs'
-import { buildAgentPrompt, type PromptOptions } from './prompt-builder'
+import { buildAgentPrompt } from './prompt-builder'
 import { extractFirstMentionedAgentId } from './agent-mention'
 
 // Re-export AgentInfo for use in this module
@@ -28,6 +28,14 @@ export interface IntelligenceEnhancement {
   recommendedTools: string[]
   /** Agent info (if loaded) */
   agentInfo: AgentInfo | null
+  /**
+   * Today's log content, separated from the persona block.
+   * The caller should inject this into the DYNAMIC section of the prompt
+   * (not the stable prefix) because the log grows throughout the day —
+   * including it in the stable section would break prompt caching every
+   * time the agent writes a new diary entry.
+   */
+  todayLog: string | null
 }
 
 /** Coordinator options */
@@ -102,19 +110,26 @@ export class IntelligenceCoordinator {
       enhancedPrompt += '\n\n' + enhancements.join('\n\n')
     }
 
+    // Today's log is intentionally NOT included in the persona block here.
+    // It is returned separately (see `todayLog` below) so the caller can place
+    // it in the dynamic section, preserving the stable cache prefix.
+    let todayLog: string | null = null
     if (agentInfo) {
-      const promptOptions: PromptOptions = {
-        includeTodayLog: true,
-        todayLog: await this.loadTodayLog(agentInfo.id, options.projectId),
-      }
-      const agentPrompt = buildAgentPrompt(agentInfo, promptOptions)
+      // Build persona WITHOUT today log — SOUL/IDENTITY/AGENTS/USER/MEMORY
+      // are stable enough for the cache prefix (they only change when the
+      // user explicitly edits agent files).
+      const agentPrompt = buildAgentPrompt(agentInfo, { includeTodayLog: false })
       enhancedPrompt += '\n\n---\n\n' + agentPrompt
+
+      // Load today log separately for the dynamic section.
+      todayLog = await this.loadTodayLog(agentInfo.id, options.projectId)
     }
 
     return {
       systemPrompt: enhancedPrompt,
       recommendedTools: [...new Set(recommendedTools)],
       agentInfo,
+      todayLog,
     }
   }
 
@@ -283,4 +298,3 @@ async function buildMultiRootBlock(
     return null
   }
 }
-

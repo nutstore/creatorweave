@@ -210,19 +210,26 @@ export function getModelContextWindow(
   const cached = merged.find((m) => m.id.toLowerCase() === lowerModelId)
   if (cached && cached.contextWindow != null && cached.contextWindow > 0) return cached.contextWindow
 
-  // 2. OpenRouter public model data (universal — covers all providers
-  //    that don't publish context_length via their own /models endpoint).
-  //    Pure static lookup from the bundled JSON snapshot.
-  const orCtx = getOpenRouterContextWindow(modelId)
-  if (orCtx != null && orCtx > 0) return orCtx
-
-  // 3. Static registry (last-resort fallback for models OpenRouter
-  //    doesn't know about either).
+  // 2. Static registry — the provider's OWN declared models take priority
+  //    over third-party public data. Covers PROVIDER_META and dynamically
+  //    registered providers (e.g. codex-oauth, whose models come from the
+  //    browser extension with explicit contextWindow values like 258000).
+  //    OpenRouter's public snapshot (step 3) reports the *API* max context
+  //    (e.g. 1.05M for gpt-5.6-terra), which is NOT what Codex OAuth sessions
+  //    actually expose — so a provider's own value must win.
+  //    For built-in providers whose static entries omit contextWindow
+  //    (e.g. OpenAI's gpt-4o), this step yields undefined → falls through.
   const staticModels = getModelsForProvider(providerType)
   const fromStatic = staticModels.find(
     (m) => m.id.toLowerCase() === lowerModelId
   )?.contextWindow
   if (fromStatic !== undefined && fromStatic > 0) return fromStatic
+
+  // 3. OpenRouter public model data — universal fallback for models whose
+  //    own provider declares no context_length (neither via /models cache
+  //    nor via static registry). Pure static lookup from bundled JSON snapshot.
+  const orCtx = getOpenRouterContextWindow(modelId)
+  if (orCtx != null && orCtx > 0) return orCtx
 
   // 4. Default fallback
   return 128000

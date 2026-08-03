@@ -74,6 +74,7 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   }
 
   // ③: Intelligence enhancements (tool recs, project fingerprint, memory)
+  let todayLog: string | null = null
   try {
     const coordinator = getIntelligenceCoordinator()
     const intelligenceResult = await coordinator.enhanceSystemPrompt(enhancedPrompt, {
@@ -83,6 +84,8 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     })
 
     enhancedPrompt = intelligenceResult.systemPrompt
+    // Save todayLog for dynamic-section injection (keeps stable prefix cache-hot).
+    todayLog = intelligenceResult.todayLog
   } catch (error) {
     console.warn('[AgentLoop] Failed to inject intelligence enhancements:', error)
     // Continue without intelligence enhancements
@@ -98,26 +101,17 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   //   console.warn('[AgentLoop] Failed to inject workflow catalog:', error)
   // }
 
-  // ⑤: MCP services — initialize connections + inject compact summary
-  // (tool discovery/execution is handled by the unified bridge search_tools/call_tool
-  //  which are registered as builtins; no per-MCP tool registration needed)
+  // ⑤: MCP services — initialize connections only (the compact summary is
+  // generated in the DYNAMIC section below because its content can vary per
+  // turn based on connection state and tab-discovery timing).
   try {
     const mcpManager = getMCPManager()
     await mcpManager.initialize()
 
     // Auto-connect any enabled servers that are not yet connected
     await mcpManager.connectUnconnectedEnabled()
-
-    // Inject compact external tools summary instead of full catalog
-    const { buildCompactExternalToolsSummary } = await import('../external-tool-bridge')
-    const summary = buildCompactExternalToolsSummary()
-    if (summary) {
-      enhancedPrompt += '\n\n<available_external_tools>\n\n## Available External Tools\n\n' +
-        'Use search_tools to discover tools and get their full schemas, then call_tool to execute.\n\n' +
-        summary + '\n\n</available_external_tools>'
-    }
   } catch (error) {
-    console.warn('[AgentLoop] Failed to inject external tools summary:', error)
+    console.warn('[AgentLoop] Failed to initialize MCP services:', error)
   }
 
   // ── DYNAMIC SECTION ─────────────────────────────────────────────────
@@ -157,6 +151,39 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
   // analogous to how image OCR text is attached — invisible in the UI but
   // visible to the model. The system prompt stays stable, so caching hits
   // across turns in the same conversation.
+
+  // ⑧.5: External tools summary — MOVED to DYNAMIC section.
+  //
+  // Previously injected in the stable section (step ⑤). That broke prompt
+  // caching because buildCompactExternalToolsSummary() output varies per turn:
+  //   - WebMCP discovery scans all tabs every turn → tool count changes as
+  //     users open/close pages
+  //   - MCP/WebMCP Map iteration order depends on connection/scan timing
+  //   - Even with deterministic sorting (now added), the *membership* of the
+  //     set changes whenever a tab connects/disconnects
+  // Moving it here means only this tail segment changes when external tools
+  // fluctuate, keeping the large stable prefix above cache-hot.
+  try {
+    const { buildCompactExternalToolsSummary } = await import('../external-tool-bridge')
+    const summary = buildCompactExternalToolsSummary()
+    if (summary) {
+      enhancedPrompt += '\n\n<available_external_tools>\n\n## Available External Tools\n\n' +
+        'Use search_tools to discover tools and get their full schemas, then call_tool to execute.\n\n' +
+        summary + '\n\n</available_external_tools>'
+    }
+  } catch (error) {
+    console.warn('[AgentLoop] Failed to inject external tools summary:', error)
+  }
+
+  // ⑧.6: Today's log — injected in DYNAMIC section.
+  //
+  // The diary grows throughout the day (agent writes new entries during a
+  // run). If it were in the stable prefix, every new entry would invalidate
+  // the cache for everything before it. By placing it here (after external
+  // tools, before current date), only this tail segment re-caches.
+  if (todayLog && todayLog.trim()) {
+    enhancedPrompt += '\n\n# 今日日志\n\n' + todayLog.trim()
+  }
 
   // ⑨: Current date only (day-level variability, appended at the bottom)
   const now = new Date()

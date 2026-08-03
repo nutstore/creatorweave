@@ -104,6 +104,11 @@ export interface ExecutePiCoreLoopInput {
    * queued user messages (see `shouldYield` on `ProcessPiLoopEventsInput`).
    */
   shouldYieldForQueue?: () => boolean
+  /**
+   * Stable conversation identifier (workspaceId), used as prompt_cache_key
+   * for providers that support it (e.g. ChatGPT Responses API via Codex).
+   */
+  sessionId?: string
 }
 
 export interface ExecutePiCoreLoopResult {
@@ -191,6 +196,17 @@ export async function executePiCoreLoop(
         if (model.provider === 'codex-oauth') {
           delete payload.max_output_tokens
           delete payload.temperature
+        }
+        // Codex (ChatGPT Responses API): set prompt_cache_key for server-side
+        // prompt caching. The key is the conversation's sessionId (workspaceId),
+        // which is stable across all turns in the same conversation. This tells
+        // ChatGPT's cache layer to reuse the cached prefix across requests that
+        // share the same key, even though store=false (OAuth path doesn't persist
+        // responses, so previous_response_id is not usable).
+        //
+        // See codex-rs/core/src/client.rs: prompt_cache_key = thread_id.to_string()
+        if (model.provider === 'codex-oauth' && input.sessionId) {
+          payload.prompt_cache_key = input.sessionId
         }
         prevOnPayload?.(payload)
       },

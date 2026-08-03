@@ -168,6 +168,7 @@ export class AgentLoop {
         initialCompressionBaseline: this.compressionBaseline,
         disableThinking: this.disableThinking,
         shouldYieldForQueue: this.shouldYieldForQueue,
+        sessionId: this.sessionId,
       })
       allMessages = result.allMessages
       shouldStopForElicitation = result.shouldStopForElicitation
