@@ -854,6 +854,18 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       // Reload roots
       await get().loadRoots()
 
+      // Invalidate workspace-runtime root map cache so that resolvePath()
+      // picks up the new root immediately. Without this, the cached _rootMap
+      // (keyed by projectId) keeps serving the pre-addRoot snapshot, so read/
+      //write/edit tools fail to resolve paths under the new root until the
+      // page is refreshed and the runtime is rebuilt from scratch.
+      try {
+        const { getWorkspaceManager } = await import('@/opfs')
+        ;(await getWorkspaceManager()).invalidateRootMapCache(projectId)
+      } catch {
+        /* manager not ready yet — resolvePath will lazily rebuild */
+      }
+
       // Sync first root to agent.store (used by some tools as default handle)
       try {
         const { useAgentStore } = await import('./agent.store')
@@ -883,6 +895,14 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
 
       // Delete from SQLite
       await getProjectRootRepository().deleteRoot(rootId)
+
+      // Invalidate workspace-runtime root map cache (same rationale as addRoot).
+      try {
+        const { getWorkspaceManager } = await import('@/opfs')
+        ;(await getWorkspaceManager()).invalidateRootMapCache(projectId)
+      } catch {
+        /* manager not ready yet */
+      }
 
       // Delete handle record
       await folderAccessRepo.deleteByProjectAndRoot(projectId, root.name)
