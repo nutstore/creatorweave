@@ -27,6 +27,15 @@ export const agent = {
         actFullAccess: "フルアクセス",
     },
 
+    runEndPolicy: {
+        manual: "手動で適用",
+        auto: "完了後に自動適用",
+        manualDescription: "内容を確認してからローカルフォルダーに適用します。",
+        autoDescription: "この設定は現在のワークスペースに保存されます。有効な間に今回の実行が正常完了し競合がない場合のみ、変更を自動適用します。",
+        menuLabel: "完了後の適用ポリシー",
+        currentAriaLabel: "完了後の適用ポリシー：{policy}。クリックして変更します。",
+    },
+
     toolSearch: {
         aiLabel: "AI",
         aiSearchInProgress: "AI セマンティック検索中...",

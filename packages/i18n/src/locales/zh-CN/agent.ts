@@ -30,6 +30,14 @@ export const agent = {
         planReadonly: "只读",
         actFullAccess: "完全访问",
     },
+    runEndPolicy: {
+        manual: "手动应用",
+        auto: "完成后自动应用",
+        manualDescription: "由你检查后，再应用修改到本地文件夹。",
+        autoDescription: "此设置保存到当前工作区；开启时，仅在本次运行正常完成且无冲突时应用本次修改。",
+        menuLabel: "完成后的应用策略",
+        currentAriaLabel: "完成后的应用策略：{policy}。点击更改。",
+    },
     vision: {
         supported: "当前模型支持图片输入",
         unsupported: "当前模型不支持图片输入",

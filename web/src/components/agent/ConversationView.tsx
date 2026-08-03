@@ -19,7 +19,9 @@ import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
 import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSelect } from './AgentModeSelect'
+import { RunEndPolicySelect } from './RunEndPolicySelect'
 import { useConversationLogic } from './useConversationLogic'
+import { useWorkspacePreferencesStore } from '@/store/workspace-preferences.store'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
@@ -71,7 +73,7 @@ const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
               disabled={!canCapture || isCapturing}
               onClick={onCapture}
               className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed ${
-                supportsVision
+                canCapture
                   ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
                   : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
               }`}
@@ -108,7 +110,7 @@ const SendCancelButton = memo(function SendCancelButton({
       <button
         type="button"
         onClick={onCancel}
-        className="absolute bottom-4 right-4 rounded-xl bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600"
+        className="absolute bottom-4 right-4 rounded-xl bg-red-600 p-2 text-white shadow-sm transition-colors hover:bg-red-700"
         title={cancelTitle}
       >
         <StopCircle className="h-4 w-4" />
@@ -122,7 +124,7 @@ const SendCancelButton = memo(function SendCancelButton({
         <button
           type="button"
           onClick={onSend}
-          className="absolute bottom-4 right-4 rounded-xl bg-blue-500 p-2 text-white shadow-sm transition-colors hover:bg-blue-600"
+          className="absolute bottom-4 right-4 rounded-xl bg-primary-600 p-2 text-white shadow-sm transition-colors hover:bg-primary-700"
           title={sendTitle}
         >
           <Send className="h-4 w-4" />
@@ -130,7 +132,7 @@ const SendCancelButton = memo(function SendCancelButton({
         <button
           type="button"
           onClick={onCancel}
-          className="absolute bottom-4 right-14 rounded-xl bg-red-500 p-2 text-white shadow-sm transition-colors hover:bg-red-600"
+          className="absolute bottom-4 right-14 rounded-xl bg-red-600 p-2 text-white shadow-sm transition-colors hover:bg-red-700"
           title={cancelTitle}
         >
           <StopCircle className="h-4 w-4" />
@@ -168,6 +170,8 @@ export function ConversationView({
   const t = useT()
   const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
   const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
+  const autoApplyOnRunComplete = useWorkspacePreferencesStore((s) => s.autoApplyOnRunComplete)
+  const setAutoApplyOnRunComplete = useWorkspacePreferencesStore((s) => s.setAutoApplyOnRunComplete)
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null)
   const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false)
   const conversationMessagesRef = useRef<ConversationMessagesHandle>(null)
@@ -541,7 +545,7 @@ export function ConversationView({
                 cancelTitle={t('conversation.buttons.stop')}
               />
               {isProcessing && queueDepth > 0 && (!hasInput && !suggestedFollowUp) && (
-                <span className="absolute bottom-4 right-14 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                <span className="absolute bottom-4 right-14 rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-100/30 dark:text-primary-700">
                   {t('conversation.queue.badge', { count: queueDepth })}
                 </span>
               )}
@@ -564,6 +568,11 @@ export function ConversationView({
                 setThinkingLevel={setThinkingLevel}
               />
               <AgentModeSelect mode={agentMode} onModeChange={setAgentMode} />
+              <RunEndPolicySelect
+                runEndPolicy={autoApplyOnRunComplete ? 'auto' : 'manual'}
+                onRunEndPolicyChange={(policy) => setAutoApplyOnRunComplete(policy === 'auto')}
+                disabled={disabled}
+              />
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <ContextUsageBar contextWindowUsage={activeContextWindowUsage} isProcessing={isProcessing} />
@@ -717,7 +726,9 @@ const ConversationErrorBanner = memo(function ConversationErrorBanner({
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
             <div className="min-w-0 flex-1">
               <p className="font-medium">{t('conversation.error.requestFailed')}</p>
-              <p className="mt-0.5 text-red-600 dark:text-red-400">{error}</p>
+              <p className="mt-0.5 max-h-32 overflow-auto whitespace-pre-wrap break-all pr-1 text-red-600 dark:text-red-400">
+                {error}
+              </p>
               {onRetry && (
                 <button
                   type="button"

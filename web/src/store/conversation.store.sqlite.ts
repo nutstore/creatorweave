@@ -122,7 +122,7 @@ function attachReasoningDurations(
     const step = [...draft.steps]
       .reverse()
       .find(
-        (candidate) =>
+        (candidate): candidate is Extract<DraftAssistantStep, { type: 'reasoning' }> =>
           candidate.type === 'reasoning' &&
           !candidate.streaming &&
           candidate.content === message.reasoning &&
@@ -2094,6 +2094,12 @@ export const useConversationStoreSQLite = create<ConversationState>()(
 
         const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
         let runEpoch = 0
+        // Ownership is deliberately in-memory and run scoped. The overlay has
+        // one pending row per path, so paths already pending when this run
+        // begins are never eligible for automatic application.
+        const runChangedPaths = new Set<string>()
+        const pendingPathsAtRunStart = new Set<string>()
+        let runOwnershipReady = false
         let latestMessages: Message[] = conv.messages
         // Compression summaries are injected into the agent loop as
         // system-context messages and mirrored into the runtime message state.
@@ -2839,6 +2845,21 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             })
           },
         }
+        try {
+          const { getWorkspaceManager } = await import('@/opfs')
+          const workspace = await (await getWorkspaceManager()).getWorkspace(conversationId)
+          if (workspace) {
+            for (const change of workspace.getPendingChanges()) {
+              pendingPathsAtRunStart.add(change.path)
+            }
+            runOwnershipReady = true
+          }
+        } catch (error) {
+          // Fail closed: without a reliable baseline, leave all changes in the
+          // normal manual-review queue rather than risk applying historic work.
+          console.warn('[conversation.store] Unable to establish auto-apply run boundary:', error)
+        }
+
         const configuredMaxIterations = useSettingsStore.getState().maxIterations
         const maxIterations =
           configuredMaxIterations === 0
@@ -2862,6 +2883,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           // Transcript storage is optional — subagent continues without it
         }
 
+        // `getOrCreateSubagentRuntime` keeps a workspace-scoped singleton.
+        // Refresh its base context for this run before any delegated task is
+        // started, so child writes contribute to the same ownership set.
         const subagentRuntime = getOrCreateSubagentRuntime({
           workspaceId: conversationId,
           provider,
@@ -2873,6 +2897,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             projectId: resolvedProjectId,
             currentAgentId: activeAgentId,
             agentMode,
+            onWorkspacePathsChanged: (paths) => {
+              for (const path of paths) runChangedPaths.add(path)
+            },
           },
           getWorkspaceDir: subagentGetWorkspaceDir,
           onNotification: (event: SubagentTaskNotification | SubagentStepNotification) => {
@@ -2918,12 +2945,16 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           toolRegistry,
           contextManager,
           mode: agentMode,
+          sessionId: conversationId,
           toolContext: {
             directoryHandle,
             workspaceId: conversationId,
             projectId: resolvedProjectId,
             currentAgentId: activeAgentId,
             agentMode,
+            onWorkspacePathsChanged: (paths) => {
+              for (const path of paths) runChangedPaths.add(path)
+            },
             subagentRuntime,
             workflowProgress: workflowProgressHooks,
             askUserQuestion: async (params) => {
@@ -3013,6 +3044,57 @@ export const useConversationStoreSQLite = create<ConversationState>()(
             const { useConversationContextStore } =
               await import('@/store/conversation-context.store')
             await useConversationContextStore.getState().refreshPendingChanges()
+
+            // Apply only changes owned by this run, only while it completed
+            // normally. Aborts and elicitation do not reach onLoopComplete;
+            // iteration-limit stops and delegate_to handoffs are explicitly
+            // excluded as incomplete/intermediate runs.
+            try {
+              const runtime = useConversationRuntimeStore.getState()
+              const iterationLimitReached = runtime.runtimes.get(conversationId)?.iterationLimitReached
+              const wasCancelled = runtime.cancelledRunIds.has(runId)
+              const { useWorkspacePreferencesStore } = await import('./workspace-preferences.store')
+              const preferences = useWorkspacePreferencesStore.getState()
+              // Read the policy for this run's workspace directly so a user
+              // navigating to another workspace while it runs cannot alter
+              // its completion behavior.
+              const autoApplyEnabled =
+                preferences.autoApplyOnRunCompleteByWorkspace[conversationId] ?? false
+              // Only auto-apply paths first made pending by this run. A path that
+              // was already pending can contain unreviewed work from an earlier
+              // run, even if this run updates the same overlay file.
+              const eligiblePaths = [...runChangedPaths].filter(
+                (path) => !pendingPathsAtRunStart.has(path),
+              )
+
+              if (
+                isCurrentRun() &&
+                runOwnershipReady &&
+                !wasCancelled &&
+                iterationLimitReached === null &&
+                !pendingDelegation &&
+                autoApplyEnabled &&
+                eligiblePaths.length > 0
+              ) {
+                const [{ getWorkspaceManager }, { autoApplyCompletedRunChanges }] = await Promise.all([
+                  import('@/opfs'),
+                  import('@/agent/auto-apply-run-changes'),
+                ])
+                const workspace = await (await getWorkspaceManager()).getWorkspace(conversationId)
+                if (workspace) {
+                  await autoApplyCompletedRunChanges(
+                    workspace,
+                    eligiblePaths,
+                    () => useConversationContextStore.getState().refreshPendingChanges(true),
+                  )
+                }
+              }
+            } catch (error) {
+              // Auto-apply is best effort and must never convert an otherwise
+              // successful run into an agent failure. Pending changes remain
+              // available through the existing manual review queue.
+              console.warn('[conversation.store] Auto-apply after completed run failed:', error)
+            }
 
             // === Favicon handling ===
             // Always reset to idle when the loop ends — the user will see

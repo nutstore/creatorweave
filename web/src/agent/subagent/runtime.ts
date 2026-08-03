@@ -39,6 +39,11 @@ type SubagentTaskInternal = {
   usage?: SubagentTaskUsage
   error?: { code: string; message: string }
   loop?: AgentLoop
+  /**
+   * The mutable context object retained by a cached AgentLoop. It must be
+   * refreshed in place when the workspace runtime is reused by a later run.
+   */
+  toolContext?: ToolContext
   /** Cached id of the tool call currently receiving streaming arg deltas. */
   currentToolCallId?: string
   processing: boolean
@@ -117,6 +122,19 @@ class SubagentRuntimeImpl implements SubagentRuntime {
 
   updateDeps(deps: RuntimeDeps): void {
     this.deps = deps
+
+    // A subagent task keeps its AgentLoop so it can be resumed. AgentLoop also
+    // keeps the original ToolContext object by reference, so replacing deps
+    // alone would make resumed child writes report to a stale parent run.
+    // Update that exact object in place while preserving child-specific state.
+    for (const task of this.tasks.values()) {
+      if (!task.toolContext) continue
+      Object.assign(task.toolContext, deps.baseToolContext, {
+        isSubagent: true,
+        agentMode: task.mode,
+        subagentRuntime: undefined,
+      })
+    }
   }
 
   /** Graceful shutdown — mark all active tasks as failed(SESSION_INTERRUPTED). */
@@ -937,6 +955,7 @@ class SubagentRuntimeImpl implements SubagentRuntime {
       subagentRuntime: undefined,
       readFileState: new Map(),
     }
+    task.toolContext = taskContext
 
     task.loop = new AgentLoop({
       provider: this.deps.provider,

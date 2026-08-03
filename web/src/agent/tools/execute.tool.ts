@@ -124,7 +124,13 @@ export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const timeout = (args.timeout as number) || 60000
 
   return pythonMutex.runExclusive(() =>
-    executePython(code, timeout, context.workspaceId, context.directoryHandle)
+    executePython(
+      code,
+      timeout,
+      context.workspaceId,
+      context.directoryHandle,
+      context.onWorkspacePathsChanged,
+    )
   )
 }
 
@@ -149,7 +155,8 @@ async function executePython(
   code: string,
   timeout: number,
   workspaceId?: string | null,
-  directoryHandle?: FileSystemDirectoryHandle | null
+  directoryHandle?: FileSystemDirectoryHandle | null,
+  onWorkspacePathsChanged?: (paths: readonly string[]) => void,
 ): Promise<string> {
   // workspaceId is always provided by the agent loop (= conversationId).
   // If missing, that's a programming error — fail fast.
@@ -206,6 +213,7 @@ async function executePython(
     const detected = active.conversation.detectChanges(beforeSnapshot)
     if (detected.changes.length > 0) {
       await active.conversation.registerDetectedChanges(detected.changes, directoryHandle)
+      onWorkspacePathsChanged?.(detected.changes.map((change) => change.path))
     }
     await useConversationContextStore.getState().refreshPendingChanges(true)
 

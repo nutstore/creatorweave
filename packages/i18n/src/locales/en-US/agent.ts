@@ -30,6 +30,14 @@ export const agent = {
         planReadonly: "Read-only",
         actFullAccess: "Full access",
     },
+    runEndPolicy: {
+        manual: "Manual apply",
+        auto: "Auto-apply when complete",
+        manualDescription: "Review and apply changes to your local folder yourself.",
+        autoDescription: "Saved for this workspace. Applies this run's conflict-free changes when it completes normally while enabled.",
+        menuLabel: "Completion apply policy",
+        currentAriaLabel: "Completion policy: {policy}. Click to change.",
+    },
     vision: {
         supported: "Current model supports image input",
         unsupported: "Current model does not support image input",

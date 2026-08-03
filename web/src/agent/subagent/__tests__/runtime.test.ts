@@ -108,7 +108,8 @@ function taskNotifications(
 
 function createRuntime(
   workspaceId: string,
-  notifications: (SubagentTaskNotification | SubagentStepNotification)[]
+  notifications: (SubagentTaskNotification | SubagentStepNotification)[],
+  onWorkspacePathsChanged?: (paths: readonly string[]) => void,
 ): SubagentRuntime {
   return getOrCreateSubagentRuntime({
     workspaceId,
@@ -126,6 +127,7 @@ function createRuntime(
       directoryHandle: null,
       workspaceId,
       agentMode: 'act',
+      onWorkspacePathsChanged,
     },
     onNotification: (event) => notifications.push(event),
   })
@@ -232,6 +234,29 @@ describe('subagent runtime', () => {
     await expect(runtime.getStatus({ agentId: result.agentId })).resolves.toMatchObject({
       status: 'completed',
     })
+  })
+
+  it('refreshes a cached child loop context before resuming it in a later parent run', async () => {
+    const workspaceId = `workspace-context-refresh-${Date.now()}`
+    const firstRunPaths: string[] = []
+    const secondRunPaths: string[] = []
+    const runtime = createRuntime(workspaceId, [], (paths) => firstRunPaths.push(...paths))
+
+    const spawned = await runtime.spawn({
+      description: 'context refresh test',
+      prompt: 'first pass',
+    })
+    const cachedContext = hoisted.loopConfigs[0].toolContext
+
+    const refreshedRuntime = createRuntime(workspaceId, [], (paths) => secondRunPaths.push(...paths))
+    await refreshedRuntime.resume({ agentId: spawned.agentId, prompt: 'second pass' })
+    await waitForStatus(refreshedRuntime, spawned.agentId, 'completed')
+
+    expect(hoisted.loopConfigs).toHaveLength(1)
+    expect(hoisted.loopConfigs[0].toolContext).toBe(cachedContext)
+    cachedContext.onWorkspacePathsChanged(['root/child-write.ts'])
+    expect(firstRunPaths).toEqual([])
+    expect(secondRunPaths).toEqual(['root/child-write.ts'])
   })
 
   it('spawn throws when subagent times out', async () => {

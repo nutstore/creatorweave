@@ -290,6 +290,11 @@ export interface ToolContext {
   /** Per-run cache of file content that was read by tools, keyed by normalized target path */
   readFileState?: Map<string, ReadFileStateEntry>
   /**
+   * Records workspace paths successfully mutated by this agent run. The owner
+   * is the run lifecycle, which can use it to safely scope end-of-run work.
+   */
+  onWorkspacePathsChanged?: (paths: readonly string[]) => void
+  /**
    * Ask user question handler. When provided, the ask_user_question tool will
    * call this to show a question card in the UI and wait for the user's response.
    * If not provided (e.g. in subagent contexts), the tool falls back to default_answer.

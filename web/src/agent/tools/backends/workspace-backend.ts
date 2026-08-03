@@ -38,6 +38,7 @@ export class WorkspaceBackend implements VfsBackend {
     private workspaceId?: string | null,
     private directoryHandle?: FileSystemDirectoryHandle | null,
     private projectId?: string | null,
+    private onWorkspacePathsChanged?: (paths: readonly string[]) => void,
   ) {}
 
   async readFile(path: string, options?: VfsReadOptions): Promise<VfsReadResult> {
@@ -88,12 +89,14 @@ export class WorkspaceBackend implements VfsBackend {
     const { writeFile } = useOPFSStore.getState()
     // Pass null to let WorkspaceRuntime resolve the correct root
     await writeFile(path, content, null, this.workspaceId, this.projectId)
+    this.onWorkspacePathsChanged?.([path])
   }
 
   async deleteFile(path: string): Promise<void> {
     const { deleteFile } = useOPFSStore.getState()
     // Pass null to let WorkspaceRuntime resolve the correct root
     await deleteFile(path, null, this.workspaceId, this.projectId)
+    this.onWorkspacePathsChanged?.([path])
   }
 
   async deleteDir(path: string): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {

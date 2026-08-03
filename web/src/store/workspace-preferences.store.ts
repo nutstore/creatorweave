@@ -66,6 +66,10 @@ export interface WorkspacePreferences {
   agentMode: 'plan' | 'act'
   /** Persisted mode map keyed by workspace ID */
   agentModeByWorkspace: Record<string, 'plan' | 'act'>
+  /** Whether a normally completed run should apply its eligible changes to disk. */
+  autoApplyOnRunComplete: boolean
+  /** Persisted auto-apply policy keyed by workspace ID. */
+  autoApplyOnRunCompleteByWorkspace: Record<string, boolean>
   /** Pinned workspace IDs — pinned items show at top of sidebar */
   pinnedWorkspaceIds: string[]
   /** File preview display mode: 'split' = side-by-side with conversation (default), 'overlay' = full-width drawer on top */
@@ -98,6 +102,8 @@ const DEFAULT_PREFERENCES: WorkspacePreferences = {
   onboardingCompleted: false,
   agentMode: 'act',
   agentModeByWorkspace: {},
+  autoApplyOnRunComplete: false,
+  autoApplyOnRunCompleteByWorkspace: {},
   pinnedWorkspaceIds: [],
   filePreviewMode: 'split',
 }
@@ -136,6 +142,10 @@ interface WorkspacePreferencesState extends WorkspacePreferences {
   // Agent mode actions
   setAgentMode: (mode: 'plan' | 'act') => void
   syncAgentModeForWorkspace: (workspaceId: string | null) => void
+
+  // Run completion application policy
+  setAutoApplyOnRunComplete: (enabled: boolean) => void
+  syncAutoApplyOnRunCompleteForWorkspace: (workspaceId: string | null) => void
 
   // Pinned workspaces actions
   setPinnedWorkspaceIds: (ids: string[]) => void
@@ -278,6 +288,23 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
             : DEFAULT_PREFERENCES.agentMode
         }),
 
+      // Run completion application policy
+      setAutoApplyOnRunComplete: (enabled) =>
+        set((state) => {
+          const workspaceId = useWorkspaceStore.getState().activeWorkspaceId
+          state.autoApplyOnRunComplete = enabled
+          if (workspaceId) {
+            state.autoApplyOnRunCompleteByWorkspace[workspaceId] = enabled
+          }
+        }),
+
+      syncAutoApplyOnRunCompleteForWorkspace: (workspaceId) =>
+        set((state) => {
+          state.autoApplyOnRunComplete = workspaceId
+            ? state.autoApplyOnRunCompleteByWorkspace[workspaceId] ?? DEFAULT_PREFERENCES.autoApplyOnRunComplete
+            : DEFAULT_PREFERENCES.autoApplyOnRunComplete
+        }),
+
       // Pinned workspaces actions
       setPinnedWorkspaceIds: (ids) =>
         set((state) => {
@@ -304,7 +331,7 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
     })),
     {
       name: 'bfosa-workspace-preferences',
-      version: 5, // Bump version for filePreviewMode
+      version: 6, // Bump version for completion auto-apply policy
       partialize: (state) => ({
         panelSizes: state.panelSizes,
         panelState: state.panelState,
@@ -313,6 +340,8 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
         onboardingCompleted: state.onboardingCompleted,
         agentMode: state.agentMode,
         agentModeByWorkspace: state.agentModeByWorkspace,
+        autoApplyOnRunComplete: state.autoApplyOnRunComplete,
+        autoApplyOnRunCompleteByWorkspace: state.autoApplyOnRunCompleteByWorkspace,
         pinnedWorkspaceIds: state.pinnedWorkspaceIds,
         filePreviewMode: state.filePreviewMode,
       }),
@@ -322,6 +351,8 @@ export const useWorkspacePreferencesStore = create<WorkspacePreferencesState>()(
           ...DEFAULT_PREFERENCES,
           ...state,
           agentModeByWorkspace: state.agentModeByWorkspace || {},
+          autoApplyOnRunCompleteByWorkspace: state.autoApplyOnRunCompleteByWorkspace || {},
+          autoApplyOnRunComplete: state.autoApplyOnRunComplete ?? DEFAULT_PREFERENCES.autoApplyOnRunComplete,
           pinnedWorkspaceIds: (state as Record<string, unknown>).pinnedWorkspaceIds as string[] || [],
           filePreviewMode: state.filePreviewMode || 'split',
         }
@@ -370,10 +401,15 @@ function ensureWorkspaceModeSync() {
 
   useWorkspaceStore.subscribe((state, prevState) => {
     if (state.activeWorkspaceId === prevState.activeWorkspaceId) return
-    useWorkspacePreferencesStore.getState().syncAgentModeForWorkspace(state.activeWorkspaceId)
+    const preferences = useWorkspacePreferencesStore.getState()
+    preferences.syncAgentModeForWorkspace(state.activeWorkspaceId)
+    preferences.syncAutoApplyOnRunCompleteForWorkspace(state.activeWorkspaceId)
   })
 
-  useWorkspacePreferencesStore.getState().syncAgentModeForWorkspace(useWorkspaceStore.getState().activeWorkspaceId)
+  const preferences = useWorkspacePreferencesStore.getState()
+  const activeWorkspaceId = useWorkspaceStore.getState().activeWorkspaceId
+  preferences.syncAgentModeForWorkspace(activeWorkspaceId)
+  preferences.syncAutoApplyOnRunCompleteForWorkspace(activeWorkspaceId)
 }
 
 // Defer sync setup to the next microtask so the module graph finishes
