@@ -34,7 +34,7 @@ export const agent = {
         manual: "手动应用",
         auto: "完成后自动应用",
         manualDescription: "由你检查后，再应用修改到本地文件夹。",
-        autoDescription: "此设置保存到当前工作区；开启时，仅在本次运行正常完成且无冲突时应用本次修改。",
+        autoDescription: "此设置保存到当前工作区。开启时，仅自动应用新增和修改（不含删除）；删除操作始终需要你手动确认。",
         menuLabel: "完成后的应用策略",
         currentAriaLabel: "完成后的应用策略：{policy}。点击更改。",
     },

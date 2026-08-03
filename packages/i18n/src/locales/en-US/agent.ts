@@ -34,7 +34,7 @@ export const agent = {
         manual: "Manual apply",
         auto: "Auto-apply when complete",
         manualDescription: "Review and apply changes to your local folder yourself.",
-        autoDescription: "Saved for this workspace. Applies this run's conflict-free changes when it completes normally while enabled.",
+        autoDescription: "Saved for this workspace. Only creates and edits are auto-applied; deletions always require manual review.",
         menuLabel: "Completion apply policy",
         currentAriaLabel: "Completion policy: {policy}. Click to change.",
     },

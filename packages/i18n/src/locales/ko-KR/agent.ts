@@ -31,7 +31,7 @@ export const agent = {
         manual: "수동 적용",
         auto: "완료 후 자동 적용",
         manualDescription: "검토한 뒤 로컬 폴더에 수정을 적용합니다.",
-        autoDescription: "이 설정은 현재 작업 공간에 저장됩니다. 활성화된 상태에서 이번 실행이 정상 완료되고 충돌이 없을 때만 수정을 자동 적용합니다.",
+        autoDescription: "이 설정은 현재 작업 공간에 저장됩니다. 새로 만들기와 편집만 자동 적용되며, 삭제는 항상 수동 확인이 필요합니다.",
         menuLabel: "완료 후 적용 정책",
         currentAriaLabel: "완료 후 적용 정책: {policy}. 클릭하여 변경합니다.",
     },
