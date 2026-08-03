@@ -33,6 +33,10 @@ echo "📦 Building frontend..."
 cd "$PROJECT_ROOT/web"
 pnpm run build
 
+# Package skills (generates dist/skills/manifest.json + zip files)
+echo "📦 Packaging skills..."
+cd "$PROJECT_ROOT" && bash scripts/pack-skills.sh
+
 echo ""
 echo "✅ Build completed successfully!"
 echo "📂 Output: $PROJECT_ROOT/web/dist/"

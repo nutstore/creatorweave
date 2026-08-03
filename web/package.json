@@ -12,6 +12,7 @@
     "copy:eo-runtime": "rm -f dist/middleware.js dist/package.json && rm -rf dist/cloud-functions && cp ../edgeone.json dist/edgeone.json",
     "copy:pyodide": "mkdir -p dist/assets/pyodide && cp -r node_modules/pyodide/* dist/assets/pyodide/",
     "copy:extension": "mkdir -p dist/extension && cd ../browser-extension && rm -rf dist/chrome-mv3 && pnpm run build && cd - && cp -r ../browser-extension/dist/chrome-mv3/* dist/extension/ && cd dist && zip -r chrome-extension.zip extension/ && cd ..",
+    "pack:skills": "cd .. && bash scripts/pack-skills.sh skill-store web/dist/skills",
     "preview": "vite preview",
     "preview:prod": "pnpm build && vite preview --port 3000",
     "test": "vitest",

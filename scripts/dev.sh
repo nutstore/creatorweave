@@ -20,6 +20,10 @@ cd "$PROJECT_ROOT"
 # Trap SIGINT to kill all background processes
 trap 'echo -e "\n${YELLOW}🛑 Stopping all servers...${NC}"; pkill -f "pnpm run dev" 2>/dev/null || true; exit 0' INT TERM
 
+# Package skills first (generates dist/skills/manifest.json for SkillDiscover)
+echo -e "${BLUE}📦 Packaging skills (manifest + zip)...${NC}"
+cd "$PROJECT_ROOT" && bash scripts/pack-skills.sh
+
 # Start web (port 5173)
 echo -e "${BLUE}🌐 Starting web (http://localhost:5173)...${NC}"
 cd "$PROJECT_ROOT/web" && pnpm run dev &

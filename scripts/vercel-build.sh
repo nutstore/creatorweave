@@ -50,6 +50,11 @@ echo "Copying Pyodide..."
 mkdir -p dist/assets/pyodide
 cp -r node_modules/pyodide/* dist/assets/pyodide/
 
+# Package skills (generates dist/skills/manifest.json + zip files)
+echo "Packaging skills..."
+cd .. && bash scripts/pack-skills.sh
+cd web
+
 # Build browser extension and copy to dist
 echo "Building browser extension..."
 cd ../browser-extension

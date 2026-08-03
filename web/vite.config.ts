@@ -8,6 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { syncGuardPlugin } from './vite-plugin-sync-guard'
 import { docsSyncPlugin } from './vite-plugin-docs-sync'
 import { extensionServePlugin } from './vite-plugin-extension-serve'
+import { serveSkillStore } from './vite-plugin-skill-store'
 import { dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -188,6 +189,7 @@ export default defineConfig({
     ...(isVitest ? [] : [extensionServePlugin()]),
     swDevMiddleware(),
     sqlitePlugin(),
+    ...(isVitest ? [] : [serveSkillStore({ src: 'dist/skills' })]),
     VitePWA({
       registerType: 'autoUpdate',
       strategies: 'injectManifest',

@@ -6,7 +6,7 @@ import { settings } from './settings'
 import { projectRoots } from './projectRoots'
 import { workspaceSettings } from './workspaceSettings'
 import { welcome } from './welcome'
-import { skills, skillCard, skillEditor, skillUpload, skillDetail, skillFileEditor } from './skills'
+import { skills, discover, skillCard, skillEditor, skillUpload, skillDetail, skillFileEditor } from './skills'
 import { webContainer } from './webContainer'
 import { workflowEditor, customWorkflowManager, workflowEditorDialog, workflow } from './workflow'
 import { remote, session } from './remote'
@@ -42,7 +42,8 @@ export const jaJP = {
   settings,
   workspaceSettings,
   welcome,
-  skills,
+  skills: { ...skills, discover },
+  discover,
   skillCard,
   skillEditor,
   skillUpload,

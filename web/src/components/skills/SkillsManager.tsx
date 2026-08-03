@@ -27,6 +27,7 @@ import { SkillFileEditor } from './SkillFileEditor'
 import { CreateSkillDialog } from './CreateSkillDialog'
 import { ProjectSkillDropZone } from './ProjectSkillDropZone'
 import { UserSkillDropZone } from './UserSkillDropZone'
+import { SkillDiscover } from './SkillDiscover'
 import { useSkillsStore } from '@/store/skills.store'
 import type { SkillMetadata } from '@/skills/skill-types'
 import { cn } from '@/lib/utils'
@@ -44,6 +45,7 @@ interface SkillsManagerProps {
 
 type FilterType = 'all' | 'enabled' | 'disabled'
 type EditorMode = 'view' | 'edit' | undefined
+type ViewMode = 'manage' | 'discover'
 
 export function SkillsManager({ open, onClose, directoryHandle = null, roots = [] }: SkillsManagerProps) {
   const skillsStore = useSkillsStore()
@@ -76,6 +78,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [userImportOpen, setUserImportOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('manage')
 
   // Collapsed state for each section
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
@@ -170,7 +173,6 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
 
-  const enabledCount = skillsStore.skills.filter((s) => s.enabled).length
   const totalCount = skillsStore.skills.length
 
   const sections: Array<{
@@ -226,43 +228,61 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
       <BrandDialog open={open} onOpenChange={onClose}>
         <BrandDialogContent className="flex max-h-[min(700px,85vh)] max-w-2xl flex-col overflow-hidden p-0">
           {/* Header */}
-          <BrandDialogHeader>
-            <BrandDialogTitle className="text-lg font-semibold">
-              {t('skills.title')}
-            </BrandDialogTitle>
+          <BrandDialogHeader className="border-b border-neutral-200 dark:border-neutral-700">
+            <div className="flex flex-1 items-center">
+              <BrandDialogTitle className="text-lg font-semibold">
+                {t('skills.title')}
+              </BrandDialogTitle>
+            </div>
             <BrandDialogClose className="text-neutral-400 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:text-neutral-300">
               <X className="h-5 w-5" />
             </BrandDialogClose>
           </BrandDialogHeader>
 
-          {/* Search & Filter */}
-          <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-6 py-3 dark:border-neutral-700">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-              <BrandInput
-                placeholder={t('skills.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="!h-9 !py-2 pl-9"
-              />
-            </div>
-            <Tabs value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
-              <TabsList variant="segment" className="h-9">
-                <TabsTrigger variant="segment" value="all" className="text-sm">
-                  {t('skills.filterAll')} ({totalCount})
-                </TabsTrigger>
-                <TabsTrigger variant="segment" value="enabled" className="text-sm">
-                  {t('skills.filterEnabled')}
-                </TabsTrigger>
-                <TabsTrigger variant="segment" value="disabled" className="text-sm">
-                  {t('skills.filterDisabled')}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <BrandButton iconButton onClick={handleRefresh} disabled={refreshing} title={t('common.refresh')}>
-              <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-            </BrandButton>
-          </div>
+          {/* Top-level view tabs (own row, border below) */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList variant="underline" className="px-6">
+              <TabsTrigger variant="underline" value="manage" className="text-sm">
+                {t('skills.discover.tabManage')}
+              </TabsTrigger>
+              <TabsTrigger variant="underline" value="discover" className="text-sm">
+                {t('skills.discover.tabDiscover')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Body content based on viewMode */}
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="flex min-h-0 flex-1 flex-col">
+            {viewMode === 'manage' ? (
+              <>
+                {/* Search & Filter */}
+                <div className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-6 py-3 dark:border-neutral-700">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <BrandInput
+                      placeholder={t('skills.searchPlaceholder')}
+                      value={searchQuery}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="!h-9 !py-2 pl-9"
+                    />
+                  </div>
+                  <Tabs value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+                    <TabsList variant="segment" className="h-9">
+                      <TabsTrigger variant="segment" value="all" className="text-sm">
+                        {t('skills.filterAll')} ({totalCount})
+                      </TabsTrigger>
+                      <TabsTrigger variant="segment" value="enabled" className="text-sm">
+                        {t('skills.filterEnabled')}
+                      </TabsTrigger>
+                      <TabsTrigger variant="segment" value="disabled" className="text-sm">
+                        {t('skills.filterDisabled')}
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <BrandButton iconButton onClick={handleRefresh} disabled={refreshing} title={t('common.refresh')}>
+                    <RefreshCw className={cn('h-4 w-4', refreshing && 'animate-spin')} />
+                  </BrandButton>
+                </div>
 
           {/* Skills List */}
           <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-5">
@@ -298,18 +318,18 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
               </div>
             )}
           </div>
+              </>
+            ) : (
+              <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-4">
+                <SkillDiscover
+                  onInstalled={() => {
+                    void loadSkills()
+                  }}
+                />
+              </div>
+            )}
+          </Tabs>
 
-          {/* Footer */}
-          <div className="flex h-14 shrink-0 items-center justify-between border-t border-neutral-200 px-6 dark:border-neutral-700">
-            <span className="text-sm text-neutral-400 text-neutral-400 dark:text-neutral-400">
-              <span className="font-medium dark:text-foreground">{enabledCount}</span>
-              {' / '}
-              {totalCount} {t('skills.enabled').toLowerCase()}
-            </span>
-            <BrandButton variant="outline" onClick={onClose}>
-              {t('common.close')}
-            </BrandButton>
-          </div>
         </BrandDialogContent>
       </BrandDialog>
 
