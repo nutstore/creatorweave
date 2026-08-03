@@ -1300,9 +1300,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             if (!workspace) return
 
             const unsynced = await workspace.getUnsyncedSnapshots()
+
+            // Suppress the toast if the set of unsynced snapshots hasn't
+            // changed since the last check. Without this, switching workspaces
+            // back and forth re-fires onNativeDirectoryGranted → this check →
+            // toast, annoying the user with the same notification they
+            // already dismissed.
+            const prevIds = new Set(get().unsyncedSnapshots.map((s) => s.snapshotId))
+            const newIds = new Set(unsynced.map((s) => s.snapshotId))
+            const unchanged =
+              prevIds.size === newIds.size &&
+              [...newIds].every((id) => prevIds.has(id))
+
             set({ unsyncedSnapshots: unsynced })
 
-            if (unsynced.length > 0) {
+            if (unsynced.length > 0 && !unchanged) {
               toast.info(`发现 ${unsynced.length} 个未同步的快照`, {
                 description: '点击同步将文件写入本地磁盘',
                 action: {
@@ -1355,7 +1367,19 @@ export const useWorkspaceStore = create<WorkspaceState>()(
                   await workspace.markSnapshotAsSynced(snapshot.snapshotId)
                   syncedCount++
                 } else {
-                  console.warn(`[WorkspaceStore] Snapshot ${snapshot.snapshotId} had ${result.failed} failed files`)
+                  // Partial failure: mark as synced only if at least some
+                  // files succeeded, so the snapshot doesn't reappear as
+                  // "unsynced" on every workspace switch. Files that failed
+                  // remain in pendingChanges for manual retry.
+                  if (result.success > 0) {
+                    await workspace.markSnapshotAsSynced(snapshot.snapshotId)
+                    syncedCount++
+                    console.warn(
+                      `[WorkspaceStore] Snapshot ${snapshot.snapshotId} partially synced: ${result.success} ok, ${result.failed} failed (staying in pending for manual retry)`
+                    )
+                  } else {
+                    console.warn(`[WorkspaceStore] Snapshot ${snapshot.snapshotId} had ${result.failed} failed files, 0 succeeded`)
+                  }
                 }
               }
             }

@@ -3,7 +3,7 @@
  *
  * Centralizes the duplicated state machines that lived in both
  * `PendingSyncPanel` and `SyncPreviewPanel`:
- *   - SnapshotApprovalDialog visibility + summary generation
+ *   - SnapshotApprovalDialog visibility (just confirm/cancel, no description)
  *   - ConflictResolutionDialog queue traversal
  *
  * The store renders the two dialogs **once** at WorkspaceLayout level
@@ -13,6 +13,10 @@
  * nativeDir policy, post-sync side effects) is injected via the
  * `syncExecutor` callback registered by whichever panel initiated the
  * current approval flow. The store is agnostic to the executor's internals.
+ *
+ * NOTE: The dialog used to ask the user to type an AI-generated description
+ * for each snapshot. That field is gone — `summary` is now stored as null
+ * on fs_changesets. Approval is just a confirmation step.
  */
 
 import { create } from 'zustand'
@@ -34,12 +38,10 @@ export type ConflictResolution = 'opfs' | 'native' | 'skip'
  * (dialog stays open so the user can retry).
  *
  * @param files       The staged FileChange list (already filtered by conflict resolution).
- * @param summary     The (possibly AI-generated) commit summary.
  * @param forcePaths  Paths the user chose to force-overwrite (conflict 'opfs').
  */
 export type SyncExecutor = (
   files: FileChange[],
-  summary: string,
   forcePaths: Set<string>,
 ) => Promise<boolean>
 
@@ -55,12 +57,10 @@ export type DiscardPendingFn = (path: string) => Promise<void>
  *
  * Implementations are expected to:
  *   - call `toast.info(...)` for `noFilesAfterConflict`
- *   - call `toast.error(...)` for `keepNativeFailed` / `summaryFailed`
- *   - for `summaryFailed`, also call `useSyncDialogStore.setState({ summaryError: <localized> })`
- *     so the SnapshotApprovalDialog can render the inline error.
+ *   - call `toast.error(...)` for `keepNativeFailed`
  */
 export type NotifyFn = (
-  kind: 'noFilesAfterConflict' | 'keepNativeFailed' | 'summaryFailed',
+  kind: 'noFilesAfterConflict' | 'keepNativeFailed',
   detail?: unknown,
 ) => void
 
@@ -68,9 +68,6 @@ export interface SyncDialogState {
   // ─── Approval dialog ───────────────────────────────────────────
   approveDialogOpen: boolean
   pendingFiles: FileChange[]
-  snapshotSummary: string
-  generatingSummary: boolean
-  summaryError: string | null
   isSyncing: boolean
 
   // ─── Conflict dialog ───────────────────────────────────────────
@@ -84,11 +81,7 @@ export interface SyncDialogState {
   // ─── Injected callbacks (set per approval flow) ────────────────
   syncExecutor: SyncExecutor | null
   discardPending: DiscardPendingFn | null
-  /** Generates an AI commit-summary stream. Adopted from PendingSyncPanel (with abort support). */
-  generateSummary: ((files: FileChange[], onChunk: (text: string) => void, signal?: AbortSignal) => Promise<string | null>) | null
   notify: NotifyFn | null
-
-  // Module-scoped (non-reactive) controller so React doesn't re-render on reassignment.
 }
 
 interface SyncDialogActions {
@@ -103,7 +96,7 @@ interface SyncDialogActions {
    * Otherwise the approval dialog opens directly.
    *
    * @param files           Staged FileChange list.
-   * @param options.ctx     Injected callbacks (executor, discard, generateSummary, notify).
+   * @param options.ctx     Injected callbacks (executor, discard, notify).
    * @param options.detect  Async conflict detector returning ConflictInfo[].
    */
   beginApprovalFlow: (
@@ -112,7 +105,6 @@ interface SyncDialogActions {
       ctx: {
         syncExecutor: SyncExecutor
         discardPending: DiscardPendingFn
-        generateSummary: SyncDialogState['generateSummary']
         notify: NotifyFn
       }
       detect: () => Promise<ConflictInfo[]>
@@ -121,11 +113,6 @@ interface SyncDialogActions {
 
   // ─── SnapshotApprovalDialog wiring ─────────────────────────────
   closeApprovalDialog: () => void
-  setSummary: (value: string) => void
-  /** Kicks off the (abortable) AI summary generation. */
-  requestGenerateSummary: () => Promise<void>
-  /** Abort an in-flight summary stream (e.g. on dialog close). */
-  abortSummary: () => void
   /** Confirm: invoke the registered syncExecutor. Closes the dialog on success. */
   confirmApproval: () => Promise<void>
 
@@ -139,19 +126,10 @@ interface SyncDialogActions {
 
 type Store = SyncDialogState & SyncDialogActions
 
-// Module-scoped abort controller (not stored in reactive state to avoid re-renders).
-let summaryController: AbortController | null = null
-// Throttle token: avoid re-rendering on every LLM token.
-let summaryRafId: number | null = null
-let summaryPendingText = ''
-
 export const useSyncDialogStore = create<Store>((set, get) => ({
   // ── initial state ──
   approveDialogOpen: false,
   pendingFiles: [],
-  snapshotSummary: '',
-  generatingSummary: false,
-  summaryError: null,
   isSyncing: false,
   conflictQueue: [],
   conflictIndex: 0,
@@ -160,7 +138,6 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
   conflictPaths: new Set(),
   syncExecutor: null,
   discardPending: null,
-  generateSummary: null,
   notify: null,
 
   setConflictPaths: (paths) => set({ conflictPaths: paths }),
@@ -169,7 +146,6 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
     set({
       syncExecutor: ctx.syncExecutor,
       discardPending: ctx.discardPending,
-      generateSummary: ctx.generateSummary,
       notify: ctx.notify,
       pendingFiles: files,
     })
@@ -195,103 +171,22 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
     // No conflicts → open approval dialog
     set({
       conflictPaths: new Set(),
-      snapshotSummary: '',
-      generatingSummary: false,
-      summaryError: null,
       approveDialogOpen: true,
     })
   },
 
   closeApprovalDialog: () => {
-    // Abort any in-flight summary generation
-    if (get().generatingSummary) {
-      get().abortSummary()
-    }
     set({ approveDialogOpen: false })
   },
 
-  setSummary: (value) => set({ snapshotSummary: value }),
-
-  requestGenerateSummary: async () => {
-    const { pendingFiles, generateSummary } = get()
-    if (!generateSummary || pendingFiles.length === 0) return
-
-    // Abort any previous run
-    get().abortSummary()
-
-    const controller = new AbortController()
-    summaryController = controller
-
-    set({ generatingSummary: true, snapshotSummary: '', summaryError: null })
-
-    const flush = (text: string) => {
-      set({ snapshotSummary: text })
-    }
-    const throttledFlush = (text: string) => {
-      // Throttle to one update per animation frame
-      summaryPendingText = text
-      if (summaryRafId !== null) return // already scheduled
-      summaryRafId = requestAnimationFrame(() => {
-        summaryRafId = null
-        flush(summaryPendingText)
-      })
-    }
-
-    try {
-      const aiSummary = await generateSummary(
-        pendingFiles,
-        (chunk) => throttledFlush(chunk),
-        controller.signal,
-      )
-      // Stale-guard: another request superseded this one
-      if (summaryController !== controller) return
-
-      // Cancel any pending RAF and flush final value
-      if (summaryRafId !== null) {
-        cancelAnimationFrame(summaryRafId)
-        summaryRafId = null
-      }
-
-      if (controller.signal.aborted) {
-        // Cancelled — leave whatever was streamed
-      } else if (aiSummary && aiSummary.trim().length > 0) {
-        set({ snapshotSummary: aiSummary.trim(), summaryError: null })
-      } else {
-        // Empty result — let the consumer surface a localized error
-        get().notify?.('summaryFailed', { phase: 'empty' })
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      get().notify?.('summaryFailed', { phase: 'exception', error: err })
-    } finally {
-      if (summaryController === controller) {
-        set({ generatingSummary: false })
-        summaryController = null
-      }
-    }
-  },
-
-  abortSummary: () => {
-    if (summaryController) {
-      summaryController.abort()
-      summaryController = null
-      set({ generatingSummary: false })
-    }
-    if (summaryRafId !== null) {
-      cancelAnimationFrame(summaryRafId)
-      summaryRafId = null
-    }
-  },
-
   confirmApproval: async () => {
-    const { syncExecutor, pendingFiles, snapshotSummary, forceOverwritePaths } = get()
+    const { syncExecutor, pendingFiles, forceOverwritePaths } = get()
     if (!syncExecutor) return
     if (pendingFiles.length === 0) return
-    if (snapshotSummary.trim().length === 0) return
 
     set({ isSyncing: true })
     try {
-      const ok = await syncExecutor(pendingFiles, snapshotSummary, forceOverwritePaths)
+      const ok = await syncExecutor(pendingFiles, forceOverwritePaths)
       if (ok) {
         set({ approveDialogOpen: false })
       }
@@ -357,9 +252,6 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
       conflictQueue: [],
       conflictIndex: 0,
       pendingFiles: nextFiles,
-      snapshotSummary: '',
-      generatingSummary: false,
-      summaryError: null,
       approveDialogOpen: true,
     })
   },
@@ -373,13 +265,9 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
     }),
 
   reset: () => {
-    get().abortSummary()
     set({
       approveDialogOpen: false,
       pendingFiles: [],
-      snapshotSummary: '',
-      generatingSummary: false,
-      summaryError: null,
       isSyncing: false,
       conflictQueue: [],
       conflictIndex: 0,
@@ -387,7 +275,6 @@ export const useSyncDialogStore = create<Store>((set, get) => ({
       skippedConflictPaths: new Set(),
       syncExecutor: null,
       discardPending: null,
-      generateSummary: null,
       notify: null,
     })
   },

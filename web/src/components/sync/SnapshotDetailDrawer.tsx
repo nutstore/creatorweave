@@ -35,6 +35,10 @@ function formatTime(ts: number | null): string {
   }
 }
 
+function getSnapshotTitle(snapshot: Pick<SnapshotRecord, 'summary' | 'opCount'>, t: ReturnType<typeof useT>): string {
+  return snapshot.summary || t('sidebar.snapshotList.autoSnapshotTitle', { count: snapshot.opCount })
+}
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
   const kb = bytes / 1024
@@ -184,7 +188,7 @@ export const SnapshotDetailDrawer: React.FC<SnapshotDetailDrawerProps> = ({
     <Drawer
       open={open}
       onClose={onClose}
-      title={snapshot.summary || t('sidebar.snapshotList.unnamedSnapshot')}
+      title={getSnapshotTitle(snapshot, t)}
       width="clamp(480px, 60vw, 800px)"
     >
       <div className="flex h-full flex-col">

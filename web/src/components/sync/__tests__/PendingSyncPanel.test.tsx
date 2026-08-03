@@ -56,43 +56,10 @@ vi.mock('@/store/conversation-context.store', () => {
   }
 })
 
-vi.mock('@/opfs', () => ({
-  isImageFile: vi.fn(() => false),
-  readFileFromNativeFS: vi.fn(),
-  readFileFromOPFS: vi.fn(),
-}))
-
-vi.mock('@/store/settings.store', () => ({
-  useSettingsStore: {
-    getState: () => ({
-      providerType: 'openai',
-      getEffectiveProviderConfig: () => null,
-    }),
-  },
-}))
-
-vi.mock('@/sqlite', () => ({
-  getApiKeyRepository: vi.fn(() => ({
-    getApiKeyByProvider: vi.fn(async () => null),
-  })),
-}))
-
-vi.mock('@/agent/llm/provider-factory', () => ({
-  createLLMProvider: vi.fn(),
-}))
-
-vi.mock('@/workers/commit-summary-worker-manager', () => ({
-  buildCommitSummaryDiffSections: vi.fn(async () => []),
-}))
-
 vi.mock('@/utils/change-helpers', () => ({
   getChangeTypeInfo: (type: string) => ({ label: type, bg: '', color: '' }),
   formatFileSize: (size?: number) => `${size || 0} B`,
   FileIcon: () => <span data-testid="file-icon" />,
-}))
-
-vi.mock('./snapshot-summary-prompt', () => ({
-  buildSnapshotSummaryPrompt: vi.fn(() => ''),
 }))
 
 vi.mock('./review-request', () => ({
@@ -116,6 +83,7 @@ vi.mock('lucide-react', () => ({
   X: () => <span>X</span>,
   Check: () => <span>Check</span>,
   AlertTriangle: () => <span>AlertTriangle</span>,
+  FileInput: () => <span>FileInput</span>,
 }))
 
 vi.mock('@creatorweave/ui', () => ({
@@ -162,8 +130,9 @@ describe('PendingSyncPanel', () => {
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard all changes/ }))
-    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm discard/ }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select All' }))
+    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard All Changes/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm Discard/ }))
 
     await waitFor(() => {
       expect(storeMock.discardPendingPaths).toHaveBeenCalledTimes(1)
@@ -185,14 +154,15 @@ describe('PendingSyncPanel', () => {
     const user = userEvent.setup()
     render(<PendingSyncPanel />)
 
-    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard all changes/ }))
-    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm discard/ }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select All' }))
+    await user.click(screen.getByRole('button', { name: /Reject All Changes|Discard All Changes/ }))
+    await user.click(screen.getByRole('button', { name: /Confirm Reject|Confirm Discard/ }))
 
     await waitFor(() => {
       expect(storeMock.discardPendingPaths).toHaveBeenCalledTimes(1)
     })
     expect(storeMock.refreshPendingChanges).toHaveBeenCalled()
-    expect(toastMock.success).toHaveBeenCalledWith('All changes rejected')
+    expect(toastMock.success).toHaveBeenCalledWith('All selected changes discarded')
     expect(toastMock.warning).not.toHaveBeenCalled()
   })
 
@@ -214,4 +184,3 @@ describe('PendingSyncPanel', () => {
     expect(toastMock.error).toHaveBeenCalledWith('Cannot discard changes to "broken.txt": missing local file baseline')
   })
 })
-    storeMock.discardPendingPaths.mockResolvedValue({ successCount: 2, failedCount: 0 })

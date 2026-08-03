@@ -646,10 +646,14 @@ export class FSOverlayRepository {
 
     const snapshotId = generateId('changeset')
     const now = Date.now()
+    // A rollback record should always be recognizable even when the user did
+    // not provide a note. This replaces the former optional AI-generated
+    // description with a predictable system summary.
+    const systemSummary = `Saved ${opCount} file modification${opCount === 1 ? '' : 's'}`
     await db.execute(
       `INSERT INTO fs_changesets (id, workspace_id, source, status, summary, created_at, committed_at, synced_at)
        VALUES (?, ?, 'review', 'approved', ?, ?, ?, ?)`,
-      [snapshotId, workspaceId, summary || null, now, now, null] // synced_at 默认为 null，表示未同步到磁盘
+      [snapshotId, workspaceId, summary?.trim() || systemSummary, now, now, null] // synced_at 默认为 null，表示未同步到磁盘
     )
 
     await db.execute(
@@ -965,8 +969,13 @@ export class FSOverlayRepository {
 
   async keepOpPending(opId: string, errorMessage?: string): Promise<void> {
     const db = getSQLiteDB()
+    // A failed disk write must return to the manual review queue. In
+    // particular, this resets operations pre-approved for auto-apply; leaving
+    // them as approved makes listPendingOps() hide the only recovery path.
     await db.execute(
-      `UPDATE fs_ops SET status = 'pending', updated_at = ?, error_message = ? WHERE id = ?`,
+      `UPDATE fs_ops
+       SET status = 'pending', review_status = 'pending', updated_at = ?, error_message = ?
+       WHERE id = ?`,
       [Date.now(), errorMessage || null, opId]
     )
   }

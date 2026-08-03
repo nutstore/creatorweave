@@ -8,14 +8,8 @@
  */
 
 import React, { useState, useCallback, useMemo, useEffect as useReactEffect } from 'react'
-import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import type { ChangeDetectionResult, FileChange } from '@/opfs/types/opfs-types'
-import { useSettingsStore } from '@/store/settings.store'
-import { getApiKeyRepository } from '@/sqlite'
-import { createLLMProvider } from '@/agent/llm/provider-factory'
-import { isCustomProviderType } from '@/agent/providers/types'
-import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import {
   BrandButton,
   BrandDialog,
@@ -27,7 +21,6 @@ import {
 } from '@creatorweave/ui'
 import { RefreshCw, ChevronRight, X, Check, AlertTriangle, FileInput } from 'lucide-react'
 import { getChangeTypeInfo, formatFileSize, FileIcon } from '@/utils/change-helpers'
-import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import {
   useSyncDialogStore,
@@ -272,123 +265,9 @@ export function PendingSyncPanel() {
     conflicts: [...a.conflicts, ...b.conflicts],
   }), [])
 
-  const generateSummaryWithLLM = useCallback(async (
-    files: FileChange[],
-    onChunk: (text: string) => void,
-    signal?: AbortSignal,
-  ): Promise<string | null> => {
-    try {
-      const activeConversation = await getActiveConversation()
-      signal?.throwIfAborted()
-      if (!activeConversation) return null
-      const { conversation, conversationId } = activeConversation
-      const nativeDir = await conversation.getNativeDirectoryHandle()
-      signal?.throwIfAborted()
-
-      const settingsState = useSettingsStore.getState()
-      const providerType = settingsState.providerType
-      const effectiveConfig = settingsState.getEffectiveProviderConfig()
-      if (!effectiveConfig?.baseUrl || !effectiveConfig.modelName) return null
-
-      const apiKey = await getApiKeyRepository().load(effectiveConfig.apiKeyProviderKey)
-      if (!apiKey) return null
-
-      const provider = createLLMProvider({
-        apiKey,
-        providerType,
-        baseUrl: effectiveConfig.baseUrl,
-        model: effectiveConfig.modelName,
-        apiMode: isCustomProviderType(providerType)
-          ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
-          : undefined,
-      })
-
-      const selectedChanges = files
-      const changesText = selectedChanges
-        .slice(0, 20)
-        .map((c) => `- ${c.type}: ${c.path}`)
-        .join('\n')
-
-      const diffInputs: Array<{
-        path: string
-        beforeText: string
-        afterText: string
-        isBinary?: boolean
-      }> = []
-      for (const change of selectedChanges.slice(0, 8)) {
-        signal?.throwIfAborted()
-        if (isImageFile(change.path)) {
-          diffInputs.push({
-            path: change.path,
-            beforeText: '',
-            afterText: '',
-            isBinary: true,
-          })
-          continue
-        }
-
-        let beforeText = ''
-        let afterText = ''
-        if (change.type !== 'add' && nativeDir) {
-          const text = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
-          beforeText = text ?? ''
-        }
-        if (change.type !== 'delete') {
-          const text = await readFileFromOPFS(conversationId, change.path)
-          afterText = text ?? ''
-        }
-        diffInputs.push({
-          path: change.path,
-          beforeText,
-          afterText,
-        })
-      }
-      let diffSections: string[] = []
-      try {
-        diffSections = await buildCommitSummaryDiffSections(diffInputs, {
-          timeoutMs: 2500,
-          maxOutputLines: 90,
-          contextLines: 2,
-          maxNoChangeLines: 20,
-        })
-      } catch {
-        // Fallback to file-list-only prompt when worker times out/fails.
-        diffSections = []
-      }
-
-      signal?.throwIfAborted()
-      const prompt = buildSnapshotSummaryPrompt(selectedChanges.length, changesText, diffSections)
-
-      // Use streaming to show text incrementally
-      let content = ''
-      for await (const chunk of provider.chatStream({
-        messages: [
-          { role: 'system', content: 'You are a commit message generator. Follow the user instructions exactly. Output only the commit message text, nothing else.' },
-          { role: 'user', content: prompt },
-        ],
-        maxTokens: 220,
-        disableThinking: true,
-      }, signal)) {
-        const delta = chunk.choices[0]?.delta?.content
-        if (delta) {
-          content += delta
-          onChunk(content.slice(0, 3000))
-        }
-      }
-      signal?.throwIfAborted()
-      const trimmed = content.trim()
-      if (!trimmed) return null
-      return trimmed.slice(0, 3000)
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return null
-      return null
-    }
-  }, [pendingChanges])
-
   /** Sync executor injected into the shared sync-dialog store. */
   const syncExecutor = useCallback<SyncExecutor>(async (
     filesToSync: FileChange[],
-    summary: string,
     overwritePaths: Set<string>,
   ) => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isSyncing) return false
@@ -411,7 +290,7 @@ export function PendingSyncPanel() {
       // Create approval snapshot (can do regardless of local directory)
       const snapshotResult = await conversation.createApprovedSnapshotForPaths(
         filesToSync.map((c) => c.path),
-        summary.trim(),
+        undefined,
         nativeDir
       )
 
@@ -434,11 +313,6 @@ export function PendingSyncPanel() {
           result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
         }
 
-        // Mark snapshot as synced after successful sync
-        if (snapshotResult?.snapshotId) {
-          await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
-        }
-
         if (result.failed > 0) {
           console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
           const conflictHint =
@@ -449,6 +323,15 @@ export function PendingSyncPanel() {
           setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
           setTimeout(() => setSyncError(null), 6000)
           return false
+        }
+
+        // Keep partial or conflicted batches available to the recovery flow.
+        if (
+          snapshotResult?.snapshotId &&
+          result.conflicts.length === 0 &&
+          result.success === allPaths.length
+        ) {
+          await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
         }
       }
 
@@ -481,7 +364,7 @@ export function PendingSyncPanel() {
   }, [pendingChanges, isSyncing, mergeSyncResult, t])
 
   // Notify callback injected into the shared sync-dialog store.
-  // Surfaces localized messages for conflict/summary outcomes.
+  // Surfaces localized messages for conflict outcomes.
   const notify = useCallback<NotifyFn>((kind, detail) => {
     if (kind === 'noFilesAfterConflict') {
       toast.info(t('settings.pendingSyncPanel.noFilesToSyncAfterConflict'))
@@ -489,8 +372,6 @@ export function PendingSyncPanel() {
       const err = (detail as { error?: unknown })?.error
       const message = err instanceof Error ? err.message : t('settings.pendingSyncPanel.keepNativeVersionFailed')
       toast.error(message)
-    } else if (kind === 'summaryFailed') {
-      useSyncDialogStore.setState({ summaryError: t('settings.pendingSyncPanel.aiSummaryFailed') })
     }
   }, [t])
 
@@ -508,7 +389,6 @@ export function PendingSyncPanel() {
       ctx: {
         syncExecutor,
         discardPending: discardPendingPath,
-        generateSummary: generateSummaryWithLLM,
         notify,
       },
       detect: async () => {
@@ -524,7 +404,7 @@ export function PendingSyncPanel() {
         }
       },
     })
-  }, [pendingChanges, isSyncing, selectedItems, syncExecutor, discardPendingPath, generateSummaryWithLLM, notify])
+  }, [pendingChanges, isSyncing, selectedItems, syncExecutor, discardPendingPath, notify])
 
   // Show empty state when no pending changes
   if (isEmpty) {

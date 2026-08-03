@@ -24,6 +24,7 @@ const getWorkspaceMock = vi.fn()
 vi.mock('@/sqlite/repositories/fs-overlay.repository', () => ({
   getFSOverlayRepository: () => ({
     listSnapshots: listSnapshotsMock,
+    listProjectSnapshots: listSnapshotsMock,
     listSnapshotOps: listSnapshotOpsMock,
     listPendingOps: listPendingOpsMock,
     getSnapshotFileContent: getSnapshotFileContentMock,
@@ -31,6 +32,7 @@ vi.mock('@/sqlite/repositories/fs-overlay.repository', () => ({
     getUnsyncedSnapshots: getUnsyncedSnapshotsMock,
     getCurrentSnapshotId: getCurrentSnapshotIdMock,
     getSnapshotById: getSnapshotByIdMock,
+    getProjectSnapshotById: getSnapshotByIdMock,
     discardPendingPath: discardPendingPathMock,
     getOrCreateDraftChangeset: getOrCreateDraftChangesetMock,
   }),
@@ -56,7 +58,7 @@ vi.mock('@/opfs/utils/file-reader', () => ({
 }))
 
 import { formatGitDiff, gitDiff, gitRestore, gitStatus } from './index'
-import { gitLog } from './index'
+import { formatGitLog, formatGitLogOneline, gitLog } from './index'
 import { formatGitShow, gitShow } from './index'
 import { readFileFromNativeFS } from '@/opfs/utils/file-reader'
 import { readFileFromNativeFSMultiRoot } from '@/opfs/utils/file-reader'
@@ -416,6 +418,27 @@ describe('opfs/git gitLog', () => {
     const result = await gitLog('ws_1', { status: 'approved', limit: 10 })
 
     expect(result.commits.map((c) => c.id)).toEqual(['s2'])
+  })
+
+  it('uses a file-count title for snapshots without a summary', async () => {
+    listSnapshotsMock.mockResolvedValue([
+      {
+        id: 's1',
+        workspaceId: 'ws_1',
+        status: 'approved',
+        summary: null,
+        source: 'review',
+        createdAt: 1,
+        committedAt: 1,
+        opCount: 3,
+      },
+    ])
+
+    const result = await gitLog('ws_1', { limit: 10 })
+
+    expect(formatGitLog(result)).toContain('Saved 3 files')
+    expect(formatGitLogOneline(result)).toContain('Saved 3 files')
+    expect(formatGitLogOneline(result)).not.toContain('(no message)')
   })
 
   it('filters snapshots by path prefix and computes hasMore after filtering', async () => {

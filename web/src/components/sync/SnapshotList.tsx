@@ -74,6 +74,10 @@ function formatContentMeta(kind: 'text' | 'binary' | 'none', size: number, t: (k
   return `${kind === 'binary' ? t('sidebar.snapshotList.contentKindBinary') : t('sidebar.snapshotList.contentKindText')} ${human}`
 }
 
+function getSnapshotTitle(snapshot: Pick<SnapshotRecord, 'summary' | 'opCount'>, t: ReturnType<typeof useT>): string {
+  return snapshot.summary || t('sidebar.snapshotList.autoSnapshotTitle', { count: snapshot.opCount })
+}
+
 /**
  * Collect all file paths from snapshots in a given index range.
  * Used to determine which paths to pause/resume Vite HMR for during snapshot switching.
@@ -396,10 +400,10 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
                 <button
                   type="button"
                   className="min-w-0 flex-1 truncate text-left text-xs font-medium text-secondary hover:underline"
-                  title={item.summary || item.id}
+                  title={getSnapshotTitle(item, t)}
                   onClick={() => toggleExpand(item.id)}
                 >
-                  {item.summary || t('sidebar.snapshotList.unnamedSnapshot')}
+                  {getSnapshotTitle(item, t)}
                 </button>
                 <div className="flex items-center gap-1">
                   <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-muted text-secondary">

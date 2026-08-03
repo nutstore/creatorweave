@@ -10,19 +10,13 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { type FileChange, type SyncResult } from '@/opfs/types/opfs-types'
-import { isImageFile, readFileFromNativeFSMultiRoot, readFileFromOPFS } from '@/opfs'
 import { useConversationContextStore, getActiveConversation } from '@/store/conversation-context.store'
 import { useSettingsStore } from '@/store/settings.store'
-import { getApiKeyRepository } from '@/sqlite'
-import { createLLMProvider } from '@/agent/llm/provider-factory'
-import { isCustomProviderType } from '@/agent/providers/types'
-import { buildCommitSummaryDiffSections } from '@/workers/commit-summary-worker-manager'
 import { BrandButton } from '@creatorweave/ui'
 import { Badge } from '@/components/ui/badge'
 import { PendingFileList } from './PendingFileList'
 import { FileDiffViewer } from './FileDiffViewer'
 import { ArrowLeft, AlertCircle, Sparkles, MessageSquare, ChevronDown, ChevronUp, Trash2, Send } from 'lucide-react'
-import { buildSnapshotSummaryPrompt } from './snapshot-summary-prompt'
 import { sendChangeReviewToConversation } from './review-request'
 import {
   useSyncDialogStore,
@@ -218,116 +212,9 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
     }
   }, [pendingChanges])
 
-  const generateSummaryWithLLM = useCallback(async (
-    changes: FileChange[],
-    onChunk: (text: string) => void,
-    signal?: AbortSignal,
-  ): Promise<string | null> => {
-    try {
-      const activeConversation = await getActiveConversation()
-      if (!activeConversation) return null
-      const { conversation, conversationId } = activeConversation
-      const nativeDir = await conversation.getNativeDirectoryHandle()
-
-      const settingsState = useSettingsStore.getState()
-      const providerType = settingsState.providerType
-      const effectiveConfig = settingsState.getEffectiveProviderConfig()
-      if (!effectiveConfig?.baseUrl || !effectiveConfig.modelName) return null
-
-      const apiKey = await getApiKeyRepository().load(effectiveConfig.apiKeyProviderKey)
-      if (!apiKey) return null
-
-      const provider = createLLMProvider({
-        apiKey,
-        providerType,
-        baseUrl: effectiveConfig.baseUrl,
-        model: effectiveConfig.modelName,
-        apiMode: isCustomProviderType(providerType)
-          ? settingsState.customProviders.find((p) => p.id === providerType)?.apiMode || 'chat-completions'
-          : undefined,
-      })
-
-      const changesText = changes
-        .slice(0, 20)
-        .map((c) => `- ${c.type}: ${c.path}`)
-        .join('\n')
-      const diffInputs: Array<{
-        path: string
-        beforeText: string
-        afterText: string
-        isBinary?: boolean
-      }> = []
-      const diffCandidates = changes.slice(0, 8)
-      for (const change of diffCandidates) {
-        if (isImageFile(change.path)) {
-          diffInputs.push({
-            path: change.path,
-            beforeText: '',
-            afterText: '',
-            isBinary: true,
-          })
-          continue
-        }
-
-        let beforeText = ''
-        let afterText = ''
-        if (change.type !== 'add' && nativeDir) {
-          const content = await readFileFromNativeFSMultiRoot(nativeDir, change.path)
-          beforeText = content ?? ''
-        }
-        if (change.type !== 'delete') {
-          const content = await readFileFromOPFS(conversationId, change.path)
-          afterText = content ?? ''
-        }
-
-        diffInputs.push({
-          path: change.path,
-          beforeText,
-          afterText,
-        })
-      }
-      let diffSections: string[] = []
-      try {
-        diffSections = await buildCommitSummaryDiffSections(diffInputs, {
-          timeoutMs: 2500,
-          maxOutputLines: 90,
-          contextLines: 2,
-          maxNoChangeLines: 20,
-        })
-      } catch {
-        diffSections = []
-      }
-
-      const prompt = buildSnapshotSummaryPrompt(changes.length, changesText, diffSections)
-
-      // Use streaming to show text incrementally
-      let content = ''
-      for await (const chunk of provider.chatStream({
-        messages: [
-          { role: 'system', content: 'You are a commit message generator. Follow the user instructions exactly. Output only the commit message text, nothing else.' },
-          { role: 'user', content: prompt },
-        ],
-        maxTokens: 220,
-        disableThinking: true,
-      }, signal)) {
-        const delta = chunk.choices[0]?.delta?.content
-        if (delta) {
-          content += delta
-          onChunk(content.slice(0, 3000))
-        }
-      }
-      const trimmed = content.trim()
-      if (!trimmed) return null
-      return trimmed.slice(0, 3000)
-    } catch {
-      return null
-    }
-  }, [])
-
   /** Sync executor injected into the shared sync-dialog store. */
   const syncExecutor = useCallback<SyncExecutor>(async (
     filesToSync: FileChange[],
-    summary: string,
     overwritePathSet: Set<string>
   ): Promise<boolean> => {
     if (!pendingChanges || isSyncing) return false
@@ -357,10 +244,11 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       await pauseHmr(approvedPaths)
 
       // Create snapshot (conflicts should have been handled before this point)
+      let snapshotResult: { snapshotId: string } | null = null
       if (approvedPaths.length > 0) {
-        await conversation.createApprovedSnapshotForPaths(
+        snapshotResult = await conversation.createApprovedSnapshotForPaths(
           approvedPaths,
-          summary.trim(),
+          undefined,
           nativeDir
         )
       }
@@ -393,6 +281,16 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         setSyncError(t('settings.syncPanel.syncPreview.syncFailedCount', { failed: pendingResult.failed, conflicts: conflictHint }))
         setConflictPaths(new Set(pendingResult.conflicts.map((c) => c.path)))
         return false
+      }
+
+      // A partial or conflicted batch must remain recoverable as an unsynced
+      // snapshot. Only mark it synced once every selected path reached disk.
+      if (
+        snapshotResult?.snapshotId &&
+        pendingResult.conflicts.length === 0 &&
+        pendingResult.success === approvedPaths.length
+      ) {
+        await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
       }
 
       // Refresh pending snapshot after sync (supports partial sync)
@@ -439,8 +337,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       const err = (detail as { error?: unknown })?.error
       const message = err instanceof Error ? err.message : t('settings.syncPanel.syncPreview.keepNativeFailed')
       toast.error(message)
-    } else if (kind === 'summaryFailed') {
-      useSyncDialogStore.setState({ summaryError: t('settings.syncPanel.syncPreview.aiSummaryFailed') })
     }
   }, [t])
 
@@ -460,7 +356,6 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
       ctx: {
         syncExecutor,
         discardPending: discardPendingPath,
-        generateSummary: generateSummaryWithLLM,
         notify,
       },
       detect: async () => {
@@ -476,7 +371,7 @@ export const SyncPreviewPanel: React.FC<SyncPreviewPanelProps> = ({
         }
       },
     })
-  }, [pendingChanges, isSyncing, syncExecutor, discardPendingPath, generateSummaryWithLLM, notify])
+  }, [pendingChanges, isSyncing, syncExecutor, discardPendingPath, notify])
 
   const handleReview = useCallback(async () => {
     if (!pendingChanges || pendingChanges.changes.length === 0 || isReviewing) return

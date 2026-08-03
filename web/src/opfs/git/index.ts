@@ -540,6 +540,10 @@ export async function gitLog(
   }
 }
 
+function getSnapshotDisplayTitle(summary: string | null, opCount: number): string {
+  return summary || `Saved ${opCount} file${opCount === 1 ? '' : 's'}`
+}
+
 export function formatGitLog(log: GitLogResult): string {
   const lines: string[] = []
 
@@ -551,10 +555,8 @@ export function formatGitLog(log: GitLogResult): string {
       lines.push(`Workspace: ${commit.workspaceName}`)
     }
     lines.push(`Date:   ${date}`)
-    if (commit.summary) {
-      lines.push('')
-      lines.push(`    ${commit.summary}`)
-    }
+    lines.push('')
+    lines.push(`    ${getSnapshotDisplayTitle(commit.summary, commit.opCount)}`)
     lines.push('')
   }
 
@@ -574,7 +576,7 @@ export function formatGitLogOneline(log: GitLogResult): string {
 
   for (const commit of log.commits) {
     const shortId = commit.id.slice(0, 8)
-    const summary = commit.summary || '(no message)'
+    const summary = getSnapshotDisplayTitle(commit.summary, commit.opCount)
     const isCurrent = commit.isCurrent ? ' *' : ''
     lines.push(`${shortId} ${summary}${isCurrent}`)
   }
@@ -657,9 +659,7 @@ export function formatGitShow(data: GitShowResult): string {
   lines.push(`Date:   ${date}`)
   lines.push(`Status: ${data.status}`)
   lines.push('')
-  if (data.summary) {
-    lines.push(`    ${data.summary}`)
-  }
+  lines.push(`    ${getSnapshotDisplayTitle(data.summary, data.opCount)}`)
   lines.push('')
   lines.push(`Changed files (${data.files.length}):`)
   for (const file of data.files) {
