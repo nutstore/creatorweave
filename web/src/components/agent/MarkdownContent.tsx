@@ -21,6 +21,7 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { Copy, Check, Loader2 } from 'lucide-react'
 import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
+import { HtmlSandboxPreview } from './HtmlSandboxPreview'
 import { Lightbox } from './Lightbox'
 
 /** Context for passing the image click callback from MarkdownContent to MarkdownImage/AssetImage */
@@ -171,10 +172,28 @@ function AssetImage({ src, alt }: { src: string; alt: string }) {
 // Previously these were inline literals, causing new array/object refs on
 // every render → 76 unnecessary re-renders on cancel (react-scan profiled).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REMARK_PLUGINS: any = [remarkGfm, remarkMath]
+const REHYPE_PLUGINS: any = [rehypeKatex]
+
+interface MarkdownAstNode {
+  type?: string
+  meta?: string
+  data?: { hProperties?: Record<string, unknown> }
+  children?: MarkdownAstNode[]
+}
+
+/** Preserve fenced-code metadata so interactive-html blocks can read title/height. */
+function preserveCodeFenceMeta() {
+  const visit = (node: MarkdownAstNode) => {
+    if (node.type === 'code' && node.meta) {
+      node.data = { ...node.data, hProperties: { ...node.data?.hProperties, 'data-meta': node.meta } }
+    }
+    node.children?.forEach(visit)
+  }
+  return (tree: MarkdownAstNode) => visit(tree)
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const REHYPE_PLUGINS: any = [rehypeKatex]
+const INTERACTIVE_HTML_REMARK_PLUGINS: any = [remarkGfm, remarkMath, preserveCodeFenceMeta]
 
 /**
  * Extract plain text from react-markdown children (may be string, ReactNode[], etc.)
@@ -244,11 +263,47 @@ function CodeBlock({
   )
 }
 
+interface MarkdownCodeNode {
+  properties?: {
+    'data-meta'?: string | null
+  }
+}
+
+export function parseInteractiveHtmlMeta(meta: string | null | undefined): { title: string; height: number } {
+  const titleMatch = meta && /(?:^|\s)title=(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(meta)
+  const heightMatch = meta && /(?:^|\s)height=(?:"([^"]*)"|'([^']*)'|(\S+))/.exec(meta)
+  const heightValue = heightMatch?.[1] ?? heightMatch?.[2] ?? heightMatch?.[3]
+  const parsedHeight = heightValue ? Number.parseInt(heightValue, 10) : NaN
+  return {
+    title: titleMatch?.[1] ?? titleMatch?.[2] ?? titleMatch?.[3] ?? 'Interactive demo',
+    height: Number.isFinite(parsedHeight) ? Math.min(Math.max(parsedHeight, 240), 720) : 420,
+  }
+}
+
 const MARKDOWN_COMPONENTS = {
+  // Fenced blocks provide their own <pre> in CodeBlock or HtmlSandboxPreview.
+  // Removing react-markdown's wrapper avoids invalid block-level elements inside <pre>.
+  pre({ children }: React.ComponentPropsWithoutRef<'pre'>) {
+    return <>{children}</>
+  },
   // Code blocks
-  code({ className, children, ...props }: React.ComponentPropsWithoutRef<'code'> & { className?: string }) {
-    const match = /language-(\w+)/.exec(className || '')
+  code({ className, children, node, ...props }: React.ComponentPropsWithoutRef<'code'> & { className?: string; node?: MarkdownCodeNode }) {
+    const match = /language-([\w-]+)/.exec(className || '')
     const isBlock = match || (typeof children === 'string' && children.includes('\n'))
+    if (match?.[1] === 'interactive-html') {
+      const meta = parseInteractiveHtmlMeta(node?.properties?.['data-meta'])
+      return (
+        <HtmlSandboxPreview
+          html={extractText(children).replace(/^\n+|\n+$/g, '')}
+          title={meta.title}
+          height={meta.height}
+          showReset
+          showSource
+          allowFullscreen
+          downloadFileName="interactive-demo.html"
+        />
+      )
+    }
     if (isBlock) {
       return <CodeBlock language={match?.[1]} code={children} />
     }
@@ -357,7 +412,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content }: Markdo
   return (
     <ImageClickContext.Provider value={setLightboxSrc}>
       <ReactMarkdown
-        remarkPlugins={REMARK_PLUGINS}
+        remarkPlugins={INTERACTIVE_HTML_REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
         components={MARKDOWN_COMPONENTS}
       >
