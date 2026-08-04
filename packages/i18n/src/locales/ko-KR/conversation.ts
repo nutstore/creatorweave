@@ -157,6 +157,12 @@ export const conversation = {
       badge: "{count}개 대기 중",
       divider: "{count}개의 메시지가 대기 중",
       remove: "대기열에서 제거",
+      edit: "편집",
+      moveUp: "위로 이동",
+      moveDown: "아래로 이동",
+      save: "저장",
+      editPlaceholder: "메시지 편집…",
+      attachmentsNote: "{count}개 첨부 파일 — 유지됨",
     },
 
     // 채팅 내보내기

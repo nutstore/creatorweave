@@ -199,6 +199,12 @@ export interface ConversationRuntimeState {
   getQueueDepth: (convId: string) => number
   clearQueue: (convId: string) => void
   removeQueuedMessage: (convId: string, index: number) => void
+  /** Update a queued message's text/assets by index */
+  updateQueuedMessage: (convId: string, index: number, patch: Partial<Pick<QueuedMessage, 'text' | 'assets'>>) => void
+  /** Move a queued message from one index to another */
+  moveQueuedMessage: (convId: string, fromIndex: number, toIndex: number) => void
+  /** Get a single queued message by index (non-reactive) */
+  getQueuedMessage: (convId: string, index: number) => QueuedMessage | undefined
 }
 
 export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
@@ -415,6 +421,32 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
           }
         }
       })
+    },
+
+    updateQueuedMessage: (convId, index, patch) => {
+      set((state) => {
+        const q = state.pendingMessageQueues.get(convId)
+        if (q && index >= 0 && index < q.length) {
+          if (patch.text !== undefined) q[index].text = patch.text
+          if (patch.assets !== undefined) q[index].assets = patch.assets
+        }
+      })
+    },
+
+    moveQueuedMessage: (convId, fromIndex, toIndex) => {
+      set((state) => {
+        const q = state.pendingMessageQueues.get(convId)
+        if (!q || fromIndex < 0 || fromIndex >= q.length || toIndex < 0 || toIndex >= q.length || fromIndex === toIndex) {
+          return
+        }
+        const [item] = q.splice(fromIndex, 1)
+        q.splice(toIndex, 0, item)
+      })
+    },
+
+    getQueuedMessage: (convId, index) => {
+      const q = get().pendingMessageQueues.get(convId)
+      return q?.[index]
     },
   }))
 )

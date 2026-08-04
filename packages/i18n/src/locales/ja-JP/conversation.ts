@@ -158,6 +158,12 @@ export const conversation = {
       badge: "{count} 件待機中",
       divider: "{count} 件のメッセージが待機中",
       remove: "キューから削除",
+      edit: "編集",
+      moveUp: "上に移動",
+      moveDown: "下に移動",
+      save: "保存",
+      editPlaceholder: "メッセージを編集…",
+      attachmentsNote: "{count} 件の添付ファイル — 保持済み",
     },
 
     // チャットエクスポート

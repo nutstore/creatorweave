@@ -53,14 +53,30 @@ export async function writePendingAssetsToOPFS(
   return results
 }
 
+/** Remove assets that were written for an operation which did not complete. */
+export async function removeAssetsFromOPFS(assets: AssetMeta[]): Promise<void> {
+  if (assets.length === 0) return
+
+  const active = await getActiveConversation()
+  if (!active) return
+
+  const assetsDir = await active.conversation.getAssetsDir()
+  await Promise.all(
+    assets.map(async (asset) => {
+      try {
+        await assetsDir.removeEntry(asset.name)
+      } catch {
+        // Best effort: the asset may already have been removed externally.
+      }
+    })
+  )
+}
+
 /**
  * Ensure the file name is unique within the assets directory.
  * Appends `-1`, `-2`, etc. before the extension if needed.
  */
-async function resolveUniqueName(
-  dir: FileSystemDirectoryHandle,
-  name: string
-): Promise<string> {
+async function resolveUniqueName(dir: FileSystemDirectoryHandle, name: string): Promise<string> {
   const dotIdx = name.lastIndexOf('.')
   const base = dotIdx > 0 ? name.slice(0, dotIdx) : name
   const ext = dotIdx > 0 ? name.slice(dotIdx) : ''
@@ -76,10 +92,7 @@ async function resolveUniqueName(
   return candidate
 }
 
-async function existsInDir(
-  dir: FileSystemDirectoryHandle,
-  name: string
-): Promise<boolean> {
+async function existsInDir(dir: FileSystemDirectoryHandle, name: string): Promise<boolean> {
   try {
     await dir.getFileHandle(name)
     return true

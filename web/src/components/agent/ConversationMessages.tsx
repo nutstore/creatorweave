@@ -17,7 +17,8 @@ import { ConversationUsageBar } from './ConversationUsageBar'
 import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
 import { groupMessagesIntoTurns } from './group-messages'
 import { useWorkflowProgressAnchor } from './useWorkflowProgressAnchor'
-import { Clock, X } from 'lucide-react'
+import { QueuedMessageCard } from './QueuedMessageCard'
+import { Clock } from 'lucide-react'
 import { useT } from '@/i18n'
 import type { DraftAssistantStep, Message, ToolCall, WorkflowExecutionState } from '@/agent/message-types'
 import type { FileMentionItem } from './FileMentionExtension'
@@ -201,7 +202,7 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   const queuedMessages = useConversationRuntimeStore(
     useShallow((s) => {
       if (!conversationId) return []
-      return s.pendingMessageQueues.get(conversationId)?.map((m) => ({ text: m.text, enqueuedAt: m.enqueuedAt })) ?? []
+      return s.pendingMessageQueues.get(conversationId) ?? []
     }),
   )
 
@@ -334,32 +335,45 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
 
         {/* Queued messages — shown while agent is processing */}
         {isProcessing && queuedMessages.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {/* Queue divider */}
-            <div className="flex items-center gap-2 text-xs text-blue-500 dark:text-blue-400">
+            <div className="flex items-center gap-2 text-xs text-primary-500 dark:text-primary-400">
               <Clock className="h-3 w-3 shrink-0" />
               <span>{t('conversation.queue.divider', { count: queuedMessages.length })}</span>
-              <div className="h-px flex-1 bg-blue-200 dark:bg-blue-800" />
+              <div className="h-px flex-1 bg-primary-200 dark:bg-primary-800" />
             </div>
-            {/* Queued message bubbles */}
+            {/* Queued message cards */}
             {queuedMessages.map((msg, idx) => (
-              <div key={`queued-${idx}-${msg.enqueuedAt}`} className="group/queued relative">
-                <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-blue-50 px-4 py-2.5 text-sm text-neutral-800 opacity-60 dark:bg-blue-900/30 dark:text-foreground dark:opacity-70">
-                  <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (conversationId) {
-                      useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, idx)
-                    }
-                  }}
-                  className="absolute -right-1.5 -top-1.5 hidden h-5 w-5 items-center justify-center rounded-full bg-neutral-200 text-neutral-500 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-500 group-hover/queued:flex group-hover/queued:opacity-100 dark:bg-neutral-700 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-red-900/60 dark:hover:text-red-400"
-                  title={t('conversation.queue.remove')}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
+              <QueuedMessageCard
+                key={`queued-${idx}-${msg.enqueuedAt}`}
+                conversationId={conversationId ?? ''}
+                index={idx}
+                total={queuedMessages.length}
+                text={msg.text}
+                assets={msg.assets}
+                mentionAgents={mentionAgents}
+                onSearchFiles={onSearchFiles}
+                onUpdate={(i, patch) => {
+                  if (conversationId) {
+                    useConversationRuntimeStore.getState().updateQueuedMessage(conversationId, i, patch)
+                  }
+                }}
+                onRemove={(i) => {
+                  if (conversationId) {
+                    useConversationRuntimeStore.getState().removeQueuedMessage(conversationId, i)
+                  }
+                }}
+                onMoveUp={(i) => {
+                  if (conversationId) {
+                    useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i - 1)
+                  }
+                }}
+                onMoveDown={(i) => {
+                  if (conversationId) {
+                    useConversationRuntimeStore.getState().moveQueuedMessage(conversationId, i, i + 1)
+                  }
+                }}
+              />
             ))}
           </div>
         )}

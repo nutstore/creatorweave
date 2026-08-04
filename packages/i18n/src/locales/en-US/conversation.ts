@@ -173,6 +173,12 @@ export const conversation = {
       badge: "{count} queued",
       divider: "{count} messages queued",
       remove: "Remove from queue",
+      edit: "Edit",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      save: "Save",
+      editPlaceholder: "Edit your message…",
+      attachmentsNote: "{count} attachment(s) — preserved from original",
     },
 
     // Export conversation

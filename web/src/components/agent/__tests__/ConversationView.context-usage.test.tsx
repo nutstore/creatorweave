@@ -101,6 +101,10 @@ const {
     mountConversation: vi.fn(),
     unmountConversation: vi.fn(),
     getQueueDepth: vi.fn(() => 0),
+    removeQueuedMessage: vi.fn(),
+    updateQueuedMessage: vi.fn(),
+    moveQueuedMessage: vi.fn(),
+    getQueuedMessage: vi.fn(() => undefined),
     resetConversationState: vi.fn(),
   }
 

@@ -5,6 +5,7 @@
  * consistent with the bottom input:
  *   - @ agent mentions
  *   - # file mentions
+ *   - / slash commands (compact, skills, etc.)
  *   - File upload + preview (local state, isolated from main composer)
  *   - Enter to submit, Escape to cancel
  */
@@ -18,6 +19,7 @@ import HardBreak from '@tiptap/extension-hard-break'
 import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
+import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExtension'
 import { Paperclip, X, ImageIcon, FileIcon, FolderIcon } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -33,6 +35,8 @@ interface LocalPendingAsset {
   id: string
   name: string
   size: number
+  file: File
+  mimeType: string
   previewUrl: string | null
 }
 
@@ -43,8 +47,8 @@ export interface InlineMessageEditorProps {
   agents: AgentMentionCandidate[]
   /** Async file search callback for # file mention */
   onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
-  /** Submit callback — receives the new plain-text content */
-  onSubmit: (text: string) => void
+  /** Submit callback — receives the new plain-text content and added files. */
+  onSubmit: (text: string, files: File[]) => void | boolean | Promise<void | boolean>
   /** Cancel callback */
   onCancel: () => void
   /** Cancel button label */
@@ -71,95 +75,93 @@ interface SuggestionDropdownProps<T> {
   selectedColor?: string
 }
 
-const SuggestionDropdown = forwardRef(
-  function SuggestionDropdown<T>(
-    {
-      items,
-      getItemKey,
-      onSelect,
-      renderItem,
-      width = 'w-72',
-      selectedColor = 'bg-primary-50 text-primary-700 dark:bg-primary-100/40 dark:text-primary-700',
-    }: SuggestionDropdownProps<T>,
-    ref: React.Ref<SuggestionDropdownHandle>,
-  ) {
-    const [selectedIndex, setSelectedIndex] = useState(0)
-    const selectedRef = useRef(0)
+const SuggestionDropdown = forwardRef(function SuggestionDropdown<T>(
+  {
+    items,
+    getItemKey,
+    onSelect,
+    renderItem,
+    width = 'w-72',
+    selectedColor = 'bg-primary-50 text-primary-700 dark:bg-primary-100/40 dark:text-primary-700',
+  }: SuggestionDropdownProps<T>,
+  ref: React.Ref<SuggestionDropdownHandle>
+) {
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const selectedRef = useRef(0)
 
-    const selectItem = useCallback(
-      (index: number) => {
-        const item = items[index]
-        if (item) onSelect(item)
-      },
-      [items, onSelect],
-    )
+  const selectItem = useCallback(
+    (index: number) => {
+      const item = items[index]
+      if (item) onSelect(item)
+    },
+    [items, onSelect]
+  )
 
-    useEffect(() => {
-      setSelectedIndex(0)
-      selectedRef.current = 0
-    }, [items])
+  useEffect(() => {
+    setSelectedIndex(0)
+    selectedRef.current = 0
+  }, [items])
 
-    useImperativeHandle(ref, () => ({
-      onKeyDown: (event: KeyboardEvent) => {
-        if (event.key === 'ArrowUp') {
-          setSelectedIndex((idx) => {
-            const next = Math.max(0, idx - 1)
-            selectedRef.current = next
-            return next
-          })
-          return true
-        }
-        if (event.key === 'ArrowDown') {
-          setSelectedIndex((idx) => {
-            const max = Math.max(items.length - 1, 0)
-            const next = idx >= max ? max : idx + 1
-            selectedRef.current = next
-            return next
-          })
-          return true
-        }
-        if (event.key === 'Enter') {
-          if (items.length === 0) return true
-          selectItem(selectedRef.current)
-          return true
-        }
-        return false
-      },
-    }))
+  useImperativeHandle(ref, () => ({
+    onKeyDown: (event: KeyboardEvent) => {
+      if (event.key === 'ArrowUp') {
+        setSelectedIndex((idx) => {
+          const next = Math.max(0, idx - 1)
+          selectedRef.current = next
+          return next
+        })
+        return true
+      }
+      if (event.key === 'ArrowDown') {
+        setSelectedIndex((idx) => {
+          const max = Math.max(items.length - 1, 0)
+          const next = idx >= max ? max : idx + 1
+          selectedRef.current = next
+          return next
+        })
+        return true
+      }
+      if (event.key === 'Enter') {
+        if (items.length === 0) return true
+        selectItem(selectedRef.current)
+        return true
+      }
+      return false
+    },
+  }))
 
-    if (items.length === 0) return null
+  if (items.length === 0) return null
 
-    return (
-      <div
-        className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
-      >
-        <div className="max-h-56 overflow-y-auto py-1">
-          {items.map((item, idx) => {
-            const selected = idx === selectedIndex
-            return (
-              <button
-                key={getItemKey(item)}
-                type="button"
-                className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                  selected
-                    ? selectedColor
-                    : 'hover:bg-neutral-100 dark:text-foreground dark:hover:bg-neutral-800'
-                }`}
-                onMouseDown={(e) => {
-                  e.preventDefault()
-                  selectItem(idx)
-                }}
-              >
-                {renderItem(item, selected)}
-              </button>
-            )
-          })}
-        </div>
+  return (
+    <div
+      className={`absolute bottom-full left-0 z-20 mb-2 ${width} overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg dark:border-neutral-700 dark:bg-neutral-900`}
+    >
+      <div className="max-h-56 overflow-y-auto py-1">
+        {items.map((item, idx) => {
+          const selected = idx === selectedIndex
+          return (
+            <button
+              key={getItemKey(item)}
+              type="button"
+              className={`flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                selected
+                  ? selectedColor
+                  : 'hover:bg-neutral-100 dark:text-foreground dark:hover:bg-neutral-800'
+              }`}
+              onMouseDown={(e) => {
+                e.preventDefault()
+                selectItem(idx)
+              }}
+            >
+              {renderItem(item, selected)}
+            </button>
+          )
+        })}
       </div>
-    )
-  },
-) as <T>(
-  props: SuggestionDropdownProps<T> & { ref?: React.Ref<SuggestionDropdownHandle> },
+    </div>
+  )
+}) as <T>(
+  props: SuggestionDropdownProps<T> & { ref?: React.Ref<SuggestionDropdownHandle> }
 ) => React.ReactElement | null
 
 // ---------------------------------------------------------------------------
@@ -218,51 +220,90 @@ export function InlineMessageEditor({
 }: InlineMessageEditorProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [pendingAssets, setPendingAssets] = useState<LocalPendingAsset[]>([])
+  const pendingAssetsRef = useRef<LocalPendingAsset[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Suggestion state – @ agent mention
   const [suggestionItems, setSuggestionItems] = useState<AgentMentionCandidate[]>([])
-  const [suggestionCommand, setSuggestionCommand] = useState<((item: { id: string }) => void) | null>(null)
+  const [suggestionCommand, setSuggestionCommand] = useState<
+    ((item: { id: string }) => void) | null
+  >(null)
   const suggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
 
   // File suggestion state – # file mention
   const [fileSuggestionItems, setFileSuggestionItems] = useState<FileMentionItem[]>([])
-  const [fileSuggestionCommand, setFileSuggestionCommand] = useState<((item: FileMentionItem) => void) | null>(null)
+  const [fileSuggestionCommand, setFileSuggestionCommand] = useState<
+    ((item: FileMentionItem) => void) | null
+  >(null)
   const fileSuggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
   const fileSuggestionItemsRef = useRef<FileMentionItem[]>([])
   const fileSuggestionCommandRef = useRef<((item: FileMentionItem) => void) | null>(null)
-  useEffect(() => { fileSuggestionItemsRef.current = fileSuggestionItems }, [fileSuggestionItems])
-  useEffect(() => { fileSuggestionCommandRef.current = fileSuggestionCommand }, [fileSuggestionCommand])
+  useEffect(() => {
+    fileSuggestionItemsRef.current = fileSuggestionItems
+  }, [fileSuggestionItems])
+  useEffect(() => {
+    fileSuggestionCommandRef.current = fileSuggestionCommand
+  }, [fileSuggestionCommand])
   const fileSuggestionRangeRef = useRef<{ from: number; to: number } | null>(null)
   const fileSuggestionEditorRef = useRef<Editor | null>(null)
 
+  // Slash command suggestion state – / trigger for commands like /compact, /skill
+  const [slashSuggestionItems, setSlashSuggestionItems] = useState<SlashCommandItem[]>([])
+  const [slashSuggestionCommand, setSlashSuggestionCommand] = useState<
+    ((item: SlashCommandItem) => void) | null
+  >(null)
+  const slashSuggestionDropdownRef = useRef<SuggestionDropdownHandle>(null)
+  const slashSuggestionItemsRef = useRef<SlashCommandItem[]>([])
+  const slashSuggestionCommandRef = useRef<((item: SlashCommandItem) => void) | null>(null)
+  const editorRef = useRef<Editor | null>(null)
+  useEffect(() => {
+    slashSuggestionItemsRef.current = slashSuggestionItems
+  }, [slashSuggestionItems])
+  useEffect(() => {
+    slashSuggestionCommandRef.current = slashSuggestionCommand
+  }, [slashSuggestionCommand])
+
   const onCancelRef = useRef(onCancel)
   const onSubmitRef = useRef(onSubmit)
-  useEffect(() => { onCancelRef.current = onCancel }, [onCancel])
-  useEffect(() => { onSubmitRef.current = onSubmit }, [onSubmit])
+  useEffect(() => {
+    onCancelRef.current = onCancel
+  }, [onCancel])
+  useEffect(() => {
+    onSubmitRef.current = onSubmit
+  }, [onSubmit])
 
   const agentsRef = useRef(agents)
-  useEffect(() => { agentsRef.current = agents }, [agents])
+  useEffect(() => {
+    agentsRef.current = agents
+  }, [agents])
 
   const handleFiles = useCallback((fileList: FileList | File[]) => {
     const files = Array.from(fileList)
     if (files.length === 0) return
-    setPendingAssets((prev) => [
-      ...prev,
-      ...files.map((file) => ({
-        id: crypto.randomUUID(),
-        name: file.name,
-        size: file.size,
-        previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
-      })),
-    ])
+    setPendingAssets((prev) => {
+      const next = [
+        ...prev,
+        ...files.map((file) => ({
+          id: crypto.randomUUID(),
+          name: file.name,
+          size: file.size,
+          file,
+          mimeType: file.type || 'application/octet-stream',
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+        })),
+      ]
+      pendingAssetsRef.current = next
+      return next
+    })
   }, [])
 
   const removePendingAsset = useCallback((id: string) => {
     setPendingAssets((prev) => {
       const target = prev.find((a) => a.id === id)
       if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl)
-      return prev.filter((a) => a.id !== id)
+      const next = prev.filter((a) => a.id !== id)
+      pendingAssetsRef.current = next
+      return next
     })
   }, [])
 
@@ -271,17 +312,27 @@ export function InlineMessageEditor({
       for (const asset of prev) {
         if (asset.previewUrl) URL.revokeObjectURL(asset.previewUrl)
       }
+      pendingAssetsRef.current = []
       return []
     })
   }, [])
 
   useEffect(() => {
     return () => {
-      for (const asset of pendingAssets) {
+      for (const asset of pendingAssetsRef.current) {
         if (asset.previewUrl) URL.revokeObjectURL(asset.previewUrl)
       }
     }
-  }, [pendingAssets])
+  }, [])
+
+  const submitEditor = useCallback(
+    async (text: string) => {
+      const files = pendingAssetsRef.current.map((asset) => asset.file)
+      const saved = await onSubmitRef.current(text, files)
+      if (saved !== false) clearPendingAssets()
+    },
+    [clearPendingAssets]
+  )
 
   // ---- editor -------------------------------------------------------------
   const editor = useEditor({
@@ -334,8 +385,7 @@ export function InlineMessageEditor({
             },
           }),
           command: ({ editor: e, range, props }) => {
-            e
-              .chain()
+            e.chain()
               .focus()
               .insertContentAt(range, [
                 { type: 'mention', attrs: { id: props.id } },
@@ -361,7 +411,11 @@ export function InlineMessageEditor({
                       .insertContentAt(range, [
                         {
                           type: 'fileMention',
-                          attrs: { path: item.path, name: item.name, extension: item.extension ?? '' },
+                          attrs: {
+                            path: item.path,
+                            name: item.name,
+                            extension: item.extension ?? '',
+                          },
                         },
                         { type: 'text', text: ' ' },
                       ])
@@ -376,7 +430,9 @@ export function InlineMessageEditor({
                 }
                 return {
                   onStart: async (props) => {
-                    const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
+                    const items = await (props.items as
+                      | Promise<FileMentionItem[]>
+                      | FileMentionItem[])
                     setFileSuggestionItems(items as FileMentionItem[])
                     setFileSuggestionCommand(() => selectFile)
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
@@ -386,7 +442,9 @@ export function InlineMessageEditor({
                     fileSuggestionEditorRef.current = props.editor
                   },
                   onUpdate: async (props) => {
-                    const items = await (props.items as Promise<FileMentionItem[]> | FileMentionItem[])
+                    const items = await (props.items as
+                      | Promise<FileMentionItem[]>
+                      | FileMentionItem[])
                     setFileSuggestionItems(items as FileMentionItem[])
                     setFileSuggestionCommand(() => selectFile)
                     fileSuggestionItemsRef.current = items as FileMentionItem[]
@@ -436,6 +494,36 @@ export function InlineMessageEditor({
             }),
           ]
         : []),
+      // Slash command extension — '/' trigger for commands like /compact, /skill
+      SlashCommandExtension.configure({
+        onSelect: (item: SlashCommandItem) => {
+          const ed = editorRef.current
+          if (!ed) return
+          ed.commands.insertContent(`/${item.id} `)
+        },
+        render: () => ({
+          onStart: (props) => {
+            setSlashSuggestionItems(props.items as SlashCommandItem[])
+            setSlashSuggestionCommand(() => props.command)
+          },
+          onUpdate: (props) => {
+            setSlashSuggestionItems(props.items as SlashCommandItem[])
+            setSlashSuggestionCommand(() => props.command)
+          },
+          onKeyDown: (props) => {
+            if (props.event.key === 'Escape') {
+              setSlashSuggestionItems([])
+              setSlashSuggestionCommand(null)
+              return true
+            }
+            return slashSuggestionDropdownRef.current?.onKeyDown(props.event) ?? false
+          },
+          onExit: () => {
+            setSlashSuggestionItems([])
+            setSlashSuggestionCommand(null)
+          },
+        }),
+      }),
     ],
     content: initialContent,
     editorProps: {
@@ -447,6 +535,17 @@ export function InlineMessageEditor({
         if (event.isComposing) return false
 
         if (event.key === 'Enter' && !event.shiftKey) {
+          // If slash command suggestion is showing, delegate to dropdown
+          const slashItems = slashSuggestionItemsRef.current
+          if (slashItems.length > 0) {
+            const handled = slashSuggestionDropdownRef.current?.onKeyDown(event) ?? false
+            if (handled) return true
+            const cmd = slashSuggestionCommandRef.current
+            if (cmd) {
+              cmd(slashItems[0])
+              return true
+            }
+          }
           // If file suggestion is showing, delegate to dropdown
           const fileItems = fileSuggestionItemsRef.current
           if (fileItems.length > 0) {
@@ -460,7 +559,7 @@ export function InlineMessageEditor({
           }
           event.preventDefault()
           const text = editor ? getPlainText(editor) : ''
-          onSubmitRef.current(text)
+          void submitEditor(text)
           return true
         }
         if (event.key === 'Escape') {
@@ -473,6 +572,11 @@ export function InlineMessageEditor({
     },
   })
 
+  // Sync editor ref for use in closures created during editor creation
+  useEffect(() => {
+    editorRef.current = editor
+  }, [editor])
+
   // Focus editor on mount, move cursor to end
   useEffect(() => {
     if (editor) {
@@ -483,14 +587,14 @@ export function InlineMessageEditor({
   const handleSubmit = () => {
     if (!editor) return
     const text = getPlainText(editor)
-    clearPendingAssets()
-    onSubmit(text)
+    void submitEditor(text)
   }
 
   const currentText = editor ? getPlainText(editor).trim() : ''
   const canSubmit = currentText.length > 0
   const showSuggestion = suggestionItems.length > 0 && !!suggestionCommand
   const showFileSuggestion = fileSuggestionItems.length > 0 && !!fileSuggestionCommand
+  const showSlashSuggestion = slashSuggestionItems.length > 0 && !!slashSuggestionCommand
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -504,12 +608,15 @@ export function InlineMessageEditor({
     setIsDragOver(false)
   }, [])
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragOver(false)
-    if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files)
-  }, [handleFiles])
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      setIsDragOver(false)
+      if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files)
+    },
+    [handleFiles]
+  )
 
   const handleCancel = () => {
     clearPendingAssets()
@@ -546,7 +653,7 @@ export function InlineMessageEditor({
       />
 
       {/* Editor container — adapted from AgentRichInput but slightly more compact */}
-      <div className="relative w-full rounded-xl border border-neutral-300 bg-white pl-11 pr-3 py-3 text-sm shadow-sm transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 dark:border-neutral-600 dark:bg-neutral-900 dark:focus-within:border-primary-500">
+      <div className="relative w-full rounded-xl border border-neutral-300 bg-white py-3 pl-11 pr-3 text-sm shadow-sm transition-colors focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500/20 dark:border-neutral-600 dark:bg-neutral-900 dark:focus-within:border-primary-500">
         {editor && (
           <>
             <EditorContent editor={editor} />
@@ -569,16 +676,14 @@ export function InlineMessageEditor({
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-300 text-neutral-300 dark:text-neutral-300">
+                      <div className="max-w-[140px] truncate text-xs font-medium text-neutral-300 dark:text-neutral-300">
                         {asset.name}
                       </div>
-                      <div className="text-[10px]">
-                        {formatFileSize(asset.size)}
-                      </div>
+                      <div className="text-[10px]">{formatFileSize(asset.size)}</div>
                     </div>
                     <button
                       type="button"
-                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity group-hover:opacity-100 hover:bg-neutral-200 dark:hover:bg-neutral-600"
+                      className="shrink-0 rounded p-0.5 opacity-0 transition-opacity hover:bg-neutral-200 group-hover:opacity-100 dark:hover:bg-neutral-600"
                       onClick={() => removePendingAsset(asset.id)}
                       aria-label={`Remove ${asset.name}`}
                     >
@@ -593,7 +698,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="absolute left-3 top-4 rounded p-1.5 transition-colors hover:bg-neutral-100 hover:text-neutral-600 text-neutral-500 text-neutral-500 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+          className="absolute left-3 top-4 rounded p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-600 dark:text-neutral-500 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
           title="Attach files"
         >
           <Paperclip className="h-4 w-4" />
@@ -605,7 +710,7 @@ export function InlineMessageEditor({
         <button
           type="button"
           onClick={handleCancel}
-          className="rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800"
+          className="rounded-md px-2.5 py-1 text-xs font-medium text-neutral-400 transition-colors hover:bg-neutral-100 dark:text-neutral-400 dark:hover:bg-neutral-800"
         >
           {cancelLabel}
         </button>
@@ -630,7 +735,7 @@ export function InlineMessageEditor({
             <>
               <span className="font-medium">@{candidate.id}</span>
               {candidate.name && candidate.name !== candidate.id && (
-                <span className="truncate pl-3 text-xs text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                <span className="truncate pl-3 text-xs text-neutral-400 dark:text-neutral-400">
                   {candidate.name}
                 </span>
               )}
@@ -650,7 +755,7 @@ export function InlineMessageEditor({
           selectedColor="bg-sky-50 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200"
           renderItem={(file) => (
             <>
-              <span className="mt-0.5 shrink-0 text-neutral-500 text-neutral-500 dark:text-neutral-500">
+              <span className="mt-0.5 shrink-0 text-neutral-500 dark:text-neutral-500">
                 {file.isDirectory ? (
                   <FolderIcon className="h-3.5 w-3.5" />
                 ) : (
@@ -659,16 +764,34 @@ export function InlineMessageEditor({
               </span>
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium leading-5">{file.name}</div>
-                <div className="truncate text-[11px] leading-4 text-neutral-500 text-neutral-500 dark:text-neutral-500">
-                  {file.path}{file.isDirectory ? '/' : ''}
+                <div className="truncate text-[11px] leading-4 text-neutral-500 dark:text-neutral-500">
+                  {file.path}
+                  {file.isDirectory ? '/' : ''}
                 </div>
               </div>
               {!file.isDirectory && file.extension && (
-                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
+                <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 text-[11px] text-neutral-400 dark:bg-neutral-800 dark:text-neutral-400">
                   .{file.extension}
                 </span>
               )}
             </>
+          )}
+        />
+      )}
+
+      {/* Slash command suggestions dropdown */}
+      {showSlashSuggestion && slashSuggestionCommand && (
+        <SuggestionDropdown<SlashCommandItem>
+          ref={slashSuggestionDropdownRef}
+          items={slashSuggestionItems}
+          getItemKey={(cmd) => cmd.id}
+          onSelect={(cmd) => slashSuggestionCommand?.(cmd)}
+          width="w-auto"
+          renderItem={(cmd) => (
+            <span className="text-neutral-700 dark:text-neutral-300">
+              /{cmd.id}
+              <span className="ml-2 text-neutral-500 dark:text-neutral-500">{cmd.description}</span>
+            </span>
           )}
         />
       )}

@@ -173,6 +173,12 @@ export const conversation = {
       badge: "{count} 条排队",
       divider: "{count} 条消息排队等待中",
       remove: "撤销排队",
+      edit: "编辑",
+      moveUp: "上移",
+      moveDown: "下移",
+      save: "保存",
+      editPlaceholder: "编辑你的消息…",
+      attachmentsNote: "{count} 个附件 — 已保留",
     },
     // 导出对话
     export: {

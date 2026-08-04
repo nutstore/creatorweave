@@ -22,7 +22,7 @@ import { useT } from '@/i18n'
 import { createUserMessage } from '@/agent/message-types'
 import type { Message } from '@/agent/message-types'
 import { useAssetStore } from '@/store/asset.store'
-import { writePendingAssetsToOPFS } from '@/services/asset.service'
+import { removeAssetsFromOPFS, writePendingAssetsToOPFS } from '@/services/asset.service'
 import { performOcr, isOcrCompatibleImage } from '@/services/ocr.service'
 import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
 import { useInputDraftStore } from '@/store/input-draft.store'
@@ -41,7 +41,9 @@ export function useConversationLogic() {
   const [hasInput, setHasInput] = useState(false)
   // Mentioned agent IDs also live in a ref — they are only read inside stable callbacks.
   const mentionedAgentIdsRef = useRef<string[]>([])
-  const setMentionedAgentIds = useCallback((ids: string[]) => { mentionedAgentIdsRef.current = ids }, [])
+  const setMentionedAgentIds = useCallback((ids: string[]) => {
+    mentionedAgentIdsRef.current = ids
+  }, [])
   const [inputResetToken, setInputResetToken] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -82,7 +84,7 @@ export function useConversationLogic() {
         .filter((agent) => agent.id !== 'default')
         .map((agent) => ({ id: agent.id, name: agent.name }))
       return filtered.length === 0 ? EMPTY_MENTION_AGENTS : filtered
-    }),
+    })
   )
 
   // ── Active conversation — only select NON-streaming data ──
@@ -131,9 +133,12 @@ export function useConversationLogic() {
 
   // ── Static snapshot for ConversationMessages ──
   // Only contains data that changes at low frequency (not per-token).
-  const staticSnapshot = useMemo(() => ({
-    activeWorkflowExecution,
-  }), [activeWorkflowExecution])
+  const staticSnapshot = useMemo(
+    () => ({
+      activeWorkflowExecution,
+    }),
+    [activeWorkflowExecution]
+  )
 
   // ── Refs ──
   const lastRenderedMessageCountRef = useRef(0)
@@ -213,7 +218,9 @@ export function useConversationLogic() {
       }
     })()
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [activeProjectId, isAgentsInitialized, isAgentsLoading, mentionAgents.length])
 
   // ── Smart auto-scroll (only scroll when user is already at the bottom) ──
@@ -253,12 +260,15 @@ export function useConversationLogic() {
         // serialize the full message (content + contentParts) as JSON so
         // the renderer can extract the image.
         if (msg.contentParts && msg.contentParts.length > 0) {
-          map.set(msg.toolCallId, JSON.stringify({
-            _envelope: true,
-            ok: true,
-            contentParts: msg.contentParts,
-            data: { note: msg.content?.slice(0, 200) },
-          }))
+          map.set(
+            msg.toolCallId,
+            JSON.stringify({
+              _envelope: true,
+              ok: true,
+              contentParts: msg.contentParts,
+              data: { note: msg.content?.slice(0, 200) },
+            })
+          )
         } else {
           map.set(msg.toolCallId, msg.content || '')
         }
@@ -269,7 +279,10 @@ export function useConversationLogic() {
 
   // Only committed tool results from messages.
   // Runtime tool results are merged inside ConversationMessages (subscribed directly).
-  const toolResults = useMemo(() => buildToolResultsMap(activeMessages), [activeMessages, buildToolResultsMap])
+  const toolResults = useMemo(
+    () => buildToolResultsMap(activeMessages),
+    [activeMessages, buildToolResultsMap]
+  )
 
   // ── Follow-up suggestion ──
   const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
@@ -282,175 +295,189 @@ export function useConversationLogic() {
   const convIdRef = useRef(convId)
   convIdRef.current = convId
 
-  const sendMessage = useCallback(async (text: string, options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }) => {
-    if (!text.trim()) return
+  const sendMessage = useCallback(
+    async (
+      text: string,
+      options?: { agentOverrideId?: string | null; assets?: import('@/types/asset').AssetMeta[] }
+    ) => {
+      if (!text.trim()) return
 
-    // Read latest from store to avoid stale closures
-    const { hasApiKey: hasKey, providerType: pType, modelName: mName, maxTokens: mTokens } = useSettingsStore.getState()
-    if (!hasKey) {
-      toast.error(t('conversation.toast.noApiKey'))
-      return
-    }
+      // Read latest from store to avoid stale closures
+      const {
+        hasApiKey: hasKey,
+        providerType: pType,
+        modelName: mName,
+        maxTokens: mTokens,
+      } = useSettingsStore.getState()
+      if (!hasKey) {
+        toast.error(t('conversation.toast.noApiKey'))
+        return
+      }
 
-    const { directoryHandle: dh } = useAgentStore.getState()
-    let targetConvId = convIdRef.current
-    const { createNew, setActive, updateMessages, runAgent } = useConversationStore.getState()
-    if (!targetConvId) {
-      const conv = createNew(text.slice(0, 30))
-      targetConvId = conv.id
-      setActive(targetConvId)
-    }
+      const { directoryHandle: dh } = useAgentStore.getState()
+      let targetConvId = convIdRef.current
+      const { createNew, setActive, updateMessages, runAgent } = useConversationStore.getState()
+      if (!targetConvId) {
+        const conv = createNew(text.slice(0, 30))
+        targetConvId = conv.id
+        setActive(targetConvId)
+      }
 
-    // Hoist the target-conversation lookup: both the page-context refresh
-    // check below and the direct-send path at the bottom need it. Reading
-    // state once keeps the two paths consistent (no race where the
-    // conversation object changes between reads).
-    const targetConv = useConversationStore
-      .getState()
-      .conversations.find((c) => c.id === targetConvId)
+      // Hoist the target-conversation lookup: both the page-context refresh
+      // check below and the direct-send path at the bottom need it. Reading
+      // state once keeps the two paths consistent (no race where the
+      // conversation object changes between reads).
+      const targetConv = useConversationStore
+        .getState()
+        .conversations.find((c) => c.id === targetConvId)
 
-    // ── Page context capture (side-panel mode only) ────────────────────
-    // Optimization: only re-pull the full context when the upstream page has
-    // actually changed. We read just the URL cheaply (capturePageUrl) and
-    // compare against the most recent pageContext-bearing message in history.
-    //   - URL unchanged → reuse null (history already has valid context)
-    //   - URL changed / no prior context / compression dropped it → full pull
-    // Null in normal (non-side-panel) mode. Shared by the direct-send and
-    // queued-message paths below.
-    let pageContext: Awaited<ReturnType<typeof import('@/agent/workspace-assistant-context')['capturePageContext']>> = null
-    {
-      const { capturePageUrl, capturePageContext, shouldRefreshPageContext } =
-        await import('@/agent/workspace-assistant-context')
-      const currentUrl = await capturePageUrl()
-      if (currentUrl) {
-        // Side-panel mode + URL read OK → compare against history.
-        const needRefresh = shouldRefreshPageContext(targetConv?.messages ?? [], currentUrl)
-        if (needRefresh) {
+      // ── Page context capture (side-panel mode only) ────────────────────
+      // Optimization: only re-pull the full context when the upstream page has
+      // actually changed. We read just the URL cheaply (capturePageUrl) and
+      // compare against the most recent pageContext-bearing message in history.
+      //   - URL unchanged → reuse null (history already has valid context)
+      //   - URL changed / no prior context / compression dropped it → full pull
+      // Null in normal (non-side-panel) mode. Shared by the direct-send and
+      // queued-message paths below.
+      let pageContext: Awaited<
+        ReturnType<(typeof import('@/agent/workspace-assistant-context'))['capturePageContext']>
+      > = null
+      {
+        const { capturePageUrl, capturePageContext, shouldRefreshPageContext } =
+          await import('@/agent/workspace-assistant-context')
+        const currentUrl = await capturePageUrl()
+        if (currentUrl) {
+          // Side-panel mode + URL read OK → compare against history.
+          const needRefresh = shouldRefreshPageContext(targetConv?.messages ?? [], currentUrl)
+          if (needRefresh) {
+            pageContext = await capturePageContext()
+          }
+        } else {
+          // Either non-side-panel mode (capturePageContext returns null too) or
+          // side-panel mode where URL read failed — fall back to a full capture.
+          // In non-side-panel mode this is a cheap null return.
           pageContext = await capturePageContext()
         }
-      } else {
-        // Either non-side-panel mode (capturePageContext returns null too) or
-        // side-panel mode where URL read failed — fall back to a full capture.
-        // In non-side-panel mode this is a cheap null return.
-        pageContext = await capturePageContext()
       }
-    }
 
-    if (useConversationRuntimeStore.getState().isConversationRunning(targetConvId)) {
-      // Queue the message instead of rejecting it
-      const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
-        text,
-        assets: options?.assets,
-        agentOverrideId: options?.agentOverrideId ?? null,
-        enqueuedAt: Date.now(),
-        pageContext: pageContext ?? undefined,
-      })
-      if (result.enqueued) {
-        setInput('')
-        setMentionedAgentIds([])
-        setInputResetToken((v) => v + 1)
-        useInputDraftStore.getState().clearDraft(targetConvId)
-        setDraftTextToRestore(null)
-        draftConvIdRef.current = null
-      } else {
-        toast.error(t('conversation.toast.queueFull'))
-      }
-      return
-    }
+      // ── Resolve pending assets (shared by both queue and direct-send paths) ──
+      // When the user has attached files via the input box, we need to write them
+      // to OPFS and resolve base64/OCR *before* deciding whether to queue or send.
+      // Previously assets were only resolved in the direct-send path, so queued
+      // messages silently lost their attachments.
+      let assets = options?.assets
+      let wrotePendingAssets = false
+      let clearPendingAssets: (() => void) | undefined
+      if (!assets || assets.length === 0) {
+        const { pendingAssets, clearAll } = useAssetStore.getState()
+        if (pendingAssets.length > 0) {
+          try {
+            // Ensure workspace is ready for asset writes.
+            const { useWorkspaceStore } = await import('@/store/workspace.store')
+            const wsState = useWorkspaceStore.getState()
+            if (wsState.activeWorkspaceId !== targetConvId) {
+              await wsState.switchWorkspace(targetConvId)
+            }
 
-    // Resolve assets for direct send (queued messages already have assets resolved above)
-    let assets = options?.assets
-    if (!assets || assets.length === 0) {
-      const { pendingAssets, clearAll } = useAssetStore.getState()
-      if (pendingAssets.length > 0) {
-        try {
-          // Ensure workspace is ready for asset writes.
-          // setActive() above fires switchWorkspace asynchronously, so we
-          // may need to wait for it to complete before the OPFS directory exists.
-          const { useWorkspaceStore } = await import('@/store/workspace.store')
-          const wsState = useWorkspaceStore.getState()
-          if (wsState.activeWorkspaceId !== targetConvId) {
-            await wsState.switchWorkspace(targetConvId)
+            assets = await writePendingAssetsToOPFS(
+              pendingAssets.map((a) => ({ name: a.name, file: a.file }))
+            )
+            // Lazy OCR: only run OCR for non-vision models.
+            const settingsState = useSettingsStore.getState()
+            const hasVision = settingsState.modelName
+              ? supportsImageInput(settingsState.modelName)
+              : false
+            const imageAssetIndexes: number[] = []
+            pendingAssets.forEach((a, idx) => {
+              if (a.mimeType.startsWith('image/') && isOcrCompatibleImage(a.mimeType)) {
+                imageAssetIndexes.push(idx)
+              }
+            })
+            let ocrResults: Map<number, string> | null = null
+            if (!hasVision && imageAssetIndexes.length > 0) {
+              const id = toast.loading(`正在识别图片文字…`)
+              try {
+                const results = await Promise.all(
+                  imageAssetIndexes.map(async (idx) => {
+                    try {
+                      const r = await performOcr(pendingAssets[idx].file)
+                      return { idx, text: r.text }
+                    } catch {
+                      return { idx, text: '' }
+                    }
+                  })
+                )
+                ocrResults = new Map(results.map((r) => [r.idx, r.text]))
+              } finally {
+                toast.dismiss(id)
+              }
+            }
+            assets = assets.map((assetMeta, idx) => {
+              const pending = pendingAssets[idx]
+              if (!pending) return assetMeta
+              const carry: { ocrText?: string; ocrBase64?: string } = {}
+              if (pending.ocrBase64) carry.ocrBase64 = pending.ocrBase64
+              if (ocrResults && ocrResults.has(idx) && ocrResults.get(idx)) {
+                carry.ocrText = ocrResults.get(idx)
+              } else if (pending.ocrText) {
+                carry.ocrText = pending.ocrText
+              }
+              return Object.keys(carry).length > 0 ? { ...assetMeta, ...carry } : assetMeta
+            })
+            wrotePendingAssets = true
+            clearPendingAssets = clearAll
+          } catch (err) {
+            toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
+            return // Don't send — user can retry
           }
-
-          assets = await writePendingAssetsToOPFS(
-            pendingAssets.map((a) => ({ name: a.name, file: a.file })),
-          )
-          // Lazy OCR: only run OCR for non-vision models (vision models can
-          // OCR the image themselves, so the Tesseract text would be noise).
-          // We do this here rather than at upload time because the model is
-          // resolved from settings at send time, not at upload time.
-          const settingsState = useSettingsStore.getState()
-          // Vision capability is purely a function of model id (from the
-          // OpenRouter snapshot), so we can skip resolving the full Model<Api>
-          // (which would require baseUrl + apiMode) for this UI decision.
-          // No model selected → skip OCR entirely (no target to send to).
-          const hasVision = settingsState.modelName
-            ? supportsImageInput(settingsState.modelName)
-            : false
-          const imageAssetIndexes: number[] = []
-          pendingAssets.forEach((a, idx) => {
-            if (a.mimeType.startsWith('image/') && isOcrCompatibleImage(a.mimeType)) {
-              imageAssetIndexes.push(idx)
-            }
-          })
-          let ocrResults: Map<number, string> | null = null
-          if (!hasVision && imageAssetIndexes.length > 0) {
-            // Show a brief loading hint so users know why send is paused.
-            const id = toast.loading(`正在识别图片文字…`)
-            try {
-              const results = await Promise.all(
-                imageAssetIndexes.map(async (idx) => {
-                  try {
-                    const r = await performOcr(pendingAssets[idx].file)
-                    return { idx, text: r.text }
-                  } catch {
-                    return { idx, text: '' }
-                  }
-                })
-              )
-              ocrResults = new Map(results.map((r) => [r.idx, r.text]))
-            } finally {
-              toast.dismiss(id)
-            }
-          }
-          // Carry over base64 + (lazily computed) OCR text from PendingAsset to AssetMeta
-          assets = assets.map((assetMeta, idx) => {
-            const pending = pendingAssets[idx]
-            if (!pending) return assetMeta
-            const carry: { ocrText?: string; ocrBase64?: string } = {}
-            if (pending.ocrBase64) carry.ocrBase64 = pending.ocrBase64
-            if (ocrResults && ocrResults.has(idx) && ocrResults.get(idx)) {
-              carry.ocrText = ocrResults.get(idx)
-            } else if (pending.ocrText) {
-              carry.ocrText = pending.ocrText
-            }
-            return Object.keys(carry).length > 0 ? { ...assetMeta, ...carry } : assetMeta
-          })
-        } catch (err) {
-          toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`)
-          return // Don't send — user can retry
         }
-        clearAll()
       }
-    }
-    const userMsg = createUserMessage(text, assets, pageContext ?? undefined)
-    updateMessages(targetConvId, targetConv ? [...targetConv.messages, userMsg] : [userMsg])
-    setInput('')
-    setMentionedAgentIds([])
-    setInputResetToken((v) => v + 1)
-    // Clear any draft for this conversation (message sent) and reset restore state
-    useInputDraftStore.getState().clearDraft(targetConvId)
-    setDraftTextToRestore(null)
-    // User initiated send — always scroll to bottom
-    isUserAtBottomRef.current = true
-    draftConvIdRef.current = null
 
-    await runAgent(
-      targetConvId, pType, mName, mTokens, dh,
-      options?.agentOverrideId ?? null
-    )
-  }, [t])
+      if (useConversationRuntimeStore.getState().isConversationRunning(targetConvId)) {
+        // Queue the message instead of rejecting it
+        const result = useConversationRuntimeStore.getState().enqueueMessage(targetConvId, {
+          text,
+          assets: assets && assets.length > 0 ? assets : undefined,
+          agentOverrideId: options?.agentOverrideId ?? null,
+          enqueuedAt: Date.now(),
+          pageContext: pageContext ?? undefined,
+        })
+        if (result.enqueued) {
+          clearPendingAssets?.()
+          setInput('')
+          setMentionedAgentIds([])
+          setInputResetToken((v) => v + 1)
+          useInputDraftStore.getState().clearDraft(targetConvId)
+          setDraftTextToRestore(null)
+          draftConvIdRef.current = null
+        } else {
+          // Keep staged files available for retry and remove the OPFS copies
+          // that were only written in preparation for this failed enqueue.
+          if (wrotePendingAssets && assets) {
+            void removeAssetsFromOPFS(assets)
+          }
+          toast.error(t('conversation.toast.queueFull'))
+        }
+        return
+      }
+
+      const userMsg = createUserMessage(text, assets, pageContext ?? undefined)
+      updateMessages(targetConvId, targetConv ? [...targetConv.messages, userMsg] : [userMsg])
+      clearPendingAssets?.()
+      setInput('')
+      setMentionedAgentIds([])
+      setInputResetToken((v) => v + 1)
+      // Clear any draft for this conversation (message sent) and reset restore state
+      useInputDraftStore.getState().clearDraft(targetConvId)
+      setDraftTextToRestore(null)
+      // User initiated send — always scroll to bottom
+      isUserAtBottomRef.current = true
+      draftConvIdRef.current = null
+
+      await runAgent(targetConvId, pType, mName, mTokens, dh, options?.agentOverrideId ?? null)
+    },
+    [t]
+  )
 
   const handleSlashCommand = useCallback(async (command: string, arg?: string) => {
     if (command === 'compact') {
@@ -479,7 +506,9 @@ export function useConversationLogic() {
         aspectRatio = arMatch[1]
         prompt = prompt.replace(/--ar\s+\S+/, '').trim()
       }
-      await useConversationStore.getState().runImageGeneration(targetConvId, prompt, { aspectRatio })
+      await useConversationStore
+        .getState()
+        .runImageGeneration(targetConvId, prompt, { aspectRatio })
     }
   }, [])
 
@@ -513,10 +542,16 @@ export function useConversationLogic() {
       return
     }
 
-    let textToSend = inputTrimmed ? inputRef.current : (currentConvId ? getSuggestedFollowUp(currentConvId) : '')
+    let textToSend = inputTrimmed
+      ? inputRef.current
+      : currentConvId
+        ? getSuggestedFollowUp(currentConvId)
+        : ''
     if (textToSend) {
       // Assets are resolved inside sendMessage (from options or pendingAssets store)
-      sendMessage(textToSend, { agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null })
+      sendMessage(textToSend, {
+        agentOverrideId: inputTrimmed ? (currentMentionedAgentIds[0] ?? null) : null,
+      })
       if (!inputTrimmed && currentConvId) clearSuggestedFollowUp(currentConvId)
     }
   }, [handleSlashCommand, sendMessage, setInput, setMentionedAgentIds])
@@ -535,46 +570,89 @@ export function useConversationLogic() {
     await runWorkflowRealRun(convId, templateId, { rubricDsl })
   }
 
-  const handleDeleteAgentLoop = useCallback((messageId: string) => {
-    const currentConvId = convIdRef.current
-    if (!currentConvId) return
-    if (deleteAgentLoop(currentConvId, messageId)) toast.success(t('conversation.toast.deletedTurn'))
-  }, [deleteAgentLoop, t])
+  const handleDeleteAgentLoop = useCallback(
+    (messageId: string) => {
+      const currentConvId = convIdRef.current
+      if (!currentConvId) return
+      if (deleteAgentLoop(currentConvId, messageId))
+        toast.success(t('conversation.toast.deletedTurn'))
+    },
+    [deleteAgentLoop, t]
+  )
 
-  const handleEditAndResend = useCallback((userMessageId: string, newContent: string) => {
-    const currentConvId = convIdRef.current
-    if (!currentConvId) return
-    editAndResendUserMessage(currentConvId, userMessageId, newContent)
-  }, [editAndResendUserMessage])
+  const handleEditAndResend = useCallback(
+    (userMessageId: string, newContent: string) => {
+      const currentConvId = convIdRef.current
+      if (!currentConvId) return
+      editAndResendUserMessage(currentConvId, userMessageId, newContent)
+    },
+    [editAndResendUserMessage]
+  )
 
   const handleRegenerate: ((id: string) => void) | undefined = convId
-    ? useCallback((id: string) => regenerateUserMessage(convId, id), [convId, regenerateUserMessage])
+    ? useCallback(
+        (id: string) => regenerateUserMessage(convId, id),
+        [convId, regenerateUserMessage]
+      )
     : undefined
 
   return {
     // Local UI state
-    hasInput, setInput, setMentionedAgentIds, inputResetToken, messagesEndRef, scrollContainerRef,
+    hasInput,
+    setInput,
+    setMentionedAgentIds,
+    inputResetToken,
+    messagesEndRef,
+    scrollContainerRef,
     isUserAtBottomRef,
-    draftTextToRestore, onDraftRestored,
+    draftTextToRestore,
+    onDraftRestored,
     // Agent store
-    allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
+    allAgents,
+    activeAgentId,
+    setActiveAgent,
+    createAgent,
+    deleteAgent,
+    mentionAgents,
     // Conversation state (NO streaming data — that's subscribed in ConversationMessages)
-    convId, activeMessages,
-    conversationError, activeContextWindowUsage,
-    isProcessing, isRunning, status, suggestedFollowUp, workflowTemplates,
-    toolResults, queueDepth,
+    convId,
+    activeMessages,
+    conversationError,
+    activeContextWindowUsage,
+    isProcessing,
+    isRunning,
+    status,
+    suggestedFollowUp,
+    workflowTemplates,
+    toolResults,
+    queueDepth,
     // Static snapshot for ConversationMessages
     staticSnapshot,
     // Settings
-    hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
+    hasApiKey,
+    enableThinking,
+    thinkingLevel,
+    setEnableThinking,
+    setThinkingLevel,
     // Workspace preferences
-    agentMode, setAgentMode,
+    agentMode,
+    setAgentMode,
     // Handlers
-    sendMessage, handleSend, handleCancel, handleSlashCommand, handleRunWorkflow, handleRealRunWorkflow,
-    handleDeleteAgentLoop, handleEditAndResend, handleRegenerate, regenerateUserMessage,
-    clearSuggestedFollowUp, runCustomWorkflowDryRun,
+    sendMessage,
+    handleSend,
+    handleCancel,
+    handleSlashCommand,
+    handleRunWorkflow,
+    handleRealRunWorkflow,
+    handleDeleteAgentLoop,
+    handleEditAndResend,
+    handleRegenerate,
+    regenerateUserMessage,
+    clearSuggestedFollowUp,
+    runCustomWorkflowDryRun,
     // Store refs (for ErrorBoundary reset)
-    useConversationStore, useConversationRuntimeStore,
+    useConversationStore,
+    useConversationRuntimeStore,
   }
 }
 
