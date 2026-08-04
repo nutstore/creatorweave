@@ -13,7 +13,7 @@ import { useOPFSStore } from '@/store/opfs.store'
 import type { ReadPolicy } from '@/opfs/types/opfs-types'
 import { resolveVfsTarget } from './vfs-resolver'
 import { ensureReadFileState, getReadStateKey } from './read-state'
-import { resolveNativeDirectoryHandleForPath } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath, withToolTimeout, isToolTimeoutError } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import {
@@ -64,6 +64,10 @@ export const readDefinition: ToolDefinition = {
             'Optional source strategy: auto (default), prefer_opfs, prefer_native.',
           enum: ['auto', 'prefer_opfs', 'prefer_native'],
         },
+        timeout: {
+          type: 'number',
+          description: 'Maximum execution time in milliseconds (default: 30000).',
+        },
       },
     },
   },
@@ -89,6 +93,7 @@ function buildMaxSizeHint(suggestedMaxSize: number): string {
 export const readExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const maxSize = args.max_size as number | undefined
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 30_000
   const readPolicyArg = args.read_policy
   const readPolicy: ReadPolicy | undefined =
     readPolicyArg === undefined ? undefined : (readPolicyArg as ReadPolicy)
@@ -132,7 +137,7 @@ export const readExecutor: ToolExecutor = async (args, context) => {
     return toolErrorJson('read', 'invalid_arguments', validationError)
   }
 
-  return executeSingleRead(effectiveReadPath, context, rangeOptions, maxSize, readPolicy)
+  return executeSingleRead(effectiveReadPath, context, rangeOptions, maxSize, readPolicy, timeoutMs)
 }
 
 function isOPFSWorkspaceMiss(error: unknown): boolean {
@@ -209,7 +214,8 @@ async function executeSingleRead(
   context: ToolContext,
   options: ReadRangeOptions = {},
   maxSize?: number,
-  readPolicy?: ReadPolicy
+  readPolicy?: ReadPolicy,
+  timeoutMs: number = 30_000,
 ): Promise<string> {
   const { readFile } = useOPFSStore.getState()
   const readFileState = ensureReadFileState(context)
@@ -251,10 +257,14 @@ async function executeSingleRead(
     const formatHandler = getFormatHandler(path)
     const needsBinary = formatHandler?.binaryMode ?? false
 
-    const backendResult = await target.backend.readFile(target.path, {
-      readPolicy: readPolicy as any,
-      ...(needsBinary ? { encoding: 'binary' as const } : {}),
-    })
+    const backendResult = await withToolTimeout(
+      target.backend.readFile(target.path, {
+        readPolicy: readPolicy as any,
+        ...(needsBinary ? { encoding: 'binary' as const } : {}),
+      }),
+      timeoutMs,
+      'read',
+    )
     const content = backendResult.content
     const metadata = { size: backendResult.size, contentType: backendResult.mimeType, mtime: backendResult.mtime }
     if (maxSize && metadata.size > maxSize) {
@@ -392,6 +402,9 @@ async function executeSingleRead(
       { retryable: true }
     )
   } catch (error) {
+    if (isToolTimeoutError(error)) {
+      return toolErrorJson('read', 'timeout', error.message, { retryable: true })
+    }
     if (isSubagentPermissionDenied(error)) {
       return toolErrorJson('read', SUBAGENT_PERMISSION_DENIED, error.message)
     }

@@ -17,6 +17,7 @@ import { useOPFSStore } from '@/store/opfs.store'
 import { useRemoteStore } from '@/store/remote.store'
 import { isProtectedAgentCoreFile, resolveVfsTarget, withVfsAgentIdHint } from './vfs-resolver'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
+import { withToolTimeout, isToolTimeoutError } from './tool-utils'
 
 export const deleteDefinition: ToolDefinition = {
   type: 'function',
@@ -49,6 +50,10 @@ export const deleteDefinition: ToolDefinition = {
           type: 'boolean',
           description: 'Preview deletion targets without marking pending changes. Default: false',
           default: false,
+        },
+        timeout: {
+          type: 'number',
+          description: 'Maximum execution time in milliseconds (default: 60000).',
         },
       },
     },
@@ -186,6 +191,7 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   const paths = args.paths as string[] | undefined
   const dryRun = args.dry_run === true
   const recursive = args.recursive === true
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 60_000
 
   const requestedTargets = paths && Array.isArray(paths) && paths.length > 0 ? paths : path ? [path] : []
 
@@ -253,30 +259,57 @@ export const deleteExecutor: ToolExecutor = async (args, context) => {
   const deletedDirs: string[] = []
   const failed: Array<{ path: string; error: string }> = []
 
-  for (const target of targets) {
-    try {
-      const result = await deleteTarget(target, context, recursive)
+  // Wrap the entire deletion loop in a wall-clock timeout. A stalled backend
+  // (revoked FS handle, locked OPFS) shouldn't hang the agent loop indefinitely.
+  try {
+    await withToolTimeout(
+      (async () => {
+        for (const target of targets) {
+          try {
+            const result = await deleteTarget(target, context, recursive)
 
-      deleted.push(...result.deletedFiles)
-      deletedDirs.push(...result.deletedDirs)
+            deleted.push(...result.deletedFiles)
+            deletedDirs.push(...result.deletedDirs)
 
-      const session = useRemoteStore.getState().session
-      if (session) {
-        // Broadcast each deleted file
-        for (const filePath of result.deletedFiles) {
-          session.broadcastFileChange(filePath, 'delete', `Deleted: ${filePath}`)
+            const session = useRemoteStore.getState().session
+            if (session) {
+              // Broadcast each deleted file
+              for (const filePath of result.deletedFiles) {
+                session.broadcastFileChange(filePath, 'delete', `Deleted: ${filePath}`)
+              }
+              // Broadcast directory removal
+              if (result.deletedDirs.length > 0) {
+                session.broadcastFileChange(target, 'delete', `Deleted: ${target}`)
+              }
+            }
+          } catch (error) {
+            failed.push({
+              path: target,
+              error: withVfsAgentIdHint(error instanceof Error ? error.message : String(error)),
+            })
+          }
         }
-        // Broadcast directory removal
-        if (result.deletedDirs.length > 0) {
-          session.broadcastFileChange(target, 'delete', `Deleted: ${target}`)
-        }
-      }
-    } catch (error) {
-      failed.push({
-        path: target,
-        error: withVfsAgentIdHint(error instanceof Error ? error.message : String(error)),
+      })(),
+      timeoutMs,
+      'delete',
+    )
+  } catch (error) {
+    if (isToolTimeoutError(error)) {
+      // Partial result: include whatever was deleted before the timeout
+      const pendingChanges = useOPFSStore.getState().getPendingChanges()
+      return JSON.stringify({
+        success: false,
+        total: deleted.length + deletedDirs.length + failed.length + 1,
+        deleted,
+        deletedDirs,
+        failed,
+        timedOut: true,
+        status: 'pending',
+        pendingCount: pendingChanges.length,
+        message: `${error.message} — ${deleted.length} file(s) deleted before timeout. ${pendingChanges.length} change(s) pending review.`,
       })
     }
+    throw error
   }
 
   const pendingChanges = useOPFSStore.getState().getPendingChanges()

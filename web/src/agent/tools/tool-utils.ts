@@ -1,10 +1,51 @@
 /**
- * Workspace directory handle resolution helpers.
+ * Workspace directory handle resolution helpers + shared tool utilities.
  *
  * All functions require a valid workspaceId — the agent loop always provides one
  * (= conversationId). If missing, that's a caller bug and should fail fast rather
  * than silently falling through to a global "active" state that may be wrong.
  */
+
+//-----------------------------------------------------------------------------
+// Timeout helpers (shared by read / write / delete / search / bash tools)
+//-----------------------------------------------------------------------------
+
+/** Error thrown when a tool exceeds its wall-clock timeout. */
+export class ToolTimeoutError extends Error {
+  readonly toolName: string
+  readonly timeoutMs: number
+
+  constructor(toolName: string, timeoutMs: number) {
+    super(`${toolName}: timed out after ${timeoutMs}ms`)
+    this.name = 'ToolTimeoutError'
+    this.toolName = toolName
+    this.timeoutMs = timeoutMs
+  }
+}
+
+/**
+ * Wrap an async operation with a wall-clock timeout.
+ *
+ * Resolves with the original result on success, or rejects with
+ * {@link ToolTimeoutError} when the timeout elapses first.
+ * The timeout timer is always cleaned up (success / failure / timeout).
+ */
+export function withToolTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  toolName: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ToolTimeoutError(toolName, timeoutMs)), timeoutMs)
+  })
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer!))
+}
+
+/** Type guard: is this error a {@link ToolTimeoutError}? */
+export function isToolTimeoutError(error: unknown): error is ToolTimeoutError {
+  return error instanceof ToolTimeoutError
+}
 
 /**
  * Resolve the native or OPFS directory handle for a workspace.

@@ -14,6 +14,7 @@ import { ensureReadFileState, getReadStateKey } from './read-state'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { getFormatHandler, buildFormatWriteContext } from './format-registry'
+import { withToolTimeout, isToolTimeoutError } from './tool-utils'
 
 // Ensure format handlers are registered before first use
 import './formats'
@@ -237,6 +238,10 @@ export const editDefinition: ToolDefinition = {
             required: ['old_text', 'new_text'],
           },
         },
+        timeout: {
+          type: 'number',
+          description: 'Maximum execution time in milliseconds (default: 30000).',
+        },
       },
       required: ['path', 'edits'],
     },
@@ -252,6 +257,7 @@ interface ResolvedEdit {
 export const editExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const edits = args.edits as Array<{ old_text?: string; new_text?: string }> | undefined
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 30_000
 
   // Reject legacy batch-edit args
   if (
@@ -313,7 +319,7 @@ export const editExecutor: ToolExecutor = async (args, context) => {
     newText: e.new_text!,
   }))
 
-  return executeEdits(context, { path: effectivePath, edits: resolvedEdits })
+  return executeEdits(context, { path: effectivePath, edits: resolvedEdits, timeoutMs })
 }
 
 // ── Apply edits atomically ──────────────────────────────────────────
@@ -331,9 +337,10 @@ export const editExecutor: ToolExecutor = async (args, context) => {
  */
 async function executeEdits(
   context: ToolContext,
-  opts: { path: string; edits: ResolvedEdit[] }
+  opts: { path: string; edits: ResolvedEdit[]; timeoutMs?: number }
 ): Promise<string> {
   const { path, edits } = opts
+  const timeoutMs = opts.timeoutMs ?? 30_000
 
   // Validate no empty old_text
   for (let i = 0; i < edits.length; i++) {
@@ -368,7 +375,11 @@ async function executeEdits(
 
     try {
       if (formatHandler?.read) {
-        const backendResult = await target.backend.readFile(target.path, { encoding: 'binary' })
+        const backendResult = await withToolTimeout(
+          target.backend.readFile(target.path, { encoding: 'binary' }),
+          timeoutMs,
+          'edit',
+        )
         const rawData = backendResult.content instanceof ArrayBuffer
           ? new Uint8Array(backendResult.content)
           : backendResult.content instanceof Uint8Array
@@ -384,7 +395,11 @@ async function executeEdits(
         const readResult = await formatHandler.read(rawData, path)
         fileContent = readResult.content
       } else {
-        const backendResult = await target.backend.readFile(target.path)
+        const backendResult = await withToolTimeout(
+          target.backend.readFile(target.path),
+          timeoutMs,
+          'edit',
+        )
         if (typeof backendResult.content !== 'string') {
           return toolErrorJson(
             'edit',
@@ -513,7 +528,7 @@ async function executeEdits(
       if (formatHandler?.write) {
         const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
         const binaryData = await formatHandler.write(updatedContent, path, writeContext)
-        await target.backend.writeFile(target.path, binaryData)
+        await withToolTimeout(target.backend.writeFile(target.path, binaryData), timeoutMs, 'edit')
       } else if (formatHandler && !formatHandler.write) {
         return toolErrorJson(
           'edit',
@@ -522,7 +537,7 @@ async function executeEdits(
           { hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.` }
         )
       } else {
-        await target.backend.writeFile(target.path, updatedContent)
+        await withToolTimeout(target.backend.writeFile(target.path, updatedContent), timeoutMs, 'edit')
       }
     }
 
@@ -572,6 +587,9 @@ async function executeEdits(
       ...(formatHandler?.formatHint ? { formatHint: formatHandler.formatHint } : {}),
     })
   } catch (error) {
+    if (isToolTimeoutError(error)) {
+      return toolErrorJson('edit', 'timeout', error.message, { retryable: true })
+    }
     if (error instanceof DOMException && error.name === 'NotFoundError') {
       return toolErrorJson('edit', 'file_not_found', `File not found: ${path}`)
     }

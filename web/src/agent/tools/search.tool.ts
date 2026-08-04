@@ -3,7 +3,7 @@ import { getSearchWorkerManager } from '@/workers/search-worker-manager'
 import type { PendingFileOverlay, SearchInDirectoryResult, FileSearchResult, SearchHit } from '@/workers/search-worker-manager'
 import { useOPFSStore } from '@/store/opfs.store'
 import { getWorkspaceManager } from '@/opfs'
-import { resolveNativeDirectoryHandleForPath } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath, withToolTimeout, isToolTimeoutError } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { checkSearchLoop } from './loop-guard'
 import { resolveVfsTarget } from './vfs-resolver'
@@ -351,6 +351,10 @@ export const searchDefinition: ToolDefinition = {
           type: 'number',
           description: 'Search time budget in milliseconds. Default 25000.',
         },
+        timeout: {
+          type: 'number',
+          description: 'Maximum total execution time in milliseconds (default: 30000). Caps the entire search operation including overlay collection and multi-root traversal.',
+        },
         max_file_size: {
           type: 'number',
           description: 'Skip files larger than this byte size. Default 1MB.',
@@ -372,6 +376,7 @@ export const searchDefinition: ToolDefinition = {
 
 export const searchExecutor: ToolExecutor = async (args, context) => {
   const query = typeof args.query === 'string' ? args.query.trim() : ''
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 30_000
   if (!query) {
     return toolErrorJson('search', 'invalid_arguments', 'query is required')
   }
@@ -544,38 +549,47 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
     // Determine whether to search a single root or all roots
     let result: SearchInDirectoryResult
 
-    if (searchPath) {
-      // Specific path provided — search single resolved root
-      // Use resolvedRootName (the actual root handle name, e.g. "creatorweave")
-      // instead of searchPath, so stripOverlayRootPrefix strips only the root prefix,
-      // leaving overlay keys that match the worker's relative paths (relative to root handle).
-      const rootName = resolvedRootName || searchPath || undefined
-      result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
+    // The heavy I/O (search worker + overlay collection) is wrapped with a
+    // wall-clock timeout so a stalled worker doesn't hang the agent loop.
+    result = await withToolTimeout(
+      (async () => {
+        if (searchPath) {
+          // Specific path provided — search single resolved root
+          // Use resolvedRootName (the actual root handle name, e.g. "creatorweave")
+          // instead of searchPath, so stripOverlayRootPrefix strips only the root prefix,
+          // leaving overlay keys that match the worker's relative paths (relative to root handle).
+          const rootName = resolvedRootName || searchPath || undefined
+          const r = await manager.searchInDirectory(directoryHandle, buildSearchOptions(vfsSubPath || undefined, rootName))
 
-      // Prepend root prefix AND sub-path to hit paths so they are fully qualified.
-      // The worker returns paths relative to the resolved sub-directory (vfsSubPath),
-      // so we must reconstruct the full path: rootName/subPath/workerRelativePath.
-      // (e.g. "creatorweave/web/src/i18n/index.ts" not "creatorweave/i18n/index.ts")
-      if (resolvedRootName) {
-        const prefix = vfsSubPath
-          ? `${resolvedRootName}/${vfsSubPath}/`
-          : `${resolvedRootName}/`
-        for (const hit of result.results) {
-          hit.path = `${prefix}${hit.path}`
+          // Prepend root prefix AND sub-path to hit paths so they are fully qualified.
+          // The worker returns paths relative to the resolved sub-directory (vfsSubPath),
+          // so we must reconstruct the full path: rootName/subPath/workerRelativePath.
+          // (e.g. "creatorweave/web/src/i18n/index.ts" not "creatorweave/i18n/index.ts")
+          if (resolvedRootName) {
+            const prefix = vfsSubPath
+              ? `${resolvedRootName}/${vfsSubPath}/`
+              : `${resolvedRootName}/`
+            for (const hit of r.results) {
+              hit.path = `${prefix}${hit.path}`
+            }
+          }
+          return r
+        } else {
+          // No path — search ALL roots and merge results
+          const allHandles = await getAllRootHandles(context)
+          if (allHandles.size <= 1) {
+            // Single root or no multi-root — infer root name from handle map
+            const singleRootName = allHandles.size === 1 ? [...allHandles.keys()][0] : undefined
+            return manager.searchInDirectory(directoryHandle, buildSearchOptions(undefined, singleRootName))
+          } else {
+            // Multi-root: search each root and merge (searchAllRoots handles prefix stripping per root)
+            return searchAllRoots(manager, allHandles, buildSearchOptions(), internalMaxResults)
+          }
         }
-      }
-    } else {
-      // No path — search ALL roots and merge results
-      const allHandles = await getAllRootHandles(context)
-      if (allHandles.size <= 1) {
-        // Single root or no multi-root — infer root name from handle map
-        const singleRootName = allHandles.size === 1 ? [...allHandles.keys()][0] : undefined
-        result = await manager.searchInDirectory(directoryHandle, buildSearchOptions(undefined, singleRootName))
-      } else {
-        // Multi-root: search each root and merge (searchAllRoots handles prefix stripping per root)
-        result = await searchAllRoots(manager, allHandles, buildSearchOptions(), internalMaxResults)
-      }
-    }
+      })(),
+      timeoutMs,
+      'search',
+    )
 
     // Aggregate raw hits into file-level results
     let files = aggregateResultsToFiles(
@@ -649,6 +663,9 @@ export const searchExecutor: ToolExecutor = async (args, context) => {
       }
     )
   } catch (error) {
+    if (isToolTimeoutError(error)) {
+      return toolErrorJson('search', 'timeout', error.message, { retryable: true })
+    }
     const structured = parseStructuredError(error)
     if (structured?.code === 'path_not_found') {
       return toolErrorJson(

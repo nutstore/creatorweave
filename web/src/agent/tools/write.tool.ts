@@ -15,7 +15,7 @@ import { resolveVfsTarget } from './vfs-resolver'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 import { rewritePythonMountPathForNonPythonTool, validateRootPrefix } from './path-guards'
 import { checkFileStaleness, refreshReadTimestamp } from './loop-guard'
-import { resolveNativeDirectoryHandleForPath } from './tool-utils'
+import { resolveNativeDirectoryHandleForPath, withToolTimeout, isToolTimeoutError } from './tool-utils'
 import { getResolvedPathForLoopGuard, formatToolErrorMessage } from './io-shared'
 import { getFormatHandler, buildFormatWriteContext } from './format-registry'
 
@@ -42,6 +42,10 @@ export const writeDefinition: ToolDefinition = {
         content: {
           type: 'string',
           description: 'Content to write',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Maximum execution time in milliseconds (default: 30000).',
         },
       },
       required: ['path', 'content'],
@@ -86,6 +90,7 @@ function getPendingWriteTypeForPath(
 export const writeExecutor: ToolExecutor = async (args, context) => {
   const path = args.path as string | undefined
   const content = args.content as string | undefined
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 30_000
 
   if (!path || content === undefined) {
     return toolErrorJson(
@@ -101,13 +106,14 @@ export const writeExecutor: ToolExecutor = async (args, context) => {
 
   const rewrittenWritePath = rewritePythonMountPathForNonPythonTool(path)
   const effectiveWritePath = rewrittenWritePath?.rewritten ? rewrittenWritePath.rewrittenPath : path
-  return executeSingleWrite(effectiveWritePath, content, context)
+  return executeSingleWrite(effectiveWritePath, content, context, timeoutMs)
 }
 
 async function executeSingleWrite(
   path: string,
   content: string,
-  context: ToolContext
+  context: ToolContext,
+  timeoutMs: number = 30_000,
 ): Promise<string> {
   const { getPendingChanges, hasCachedFile } = useOPFSStore.getState()
 
@@ -157,11 +163,16 @@ async function executeSingleWrite(
     // If a format handler with write support is registered for this file type,
     // delegate content serialization to the handler (e.g. .nol → ZIP)
     const formatHandler = getFormatHandler(path)
+    // Helper to wrap backend I/O with wall-clock timeout so a stalled backend
+    // (revoked FS handle, locked OPFS) doesn't hang the agent loop.
+    const writeWithTimeout = (writePromise: Promise<void>) =>
+      withToolTimeout(writePromise, timeoutMs, 'write')
+
     if (formatHandler?.write) {
       const writeContext = await buildFormatWriteContext(target.backend, target.path, context.workspaceId)
       try {
         const binaryData = await formatHandler.write(content, path, writeContext)
-        await target.backend.writeFile(target.path, binaryData)
+        await writeWithTimeout(target.backend.writeFile(target.path, binaryData))
       } catch (formatError) {
         // FormatWriteError: handler rejected the content with a progressive hint
         if (formatError instanceof Error && formatError.name === 'FormatWriteError' && 'hint' in formatError) {
@@ -178,7 +189,7 @@ async function executeSingleWrite(
         hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.`,
       })
     } else {
-      await target.backend.writeFile(target.path, content)
+      await writeWithTimeout(target.backend.writeFile(target.path, content))
     }
 
     // Collect asset metadata for assets backend (so UI shows AssetCard)
@@ -236,6 +247,9 @@ async function executeSingleWrite(
       buildMeta()
     )
   } catch (error) {
+    if (isToolTimeoutError(error)) {
+      return toolErrorJson('write', 'timeout', error.message, { retryable: true })
+    }
     return toolErrorJson(
       'write',
       'internal_error',

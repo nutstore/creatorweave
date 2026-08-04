@@ -20,6 +20,7 @@ import { resolveVfsTarget } from './vfs-resolver'
 import { AssetsBackend } from './backends/assets-backend'
 import { AgentBackend } from './backends/agent-backend'
 import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
+import { withToolTimeout, isToolTimeoutError } from './tool-utils'
 
 /** Workspace mount point inside the bash sandbox (must match just-bash-bridge.ts) */
 const WORKSPACE_MOUNT = '/workspace'
@@ -297,18 +298,17 @@ export const bashToolExecutor: ToolExecutor = async (
 
   // Execute the command with wall-clock timeout
   const startTime = Date.now()
-  const timeoutMs = (args.timeout as number) || 120_000
+  const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 120_000
 
   try {
     const cwd = (args.cwd as string) || defaultCwd
 
     // Race between execution and timeout
-    const result = await Promise.race([
+    const result = await withToolTimeout(
       bash.exec(command, { cwd }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error(`bash: command timed out after ${timeoutMs}ms`)), timeoutMs)
-      ),
-    ])
+      timeoutMs,
+      'bash',
+    )
     const elapsedMs = Date.now() - startTime
 
     // Decode byte-shaped stdout for display in the tool result.
@@ -359,6 +359,12 @@ export const bashToolExecutor: ToolExecutor = async (
       elapsedMs,
     })
   } catch (err) {
+    if (isToolTimeoutError(err)) {
+      return toolErrorJson('bash', 'timeout', err.message, {
+        details: { command, elapsedMs: Date.now() - startTime },
+        retryable: true,
+      })
+    }
     const message = err instanceof Error ? err.message : String(err)
     if (message.startsWith('EACCES: delegated subagent')) {
       return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, message)
