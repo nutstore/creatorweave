@@ -76,7 +76,7 @@ export const discover = {
     progressValidating: "Validating…",
     progressInstalling: "Installing…",
     progressUninstalling: "Uninstalling…",
-    progressInstallDone: "Installed ({count} files)",
+    progressInstallDone: "Installed",
     progressUninstallDone: "Uninstalled",
     progressInstallFailed: "Install failed",
     progressUninstallFailed: "Uninstall failed",

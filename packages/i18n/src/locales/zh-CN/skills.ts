@@ -76,7 +76,7 @@ export const discover = {
     progressValidating: "校验中…",
     progressInstalling: "安装中…",
     progressUninstalling: "正在卸载…",
-    progressInstallDone: "安装成功（{count} 个文件）",
+    progressInstallDone: "安装成功",
     progressUninstallDone: "卸载成功",
     progressInstallFailed: "安装失败",
     progressUninstallFailed: "卸载失败",
