@@ -72,10 +72,10 @@ const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
               aria-label={label}
               disabled={!canCapture || isCapturing}
               onClick={onCapture}
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed ${
-                canCapture
-                  ? 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
-                  : 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                !supportsVision
+                  ? 'bg-neutral-50 text-neutral-400 dark:bg-neutral-900 dark:text-neutral-600'
+                  : 'bg-primary-50 text-primary-600 dark:bg-primary-50/40 dark:text-primary-700'
               }`}
             >
               {isCapturing ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />}
