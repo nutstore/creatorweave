@@ -281,9 +281,12 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
             </TabsList>
           </Tabs>
 
-          {/* Body content based on viewMode */}
-          {viewMode === 'manage' ? (
-            <>
+          {/* Body content — both views are always mounted and toggled via CSS
+              so that SkillDiscover is not remounted on tab switch (which would
+              reset its manifest state to null and cause a full-dialog height
+              flicker). */}
+          {/* Manage view */}
+          <div className={cn('flex min-h-0 flex-1 flex-col', viewMode !== 'manage' && 'hidden')}>
               {/* Toolbar — search + filter + refresh */}
               <div className="flex items-center gap-2 px-6 py-3">
                 <SkillSearchInput
@@ -338,16 +341,16 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
                   </div>
                 )}
               </div>
-            </>
-          ) : (
-            <div className="custom-scrollbar flex-1 overflow-y-auto px-6 py-4">
+          </div>
+
+          {/* Discover view — always mounted to preserve SkillDiscover state. */}
+          <div className={cn('custom-scrollbar flex-1 overflow-y-auto px-6 py-4', viewMode !== 'discover' && 'hidden')}>
               <SkillDiscover
                 onInstalled={() => {
                   void loadSkills()
                 }}
               />
-            </div>
-          )}
+          </div>
 
         </BrandDialogContent>
       </BrandDialog>
