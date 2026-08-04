@@ -333,6 +333,10 @@ export default defineConfig({
           if (id.includes('node_modules/xlsx/') || id.includes('node_modules/exceljs/')) {
             return 'xlsx'
           }
+          // Mermaid diagrams (lazy-loaded, only when a mermaid code block renders)
+          if (id.includes('node_modules/mermaid/')) {
+            return 'mermaid'
+          }
           // just-bash: do NOT add to manualChunks — it uses dynamic import()
           // and contains node:zlib references that break PWA buildEnd scanning.
           // Leaving it as a dynamic-import chunk avoids rollup parsing its internals.

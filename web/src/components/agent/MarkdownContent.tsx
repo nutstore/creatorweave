@@ -23,6 +23,7 @@ import { Copy, Check, Loader2 } from 'lucide-react'
 import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
 import { HtmlSandboxPreview } from './HtmlSandboxPreview'
 import { Lightbox } from './Lightbox'
+import { MermaidDiagram } from './MermaidDiagram'
 
 /** Context for passing the image click callback from MarkdownContent to MarkdownImage/AssetImage */
 const ImageClickContext = createContext<(src: string) => void>(() => {})
@@ -290,6 +291,9 @@ const MARKDOWN_COMPONENTS = {
   code({ className, children, node, ...props }: React.ComponentPropsWithoutRef<'code'> & { className?: string; node?: MarkdownCodeNode }) {
     const match = /language-([\w-]+)/.exec(className || '')
     const isBlock = match || (typeof children === 'string' && children.includes('\n'))
+    if (match?.[1] === 'mermaid') {
+      return <MermaidDiagram chart={extractText(children).replace(/^\n+|\n+$/g, '')} />
+    }
     if (match?.[1] === 'interactive-html') {
       const meta = parseInteractiveHtmlMeta(node?.properties?.['data-meta'])
       return (

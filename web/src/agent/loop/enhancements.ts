@@ -125,7 +125,25 @@ export async function buildRuntimeEnhancedPrompt(input: InjectEnhancementsInput)
     if (skillManager.initialized) {
       const { buildAvailableSkillsBlock } = await import('@/skills/skill-injection')
       const metadata = skillManager.getSkillMetadata()
-      const skillsBlock = buildAvailableSkillsBlock(metadata)
+
+      // Best-effort: count uninstalled skills in the store for a search hint.
+      // The count is injected into the system prompt to make the agent aware
+      // that relevant uninstalled skills may exist, nudging it toward
+      // search_skills instead of defaulting to a manual approach.
+      let uninstalledCount = 0
+      try {
+        const { fetchSkillStoreManifest, scanInstalledDirNames } =
+          await import('@/skills/skill-store')
+        const manifest = await fetchSkillStoreManifest()
+        const installedSet = await scanInstalledDirNames()
+        uninstalledCount = manifest.skills.filter(
+          (s) => !installedSet.has(s.dirName),
+        ).length
+      } catch {
+        // Skill store manifest unavailable (offline / dev without pack) — skip count
+      }
+
+      const skillsBlock = buildAvailableSkillsBlock(metadata, uninstalledCount)
       if (skillsBlock) {
         enhancedPrompt += '\n\n' + skillsBlock
       }

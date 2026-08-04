@@ -21,12 +21,33 @@ import type { SkillMetadata } from './skill-types'
  * Injects metadata for all enabled skills. The LLM reads the descriptions and
  * triggers to decide which skill (if any) to load via `read_skill`.
  */
-export function buildAvailableSkillsBlock(allSkills: SkillMetadata[]): string {
+export function buildAvailableSkillsBlock(
+  allSkills: SkillMetadata[],
+  uninstalledCount = 0,
+): string {
   // Filter enabled skills
   const enabledSkills = allSkills.filter((s) => s.enabled)
 
-  if (enabledSkills.length === 0) {
+  // Skip entirely only if no installed skills AND no uninstalled skills to hint at
+  if (enabledSkills.length === 0 && uninstalledCount <= 0) {
     return ''
+  }
+
+  // Build the Skill Store discovery hint — dynamic, based on uninstalled count.
+  // Injecting the count makes the existence of uninstalled skills concrete and
+  // nudges the agent toward search_skills instead of defaulting to a manual approach.
+  let storeHint: string
+  if (uninstalledCount > 0) {
+    storeHint = `Discovering NEW skills:
+The Skill Store currently has **${uninstalledCount} skill${uninstalledCount > 1 ? 's' : ''} NOT installed** in this workspace. One may be directly relevant to the current task.
+- If no skill above matches the user's task, call search_skills(query or intent) to check the store BEFORE attempting a manual solution
+- Common domains covered: audio/video transcription, image processing, code review, design audit, writing, reading analysis, data/spreadsheet analysis, OCR, novel/OKF knowledge bases, OKR management, brainstorming, and more
+- search_skills results show installable cards; use ask_user_question to confirm with the user, then install_skill(dirName) + read_skill
+- Even when you know how to do the task yourself, checking the store first is often faster — pre-built skills ship tested scripts and workflows`
+  } else {
+    storeHint = `Discovering NEW skills:
+- All skills in the Skill Store are already installed in this workspace
+- If no skill above matches the task, you may still try search_skills(query) for recently added skills`
   }
 
   // Generate skills list (flat, no category headings that could be mistaken for skill names)
@@ -50,18 +71,12 @@ How to use skills:
 - Do not invoke a skill that is already loaded in your context
 - Do NOT pass category names to read_skill; only use the exact <name> value from a <skill> entry
 
-Discovering NEW skills:
-- If no skill above matches the user's task, call search_skills(query) to search the Skill Store
-- The Skill Store contains installable skills NOT listed here (code review, design audit, writing, reading analysis, etc.)
-- When search_skills finds a matching skill, use ask_user_question to ask the user if they want to install it
-- ONLY after the user confirms, call install_skill(dirName) to install it
-- After installation, call read_skill immediately to load the skill — it is available right away
-- Proactively call search_skills when the user's task clearly matches a domain (code review, design, writing, reading, etc.) but no matching skill is installed
+${storeHint}
 </usage>
 
 <available_skills>
 
-${skillsList}
+${skillsList || '(No skills installed yet — use search_skills to discover installable skills from the Skill Store.)'}
 
 </available_skills>
 

@@ -125,8 +125,8 @@ export const searchSkillsDefinition: ToolDefinition = {
     description: [
       'Search the Skill Store for skills that can be installed.',
       '',
-      'Use this when the user needs a capability (code review, design audit, writing, reading analysis, etc.)',
-      "that might be available as a pre-built skill but isn't currently installed.",
+      "Use this when the user needs a capability that might be available as a pre-built skill but isn't currently installed.",
+      'Domains include: audio/video transcription, image processing, code review, design audit, writing, reading analysis, data/spreadsheet analysis, OCR, novel/OKF, OKR management, brainstorming, and more.',
       'Results render as interactive cards in the chat — the user can install with one click.',
       '',
       'The search covers the Skill Store catalog (skills NOT yet installed).',
