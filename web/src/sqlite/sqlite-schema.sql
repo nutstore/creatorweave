@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 11;
+PRAGMA user_version = 12;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -291,6 +291,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_fs_snapshot_files_snapshot_path
     ON fs_snapshot_files(snapshot_id, path);
 CREATE INDEX IF NOT EXISTS idx_fs_snapshot_files_workspace_id
     ON fs_snapshot_files(workspace_id);
+
+-- ============================================================================
+-- App Settings Table (key/value application-level preferences)
+-- ============================================================================
+-- Generic key/value store for scalar app-level settings not tied to a
+-- specific project or workspace. Keys are dotted namespaces, e.g.
+-- 'snapshot.high_watermark'. Values are JSON-encoded strings.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
+);
 
 CREATE TABLE IF NOT EXISTS fs_sync_batches (
     id TEXT PRIMARY KEY,

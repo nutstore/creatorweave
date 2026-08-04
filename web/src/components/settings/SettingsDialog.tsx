@@ -754,6 +754,74 @@ function ScheduleToggle() {
 }
 
 // =============================================================================
+// Snapshot Retention Section
+// =============================================================================
+//
+// Two number inputs (high/low watermark) persisted to localStorage via
+// useSettingsStore. UI-only for now — automatic pruning is not wired up
+// (see comment in settings.store.ts).
+
+function SnapshotRetentionSection() {
+  const t = useT()
+  const high = useSettingsStore((s) => s.snapshotHighWatermark)
+  const low = useSettingsStore((s) => s.snapshotLowWatermark)
+  const setHigh = useSettingsStore((s) => s.setSnapshotHighWatermark)
+  const setLow = useSettingsStore((s) => s.setSnapshotLowWatermark)
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Database className="h-4 w-4 text-tertiary" />
+        <h3 className="text-sm font-medium text-secondary">{t('settings.snapshotRetention')}</h3>
+      </div>
+      <p className="text-xs text-tertiary">{t('settings.snapshotRetentionDesc')}</p>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-secondary">
+            {t('settings.snapshotHighWatermark')}
+          </label>
+          <input
+            type="number"
+            value={high}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              if (!Number.isNaN(n) && n > 0) setHigh(n)
+            }}
+            min={1}
+            step={1}
+            className="h-10 w-full rounded-md border border-neutral-200 bg-background px-3 text-sm tabular-nums text-foreground outline-none focus:border-primary-500 dark:border-neutral-700"
+          />
+          <p className="text-[10px] text-tertiary">
+            {t('settings.snapshotHighWatermarkDesc')}
+          </p>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-secondary">
+            {t('settings.snapshotLowWatermark')}
+          </label>
+          <input
+            type="number"
+            value={low}
+            onChange={(e) => {
+              const n = parseInt(e.target.value, 10)
+              if (!Number.isNaN(n) && n > 0) setLow(n)
+            }}
+            min={1}
+            step={1}
+            className="h-10 w-full rounded-md border border-neutral-200 bg-background px-3 text-sm tabular-nums text-foreground outline-none focus:border-primary-500 dark:border-neutral-700"
+          />
+          <p className="text-[10px] text-tertiary">
+            {t('settings.snapshotLowWatermarkDesc')}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// =============================================================================
 // Notifications Section (within General tab)
 // =============================================================================
 
@@ -1527,6 +1595,9 @@ const SettingsDialogContent = forwardRef<
                 <p className="text-xs text-tertiary">{t('settings.notifications.description')}</p>
                 <NotificationsSection />
               </div>
+
+              {/* Snapshot Retention Section */}
+              <SnapshotRetentionSection />
             </div>
           )}
 

@@ -838,6 +838,17 @@ function App() {
         console.error('[App] Failed to check API key:', err)
       }
 
+      // Hydrate snapshot retention watermarks from SQLite's app_settings
+      // so cross-device values (or values set by another tab) override
+      // the localStorage copy. Best-effort — failures fall back to
+      // localStorage values / hardcoded defaults.
+      try {
+        const { hydrateSnapshotWatermarksFromDb } = await import('@/store/settings.store')
+        await runInitStep('hydrateSnapshotWatermarksFromDb', () => hydrateSnapshotWatermarksFromDb())
+      } catch (err) {
+        console.error('[App] Failed to hydrate snapshot watermarks from DB:', err)
+      }
+
       // Register LLM Gateway provider + restore session from saved access_token
       try {
         const { registerLLMGatewayProvider, updateGatewayModels, getLLMGatewayApiKeyProviderKey, getLLMGatewayBaseURL, getLLMGatewayClientId } = await import('@/agent/providers/llm-gateway-provider')

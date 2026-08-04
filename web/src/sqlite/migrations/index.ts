@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 11
+export const BASE_SCHEMA_VERSION = 12
 
 // ============================================================================
 // Migration Registry
@@ -194,6 +194,22 @@ export const migrations: Migration[] = [
         ADD COLUMN parent_tool_call_id TEXT;
 
       PRAGMA user_version = 11;
+    `,
+  },
+  {
+    version: 12,
+    name: 'create_app_settings_table',
+    up: `
+      -- Generic key/value store for scalar app-level settings not tied to a
+      -- specific project or workspace (e.g. snapshot.high_watermark).
+      -- Values are JSON-encoded strings.
+      CREATE TABLE IF NOT EXISTS app_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
+      );
+
+      PRAGMA user_version = 12;
     `,
   },
 ]

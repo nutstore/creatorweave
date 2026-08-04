@@ -15,7 +15,7 @@ export const sidebar = {
     hasSchedule: "This conversation has scheduled tasks",
     workspaceDeleted: "Chat deleted",
     emptyStateNoWorkspace:
-      "No chat for this project yet. A chat will be automatically created when you start your first conversation.",
+      "No chats yet in this project. Create one to get started.",
     createFirstWorkspace: "Create First Chat",
     deleteWorkspaceFailed: "Failed to delete chat",
     deleteWorkspace: "Delete Chat",
@@ -50,26 +50,14 @@ export const sidebar = {
       loading: "Loading save records...",
       current: "Current",
       delete: "Delete",
-      switch: "Switch",
-      switching: "Switching...",
       deleting: "Deleting...",
       clear: "Clear",
       clearing: "Clearing...",
-      workspaceNotFound: "Chat not found: {name}",
-      switchPartial:
-        "Switch to save record not fully successful ({failedSnapshotId}), {count} files still not restored",
-      switchFailed:
-        "Switch failed and auto recovery not fully successful, please manually check save record status",
-      switchFailedWithCount:
-        "Switch to latest not fully successful, {count} files still not restored",
       loadFailed: "Failed to load save record",
       loadDetailFailed: "Failed to load save record details",
       deleteFailed: "Failed to delete save record",
       clearFailed: "Failed to clear save records",
       noActiveProject: "No active project",
-      noLatestSnapshot: "No save record to switch to",
-      snapshotNotFound: "Save record not found",
-      switchToLatestFailed: "Failed to switch to latest",
       pendingCount: "{count} changes",
       fileOpCreate: "Added",
       fileOpModify: "Modified",
@@ -88,6 +76,22 @@ export const sidebar = {
       draft: "Draft",
       rolledBack: "Rolled Back",
       autoSnapshotTitle: "Saved {count} files",
+      watermark: {
+        title: "Snapshot Limit",
+        description:
+          "When the limit is exceeded, the oldest snapshots are pruned first until the keep count is reached",
+        high: "Limit",
+        low: "Keep",
+        cancel: "Cancel",
+        save: "Save",
+        saving: "Saving...",
+        close: "Close",
+        invalidHigh: "Limit must be a positive integer",
+        invalidLow: "Keep count must be zero or a positive integer",
+        lowMustBeLessThanHigh: "Keep count must be less than the limit",
+        loadFailed: "Failed to load settings",
+        saveFailed: "Failed to save settings",
+      },
       processing: "Processing {current}/{total}",
       loadingDetails: "Loading details...",
       noDetails: "No file details for this save record",
@@ -109,7 +113,7 @@ export const sidebar = {
     pluginManagerHint: "Plugin management will be displayed here",
     clearWorkspaceTitle: "Clear Chat",
     confirmClearWorkspace:
-      "Clear all chat for current project? This cannot be undone.",
+      "Clear all chats for the current project? This cannot be undone.",
     clearedCount: "Cleared {count} chat(s)",
     clearFailed: "Clear failed ({count} failed)",
     deletePartial: "Deleted {success}, failed {failed}",
@@ -137,7 +141,7 @@ export const sidebar = {
     fileDiffViewer: {
       selectFile: "Select a file to view details",
       selectFileHint:
-        "Select a file from the list on the left to view diff between version and current file",
+        "Select a file from the tree to view its diff",
       loadingFile: "Loading file content...",
       loadFailed: "Load Failed",
       openInPreview: "Open file",
@@ -148,7 +152,7 @@ export const sidebar = {
       changedVersion: "Changed Version",
       binarySnapshot: "Binary File Comparison",
       binaryContent:
-        "Binary content does not support text-level diff. Download the file or use a dedicated binary comparison tool.",
+        "Binary file content is not supported for preview",
       noImageContent: "No image content",
       fileDeleted: "File deleted (no content in changed version)",
       cannotReadChangedVersion: "Cannot read changed version content",
@@ -170,7 +174,7 @@ export const sidebar = {
       cannotReadNativeImage: "Cannot read native image",
       cannotReadChangedImage: "Cannot read changed version image",
       imageWillBeDeleted:
-        "Image will be deleted (no content in changed version)",
+        "This image will be deleted",
       currentFileComments: "Current file comments",
       filesWithComments: "files with comments",
       copyCommentsToAI: "Send to AI",
@@ -182,7 +186,7 @@ export const sidebar = {
       // Error messages
       loadFailedError: "Failed to load file",
       cannotReadNativeContent:
-        "Cannot read native file content. Please select a project directory first.",
+        "Could not read the original file content",
       readNativeFileFailed: "Failed to read native file",
       // Snapshot comparison
       beforeSnapshotLabel: "Before Save",

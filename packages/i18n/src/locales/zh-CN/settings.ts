@@ -125,6 +125,14 @@ export const settings = {
     scheduleToggle: "定时任务 (Schedules)",
     scheduleToggleDesc: "启用 cron 表达式驱动的定时任务。开启后可在 TopBar 打开定时任务面板，Agent 也会获得 manage_schedule 工具。",
 
+    // Snapshot retention
+    snapshotRetention: "快照保留策略",
+    snapshotRetentionDesc: "限制每个项目保留的快照数量上限。快照含文件内容备份，保留越少 SQLite 文件越小。每次创建快照后会自动清理：超过高水位时清理到低水位，当前快照和最近一个可回滚点永远保留。",
+    snapshotHighWatermark: "高水位",
+    snapshotHighWatermarkDesc: "当快照数量超过这个值时，旧的快照会被标记为可清理。",
+    snapshotLowWatermark: "低水位",
+    snapshotLowWatermarkDesc: "清理后保留多少条。要 ≤ 高水位，且 ≥ 1。",
+
     // Sync panel
     syncPanel: {
       upload: "上传",

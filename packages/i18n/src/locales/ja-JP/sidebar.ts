@@ -13,7 +13,7 @@ export const sidebar = {
     hasSchedule: "このチャットにはスケジュールされたタスクがあります",
     workspaceDeleted: "チャットが削除されました",
     emptyStateNoWorkspace:
-      "このプロジェクトのチャットはまだありません。新しいチャットを作成して AI と対話を始めましょう。",
+      "このプロジェクトにはまだチャットがありません。作成して開始してください。",
     createFirstWorkspace: "最初のチャットを作成",
     deleteWorkspaceFailed: "チャットの削除に失敗しました",
     deleteWorkspace: "チャットを削除",
@@ -42,25 +42,14 @@ export const sidebar = {
       loading: "保存記録を読み込み中...",
       current: "現在",
       delete: "削除",
-      switch: "切り替え",
-      switching: "処理中...",
       deleting: "削除中...",
       clear: "クリア",
       clearing: "クリア中...",
-      workspaceNotFound: "チャットが見つかりません: {name}",
-      switchPartial:
-        "保存記録への切り替えが完全成功しませんでした（失敗保存記録 {failedSnapshotId}）、{count}件の変更がまだ元に戻っていません",
-      switchFailed:
-        "切り替えが失敗し自動回復も完全成功しませんでした。手動で保存記録の状況を確認してください",
-      switchFailedWithCount:
-        "最新への切り替えが完全成功しませんでした、{count}件の変更がまだ元に戻っていません",
       loadFailed: "保存記録の読み込みに失敗しました",
       loadDetailFailed: "保存記録詳細の読み込みに失敗しました",
       deleteFailed: "保存記録の削除に失敗しました",
       clearFailed: "保存記録のクリアに失敗しました",
       noActiveProject: "アクティブなプロジェクトがありません",
-      snapshotNotFound: "保存記録が見つかりません",
-      switchToLatestFailed: "最新の保存記録への切り替えに失敗しました",
       pendingCount: "{count}件の変更",
       fileOpCreate: "追加",
       fileOpModify: "変更",
@@ -79,6 +68,22 @@ export const sidebar = {
       draft: "下書き",
       rolledBack: "ロールバック済み",
       autoSnapshotTitle: "{count}件のファイルを保存",
+      watermark: {
+        title: "スナップショット保持上限",
+        description:
+          "上限を超えると最も古いスナップショットから順に削除され、保持数に達するまで続きます",
+        high: "上限",
+        low: "保持",
+        cancel: "キャンセル",
+        save: "保存",
+        saving: "保存中...",
+        close: "閉じる",
+        invalidHigh: "上限は正の整数である必要があります",
+        invalidLow: "保持数は 0 以上の整数である必要があります",
+        lowMustBeLessThanHigh: "保持数は上限より小さい必要があります",
+        loadFailed: "設定の読み込みに失敗しました",
+        saveFailed: "設定の保存に失敗しました",
+      },
       processing: "処理中 {current}/{total}",
       loadingDetails: "詳細を読み込み中...",
       noDetails: "この保存記録には詳細がありません",
@@ -127,7 +132,7 @@ export const sidebar = {
     fileDiffViewer: {
       selectFile: "ファイルを選択して詳細を表示",
       selectFileHint:
-        "左側のリストからファイルを選択して、バージョンと現在のファイルの差分を表示",
+        "ツリーからファイルを選択して差分を表示",
       loadingFile: "ファイル内容を読み込み中...",
       loadFailed: "読み込み失敗",
       openInPreview: "ファイルを開く",
@@ -138,7 +143,7 @@ export const sidebar = {
       changedVersion: "変更バージョン",
       binarySnapshot: "バイナリファイル比較",
       binaryContent:
-        "バイナリ内容はテキストレベルの差分をサポートしていません。ファイルをダウンロードするか、専用バイナリ比較ツールを使用してください。",
+        "バイナリファイルの内容はプレビューに対応していません",
       noImageContent: "画像コンテンツなし",
       fileDeleted: "ファイル削除済み（変更バージョンに内容なし）",
       cannotReadChangedVersion: "変更バージョンの内容を読み込めません",
@@ -171,7 +176,7 @@ export const sidebar = {
       // Error messages
       loadFailedError: "ファイルの読み込みに失敗しました",
       cannotReadNativeContent:
-        "ネイティブファイル内容を表示するにはプロジェクトディレクトリを選択してください",
+        "元のファイル内容を読み込めませんでした",
       readNativeFileFailed: "ネイティブファイルの読み込みに失敗しました",
       // Snapshot comparison
       beforeSnapshotLabel: "保存前",

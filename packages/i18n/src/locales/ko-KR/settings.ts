@@ -125,6 +125,14 @@ export const settings = {
     scheduleToggle: "스케줄 (Schedules)",
     scheduleToggleDesc: "cron 식 기반 예약 작업을 활성화합니다. 켜면 상단 표시줄에 스케줄 버튼이 나타나고 에이전트는 manage_schedule 도구를 사용할 수 있습니다.",
 
+    // Snapshot retention
+    snapshotRetention: "스냅샷 보존 정책",
+    snapshotRetentionDesc: "프로젝트당 보존할 스냅샷 수를 제한합니다. 스냅샷에는 파일 내용 백업이 포함되므로, 수를 줄이면 데이터베이스가 작아집니다. 스냅샷 생성 후 자동 정리가 실행됩니다: 상한선을 초과하면 가장 오래된 스냅샷이 하한선까지 제거됩니다. 현재 스냅샷과 가장 최근의 롤백 지점은 항상 보존됩니다.",
+    snapshotHighWatermark: "상한선",
+    snapshotHighWatermarkDesc: "스냅샷 수가 이 값을 초과하면 오래된 스냅샷이 정리 대상이 됩니다.",
+    snapshotLowWatermark: "하한선",
+    snapshotLowWatermarkDesc: "정리 후 남길 수. 상한선 이하, 1 이상.",
+
     // Sync panel
     syncPanel: {
       upload: "업로드",

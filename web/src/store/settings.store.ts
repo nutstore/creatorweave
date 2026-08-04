@@ -73,6 +73,16 @@ interface SettingsState {
     onlyWhenHidden: boolean
   }
 
+  // Snapshot retention (per-workspace, which is per-project in our
+  // 1:1:1 model). When a workspace accumulates more than
+  // `snapshotHighWatermark` snapshots, the next
+  // `createApprovedSnapshotForPaths` call prunes them down to
+  // `snapshotLowWatermark`. Persisted for future Settings UI. The
+  // authoritative source lives in `app_settings`; this Zustand copy is
+  // a UI convenience and is loaded on hydration.
+  snapshotHighWatermark: number
+  snapshotLowWatermark: number
+
   // API key status - NOT persisted, derived from SQLite
   // Use getHasApiKey() or checkHasApiKey() to get the current value
   hasApiKey: boolean
@@ -121,6 +131,8 @@ interface SettingsState {
   setEnableBatchSpawn: (v: boolean) => void
   setEnableWebMCP: (v: boolean) => void
   setEnableSchedules: (v: boolean) => void
+  setSnapshotHighWatermark: (n: number) => void
+  setSnapshotLowWatermark: (n: number) => void
   setHasApiKey: (has: boolean) => void
   setAgentLoopNotificationsEnabled: (enabled: boolean) => void
   setAgentLoopNotificationsOnlyWhenHidden: (onlyWhenHidden: boolean) => void
@@ -189,6 +201,66 @@ interface SettingsState {
   triggerProviderRefresh: () => void
 }
 
+/**
+ * Persist snapshot retention watermarks to SQLite's `app_settings` table.
+ *
+ * Called as fire-and-forget from the synchronous Zustand setters — a SQLite
+ * write failure must not block the UI update. We use a dynamic import to
+ * avoid a hard cycle (settings.store → fs-overlay.repository; repository
+ * never imports settings.store today, but keeping the import lazy also
+ * shortens the initial bundle).
+ */
+async function persistSnapshotWatermarksToDb(
+  high: number,
+  low: number,
+): Promise<void> {
+  try {
+    const { getFSOverlayRepository } = await import(
+      '@/sqlite/repositories/fs-overlay.repository'
+    )
+    await getFSOverlayRepository().setSnapshotWatermarks(high, low)
+  } catch (err) {
+    // Don't surface to UI — the user already saw their input reflected in
+    // the local Zustand copy. The next successful write (or app restart
+    // with onRehydrateStorage hydration) will reconcile.
+    console.warn(
+      '[SettingsStore] Failed to persist snapshot watermarks to app_settings; will retry on next set:',
+      err,
+    )
+  }
+}
+
+/**
+ * Read snapshot watermarks from `app_settings` and merge into the Zustand
+ * state. Called once on app boot, after rehydration, so cross-device
+ * values (or values set by another tab) override the localStorage copy.
+ *
+ * Safe to call before the SQLite worker is ready — errors are swallowed
+ * and we fall back to the defaults.
+ */
+export async function hydrateSnapshotWatermarksFromDb(): Promise<void> {
+  try {
+    const { getFSOverlayRepository } = await import(
+      '@/sqlite/repositories/fs-overlay.repository'
+    )
+    const wm = await getFSOverlayRepository().getSnapshotWatermarks()
+    const defaults = { high: 100, low: 50 }
+    // Only override when DB values differ from the localStorage defaults —
+    // otherwise the user's localStorage copy (typed in offline) wins.
+    if (wm.high !== defaults.high || wm.low !== defaults.low) {
+      useSettingsStore.setState({
+        snapshotHighWatermark: wm.high,
+        snapshotLowWatermark: wm.low,
+      })
+    }
+  } catch (err) {
+    console.warn(
+      '[SettingsStore] hydrateSnapshotWatermarksFromDb failed; using Zustand defaults:',
+      err,
+    )
+  }
+}
+
 /** Helper: register a CustomProviderConfig into the dynamic provider registry */
 function registerCustomAsDynamic(cp: CustomProviderConfig) {
   registerDynamicProvider(
@@ -225,6 +297,8 @@ export const useSettingsStore = create<SettingsState>()(
       enableBatchSpawn: false,
       enableWebMCP: true,
       enableSchedules: false,
+      snapshotHighWatermark: 100,
+      snapshotLowWatermark: 50,
       hasApiKey: false,
       hasApiKeyLoaded: false,
       modelOverridesByWorkspace: {},
@@ -446,6 +520,24 @@ export const useSettingsStore = create<SettingsState>()(
       setEnableBatchSpawn: (enableBatchSpawn) => set({ enableBatchSpawn }),
       setEnableWebMCP: (enableWebMCP) => set({ enableWebMCP }),
       setEnableSchedules: (enableSchedules) => set({ enableSchedules }),
+      setSnapshotHighWatermark: (snapshotHighWatermark) => {
+        const low = get().snapshotLowWatermark
+        // Keep a strict gap: repository validation requires low < high.
+        const nextHigh = Math.max(1, Math.floor(snapshotHighWatermark), low + 1)
+        set({ snapshotHighWatermark: nextHigh })
+        // Persist to app_settings so pruneProjectSnapshots sees the new value.
+        // Fire-and-forget: SQLite write failure must not block UI updates.
+        void persistSnapshotWatermarksToDb(nextHigh, low)
+      },
+      setSnapshotLowWatermark: (snapshotLowWatermark) => {
+        const high = get().snapshotHighWatermark
+        // Keep a strict gap while allowing zero retained history.
+        const nextLow = Math.min(Math.max(0, Math.floor(snapshotLowWatermark)), high - 1)
+        set({ snapshotLowWatermark: nextLow })
+        // Persist to app_settings so pruneProjectSnapshots sees the new value.
+        // Fire-and-forget: SQLite write failure must not block UI updates.
+        void persistSnapshotWatermarksToDb(high, nextLow)
+      },
       setHasApiKey: (hasApiKey) => set({ hasApiKey }),
       setAgentLoopNotificationsEnabled: (enabled) => {
         set((s) => ({ agentLoopNotifications: { ...s.agentLoopNotifications, enabled } }))
@@ -807,6 +899,8 @@ export const useSettingsStore = create<SettingsState>()(
         enableBatchSpawn: state.enableBatchSpawn,
         enableWebMCP: state.enableWebMCP,
         enableSchedules: state.enableSchedules,
+        snapshotHighWatermark: state.snapshotHighWatermark,
+        snapshotLowWatermark: state.snapshotLowWatermark,
         modelOverridesByWorkspace: state.modelOverridesByWorkspace,
         lastUsedModelByProvider: state.lastUsedModelByProvider,
         imageGenModel: state.imageGenModel,

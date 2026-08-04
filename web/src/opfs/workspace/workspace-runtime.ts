@@ -1842,6 +1842,15 @@ export class WorkspaceRuntime {
       })
     }
 
+    // Notify UI (SnapshotList) that a new snapshot was created, so it can
+    // auto-reload without waiting for a manual tab switch.
+    try {
+        const { useWorkspaceStore } = await import('@/store/workspace.store')
+        useWorkspaceStore.getState().triggerSnapshotRefresh()
+    } catch {
+        // Store import is best-effort; never block snapshot creation.
+    }
+
     return { ...snapshot, conflicts }
   }
 
@@ -2050,158 +2059,6 @@ export class WorkspaceRuntime {
       reverted,
       unresolved,
       failedSnapshotId,
-    }
-  }
-
-  async switchToSnapshot(
-    snapshotId: string,
-    directoryHandle?: FileSystemDirectoryHandle | null,
-    onProgress?: (progress: {
-      phase: 'rollback' | 'apply'
-      processed: number
-      total: number
-      snapshotId: string
-    }) => void
-  ): Promise<{
-    targetSnapshotId: string
-    direction: 'backward' | 'forward' | 'noop'
-    rolledBackSnapshotIds: string[]
-    appliedSnapshotIds: string[]
-    reverted: number
-    applied: number
-    unresolved: string[]
-    failedSnapshotId?: string
-    compensationAttempted?: boolean
-    compensationSucceeded?: boolean
-  }> {
-    if (!this.initialized) await this.initialize()
-    const repo = getFSOverlayRepository()
-    const snapshots = await repo.listSnapshots(this.workspaceId, 500)
-    const targetIndex = snapshots.findIndex((item) => item.id === snapshotId)
-    if (targetIndex < 0) {
-      throw new Error(`快照不存在: ${snapshotId}`)
-    }
-
-    const isActive = (status: string): boolean => status === 'approved' || status === 'committed'
-    const currentIndex = snapshots.findIndex((item) => isActive(item.status))
-    const normalizedCurrentIndex = currentIndex >= 0 ? currentIndex : snapshots.length
-
-    if (targetIndex === normalizedCurrentIndex) {
-      await repo.setCurrentSnapshotId(this.workspaceId, snapshotId)
-      return {
-        targetSnapshotId: snapshotId,
-        direction: 'noop',
-        rolledBackSnapshotIds: [],
-        appliedSnapshotIds: [],
-        reverted: 0,
-        applied: 0,
-        unresolved: [],
-        compensationAttempted: false,
-        compensationSucceeded: true,
-      }
-    }
-
-    const rolledBackSnapshotIds: string[] = []
-    const appliedSnapshotIds: string[] = []
-    let reverted = 0
-    let applied = 0
-    let unresolved: string[] = []
-    let failedSnapshotId: string | undefined
-    let compensationAttempted = false
-    let compensationSucceeded = true
-
-    // target older than current: rollback newer snapshots down to target(exclusive).
-    if (targetIndex > normalizedCurrentIndex) {
-      const total = Math.max(targetIndex - normalizedCurrentIndex, 0)
-      for (let i = normalizedCurrentIndex; i < targetIndex; i++) {
-        const id = snapshots[i]?.id
-        if (!id) continue
-        onProgress?.({
-          phase: 'rollback',
-          processed: i - normalizedCurrentIndex + 1,
-          total,
-          snapshotId: id,
-        })
-        const result = await this.rollbackSnapshot(id, directoryHandle)
-        reverted += result.reverted
-        if (result.unresolved.length > 0) {
-          unresolved = result.unresolved
-          failedSnapshotId = id
-          if (rolledBackSnapshotIds.length > 0) {
-            compensationAttempted = true
-            for (const rollbacked of [...rolledBackSnapshotIds].reverse()) {
-              const compensation = await this.applySnapshot(rollbacked, directoryHandle)
-              if (compensation.unresolved.length > 0) {
-                compensationSucceeded = false
-                break
-              }
-            }
-          }
-          break
-        }
-        rolledBackSnapshotIds.push(id)
-      }
-
-      await this.syncCurrentSnapshotPointer()
-
-      return {
-        targetSnapshotId: snapshotId,
-        direction: 'backward',
-        rolledBackSnapshotIds,
-        appliedSnapshotIds,
-        reverted,
-        applied,
-        unresolved,
-        failedSnapshotId,
-        compensationAttempted,
-        compensationSucceeded,
-      }
-    }
-
-    // target newer than current: re-apply snapshots from current(exclusive) to target(inclusive).
-    const total = Math.max(normalizedCurrentIndex - targetIndex, 0)
-    for (let i = normalizedCurrentIndex - 1; i >= targetIndex; i--) {
-      const id = snapshots[i]?.id
-      if (!id) continue
-      onProgress?.({
-        phase: 'apply',
-        processed: normalizedCurrentIndex - i,
-        total,
-        snapshotId: id,
-      })
-      const result = await this.applySnapshot(id, directoryHandle)
-      applied += result.applied
-      if (result.unresolved.length > 0) {
-        unresolved = result.unresolved
-        failedSnapshotId = id
-        if (appliedSnapshotIds.length > 0) {
-          compensationAttempted = true
-          for (const appliedId of [...appliedSnapshotIds].reverse()) {
-            const compensation = await this.rollbackSnapshot(appliedId, directoryHandle)
-            if (compensation.unresolved.length > 0) {
-              compensationSucceeded = false
-              break
-            }
-          }
-        }
-        break
-      }
-      appliedSnapshotIds.push(id)
-    }
-
-    await this.syncCurrentSnapshotPointer()
-
-    return {
-      targetSnapshotId: snapshotId,
-      direction: 'forward',
-      rolledBackSnapshotIds,
-      appliedSnapshotIds,
-      reverted,
-      applied,
-      unresolved,
-      failedSnapshotId,
-      compensationAttempted,
-      compensationSucceeded,
     }
   }
 

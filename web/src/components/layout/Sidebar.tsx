@@ -750,6 +750,10 @@ export const Sidebar = memo(function Sidebar({
     () => scopedConversations.filter((conv) => workspaceStatusMap.get(conv.id) === 'archived').length,
     [scopedConversations, workspaceStatusMap]
   )
+  const activeCount = useMemo(
+    () => scopedConversations.length - archivedCount,
+    [scopedConversations.length, archivedCount]
+  )
 
   // Schedule badges: subscribe to workspaceScheduleCount map (only re-renders when counts change)
   const workspaceScheduleCount = useScheduleStore((s) => s.workspaceScheduleCount)
@@ -1182,6 +1186,9 @@ export const Sidebar = memo(function Sidebar({
               onClick={() => setWorkspaceTab('active')}
             >
               {t('sidebar.activeTab')}
+              {activeCount > 0 && (
+                <span className="ml-0.5 text-xs text-tertiary">({activeCount})</span>
+              )}
             </button>
             <button
               type="button"

@@ -125,6 +125,14 @@ export const settings = {
     scheduleToggle: "スケジュール (Schedules)",
     scheduleToggleDesc: "cron 式によるスケジュールタスクを有効にします。オンにするとトップバーにスケジュールボタンが表示され、エージェントは manage_schedule ツールを使用できるようになります。",
 
+    // Snapshot retention
+    snapshotRetention: "スナップショット保存ポリシー",
+    snapshotRetentionDesc: "プロジェクトごとに保持するスナップショット数を制限します。スナップショットにはファイルのバックアップ内容が含まれるため、数を減らすとデータベースサイズが小さくなります。スナップショットの作成後、自動的にクリーンアップが実行されます：高水位を超えると、最も古いスナップショットが低水位まで削除されます。現在のスナップショットと最新のロールバックポイントは常に保持されます。",
+    snapshotHighWatermark: "高水位",
+    snapshotHighWatermarkDesc: "スナップショット数がこの値を超えると、古いスナップショットがクリーンアップ対象になります。",
+    snapshotLowWatermark: "低水位",
+    snapshotLowWatermarkDesc: "クリーンアップ後に残す件数。高水位以下、かつ 1 以上。",
+
     // Sync panel
     syncPanel: {
       upload: "アップロード",

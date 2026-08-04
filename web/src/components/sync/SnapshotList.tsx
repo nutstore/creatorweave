@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { Settings, Check, X as XIcon } from 'lucide-react'
 import {
   BrandButton,
   BrandDialog,
@@ -8,16 +9,11 @@ import {
   BrandDialogHeader,
   BrandDialogTitle,
 } from '@creatorweave/ui'
-import {
-  getFSOverlayRepository,
-  type SnapshotFileMetaRecord,
-  type SnapshotRecord,
-} from '@/sqlite/repositories/fs-overlay.repository'
+import { getFSOverlayRepository, type SnapshotFileMetaRecord, type SnapshotRecord } from '@/sqlite/repositories/fs-overlay.repository'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useWorkspaceStore } from '@/store/workspace.store'
 import { useProjectStore } from '@/store/project.store'
-import { getWorkspaceManager } from '@/opfs'
-import { pauseHmr, resumeHmr } from '@/lib/sync-guard'
+import { useSettingsStore } from '@/store/settings.store'
 import { useT } from '@/i18n'
 import { SnapshotDetailDrawer } from '@/components/sync/SnapshotDetailDrawer'
 
@@ -78,31 +74,6 @@ function getSnapshotTitle(snapshot: Pick<SnapshotRecord, 'summary' | 'opCount'>,
   return snapshot.summary || t('sidebar.snapshotList.autoSnapshotTitle', { count: snapshot.opCount })
 }
 
-/**
- * Collect all file paths from snapshots in a given index range.
- * Used to determine which paths to pause/resume Vite HMR for during snapshot switching.
- */
-async function collectSnapshotPaths(
-  workspaceId: string,
-  snapshots: SnapshotRecord[],
-  fromIndex: number,
-  toIndex: number
-): Promise<string[]> {
-  const repo = getFSOverlayRepository()
-  const paths = new Set<string>()
-  const start = Math.min(fromIndex, toIndex)
-  const end = Math.max(fromIndex, toIndex)
-  for (let i = start; i < end; i++) {
-    const snapshot = snapshots[i]
-    if (!snapshot) continue
-    const ops = await repo.listSnapshotOps(workspaceId, snapshot.id)
-    for (const op of ops) {
-      paths.add(op.path)
-    }
-  }
-  return [...paths]
-}
-
 export const SnapshotList: React.FC<SnapshotListProps> = ({
   limit = 20,
   fullHeight = false,
@@ -110,25 +81,31 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
 }) => {
   const t = useT()
   const activeProjectId = useProjectStore((state) => state.activeProjectId)
+  // Auto-reload when a snapshot is created/deleted/pruned anywhere in the
+  // project (e.g. via auto-apply), without requiring a manual tab switch.
+  const snapshotVersion = useWorkspaceStore((state) => state.snapshotVersion)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [snapshots, setSnapshots] = useState<SnapshotRecord[]>([])
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [detailsMap, setDetailsMap] = useState<Record<string, SnapshotFileMetaRecord[]>>({})
   const [detailsLoading, setDetailsLoading] = useState<Set<string>>(new Set())
-  const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [deletingSnapshotId, setDeletingSnapshotId] = useState<string | null>(null)
   const [clearingSnapshots, setClearingSnapshots] = useState(false)
   const [confirmAction, setConfirmAction] = useState<null | { type: 'delete'; snapshotId: string } | { type: 'clear' }>(null)
   const [currentSnapshotId, setCurrentSnapshotId] = useState<string | null>(null)
-  const [switchProgress, setSwitchProgress] = useState<{
-    phase: 'rollback' | 'apply'
-    processed: number
-    total: number
-    snapshotId: string
-  } | null>(null)
   const [detailSnapshot, setDetailSnapshot] = useState<SnapshotRecord | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+
+  // Snapshot retention watermarks When the project has more
+  // than `watermarkHigh` snapshots, the repo auto-prunes down to
+  // `watermarkLow` (see FSOverlayRepository.createApprovedSnapshotForPaths).
+  // UI here is a thin read/write layer over the SQLite app_settings table.
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [watermarkHigh, setWatermarkHigh] = useState('')
+  const [watermarkLow, setWatermarkLow] = useState('')
+  const [savingWatermark, setSavingWatermark] = useState(false)
+  const [watermarkError, setWatermarkError] = useState<string | null>(null)
 
   const loadSnapshots = useCallback(async (cancelled: { value: boolean } = { value: false }) => {
     setLoading(true)
@@ -162,12 +139,7 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
     return () => {
       cancelled.value = true
     }
-  }, [loadSnapshots])
-
-  const latestRollbackableId = useMemo(
-    () => snapshots.find((item) => item.status === 'approved' || item.status === 'committed')?.id ?? null,
-    [snapshots]
-  )
+  }, [loadSnapshots, snapshotVersion])
 
   const toggleExpand = useCallback(async (snapshotId: string) => {
     setExpanded((prev) => {
@@ -194,97 +166,6 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
     }
   }, [detailsMap, t])
 
-  const handleRollbackLatest = useCallback(async () => {
-    setRollingBack('__latest__')
-    setError(null)
-    try {
-      if (!activeProjectId) throw new Error(t('sidebar.snapshotList.noActiveProject'))
-      const repo = getFSOverlayRepository()
-      const rows = await repo.listProjectSnapshots(activeProjectId, 200)
-      const latest = rows.find((item) => item.status === 'approved' || item.status === 'committed')
-      if (!latest) {
-        setError(t('sidebar.snapshotList.noLatestSnapshot'))
-      } else {
-        const manager = await getWorkspaceManager()
-        const workspace = await manager.getWorkspace(latest.workspaceId)
-        if (!workspace) throw new Error(t('sidebar.snapshotList.workspaceNotFound', { name: latest.workspaceName || latest.workspaceId }))
-        const nativeDir = await workspace.getNativeDirectoryHandle()
-
-        // Collect all paths that will be touched during the switch
-        const currentIndex = rows.findIndex((item) => item.status === 'approved' || item.status === 'committed')
-        const targetIndex = rows.findIndex((item) => item.id === latest.id)
-        const affectedPaths = await collectSnapshotPaths(latest.workspaceId, rows, currentIndex, targetIndex)
-
-        // Pause Vite HMR to prevent mid-switch page reloads
-        await pauseHmr(affectedPaths)
-        try {
-          const result = await workspace.switchToSnapshot(latest.id, nativeDir, setSwitchProgress)
-          if (result.unresolved.length > 0) {
-            setError(t('sidebar.snapshotList.switchFailedWithCount', { count: result.unresolved.length }))
-          } else if (result.compensationAttempted && !result.compensationSucceeded) {
-            setError(t('sidebar.snapshotList.switchFailed'))
-          }
-        } finally {
-          // Resume HMR — re-add paths and trigger full-reload for consistent state
-          await resumeHmr(affectedPaths)
-        }
-      }
-      await useWorkspaceStore.getState().refreshPendingChanges(true)
-      await useWorkspaceStore.getState().refreshWorkspaces()
-      await loadSnapshots()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('sidebar.snapshotList.switchToLatestFailed'))
-    } finally {
-      setRollingBack(null)
-      setSwitchProgress(null)
-    }
-  }, [activeProjectId, loadSnapshots, t])
-
-  const handleRollbackTo = useCallback(async (snapshotId: string) => {
-    setRollingBack(snapshotId)
-    setError(null)
-    try {
-      const target = snapshots.find((item) => item.id === snapshotId)
-      if (!target) throw new Error(t('sidebar.snapshotList.snapshotNotFound'))
-      const manager = await getWorkspaceManager()
-      const workspace = await manager.getWorkspace(target.workspaceId)
-      if (!workspace) throw new Error(t('sidebar.snapshotList.workspaceNotFound', { name: target.workspaceName || target.workspaceId }))
-      const nativeDir = await workspace.getNativeDirectoryHandle()
-
-      // Collect all paths that will be touched during the switch
-      const repo = getFSOverlayRepository()
-      const allSnapshots = await repo.listSnapshots(target.workspaceId, 500)
-      const currentIndex = allSnapshots.findIndex((item) => item.status === 'approved' || item.status === 'committed')
-      const targetIndex = allSnapshots.findIndex((item) => item.id === snapshotId)
-      const affectedPaths = await collectSnapshotPaths(target.workspaceId, allSnapshots, currentIndex, targetIndex)
-
-      // Pause Vite HMR to prevent mid-switch page reloads
-      await pauseHmr(affectedPaths)
-      try {
-        const result = await workspace.switchToSnapshot(snapshotId, nativeDir, setSwitchProgress)
-        if (result.unresolved.length > 0) {
-          setError(
-            t('sidebar.snapshotList.switchPartial', { failedSnapshotId: result.failedSnapshotId || '-', count: result.unresolved.length })
-          )
-        } else if (result.compensationAttempted && !result.compensationSucceeded) {
-          setError(t('sidebar.snapshotList.switchFailed'))
-        }
-      } finally {
-        // Resume HMR — re-add paths and trigger full-reload for consistent state
-        await resumeHmr(affectedPaths)
-      }
-
-      await useWorkspaceStore.getState().refreshPendingChanges(true)
-      await useWorkspaceStore.getState().refreshWorkspaces()
-      await loadSnapshots()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('sidebar.snapshotList.switchFailed'))
-    } finally {
-      setRollingBack(null)
-      setSwitchProgress(null)
-    }
-  }, [loadSnapshots, snapshots, t])
-
   const handleDeleteSnapshot = useCallback(async (snapshotId: string) => {
     setConfirmAction({ type: 'delete', snapshotId })
   }, [])
@@ -307,6 +188,66 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
   const handleClearSnapshots = useCallback(async () => {
     setConfirmAction({ type: 'clear' })
   }, [])
+
+  // Load current watermarks from SQLite when the settings panel first opens.
+  // We keep the inputs as strings so the user can clear/type freely without
+  // the value being re-coerced on every keystroke; parse happens on save.
+  useEffect(() => {
+    if (!settingsOpen) return
+    let cancelled = false
+    const repo = getFSOverlayRepository()
+    repo
+      .getSnapshotWatermarks()
+      .then((w) => {
+        if (cancelled) return
+        setWatermarkHigh(String(w.high))
+        setWatermarkLow(String(w.low))
+        setWatermarkError(null)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setWatermarkError(
+          err instanceof Error ? err.message : t('sidebar.snapshotList.watermark.loadFailed')
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [settingsOpen, t])
+
+  const handleSaveWatermark = useCallback(async () => {
+    setWatermarkError(null)
+    const high = Number(watermarkHigh)
+    const low = Number(watermarkLow)
+    if (!Number.isFinite(high) || !Number.isInteger(high) || high <= 0) {
+      setWatermarkError(t('sidebar.snapshotList.watermark.invalidHigh'))
+      return
+    }
+    if (!Number.isFinite(low) || !Number.isInteger(low) || low < 0) {
+      setWatermarkError(t('sidebar.snapshotList.watermark.invalidLow'))
+      return
+    }
+    if (low >= high) {
+      setWatermarkError(t('sidebar.snapshotList.watermark.lowMustBeLessThanHigh'))
+      return
+    }
+    setSavingWatermark(true)
+    try {
+      const repo = getFSOverlayRepository()
+      await repo.setSnapshotWatermarks(high, low)
+      useSettingsStore.setState({
+        snapshotHighWatermark: high,
+        snapshotLowWatermark: low,
+      })
+      setSettingsOpen(false)
+    } catch (err) {
+      setWatermarkError(
+        err instanceof Error ? err.message : t('sidebar.snapshotList.watermark.saveFailed')
+      )
+    } finally {
+      setSavingWatermark(false)
+    }
+  }, [watermarkHigh, watermarkLow, t])
 
   const performClearSnapshots = useCallback(async () => {
     if (!activeProjectId) {
@@ -349,6 +290,16 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
         }
         right={
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="text-secondary hover:text-primary h-6 w-6 inline-flex items-center justify-center rounded transition-colors"
+              onClick={() => setSettingsOpen((v) => !v)}
+              aria-label={t('sidebar.snapshotList.watermark.title')}
+              aria-expanded={settingsOpen}
+              title={t('sidebar.snapshotList.watermark.title')}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
             <BrandButton
               variant="ghost"
               className="h-6 px-2 text-[11px]"
@@ -357,25 +308,99 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
             >
               {clearingSnapshots ? t('sidebar.snapshotList.clearing') : t('sidebar.snapshotList.clear')}
             </BrandButton>
-            <BrandButton
-              variant="ghost"
-              className="h-6 px-2 text-[11px]"
-              disabled={!latestRollbackableId || rollingBack === '__latest__' || clearingSnapshots}
-              onClick={handleRollbackLatest}
-            >
-              {rollingBack === '__latest__' ? t('sidebar.snapshotList.switching') : t('sidebar.snapshotList.current')}
-            </BrandButton>
           </div>
         }
       />
 
+      {settingsOpen && (
+        <div
+          role="region"
+          aria-label={t('sidebar.snapshotList.watermark.title')}
+          className="space-y-2 border-subtle border-b bg-subtle/50 px-3 py-2"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-secondary text-[11px] font-semibold uppercase tracking-wide">
+              {t('sidebar.snapshotList.watermark.title')}
+            </span>
+            <button
+              type="button"
+              className="text-secondary hover:text-primary inline-flex h-5 w-5 items-center justify-center rounded"
+              onClick={() => setSettingsOpen(false)}
+              aria-label={t('sidebar.snapshotList.watermark.close')}
+            >
+              <XIcon className="h-3 w-3" />
+            </button>
+          </div>
+          <p className="text-secondary text-[11px] leading-snug">
+            {t('sidebar.snapshotList.watermark.description')}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-secondary text-[10px] font-medium">
+                {t('sidebar.snapshotList.watermark.high')}
+              </span>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                className="border-subtle bg-elevated text-primary h-7 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                value={watermarkHigh}
+                onChange={(e) => setWatermarkHigh(e.target.value)}
+                disabled={savingWatermark}
+                aria-label={t('sidebar.snapshotList.watermark.high')}
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-secondary text-[10px] font-medium">
+                {t('sidebar.snapshotList.watermark.low')}
+              </span>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                className="border-subtle bg-elevated text-primary h-7 rounded border px-2 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+                value={watermarkLow}
+                onChange={(e) => setWatermarkLow(e.target.value)}
+                disabled={savingWatermark}
+                aria-label={t('sidebar.snapshotList.watermark.low')}
+              />
+            </label>
+          </div>
+          {watermarkError && (
+            <p className="text-destructive text-[11px] leading-snug">{watermarkError}</p>
+          )}
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              className="text-secondary hover:text-primary h-6 px-2 text-[11px] rounded"
+              onClick={() => setSettingsOpen(false)}
+              disabled={savingWatermark}
+            >
+              {t('sidebar.snapshotList.watermark.cancel')}
+            </button>
+            <BrandButton
+              variant="primary"
+              className="h-6 px-2 text-[11px]"
+              onClick={handleSaveWatermark}
+              disabled={savingWatermark}
+            >
+              {savingWatermark ? (
+                t('sidebar.snapshotList.watermark.saving')
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  {t('sidebar.snapshotList.watermark.save')}
+                </span>
+              )}
+            </BrandButton>
+          </div>
+        </div>
+      )}
+
       {loading && <p className="px-2 py-2 text-xs text-secondary">{t('sidebar.snapshotList.loading')}</p>}
       {error && <p className="px-2 py-2 text-xs text-destructive">{error}</p>}
-      {switchProgress && (
-        <p className="px-2 py-2 text-xs text-secondary">
-          {t('sidebar.snapshotList.processing', { current: switchProgress.processed, total: switchProgress.total })}
-        </p>
-      )}
 
       {!loading && !error && snapshots.length === 0 && (
         <p className="px-2 py-2 text-xs text-secondary">{t('sidebar.snapshotList.noSnapshots')}</p>
@@ -429,21 +454,11 @@ export const SnapshotList: React.FC<SnapshotListProps> = ({
                 <BrandButton
                   variant="ghost"
                   className="h-6 px-2 text-[11px]"
-                  disabled={deletingSnapshotId === item.id || rollingBack !== null || clearingSnapshots}
+                  disabled={deletingSnapshotId === item.id || clearingSnapshots}
                   onClick={() => handleDeleteSnapshot(item.id)}
                 >
                   {deletingSnapshotId === item.id ? t('sidebar.snapshotList.deleting') : t('sidebar.snapshotList.delete')}
                 </BrandButton>
-                {(item.status === 'approved' || item.status === 'committed') && (
-                  <BrandButton
-                    variant="ghost"
-                    className="h-6 px-2 text-[11px]"
-                    disabled={rollingBack === item.id || deletingSnapshotId !== null || clearingSnapshots}
-                    onClick={() => handleRollbackTo(item.id)}
-                  >
-                    {rollingBack === item.id ? t('sidebar.snapshotList.switching') : item.id === latestRollbackableId ? t('sidebar.snapshotList.current') : t('sidebar.snapshotList.switch')}
-                  </BrandButton>
-                )}
               </div>
               {expanded.has(item.id) && (
                 <div className="mt-2 border-t border-subtle pt-2">

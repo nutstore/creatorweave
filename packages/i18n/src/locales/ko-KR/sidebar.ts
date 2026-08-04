@@ -13,7 +13,7 @@ export const sidebar = {
     hasSchedule: "이 채팅에 예약된 작업이 있습니다",
     workspaceDeleted: "채팅이 삭제되었습니다",
     emptyStateNoWorkspace:
-      "이 프로젝트에는 아직 채팅이 없습니다. 새 채팅을 만들어 AI와 대화를 시작하세요.",
+      "이 프로젝트에 아직 채팅이 없습니다. 하나 만들어 시작하세요.",
     createFirstWorkspace: "첫 번째 채팅 만들기",
     deleteWorkspaceFailed: "채팅 삭제 실패",
     deleteWorkspace: "채팅 삭제",
@@ -42,25 +42,14 @@ export const sidebar = {
       loading: "저장 기록 로드 중...",
       current: "현재",
       delete: "삭제",
-      switch: "전환",
-      switching: "처리 중...",
       deleting: "삭제 중...",
       clear: "지우기",
       clearing: "지우는 중...",
-      workspaceNotFound: "채팅을 찾을 수 없습니다: {name}",
-      switchPartial:
-        "저장 기록 전환이 완전히 성공하지 못했습니다(실패한 저장 기록 {failedSnapshotId}), {count}개 파일이 아직 복원되지 않았습니다",
-      switchFailed:
-        "전환이 실패하고 자동 복구도 완전히 성공하지 못했습니다. 저장 기록 상태를 수동으로 확인하세요",
-      switchFailedWithCount:
-        "최신으로의 전환이 완전히 성공하지 못했습니다, {count}개 파일이 아직 복원되지 않았습니다",
       loadFailed: "저장 기록 로드 실패",
       loadDetailFailed: "저장 기록 상세 정보 로드 실패",
       deleteFailed: "저장 기록 삭제 실패",
       clearFailed: "저장 기록 지우기 실패",
       noActiveProject: "활성 프로젝트가 없습니다",
-      snapshotNotFound: "저장 기록을 찾을 수 없습니다",
-      switchToLatestFailed: "최신 저장 기록으로의 전환 실패",
       pendingCount: "{count}개 변경",
       fileOpCreate: "추가됨",
       fileOpModify: "수정됨",
@@ -79,6 +68,22 @@ export const sidebar = {
       draft: "초안",
       rolledBack: "롤백됨",
       autoSnapshotTitle: "{count}개 파일 저장",
+      watermark: {
+        title: "스냅샷 보존 한도",
+        description:
+          "한도를 초과하면 가장 오래된 스냅샷부터 삭제하여 보존 수에 도달할 때까지 진행됩니다",
+        high: "한도",
+        low: "보존",
+        cancel: "취소",
+        save: "저장",
+        saving: "저장 중...",
+        close: "닫기",
+        invalidHigh: "한도는 양의 정수여야 합니다",
+        invalidLow: "보존 수는 0 이상의 정수여야 합니다",
+        lowMustBeLessThanHigh: "보존 수는 한도보다 작아야 합니다",
+        loadFailed: "설정 로드 실패",
+        saveFailed: "설정 저장 실패",
+      },
       processing: "처리 중 {current}/{total}",
       loadingDetails: "상세 정보 로드 중...",
       noDetails: "이 저장 기록의 파일 상세 정보가 없습니다",
@@ -127,7 +132,7 @@ export const sidebar = {
     fileDiffViewer: {
       selectFile: "세부 정보를 보려면 파일을 선택하세요",
       selectFileHint:
-        "왼쪽 목록에서 파일을 선택하여 버전과 현재 파일의 차이를 확인하세요",
+        "트리에서 파일을 선택하여 diff를 확인하세요",
       loadingFile: "파일 내용을 불러오는 중...",
       loadFailed: "불러오기 실패",
       openInPreview: "파일 열기",
@@ -138,7 +143,7 @@ export const sidebar = {
       changedVersion: "변경된 버전",
       binarySnapshot: "바이너리 파일 비교",
       binaryContent:
-        "바이너리 내용은 텍스트 레벨 차이를 지원하지 않습니다. 파일을 다운로드하거나 전용 바이너리 비교 도구를 사용하세요.",
+        "바이너리 파일 내용은 미리보기를 지원하지 않습니다",
       noImageContent: "이미지 내용 없음",
       fileDeleted: "파일 삭제됨 (변경된 버전에 내용 없음)",
       cannotReadChangedVersion: "변경된 버전을 읽을 수 없습니다",
@@ -171,7 +176,7 @@ export const sidebar = {
       // Error messages
       loadFailedError: "파일 불러오기 실패",
       cannotReadNativeContent:
-        "네이티브 파일 내용을 보려면 프로젝트 디렉토리를 선택하세요",
+        "원본 파일 내용을 읽을 수 없습니다",
       readNativeFileFailed: "네이티브 파일 읽기 실패",
       // Snapshot comparison
       beforeSnapshotLabel: "저장 전",

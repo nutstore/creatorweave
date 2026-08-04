@@ -261,6 +261,13 @@ interface WorkspaceState {
   /** Whether workspace has valid native FS directory handle */
   hasDirectoryHandle: boolean
 
+  /**
+   * Monotonic counter bumped whenever a snapshot is created/deleted/pruned.
+   * SnapshotList subscribes to this to auto-reload without manual tab switch.
+   */
+  snapshotVersion: number
+  triggerSnapshotRefresh: () => void
+
   /** Whether sync preview is enabled/disabled */
   isSyncPreviewEnabled: boolean
 
@@ -411,6 +418,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         showPreview: false,
         previewSelectedPath: null,
         hasDirectoryHandle: false,
+        snapshotVersion: 0,
+        triggerSnapshotRefresh: () =>
+          set((s) => ({ snapshotVersion: s.snapshotVersion + 1 })),
         isSyncPreviewEnabled: true,
         switchingWorkspaceId: null,
         unsyncedSnapshots: [],

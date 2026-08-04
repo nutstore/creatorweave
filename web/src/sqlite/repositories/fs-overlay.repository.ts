@@ -663,6 +663,33 @@ export class FSOverlayRepository {
       [snapshotId, now, now, workspaceId, ...paths]
     )
 
+    // Auto-prune old snapshots for the project when count exceeds the
+    // configured high watermark. We await so the next sync sees the pruned
+    // set, but a prune failure must not fail the snapshot we just created
+    // — log and continue.
+    //
+    // Pruning is project-level (not workspace-level) because the
+    // user-visible Snapshot list in the Sidebar aggregates across the
+    // project's workspaces — per-workspace caps would silently let a
+    // multi-workspace project bloat indefinitely.
+    //
+    // Watermarks are read from `app_settings` (default: high=100,
+    // low=50). See `getSnapshotWatermarks` for details.
+    try {
+      const projectRow = await db.queryFirst<{ project_id: string }>(
+        `SELECT project_id FROM workspaces WHERE id = ?`,
+        [workspaceId]
+      )
+      if (projectRow?.project_id) {
+        await this.pruneProjectSnapshots(projectRow.project_id)
+      }
+    } catch (err) {
+      console.warn(
+        `[FSOverlay] post-create prune failed for workspace ${workspaceId} (snapshot ${snapshotId} preserved):`,
+        err
+      )
+    }
+
     return { snapshotId, opCount }
   }
 
@@ -889,9 +916,24 @@ export class FSOverlayRepository {
     const placeholders = ids.map(() => '?').join(', ')
     await db.execute(`DELETE FROM fs_changesets WHERE id IN (${placeholders})`, ids)
 
+    // Also purge the orphaned fs_ops rows (ON DELETE SET NULL leaves them).
+    await db.execute(
+      `DELETE FROM fs_ops WHERE changeset_id IS NULL AND status != 'pending'`
+    )
+
     const workspaceIds = Array.from(new Set(rows.map((r) => r.workspace_id)))
     for (const workspaceId of workspaceIds) {
       await this.reconcileWorkspaceCurrentSnapshot(workspaceId)
+    }
+
+    // Reclaim disk space — DELETE only marks pages as reusable, the file
+    // itself doesn't shrink. VACUUM rebuilds the database file. This is a
+    // heavy operation (O(n) full-table rewrite) so we only run it on the
+    // explicit "clear all" path, never on incremental prune.
+    try {
+      await db.execute('VACUUM')
+    } catch (err) {
+      console.warn('[FSOverlay] VACUUM after clearProjectSnapshots failed:', err)
     }
 
     return ids.length
@@ -1014,6 +1056,189 @@ export class FSOverlayRepository {
       [workspaceId]
     )
     return new Set(rows.map((r) => r.path))
+  }
+
+  // ==========================================================================
+  // Snapshot retention / pruning
+  // ==========================================================================
+
+  /** Default watermarks when app_settings has no user override. */
+  static readonly DEFAULT_SNAPSHOT_HIGH_WATERMARK = 100
+  static readonly DEFAULT_SNAPSHOT_LOW_WATERMARK = 50
+
+  /** Settings keys for app_settings table. */
+  private static readonly SETTING_KEY_SNAPSHOT_HIGH = 'snapshot.high_watermark'
+  private static readonly SETTING_KEY_SNAPSHOT_LOW = 'snapshot.low_watermark'
+
+  /**
+   * Read snapshot retention watermarks from app_settings.
+   *
+   * Strategy: LRU-style two-watermark. When a workspace's snapshot count
+   * exceeds `high`, prune it down to `low`. The gap between high and low
+   * ("breathing room") avoids triggering a prune on every single new
+   * snapshot once the cap is reached.
+   *
+   * Returns {high, low} with defaults applied when keys are missing or
+   * hold invalid values.
+   */
+  async getSnapshotWatermarks(): Promise<{ high: number; low: number }> {
+    const db = getSQLiteDB()
+    const rows = await db.queryAll<{ key: string; value: string }>(
+      `SELECT key, value FROM app_settings
+       WHERE key IN (?, ?)`,
+      [
+        FSOverlayRepository.SETTING_KEY_SNAPSHOT_HIGH,
+        FSOverlayRepository.SETTING_KEY_SNAPSHOT_LOW,
+      ]
+    )
+
+    const defaults = {
+      high: FSOverlayRepository.DEFAULT_SNAPSHOT_HIGH_WATERMARK,
+      low: FSOverlayRepository.DEFAULT_SNAPSHOT_LOW_WATERMARK,
+    }
+    const parsed = { ...defaults }
+    for (const row of rows) {
+      const n = Number(row.value)
+      // Allow low=0 ("keep no history"), but reject NaN/negative.
+      if (!Number.isFinite(n) || n < 0) continue
+      if (row.key === FSOverlayRepository.SETTING_KEY_SNAPSHOT_HIGH) {
+        if (n > 0) parsed.high = Math.floor(n)
+      } else if (row.key === FSOverlayRepository.SETTING_KEY_SNAPSHOT_LOW) {
+        parsed.low = Math.floor(n)
+      }
+    }
+    // Defensive: ensure low < high.
+    if (parsed.low >= parsed.high) {
+      parsed.low = Math.max(0, Math.floor(parsed.high / 2))
+    }
+    return parsed
+  }
+
+  /**
+   * Persist snapshot retention watermarks. Validates that high > low >= 0.
+   * low=0 is allowed: it means "keep no history" — every new snapshot is
+   * immediately pruned on the next prune trigger. Throws if invalid.
+   */
+  async setSnapshotWatermarks(high: number, low: number): Promise<void> {
+    if (!Number.isFinite(high) || high <= 0) {
+      throw new Error(`snapshot.high_watermark must be a positive number, got ${high}`)
+    }
+    if (!Number.isFinite(low) || low < 0) {
+      throw new Error(`snapshot.low_watermark must be a non-negative number, got ${low}`)
+    }
+    if (low >= high) {
+      throw new Error(
+        `snapshot.low_watermark (${low}) must be less than snapshot.high_watermark (${high})`
+      )
+    }
+    const db = getSQLiteDB()
+    const now = Date.now()
+    await db.execute(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [FSOverlayRepository.SETTING_KEY_SNAPSHOT_HIGH, String(Math.floor(high)), now]
+    )
+    await db.execute(
+      `INSERT INTO app_settings (key, value, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      [FSOverlayRepository.SETTING_KEY_SNAPSHOT_LOW, String(Math.floor(low)), now]
+    )
+  }
+
+  /**
+   * Count non-draft snapshots for a project (across all its workspaces).
+   */
+  async getProjectSnapshotCount(projectId: string): Promise<number> {
+    const db = getSQLiteDB()
+    const row = await db.queryFirst<{ n: number }>(
+      `SELECT COUNT(*) AS n
+       FROM fs_changesets c
+       JOIN workspaces w ON w.id = c.workspace_id
+       WHERE w.project_id = ? AND c.status != 'draft'`,
+      [projectId]
+    )
+    return Number(row?.n ?? 0)
+  }
+
+  /**
+   * Prune old snapshots for a project: when count exceeds the high
+   * watermark, delete the oldest until it reaches the low watermark.
+   *
+   * Only fully synced, non-current snapshots are eligible. Unsynced
+   * snapshots are recovery records for pending native writes and deleting
+   * them would strand those operations without a changeset to recover from.
+   *
+   * fs_ops and fs_snapshot_files rows are cleaned up via the existing
+   * ON DELETE CASCADE foreign keys.
+   *
+   * Returns { deleted, kept } for observability.
+   */
+  async pruneProjectSnapshots(
+    projectId: string,
+    highWatermark?: number,
+    lowWatermark?: number
+  ): Promise<{ deleted: number; kept: number }> {
+    const db = getSQLiteDB()
+    const { high: defaultHigh, low: defaultLow } =
+      await this.getSnapshotWatermarks()
+    const high = highWatermark ?? defaultHigh
+    const low = lowWatermark ?? defaultLow
+
+    const total = await this.getProjectSnapshotCount(projectId)
+    if (total <= high) {
+      return { deleted: 0, kept: total }
+    }
+
+    // Delete the oldest (total - low) snapshots in one shot. SQLite picks
+    // rows by created_at ASC and keeps the newest `low`.
+    const idsToDelete = await db.queryAll<{ id: string }>(
+      `SELECT c.id
+       FROM fs_changesets c
+       JOIN workspaces w ON w.id = c.workspace_id
+       WHERE w.project_id = ?
+         AND c.status != 'draft'
+         AND c.synced_at IS NOT NULL
+         AND (w.current_snapshot_id IS NULL OR w.current_snapshot_id != c.id)
+         AND NOT EXISTS (
+           SELECT 1 FROM fs_ops o
+           WHERE o.changeset_id = c.id AND o.status = 'pending'
+         )
+       ORDER BY c.created_at ASC
+       LIMIT ?`,
+      [projectId, total - low]
+    )
+
+    if (idsToDelete.length === 0) {
+      return { deleted: 0, kept: total }
+    }
+
+    const snapshotIds = idsToDelete.map((r) => r.id)
+    const placeholders = snapshotIds.map(() => '?').join(', ')
+
+    // Clean up fs_ops explicitly BEFORE deleting the changeset.
+    // fs_ops.changeset_id uses ON DELETE SET NULL (not CASCADE) because
+    // ops may outlive their snapshot in the manual-review flow. But for
+    // pruned (old) snapshots, the ops are pure history baggage — delete them
+    // or the table bloats indefinitely. Only delete ops that belong to these
+    // specific snapshots AND are already synced (no longer pending).
+    await db.execute(
+      `DELETE FROM fs_ops
+       WHERE changeset_id IN (${placeholders})
+         AND status != 'pending'`,
+      snapshotIds
+    )
+
+    // fs_snapshot_files uses ON DELETE CASCADE, so it's cleaned up
+    // automatically when the changeset row is deleted (as long as
+    // PRAGMA foreign_keys = ON, which the schema enforces).
+    await db.execute(
+      `DELETE FROM fs_changesets WHERE id IN (${placeholders})`,
+      snapshotIds
+    )
+
+    return { deleted: snapshotIds.length, kept: total - snapshotIds.length }
   }
 }
 

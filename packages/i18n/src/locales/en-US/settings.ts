@@ -124,6 +124,14 @@ export const settings = {
     scheduleToggle: "Schedules",
     scheduleToggleDesc: "Enable cron-based scheduled tasks. When enabled, a Schedules button appears in the top bar and the agent gains the manage_schedule tool.",
 
+    // Snapshot retention
+    snapshotRetention: "Snapshot retention",
+    snapshotRetentionDesc: "Limit how many snapshot records are kept per project. Snapshots contain file content backups, so fewer snapshots means a smaller database. After every snapshot creation, automatic cleanup runs: when the high watermark is exceeded, the oldest snapshots are pruned down to the low watermark. The current snapshot and the most recent rollback point are always preserved.",
+    snapshotHighWatermark: "High watermark",
+    snapshotHighWatermarkDesc: "When snapshots exceed this count, old ones become eligible for cleanup.",
+    snapshotLowWatermark: "Low watermark",
+    snapshotLowWatermarkDesc: "After cleanup, the count is reduced to this level. Should be ≤ high watermark and ≥ 1.",
+
     // Sync panel
     syncPanel: {
       upload: "Upload",
