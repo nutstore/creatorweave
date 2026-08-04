@@ -32,7 +32,6 @@ import type {
   DraftAssistantStep,
   Message,
   ToolCall,
-  WorkflowRealRunPayload,
 } from '@/agent/message-types'
 import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
@@ -96,8 +95,6 @@ interface AssistantTurnBubbleProps {
   runtimeToolCalls?: ToolCall[]
   /** Runtime ordered streaming timeline (reasoning/content/tool calls) */
   runtimeSteps?: DraftAssistantStep[]
-  /** Optional workflow progress block rendered at the bottom of the bubble */
-  workflowProgress?: ReactNode
   /** Conversation ID — needed for ask_user_question to bridge UI answer back to executor */
   conversationId?: string | null
   /** Open the shared FilePreview drawer with a pre-loaded blob */
@@ -329,7 +326,6 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
   streamingToolArgsByCallId,
   runtimeToolCalls,
   runtimeSteps,
-  workflowProgress,
   conversationId,
   onPreviewAsset,
   iterationLimitReached,
@@ -431,7 +427,6 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
           </div>
         )}
 
-        {workflowProgress}
 
         {/* Iteration limit reached hint (only when not processing) */}
         {!isProcessing && !isWaiting && iterationLimitReached && (
@@ -716,8 +711,6 @@ const AssistantStep = memo(function AssistantStep({
     message.toolCalls?.filter((tc) => !suppressExecutingToolCallIds?.has(tc.id)) || []
   const hasToolCalls = visibleToolCalls.length > 0
   const isContextSummary = message.kind === 'context_summary'
-  const isWorkflowDryRun = message.kind === 'workflow_dry_run'
-  const isWorkflowRealRun = message.kind === 'workflow_real_run'
 
   return (
     <>
@@ -735,35 +728,10 @@ const AssistantStep = memo(function AssistantStep({
               className={
                 isContextSummary
                   ? 'rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-base text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100'
-                  : isWorkflowDryRun
-                    ? 'rounded-lg border border-sky-200 bg-sky-50 px-4 py-2 text-base text-sky-900 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-100'
-                    : isWorkflowRealRun
-                      ? 'rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-base text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-100'
-                      : 'rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
+                  : 'rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700'
               }
             >
               {isContextSummary && <ContextSummaryCard content={message.content!} />}
-              {isWorkflowDryRun && (
-                <div className="mb-2 space-y-1">
-                  <div className="text-xs font-medium uppercase tracking-wide text-sky-700 dark:text-sky-300">
-                    {t('workflow.simulateRun')}
-                  </div>
-                  {message.workflowDryRun && (
-                    <div className="text-xs text-sky-800/90 dark:text-sky-200/90">
-                      <span className="mr-2">
-                        {t('workflow.status')}: {message.workflowDryRun.status}
-                      </span>
-                      <span className="mr-2">
-                        {t('workflow.template')}: {message.workflowDryRun.templateId}
-                      </span>
-                      <span>
-                        {t('workflow.repairRounds')}: {message.workflowDryRun.repairRound}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              )}
-              {isWorkflowRealRun && <WorkflowRealRunHeader payload={message.workflowRealRun} />}
               {!isContextSummary && (
                 <div ref={contentRef} className="prose max-w-prose overflow-x-auto break-words select-text">
                   <MarkdownContent content={message.content!} />
@@ -870,50 +838,6 @@ function CompressionStatusCard({ text, streaming }: { text: string; streaming: b
       <span>{text}</span>
       {streaming && (
         <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent align-text-bottom" />
-      )}
-    </div>
-  )
-}
-
-function WorkflowRealRunHeader({ payload }: { payload?: WorkflowRealRunPayload }) {
-  const t = useT()
-  return (
-    <div className="mb-2 space-y-1">
-      <div className="text-xs font-medium uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
-        {t('workflow.realRun')}
-      </div>
-      {payload && (
-        <div className="space-y-1 text-xs text-emerald-800/90 dark:text-emerald-200/90">
-          <div>
-            <span className="mr-2">
-              {t('workflow.status')}: {payload.status}
-            </span>
-            <span className="mr-2">
-              {t('workflow.template')}: {payload.templateId}
-            </span>
-            <span className="mr-2">
-              {t('workflow.repairRounds')}: {payload.repairRound}
-            </span>
-            {payload.totalTokens != null && <span>Tokens: {payload.totalTokens}</span>}
-          </div>
-          {Object.keys(payload.nodeOutputs).length > 0 && (
-            <div className="mt-1 space-y-0.5">
-              {Object.entries(payload.nodeOutputs).map(([key, content]) => (
-                <details
-                  key={key}
-                  className="rounded border border-emerald-200 dark:border-emerald-800"
-                >
-                  <summary className="cursor-pointer px-2 py-0.5 font-medium hover:bg-emerald-100 dark:hover:bg-emerald-900/30">
-                    {key}
-                  </summary>
-                  <div className="max-h-40 overflow-auto whitespace-pre-wrap px-2 py-1 text-[11px]">
-                    {content.length > 500 ? content.slice(0, 500) + '...' : content}
-                  </div>
-                </details>
-              ))}
-            </div>
-          )}
-        </div>
       )}
     </div>
   )

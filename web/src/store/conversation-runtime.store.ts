@@ -88,8 +88,6 @@ export interface ConversationRuntime {
   } | null
   /** Runtime context window usage for the active model call */
   contextWindowUsage: ContextWindowUsage | null
-  /** Runtime workflow execution progress */
-  workflowExecution: import('@/agent/message-types').WorkflowExecutionState | null
   /** Assets collected during current agent run */
   collectedAssets: AssetMeta[]
   /** Runtime convert call counter for context compression cadence */
@@ -119,7 +117,6 @@ export function createEmptyRuntime(): ConversationRuntime {
     runEpoch: 0,
     draftAssistant: null,
     contextWindowUsage: null,
-    workflowExecution: null,
     collectedAssets: [],
     compressionConvertCallCount: 0,
     compressionLastSummaryConvertCall: Number.NEGATIVE_INFINITY,
@@ -156,17 +153,6 @@ export interface ConversationRuntimeState {
 
   // ─── Track mounted view ref counts per conversation (not persisted) ───
   mountedConversations: Map<string, number>
-
-  // ─── Pending workflow requests (not persisted) ───
-  pendingWorkflowDryRuns: Map<string, {
-    templateId: string
-    rubricDsl?: string
-  }>
-  pendingWorkflowRealRuns: Map<string, {
-    templateId: string
-    rubricDsl?: string
-  }>
-  workflowAbortControllers: Map<string, AbortController>
 
   // ─── Queued user messages (not persisted) ───
   pendingMessageQueues: Map<string, QueuedMessage[]>
@@ -215,9 +201,6 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
     suggestedFollowUps: new Map(),
     cancelledRunIds: new Set(),
     mountedConversations: new Map(),
-    pendingWorkflowDryRuns: new Map(),
-    pendingWorkflowRealRuns: new Map(),
-    workflowAbortControllers: new Map(),
     pendingMessageQueues: new Map(),
 
     // ─── Computed helpers ───
@@ -281,14 +264,6 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
         .catch(() => {})
 
       set((state) => {
-        const workflowAbortController = state.workflowAbortControllers.get(convId)
-        if (workflowAbortController) {
-          workflowAbortController.abort()
-          state.workflowAbortControllers.delete(convId)
-        }
-        state.pendingWorkflowDryRuns.delete(convId)
-        state.pendingWorkflowRealRuns.delete(convId)
-
         const rt = state.runtimes.get(convId)
         if (rt) {
           // Reset all runtime fields to initial state
@@ -307,7 +282,6 @@ export const useConversationRuntimeStore = create<ConversationRuntimeState>()(
           rt.activeRunId = null
           rt.draftAssistant = null
           rt.contextWindowUsage = null
-          rt.workflowExecution = null
           rt.iterationLimitReached = null
         }
       })

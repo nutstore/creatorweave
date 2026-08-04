@@ -44,7 +44,6 @@ const {
         activeToolCalls: [],
         streamingToolArgs: '',
         streamingToolArgsByCallId: {},
-        workflowExecution: null,
         error: null,
         contextWindowUsage: {
           usedTokens: 4200,
@@ -67,10 +66,6 @@ const {
     deleteAgentLoop: vi.fn(() => true),
     setActive: vi.fn(),
     runAgent: vi.fn(),
-    runWorkflowDryRun: vi.fn(),
-    runWorkflowRealRun: vi.fn(),
-    runCustomWorkflowDryRun: vi.fn(),
-    listWorkflowTemplates: vi.fn(() => []),
     cancelAgent: vi.fn(),
     regenerateUserMessage: vi.fn(),
     editAndResendUserMessage: vi.fn(),
@@ -83,7 +78,6 @@ const {
         {
           status: 'idle',
           error: null,
-          workflowExecution: null,
           contextWindowUsage: {
             usedTokens: 832,
             maxTokens: 198000,
@@ -208,18 +202,6 @@ vi.mock('../AssistantTurnBubble', () => ({
 
 vi.mock('../AgentRichInput', () => ({
   AgentRichInput: () => <div data-testid="agent-rich-input" />,
-}))
-
-vi.mock('../WorkflowQuickActions', () => ({
-  WorkflowQuickActions: () => null,
-}))
-
-vi.mock('../WorkflowExecutionProgress', () => ({
-  WorkflowExecutionProgress: () => null,
-}))
-
-vi.mock('../workflow-editor/WorkflowEditorDialog', () => ({
-  WorkflowEditorDialog: () => null,
 }))
 
 vi.mock('@creatorweave/ui', () => ({

@@ -23,7 +23,6 @@ import { pythonDefinition, pythonToolExecutor, pythonPromptDoc } from './tools/e
 import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm-bridge.tool'
 // Bash shell tool (just-bash sandbox)
 import { bashDefinition, bashToolExecutor, bashPromptDoc } from './tools/bash.tool'
-// import { runWorkflowDefinition, runWorkflowExecutor, workflowPromptDoc } from './tools/workflow.tool' -- disabled: workflows unused
 
 // Git tools
 import {
@@ -193,8 +192,6 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: bashDefinition, executor: bashToolExecutor },
   // OCR (image text recognition)
   { definition: ocrDefinition, executor: ocrExecutor },
-  // Workflow orchestration — DISABLED (workflows unused, saves tool definition tokens)
-  // { definition: runWorkflowDefinition, executor: runWorkflowExecutor },
   // Git tools
   { definition: gitStatusDefinition, executor: gitStatusExecutor },
   { definition: gitDiffDefinition, executor: gitDiffExecutor },
@@ -240,7 +237,6 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   gitPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,
-  // workflowPromptDoc,  -- disabled: workflows unused
   subagentPromptDoc,
   switchModePromptDoc,
   askUserQuestionPromptDoc,

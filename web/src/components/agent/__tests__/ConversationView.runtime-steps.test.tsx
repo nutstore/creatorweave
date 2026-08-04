@@ -49,7 +49,6 @@ const {
         activeToolCalls: [],
         streamingToolArgs: '',
         streamingToolArgsByCallId: {},
-        workflowExecution: null,
         error: null,
         contextWindowUsage: null,
         lastContextWindowUsage: null,
@@ -60,10 +59,6 @@ const {
     deleteAgentLoop: vi.fn(() => true),
     setActive: vi.fn(),
     runAgent: vi.fn(),
-    runWorkflowDryRun: vi.fn(),
-    runWorkflowRealRun: vi.fn(),
-    runCustomWorkflowDryRun: vi.fn(),
-    listWorkflowTemplates: vi.fn(() => []),
     cancelAgent: vi.fn(),
     isConversationRunning: vi.fn(() => true),
     getSuggestedFollowUp: vi.fn(() => ''),
@@ -82,7 +77,6 @@ const {
         {
           status: 'pending',
           error: null,
-          workflowExecution: null,
           contextWindowUsage: null,
           draftAssistant: {
             reasoning: '',
@@ -115,7 +109,9 @@ const {
         },
       ],
     ]),
+    pendingMessageQueues: new Map(),
     isConversationRunning: vi.fn(() => true),
+    getQueueDepth: vi.fn(() => 0),
     getSuggestedFollowUp: vi.fn(() => ''),
     clearSuggestedFollowUp: vi.fn(),
     mountConversation: vi.fn(),
@@ -230,18 +226,6 @@ vi.mock('../AssistantTurnBubble', () => ({
 
 vi.mock('../AgentRichInput', () => ({
   AgentRichInput: () => <div data-testid="agent-rich-input" />,
-}))
-
-vi.mock('../WorkflowQuickActions', () => ({
-  WorkflowQuickActions: () => null,
-}))
-
-vi.mock('../WorkflowExecutionProgress', () => ({
-  WorkflowExecutionProgress: () => null,
-}))
-
-vi.mock('../workflow-editor/WorkflowEditorDialog', () => ({
-  WorkflowEditorDialog: () => null,
 }))
 
 vi.mock('@creatorweave/ui', () => ({

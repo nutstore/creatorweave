@@ -587,7 +587,7 @@ export async function importStorage(data: {
                 const contentJson = JSON.stringify(msg.content ?? null)
                 const meta: Record<string, unknown> = {}
                 let hasMeta = false
-                const metaFields = ['kind', 'workflowDryRun', 'workflowRealRun', 'reasoning', 'toolCalls', 'toolCallId', 'name', 'usage', 'assets'] as const
+                const metaFields = ['kind', 'reasoning', 'toolCalls', 'toolCallId', 'name', 'usage', 'assets'] as const
                 for (const field of metaFields) {
                   if (msg[field] !== undefined) { meta[field] = msg[field]; hasMeta = true }
                 }

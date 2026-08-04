@@ -25,22 +25,6 @@ export interface JSONSchema {
   required?: string[]
 }
 
-export interface WorkflowProgressHooks {
-  onStart?: (payload: {
-    templateId: string
-    label: string
-    nodes: Array<{ id: string; kind: string; label: string }>
-  }) => void
-  onNodeStart?: (payload: { nodeId: string; kind: string }) => void
-  onNodeComplete?: (payload: { nodeId: string; output: string }) => void
-  onNodeError?: (payload: { nodeId: string; error: string }) => void
-  onFinish?: (payload: {
-    status: string
-    totalTokens?: number
-    errors?: string[]
-  }) => void
-}
-
 export type SubagentTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'killed'
 
 // ---------------------------------------------------------------------------
@@ -279,8 +263,6 @@ export interface ToolContext {
     usedTokens: number
     maxTokens: number
   }
-  /** Workflow progress callbacks for long-running workflow tools */
-  workflowProgress?: WorkflowProgressHooks
   /** Agent execution mode: 'plan' (read-only) or 'act' (full access) */
   agentMode?: 'plan' | 'act'
   /** The LLM provider from the current agent loop — available to tool executors that need LLM access */

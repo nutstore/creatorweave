@@ -17,7 +17,6 @@ import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { AgentRichInput, type AgentRichInputHandle } from './AgentRichInput'
-import { WorkflowEditorDialog } from './workflow-editor/WorkflowEditorDialog'
 import { AgentModeSelect } from './AgentModeSelect'
 import { RunEndPolicySelect } from './RunEndPolicySelect'
 import { useConversationLogic } from './useConversationLogic'
@@ -168,8 +167,6 @@ export function ConversationView({
   onPreviewAsset,
 }: ConversationViewProps) {
   const t = useT()
-  const [selectedWorkflowTemplateId, setSelectedWorkflowTemplateId] = useState('')
-  const [workflowEditorOpen, setWorkflowEditorOpen] = useState(false)
   const autoApplyOnRunComplete = useWorkspacePreferencesStore((s) => s.autoApplyOnRunComplete)
   const setAutoApplyOnRunComplete = useWorkspacePreferencesStore((s) => s.setAutoApplyOnRunComplete)
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null)
@@ -186,13 +183,11 @@ export function ConversationView({
     allAgents, activeAgentId, setActiveAgent, createAgent, deleteAgent, mentionAgents,
     convId, activeMessages,
     conversationError, activeContextWindowUsage,
-    isProcessing, status, suggestedFollowUp, workflowTemplates, toolResults,
-    staticSnapshot,
+    isProcessing, status, suggestedFollowUp, toolResults,
     hasApiKey, enableThinking, thinkingLevel, setEnableThinking, setThinkingLevel,
     agentMode, setAgentMode,
     sendMessage, handleSend, handleCancel,
     handleDeleteAgentLoop, handleEditAndResend, handleRegenerate,
-    runCustomWorkflowDryRun,
     queueDepth,
   } = logic
 
@@ -404,17 +399,6 @@ export function ConversationView({
     onConsumed: onInitialMessageConsumed,
   })
 
-  // ── Workflow template selection sync ──
-  useEffect(() => {
-    if (workflowTemplates.length === 0) {
-      if (selectedWorkflowTemplateId) setSelectedWorkflowTemplateId('')
-      return
-    }
-    if (!workflowTemplates.some((t) => t.id === selectedWorkflowTemplateId)) {
-      setSelectedWorkflowTemplateId(workflowTemplates[0].id)
-    }
-  }, [workflowTemplates, selectedWorkflowTemplateId])
-
   // ── Stable error handler for ErrorBoundary ──
   const handleErrorBoundaryError = useCallback(
     (error: Error) => {
@@ -454,7 +438,6 @@ export function ConversationView({
               toolResults={toolResults}
               isProcessing={isProcessing}
               status={status}
-              staticSnapshot={staticSnapshot}
               onDeleteAgentLoop={handleDeleteAgentLoop}
               onEditAndResend={handleEditAndResend}
               onRegenerate={handleRegenerate}
@@ -589,16 +572,6 @@ export function ConversationView({
         />
       )}
 
-      <WorkflowEditorDialog
-        open={workflowEditorOpen}
-        onOpenChange={setWorkflowEditorOpen}
-        initialTemplateId={selectedWorkflowTemplateId}
-        onRunDryRun={(template) => {
-          void runCustomWorkflowDryRun(convId, template)
-          setSelectedWorkflowTemplateId(template.id)
-          setWorkflowEditorOpen(false)
-        }}
-      />
     </ErrorBoundary>
     </ConversationActionContext.Provider>
   )

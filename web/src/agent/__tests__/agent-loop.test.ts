@@ -703,65 +703,6 @@ describe('AgentLoop', () => {
       expect(events).toEqual(['start:call_1', 'msg:call_1', 'complete:call_1'])
     })
 
-    it('should re-emit tool start when execution args become more specific', async () => {
-      const starts: string[] = []
-      mockAgentLoopContinue.mockImplementation((context: any) => {
-        return (async function* () {
-          const tool = context.tools.find((t: any) => t.name === 'run_workflow')
-          yield {
-            type: 'message_update',
-            assistantMessageEvent: {
-              type: 'toolcall_start',
-              contentIndex: 0,
-              partial: {
-                content: [{ type: 'toolCall', id: 'call_wf', name: 'run_workflow', arguments: {} }],
-              },
-            },
-          }
-          yield {
-            type: 'tool_execution_start',
-            toolCallId: 'call_wf',
-            toolName: 'run_workflow',
-            args: { workflow_id: 'novel_daily_v1', mode: 'real_run' },
-          }
-          const result = await tool.execute('call_wf', { workflow_id: 'novel_daily_v1', mode: 'real_run' })
-          yield { type: 'tool_execution_end', toolCallId: 'call_wf', toolName: 'run_workflow', result }
-          yield {
-            type: 'message_end',
-            message: toolResultMessage('call_wf', 'run_workflow', result.content[0].text),
-          }
-          yield { type: 'message_end', message: assistantMessage('Done') }
-        })()
-      })
-
-      mockTools.getToolDefinitions.mockReturnValue([
-        {
-          type: 'function',
-          function: {
-            name: 'run_workflow',
-            description: 'run workflow',
-            parameters: { type: 'object', properties: {} },
-          },
-        },
-      ])
-
-      const loop = new AgentLoop({
-        provider: mockProvider,
-        toolRegistry: mockTools,
-        contextManager: mockContextManager,
-        toolContext: createMockToolContext(),
-      })
-
-      await loop.run([createUserMessage('run workflow')], {
-        onToolCallStart: (tc) => starts.push(tc.function.arguments),
-      })
-
-      expect(starts).toEqual([
-        '{}',
-        '{"workflow_id":"novel_daily_v1","mode":"real_run"}',
-      ])
-    })
-
     it('should surface tool error as tool result message', async () => {
       mockAgentLoopContinue.mockImplementation((context: any) => {
         return (async function* () {

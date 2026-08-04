@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 12;
+PRAGMA user_version = 13;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -478,29 +478,6 @@ CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_type ON mcp_servers(type);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_transport ON mcp_servers(transport);
 
--- ============================================================================
--- Custom Workflows Table (User-created workflow templates)
--- ============================================================================
-CREATE TABLE IF NOT EXISTS custom_workflows (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    domain TEXT NOT NULL DEFAULT 'custom',
-    entry_node_id TEXT,
-    nodes_json TEXT NOT NULL DEFAULT '[]',    -- JSON array of CustomWorkflowNode
-    edges_json TEXT NOT NULL DEFAULT '[]',    -- JSON array of WorkflowEdge
-    source TEXT NOT NULL DEFAULT 'user-created',  -- 'built-in' | 'user-created' | 'imported'
-    version INTEGER NOT NULL DEFAULT 1,
-    enabled INTEGER NOT NULL DEFAULT 1,       -- BOOLEAN (0 or 1)
-    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
-);
-
-CREATE INDEX IF NOT EXISTS idx_custom_workflows_domain ON custom_workflows(domain);
-CREATE INDEX IF NOT EXISTS idx_custom_workflows_source ON custom_workflows(source);
-CREATE INDEX IF NOT EXISTS idx_custom_workflows_enabled ON custom_workflows(enabled);
-CREATE INDEX IF NOT EXISTS idx_custom_workflows_updated_at ON custom_workflows(updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_custom_workflows_name_lower ON custom_workflows(lower(name));
 
 -- ============================================================================
 -- Triggers for Automatic Timestamps

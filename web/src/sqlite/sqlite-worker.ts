@@ -278,7 +278,7 @@ async function migrateMessagesFromJsonBlob(dbHandle: any): Promise<void> {
           const meta: Record<string, unknown> = {}
           let hasMeta = false
           const metaFields = [
-            'kind', 'workflowDryRun', 'workflowRealRun', 'reasoning',
+            'kind', 'reasoning',
             'toolCalls', 'toolCallId', 'name', 'usage', 'assets',
           ] as const
           for (const field of metaFields) {
@@ -457,7 +457,7 @@ async function backfillLegacyMessagesFromSahpoolIfNeeded(currentDb: any): Promis
           const meta: Record<string, unknown> = {}
           let hasMeta = false
           const metaFields = [
-            'kind', 'workflowDryRun', 'workflowRealRun', 'reasoning',
+            'kind', 'reasoning',
             'toolCalls', 'toolCallId', 'name', 'usage', 'assets',
           ] as const
           for (const field of metaFields) {

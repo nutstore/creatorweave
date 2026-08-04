@@ -96,16 +96,11 @@ export function useConversationLogic() {
   // NOTE: active.draftAssistant and active.streamingState are intentionally
   // NOT destructured here. They change at ~60fps during streaming and would
   // cause ConversationView to re-render on every token.
-  const activeWorkflowExecution = active.workflowExecution
   const conversationError = active.error
   const activeContextWindowUsage = active.contextWindowUsage
 
   // ── Conversation actions (stable refs from store) ──
   const deleteAgentLoop = useConversationStore((s) => s.deleteAgentLoop)
-  const runWorkflowDryRun = useConversationStore((s) => s.runWorkflowDryRun)
-  const runWorkflowRealRun = useConversationStore((s) => s.runWorkflowRealRun)
-  const runCustomWorkflowDryRun = useConversationStore((s) => s.runCustomWorkflowDryRun)
-  const listWorkflowTemplates = useConversationStore((s) => s.listWorkflowTemplates)
   const isConversationRunning = useConversationRuntimeStore((s) => s.isConversationRunning)
   const getSuggestedFollowUp = useConversationRuntimeStore((s) => s.getSuggestedFollowUp)
   const clearSuggestedFollowUp = useConversationRuntimeStore((s) => s.clearSuggestedFollowUp)
@@ -130,15 +125,6 @@ export function useConversationLogic() {
   const isRunning = convId ? isConversationRunning(convId) : false
   const isProcessing = isRunning
   const queueDepth = convId ? getQueueDepth(convId) : 0
-
-  // ── Static snapshot for ConversationMessages ──
-  // Only contains data that changes at low frequency (not per-token).
-  const staticSnapshot = useMemo(
-    () => ({
-      activeWorkflowExecution,
-    }),
-    [activeWorkflowExecution]
-  )
 
   // ── Refs ──
   const lastRenderedMessageCountRef = useRef(0)
@@ -286,9 +272,6 @@ export function useConversationLogic() {
 
   // ── Follow-up suggestion ──
   const suggestedFollowUp = convId ? getSuggestedFollowUp(convId) : ''
-
-  // ── Workflow templates ──
-  const workflowTemplates = useMemo(() => listWorkflowTemplates(), [listWorkflowTemplates])
 
   // ── Handlers ──
   // Refs for reading latest values inside stable callbacks
@@ -560,16 +543,6 @@ export function useConversationLogic() {
     const currentConvId = convIdRef.current
     if (currentConvId) useConversationStore.getState().cancelAgent(currentConvId)
   }, [])
-  const handleRunWorkflow = async (templateId: string, rubricDsl?: string) => {
-    if (!convId || !templateId || isProcessing) return
-    await runWorkflowDryRun(convId, templateId, { rubricDsl })
-  }
-
-  const handleRealRunWorkflow = async (templateId: string, rubricDsl?: string) => {
-    if (!convId || !templateId || isProcessing) return
-    await runWorkflowRealRun(convId, templateId, { rubricDsl })
-  }
-
   const handleDeleteAgentLoop = useCallback(
     (messageId: string) => {
       const currentConvId = convIdRef.current
@@ -623,11 +596,8 @@ export function useConversationLogic() {
     isRunning,
     status,
     suggestedFollowUp,
-    workflowTemplates,
     toolResults,
     queueDepth,
-    // Static snapshot for ConversationMessages
-    staticSnapshot,
     // Settings
     hasApiKey,
     enableThinking,
@@ -642,14 +612,11 @@ export function useConversationLogic() {
     handleSend,
     handleCancel,
     handleSlashCommand,
-    handleRunWorkflow,
-    handleRealRunWorkflow,
     handleDeleteAgentLoop,
     handleEditAndResend,
     handleRegenerate,
     regenerateUserMessage,
     clearSuggestedFollowUp,
-    runCustomWorkflowDryRun,
     // Store refs (for ErrorBoundary reset)
     useConversationStore,
     useConversationRuntimeStore,

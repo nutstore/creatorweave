@@ -1,6 +1,6 @@
 /**
  * ConversationMessages — renders the list of message turns,
- * draft assistant bubble, and workflow progress panels.
+ * draft assistant bubble.
  *
  * Streaming data (draftAssistant, streamingState, streamingContent, toolResults)
  * is subscribed directly from the runtime store inside this component,
@@ -14,13 +14,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { MessageBubble } from './MessageBubble'
 import { AssistantTurnBubble } from './AssistantTurnBubble'
 import { ConversationUsageBar } from './ConversationUsageBar'
-import { WorkflowExecutionProgress } from './WorkflowExecutionProgress'
 import { groupMessagesIntoTurns } from './group-messages'
-import { useWorkflowProgressAnchor } from './useWorkflowProgressAnchor'
 import { QueuedMessageCard } from './QueuedMessageCard'
 import { Clock } from 'lucide-react'
 import { useT } from '@/i18n'
-import type { DraftAssistantStep, Message, ToolCall, WorkflowExecutionState } from '@/agent/message-types'
+import type { DraftAssistantStep, Message, ToolCall } from '@/agent/message-types'
 import type { FileMentionItem } from './FileMentionExtension'
 
 type ConversationMessagesProps = {
@@ -42,14 +40,6 @@ type ConversationMessagesProps = {
   onSearchFiles?: (query: string) => Promise<FileMentionItem[]>
   /** Open the shared FilePreview drawer with a pre-loaded blob */
   onPreviewAsset?: (name: string, blob: Blob) => void
-  /**
-   * Stable snapshot of low-frequency data computed by the parent.
-   * These fields change only when the processing state or messages change,
-   * NOT on every streaming token.
-   */
-  staticSnapshot: {
-    activeWorkflowExecution: WorkflowExecutionState | null
-  }
 }
 
 export interface ConversationMessagesHandle {
@@ -104,10 +94,8 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
   mentionAgents,
   onSearchFiles,
   onPreviewAsset,
-  staticSnapshot,
 }: ConversationMessagesProps, ref: React.Ref<ConversationMessagesHandle | null>) {
   const t = useT()
-  const { activeWorkflowExecution } = staticSnapshot
 
   // ── Subscribe to streaming data directly from runtime store ──
   // This component is the ONLY place that reads streaming data at high frequency.
@@ -240,15 +228,6 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
     },
   }), [turns]))
 
-  const anchorIndex = useWorkflowProgressAnchor({
-    activeWorkflowExecution,
-    activeDraftAssistant,
-    activeStreamingState,
-    activeMessages,
-    isProcessing,
-    turns,
-  })
-
   const shouldRenderDraftAssistant = isProcessing && (!lastTurn || lastTurn.type !== 'assistant')
   const shouldAttachRuntimeToDraft = shouldRenderDraftAssistant
   return (
@@ -295,11 +274,6 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
                 conversationId={conversationId}
                 onPreviewAsset={onPreviewAsset}
                 iterationLimitReached={idx === turns.length - 1 ? streamingData?.iterationLimitReached ?? null : null}
-                workflowProgress={
-                  activeWorkflowExecution && idx === anchorIndex ? (
-                    <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />
-                  ) : undefined
-                }
               />
             </Fragment>
           )
@@ -319,18 +293,8 @@ export const ConversationMessages = memo(forwardRef(function ConversationMessage
                 shouldAttachRuntimeToDraft, isWaitingForModel, activeDraftAssistant,
                 activeStreamingState, streamingState, streamingContentMessage, status,
               )}
-              workflowProgress={
-                activeWorkflowExecution && anchorIndex === -1 ? (
-                  <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />
-                ) : undefined
-              }
             />
           </Fragment>
-        )}
-
-        {/* Fallback workflow progress */}
-        {activeWorkflowExecution && anchorIndex === -1 && !shouldRenderDraftAssistant && (
-          <WorkflowExecutionProgress execution={activeWorkflowExecution} onStop={onCancel} />
         )}
 
         {/* Queued messages — shown while agent is processing */}

@@ -82,8 +82,8 @@ describe('build-agent-tools', () => {
         {
           type: 'function',
           function: {
-            name: 'run_workflow',
-            description: 'workflow',
+            name: 'test_exempt_tool',
+            description: 'test exempt tool',
             parameters: { type: 'object', properties: {} },
           },
         },
@@ -93,10 +93,10 @@ describe('build-agent-tools', () => {
 
     const tools = buildAgentTools(createInput({
       toolRegistry,
-      toolTimeoutExemptions: new Set<string>(['run_workflow']),
+      toolTimeoutExemptions: new Set<string>(['test_exempt_tool']),
     }))
 
-    // run_workflow is in exemptions → no timeout at all, should succeed
+    // test_exempt_tool is in exemptions → no timeout at all, should succeed
     await tools[0].execute('call_1', { timeout: 1000 })
     expect(toolRegistry.execute).toHaveBeenCalled()
   })

@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 12
+export const BASE_SCHEMA_VERSION = 13
 
 // ============================================================================
 // Migration Registry
@@ -210,6 +210,18 @@ export const migrations: Migration[] = [
       );
 
       PRAGMA user_version = 12;
+    `,
+  },
+  {
+    version: 13,
+    name: 'drop_custom_workflows_table',
+    up: `
+      -- Drop the legacy custom_workflows table.
+      -- The old workflow system (LLM role-based pipelines) has been removed
+      -- and will be replaced by a new visual canvas workflow system.
+      DROP TABLE IF EXISTS custom_workflows;
+
+      PRAGMA user_version = 13;
     `,
   },
 ]

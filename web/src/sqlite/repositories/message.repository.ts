@@ -26,9 +26,7 @@ export interface MessageRow {
 
 /** Fields stored in meta_json */
 interface MessageMeta {
-  kind?: 'normal' | 'context_summary' | 'workflow_dry_run' | 'workflow_real_run'
-  workflowDryRun?: unknown
-  workflowRealRun?: unknown
+  kind?: 'normal' | 'context_summary'
   reasoning?: string | null
   reasoningDurationMs?: number
   toolCalls?: ToolCall[]
@@ -216,14 +214,6 @@ export class MessageRepository {
       meta.kind = message.kind
       hasMeta = true
     }
-    if (message.workflowDryRun !== undefined) {
-      meta.workflowDryRun = message.workflowDryRun
-      hasMeta = true
-    }
-    if (message.workflowRealRun !== undefined) {
-      meta.workflowRealRun = message.workflowRealRun
-      hasMeta = true
-    }
     if (message.reasoning !== undefined) {
       meta.reasoning = message.reasoning
       hasMeta = true
@@ -278,8 +268,6 @@ export class MessageRepository {
       role: row.role as Message['role'],
       content: parseJSON<string | null>(row.content_json, null),
       kind: meta.kind,
-      workflowDryRun: meta.workflowDryRun as Message['workflowDryRun'],
-      workflowRealRun: meta.workflowRealRun as Message['workflowRealRun'],
       reasoning: meta.reasoning,
       reasoningDurationMs: meta.reasoningDurationMs,
       toolCalls: meta.toolCalls,

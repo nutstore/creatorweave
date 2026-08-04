@@ -195,7 +195,7 @@ async function buildRuntimeDeps(schedule: NonNullable<Awaited<ReturnType<typeof 
   toolContext: ToolContext
 }> {
   // ── Provider ─────────────────────────────────────────────────────────
-  // Follow the same pattern as workflow.tool.ts and conversation.store.sqlite.ts:
+  // Resolve the effective provider configuration for scheduled execution:
   //   1. getEffectiveProviderConfig() → { apiKeyProviderKey, baseUrl, modelName }
   //   2. getApiKeyRepository().load(apiKeyProviderKey) → apiKey
   //   3. createLLMProvider({ apiKey, providerType, baseUrl, model, apiMode })

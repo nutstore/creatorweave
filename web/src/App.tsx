@@ -464,9 +464,6 @@ function AppReady() {
         suggestedFollowUps: new Map(),
         cancelledRunIds: new Set(),
         mountedConversations: new Map(),
-        pendingWorkflowDryRuns: new Map(),
-        pendingWorkflowRealRuns: new Map(),
-        workflowAbortControllers: new Map(),
       })
 
       await useProjectStore.getState().initialize()

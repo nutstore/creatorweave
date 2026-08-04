@@ -18,7 +18,7 @@ describe('AssistantTurnBubble timeline ordering', () => {
           id: 'tool-1',
           type: 'function',
           function: {
-            name: 'run_workflow',
+            name: 'test_tool',
             arguments: '{}',
           },
         },
@@ -60,7 +60,7 @@ describe('AssistantTurnBubble timeline ordering', () => {
     const text = container.textContent || ''
     const summaryIndex = text.indexOf('Compressed summary content')
     const compressionIndex = text.indexOf('Context compressed and summary generated')
-    const toolIndex = text.indexOf('run_workflow')
+    const toolIndex = text.indexOf('test_tool')
 
     expect(summaryIndex).toBeGreaterThanOrEqual(0)
     expect(compressionIndex).toBeGreaterThan(summaryIndex)

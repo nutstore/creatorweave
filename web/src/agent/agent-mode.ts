@@ -44,8 +44,6 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
     planModeDescription: 'Execute read-only bash commands in sandbox (grep, cat, ls, etc. — writes blocked)'
   }],
   ['ocr', { name: 'ocr', category: 'read' }],
-  // run_workflow disabled — workflows unused
-  // ['run_workflow', { name: 'run_workflow', category: 'read' }],
   
   // Git read tools
   ['git_status', { name: 'git_status', category: 'read' }],

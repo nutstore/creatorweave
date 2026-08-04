@@ -20,7 +20,6 @@ const { useConversationStoreMock } = vi.hoisted(() => {
         activeToolCalls: [],
         streamingToolArgs: '',
         streamingToolArgsByCallId: {},
-        workflowExecution: null,
         error: null,
         contextWindowUsage: null,
         lastContextWindowUsage: null,
@@ -31,12 +30,6 @@ const { useConversationStoreMock } = vi.hoisted(() => {
     deleteAgentLoop: vi.fn(() => true),
     setActive: vi.fn(),
     runAgent: vi.fn(),
-    runWorkflowDryRun: vi.fn(),
-    runWorkflowRealRun: vi.fn(),
-    runCustomWorkflowDryRun: vi.fn(),
-    listWorkflowTemplates: vi.fn(() => [
-      { id: 'novel_daily_v1', label: 'Novel Daily', pipeline: ['plan', 'produce', 'review'] },
-    ]),
     cancelAgent: vi.fn(),
     isConversationRunning: vi.fn(() => false),
     getSuggestedFollowUp: vi.fn(() => ''),
@@ -151,18 +144,6 @@ vi.mock('../AgentRichInput', () => ({
   AgentRichInput: ({ leadingAccessory }: { leadingAccessory?: ReactNode }) => (
     <div data-testid="agent-rich-input">{leadingAccessory}</div>
   ),
-}))
-
-vi.mock('../WorkflowQuickActions', () => ({
-  WorkflowQuickActions: () => <div data-testid="workflow-quick-actions" />,
-}))
-
-vi.mock('../WorkflowExecutionProgress', () => ({
-  WorkflowExecutionProgress: () => <div data-testid="workflow-exec-progress" />,
-}))
-
-vi.mock('../workflow-editor/WorkflowEditorDialog', () => ({
-  WorkflowEditorDialog: () => null,
 }))
 
 vi.mock('@creatorweave/ui', () => ({
