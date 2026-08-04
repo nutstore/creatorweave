@@ -45,6 +45,7 @@ export const skills = {
       loadAll: "모두 로드",
       skip: "건너뛰기",
     },
+    secretsRequired: "시크릿 필요",
 } as const
 
 export const discover = {
@@ -92,6 +93,9 @@ export const skillCard = {
     export: "ZIP으로 내보내기",
     exportFailed: "내보내기 실패",
     updated: "업데이트됨",
+    secretsOk: "{count}/{total}개 시크릿 구성됨",
+    secretsMissing: "{total}개 중 {missing}개 시크릿 누락",
+    secretsTooltip: "시크릿 종속성",
     category: {
       codeReview: "코드 리뷰",
       testing: "테스트",

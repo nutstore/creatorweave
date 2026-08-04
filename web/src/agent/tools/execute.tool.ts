@@ -297,10 +297,9 @@ async function loadRuntimeSecrets(): Promise<Record<string, string>> {
       import('@/store/project.store'),
     ])
     const projectId = useProjectStore.getState().activeProjectId
-    if (!projectId) {
-      return {}
-    }
-    const names = await getAllSecretNames(projectId)
+    // Even without an active project, global-scoped secrets are still useful.
+    // getAllSecretNames(undefined) returns the global-only set.
+    const names = await getAllSecretNames(projectId || undefined)
     const entries = await Promise.all(
       names.map(async (name) => {
         const value = await loadSecret(projectId, name)

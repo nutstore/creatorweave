@@ -46,6 +46,7 @@ export const skills = {
       loadAll: "Load All",
       skip: "Skip",
     },
+    secretsRequired: "Requires secrets",
 } as const
 
 export const discover = {
@@ -93,6 +94,9 @@ export const skillCard = {
     export: "Export as ZIP",
     exportFailed: "Export failed",
     updated: "Updated",
+    secretsOk: "{count}/{total} secrets configured",
+    secretsMissing: "{missing} of {total} secrets missing",
+    secretsTooltip: "Secret dependencies",
     category: {
       codeReview: "Code Review",
       testing: "Testing",

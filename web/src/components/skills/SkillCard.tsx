@@ -12,7 +12,8 @@
  * the action buttons in the footer handle specific operations.
  */
 
-import { Eye, Pencil, Trash2, Download } from 'lucide-react'
+import { Eye, KeyRound, Pencil, Trash2, Download } from 'lucide-react'
+import { useMemo } from 'react'
 import { BrandButton } from '@creatorweave/ui'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
@@ -23,6 +24,8 @@ interface SkillCardProps {
   skill: SkillMetadata
   /** Read-only mode for project/builtin skills (cannot edit/delete) */
   isReadOnly?: boolean
+  /** Names of secrets currently configured for the active project (project + global). */
+  configuredSecrets?: Set<string>
   onToggle: (id: string, enabled: boolean) => void
   onView: (skill: SkillMetadata) => void
   onEdit: (skill: SkillMetadata) => void
@@ -69,10 +72,20 @@ function formatRelativeTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString()
 }
 
-export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelete, onExport }: SkillCardProps) {
+export function SkillCard({ skill, isReadOnly, configuredSecrets, onToggle, onView, onEdit, onDelete, onExport }: SkillCardProps) {
   const t = useT()
   const catKey = CATEGORY_KEY[skill.category] ?? CATEGORY_KEY.general
   const catClass = CATEGORY_BADGE[skill.category] ?? CATEGORY_BADGE.general
+
+  // Compute secret dependency status
+  const requiredSecrets = skill.secrets?.filter((s) => s.required !== false) ?? []
+  const totalSecrets = skill.secrets?.length ?? 0
+  const missingCount = useMemo(() => {
+    if (totalSecrets === 0 || !configuredSecrets) return 0
+    return requiredSecrets.filter((s) => !configuredSecrets.has(s.name)).length
+  }, [requiredSecrets, totalSecrets, configuredSecrets])
+
+  const hasSecrets = totalSecrets > 0
 
   // Stop click-throughs on the action buttons / switch from opening the detail view.
   const stop = (e: React.MouseEvent) => e.stopPropagation()
@@ -152,6 +165,23 @@ export function SkillCard({ skill, isReadOnly, onToggle, onView, onEdit, onDelet
           )}
           {skill.source === 'project' && (
             <span className="text-neutral-400 dark:text-neutral-600">· {t('skillCard.project')}</span>
+          )}
+          {hasSecrets && (
+            <span
+              className="flex items-center gap-0.5"
+              title={
+                missingCount > 0
+                  ? t('skillCard.secretsMissing', { missing: missingCount, total: totalSecrets })
+                  : t('skillCard.secretsOk', { count: totalSecrets - missingCount, total: totalSecrets })
+              }
+            >
+              · <KeyRound className={missingCount > 0 ? 'h-3 w-3 text-amber-500' : 'h-3 w-3 text-emerald-500'} />
+              {missingCount > 0 ? (
+                <span className="text-amber-500">{missingCount}/{totalSecrets}</span>
+              ) : (
+                <span className="text-neutral-400">{totalSecrets}</span>
+              )}
+            </span>
           )}
         </div>
         <div className="flex shrink-0 items-center gap-0.5">

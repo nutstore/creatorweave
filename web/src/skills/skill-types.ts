@@ -45,10 +45,22 @@ export interface SkillMetadata {
   triggers: SkillTrigger
   /** Whether this skill is enabled */
   enabled: boolean
+  /** Secret names this skill declares as dependencies (uppercase env-style). */
+  secrets?: SkillSecret[]
   /** Creation timestamp */
   createdAt: number
   /** Last update timestamp */
   updatedAt: number
+}
+
+/** A secret dependency declared in skill frontmatter. */
+export interface SkillSecret {
+  /** Uppercase env-style identifier, e.g. `WEREAD_API_KEY`. */
+  name: string
+  /** Human-readable description of what this secret is for. */
+  description?: string
+  /** Whether the secret is mandatory (default `true`). */
+  required?: boolean
 }
 
 /** Full skill data (loaded on demand) */

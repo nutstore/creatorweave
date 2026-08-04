@@ -16,6 +16,7 @@ import {
   getAllSecretNames,
   hasSecret,
   loadSecret,
+  promoteSecretToGlobal,
   saveSecret,
 } from './secret-store'
 
@@ -23,7 +24,12 @@ describe('secret-store', () => {
   const projectId = 'project-alpha'
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    apiKeyStore.deleteApiKey.mockResolvedValue(undefined)
+    apiKeyStore.getAllApiKeyProviders.mockResolvedValue([])
+    apiKeyStore.hasApiKey.mockResolvedValue(false)
+    apiKeyStore.loadApiKey.mockResolvedValue(null)
+    apiKeyStore.saveApiKey.mockResolvedValue(undefined)
   })
 
   it('stores a secret in an isolated encrypted-store namespace', async () => {
@@ -45,8 +51,11 @@ describe('secret-store', () => {
     await hasSecret(projectId, 'ASSEMBLYAI_API_KEY')
     await deleteSecret(projectId, 'ASSEMBLYAI_API_KEY')
 
+    // load/has check project scope first, then fall back to global scope
     expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:project-alpha:ASSEMBLYAI_API_KEY')
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:_global:ASSEMBLYAI_API_KEY')
     expect(apiKeyStore.hasApiKey).toHaveBeenCalledWith('__secret__:project-alpha:ASSEMBLYAI_API_KEY')
+    expect(apiKeyStore.hasApiKey).toHaveBeenCalledWith('__secret__:_global:ASSEMBLYAI_API_KEY')
     expect(apiKeyStore.deleteApiKey).toHaveBeenCalledWith('__secret__:project-alpha:ASSEMBLYAI_API_KEY')
   })
 
@@ -57,11 +66,13 @@ describe('secret-store', () => {
       '__secret__:project-alpha:bad-name',
       '__secret__:project-alpha:OPENAI_API_KEY',
       '__secret__:project-beta:OTHER_PROJECT_KEY',
+      '__secret__:_global:SHARED_GLOBAL_KEY',
     ])
 
     await expect(getAllSecretNames(projectId)).resolves.toEqual([
       'ASSEMBLYAI_API_KEY',
       'OPENAI_API_KEY',
+      'SHARED_GLOBAL_KEY',
     ])
     expect(apiKeyStore.loadApiKey).not.toHaveBeenCalled()
   })
@@ -77,5 +88,90 @@ describe('secret-store', () => {
   it('rejects an empty secret value', async () => {
     await expect(saveSecret(projectId, 'ASSEMBLYAI_API_KEY', '')).rejects.toThrow('cannot be empty')
     expect(apiKeyStore.saveApiKey).not.toHaveBeenCalled()
+  })
+
+  // --- Global scope tests ---
+
+  it('saves a global secret under the _global prefix', async () => {
+    await saveSecret(projectId, 'SHARED_TOKEN', 'value', 'global')
+
+    expect(apiKeyStore.saveApiKey).toHaveBeenCalledWith(
+      '__secret__:_global:SHARED_TOKEN',
+      'value'
+    )
+  })
+
+  it('deletes a global secret from the _global prefix', async () => {
+    await deleteSecret(projectId, 'SHARED_TOKEN', 'global')
+
+    expect(apiKeyStore.deleteApiKey).toHaveBeenCalledWith('__secret__:_global:SHARED_TOKEN')
+  })
+
+  it('falls back to global scope when project scope is missing', async () => {
+    // First call (project scope) returns null, second (global) returns the value
+    apiKeyStore.loadApiKey
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('global-value')
+
+    const result = await loadSecret(projectId, 'SHARED_TOKEN')
+
+    expect(result).toBe('global-value')
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:project-alpha:SHARED_TOKEN')
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:_global:SHARED_TOKEN')
+  })
+
+  it('prefers project scope over global scope', async () => {
+    apiKeyStore.loadApiKey
+      .mockResolvedValueOnce('project-value')
+      .mockResolvedValueOnce('global-value')
+
+    const result = await loadSecret(projectId, 'SHARED_TOKEN')
+
+    expect(result).toBe('project-value')
+    // Should not have checked global when project scope had the value
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns null when neither project nor global scope has the secret', async () => {
+    apiKeyStore.loadApiKey.mockResolvedValue(null)
+
+    const result = await loadSecret(projectId, 'MISSING_KEY')
+
+    expect(result).toBeNull()
+  })
+
+  it('loadSecret works without a project (global-only lookup)', async () => {
+    apiKeyStore.loadApiKey.mockResolvedValue('global-only-value')
+
+    const result = await loadSecret('', 'SHARED_TOKEN')
+
+    expect(result).toBe('global-only-value')
+    // Should only check global, not project
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:_global:SHARED_TOKEN')
+    expect(apiKeyStore.loadApiKey).not.toHaveBeenCalledWith(expect.stringContaining('project'))
+  })
+
+  it('promotes a project secret to global (read → write global → delete project)', async () => {
+    apiKeyStore.loadApiKey.mockResolvedValue('project-value')
+
+    const ok = await promoteSecretToGlobal(projectId, 'API_KEY')
+
+    expect(ok).toBe(true)
+    // Read project value
+    expect(apiKeyStore.loadApiKey).toHaveBeenCalledWith('__secret__:project-alpha:API_KEY')
+    // Write to global
+    expect(apiKeyStore.saveApiKey).toHaveBeenCalledWith('__secret__:_global:API_KEY', 'project-value')
+    // Delete project-scoped copy
+    expect(apiKeyStore.deleteApiKey).toHaveBeenCalledWith('__secret__:project-alpha:API_KEY')
+  })
+
+  it('returns false when promoting a non-existent project secret', async () => {
+    apiKeyStore.loadApiKey.mockResolvedValue(null)
+
+    const ok = await promoteSecretToGlobal(projectId, 'MISSING_KEY')
+
+    expect(ok).toBe(false)
+    expect(apiKeyStore.saveApiKey).not.toHaveBeenCalled()
+    expect(apiKeyStore.deleteApiKey).not.toHaveBeenCalled()
   })
 })

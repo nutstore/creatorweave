@@ -46,6 +46,7 @@ export const skills = {
       loadAll: "加载全部",
       skip: "跳过",
     },
+    secretsRequired: "需要密钥",
 } as const
 
 export const discover = {
@@ -93,6 +94,9 @@ export const skillCard = {
     export: "导出为 ZIP",
     exportFailed: "导出失败",
     updated: "更新于",
+    secretsOk: "已配置 {count}/{total} 个密钥",
+    secretsMissing: "{total} 个密钥中缺少 {missing} 个",
+    secretsTooltip: "密钥依赖",
     category: {
       codeReview: "代码审查",
       testing: "测试",

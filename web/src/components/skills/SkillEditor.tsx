@@ -109,6 +109,21 @@ export function SkillEditor({ skill, open, onClose, readOnly = false }: SkillEdi
         `  fileExtensions: [${skill.triggers.fileExtensions.map((e) => `"${e}"`).join(', ')}]`
       )
     }
+    // Preserve existing secrets (UI doesn't edit them — they come from raw YAML)
+    if (skill?.secrets && skill.secrets.length > 0) {
+      lines.push('secrets:')
+      for (const secret of skill.secrets) {
+        const desc = secret.description ? yamlEscape(secret.description) : ''
+        if (desc) {
+          lines.push(`  - name: "${yamlEscape(secret.name)}"`)
+          lines.push(`    description: "${desc}"`)
+          if (secret.required === false) lines.push(`    required: false`)
+        } else {
+          lines.push(`  - name: "${yamlEscape(secret.name)}"`)
+          if (secret.required === false) lines.push(`    required: false`)
+        }
+      }
+    }
     lines.push('---')
     lines.push('')
     if (instruction) {

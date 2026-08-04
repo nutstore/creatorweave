@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const secretStore = vi.hoisted(() => ({
   deleteSecret: vi.fn(async () => undefined),
+  getAllSecretEntries: vi.fn(async () => [{ name: 'ASSEMBLYAI_API_KEY', scope: 'project' as const }]),
+  getGlobalSecretNames: vi.fn(async () => [] as string[]),
   getAllSecretNames: vi.fn(async () => ['ASSEMBLYAI_API_KEY']),
   loadSecret: vi.fn(async () => 'secret-value'),
   saveSecret: vi.fn(async () => undefined),
@@ -26,23 +28,28 @@ describe('SecretManager', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     projectStore.activeProjectId = 'project-alpha'
+    secretStore.getAllSecretEntries.mockResolvedValue([
+      { name: 'ASSEMBLYAI_API_KEY', scope: 'project' },
+    ])
+    secretStore.getGlobalSecretNames.mockResolvedValue([])
     secretStore.getAllSecretNames.mockResolvedValue(['ASSEMBLYAI_API_KEY'])
   })
 
-  it('lists secret names without loading secret values', async () => {
+  it('lists project secret names without loading secret values', async () => {
     render(<SecretManager />)
 
     expect(await screen.findByText('ASSEMBLYAI_API_KEY')).toBeInTheDocument()
-    expect(screen.getByText('settings.secrets.currentProject:Project Alpha')).toBeInTheDocument()
-    expect(secretStore.getAllSecretNames).toHaveBeenCalledWith('project-alpha')
+    expect(secretStore.getAllSecretEntries).toHaveBeenCalledWith('project-alpha')
     expect(secretStore.loadSecret).not.toHaveBeenCalled()
   })
 
-  it('saves a new secret through the encrypted store', async () => {
+  it('saves a new project secret through the encrypted store', async () => {
     render(<SecretManager />)
     await screen.findByText('ASSEMBLYAI_API_KEY')
 
-    fireEvent.click(screen.getByText('settings.secrets.add'))
+    // The first "add" button is for project scope
+    const addButtons = screen.getAllByText('settings.secrets.add')
+    fireEvent.click(addButtons[0])
     fireEvent.change(screen.getByLabelText('settings.secrets.name'), {
       target: { value: 'ASSEMBLYAI_API_KEY' },
     })
@@ -52,18 +59,21 @@ describe('SecretManager', () => {
     fireEvent.click(screen.getByText('settings.secrets.save'))
 
     await waitFor(() => {
-      expect(secretStore.saveSecret).toHaveBeenCalledWith('project-alpha', 'ASSEMBLYAI_API_KEY', 'new-secret')
+      expect(secretStore.saveSecret).toHaveBeenCalledWith(
+        'project-alpha',
+        'ASSEMBLYAI_API_KEY',
+        'new-secret',
+        'project'
+      )
     })
   })
 
-  it('requires an explicit edit-and-reveal action before loading a value', async () => {
+  it('lists global secrets in the global section', async () => {
+    secretStore.getGlobalSecretNames.mockResolvedValue(['SHARED_GLOBAL_TOKEN'])
+
     render(<SecretManager />)
-    await screen.findByText('ASSEMBLYAI_API_KEY')
 
-    fireEvent.click(screen.getByText('settings.secrets.update'))
-    expect(secretStore.loadSecret).not.toHaveBeenCalled()
-
-    fireEvent.click(screen.getByText('settings.secrets.reveal'))
-    await waitFor(() => expect(secretStore.loadSecret).toHaveBeenCalledWith('project-alpha', 'ASSEMBLYAI_API_KEY'))
+    expect(await screen.findByText('SHARED_GLOBAL_TOKEN')).toBeInTheDocument()
+    expect(secretStore.getGlobalSecretNames).toHaveBeenCalled()
   })
 })

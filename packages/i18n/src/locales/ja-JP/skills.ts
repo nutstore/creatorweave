@@ -45,6 +45,7 @@ export const skills = {
       loadAll: "すべて読み込み",
       skip: "スキップ",
     },
+    secretsRequired: "シークレットが必要",
 } as const
 
 export const discover = {
@@ -92,6 +93,9 @@ export const skillCard = {
     export: "ZIPとしてエクスポート",
     exportFailed: "エクスポートに失敗しました",
     updated: "更新",
+    secretsOk: "{count}/{total} 個のシークレットが設定済み",
+    secretsMissing: "{total} 個中 {missing} 個のシークレットが未設定",
+    secretsTooltip: "シークレット依存関係",
     category: {
       codeReview: "コードレビュー",
       testing: "テスト",

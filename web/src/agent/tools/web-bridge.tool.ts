@@ -85,12 +85,15 @@ async function resolveSecrets(
   names: string[],
 ): Promise<Map<string, string>> {
   const resolved = new Map<string, string>()
-  if (!projectId || names.length === 0) return resolved
+  if (names.length === 0) return resolved
   try {
     const { loadSecret } = await import('@/security/secret-store')
+    // loadSecret falls back to the global scope when the project-scoped key is
+    // missing, so even without a project we can resolve global secrets.
+    const pid = projectId || ''
     await Promise.all(
       names.map(async (name) => {
-        const value = await loadSecret(projectId, name)
+        const value = await loadSecret(pid, name)
         if (value) resolved.set(name, value)
       }),
     )

@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/i18n'
 import { getSkillManager } from '@/skills/skill-manager'
 import { useProjectStore } from '@/store/project.store'
+import { getAllSecretNames } from '@/security/secret-store'
 import { exportSkillAsZip } from '@/skills/skill-export'
 import type { SkillFilterOption } from './SkillToolbar'
 
@@ -87,6 +88,22 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
 
   // Collapsed state for each section
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+
+  // Load configured secret names so SkillCard can show ✅/❌ status.
+  // getAllSecretNames returns the union of project + global scopes.
+  const [configuredSecrets, setConfiguredSecrets] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    getAllSecretNames(activeProjectId || undefined)
+      .then((names) => {
+        if (!cancelled) setConfiguredSecrets(new Set(names))
+      })
+      .catch(() => {
+        // Non-critical — SkillCard just won't show secret status
+      })
+    return () => { cancelled = true }
+  }, [open, activeProjectId])
 
   // Reload skills every time the dialog opens, not just the first time.
   // Agent (or external code) may have written/deleted skill files in OPFS
@@ -314,6 +331,7 @@ export function SkillsManager({ open, onClose, directoryHandle = null, roots = [
                         onExport={section.onExport}
                         action={section.action}
                         secondaryAction={section.secondaryAction}
+                        configuredSecrets={configuredSecrets}
                         t={t}
                       />
                     ))}
@@ -445,12 +463,13 @@ interface SkillSectionProps {
   onExport?: (skill: SkillMetadata) => void
   action?: SkillSectionAction
   secondaryAction?: SkillSectionAction
+  configuredSecrets: Set<string>
   t: (key: string) => string
 }
 
 function SkillSection({
   icon, label, skills, isCollapsed, onToggleCollapse,
-  isReadOnly, onToggle, onView, onEdit, onDelete, onExport, action, secondaryAction, t,
+  isReadOnly, onToggle, onView, onEdit, onDelete, onExport, action, secondaryAction, configuredSecrets, t,
 }: SkillSectionProps) {
   return (
     <section>
@@ -511,6 +530,7 @@ function SkillSection({
                 key={skill.id}
                 skill={skill}
                 isReadOnly={isReadOnly}
+                configuredSecrets={configuredSecrets}
                 onToggle={onToggle}
                 onView={onView}
                 onEdit={isReadOnly ? onView : onEdit}

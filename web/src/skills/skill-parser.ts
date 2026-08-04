@@ -27,7 +27,7 @@
  */
 
 import yaml from 'js-yaml'
-import type { Skill, SkillCategory, SkillSource, SkillTrigger } from './skill-types'
+import type { Skill, SkillCategory, SkillSecret, SkillSource, SkillTrigger } from './skill-types'
 
 /** Parse result */
 interface ParseResult {
@@ -75,6 +75,7 @@ export function parseSkillMd(content: string, source: SkillSource = 'import'): P
   const id = meta.id ? String(meta.id) : slugify(name)
 
   const triggers = parseTriggers(meta.triggers)
+  const secrets = parseSecrets(meta.secrets)
 
   const skill: Skill = {
     id,
@@ -86,6 +87,7 @@ export function parseSkillMd(content: string, source: SkillSource = 'import'): P
     tags: parseStringArray(meta.tags),
     source,
     triggers,
+    secrets: secrets.length > 0 ? secrets : undefined,
     enabled: true,
     createdAt: now,
     updatedAt: now,
@@ -125,6 +127,26 @@ export function serializeSkillMd(skill: Skill): string {
     lines.push(
       `  fileExtensions: [${skill.triggers.fileExtensions.map((e) => `"${e}"`).join(', ')}]`
     )
+  }
+
+  // Secrets
+  if (skill.secrets && skill.secrets.length > 0) {
+    lines.push(`secrets:`)
+    for (const secret of skill.secrets) {
+      const desc = secret.description ? escapeYamlString(secret.description) : ''
+      const required = secret.required === false ? 'false' : 'true'
+      if (desc) {
+        lines.push(`  - name: "${escapeYamlString(secret.name)}"`)
+        lines.push(`    description: "${desc}"`)
+        lines.push(`    required: ${required}`)
+      } else {
+        // Compact form when no description
+        lines.push(`  - name: "${escapeYamlString(secret.name)}"`)
+        if (secret.required === false) {
+          lines.push(`    required: false`)
+        }
+      }
+    }
   }
 
   lines.push('---')
@@ -239,6 +261,48 @@ function parseTriggers(value: unknown): SkillTrigger {
     keywords: parseStringArray(obj.keywords),
     fileExtensions: obj.fileExtensions ? parseStringArray(obj.fileExtensions) : undefined,
   }
+}
+
+/**
+ * Parse the `secrets:` frontmatter field.
+ *
+ * Supports two forms:
+ * ```yaml
+ * # Simple list — just names (all required, no description)
+ * secrets: [API_KEY, TOKEN]
+ *
+ * # Detailed list — objects with name / description / required
+ * secrets:
+ *   - name: API_KEY
+ *     description: The main API token
+ *   - name: OPTIONAL_PROXY
+ *     required: false
+ * ```
+ */
+function parseSecrets(value: unknown): SkillSecret[] {
+  if (!Array.isArray(value)) return []
+
+  const result: SkillSecret[] = []
+  for (const item of value) {
+    if (typeof item === 'string') {
+      if (item.trim()) result.push({ name: item.trim(), required: true })
+      continue
+    }
+    if (item && typeof item === 'object') {
+      const obj = item as Record<string, unknown>
+      const name = obj.name !== undefined ? String(obj.name) : ''
+      if (!name.trim()) continue
+      const secret: SkillSecret = {
+        name: name.trim(),
+        required: obj.required === undefined ? true : Boolean(obj.required),
+      }
+      if (obj.description !== undefined) {
+        secret.description = String(obj.description)
+      }
+      result.push(secret)
+    }
+  }
+  return result
 }
 
 /** Escape special characters for YAML double-quoted string output.
