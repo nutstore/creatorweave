@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import type { FolderAccessRecord, FolderAccessStatus, FolderAccessStore, RootInfo } from '@/types/folder-access'
 import { folderAccessRepo } from '@/services/folder-access.repository'
 import { selectFolderReadWrite } from '@/services/fsAccess.service'
+import { getRuntimeCapability } from '@/storage/runtime-capability'
 import {
   bindRuntimeDirectoryHandle,
   unbindRuntimeDirectoryHandle,
@@ -800,7 +801,6 @@ export const useFolderAccessStore = create<FolderAccessStore>()(
       if (!projectId) return false
 
       // Check if we have directory picker capability
-      const { getRuntimeCapability } = await import('@/storage/runtime-capability')
       const capability = getRuntimeCapability()
       if (!capability.canPickDirectory) {
         toast.error('Directory picker not available in this browser')

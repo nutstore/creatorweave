@@ -29,6 +29,7 @@ import { useConversationStore } from '@/store/conversation.store'
 import { useSettingsStore } from '@/store/settings.store'
 import { createUserMessage } from '@/agent/message-types'
 import { getIntelligenceCoordinator } from '@/agent/intelligence-coordinator'
+import { selectFolderReadWrite } from '@/services/fsAccess.service'
 import { useT } from '@/i18n'
 
 //=============================================================================
@@ -279,7 +280,6 @@ export function QuickActionsPanel({
 
   const handleSelectFolder = async () => {
     try {
-      const { selectFolderReadWrite } = await import('@/services/fsAccess.service')
       const handle = await selectFolderReadWrite()
       setDirectoryHandle(handle)
     } catch (error) {

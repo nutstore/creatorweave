@@ -2,7 +2,7 @@
  * FolderSelector - Multi-root folder management component
  *
  * Features:
- * - No roots: show "Open Folder" button → pickDirectory
+ * - No roots: show "Open Folder" button → addRoot
  * - Has roots: show root chips + [+] add button
  * - Each chip: root name, lock icon if read-only
  * - Chip dropdown: restore permission, toggle read-only, remove

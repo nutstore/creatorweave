@@ -20,6 +20,7 @@ import {
   Archive,
 } from 'lucide-react'
 import { useAgentStore } from '@/store/agent.store'
+import { selectFolderReadWrite } from '@/services/fsAccess.service'
 
 //=============================================================================
 // Types
@@ -254,7 +255,6 @@ export function DropZone({ onFilesDrop, onPrompt, className, minimal }: DropZone
 
   const handleSelectFolder = async () => {
     try {
-      const { selectFolderReadWrite } = await import('@/services/fsAccess.service')
       const handle = await selectFolderReadWrite()
       setDirectoryHandle(handle)
     } catch (error) {
