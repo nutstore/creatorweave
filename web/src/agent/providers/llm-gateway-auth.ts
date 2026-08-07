@@ -52,8 +52,8 @@ export interface RateLimitWindow {
   remaining: number
   /** 剩余百分比 (0–100) */
   remaining_percentage: number
-  /** 下次重置时间 (ISO 8601 UTC) */
-  next_reset_at: string
+  /** Next reset time (ISO 8601 UTC); may be null when the gateway omits it */
+  next_reset_at: string | null
 }
 
 /** Response of `GET /v1/rate-limits`. */

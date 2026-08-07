@@ -1764,7 +1764,8 @@ export class WorkspaceRuntime {
   async createApprovedSnapshotForPaths(
     paths: string[],
     summary?: string,
-    directoryHandle?: FileSystemDirectoryHandle | null
+    directoryHandle?: FileSystemDirectoryHandle | null,
+    runId?: string | null
   ): Promise<{ snapshotId: string; opCount: number; conflicts?: ConflictInfo[] } | null> {
     if (!this.initialized) await this.initialize()
     if (paths.length === 0) return null
@@ -1800,7 +1801,7 @@ export class WorkspaceRuntime {
     }
 
     const repo = getFSOverlayRepository()
-    const snapshot = await repo.createApprovedSnapshotForPaths(this.workspaceId, paths, summary)
+    const snapshot = await repo.createApprovedSnapshotForPaths(this.workspaceId, paths, summary, runId)
     if (!snapshot) return null
     await repo.setCurrentSnapshotId(this.workspaceId, snapshot.snapshotId)
 
@@ -1922,77 +1923,6 @@ export class WorkspaceRuntime {
     }
 
     return { reverted, unresolved }
-  }
-
-  private async applySnapshot(
-    snapshotId: string,
-    directoryHandle?: FileSystemDirectoryHandle | null
-  ): Promise<{ applied: number; unresolved: string[] }> {
-    if (!this.initialized) await this.initialize()
-    const repo = getFSOverlayRepository()
-    const ops = await repo.listSnapshotOps(this.workspaceId, snapshotId)
-    let applied = 0
-    const unresolved: string[] = []
-
-    for (const op of ops) {
-      try {
-        const snapshotFile = await repo.getSnapshotFileContent(snapshotId, op.path)
-        const requiresNativeApply = op.status === 'synced'
-
-        if (op.type === 'delete') {
-          if (requiresNativeApply && !directoryHandle) {
-            unresolved.push(op.path)
-            continue
-          }
-          await this.deleteFromFilesDirIfExists(op.path)
-          this.filesIndex.delete(op.path)
-          if (directoryHandle) {
-            await this.deleteFromNativeIfExists(directoryHandle, op.path)
-          }
-          await this.pendingManager.removeByPath(op.path)
-          applied++
-          continue
-        }
-
-        const restored = await this.restoreFromSnapshotContent(
-          op.path,
-          snapshotFile?.afterContentKind,
-          snapshotFile?.afterContentText,
-          snapshotFile?.afterContentBlob || null
-        )
-        if (!restored) {
-          unresolved.push(op.path)
-          continue
-        }
-
-        if (requiresNativeApply && !directoryHandle) {
-          unresolved.push(op.path)
-          continue
-        }
-
-        if (directoryHandle) {
-          const data = await this.readCacheContentForPath(op.path)
-          if (data !== null) {
-            await this.writeNativeFile(directoryHandle, op.path, data)
-          } else {
-            unresolved.push(op.path)
-            continue
-          }
-        }
-
-        await this.pendingManager.removeByPath(op.path)
-        applied++
-      } catch {
-        unresolved.push(op.path)
-      }
-    }
-
-    if (unresolved.length === 0 && applied > 0) {
-      await repo.markSnapshotActive(this.workspaceId, snapshotId)
-      await repo.setCurrentSnapshotId(this.workspaceId, snapshotId)
-    }
-
-    return { applied, unresolved }
   }
 
   async rollbackLatestSnapshot(
@@ -2177,17 +2107,22 @@ export class WorkspaceRuntime {
 
     if (contentKind === 'text') {
       const filesDir = await this.getFilesDir()
-      await this.writeFileToOPFS(filesDir, path, new TextEncoder().encode(contentText || '').buffer)
+      const encoded = new TextEncoder().encode(contentText || '')
+      await this.writeFileToOPFS(
+        filesDir,
+        path,
+        encoded.buffer.slice(encoded.byteOffset, encoded.byteOffset + encoded.byteLength) as ArrayBuffer
+      )
       this.filesIndex.add(path)
       return true
     }
 
     const binary =
       contentBlob instanceof Uint8Array
-        ? contentBlob.buffer.slice(
+        ? (contentBlob.buffer.slice(
             contentBlob.byteOffset,
             contentBlob.byteOffset + contentBlob.byteLength
-          )
+          ) as ArrayBuffer)
         : contentBlob
     if (!(binary instanceof ArrayBuffer)) return false
 

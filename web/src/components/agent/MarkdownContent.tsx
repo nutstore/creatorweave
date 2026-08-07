@@ -13,8 +13,9 @@
  * Inline: $x_1$  Block: $$\varepsilon_l = x_l - \hat{x}_l$$
  */
 
-import { memo, useContext, createContext, useEffect, useRef, useState, useCallback } from 'react'
+import { memo, useContext, createContext, useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
@@ -194,7 +195,10 @@ function preserveCodeFenceMeta() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const INTERACTIVE_HTML_REMARK_PLUGINS: any = [remarkGfm, remarkMath, preserveCodeFenceMeta]
+// remark-breaks converts single line breaks (\n) into <br>, so poetry,
+// lyrics, and other content that relies on one-line-per-statement renders
+// correctly instead of being merged into a single paragraph.
+const INTERACTIVE_HTML_REMARK_PLUGINS: any = [remarkGfm, remarkMath, remarkBreaks, preserveCodeFenceMeta]
 
 /**
  * Extract plain text from react-markdown children (may be string, ReactNode[], etc.)
@@ -281,7 +285,8 @@ export function parseInteractiveHtmlMeta(meta: string | null | undefined): { tit
   }
 }
 
-const MARKDOWN_COMPONENTS = {
+function buildMarkdownComponents(streaming: boolean) {
+  return {
   // Fenced blocks provide their own <pre> in CodeBlock or HtmlSandboxPreview.
   // Removing react-markdown's wrapper avoids invalid block-level elements inside <pre>.
   pre({ children }: React.ComponentPropsWithoutRef<'pre'>) {
@@ -292,7 +297,7 @@ const MARKDOWN_COMPONENTS = {
     const match = /language-([\w-]+)/.exec(className || '')
     const isBlock = match || (typeof children === 'string' && children.includes('\n'))
     if (match?.[1] === 'mermaid') {
-      return <MermaidDiagram chart={extractText(children).replace(/^\n+|\n+$/g, '')} />
+      return <MermaidDiagram chart={extractText(children).replace(/^\n+|\n+$/g, '')} streaming={streaming} />
     }
     if (match?.[1] === 'interactive-html') {
       const meta = parseInteractiveHtmlMeta(node?.properties?.['data-meta'])
@@ -388,7 +393,8 @@ const MARKDOWN_COMPONENTS = {
   img(props: React.ComponentPropsWithoutRef<'img'>) {
     return <MarkdownImage {...props} />
   },
-} as const
+  }
+}
 
 /**
  * Convert LaTeX-style delimiters to remark-math compatible syntax.
@@ -408,17 +414,27 @@ function normalizeMathDelimiters(content: string): string {
 
 interface MarkdownContentProps {
   content: string
+  /**
+   * Whether the markdown content is still being streamed in by the
+   * parent (typically an LLM token stream). Defaults to false.
+   *
+   * Forwarded to `MermaidDiagram` so a partially-emitted mermaid
+   * block shows a "Preparing diagram…" spinner instead of flashing a
+   * misleading "syntax error" banner mid-stream.
+   */
+  streaming?: boolean
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({ content, streaming = false }: MarkdownContentProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const normalized = normalizeMathDelimiters(content)
+  const components = useMemo(() => buildMarkdownComponents(streaming), [streaming])
   return (
     <ImageClickContext.Provider value={setLightboxSrc}>
       <ReactMarkdown
         remarkPlugins={INTERACTIVE_HTML_REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
-        components={MARKDOWN_COMPONENTS}
+        components={components}
       >
         {normalized}
       </ReactMarkdown>

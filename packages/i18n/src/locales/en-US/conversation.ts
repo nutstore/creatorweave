@@ -34,6 +34,7 @@ export const conversation = {
       medium: "Medium",
       high: "High",
       xhigh: "Ultra",
+      max: "Max",
     },
     tokenBudget:
       "Effective input budget {effectiveBudget} = Total limit {modelMaxTokens} - Reserve {reserveTokens}",
@@ -237,4 +238,22 @@ export const questionCard = {
     customInputHint: "Type your own answer",
     userAnswer: "Your answer",
     recommended: "Recommended",
+} as const
+
+// Run changes card (auto-applied run summary)
+export const runChanges = {
+    title: "Changes applied in this run",
+    applied: "Applied",
+    loading: "Loading changes…",
+    noFiles: "No file changes recorded",
+    loadingFile: "Loading diff…",
+    binaryFileHint: "Binary file — diff not available",
+    fileDeletedHint: "This file was deleted",
+    fileOpCreate: "added",
+    fileOpModify: "modified",
+    fileOpDelete: "deleted",
+    expandAllDiffs: "Expand all diffs",
+    collapseAllDiffs: "Collapse all diffs",
+    showAllFiles: "Show all {count} more files",
+    noDiff: "No diff available",
 } as const

@@ -26,7 +26,7 @@ export interface MessageRow {
 
 /** Fields stored in meta_json */
 interface MessageMeta {
-  kind?: 'normal' | 'context_summary'
+  kind?: 'normal' | 'context_summary' | 'run_changes'
   reasoning?: string | null
   reasoningDurationMs?: number
   toolCalls?: ToolCall[]
@@ -36,6 +36,7 @@ interface MessageMeta {
   assets?: AssetMeta[]
   images?: Array<{ data: string; mimeType: string }>
   contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
+  runChanges?: { snapshotId: string }
 }
 
 interface AppSessionSerializedMessage {
@@ -250,6 +251,10 @@ export class MessageRepository {
       meta.contentParts = message.contentParts
       hasMeta = true
     }
+    if (message.runChanges !== undefined) {
+      meta.runChanges = message.runChanges
+      hasMeta = true
+    }
 
     return {
       contentJson,
@@ -278,6 +283,7 @@ export class MessageRepository {
       assets: meta.assets,
       images: meta.images,
       contentParts: meta.contentParts,
+      runChanges: meta.runChanges,
     }
   }
 

@@ -446,6 +446,7 @@ class XlsxParser:
                 content_types_map=content_types_map,
                 sheet_name=sheet_name,
                 sheet_slug=sheet_slug,
+                position=position,
             )
             parse_elapsed_ms: int = self._elapsed_ms(sheet_stage_started_at)
             sheet_slugs.append(parsed_sheet.slug)
@@ -748,6 +749,7 @@ class XlsxParser:
         content_types_map: ContentTypesMap,
         sheet_name: str,
         sheet_slug: str,
+        position: int,
     ) -> ParsedSheet:
         sheet_dir: Path = workspace.sheets_dir / sheet_slug
         ensure_directory(path=sheet_dir)

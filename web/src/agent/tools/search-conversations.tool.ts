@@ -79,6 +79,10 @@ interface SearchResultRow {
   projectName: string | null
   updatedAt: number
   matchedContentJson?: string
+  // JSON-encoded content_json of the most recent assistant message in the conversation.
+  // Lets the LLM judge the conversation's status (awaiting input / wrapping up / done)
+  // without fetching every message. Decoded by the renderer + caller.
+  lastAssistantContentJson?: string | null
 }
 
 interface ProjectBreakdownRow {
@@ -117,6 +121,52 @@ function extractSnippetFromContentJson(contentJson: string, query: string): stri
     const text = typeof parsed === 'string' ? parsed : ''
     if (!text) return null
     return extractSnippet(text, query)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * SQL fragment (subquery in SELECT) that returns the content_json of the most
+ * recent assistant message in the outer conversation row. Used directly in the
+ * outer SELECT list so the executor can ship the final assistant message
+ * alongside each conversation row in a single round-trip.
+ *
+ * Why a correlated subquery (not a CTE or LEFT JOIN-derived table):
+ *   - SQLite refuses to reference an outer alias (`c.id`) inside a derived
+ *     table, so `LEFT JOIN (SELECT ... WHERE m.conversation_id = c.id) la`
+ *     errors with "no such column: c.id".
+ *   - CTEs would work but the dev `db_query` tool's response shaper drops rows
+ *     for `WITH` queries in observed tests.
+ *   - A correlated subquery in the SELECT list is the simplest portable form;
+ *     the SQLite planner turns it into a per-row index lookup, which is fast
+ *     for the indexed `(conversation_id, seq)` path.
+ */
+function buildLastAssistantColumn(): string {
+  return `(
+    SELECT m.content_json
+    FROM messages m
+    WHERE m.role = 'assistant'
+      AND m.conversation_id = c.id
+    ORDER BY m.seq DESC
+    LIMIT 1
+  ) AS lastAssistantContentJson`
+}
+
+/**
+ * Decode the JSON-encoded content_json of a message into a plain string.
+ * Returns null if the field is absent or the JSON is malformed.
+ *
+ * The `messages.content_json` column is always a JSON string (e.g. `"hello"` or
+ * `"{\"ok\":true,\"tool\":...}"`). For assistant text this is just a plain string;
+ * for tool messages it would be a JSON object, but we only attach assistant
+ * messages here, so a single decode is enough.
+ */
+function decodeMessageContent(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  try {
+    const decoded = JSON.parse(raw) as unknown
+    return typeof decoded === 'string' ? decoded : null
   } catch {
     return null
   }
@@ -214,7 +264,8 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
           w.name AS workspaceName,
           p.name AS projectName,
           c.updated_at AS updatedAt,
-          m_match.content_json AS matchedContentJson
+          m_match.content_json AS matchedContentJson,
+          ${buildLastAssistantColumn()}
         FROM conversations c
         INNER JOIN matched mt ON mt.conversationId = c.id
         INNER JOIN messages m_match ON m_match.conversation_id = mt.conversationId
@@ -259,7 +310,8 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
           w.name AS workspaceName,
           p.name AS projectName,
           c.updated_at AS updatedAt,
-          '' AS matchedContentJson
+          '' AS matchedContentJson,
+          ${buildLastAssistantColumn()}
         FROM conversations c
         LEFT JOIN workspaces w ON c.id = w.id
         LEFT JOIN projects p ON w.project_id = p.id
@@ -300,6 +352,9 @@ export const searchConversationsExecutor: ToolExecutor = async (args) => {
         hasQuery && row.matchedContentJson
           ? extractSnippetFromContentJson(row.matchedContentJson, query)
           : null,
+      // The last assistant message in the conversation. Lets the calling model
+      // judge status (awaiting input / wrapping up / done) without re-querying.
+      lastAssistantMessage: decodeMessageContent(row.lastAssistantContentJson),
     }))
 
     return toolOkJson('search_conversations', {

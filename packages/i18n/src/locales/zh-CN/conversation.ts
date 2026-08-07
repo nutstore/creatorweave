@@ -34,6 +34,7 @@ export const conversation = {
       medium: "中",
       high: "深",
       xhigh: "极深",
+      max: "极致",
     },
     tokenBudget:
       "有效输入预算 {effectiveBudget} = 总上限 {modelMaxTokens} - 预留 {reserveTokens}",
@@ -236,4 +237,22 @@ export const questionCard = {
     customInputHint: "自己填写回答",
     userAnswer: "用户回答",
     recommended: "推荐",
+} as const
+
+// Run changes card (auto-applied run summary)
+export const runChanges = {
+    title: "本轮运行已应用的修改",
+    applied: "已应用",
+    loading: "正在加载修改…",
+    noFiles: "未记录到文件修改",
+    loadingFile: "正在加载差异…",
+    binaryFileHint: "二进制文件，无法展示差异",
+    fileDeletedHint: "此文件已被删除",
+    fileOpCreate: "新增",
+    fileOpModify: "修改",
+    fileOpDelete: "删除",
+    expandAllDiffs: "展开全部差异",
+    collapseAllDiffs: "收起全部差异",
+    showAllFiles: "查看全部 {count} 个更多文件",
+    noDiff: "无可用差异",
 } as const

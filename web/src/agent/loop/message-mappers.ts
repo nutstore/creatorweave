@@ -47,6 +47,11 @@ export function internalToPiMessages(
   const lastSummaryIndex = normalizedMessages.map((m) => m.kind).lastIndexOf('context_summary')
   const modelMessages = lastSummaryIndex >= 0 ? normalizedMessages.slice(lastSummaryIndex) : normalizedMessages
   return modelMessages.flatMap((msg): PiMessage[] => {
+    if (msg.kind === 'run_changes') {
+      // A pure UI card ("what this run changed") — no model-facing content.
+      // Drop it so it never enters the LLM context budget.
+      return []
+    }
     if (msg.kind === 'context_summary') {
       // Map context_summary as a user message (system-context block) so the
       // model treats it as memory/context rather than its own prior response.

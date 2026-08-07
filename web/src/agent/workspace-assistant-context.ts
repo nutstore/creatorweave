@@ -479,6 +479,7 @@ export function renderPageContextBlock(ctx: PageContextSnapshot | null): string 
     block += `\n[Page details — ${hostname} provided no additional business fields]\n`
   }
 
+  block += '\n**Important — always search before acting:** When the user wants to interact with this page or its content (e.g., read data, submit forms, navigate, extract info), you MUST call `search_tools` first to discover the available tools for this website. Do NOT guess tool names or call `call_tool` directly without searching — tool names are case-sensitive and vary by provider.\n'
   block += '\nWhen the user says "this", "it", or "that one above", they usually mean an element in the context above. When the user navigates to a different page, URL/title/details refresh automatically — the user does not need to restate.\n'
   block += '\nTip: use the `web_fetch` tool on the URL above if you need the full page content.\n'
   block += '</current_page_context>'

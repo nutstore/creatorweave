@@ -10,6 +10,13 @@
 import { MessageSquare, Search, Clock } from 'lucide-react'
 import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
+import { useT } from '@/i18n'
+
+/** Shorthand for the translator function (matches the i18n package's createUseT shape). */
+type Translator = (
+  key: string,
+  params?: Record<string, string | number>
+) => string
 
 interface SearchResultItem {
   conversationId: string
@@ -18,6 +25,9 @@ interface SearchResultItem {
   projectName?: string
   updatedAt: number
   snippet?: string | null
+  // Last assistant message in the conversation — gives the LLM (and humans)
+  // a one-liner hint about the conversation's status / where it left off.
+  lastAssistantMessage?: string | null
 }
 
 interface ProjectBreakdownItem {
@@ -65,6 +75,62 @@ function relativeTime(ms: number): string {
   return `${d.getMonth() + 1}/${d.getDate()}`
 }
 
+/** Format a Unix-ms timestamp as "MM-DD HH:MM" (local time). */
+function formatTimePoint(ms: number): string {
+  const d = new Date(ms)
+  const M = String(d.getMonth() + 1).padStart(2, '0')
+  const D = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return `${M}-${D} ${h}:${m}`
+}
+
+/**
+ * Combine `updated_after` / `updated_before` into a single human-readable chip.
+ *
+ * SQL-style: directly shows absolute time points and the `→` / `~` range
+ * operators. Symbols are language-neutral; only the "full day" label is
+ * translated.
+ *
+ * Examples:
+ *   (08-05 00:00, 08-06 00:00)  → "08-05 整天"          (full day)
+ *   (08-05 09:00, 08-05 18:00)  → "08-05 09:00 → 08-05 18:00"
+ *   (08-05 09:00, 08-06 12:00)  → "08-05 09:00 → 08-06 12:00"
+ *   (08-05 00:00, null)         → "08-05 00:00 ~"       (open upper)
+ *   (null, 08-06 00:00)         → "~ 08-06 00:00"       (open lower)
+ *
+ * Avoids the confusing "≥ 1d ago, ≤ 13h ago" form, which reads like two
+ * opposing ranges rather than a single time window.
+ */
+function formatTimeRange(
+  after: number | null | undefined,
+  before: number | null | undefined,
+  t: Translator
+): string | null {
+  if (after && before) {
+    const sd = new Date(after)
+    const ed = new Date(before)
+    const isFullDay =
+      sd.getHours() === 0 &&
+      sd.getMinutes() === 0 &&
+      ed.getHours() === 0 &&
+      ed.getMinutes() === 0 &&
+      before - after === 86400000
+    if (isFullDay) {
+      const date = `${sd.getMonth() + 1}-${sd.getDate()}`
+      return `${date} ${t('agent.searchConversations.fullDay')}`
+    }
+    return `${formatTimePoint(after)} → ${formatTimePoint(before)}`
+  }
+  if (after) {
+    return `${formatTimePoint(after)} ~`
+  }
+  if (before) {
+    return `~ ${formatTimePoint(before)}`
+  }
+  return null
+}
+
 /** Truncate a string to n chars with ellipsis. */
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n - 1) + '…' : s
@@ -107,12 +173,13 @@ registerRenderer({
   icon: <MessageSquare className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const data = extractData(ctx)
+    const t = useT()
 
     if (ctx.isError) {
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
-          <span className="ml-auto shrink-0 text-xs text-red-500">failed</span>
+          <span className="ml-auto shrink-0 text-xs text-red-500">{t('agent.searchConversations.failed')}</span>
         </>
       )
     }
@@ -120,12 +187,12 @@ registerRenderer({
     // Streaming / executing state
     if (ctx.isExecuting || ctx.isStreaming || !data) {
       const query = typeof ctx.args.query === 'string' ? ctx.args.query.trim() : ''
-      const mode = query ? 'keyword' : 'list'
+      const modeKey = query ? 'agent.searchConversations.modeKeyword' : 'agent.searchConversations.modeList'
       return (
         <>
           <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
           <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
-            {mode}
+            {t(modeKey)}
           </span>
           {query && (
             <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">"{truncate(query, 30)}"</span>
@@ -142,17 +209,26 @@ registerRenderer({
     const filters = data.filters ?? {}
     const breakdown = data.projects_breakdown ?? []
 
-    // Build filter chips
+    // Build filter chips — collapse the time window into one chip.
     const chips: string[] = []
-    if (filters.updated_after) chips.push(`≥ ${relativeTime(filters.updated_after)}`)
-    if (filters.updated_before) chips.push(`≤ ${relativeTime(filters.updated_before)}`)
+    const timeRange = formatTimeRange(filters.updated_after, filters.updated_before, t)
+    if (timeRange) chips.push(timeRange)
     if (filters.project) chips.push(filters.project)
+
+    const modeLabel =
+      mode === 'keyword'
+        ? t('agent.searchConversations.modeKeyword')
+        : t('agent.searchConversations.modeList')
+    const matchLabel = t(
+      total === 1 ? 'agent.searchConversations.match_one' : 'agent.searchConversations.match_other',
+      { count: total }
+    )
 
     return (
       <>
         <code className="font-medium text-neutral-700 dark:text-foreground">search_conversations</code>
         <span className="ml-1 rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-500 dark:bg-neutral-800 text-neutral-400 text-neutral-400 dark:text-neutral-400">
-          {mode}
+          {modeLabel}
         </span>
         {mode === 'keyword' && data.query && data.query !== '*' && (
           <span className="truncate text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">"{truncate(data.query, 30)}"</span>
@@ -162,9 +238,7 @@ registerRenderer({
             {chips.join(' · ')}
           </span>
         )}
-        <span className="ml-auto shrink-0 text-xs text-neutral-400">
-          {total} match{total !== 1 ? 'es' : ''}
-        </span>
+        <span className="ml-auto shrink-0 text-xs text-neutral-400">{matchLabel}</span>
         {/* Mini breakdown badges — only when multiple projects */}
         {breakdown.length > 1 && (
           <span className="hidden sm:inline-flex items-center gap-1 shrink-0">
@@ -185,6 +259,7 @@ registerRenderer({
 
   Detail(ctx) {
     const data = extractData(ctx)
+    const t = useT()
 
     // Error envelopes do not carry a `data` payload, so this must precede
     // the no-data loading state below.
@@ -206,11 +281,12 @@ registerRenderer({
     const total = data.totalMatches ?? 0
     const mode = data.mode ?? 'list'
     const maxShow = 15
+    const timeRange = formatTimeRange(filters.updated_after, filters.updated_before, t)
 
     if (results.length === 0) {
       return (
         <div className="px-3 py-3 text-xs text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
-          No conversations matched.
+          {t('agent.searchConversations.noResults')}
         </div>
       )
     }
@@ -226,16 +302,10 @@ registerRenderer({
                 "{truncate(data.query, 24)}"
               </span>
             )}
-            {filters.updated_after && (
+            {timeRange && (
               <span className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded px-1.5 py-0.5">
                 <Clock className="h-2.5 w-2.5" />
-                ≥ {relativeTime(filters.updated_after)}
-              </span>
-            )}
-            {filters.updated_before && (
-              <span className="inline-flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 rounded px-1.5 py-0.5">
-                <Clock className="h-2.5 w-2.5" />
-                ≤ {relativeTime(filters.updated_before)}
+                {timeRange}
               </span>
             )}
             {filters.project && <ProjectBadge name={filters.project} />}
@@ -246,7 +316,7 @@ registerRenderer({
         {breakdown.length > 1 && (
           <div className="rounded border border-neutral-200 dark:border-neutral-700 overflow-hidden">
             <div className="bg-neutral-50 dark:bg-neutral-800/50 px-2 py-1 text-[10px] font-medium text-neutral-500 text-neutral-400 text-neutral-400 dark:text-neutral-400">
-              Projects ({breakdown.length})
+              {t('agent.searchConversations.projectsHeader', { count: breakdown.length })}
             </div>
             <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {breakdown.map((p) => (
@@ -265,18 +335,29 @@ registerRenderer({
           {results.slice(0, maxShow).map((r, i) => (
             <div
               key={r.conversationId}
-              className="flex items-center gap-2 text-xs"
+              className="flex flex-col gap-0.5 text-xs"
               style={{ animation: `tool-row-in .2s ease-out ${i * 18}ms backwards` }}
             >
-              <MessageSquare className="h-3 w-3 text-neutral-400 shrink-0" />
-              <span
-                className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1"
-                title={r.title}
-              >
-                {r.title || '(untitled)'}
-              </span>
-              {r.projectName && <ProjectBadge name={r.projectName} />}
-              <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(r.updatedAt)}</span>
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-3 w-3 text-neutral-400 shrink-0" />
+                <span
+                  className="text-neutral-600 text-neutral-300 text-neutral-300 dark:text-neutral-300 truncate flex-1"
+                  title={r.title}
+                >
+                  {r.title || t('agent.searchConversations.untitled')}
+                </span>
+                {r.projectName && <ProjectBadge name={r.projectName} />}
+                <span className="text-[10px] text-neutral-400 shrink-0">{relativeTime(r.updatedAt)}</span>
+              </div>
+              {/* Last assistant message — gives the LLM status context for free */}
+              {r.lastAssistantMessage && (
+                <div
+                  className="ml-5 text-[11px] text-neutral-500 dark:text-neutral-400 truncate"
+                  title={r.lastAssistantMessage}
+                >
+                  ↳ {truncate(r.lastAssistantMessage, 140)}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -284,11 +365,13 @@ registerRenderer({
         {/* Overflow indicator */}
         {results.length > maxShow && (
           <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
-            +{results.length - maxShow} more ({total} total{data.hasMore ? ', has more' : ''})
+            {t('agent.searchConversations.moreResults', { count: results.length - maxShow, total })}
           </div>
         )}
         {data.hasMore && results.length <= maxShow && (
-          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">more results available</div>
+          <div className="text-[10px] text-neutral-400 text-neutral-600 text-neutral-600 dark:text-neutral-600">
+            {t('agent.searchConversations.moreAvailable')}
+          </div>
         )}
       </div>
     )

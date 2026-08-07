@@ -35,6 +35,7 @@ export const conversation = {
       medium: "中",
       high: "深",
       xhigh: "超深",
+      max: "究極",
     },
     tokenBudget:
       "有効な入力予算 {effectiveBudget} = 上限 {modelMaxTokens} - 予約 {reserveTokens}",
@@ -222,4 +223,22 @@ export const questionCard = {
     customInputHint: "自分で回答を入力",
     userAnswer: "あなたの回答",
     recommended: "推奨",
+} as const
+
+// Run changes card (auto-applied run summary)
+export const runChanges = {
+    title: "この実行で適用された変更",
+    applied: "適用済み",
+    loading: "変更を読み込み中…",
+    noFiles: "ファイルの変更は記録されていません",
+    loadingFile: "差分を読み込み中…",
+    binaryFileHint: "バイナリファイルのため差分を表示できません",
+    fileDeletedHint: "このファイルは削除されました",
+    fileOpCreate: "追加",
+    fileOpModify: "変更",
+    fileOpDelete: "削除",
+    expandAllDiffs: "すべての差分を展開",
+    collapseAllDiffs: "すべての差分を折りたたむ",
+    showAllFiles: "さらに {count} ファイルをすべて表示",
+    noDiff: "差分がありません",
 } as const

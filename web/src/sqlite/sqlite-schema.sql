@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 13;
+PRAGMA user_version = 14;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)
@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS fs_changesets (
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     committed_at INTEGER,
     synced_at INTEGER,
+    run_id TEXT,                          -- agent run that produced this snapshot (auto-apply)
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
 );
 
@@ -477,7 +478,6 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_type ON mcp_servers(type);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_transport ON mcp_servers(transport);
-
 
 -- ============================================================================
 -- Triggers for Automatic Timestamps

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { buildChatCompletionsPayload, CW_OPENAI_FETCH_API } from '../pi-ai-custom-openai-fetch'
+import {
+  applyMaxThinkingOverride,
+  buildChatCompletionsPayload,
+  CW_OPENAI_FETCH_API,
+} from '../pi-ai-custom-openai-fetch'
 
 describe('buildChatCompletionsPayload', () => {
   it('should request usage in streaming mode', () => {
@@ -270,5 +274,76 @@ describe('buildChatCompletionsPayload', () => {
 
     expect(payload.reasoning).toBeUndefined()
     expect(payload.reasoning_effort).toBeUndefined()
+  })
+})
+
+describe('applyMaxThinkingOverride', () => {
+  it('should set reasoning.effort=max for openrouter baseUrl', () => {
+    const payload: Record<string, unknown> = {
+      reasoning: { effort: 'high' },
+    }
+    applyMaxThinkingOverride(payload, 'https://openrouter.ai/api/v1')
+    expect(payload.reasoning).toEqual({ effort: 'max' })
+  })
+
+  it('should create reasoning object when openrouter payload lacks it', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://openrouter.ai/api/v1')
+    expect(payload.reasoning).toEqual({ effort: 'max' })
+  })
+
+  it('should set reasoning_effort=max for openai/auto baseUrl', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://api.openai.com/v1')
+    expect(payload.reasoning_effort).toBe('max')
+  })
+
+  it('should update nested reasoning.effort for responses-API style payload', () => {
+    const payload: Record<string, unknown> = {
+      reasoning: { effort: 'high', summary: 'auto' },
+    }
+    applyMaxThinkingOverride(payload, 'https://api.openai.com/v1')
+    expect(payload.reasoning).toEqual({ effort: 'max', summary: 'auto' })
+    expect(payload.reasoning_effort).toBe('max')
+  })
+
+  it('should set reasoning_effort=max for tencent-tokenhub baseUrl', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://ai.jianguoyun.com')
+    expect(payload.reasoning_effort).toBe('max')
+  })
+
+  it('should use thinkingLevelMap mapping when provided', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://api.openai.com/v1', {
+      max: 'maximum',
+    })
+    expect(payload.reasoning_effort).toBe('maximum')
+  })
+
+  it('should enable thinking for deepseek format', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://api.deepseek.com')
+    expect(payload.thinking).toEqual({ type: 'enabled' })
+    expect(payload.reasoning_effort).toBe('max')
+  })
+
+  it('should enable reasoning for together format', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://api.together.ai')
+    expect(payload.reasoning).toEqual({ enabled: true })
+    expect(payload.reasoning_effort).toBe('max')
+  })
+
+  it('should enable thinking for qwen format', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://dashscope.aliyuncs.com')
+    expect(payload.enable_thinking).toBe(true)
+  })
+
+  it('should set reasoning_split for minimax format', () => {
+    const payload: Record<string, unknown> = {}
+    applyMaxThinkingOverride(payload, 'https://api.minimax.io/v1')
+    expect(payload.reasoning_split).toBe(true)
   })
 })

@@ -440,6 +440,7 @@ export const settings = {
       medium: "중간",
       high: "깊음",
       xhigh: "매우 깊음",
+      max: "최대",
     },
     thinkingModeFast: "빠름",
     thinkingModeDeep: "깊이",
@@ -476,6 +477,33 @@ export const settings = {
       noApiModels: "사용 가능한 모델이 없습니다. 새로고침 버튼으로 모델 목록을 먼저 가져오세요",
       noMatch: "일치하는 모델이 없습니다",
       dialogHint: "{count}개의 모델을 선택할 수 있습니다. 클릭하여 추가",
+    },
+
+    // Nutstore AI usage quota
+    gatewayRateLimits: {
+      fiveHour: "최근 5시간",
+      week: "이번 주",
+      resetUnknown: "리셋 시간 알 수 없음",
+      resetSoon: "곧 리셋",
+      resetInHours: "{count}시간 후 리셋",
+      resetInDays: "{count}일 후 리셋",
+      refresh: "새로고침",
+      refreshing: "새로고침 중...",
+      queryFailed: "조회 실패",
+    },
+
+    // DeepSeek 계정 잔액
+    deepseekBalance: {
+      title: "계정 잔액",
+      refresh: "잔액 새로고침",
+      refreshing: "조회 중...",
+      queryFailed: "잔액 조회 실패",
+      unavailable: "계정을 사용할 수 없습니다. API 키를 확인하세요",
+      empty: "잔액 정보가 없습니다",
+      total: "{currency} 사용 가능 잔액",
+      granted: "증정 잔액",
+      toppedUp: "충전 잔액",
+      hint: "API 키를 저장하면 계정 잔액을 확인할 수 있습니다",
     },
 
     imageGen: {

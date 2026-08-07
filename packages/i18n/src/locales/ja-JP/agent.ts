@@ -49,4 +49,19 @@ export const agent = {
         selectFolder: "フォルダを選択",
         later: "後で",
     },
+
+    // 検索会話ツール
+    searchConversations: {
+        failed: "失敗",
+        modeKeyword: "キーワード",
+        modeList: "リスト",
+        match_one: "{count} 件一致",
+        match_other: "{count} 件一致",
+        noResults: "一致する会話はありません。",
+        projectsHeader: "プロジェクト ({count})",
+        fullDay: "終日",
+        moreResults: "他 {count} 件（合計 {total} 件）",
+        moreAvailable: "さらに結果があります",
+        untitled: "（無題）",
+    },
 } as const

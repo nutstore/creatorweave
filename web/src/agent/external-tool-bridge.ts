@@ -500,7 +500,9 @@ export const searchToolsDefinition: ToolDefinition = {
     name: 'search_tools',
     description:
       'Search for external tools (MCP and WebMCP). Returns matching tools with their full parameter schemas, ready to call. ' +
-      'No need to call a separate schema tool — just search, pick, and call.',
+      '**Always search first** when the user wants to interact with a website, service, or external platform — ' +
+      'do NOT guess tool names or call call_tool directly. query: keywords (BM25, fast). intent: task description (semantic, LLM-powered, slower but smarter). ' +
+      'Prefer intent when unsure which tool to use.',
     parameters: {
       type: 'object',
       properties: {
@@ -1141,8 +1143,8 @@ export const unifiedExternalToolsPromptDoc: ToolPromptDoc = {
   category: 'external-tools',
   section: '### External Tools (MCP + WebMCP)',
   lines: [
-    '- `search_tools(query?, intent?, limit?)` — Search external tools. query: keywords (BM25, fast). intent: task description (semantic, smarter). At least one required. Prefer intent when unsure which tool to use.',
-    '- `call_tool(full_tool_name, args)` — Execute an external tool. Use the fullName and inputSchema from search_tools results.',
+    '- `search_tools(query?, intent?, limit?)` — **Always search first** before using any external tool. Returns matching tools with full parameter schemas. query: keywords (BM25, fast). intent: natural language description (slower but smarter). At least one required. Prefer intent when unsure.',
+    '- `call_tool(full_tool_name, args)` — Execute an external tool discovered via search_tools. Use the fullName and inputSchema from search_tools results. Do NOT call this directly without searching first.',
   ],
 }
 

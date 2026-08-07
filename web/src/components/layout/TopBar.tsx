@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import {
   Settings,
-  Wrench,
+  WandSparkles,
   KeyRound,
   List,
   Keyboard,
@@ -305,7 +305,7 @@ export function TopBar({
             {/* Skills */}
             <ActionTooltip label={t('topbar.tooltips.skillsManager')}>
               <BrandButton iconButton className="shrink-0" onClick={onSkillsManagerOpen} data-tour="skills">
-                <Wrench className="h-[14px] w-[14px]" />
+                <WandSparkles className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
 
@@ -395,7 +395,7 @@ export function TopBar({
                   closeMobileMorePanel()
                 }}
               >
-                <Wrench className="h-3.5 w-3.5" />
+                <WandSparkles className="h-3.5 w-3.5" />
                 {t('topbar.mobile.skills')}
               </BrandButton>
               <BrandButton

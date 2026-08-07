@@ -72,4 +72,19 @@ export const agent = {
         approve: "Approve",
         deny: "Deny",
     },
+
+    // Search-conversations tool
+    searchConversations: {
+        failed: "failed",
+        modeKeyword: "keyword",
+        modeList: "list",
+        match_one: "{count} match",
+        match_other: "{count} matches",
+        noResults: "No conversations matched.",
+        projectsHeader: "Projects ({count})",
+        fullDay: "full day",
+        moreResults: "+{count} more ({total} total)",
+        moreAvailable: "more results available",
+        untitled: "(untitled)",
+    },
 } as const

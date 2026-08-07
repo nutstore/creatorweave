@@ -48,7 +48,7 @@ export class ProjectRepository {
 
   async findAllProjects(): Promise<Project[]> {
     const db = getSQLiteDB()
-    const rows = await db.queryAll<ProjectRow>('SELECT * FROM projects ORDER BY updated_at DESC')
+    const rows = await db.queryAll<ProjectRow>("SELECT * FROM projects ORDER BY updated_at DESC")
     return rows.map((row) => this.rowToProject(row))
   }
 

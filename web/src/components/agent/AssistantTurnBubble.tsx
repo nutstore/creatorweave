@@ -26,7 +26,7 @@
 
 import { Fragment, memo, type ReactNode, useContext, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Bot, Database, GitFork, AlertTriangle, Download } from 'lucide-react'
+import { Bot, Database, Split, AlertTriangle, Download } from 'lucide-react'
 import type { Turn } from './group-messages'
 import type {
   DraftAssistantStep,
@@ -36,9 +36,11 @@ import type {
 import { ReasoningSection } from './ReasoningSection'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { MarkdownContent } from './MarkdownContent'
+import { useStreamingMarkdown } from './use-streaming-markdown'
 import { CopyButton } from './CopyButton'
 import { ShareButton } from './ShareButton'
 import { ContextSummaryCard } from './ContextSummaryCard'
+import { RunChangesCard } from './RunChangesCard'
 import { TextSelectionToolbar } from './TextSelectionToolbar'
 import { AssetCompactList } from './AssetCard'
 import { useT } from '@/i18n'
@@ -491,7 +493,7 @@ export const AssistantTurnBubble = memo(function AssistantTurnBubble({
               title={t('conversation.branch') || 'Branch from here'}
               aria-label={t('conversation.branch') || 'Branch from here'}
             >
-              <GitFork className={`h-3.5 w-3.5 ${isBranching ? 'animate-pulse' : ''}`} />
+              <Split className={`h-3.5 w-3.5 ${isBranching ? 'animate-pulse' : ''}`} />
             </button>
           </div>
         )}
@@ -598,6 +600,11 @@ function renderRuntimeStep(
         isStreamingReasoning={false}
         isStreamingContent={step.streaming}
         lightweight={true}
+        // Content steps always use the incremental-markdown path: the hook
+        // keeps the 60fps plain-text fallback while tokens arrive, promotes
+        // to a formatted snapshot during quiet windows, and renders the
+        // final markdown once the step completes (no flash back to plain).
+        renderMarkdownWhileStreaming={true}
         showDivider={false}
       />
     )
@@ -629,7 +636,14 @@ function renderRuntimeStep(
 
 // ─── Sub-components ───────────────────────────────────────────────────
 
-/** Renders streaming content section within the turn */
+/**
+ * Renders streaming content section within the turn.
+ *
+ * `renderMarkdownWhileStreaming` opts the content block into incremental
+ * markdown rendering during the live stream: the hook keeps the 60fps
+ * plain-text path while tokens arrive, then promotes to a formatted
+ * markdown snapshot during quiet windows (see use-streaming-markdown).
+ */
 const StreamingContentSection = memo(function StreamingContentSection({
   reasoning,
   reasoningStartedAt,
@@ -639,6 +653,7 @@ const StreamingContentSection = memo(function StreamingContentSection({
   isStreamingContent,
   lightweight = false,
   showDivider = true,
+  renderMarkdownWhileStreaming = false,
 }: {
   reasoning?: string
   reasoningStartedAt?: number
@@ -648,7 +663,13 @@ const StreamingContentSection = memo(function StreamingContentSection({
   isStreamingContent: boolean
   lightweight?: boolean
   showDivider?: boolean
+  /** When true, streamed content renders markdown incrementally (quiet-window promotion). */
+  renderMarkdownWhileStreaming?: boolean
 }) {
+  const streamingMarkdown = useStreamingMarkdown(
+    content ?? '',
+    isStreamingContent && !!renderMarkdownWhileStreaming,
+  )
   return (
     <>
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
@@ -666,13 +687,27 @@ const StreamingContentSection = memo(function StreamingContentSection({
       {/* Content */}
       {content && (
         <div className="rounded-lg bg-white px-4 py-2 text-base text-neutral-800 shadow-sm ring-1 ring-neutral-200 dark:bg-neutral-800 dark:text-neutral-100 dark:ring-neutral-700">
-          {lightweight ? (
-            <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
-          ) : (
-            <div className="prose max-w-prose overflow-x-auto break-words">
-              <MarkdownContent content={content} />
-            </div>
-          )}
+          {(() => {
+            // Incremental markdown during live stream: use the hook's
+            // decision (plain 60fps vs markdown snapshot). Non-streaming
+            // content always renders markdown directly.
+            if (renderMarkdownWhileStreaming) {
+              return streamingMarkdown.renderMarkdown ? (
+                <div className="prose max-w-prose overflow-x-auto break-words">
+                  <MarkdownContent content={streamingMarkdown.content} streaming={isStreamingContent} />
+                </div>
+              ) : (
+                <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
+              )
+            }
+            return lightweight ? (
+              <div className="max-w-prose whitespace-pre-wrap break-words">{content}</div>
+            ) : (
+              <div className="prose max-w-prose overflow-x-auto break-words">
+                <MarkdownContent content={content} streaming={isStreamingContent} />
+              </div>
+            )
+          })()}
           {/* Cursor when actively streaming content */}
           {isStreamingContent && (
             <span className="ml-0.5 inline-block h-4 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
@@ -711,12 +746,17 @@ const AssistantStep = memo(function AssistantStep({
     message.toolCalls?.filter((tc) => !suppressExecutingToolCallIds?.has(tc.id)) || []
   const hasToolCalls = visibleToolCalls.length > 0
   const isContextSummary = message.kind === 'context_summary'
+  const isRunChanges = message.kind === 'run_changes'
 
   return (
     <>
       {showDivider && <div className="border-t border-neutral-100 dark:border-neutral-700" />}
 
-      {(hasReasoning || hasContent || hasImages || hasToolCalls || hasAssets) && (
+      {isRunChanges && message.runChanges && (
+        <RunChangesCard snapshotId={message.runChanges.snapshotId} />
+      )}
+
+      {!isRunChanges && (hasReasoning || hasContent || hasImages || hasToolCalls || hasAssets) && (
         <div className="space-y-2">
           {hasReasoning && (
             <ReasoningSection reasoning={message.reasoning!} durationMs={message.reasoningDurationMs} />

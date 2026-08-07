@@ -36,6 +36,7 @@ import {
   isCustomProviderType,
 } from '@/agent/providers/types'
 import { supportsImageInput } from '@/agent/llm/pi-ai-model-resolver'
+import { DEEPSEEK_PROVIDER_TYPE, fetchDeepSeekBalance, type DeepSeekBalanceResponse } from '@/agent/providers/deepseek-provider'
 import type {
   LLMProviderType,
   ModelInfo,
@@ -113,6 +114,46 @@ function ProviderCard({
     loading: modelsLoading,
     refresh: refreshModels,
   } = useDynamicModels(providerType, providerKey)
+
+  // Balance query state (DeepSeek only)
+  const [balanceLoading, setBalanceLoading] = useState(false)
+  const [balanceResult, setBalanceResult] = useState<DeepSeekBalanceResponse | null>(null)
+  const [balanceError, setBalanceError] = useState<string | null>(null)
+  const isDeepSeek = providerType === DEEPSEEK_PROVIDER_TYPE
+
+  // DeepSeek: auto-fetch balance after saving a key (covers the initial save
+  // flow) and when the card is expanded and we have a key but no result yet.
+  useEffect(() => {
+    if (!isDeepSeek || !hasKey || !isExpanded) return
+    if (balanceLoading || balanceResult || balanceError) return
+    void handleRefreshBalance()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDeepSeek, hasKey, isExpanded, balanceLoading, balanceResult, balanceError])
+
+  const handleRefreshBalance = useCallback(async () => {
+    if (!hasKey && !apiKey.trim()) {
+      setBalanceError(t('settings.deepseekBalance.queryFailed'))
+      return
+    }
+    const trimmedKey = apiKey.trim() || (await loadApiKey(providerKey).catch(() => null)) || ''
+    if (!trimmedKey) {
+      setBalanceError(t('settings.deepseekBalance.queryFailed'))
+      return
+    }
+    setBalanceLoading(true)
+    setBalanceError(null)
+    try {
+      const url = isCustom
+        ? customProvider?.baseUrl || ''
+        : config?.baseURL || ''
+      const result = await fetchDeepSeekBalance(trimmedKey, url || undefined)
+      setBalanceResult(result)
+    } catch (e) {
+      setBalanceError((e as Error).message || t('settings.deepseekBalance.queryFailed'))
+    } finally {
+      setBalanceLoading(false)
+    }
+  }, [hasKey, apiKey, providerKey, isCustom, customProvider, config, t])
 
   // Model management state
   const [addingModel, setAddingModel] = useState(false)
@@ -584,6 +625,72 @@ function ProviderCard({
             </div>
           </div>
 
+          {/* Account Balance (DeepSeek only) */}
+          {isDeepSeek && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[12px] font-medium text-secondary">
+                  {t('settings.deepseekBalance.title')}
+                </label>
+                <button
+                  type="button"
+                  onClick={handleRefreshBalance}
+                  disabled={balanceLoading}
+                  className="text-tertiary hover:text-primary disabled:opacity-50"
+                  title={t('settings.deepseekBalance.refresh')}
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${balanceLoading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
+
+              {balanceLoading && (
+                <p className="text-[11px] text-tertiary">{t('settings.deepseekBalance.refreshing')}</p>
+              )}
+
+              {!balanceLoading && balanceError && (
+                <p className="text-[11px] text-red-500 break-all">{balanceError}</p>
+              )}
+
+              {!balanceLoading && balanceResult && !balanceError && (
+                <div className="rounded-md border border-border/60 bg-muted/20 p-2.5 space-y-1.5">
+                  {balanceResult.is_available === false && (
+                    <p className="text-[11px] text-amber-500">
+                      {t('settings.deepseekBalance.unavailable')}
+                    </p>
+                  )}
+                  {balanceResult.balance_infos.length === 0 ? (
+                    <p className="text-[11px] text-tertiary">{t('settings.deepseekBalance.empty')}</p>
+                  ) : (
+                    balanceResult.balance_infos.map((info) => (
+                      <div key={info.currency} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-medium text-secondary">
+                            {t('settings.deepseekBalance.total', { currency: info.currency })}
+                          </span>
+                          <span className="font-mono font-semibold text-primary">{info.total_balance}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-tertiary">
+                          <span>{t('settings.deepseekBalance.granted')}</span>
+                          <span className="font-mono">{info.granted_balance}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[10px] text-tertiary">
+                          <span>{t('settings.deepseekBalance.toppedUp')}</span>
+                          <span className="font-mono">{info.topped_up_balance}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {!balanceLoading && !balanceResult && !balanceError && (
+                <p className="text-[11px] text-tertiary/60">
+                  {t('settings.deepseekBalance.hint')}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* My Models (pinned) — works for both built-in and custom providers */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -949,13 +1056,14 @@ function NewProviderForm({ onClose }: { onClose: () => void }) {
 // =============================================================================
 
 /** Format an ISO reset timestamp as a compact relative string. */
-function formatResetTime(iso: string): string {
+function formatResetTime(iso: string | null, t: (key: string, params?: Record<string, string | number>) => string): string {
+  if (!iso) return t('settings.gatewayRateLimits.resetUnknown')
   const d = new Date(iso)
   const diffMs = d.getTime() - Date.now()
   const diffH = Math.round(diffMs / 3_600_000)
-  if (diffH <= 0) return '即将重置'
-  if (diffH < 24) return `${diffH} 小时后重置`
-  return `${Math.round(diffH / 24)} 天后重置`
+  if (diffH <= 0) return t('settings.gatewayRateLimits.resetSoon')
+  if (diffH < 24) return t('settings.gatewayRateLimits.resetInHours', { count: diffH })
+  return t('settings.gatewayRateLimits.resetInDays', { count: Math.round(diffH / 24) })
 }
 
 function LLMGatewayCard({
@@ -1128,7 +1236,7 @@ function LLMGatewayCard({
         console.log('[llm-gateway] GET /v1/rate-limits response:', result)
       }
     } catch (e) {
-      const msg = (e as Error).message || '查询失败'
+      const msg = (e as Error).message || t('settings.gatewayRateLimits.queryFailed')
       setRateLimitsError(msg)
       if (import.meta.env.DEV) {
         console.error('[llm-gateway] GET /v1/rate-limits error:', e)
@@ -1136,7 +1244,7 @@ function LLMGatewayCard({
     } finally {
       setRateLimitsLoading(false)
     }
-  }, [])
+  }, [t])
 
   // Auto-fetch rate limits when the card is expanded and logged in
   useEffect(() => {
@@ -1364,8 +1472,8 @@ function LLMGatewayCard({
                     <p className="text-[11px] text-red-500 break-all">{rateLimitsError}</p>
                   ) : rateLimitsResult ? (
                     [
-                      { label: '近 5 小时', data: rateLimitsResult.five_hour },
-                      { label: '本周', data: rateLimitsResult.week },
+                      { label: t('settings.gatewayRateLimits.fiveHour'), data: rateLimitsResult.five_hour },
+                      { label: t('settings.gatewayRateLimits.week'), data: rateLimitsResult.week },
                     ]
                       .filter((w): w is { label: string; data: RateLimitWindow } => {
                         const d = w.data
@@ -1374,7 +1482,7 @@ function LLMGatewayCard({
                           typeof d.used === 'number' &&
                           typeof d.limit === 'number' &&
                           typeof d.remaining_percentage === 'number' &&
-                          typeof d.next_reset_at === 'string'
+                          (typeof d.next_reset_at === 'string' || d.next_reset_at === null || d.next_reset_at === undefined)
                         )
                       })
                       .map(({ label, data }) => {
@@ -1396,7 +1504,7 @@ function LLMGatewayCard({
                             />
                           </div>
                           <div className="text-[10px] text-tertiary/70 mt-0.5">
-                            {formatResetTime(data.next_reset_at)}
+                            {formatResetTime(data.next_reset_at, t)}
                           </div>
                         </div>
                       )
@@ -1412,7 +1520,7 @@ function LLMGatewayCard({
                   onClick={handleFetchRateLimits}
                   disabled={rateLimitsLoading}
                 >
-                  {rateLimitsLoading ? '刷新中...' : '刷新'}
+                  {rateLimitsLoading ? t('settings.gatewayRateLimits.refreshing') : t('settings.gatewayRateLimits.refresh')}
                 </BrandButton>
                 <BrandButton
                   variant="outline"

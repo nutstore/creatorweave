@@ -39,17 +39,40 @@ echo -e "${BLUE}📱 Starting mobile-web (http://localhost:5174)...${NC}"
 cd "$PROJECT_ROOT/mobile-web" && pnpm run dev --port 5174 &
 MOBILE_PID=$!
 
+# Ensure browser-extension dependencies are installed
+if [ ! -d "$PROJECT_ROOT/browser-extension/node_modules" ]; then
+  echo -e "${BLUE}📦 Installing browser-extension dependencies...${NC}"
+  cd "$PROJECT_ROOT/browser-extension" && pnpm install
+fi
+
+# Start browser-extension dev server LAST.
+# It must start after web's vite server, because vite-plugin-extension-serve's
+# ensureExtensionBuilt() will run a PROD build (wxt build) if dist/chrome-mv3 is
+# empty when an /extension/* request arrives. wxt dev clears+rebuilds that dir
+# on startup — if it runs while web is serving, the PROD build can overwrite the
+# DEV artifacts. Starting it last lets its DEV build win.
+#
+# stdin trick: WXT 0.19.29 dev server registers a readline on process.stdin
+# (keyboard-shortcuts.mjs) to stay alive. In background mode stdin is closed
+# by the parent shell, readline emits close, and the Node process exits — even
+# though `isOngoing: true` is returned. We feed it a never-closing stdin via
+# process substitution (a sleep loop) so the readline stays open.
+echo -e "${BLUE}🧩 Starting browser-extension (wxt dev → dist/chrome-mv3)...${NC}"
+cd "$PROJECT_ROOT/browser-extension" && pnpm run dev < <(while true; do sleep 3600; done) > /tmp/wxt-dev.log 2>&1 &
+EXTENSION_PID=$!
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}✅ All dev servers started!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  🌐 Web:    ${BLUE}http://localhost:5173${NC}"
-echo -e "  🔌 Relay:  ${BLUE}http://localhost:3000${NC}"
-echo -e "  📱 Mobile: ${BLUE}http://localhost:5174${NC}"
+echo -e "  🌐 Web:       ${BLUE}http://localhost:5173${NC}"
+echo -e "  🔌 Relay:     ${BLUE}http://localhost:3000${NC}"
+echo -e "  📱 Mobile:    ${BLUE}http://localhost:5174${NC}"
+echo -e "  🧩 Extension: ${BLUE}wxt dev → dist/chrome-mv3 (DEV)${NC}"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop all servers${NC}"
 echo ""
 
 # Wait for all background processes
-wait $WEB_PID $RELAY_PID $MOBILE_PID
+wait $WEB_PID $RELAY_PID $MOBILE_PID $EXTENSION_PID

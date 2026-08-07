@@ -35,6 +35,7 @@ export const conversation = {
       medium: "중간",
       high: "높음",
       xhigh: "초고",
+      max: "최대",
     },
     tokenBudget:
       "유효 입력 예산 {effectiveBudget} = 총 한도 {modelMaxTokens} - 예약 {reserveTokens}",
@@ -221,4 +222,22 @@ export const questionCard = {
     customInputHint: "직접 답변 입력",
     userAnswer: "사용자 답변",
     recommended: "추천",
+} as const
+
+// Run changes card (auto-applied run summary)
+export const runChanges = {
+    title: "이번 실행에서 적용된 변경",
+    applied: "적용됨",
+    loading: "변경 사항 불러오는 중…",
+    noFiles: "기록된 파일 변경이 없습니다",
+    loadingFile: "차이점 불러오는 중…",
+    binaryFileHint: "바이너리 파일로 차이점을 표시할 수 없습니다",
+    fileDeletedHint: "이 파일은 삭제되었습니다",
+    fileOpCreate: "추가",
+    fileOpModify: "수정",
+    fileOpDelete: "삭제",
+    expandAllDiffs: "모든 차이점 펼치기",
+    collapseAllDiffs: "모든 차이점 접기",
+    showAllFiles: "파일 {count}개 더 모두 보기",
+    noDiff: "사용 가능한 차이점 없음",
 } as const

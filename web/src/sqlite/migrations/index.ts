@@ -48,7 +48,7 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 13
+export const BASE_SCHEMA_VERSION = 14
 
 // ============================================================================
 // Migration Registry
@@ -222,6 +222,20 @@ export const migrations: Migration[] = [
       DROP TABLE IF EXISTS custom_workflows;
 
       PRAGMA user_version = 13;
+    `,
+  },
+  {
+    version: 14,
+    name: 'add_run_id_to_fs_changesets',
+    up: `
+      -- Associate a snapshot with the agent run that produced it (auto-apply).
+      -- Lets the conversation UI find "what this run changed" from the
+      -- persisted snapshot without any separate index.
+      ALTER TABLE fs_changesets ADD COLUMN run_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_fs_changesets_workspace_run
+        ON fs_changesets(workspace_id, run_id);
+
+      PRAGMA user_version = 14;
     `,
   },
 ]

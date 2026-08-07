@@ -18,6 +18,7 @@ export interface AutoApplyWorkspace {
     paths: string[],
     summary?: string,
     directoryHandle?: FileSystemDirectoryHandle | null,
+    runId?: string | null,
   ): Promise<{ snapshotId: string; opCount: number } | null>
   syncToDisk(
     directoryHandle: FileSystemDirectoryHandle,
@@ -41,6 +42,7 @@ export async function autoApplyCompletedRunChanges(
   workspace: AutoApplyWorkspace,
   candidatePaths: readonly string[],
   refreshPendingChanges: () => Promise<unknown>,
+  runId?: string | null,
 ): Promise<AutoApplyRunResult> {
   const uniqueCandidates = [...new Set(candidatePaths.filter(Boolean))]
   if (uniqueCandidates.length === 0) {
@@ -76,7 +78,7 @@ export async function autoApplyCompletedRunChanges(
 
   // `undefined` deliberately creates the normal rollback record without a
   // user-facing description, matching the existing manual application flow.
-  const snapshot = await workspace.createApprovedSnapshotForPaths(paths, undefined, nativeDirectory)
+  const snapshot = await workspace.createApprovedSnapshotForPaths(paths, undefined, nativeDirectory, runId)
   if (!snapshot) {
     await refreshPendingChanges()
     return {

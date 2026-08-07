@@ -80,7 +80,7 @@ describe('opfs-utils', () => {
     })
 
     it('should handle ArrayBuffer', async () => {
-      const buffer = new TextEncoder().encode('test').buffer
+      const buffer = new TextEncoder().encode('test').buffer as ArrayBuffer
       const hash = await calculateHash(buffer)
       expect(hash).toMatch(/^[a-f0-9]{64}$/)
     })
@@ -221,9 +221,9 @@ describe('opfs-utils', () => {
     })
 
     it('should compare ArrayBuffer content', async () => {
-      const buffer1 = new TextEncoder().encode('test').buffer
-      const buffer2 = new TextEncoder().encode('test').buffer
-      const buffer3 = new TextEncoder().encode('other').buffer
+      const buffer1 = new TextEncoder().encode('test').buffer as ArrayBuffer
+      const buffer2 = new TextEncoder().encode('test').buffer as ArrayBuffer
+      const buffer3 = new TextEncoder().encode('other').buffer as ArrayBuffer
 
       await expect(isContentEqual(buffer1, buffer2)).resolves.toBe(true)
       await expect(isContentEqual(buffer1, buffer3)).resolves.toBe(false)

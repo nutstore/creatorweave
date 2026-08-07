@@ -56,7 +56,7 @@ export const pdfHandler: FormatHandler = {
 
   async read(data: ArrayBuffer | Uint8Array, path: string): Promise<FormatReadResult> {
     const input = data instanceof ArrayBuffer ? new Uint8Array(data) : data
-    const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength)
+    const buffer = input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer
 
     const pdfjsLib = await getPdfjs()
     const doc = await pdfjsLib.getDocument({ data: buffer }).promise

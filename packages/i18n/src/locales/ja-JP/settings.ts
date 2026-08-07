@@ -447,6 +447,7 @@ export const settings = {
       medium: "中",
       high: "深",
       xhigh: "超深",
+      max: "究極",
     },
     thinkingModeFast: "高速",
     thinkingModeDeep: "深堀り",
@@ -483,6 +484,33 @@ export const settings = {
       noApiModels: "利用可能なモデルがありません。更新ボタンでモデルリストを取得してください",
       noMatch: "一致するモデルがありません",
       dialogHint: "{count} 個のモデルが選択可能です。クリックで追加",
+    },
+
+    // Nutstore AI usage quota
+    gatewayRateLimits: {
+      fiveHour: "直近5時間",
+      week: "今週",
+      resetUnknown: "リセット時刻不明",
+      resetSoon: "まもなくリセット",
+      resetInHours: "{count}時間後にリセット",
+      resetInDays: "{count}日後にリセット",
+      refresh: "更新",
+      refreshing: "更新中...",
+      queryFailed: "取得に失敗",
+    },
+
+    // DeepSeek アカウント残高
+    deepseekBalance: {
+      title: "アカウント残高",
+      refresh: "残高を更新",
+      refreshing: "取得中...",
+      queryFailed: "残高の取得に失敗しました",
+      unavailable: "アカウントが利用できません。APIキーを確認してください",
+      empty: "残高情報がありません",
+      total: "{currency} 利用可能残高",
+      granted: "付与残高",
+      toppedUp: "チャージ残高",
+      hint: "APIキーを保存すると残高を確認できます",
     },
 
     imageGen: {

@@ -13,7 +13,7 @@ import { remote, session } from './remote'
 import { fileViewer, standalonePreview, filePreview, recentFiles, officePreview } from './fileViewer'
 import { storageStatusBanner, pendingSync, conversationStorage, workspaceStorage } from './storage'
 import { themeToggle } from './themeToggle'
-import { conversation, toolCallDisplay, questionCard } from './conversation'
+import { conversation, toolCallDisplay, questionCard, runChanges } from './conversation'
 import { mobile, offlineQueue } from './mobile'
 import { activityHeatmap } from './activityHeatmap'
 import { errorBoundary } from './errorBoundary'
@@ -86,6 +86,7 @@ export const enUS = {
   keyboardShortcuts,
   workflow,
   questionCard,
+  runChanges,
   extension,
   assets,
   tools,

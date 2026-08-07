@@ -51,7 +51,7 @@ export class WorkspaceBackend implements VfsBackend {
       ? await readFile(path, null, this.workspaceId, readPolicy, this.projectId)
       : await readFile(path, null, this.workspaceId, undefined, this.projectId)
 
-    let { content } = result
+    let content: string | Uint8Array | ArrayBuffer | Blob = result.content
     const { metadata, source } = result
 
     // VfsReadOptions.encoding is part of the public backend contract used by

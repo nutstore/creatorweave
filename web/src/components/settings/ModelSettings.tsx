@@ -20,7 +20,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import { useSettingsStore } from '@/store/settings.store'
-import type { ThinkingLevel } from '@earendil-works/pi-ai'
+import type { ExtendedThinkingLevel } from '@/agent/llm/pi-ai-custom-openai-fetch'
 import type { LLMProviderType, ModelCapability } from '@/agent/providers/types'
 import { useT } from '@/i18n'
 import { BrandInput } from '@creatorweave/ui'
@@ -399,19 +399,20 @@ export function ModelSettings({ open }: ModelSettingsProps) {
                     {/* Intensity gradient track */}
                     <div className="h-1.5 rounded-full bg-gradient-to-r from-primary-100 via-primary-500 to-primary-600 dark:from-primary-800 dark:via-primary-600 dark:to-primary-500" />
                     {/* Level pills */}
-                    <div className="mt-2 flex gap-1">
+                    <div className="mt-2 flex gap-1 overflow-x-auto">
                       {([
-                        { value: 'minimal' as ThinkingLevel, label: t('settings.thinkingLevels.minimal') },
-                        { value: 'low' as ThinkingLevel, label: t('settings.thinkingLevels.low') },
-                        { value: 'medium' as ThinkingLevel, label: t('settings.thinkingLevels.medium') },
-                        { value: 'high' as ThinkingLevel, label: t('settings.thinkingLevels.high') },
-                        { value: 'xhigh' as ThinkingLevel, label: t('settings.thinkingLevels.xhigh') },
+                        { value: 'minimal' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.minimal') },
+                        { value: 'low' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.low') },
+                        { value: 'medium' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.medium') },
+                        { value: 'high' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.high') },
+                        { value: 'xhigh' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.xhigh') },
+                        { value: 'max' as ExtendedThinkingLevel, label: t('settings.thinkingLevels.max') },
                       ]).map(({ value, label }) => (
                         <button
                           key={value}
                           type="button"
                           onClick={() => setThinkingLevel(value)}
-                          className={`flex-1 rounded-md py-1.5 text-[11px] font-medium transition-all ${
+                          className={`flex-1 whitespace-nowrap rounded-md py-1.5 text-[11px] font-medium transition-all ${
                             thinkingLevel === value
                               ? 'bg-primary-600 text-white shadow-sm dark:bg-primary-500'
                               : 'bg-neutral-50 text-tertiary hover:bg-neutral-100 hover:text-secondary dark:bg-neutral-800/60 dark:text-muted dark:hover:bg-neutral-700 dark:hover:text-secondary'

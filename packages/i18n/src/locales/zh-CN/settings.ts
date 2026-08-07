@@ -432,6 +432,7 @@ export const settings = {
       medium: "中",
       high: "深度",
       xhigh: "极深",
+      max: "极致",
     },
     thinkingModeFast: "快速",
     thinkingModeDeep: "深入",
@@ -468,6 +469,33 @@ export const settings = {
       noApiModels: "暂无可用模型，请先点击刷新按钮获取模型列表",
       noMatch: "没有匹配的模型",
       dialogHint: "共 {count} 个模型可选，点击即可添加",
+    },
+
+    // 坚果云 AI 使用额度
+    gatewayRateLimits: {
+      fiveHour: "近 5 小时",
+      week: "本周",
+      resetUnknown: "重置时间未知",
+      resetSoon: "即将重置",
+      resetInHours: "{count} 小时后重置",
+      resetInDays: "{count} 天后重置",
+      refresh: "刷新",
+      refreshing: "刷新中...",
+      queryFailed: "查询失败",
+    },
+
+    // DeepSeek 账户余额
+    deepseekBalance: {
+      title: "账户余额",
+      total: "{currency} 总余额",
+      granted: "赠金余额",
+      toppedUp: "充值余额",
+      refresh: "刷新余额",
+      refreshing: "查询中...",
+      unavailable: "账户当前不可用",
+      empty: "暂无余额信息",
+      hint: "保存 API Key 后可查询账户余额",
+      queryFailed: "余额查询失败",
     },
 
     imageGen: {

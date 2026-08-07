@@ -444,6 +444,7 @@ export const settings = {
       medium: "Medium",
       high: "Deep",
       xhigh: "Ultra",
+      max: "Max",
     },
     thinkingModeFast: "Fast",
     thinkingModeDeep: "Deep",
@@ -480,6 +481,33 @@ export const settings = {
       noApiModels: "No models available. Click refresh to fetch the model list first.",
       noMatch: "No matching models",
       dialogHint: "{count} models available. Click to add.",
+    },
+
+    // Nutstore AI usage quota
+    gatewayRateLimits: {
+      fiveHour: "Last 5 hours",
+      week: "This week",
+      resetUnknown: "Reset time unknown",
+      resetSoon: "Resets soon",
+      resetInHours: "Resets in {count}h",
+      resetInDays: "Resets in {count}d",
+      refresh: "Refresh",
+      refreshing: "Refreshing...",
+      queryFailed: "Query failed",
+    },
+
+    // DeepSeek account balance
+    deepseekBalance: {
+      title: "Account Balance",
+      refresh: "Refresh balance",
+      refreshing: "Querying...",
+      queryFailed: "Failed to query balance",
+      unavailable: "Account unavailable, please check your API key",
+      empty: "No balance info available",
+      total: "{currency} available balance",
+      granted: "Granted balance",
+      toppedUp: "Topped-up balance",
+      hint: "Save an API key to query your account balance",
     },
 
     imageGen: {

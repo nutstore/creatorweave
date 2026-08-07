@@ -21,9 +21,9 @@ import { FSOverlayRepository } from '../fs-overlay.repository'
 // ---------------------------------------------------------------------------
 
 const fakeDb = {
-  execute: vi.fn(async () => undefined),
-  queryFirst: vi.fn(async () => null as any),
-  queryAll: vi.fn(async () => [] as any[]),
+  execute: vi.fn(async (_sql: string, _params?: unknown[]) => undefined),
+  queryFirst: vi.fn(async (_sql: string, _params?: unknown[]) => null as any),
+  queryAll: vi.fn(async (_sql: string, _params?: unknown[]) => [] as any[]),
 }
 
 vi.mock('../../sqlite-database', async () => {

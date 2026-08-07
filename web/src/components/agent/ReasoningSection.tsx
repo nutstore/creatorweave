@@ -69,7 +69,7 @@ export function ReasoningSection({ reasoning, streaming, startedAt, durationMs }
       </button>
       {open && (
         <div className="max-h-48 overflow-y-auto rounded-b border border-t-0 border-neutral-200 bg-neutral-50 px-3 py-2 text-xs leading-relaxed text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
-          <MarkdownContent content={reasoning} />
+          <MarkdownContent content={reasoning} streaming={streaming} />
         </div>
       )}
     </>

@@ -18,6 +18,14 @@ import { assertHeaderAscii } from './http-headers'
 
 export const CW_OPENAI_FETCH_API = 'cw-openai-fetch' as const
 
+/**
+ * Thinking level extended with `max` (OpenAI/OpenRouter's highest tier).
+ * pi-ai 0.78.0's `ThinkingLevel` stops at `xhigh` and its clamp function
+ * silently downgrades unknown levels to `off` — this union lets the app
+ * carry `max` end-to-end and inject it via `applyMaxThinkingOverride`.
+ */
+export type ExtendedThinkingLevel = ThinkingLevel | 'max'
+
 const CUSTOM_PROVIDER_SOURCE_ID = 'creatorweave/cw-openai-fetch'
 
 let customProviderRegistered = false
@@ -213,7 +221,10 @@ function streamCwOpenAIChatCompletions(
         const delta = choice.delta
         if (!delta) return
 
-        if (delta.content) {
+        // Skip pure-whitespace content chunks. Some models (e.g. MiniMax-M2.7)
+        // emit trailing newlines between the reasoning phase and tool_calls,
+        // which would otherwise render as empty bubbles in the UI.
+        if (delta.content && delta.content.trim().length > 0) {
           if (!currentBlock || currentBlock.type !== 'text') {
             finishCurrentBlock(currentBlock)
             currentBlock = { type: 'text', text: '' }
@@ -423,7 +434,9 @@ export function buildChatCompletionsPayload(
     // options can be undefined when caller doesn't pass it (e.g. test fixtures
     // or non-streaming paths) — guard with optional chaining instead of casting
     // through undefined.
-    const reasoning = (options as (Record<string, unknown> & { reasoning?: ThinkingLevel }) | undefined)?.reasoning
+    const reasoning = (options as
+      | (Record<string, unknown> & { reasoning?: ExtendedThinkingLevel })
+      | undefined)?.reasoning
     applyThinkingParams(payload, model.baseUrl, reasoning, model.thinkingLevelMap)
   }
 
@@ -493,7 +506,7 @@ export function detectThinkingFormat(baseUrl: string): ThinkingFormat {
 function applyMinimaxThinkingParams(
   payload: Record<string, unknown>,
   enabled: boolean,
-  level?: ThinkingLevel,
+  level?: ExtendedThinkingLevel,
   levelMap?: Partial<Record<string, string | null>>
 ): void {
   if (enabled) {
@@ -513,10 +526,10 @@ function applyMinimaxThinkingParams(
 
 /**
  * ThinkingLevel → OpenRouter effort value.
- * OpenRouter also supports "none" (off) and "xhigh".
+ * OpenRouter also supports "none" (off), "xhigh", and "max".
  */
 function toEffortValue(
-  level: ThinkingLevel,
+  level: ExtendedThinkingLevel,
   levelMap?: Partial<Record<string, string | null>>
 ): string {
   return levelMap?.[level] ?? level
@@ -531,7 +544,7 @@ function toEffortValue(
 function applyThinkingParams(
   payload: Record<string, unknown>,
   baseUrl: string,
-  level: ThinkingLevel | undefined,
+  level: ExtendedThinkingLevel | undefined,
   thinkingLevelMap?: Partial<Record<string, string | null>>
 ): void {
   const format = detectThinkingFormat(baseUrl)
@@ -586,6 +599,72 @@ function applyThinkingParams(
       if (enabled) {
         payload.reasoning_effort = toEffortValue(level!, thinkingLevelMap)
       }
+      break
+    }
+  }
+}
+
+/**
+ * Override an already-built payload so that thinking runs at `max`.
+ *
+ * pi-ai 0.78.0's `clampThinkingLevel` does not know `max` and silently
+ * downgrades it to `off` — meaning built-in handlers (openai-completions,
+ * openai-responses) would disable thinking entirely when the user picks `max`.
+ * This function inspects the payload that the handler already wrote (using its
+ * detected format) and rewrites the effort fields to the `max` value, matching
+ * the exact shape the built-in handlers produce. Call it from the streamFn
+ * onPayload wrapper (pi-core-runner) right before the request goes out.
+ */
+export function applyMaxThinkingOverride(
+  payload: Record<string, unknown>,
+  baseUrl: string,
+  thinkingLevelMap?: Partial<Record<string, string | null>>
+): void {
+  const effort = toEffortValue('max', thinkingLevelMap)
+  const format = detectThinkingFormat(baseUrl)
+
+  switch (format) {
+    case 'openrouter': {
+      // openai-completions handler writes reasoning: { effort }
+      const reasoning = payload.reasoning as Record<string, unknown> | undefined
+      if (reasoning && typeof reasoning === 'object') {
+        reasoning.effort = effort
+      } else {
+        payload.reasoning = { effort }
+      }
+      break
+    }
+    case 'openai':
+    case 'tencent-tokenhub':
+    case 'auto':
+    default: {
+      // openai-completions handler writes reasoning_effort for these formats
+      payload.reasoning_effort = effort
+      // Responses API handler writes reasoning: { effort, summary }
+      const reasoning = payload.reasoning as Record<string, unknown> | undefined
+      if (reasoning && typeof reasoning === 'object' && 'effort' in reasoning) {
+        reasoning.effort = effort
+      }
+      break
+    }
+    case 'deepseek': {
+      payload.thinking = { type: 'enabled' }
+      payload.reasoning_effort = effort
+      break
+    }
+    case 'together': {
+      payload.reasoning = { enabled: true }
+      payload.reasoning_effort = effort
+      break
+    }
+    case 'qwen': {
+      // Qwen has no effort tiers — thinking is boolean. Keep enabled.
+      payload.enable_thinking = true
+      break
+    }
+    case 'minimax': {
+      // MiniMax has no effort tiers — reasoning_split isolates thinking.
+      payload.reasoning_split = true
       break
     }
   }

@@ -17,7 +17,7 @@ import {
   getProviderConfig,
 } from '@/agent/providers/types'
 import { getModelContextWindow } from '@/agent/providers/model-store'
-import type { ThinkingLevel } from '@earendil-works/pi-ai'
+import type { ExtendedThinkingLevel } from '@/agent/llm/pi-ai-custom-openai-fetch'
 
 // Cache for hasApiKey to avoid repeated database queries
 // This is a soft cache that can be invalidated
@@ -62,7 +62,7 @@ interface SettingsState {
   maxTokens: number
   maxIterations: number
   enableThinking: boolean
-  thinkingLevel: ThinkingLevel
+  thinkingLevel: ExtendedThinkingLevel
 
   // 实验性功能 (Experimental features, disabled by default)
   enableBatchSpawn: boolean
@@ -125,7 +125,7 @@ interface SettingsState {
   setMaxTokens: (tokens: number) => void
   setMaxIterations: (iterations: number) => void
   setEnableThinking: (v: boolean) => void
-  setThinkingLevel: (v: ThinkingLevel) => void
+  setThinkingLevel: (v: ExtendedThinkingLevel) => void
   setImageGenModel: (v: string) => void
   setImageGenAspectRatio: (v: string) => void
   setEnableBatchSpawn: (v: boolean) => void
@@ -293,7 +293,7 @@ export const useSettingsStore = create<SettingsState>()(
       maxTokens: 4096,
       maxIterations: 20,
       enableThinking: false,
-      thinkingLevel: 'medium' as ThinkingLevel,
+      thinkingLevel: 'medium' as ExtendedThinkingLevel,
       enableBatchSpawn: false,
       enableWebMCP: true,
       enableSchedules: false,

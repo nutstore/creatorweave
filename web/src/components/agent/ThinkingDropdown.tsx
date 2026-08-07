@@ -6,13 +6,13 @@ import { useState, useEffect } from 'react'
 import { Brain, ChevronDown } from 'lucide-react'
 import { BrandSwitch } from '@creatorweave/ui'
 import { useT } from '@/i18n'
-import type { ThinkingLevel } from '@earendil-works/pi-ai'
+import type { ExtendedThinkingLevel } from '@/agent/llm/pi-ai-custom-openai-fetch'
 
 interface ThinkingDropdownProps {
   enableThinking: boolean
-  thinkingLevel: ThinkingLevel
+  thinkingLevel: ExtendedThinkingLevel
   setEnableThinking: (enabled: boolean) => void
-  setThinkingLevel: (level: ThinkingLevel) => void
+  setThinkingLevel: (level: ExtendedThinkingLevel) => void
 }
 
 export function ThinkingDropdown({
@@ -39,12 +39,13 @@ export function ThinkingDropdown({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [isOpen])
 
-  const levels: { value: ThinkingLevel; label: string }[] = [
+  const levels: { value: ExtendedThinkingLevel; label: string }[] = [
     { value: 'minimal', label: t('conversation.thinkingLevels.minimal') },
     { value: 'low', label: t('conversation.thinkingLevels.low') },
     { value: 'medium', label: t('conversation.thinkingLevels.medium') },
     { value: 'high', label: t('conversation.thinkingLevels.high') },
     { value: 'xhigh', label: t('conversation.thinkingLevels.xhigh') },
+    { value: 'max', label: t('conversation.thinkingLevels.max') },
   ]
 
   return (
@@ -85,7 +86,7 @@ export function ThinkingDropdown({
           </div>
           {enableThinking && (
             <div className="border-t border-neutral-100 px-2 py-1.5 dark:border-neutral-800">
-              <div className="grid grid-cols-5 gap-1">
+              <div className="grid grid-cols-3 gap-1">
                 {levels.map(({ value, label }) => (
                   <button
                     key={value}
@@ -94,7 +95,7 @@ export function ThinkingDropdown({
                       setThinkingLevel(value)
                       setIsOpen(false)
                     }}
-                    className={`rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
+                    className={`whitespace-nowrap rounded px-1.5 py-1 text-[10px] font-medium transition-colors ${
                       thinkingLevel === value
                         ? 'bg-primary-600 text-white'
                         : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'

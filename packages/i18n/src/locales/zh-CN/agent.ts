@@ -71,4 +71,19 @@ export const agent = {
         approve: "允许",
         deny: "拒绝",
     },
+
+    // 搜索会话工具
+    searchConversations: {
+        failed: "失败",
+        modeKeyword: "关键词",
+        modeList: "列表",
+        match_one: "{count} 条匹配",
+        match_other: "{count} 条匹配",
+        noResults: "未找到匹配的对话。",
+        projectsHeader: "项目 ({count})",
+        fullDay: "整天",
+        moreResults: "还有 {count} 条（共 {total} 条）",
+        moreAvailable: "还有更多结果",
+        untitled: "（未命名）",
+    },
 } as const

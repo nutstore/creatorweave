@@ -43,6 +43,8 @@ export interface SnapshotRecord {
   committedAt: number | null
   opCount: number
   isCurrent?: boolean
+  /** Agent run that produced this snapshot (auto-apply). */
+  runId?: string | null
 }
 
 export interface SnapshotFileMetaRecord {
@@ -92,6 +94,7 @@ export class FSOverlayRepository {
       source: string
       created_at: number
       committed_at: number | null
+      run_id: string | null
       op_count: number
     }>(
       `SELECT c.id,
@@ -101,6 +104,7 @@ export class FSOverlayRepository {
               c.source,
               c.created_at,
               c.committed_at,
+              c.run_id,
               COUNT(o.id) AS op_count
        FROM fs_changesets c
        LEFT JOIN fs_ops o
@@ -122,6 +126,7 @@ export class FSOverlayRepository {
       source: row.source,
       createdAt: row.created_at,
       committedAt: row.committed_at,
+      runId: row.run_id,
       opCount: Number(row.op_count || 0),
     }))
   }
@@ -136,6 +141,7 @@ export class FSOverlayRepository {
       source: string
       created_at: number
       committed_at: number | null
+      run_id: string | null
       op_count: number
       is_current: number
     }>(
@@ -146,6 +152,7 @@ export class FSOverlayRepository {
               c.source,
               c.created_at,
               c.committed_at,
+              c.run_id,
               COUNT(o.id) AS op_count,
               CASE WHEN w.current_snapshot_id = c.id THEN 1 ELSE 0 END AS is_current
        FROM fs_changesets c
@@ -170,6 +177,7 @@ export class FSOverlayRepository {
       source: row.source,
       createdAt: row.created_at,
       committedAt: row.committed_at,
+      runId: row.run_id,
       opCount: Number(row.op_count || 0),
       isCurrent: row.is_current === 1,
     }
@@ -630,7 +638,8 @@ export class FSOverlayRepository {
   async createApprovedSnapshotForPaths(
     workspaceId: string,
     paths: string[],
-    summary?: string
+    summary?: string,
+    runId?: string | null
   ): Promise<{ snapshotId: string; opCount: number } | null> {
     if (paths.length === 0) return null
     const db = getSQLiteDB()
@@ -651,9 +660,9 @@ export class FSOverlayRepository {
     // description with a predictable system summary.
     const systemSummary = `Saved ${opCount} file modification${opCount === 1 ? '' : 's'}`
     await db.execute(
-      `INSERT INTO fs_changesets (id, workspace_id, source, status, summary, created_at, committed_at, synced_at)
-       VALUES (?, ?, 'review', 'approved', ?, ?, ?, ?)`,
-      [snapshotId, workspaceId, summary?.trim() || systemSummary, now, now, null] // synced_at 默认为 null，表示未同步到磁盘
+      `INSERT INTO fs_changesets (id, workspace_id, source, status, summary, created_at, committed_at, synced_at, run_id)
+       VALUES (?, ?, 'review', 'approved', ?, ?, ?, ?, ?)`,
+      [snapshotId, workspaceId, summary?.trim() || systemSummary, now, now, null, runId ?? null] // synced_at 默认为 null，表示未同步到磁盘
     )
 
     await db.execute(

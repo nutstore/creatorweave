@@ -14,6 +14,8 @@ import type { DraftAssistantStep, Message } from '@/agent/message-types'
 import { getSubagentRepository } from '@/sqlite'
 import { ToolCallDisplay } from './ToolCallDisplay'
 import { ReasoningSection } from './ReasoningSection'
+import { MarkdownContent } from './MarkdownContent'
+import { useStreamingMarkdown } from './use-streaming-markdown'
 import { useConversationRuntimeStore } from '@/store/conversation-runtime.store'
 
 // ─── Sub-components (mirrors AssistantTurnBubble's lightweight renderers) ──
@@ -33,6 +35,7 @@ function SubagentStreamingContent({
   isStreamingReasoning: boolean
   isStreamingContent: boolean
 }) {
+  const streamingMarkdown = useStreamingMarkdown(content ?? '', isStreamingContent)
   return (
     <>
       {reasoning && (
@@ -45,12 +48,18 @@ function SubagentStreamingContent({
       )}
       {content && (
         <div className="rounded-lg bg-white px-3 py-1.5 text-sm text-neutral-800 dark:bg-neutral-800 dark:text-neutral-100">
-          <div className="max-w-prose whitespace-pre-wrap break-words">
-            {content}
-            {isStreamingContent && (
-              <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
-            )}
-          </div>
+          {isStreamingContent && streamingMarkdown.renderMarkdown ? (
+            <div className="prose max-w-prose overflow-x-auto break-words">
+              <MarkdownContent content={streamingMarkdown.content} streaming />
+            </div>
+          ) : (
+            <div className="max-w-prose whitespace-pre-wrap break-words">
+              {content}
+              {isStreamingContent && (
+                <span className="ml-0.5 inline-block h-3 w-[2px] animate-pulse bg-neutral-400 align-text-bottom" />
+              )}
+            </div>
+          )}
         </div>
       )}
     </>

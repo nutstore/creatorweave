@@ -3,6 +3,17 @@ import pkg from './package.json';
 
 export default defineConfig({
   outDir: 'dist',
+  // Dev mode outputs to `dist/chrome-mv3` (not the default `chrome-mv3-dev`),
+  // so the web app's vite-plugin-extension-serve (which watches dist/chrome-mv3)
+  // serves the DEV build. Without this, dev artifacts land in chrome-mv3-dev and
+  // the web keeps serving the stale PROD build → popup shows PROD.
+  outDirTemplate: '{{browser}}-mv{{manifestVersion}}',
+  // Don't auto-launch a separate browser during `wxt dev`. CreatorWeave loads
+  // the extension via a zip downloaded from the web app, not via web-ext's
+  // managed browser. The manual runner just logs the output path.
+  runner: {
+    disabled: true,
+  },
   manifest: {
     name: '__MSG_extensionName__',
     description: '__MSG_extensionDescription__',

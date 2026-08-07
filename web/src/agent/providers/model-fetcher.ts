@@ -40,6 +40,7 @@ const OPENAI_COMPATIBLE_PROVIDERS: LLMProviderType[] = [
   'minimax',
   'minimax-cn',
   'qwen',
+  'deepseek',
   'custom',
 ]
 

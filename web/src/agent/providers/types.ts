@@ -72,6 +72,7 @@ export type BuiltinLLMProviderType =
   | 'minimax-cn'
   | 'qwen'
   | 'volcengine-coding'
+  | 'deepseek'
 
 /** Provider type: built-in or dynamically registered custom provider (e.g. "custom-abc123") */
 export type LLMProviderType = BuiltinLLMProviderType | string
@@ -142,6 +143,11 @@ export const LLM_PROVIDER_CONFIGS: Record<LLMProviderType, Omit<LLMProviderConfi
   'volcengine-coding': {
     baseURL: 'https://ark.cn-beijing.volces.com/api/coding',
     modelName: '',
+    headers: {},
+  },
+  deepseek: {
+    baseURL: 'https://api.deepseek.com',
+    modelName: 'deepseek-v4-pro',
     headers: {},
   },
 }
@@ -481,6 +487,25 @@ export const PROVIDER_META: Record<LLMProviderType, ProviderMeta> = {
     displayName: '火山方舟 Coding',
     website: 'https://console.volcengine.com/ark',
     models: [],
+  },
+  deepseek: {
+    category: 'chinese',
+    displayName: 'DeepSeek',
+    website: 'https://platform.deepseek.com',
+    models: [
+      {
+        id: 'deepseek-v4-flash',
+        name: 'DeepSeek V4 Flash',
+        capabilities: ['code', 'writing', 'reasoning', 'fast'],
+        contextWindow: 1048576,
+      },
+      {
+        id: 'deepseek-v4-pro',
+        name: 'DeepSeek V4 Pro',
+        capabilities: ['code', 'writing', 'reasoning'],
+        contextWindow: 1048576,
+      },
+    ],
   },
 }
 

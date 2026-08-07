@@ -5,6 +5,7 @@ import { useSettingsStore } from '@/store/settings.store'
 import type { AgentMode } from '../agent-mode'
 import type { ContextManager } from '../context-manager'
 import type { PiAIProvider } from '../llm/pi-ai-provider'
+import { applyMaxThinkingOverride, type ExtendedThinkingLevel } from '../llm/pi-ai-custom-openai-fetch'
 import { generateId, type Message } from '../message-types'
 import type { ToolRegistry } from '../tool-registry'
 import type { ToolContext } from '../tools/tool-types'
@@ -179,6 +180,15 @@ export async function executePiCoreLoop(
         ? (streamOptions.onPayload as (payload: Record<string, unknown>) => void)
         : undefined
 
+    // pi-ai 0.78.0 does not know `max` (its ThinkingLevel stops at xhigh) and
+    // its clamp silently downgrades unknown levels to `off`, which would turn
+    // thinking off entirely when the user picks max. Detect the requested
+    // level from the stream options and, for max, rewrite the payload after
+    // the built-in handler built it (see applyMaxThinkingOverride).
+    const requestedReasoning = (streamOptions as
+      | (Record<string, unknown> & { reasoning?: ExtendedThinkingLevel })
+      | undefined)?.reasoning
+
     const mergedOptions: Record<string, unknown> = {
       ...(streamOptions || {}),
       onPayload: (payload: Record<string, unknown>) => {
@@ -208,6 +218,10 @@ export async function executePiCoreLoop(
         if (model.provider === 'codex-oauth' && input.sessionId) {
           payload.prompt_cache_key = input.sessionId
         }
+        // Restore the max thinking tier after built-in handlers clamp it away.
+        if (requestedReasoning === 'max' && model.reasoning) {
+          applyMaxThinkingOverride(payload, model.baseUrl, model.thinkingLevelMap)
+        }
         prevOnPayload?.(payload)
       },
     }
@@ -225,11 +239,17 @@ export async function executePiCoreLoop(
   }) as unknown as StreamFn
 
   const settingsState = useSettingsStore.getState()
-  const reasoning = input.disableThinking
+  const rawThinkingLevel = input.disableThinking
     ? undefined
     : settingsState.enableThinking
       ? settingsState.thinkingLevel
       : undefined
+
+  // pi-ai 0.78.0's ThinkingLevel stops at xhigh; a raw 'max' would be clamped
+  // to 'off' by its handlers (disabling thinking entirely). We pass a supported
+  // level ('high') to the loop so thinking stays enabled, and the streamFn
+  // onPayload wrapper restores the true max tier via applyMaxThinkingOverride.
+  const reasoning = rawThinkingLevel === 'max' ? 'high' : rawThinkingLevel
 
   const loop = agentLoopContinue(
     context,

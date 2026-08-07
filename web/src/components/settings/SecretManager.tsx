@@ -22,7 +22,6 @@ import {
   promoteSecretToGlobal,
   saveSecret,
   type SecretEntry,
-  type SecretName,
   type SecretScope,
 } from '@/security/secret-store'
 
@@ -254,7 +253,6 @@ export function SecretManager() {
         addLabel={t('settings.secrets.add')}
         refreshLabel={t('settings.secrets.refresh')}
         onRefresh={() => void refreshSecrets()}
-        t={t}
       />
 
       {/* Global secrets section */}
@@ -275,7 +273,6 @@ export function SecretManager() {
         addLabel={t('settings.secrets.add')}
         refreshLabel={t('settings.secrets.refresh')}
         onRefresh={() => void refreshSecrets()}
-        t={t}
         renderBadge={(entry) =>
           (entry as RenderedSecret).overridden ? (
             <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-400 dark:bg-neutral-800">
@@ -469,7 +466,6 @@ interface SecretSectionProps {
   addLabel: string
   refreshLabel: string
   onRefresh: () => void
-  t: ReturnType<typeof useT>
   renderBadge?: (entry: SecretEntry) => React.ReactNode
 }
 
@@ -492,7 +488,6 @@ function SecretSection({
   addLabel,
   refreshLabel,
   onRefresh,
-  t,
   renderBadge,
 }: SecretSectionProps) {
   return (

@@ -46,6 +46,9 @@ The project is also exploring multi-agent collaboration workflows for content cr
 - **Message Bubbles**: Rich message display with markdown support, syntax highlighting, and inline code rendering
 - **Reasoning Visualization**: See AI thinking process with collapsible reasoning sections
 - **Tool Call Display**: View all tool invocations with parameters and results
+- **Run Change Summary**: See a per-run card in the message stream listing exactly which files each agent run changed, with inline diffs and rollback linkage
+- **Auto-apply on completion**: Optionally apply a completed run's eligible file changes to your local folder automatically, while keeping every change visible and rollback-safe in the message stream
+- **Change Safety Nets**: Every applied change is captured in a persisted snapshot with a visible per-run card and easy rollback
 - **Streaming Support**: Real-time streaming of AI responses for faster feedback
 
 ### Code Intelligence

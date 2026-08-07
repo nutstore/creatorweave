@@ -49,4 +49,19 @@ export const agent = {
         selectFolder: "폴더 선택",
         later: "나중에",
     },
+
+    // 대화 검색 도구
+    searchConversations: {
+        failed: "실패",
+        modeKeyword: "키워드",
+        modeList: "목록",
+        match_one: "{count}개 일치",
+        match_other: "{count}개 일치",
+        noResults: "일치하는 대화가 없습니다.",
+        projectsHeader: "프로젝트 ({count})",
+        fullDay: "하루 종일",
+        moreResults: "+{count}개 더 (총 {total}개)",
+        moreAvailable: "더 많은 결과 사용 가능",
+        untitled: "(제목 없음)",
+    },
 } as const

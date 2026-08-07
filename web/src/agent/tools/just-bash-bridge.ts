@@ -222,6 +222,16 @@ export class VfsBridgeFs {
     return content
   }
 
+  /** Convert any writable content to a form VfsBackend.writeFile accepts (string | ArrayBuffer | Blob).
+   *  VfsBackend.writeFile does not accept Uint8Array directly (TS 5.7+ types it as
+   *  Uint8Array<ArrayBufferLike> which is incompatible with ArrayBuffer). */
+  private toBackendWritable(content: string | Uint8Array | ArrayBuffer | Blob): string | ArrayBuffer | Blob {
+    if (content instanceof Uint8Array) {
+      return content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer
+    }
+    return content
+  }
+
   private normalizeWriteEncoding(options?: { encoding?: string } | string): 'binary' | 'text' {
     const encoding = typeof options === 'string' ? options : options?.encoding
     return encoding === 'binary' ? 'binary' : 'text'
@@ -271,7 +281,7 @@ export class VfsBridgeFs {
       const writable = typeof content === 'string'
         ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
         : content
-      await this.assetsBackend.writeFile(relPath, writable)
+      await this.assetsBackend.writeFile(relPath, this.toBackendWritable(writable))
       this._cachedAllPaths = null
       return
     }
@@ -285,7 +295,7 @@ export class VfsBridgeFs {
       const writable = typeof content === 'string'
         ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
         : content
-      await this.agentBackend.writeFile(relPath, writable)
+      await this.agentBackend.writeFile(relPath, this.toBackendWritable(writable))
       this._cachedAllPaths = null
       return
     }
@@ -300,7 +310,7 @@ export class VfsBridgeFs {
     const writable = typeof content === 'string'
       ? (encoding === 'binary' ? this.latin1StringToBytes(content) : content)
       : content
-    await this.backend.writeFile(relPath, writable)
+    await this.backend.writeFile(relPath, this.toBackendWritable(writable))
     this._cachedAllPaths = null // invalidate cache
   }
 
@@ -334,7 +344,7 @@ export class VfsBridgeFs {
       const relPath = this.toAssetsRelative(path)
       const encoding = this.normalizeWriteEncoding(options)
       if (encoding === 'binary') {
-        let existing = new Uint8Array(0)
+        let existing: Uint8Array = new Uint8Array(0)
         try {
           const result = await this.assetsBackend.readFile(relPath, { encoding: 'binary' })
           existing = await this.toWritableContent(result.content) as Uint8Array
@@ -345,7 +355,7 @@ export class VfsBridgeFs {
         const combined = new Uint8Array(existing.length + toAppend.length)
         combined.set(existing)
         combined.set(toAppend, existing.length)
-        await this.assetsBackend.writeFile(relPath, combined)
+        await this.assetsBackend.writeFile(relPath, this.toBackendWritable(combined))
       } else {
         let existing = ''
         try {
@@ -369,7 +379,7 @@ export class VfsBridgeFs {
       const relPath = this.toAgentsRelative(path)
       const encoding = this.normalizeWriteEncoding(options)
       if (encoding === 'binary') {
-        let agExisting = new Uint8Array(0)
+        let agExisting: Uint8Array = new Uint8Array(0)
         try {
           const result = await this.agentBackend.readFile(relPath, { encoding: 'binary' })
           agExisting = await this.toWritableContent(result.content) as Uint8Array
@@ -378,7 +388,7 @@ export class VfsBridgeFs {
         const combined = new Uint8Array(agExisting.length + agToAppend.length)
         combined.set(agExisting)
         combined.set(agToAppend, agExisting.length)
-        await this.agentBackend.writeFile(relPath, combined)
+        await this.agentBackend.writeFile(relPath, this.toBackendWritable(combined))
       } else {
         let agExisting = ''
         try {
@@ -401,7 +411,7 @@ export class VfsBridgeFs {
     const relPath = this.toRelative(path)
     const encoding = this.normalizeWriteEncoding(options)
     if (encoding === 'binary') {
-      let existing = new Uint8Array(0)
+      let existing: Uint8Array = new Uint8Array(0)
       try {
         const result = await this.backend.readFile(relPath, { encoding: 'binary' })
         existing = await this.toWritableContent(result.content) as Uint8Array
@@ -412,7 +422,7 @@ export class VfsBridgeFs {
       const combined = new Uint8Array(existing.length + toAppend.length)
       combined.set(existing)
       combined.set(toAppend, existing.length)
-      await this.backend.writeFile(relPath, combined)
+      await this.backend.writeFile(relPath, this.toBackendWritable(combined))
     } else {
       let existing = ''
       try {
@@ -812,7 +822,7 @@ export class VfsBridgeFs {
     try {
       const result = await this.backend.readFile(srcRel)
       const destRel = this.toRelative(destNorm)
-      await this.backend.writeFile(destRel, result.content)
+      await this.backend.writeFile(destRel, this.toBackendWritable(result.content))
       return
     } catch {
       // Not a file — try as directory if -r
@@ -853,7 +863,7 @@ export class VfsBridgeFs {
       if (entry.kind === 'file') {
         const result = await this.backend.readFile(childSrc)
         const destRel = this.toRelative(this.normalizeAbsolutePath(childDest))
-        await this.backend.writeFile(destRel, result.content)
+        await this.backend.writeFile(destRel, this.toBackendWritable(result.content))
       } else if (entry.kind === 'directory') {
         await this.cpVfsDir(childSrc, childDest)
       }

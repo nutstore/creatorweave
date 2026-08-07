@@ -64,7 +64,14 @@ export interface Message {
    */
   contentParts?: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>
   /** UI-only classification for special assistant records */
-  kind?: 'normal' | 'context_summary'
+  kind?: 'normal' | 'context_summary' | 'run_changes'
+  /**
+   * Present only on `kind === 'run_changes'` assistant records. Points at the
+   * auto-apply snapshot that captured everything this agent run changed, so
+   * the message-stream UI can render a "what this run changed" card that
+   * stays persisted with the run's message history.
+   */
+  runChanges?: { snapshotId: string }
   /** Chain-of-thought reasoning content (GLM-4.7+), not sent back to API */
   reasoning?: string | null
   /** Elapsed wall-clock time for this message's reasoning block, in milliseconds. */
@@ -310,6 +317,24 @@ export function createToolMessage(result: ToolResult): Message {
     contentParts: result.contentParts,
     toolCallId: result.toolCallId,
     name: result.name,
+    timestamp: Date.now(),
+  }
+}
+
+/**
+ * Create a UI-only "run changes" card message.
+ *
+ * Never sent to the model (see internalToPiMessages) and rendered as a
+ * dedicated card in the message stream. It persists with the run's message
+ * history so the change summary survives reloads.
+ */
+export function createRunChangesMessage(snapshotId: string): Message {
+  return {
+    id: generateId(),
+    role: 'assistant',
+    content: null,
+    kind: 'run_changes',
+    runChanges: { snapshotId },
     timestamp: Date.now(),
   }
 }

@@ -399,6 +399,18 @@ export function ConversationView({
     onConsumed: onInitialMessageConsumed,
   })
 
+  // ── Auto-focus input on a fresh (empty) conversation ──
+  // So clicking "new conversation" drops you straight into typing. Only focuses
+  // empty conversations — never steals focus when switching back to an existing
+  // thread that has a body of messages.
+  useEffect(() => {
+    if (!convId) return
+    if (activeMessages.length > 0) return
+    // Defer to next frame so the TipTap editor has mounted and can accept focus.
+    const raf = requestAnimationFrame(() => richInputRef.current?.focus())
+    return () => cancelAnimationFrame(raf)
+  }, [convId, activeMessages.length])
+
   // ── Stable error handler for ErrorBoundary ──
   const handleErrorBoundaryError = useCallback(
     (error: Error) => {

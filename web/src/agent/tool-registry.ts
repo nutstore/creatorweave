@@ -112,6 +112,7 @@ import {
 
 // OCR tool (on-demand image text recognition)
 import { ocrDefinition, ocrExecutor, ocrPromptDoc } from './tools/ocr.tool'
+import { dbQueryTool } from './tools/db-query.tool'
 
 // Web bridge tools (conditional — requires Browser Extension)
 import {
@@ -192,6 +193,10 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: bashDefinition, executor: bashToolExecutor },
   // OCR (image text recognition)
   { definition: ocrDefinition, executor: ocrExecutor },
+  // Dev: database query (full CRUD) — dev mode only
+  ...(import.meta.env.DEV
+    ? [{ definition: dbQueryTool.definition, executor: dbQueryTool.executor }]
+    : []),
   // Git tools
   { definition: gitStatusDefinition, executor: gitStatusExecutor },
   { definition: gitDiffDefinition, executor: gitDiffExecutor },

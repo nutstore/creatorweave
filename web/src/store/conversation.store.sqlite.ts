@@ -27,6 +27,7 @@ import type { AssetMeta } from '@/types/asset'
 import {
   createAssistantMessage,
   createConversation,
+  createRunChangesMessage,
   createToolMessage,
   createUserMessage,
   generateId,
@@ -1988,6 +1989,9 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         const runChangedPaths = new Set<string>()
         const pendingPathsAtRunStart = new Set<string>()
         let runOwnershipReady = false
+        // Captures the auto-apply snapshot for this run (set in onLoopComplete,
+        // consumed after agentLoop.run resolves to attach a run_changes card).
+        let runApplyResult: { snapshotId: string } | null = null
         let latestMessages: Message[] = conv.messages
         // Compression summaries are injected into the agent loop as
         // system-context messages and mirrored into the runtime message state.
@@ -2495,11 +2499,19 @@ export const useConversationStoreSQLite = create<ConversationState>()(
                 ])
                 const workspace = await (await getWorkspaceManager()).getWorkspace(conversationId)
                 if (workspace) {
-                  await autoApplyCompletedRunChanges(
+                  const applyResult = await autoApplyCompletedRunChanges(
                     workspace,
                     eligiblePaths,
                     () => useConversationContextStore.getState().refreshPendingChanges(true),
+                    runId,
                   )
+                  // Remember the snapshot so a "what this run changed" card can be
+                  // appended to this run's message history after finalize commits.
+                  if (applyResult.status === 'synced') {
+                    runApplyResult = { snapshotId: applyResult.snapshotId }
+                  } else if (applyResult.status === 'partial' && applyResult.snapshotId) {
+                    runApplyResult = { snapshotId: applyResult.snapshotId }
+                  }
                 }
               }
             } catch (error) {
@@ -2632,7 +2644,8 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               ? (() => {
                   const cloned = targetMessages.slice()
                   for (let i = cloned.length - 1; i >= 0; i--) {
-                    if (cloned[i].role === 'assistant') {
+                    // Skip run_changes cards — they carry no generated assets.
+                    if (cloned[i].role === 'assistant' && cloned[i].kind !== 'run_changes') {
                       cloned[i] = {
                         ...cloned[i],
                         assets: collectedAssets,
@@ -3487,6 +3500,14 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               messagesCount: reconciled.length,
             })
             latestMessages = reconciled
+            // Attach the auto-apply snapshot card to this run's message history so
+            // the user sees "what this run changed". onComplete runs right after
+            // onLoopComplete (where auto-apply set runApplyResult), and is the
+            // first/effective finalize point — the later finalizeRun call after
+            // agentLoop.run resolves is short-circuited by the `committed` guard.
+            if (runApplyResult) {
+              latestMessages = [...latestMessages, createRunChangesMessage(runApplyResult.snapshotId)]
+            }
             reasoningQueue.flushNow()
             contentQueue.flushNow()
             cleanupQueues()
@@ -4178,6 +4199,33 @@ export const useConversationStoreSQLite = create<ConversationState>()(
               r.draftAssistant = null
             }
           })
+        }
+      }
+
+      // ── Consume queued messages ──
+      // After a successful compact, check if messages were queued during
+      // the compression run. If so, dequeue and trigger a new agent run —
+      // mirroring the behavior in runAgent's finalize block.
+      const finalStatus = get().conversations.find((c) => c.id === conversationId)?.status
+      if (finalStatus === 'idle') {
+        const nextMsg = useConversationRuntimeStore.getState().dequeueMessage(conversationId)
+        if (nextMsg) {
+          const { createUserMessage: createMsg } = await import('@/agent/message-types')
+          const userMsg = createMsg(nextMsg.text, nextMsg.assets, nextMsg.pageContext)
+          const currentConv = get().conversations.find((c) => c.id === conversationId)
+          if (currentConv) {
+            get().updateMessages(conversationId, [...currentConv.messages, userMsg])
+            queueMicrotask(() => {
+              get().runAgent(
+                conversationId,
+                pType,
+                mName,
+                maxTokens,
+                null,
+                nextMsg.agentOverrideId ?? null,
+              )
+            })
+          }
         }
       }
     },

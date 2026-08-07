@@ -146,7 +146,7 @@ export async function convertAgentMessagesToLlm(
   if (shouldAllowCompression) {
     // Compression: generate summary via LLM, then replace all messages with [summary].
     const droppedContent = internalMessages
-      .filter((msg) => msg.kind !== 'context_summary')
+      .filter((msg) => msg.kind !== 'context_summary' && msg.kind !== 'run_changes')
       .map((msg) => {
         // For multimodal messages (with images), use the extracted text only.
         // The LLM doing compression can't see the images anyway, so this is safe.
