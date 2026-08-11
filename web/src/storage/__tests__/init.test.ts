@@ -84,4 +84,18 @@ describe('storage init reset marker guard', () => {
     expect(result.error).toContain('请关闭同源的其他标签页/窗口后刷新重试')
     __test__.resetForTests()
   })
+
+  it('keeps schema-migration failures recoverable and tells users to export first', async () => {
+    mocks.initSQLiteDB.mockRejectedValueOnce(
+      new Error('SCHEMA_INCOMPATIBLE: no such column: compressed_context_summary')
+    )
+
+    const { initStorage, __test__ } = await import('../init')
+    const result = await initStorage({ allowFallback: false })
+
+    expect(result.success).toBe(false)
+    expect(result.error).toContain('DATABASE_SCHEMA_MIGRATION_FAILED')
+    expect(result.error).toContain('Export the database before resetting')
+    __test__.resetForTests()
+  })
 })

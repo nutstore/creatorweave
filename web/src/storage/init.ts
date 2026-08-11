@@ -106,6 +106,18 @@ function buildDatabaseInaccessibleMessage(rawError: string): string {
   return `DATABASE_INACCESSIBLE: ${rawError}. 请关闭同源的其他标签页/窗口后刷新重试。`
 }
 
+function isSchemaMigrationError(errorMsg: string): boolean {
+  const msg = errorMsg.toLowerCase()
+  return msg.includes('schema_incompatible') || msg.includes('migration failed')
+}
+
+function buildSchemaMigrationFailureMessage(rawError: string): string {
+  return (
+    `DATABASE_SCHEMA_MIGRATION_FAILED: ${rawError}. ` +
+    'Existing data has not been deleted. Export the database before resetting, then refresh to retry.'
+  )
+}
+
 function buildResetRequiresTabClosureMessage(rawError: string): string {
   return `${RESET_REQUIRES_TAB_CLOSURE}: ${rawError}. Please close other tabs/windows for this app and retry.`
 }
@@ -213,6 +225,22 @@ export async function initStorage(options: InitStorageOptions = {}): Promise<Ini
 
       if (isDatabaseInaccessibleError(errorMsg)) {
         const actionableError = buildDatabaseInaccessibleMessage(errorMsg)
+        onProgress?.({
+          step: 'error',
+          total: 1,
+          current: 0,
+          details: actionableError,
+        })
+        storageInitPromise = undefined
+        return {
+          success: false,
+          mode: currentStorageMode,
+          error: actionableError,
+        }
+      }
+
+      if (isSchemaMigrationError(errorMsg)) {
+        const actionableError = buildSchemaMigrationFailureMessage(errorMsg)
         onProgress?.({
           step: 'error',
           total: 1,

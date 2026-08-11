@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { initializeSchema } from './index'
+import { BASE_SCHEMA_VERSION, initializeSchema } from './index'
 
 class SchemaDatabase {
   statements: string[] = []
 
-  constructor(public userVersion = 0) {}
+  constructor(
+    public userVersion = 0,
+    private readonly failConversationSchemaValidation = false,
+  ) {}
 
   exec(sql: string): Array<{ values: number[][] }> {
     if (sql.trim() === 'PRAGMA user_version') {
       return [{ values: [[this.userVersion]] }]
+    }
+
+    if (
+      this.failConversationSchemaValidation &&
+      sql.trim().startsWith('SELECT compressed_context_summary')
+    ) {
+      throw new Error('no such column: compressed_context_summary')
     }
 
     this.statements.push(sql)
@@ -25,7 +35,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(11)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements.some((sql) => sql.includes('ALTER TABLE subagent_tasks'))).toBe(false)
   })
 
@@ -34,12 +44,35 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(11)
+    expect(db.userVersion).toBe(BASE_SCHEMA_VERSION)
     expect(db.statements).toContainEqual(
       expect.stringContaining('ADD COLUMN subagent_type')
     )
     expect(db.statements).toContainEqual(
       expect.stringContaining('ADD COLUMN parent_tool_call_id')
     )
+  })
+
+  it('applies the complete release upgrade in one v14 migration', async () => {
+    const db = new SchemaDatabase(13)
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(14)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('CREATE TABLE IF NOT EXISTS flow_templates')
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ADD COLUMN run_id')
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ADD COLUMN flow_instance_json')
+    )
+  })
+
+  it('rejects a database whose declared schema still lacks required conversation columns', async () => {
+    const db = new SchemaDatabase(14, true)
+
+    await expect(initializeSchema(db)).rejects.toThrow('SCHEMA_INCOMPATIBLE')
   })
 })

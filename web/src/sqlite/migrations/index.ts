@@ -46,6 +46,23 @@ function canRecoverMigrationError(migration: Migration, error: unknown): boolean
   return migration.up.toLowerCase().includes('add column') && msg.includes('already exists')
 }
 
+/**
+ * Guard against databases whose user_version claims an upgrade completed while
+ * required conversation columns are absent. This has happened when a base
+ * schema version was raised without mirroring an earlier ALTER TABLE.
+ */
+function verifyConversationSchema(db: any): void {
+  try {
+    db.exec(
+      'SELECT compressed_context_summary, compressed_context_cutoff_ts FROM conversations LIMIT 0'
+    )
+  } catch (error) {
+    throw new Error(
+      `SCHEMA_INCOMPATIBLE: conversations is missing required compression columns. ${getErrorMessage(error)}`
+    )
+  }
+}
+
 
 // Base schema version
 export const BASE_SCHEMA_VERSION = 14
@@ -226,15 +243,30 @@ export const migrations: Migration[] = [
   },
   {
     version: 14,
-    name: 'add_run_id_to_fs_changesets',
+    name: 'release_flow_and_snapshot_schema',
     up: `
-      -- Associate a snapshot with the agent run that produced it (auto-apply).
-      -- Lets the conversation UI find "what this run changed" from the
-      -- persisted snapshot without any separate index.
+      -- All schema additions introduced by the v14 production release are
+      -- grouped here because production's latest released schema is v13.
+      CREATE TABLE IF NOT EXISTS flow_templates (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          nodes_json TEXT NOT NULL DEFAULT '[]',
+          edges_json TEXT NOT NULL DEFAULT '[]',
+          entry_node_id TEXT,
+          created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+          updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_flow_templates_project ON flow_templates(project_id);
+      CREATE INDEX IF NOT EXISTS idx_flow_templates_updated ON flow_templates(updated_at DESC);
+
       ALTER TABLE fs_changesets ADD COLUMN run_id TEXT;
       CREATE INDEX IF NOT EXISTS idx_fs_changesets_workspace_run
         ON fs_changesets(workspace_id, run_id);
 
+      ALTER TABLE conversations ADD COLUMN flow_instance_json TEXT;
       PRAGMA user_version = 14;
     `,
   },
@@ -396,6 +428,11 @@ export async function initializeSchema(
 
   // Run any pending migrations
   await runPendingMigrations(db, onProgress)
+
+  // Version numbers alone are not enough: validate the physical columns after
+  // migration so the app fails safely with an exportable database instead of
+  // later rendering an empty conversation list.
+  verifyConversationSchema(db)
 
   // Report completion
   onProgress?.({

@@ -42,8 +42,7 @@ CREATE TABLE IF NOT EXISTS project_roots (
     read_only INTEGER NOT NULL DEFAULT 0,    -- 1 = agent can only read
     sort_order INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    UNIQUE(project_id, name),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    UNIQUE(project_id, name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_project_roots_project_id ON project_roots(project_id);
@@ -59,6 +58,9 @@ CREATE TABLE IF NOT EXISTS conversations (
     title_mode TEXT NOT NULL DEFAULT 'manual', -- 'auto' | 'manual'
     messages_json TEXT NOT NULL DEFAULT '[]',  -- legacy rollback safety net, no longer read in normal path
     context_usage_json TEXT,               -- JSON object for context window usage
+    compressed_context_summary TEXT,        -- compression baseline summary
+    compressed_context_cutoff_ts INTEGER,   -- timestamp covered by the compression baseline
+    flow_instance_json TEXT,               -- JSON object for the visual workflow working copy
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
 );
@@ -215,8 +217,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     undo_count INTEGER NOT NULL DEFAULT 0,
     modified_files INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    last_accessed_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
-    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    last_accessed_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_workspaces_root_directory ON workspaces(root_directory);
@@ -478,6 +479,25 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_enabled ON mcp_servers(enabled);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_type ON mcp_servers(type);
 CREATE INDEX IF NOT EXISTS idx_mcp_servers_transport ON mcp_servers(transport);
+
+-- ============================================================================
+-- Flow Templates Table (visual workflow definitions)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS flow_templates (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    nodes_json TEXT NOT NULL DEFAULT '[]',    -- JSON array of FlowNode
+    edges_json TEXT NOT NULL DEFAULT '[]',    -- JSON array of FlowEdge
+    entry_node_id TEXT,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 's') * 1000)
+);
+
+CREATE INDEX IF NOT EXISTS idx_flow_templates_project ON flow_templates(project_id);
+CREATE INDEX IF NOT EXISTS idx_flow_templates_updated ON flow_templates(updated_at DESC);
+
 
 -- ============================================================================
 -- Triggers for Automatic Timestamps

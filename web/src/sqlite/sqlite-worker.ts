@@ -1001,7 +1001,7 @@ async function handleInit(reportProgress = false, _id: string = 'init') {
     if (isSchemaError) {
       throw new Error(
         `SCHEMA_INCOMPATIBLE: ${errorMsg}. ` +
-          'Please run window.__clearAllSQLiteTables() to rebuild schema without page refresh.'
+          'Existing data was not deleted. Export a backup before resetting, then refresh to retry.'
       )
     }
     throw error
