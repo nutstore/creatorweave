@@ -4,6 +4,7 @@
  */
 
 import type { AssetMeta } from '@/types/asset'
+import type { FlowInstance } from '@/agent/flow/types'
 import { parseThinkTags } from './think-tags'
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool'
@@ -243,6 +244,8 @@ export interface Conversation {
   compressedContextSummary?: string | null
   /** Persisted cutoff timestamp for rebuilding compressed context */
   compressedContextCutoffTimestamp?: number | null
+  /** Persisted visual-flow working copy for this conversation. */
+  flowInstance?: FlowInstance | null
   /** Assets collected during current agent run (not persisted, moved to assistant message on commit) */
   collectedAssets?: AssetMeta[]
   /**

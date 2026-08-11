@@ -41,6 +41,7 @@ export interface ConversationRow {
   context_usage_json?: string | null
   compressed_context_summary?: string | null
   compressed_context_cutoff_ts?: number | null
+  flow_instance_json?: string | null
   created_at: number
   updated_at: number
 }

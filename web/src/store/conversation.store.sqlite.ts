@@ -795,6 +795,10 @@ interface ConversationState {
   conversations: Conversation[]
   activeConversationId: string | null
   loaded: boolean
+  /** Last loadFromDB error, if any. When set, `loaded` stays false so the
+   *  WorkspaceLayout effect (`if (!loaded) loadFromDB()`) can retry. UI can
+   *  also surface this instead of silently rendering an empty sidebar. */
+  loadError: string | null
 
   // Live AgentLoop instances live in `@/store/agent-loop-registry` rather
   // than in this state. They are service objects with private fields that
@@ -930,6 +934,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
     conversations: [],
     activeConversationId: null,
     loaded: false,
+    loadError: null,
     suggestedFollowUps: new Map(),
     cancelledRunIds: new Set(),
     mountedConversations: new Map(),
@@ -1179,6 +1184,7 @@ export const useConversationStoreSQLite = create<ConversationState>()(
           }))
           state.activeConversationId = activeId
           state.loaded = true
+          state.loadError = null
           state.suggestedFollowUps.clear()
           state.cancelledRunIds.clear()
         })
@@ -1205,9 +1211,48 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         }
       } catch (error) {
         console.error('[conversation.store] Failed to load conversations:', error)
-        set((state) => {
-          state.loaded = true
-        })
+        // One-shot retry, mirroring workspace.store's initialize retry.
+        // A transient failure (e.g. SQLite/OPFS hydration race on cold start)
+        // previously fell through to `loaded = true` with `conversations: []`,
+        // which looks like "success with no data" to the rest of the app —
+        // the sidebar then renders permanently empty because the only effect
+        // that re-triggers loadFromDB (`if (!loaded) loadFromDB()`) never
+        // fires again. Retry once before recording the error.
+        try {
+          await new Promise((r) => setTimeout(r, 300))
+          const retryConversations = await loadConversationsMeta()
+          set((state) => {
+            state.conversations = retryConversations.map((conv) => ({
+              ...conv,
+              mountRefCount: 0,
+              collectedAssets: [],
+            }))
+            state.activeConversationId =
+              (retryConversations.length > 0 ? retryConversations[0].id : null)
+            state.loaded = true
+            state.loadError = null
+            state.suggestedFollowUps.clear()
+            state.cancelledRunIds.clear()
+          })
+          console.log(
+            '[conversation.store] loadFromDB retry succeeded',
+            { conversationCount: retryConversations.length },
+          )
+        } catch (retryErr) {
+          console.error(
+            '[conversation.store] loadFromDB retry also failed:',
+            retryErr instanceof Error ? retryErr.message : retryErr,
+          )
+          // Do NOT set loaded=true here. Keeping loaded=false lets the
+          // WorkspaceLayout effect re-run loadFromDB (e.g. on the next store
+          // change) instead of permanently locking in an empty list.
+          const retryMessage =
+            retryErr instanceof Error ? retryErr.message : 'Failed to load conversations'
+          set((state) => {
+            state.loaded = false
+            state.loadError = retryMessage
+          })
+        }
       } finally {
         inflightLoadFromDB = null
       }

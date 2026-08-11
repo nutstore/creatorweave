@@ -41,6 +41,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@creat
 import { captureTab, isPageActionAvailable } from '@/agent/tools/page-action-bridge'
 import { useAssetStore } from '@/store/asset.store'
 import { PageScreenshotCropDialog } from './PageScreenshotCropDialog'
+import { FlowCanvasPanel } from './FlowCanvasPanel'
 
 const VisionCapabilityIndicator = memo(function VisionCapabilityIndicator({
   modelName,
@@ -488,6 +489,9 @@ export function ConversationView({
         {conversationError && (
           <ConversationErrorBanner error={conversationError} onRetry={handleRetry} />
         )}
+
+        {/* Flow canvas panel — overlay, opened from the TopBar workflow button */}
+        <FlowCanvasPanel conversationId={convId} />
 
         {/* Input area */}
         <div className="shrink-0 border-t border-neutral-200 bg-white px-2 py-2 dark:border-neutral-700 dark:bg-neutral-900 sm:px-4 sm:py-3">

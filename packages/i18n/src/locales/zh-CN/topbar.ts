@@ -25,6 +25,7 @@ export const topbar = {
       openApiKeySettings: "打开 API Key 设置",
       workspaceSettings: "对话布局与偏好",
       toolsPanel: "工具面板",
+      workflow: "工作流白板",
       commandPalette: "命令面板 (Cmd/Ctrl+K)",
       skillsManager: "技能管理",
       mcpSettings: "MCP 服务配置",

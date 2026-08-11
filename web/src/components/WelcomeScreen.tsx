@@ -9,7 +9,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon, ArrowRight, Check, FileText, Code2, Mail } from 'lucide-react'
+import { Send, FolderOpen, Sparkles, KeyRound, ChevronRight, Shield, Loader2, ImageIcon, ArrowRight, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useSettingsStore } from '@/store/settings.store'
 import { useFolderAccessStore } from '@/store/folder-access.store'
@@ -341,27 +341,10 @@ export function WelcomeScreen({ onStartConversation, onOpenSettings, onGatewayLo
         ) : (
           /* ── Ready: Active input ── */
           <>
-            {/* Quick-start prompts */}
-            <div className="mb-4 flex flex-wrap justify-center gap-2">
-              <span className="w-full text-center text-xs text-neutral-500 dark:text-neutral-400">
-                {t('welcome.quickStartTitle')}
-              </span>
-              {[
-                { icon: <Mail className="h-3 w-3" />, text: t('welcome.quickStartEmail') },
-                { icon: <FileText className="h-3 w-3" />, text: t('welcome.quickStartSummary') },
-                { icon: <Code2 className="h-3 w-3" />, text: t('welcome.quickStartCode') },
-              ].map((prompt, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => setInputValue(prompt.text)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-secondary transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-50/30"
-                >
-                  {prompt.icon}
-                  {prompt.text}
-                </button>
-              ))}
-            </div>
+            {/* One-line hint replacing the quick-start buttons */}
+            <p className="mb-4 text-center text-sm text-neutral-500 dark:text-neutral-400">
+              {t('welcome.readyHint')}
+            </p>
             <div className="relative mb-6" data-tour="welcome-input">
               <AgentRichInput
                 placeholder={t('welcome.placeholder')}

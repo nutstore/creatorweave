@@ -359,6 +359,12 @@ export const useProjectStore = create<ProjectState>()(
         //    correct workspace based on the URL.
         await useConversationContextStore.getState().refreshWorkspaces()
 
+        // 4b. Refresh projectStats so the per-project conversation/workspace
+        //     badge count reflects the freshly loaded project (otherwise it
+        //     stays at the stale snapshot from initialize and shows e.g. "5"
+        //     when the DB actually has 6).
+        await get().refreshProjects()
+
         // 5. Loading complete — signal syncFromRoute effect to proceed.
         set({ isLoading: false })
 

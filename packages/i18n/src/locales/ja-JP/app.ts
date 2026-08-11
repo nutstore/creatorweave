@@ -63,6 +63,10 @@ export const app = {
       "最近ブラウザのストレージをクリーンアップした場合（CleanMyMac、CCleaner、ブラウザの「閲覧履歴の削除」など）、OPFS データベースファイルも削除されている可能性があります。リセットする前に、下の「データベースをバックアップ」ボタンで残ったデータを救出してください。",
     exportBeforeResetWarning:
       "⚠️ リセットするとすべての会話、設定、スキルが削除され、元に戻せません。事前に「データベースをバックアップ」でエクスポートすることを強く推奨します。",
+    resetDatabaseConfirm:
+      "もう一度クリックして確認—すべてのデータが完全に削除されます",
+    resetDatabaseArmedHint:
+      "本当によろしいですか？この操作は取り消せません。ボタン外をクリックするとキャンセルできます。",
     exportDatabase: "データベースをバックアップ",
     exportDatabaseSuccess: "データベースのバックアップをダウンロードしました：{filename}",
     exportDatabaseFailed: "エクスポートに失敗しました：{error}",

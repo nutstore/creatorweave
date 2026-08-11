@@ -454,6 +454,7 @@ function AppReady() {
         conversations: [],
         activeConversationId: null,
         loaded: true,
+        loadError: null,
         suggestedFollowUps: new Map(),
         mountedConversations: new Map(),
       })

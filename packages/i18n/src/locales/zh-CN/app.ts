@@ -53,6 +53,9 @@ export const app = {
       "如果你最近清理过浏览器存储（通过 CleanMyMac、MacKeeper、清理大师或浏览器「清除浏览数据」），OPFS 数据库文件可能已被一并清除。请先点击下方「导出数据库备份」尝试抢救残留数据，再考虑重置。",
     exportBeforeResetWarning:
       "⚠️ 重置将清除所有对话、设置和技能，且不可恢复。强烈建议先「导出数据库备份」再重置。",
+    resetDatabaseConfirm: "再次点击确认重置——所有数据将被永久删除",
+    resetDatabaseArmedHint:
+      "确定吗？此操作不可撤销。点击按钮外的区域可取消。",
     exportDatabase: "导出数据库备份",
     exportDatabaseSuccess: "数据库备份已下载：{filename}",
     exportDatabaseFailed: "导出失败：{error}",

@@ -86,12 +86,6 @@ describe('WelcomeScreen', () => {
     pageActionAvailable.value = true
   })
 
-  it('does not show the generic view capabilities action', () => {
-    render(<WelcomeScreen onStartConversation={vi.fn()} />)
-
-    expect(screen.queryByRole('button', { name: 'welcome.viewCapabilities' })).not.toBeInTheDocument()
-  })
-
   it('explains why selecting a folder grants AI file access', () => {
     render(<WelcomeScreen onStartConversation={vi.fn()} />)
 
@@ -106,14 +100,6 @@ describe('WelcomeScreen', () => {
     const privacyNote = screen.getByText('Your data stays in this browser.')
 
     expect(folderAction.compareDocumentPosition(privacyNote) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
-
-  it('keeps low-priority navigation hints off the welcome screen', () => {
-    conversationState.conversations = [{}]
-    render(<WelcomeScreen onStartConversation={vi.fn()} />)
-
-    expect(screen.queryByText('welcome.recentHint')).not.toBeInTheDocument()
-    expect(screen.queryByText('welcome.commandPaletteHint')).not.toBeInTheDocument()
   })
 
   it('captures a screenshot and stages it for the first conversation message', async () => {

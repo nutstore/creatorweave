@@ -62,6 +62,10 @@ export const app = {
       "최근 브라우저 저장소를 정리한 경우(CleanMyMac, MacKeeper, 브라우저의 '브라우징 데이터 삭제' 등) OPFS 데이터베이스 파일도 함께 삭제되었을 수 있습니다. 재설정하기 전에 아래 '데이터베이스 백업 내보내기' 버튼으로 남은 데이터를 복구해 보세요.",
     exportBeforeResetWarning:
       "⚠️ 재설정하면 모든 대화, 설정, 스킬이 삭제되며 복구할 수 없습니다. 먼저 '데이터베이스 백업 내보내기'를 사용하는 것을 강력히 권장합니다.",
+    resetDatabaseConfirm:
+      "다시 클릭하여 확인 — 모든 데이터가 영구적으로 삭제됩니다",
+    resetDatabaseArmedHint:
+      "정말 진행하시겠습니까? 되돌릴 수 없습니다. 버튼 바깥을 클릭하면 취소됩니다.",
     exportDatabase: "데이터베이스 백업 내보내기",
     exportDatabaseSuccess: "데이터베이스 백업이 다운로드되었습니다: {filename}",
     exportDatabaseFailed: "내보내기 실패: {error}",

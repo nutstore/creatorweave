@@ -1,0 +1,268 @@
+[HTML] mermaid-stream.html
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mermaid Streaming Diagnostic</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 24px;
+        background: #fafafa;
+        color: #1a1a1a;
+      }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      h2 { font-size: 14px; margin: 24px 0 8px; padding: 8px 12px; background: #eef; border-radius: 6px; }
+      h3 { font-size: 12px; margin: 12px 0 4px; color: #555; }
+      .err {
+        background: #fee;
+        border-left: 3px solid #c33;
+        padding: 8px 12px;
+        margin: 4px 0;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ok {
+        background: #efe;
+        border-left: 3px solid #3a3;
+        padding: 8px 12px;
+        margin: 4px 0;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+      }
+      .diag {
+        border: 1px solid #ddd;
+        background: #fff;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 12px 0;
+      }
+      .meta { font-size: 11px; color: #888; margin-bottom: 4px; }
+      pre {
+        background: #f5f5f5;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        overflow-x: auto;
+      }
+      .summary { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>🐛 Mermaid 流式渲染诊断</h1>
+    <p class="meta">
+      加载 mermaid <code id="mmd-version">…</code> from CDN。模拟聊天面板 streaming，
+      把整段 chart 按 token 化切片喂给 mermaid.render()，记录每次抛出的错误。
+      打开 DevTools Console 看完整堆栈。
+    </p>
+
+    <div class="diag">
+      <h2>Test 1: 完整 chart 一次性渲染</h2>
+      <div id="t1"></div>
+    </div>
+
+    <div class="diag">
+      <h2>Test 2: 模拟 streaming — 按行渐进切片</h2>
+      <div id="t2-meta" class="meta"></div>
+      <div id="t2"></div>
+    </div>
+
+    <div class="diag">
+      <h2>Test 3: 模拟 streaming — 按 token 切片（最严苛）</h2>
+      <div id="t3-meta" class="meta"></div>
+      <div id="t3"></div>
+    </div>
+
+    <div class="diag">
+      <h2>Test 4: 触发"flow is not defined"专项</h2>
+      <p class="meta">把 chart 切成越来越短的 prefix，看哪一步开始抛错、错误文本是什么。</p>
+      <div id="t4"></div>
+    </div>
+
+    <script>
+      // 完全等同 CreatorWeave 实际配置（mermaid ^11.16.0）
+      const CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11.16.0/dist/mermaid.min.js';
+      document.getElementById('mmd-version').textContent = '11.16.0';
+
+      const CHART = `flowchart TB
+    IN["📥 用户输入(主题+要点)"]:::input
+    S["🔍 web_search 检索补充"]:::tool
+    O["🧠 生成技术博客大纲"]:::llm
+    OR{"⚖️ 大纲质量审查 ≥80?"}:::review
+    F["✍️ 撰写完整正文"]:::llm
+    FR{"⚖️ 正文审查 ≥80?"}:::review
+    OUT["💾 写入 blog 文件"]:::output
+
+    IN --> S
+    IN --> O
+    S --> O
+    O --> OR
+    OR -- "✅ 通过" --> F
+    OR -. "🔄 不达标循环重写" .-> O
+    F --> FR
+    FR -- "✅ 通过" --> OUT
+    FR -. "🔄 不达标循环重写" .-> F
+
+    classDef input fill:#fef3c7,stroke:#f59e0b,color:#78350f
+    classDef tool fill:#dbeafe,stroke:#3b82f6,color:#1e3a8a
+    classDef llm fill:#f3e8ff,stroke:#a855f7,color:#581c87
+    classDef review fill:#fee2e2,stroke:#ef4444,color:#7f1d1d
+    classDef output fill:#d1fae5,stroke:#10b981,color:#064e3b`;
+
+      function appendErr(target, idx, prefix, err) {
+        const msg = err && err.message ? err.message : String(err);
+        const div = document.createElement('div');
+        div.className = 'err';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `[${idx}] prefix=${prefix.length} chars`;
+        const body = document.createElement('pre');
+        body.style.margin = '4px 0 0';
+        body.style.whiteSpace = 'pre-wrap';
+        body.style.fontFamily = 'inherit';
+        body.textContent = msg;
+        div.appendChild(meta);
+        div.appendChild(body);
+        target.appendChild(div);
+        console.error(`[diag ${idx}]`, msg, err);
+      }
+
+      function appendOk(target, idx, prefix, info) {
+        const div = document.createElement('div');
+        div.className = 'ok';
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = `[${idx}] prefix=${prefix.length} chars`;
+        const body = document.createElement('div');
+        body.style.margin = '4px 0 0';
+        body.textContent = info;
+        div.appendChild(meta);
+        div.appendChild(body);
+        target.appendChild(div);
+      }
+
+      function appendSummary(target, text) {
+        const div = document.createElement('div');
+        div.className = 'summary';
+        div.style.margin = '8px 0';
+        div.textContent = text;
+        target.prepend(div);
+      }
+
+      async function loadMermaid() {
+        if (window.mermaid) return window.mermaid;
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = CDN;
+          s.onload = resolve;
+          s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        window.mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: 'strict',
+          theme: 'default',
+        });
+        return window.mermaid;
+      }
+
+      async function render(mermaid, idx, prefix, label, target) {
+        try {
+          const res = await mermaid.render(`r-${idx}-${Date.now()}`, prefix);
+          appendOk(target, idx, prefix, `${label}: ok (svg ${res?.svg?.length || 0} bytes)`);
+          return true;
+        } catch (e) {
+          appendErr(target, idx, prefix, e);
+          return false;
+        }
+      }
+
+      // 行切片
+      function sliceByLines(s) {
+        const lines = s.split('\n');
+        const out = [];
+        let acc = '';
+        for (const line of lines) {
+          acc += line + '\n';
+          out.push(acc);
+        }
+        return out;
+      }
+
+      // token 切片（按空白/特殊字符）
+      function sliceByTokens(s) {
+        // 模拟 LLM token stream：按 行 + 单词 + 标点 切
+        const out = [];
+        let acc = '';
+        const tokens = s.match(/(\s+|[^\s])/g) || [];
+        for (const t of tokens) {
+          acc += t;
+          out.push(acc);
+        }
+        return out;
+      }
+
+      async function main() {
+        const mermaid = await loadMermaid();
+
+        // Test 1: full
+        const t1 = document.getElementById('t1');
+        const t1Ok = await render(mermaid, 0, CHART, 'full', t1);
+        appendSummary(t1, t1Ok ? '✅ 完整 chart 渲染成功' : '❌ 完整 chart 失败');
+
+        // Test 2: by-lines
+        const t2 = document.getElementById('t2');
+        const t2Meta = document.getElementById('t2-meta');
+        const lines = sliceByLines(CHART);
+        t2Meta.textContent = `共 ${lines.length} 个行 prefix，逐个喂给 mermaid.render()`;
+        let t2Errs = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const ok = await render(mermaid, i, lines[i], `lines[${i}]`, t2);
+          if (!ok) t2Errs++;
+        }
+        appendSummary(t2, `行切片 ${t2Errs} / ${lines.length} 次失败`);
+
+        // Test 3: by-tokens (subset — every 20 tokens to keep test fast)
+        const t3 = document.getElementById('t3');
+        const t3Meta = document.getElementById('t3-meta');
+        const tokens = sliceByTokens(CHART);
+        const step = 20;
+        const sample = tokens.filter((_, i) => i % step === 0 || i === tokens.length - 1);
+        t3Meta.textContent = `共 ${tokens.length} tokens，按每 ${step} 个采样 → ${sample.length} 次渲染`;
+        let t3Errs = 0;
+        for (let i = 0; i < sample.length; i++) {
+          const ok = await render(mermaid, i, sample[i], `tok[${i * step}]`, t3);
+          if (!ok) t3Errs++;
+        }
+        appendSummary(t3, `token 切片 ${t3Errs} / ${sample.length} 次失败`);
+
+        // Test 4: short prefixes (where flow error likely originates)
+        const t4 = document.getElementById('t4');
+        const prefixes = [
+          'flow', 'flowchart', 'flowchart TB', 'flowchart TB\n', 'flowchart TB\n  ',
+          CHART.split('\n').slice(0, 1).join('\n'),
+          CHART.split('\n').slice(0, 2).join('\n'),
+          CHART.split('\n').slice(0, 3).join('\n'),
+          CHART.split('\n').slice(0, 5).join('\n'),
+        ];
+        for (let i = 0; i < prefixes.length; i++) {
+          await render(mermaid, i, prefixes[i], `prefix[${i}]`, t4);
+        }
+      }
+
+      main().catch((e) => {
+        document.body.insertAdjacentHTML(
+          'afterbegin',
+          `<div class="err">main() failed: ${e.message}\n${e.stack}</div>`
+        );
+      });
+    </script>
+  </body>
+</html>

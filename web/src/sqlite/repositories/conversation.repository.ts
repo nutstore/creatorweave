@@ -7,6 +7,7 @@
 
 import { getSQLiteDB, type ConversationRow, parseJSON, toJSON } from '../sqlite-database'
 import type { ContextWindowUsage } from '@/agent/message-types'
+import type { FlowInstance } from '@/agent/flow/types'
 
 export interface StoredConversation {
   id: string
@@ -26,6 +27,7 @@ export interface ConversationMeta {
   lastContextWindowUsage?: ContextWindowUsage | null
   compressedContextSummary?: string | null
   compressedContextCutoffTimestamp?: number | null
+  flowInstance?: FlowInstance | null
   createdAt: number
   updatedAt: number
 }
@@ -44,8 +46,13 @@ type ExtendedMetaColumns = Pick<
   'created_at' | 'updated_at'
 >
 
+type FlowInstanceMetaColumns = ExtendedMetaColumns & Pick<ConversationRow, 'flow_instance_json'>
+type FlowInstanceBaseMetaColumns = BaseMetaColumns & Pick<ConversationRow, 'flow_instance_json'>
+
 const BASE_SELECT = `SELECT id, title, title_mode, context_usage_json, created_at, updated_at FROM conversations`
 const EXTENDED_SELECT = `SELECT id, title, title_mode, context_usage_json, compressed_context_summary, compressed_context_cutoff_ts, created_at, updated_at FROM conversations`
+const FLOW_INSTANCE_SELECT = `SELECT id, title, title_mode, context_usage_json, compressed_context_summary, compressed_context_cutoff_ts, flow_instance_json, created_at, updated_at FROM conversations`
+const FLOW_INSTANCE_BASE_SELECT = `SELECT id, title, title_mode, context_usage_json, flow_instance_json, created_at, updated_at FROM conversations`
 
 //=============================================================================
 // Conversation Repository
@@ -53,6 +60,18 @@ const EXTENDED_SELECT = `SELECT id, title, title_mode, context_usage_json, compr
 
 export class ConversationRepository {
   private _hasCompressionColumns: boolean | null = null
+  private _hasFlowInstanceColumn: boolean | null = null
+
+  private async hasFlowInstanceColumn(): Promise<boolean> {
+    if (this._hasFlowInstanceColumn !== null) return this._hasFlowInstanceColumn
+    try {
+      await getSQLiteDB().queryFirst('SELECT flow_instance_json FROM conversations LIMIT 0')
+      this._hasFlowInstanceColumn = true
+    } catch {
+      this._hasFlowInstanceColumn = false
+    }
+    return this._hasFlowInstanceColumn
+  }
 
   /**
    * Check whether the compression baseline columns exist in the conversations
@@ -78,8 +97,21 @@ export class ConversationRepository {
    */
   private async queryMetaAll(orderBy: string): Promise<ConversationMeta[]> {
     const db = getSQLiteDB()
-    const useExtended = await this.hasCompressionColumns()
-    if (useExtended) {
+    const [hasFlowInstance, hasCompression] = await Promise.all([
+      this.hasFlowInstanceColumn(),
+      this.hasCompressionColumns(),
+    ])
+    if (hasFlowInstance && hasCompression) {
+      const rows = await db.queryAll<FlowInstanceMetaColumns>(`${FLOW_INSTANCE_SELECT} ${orderBy}`)
+      return rows.map((row) => this.flowInstanceRowToMeta(row))
+    }
+    if (hasFlowInstance) {
+      const rows = await db.queryAll<FlowInstanceBaseMetaColumns>(
+        `${FLOW_INSTANCE_BASE_SELECT} ${orderBy}`
+      )
+      return rows.map((row) => this.flowInstanceBaseRowToMeta(row))
+    }
+    if (hasCompression) {
       const rows = await db.queryAll<ExtendedMetaColumns>(
         `${EXTENDED_SELECT} ${orderBy}`
       )
@@ -91,8 +123,22 @@ export class ConversationRepository {
 
   private async queryMetaFirst(where: string, params: unknown[]): Promise<ConversationMeta | null> {
     const db = getSQLiteDB()
-    const useExtended = await this.hasCompressionColumns()
-    if (useExtended) {
+    const [hasFlowInstance, hasCompression] = await Promise.all([
+      this.hasFlowInstanceColumn(),
+      this.hasCompressionColumns(),
+    ])
+    if (hasFlowInstance && hasCompression) {
+      const row = await db.queryFirst<FlowInstanceMetaColumns>(`${FLOW_INSTANCE_SELECT} ${where}`, params)
+      return row ? this.flowInstanceRowToMeta(row) : null
+    }
+    if (hasFlowInstance) {
+      const row = await db.queryFirst<FlowInstanceBaseMetaColumns>(
+        `${FLOW_INSTANCE_BASE_SELECT} ${where}`,
+        params,
+      )
+      return row ? this.flowInstanceBaseRowToMeta(row) : null
+    }
+    if (hasCompression) {
       const row = await db.queryFirst<ExtendedMetaColumns>(
         `${EXTENDED_SELECT} ${where}`, params
       )
@@ -201,6 +247,24 @@ export class ConversationRepository {
     await db.execute('UPDATE conversations SET updated_at = ? WHERE id = ?', [Date.now(), id])
   }
 
+  async loadFlowInstance(conversationId: string): Promise<FlowInstance | null> {
+    if (!await this.hasFlowInstanceColumn()) return null
+    const row = await getSQLiteDB().queryFirst<{ flow_instance_json: string | null }>(
+      'SELECT flow_instance_json FROM conversations WHERE id = ?', [conversationId]
+    )
+    return row?.flow_instance_json
+      ? parseJSON<FlowInstance | null>(row.flow_instance_json, null)
+      : null
+  }
+
+  async saveFlowInstance(conversationId: string, instance: FlowInstance): Promise<void> {
+    if (!await this.hasFlowInstanceColumn()) return
+    await getSQLiteDB().execute(
+      'UPDATE conversations SET flow_instance_json = ?, updated_at = ? WHERE id = ?',
+      [toJSON(instance), Date.now(), conversationId]
+    )
+  }
+
   /**
    * Save only the metadata fields (no messages).
    * Used by persistConversationMeta().
@@ -285,8 +349,23 @@ export class ConversationRepository {
       lastContextWindowUsage: parseJSON(row.context_usage_json || '', null),
       compressedContextSummary: row.compressed_context_summary || null,
       compressedContextCutoffTimestamp: row.compressed_context_cutoff_ts ?? null,
+      flowInstance: null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
+    }
+  }
+
+  private flowInstanceRowToMeta(row: FlowInstanceMetaColumns): ConversationMeta {
+    return {
+      ...this.extendedRowToMeta(row),
+      flowInstance: parseJSON<FlowInstance | null>(row.flow_instance_json || '', null),
+    }
+  }
+
+  private flowInstanceBaseRowToMeta(row: FlowInstanceBaseMetaColumns): ConversationMeta {
+    return {
+      ...this.baseRowToMeta(row),
+      flowInstance: parseJSON<FlowInstance | null>(row.flow_instance_json || '', null),
     }
   }
 }

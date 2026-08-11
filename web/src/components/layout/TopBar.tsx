@@ -14,6 +14,7 @@ import {
   KeyRound,
   List,
   Keyboard,
+  Workflow,
   Menu,
   ArrowLeft,
   Clock,
@@ -38,6 +39,7 @@ import {
   TooltipTrigger,
 } from '@creatorweave/ui'
 import { isSidePanelMode } from '@/agent/workspace-assistant-context'
+import { useFlowStore } from '@/store/flow.store'
 
 /** Stable tooltip wrapper — defined at module level to avoid recreating on every render. */
 const ActionTooltip = ({
@@ -80,6 +82,8 @@ interface TopBarProps {
   onSelectWorkspace?: (workspaceId: string) => void
   /** Open the schedule drawer */
   onScheduleDrawerOpen?: () => void
+  /** Open the workflow canvas */
+  onWorkflowOpen?: () => void
   /** Create a new conversation */
   onNewConversation?: () => void
   /**
@@ -106,6 +110,7 @@ export function TopBar({
   onProjectSwitcherOpenChange,
   onSelectWorkspace,
   onScheduleDrawerOpen,
+  onWorkflowOpen,
   folderButtonRef,
   onNewConversation,
 }: TopBarProps) {
@@ -117,6 +122,7 @@ export function TopBar({
   const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
   const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   const hasImageModels = useHasImageModels()
+  const flowPanelOpen = useFlowStore((s) => s.panelOpen)
   const t = useT()
   const conversationName = activeConversationName ?? activeWorkspaceName
 
@@ -294,6 +300,21 @@ export function TopBar({
                 <List className="h-[14px] w-[14px]" />
               </BrandButton>
             </ActionTooltip>
+
+            {/* Workflow Canvas (only in an active conversation) */}
+            {conversationName && onWorkflowOpen && (
+              <ActionTooltip label={t('topbar.tooltips.workflow')}>
+                <BrandButton
+                  iconButton
+                  className="shrink-0"
+                  variant={flowPanelOpen ? 'primary' : undefined}
+                  onClick={onWorkflowOpen}
+                  aria-pressed={flowPanelOpen}
+                >
+                  <Workflow className="h-[14px] w-[14px]" />
+                </BrandButton>
+              </ActionTooltip>
+            )}
 
             {/* Quick Actions / Command Palette */}
             <ActionTooltip label={t('topbar.tooltips.commandPalette')}>

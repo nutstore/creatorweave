@@ -463,11 +463,26 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             const sqliteWorkspaces = await repo.findWorkspacesByProject(activeProjectId)
             if (sqliteWorkspaces.length > 0) {
               workspaces = sqliteWorkspaces.map(sqliteWorkspaceToWorkspaceStats)
-              // Get real pending counts from fs_ops (not cached values)
-              const realPendingCounts = await repo.getRealPendingCounts()
+              // Get real pending counts from fs_ops (not cached values).
+              // CRITICAL: this enrichment must be NON-FATAL. Previously a
+              // transient throw here (e.g. fs_ops query racing with hydration)
+              // propagated to the outer catch and nuked the ENTIRE workspace
+              // list → workspaces:[] + initialized:true, which looked like
+              // "success with no data" and made the sidebar conversation list
+              // render empty even though the workspaces themselves loaded
+              // fine. Fall back to pendingCount:0 and keep the list.
+              let realPendingCounts: Map<string, number> | null = null
+              try {
+                realPendingCounts = await repo.getRealPendingCounts()
+              } catch (countsErr) {
+                console.warn(
+                  '[WorkspaceStore] getRealPendingCounts failed, using pendingCount:0 — workspace list preserved',
+                  countsErr,
+                )
+              }
               workspaces = workspaces.map((ws) => ({
                 ...ws,
-                pendingCount: realPendingCounts.get(ws.id) ?? 0,
+                pendingCount: realPendingCounts?.get(ws.id) ?? 0,
               }))
             }
 
@@ -518,13 +533,58 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             )
           } catch (e: unknown) {
             const message = e instanceof Error ? e.message : 'Failed to initialize workspaces'
-            // Re-derive hasDirectoryHandle so a transient error (e.g.
-            // resolveActiveProjectId timing) does not clobber the already-
-            // mounted native directory and make the PendingSyncPanel show
-            // "未挂载本地目录" after a successful approval sync.
-            const liveHandle = await deriveLiveHasDirectoryHandle(
-              await resolveActiveProjectId().catch(() => null),
+            console.error(
+              `[WorkspaceStore] initialize failed (${Math.round(performance.now() - started)}ms):`,
+              message,
+              '\nWill retry once after a short delay.'
             )
+            // One-shot retry: cold-start transient failures (e.g. a downstream
+            // query racing with SQLite/opfs hydration) can leave the sidebar
+            // conversation list permanently empty because initialized:true
+            // is set below and no later effect re-triggers refresh. Retry
+            // once before giving up, but only if a project is actually active.
+            const retryProjectId = await resolveActiveProjectId().catch(() => null)
+            if (retryProjectId) {
+              await new Promise((r) => setTimeout(r, 300))
+              try {
+                const repo = getWorkspaceRepository()
+                const retryWorkspaces = (await repo.findWorkspacesByProject(retryProjectId)).map(
+                  sqliteWorkspaceToWorkspaceStats,
+                )
+                let retryCounts: Map<string, number> | null = null
+                try {
+                  retryCounts = await repo.getRealPendingCounts()
+                } catch {
+                  /* keep null — counts are non-fatal */
+                }
+                const filled = retryWorkspaces.map((ws) => ({
+                  ...ws,
+                  pendingCount: retryCounts?.get(ws.id) ?? 0,
+                }))
+                const liveHandle = await deriveLiveHasDirectoryHandle(retryProjectId)
+                set({
+                  ...PENDING_RESET_PATCH,
+                  hasDirectoryHandle: liveHandle,
+                  workspaces: filled,
+                  error: null,
+                  isLoading: false,
+                  initialized: true,
+                })
+                console.log(
+                  `[WorkspaceStore] initialize retry succeeded (${Math.round(performance.now() - started)}ms)`,
+                  { activeProjectId: retryProjectId, workspaceCount: filled.length }
+                )
+                return
+              } catch (retryErr) {
+                console.error(
+                  `[WorkspaceStore] initialize retry also failed:`,
+                  retryErr instanceof Error ? retryErr.message : retryErr,
+                )
+              }
+            }
+            // Final fallback: record the error visibly so the UI can surface
+            // it instead of silently rendering an empty list.
+            const liveHandle = await deriveLiveHasDirectoryHandle(retryProjectId).catch(() => false)
             set({
               ...PENDING_RESET_PATCH,
               hasDirectoryHandle: liveHandle,
@@ -532,10 +592,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
               isLoading: false,
               initialized: true,
             })
-            console.error(
-              `[WorkspaceStore] initialize failed (${Math.round(performance.now() - started)}ms):`,
-              message
-            )
           }
         },
 

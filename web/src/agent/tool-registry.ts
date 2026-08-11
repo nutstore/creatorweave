@@ -112,6 +112,7 @@ import {
 
 // OCR tool (on-demand image text recognition)
 import { ocrDefinition, ocrExecutor, ocrPromptDoc } from './tools/ocr.tool'
+import { canvasToolDefinitions, canvasPromptDoc } from './tools/canvas.tool'
 import { dbQueryTool } from './tools/db-query.tool'
 
 // Web bridge tools (conditional — requires Browser Extension)
@@ -193,6 +194,8 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: bashDefinition, executor: bashToolExecutor },
   // OCR (image text recognition)
   { definition: ocrDefinition, executor: ocrExecutor },
+  // Visual workflow canvas tools
+  ...canvasToolDefinitions.map((t) => ({ definition: t.definition, executor: t.executor })),
   // Dev: database query (full CRUD) — dev mode only
   ...(import.meta.env.DEV
     ? [{ definition: dbQueryTool.definition, executor: dbQueryTool.executor }]
@@ -239,6 +242,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   pythonPromptDoc,
   bashPromptDoc,
   ocrPromptDoc,
+  canvasPromptDoc,
   gitPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,

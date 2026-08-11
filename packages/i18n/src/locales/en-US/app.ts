@@ -60,6 +60,10 @@ export const app = {
       'If you recently cleared browser storage (via CleanMyMac, "Clear Browsing Data", or a system cleaner), the OPFS database file may have been wiped. Try the export below to recover any remaining data before resetting.',
     exportBeforeResetWarning:
       "⚠️ Resetting clears all conversations, settings, and skills — this is irreversible. We strongly recommend exporting a backup first.",
+    resetDatabaseConfirm:
+      "Click again to CONFIRM — ALL data will be permanently deleted",
+    resetDatabaseArmedHint:
+      "Are you sure? This cannot be undone. Click outside to cancel.",
     exportDatabase: "Export Database Backup",
     exportDatabaseSuccess: "Database backup downloaded: {filename}",
     exportDatabaseFailed: "Export failed: {error}",

@@ -24,6 +24,7 @@ export const topbar = {
       openApiKeySettings: "Open API Key Settings",
       workspaceSettings: "Chat Layout & Preferences",
       toolsPanel: "Tools Panel",
+      workflow: "Workflow Canvas",
       commandPalette: "Command Palette (Cmd/Ctrl+K)",
       skillsManager: "Skills Manager",
       mcpSettings: "MCP Service Settings",

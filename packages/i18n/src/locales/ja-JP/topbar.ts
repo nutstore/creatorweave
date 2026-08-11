@@ -25,6 +25,7 @@ export const topbar = {
       openApiKeySettings: "API Key 設定を開く",
       workspaceSettings: "チャットレイアウトと設定",
       toolsPanel: "ツールパネル",
+      workflow: "ワークフローキャンバス",
       commandPalette: "コマンドパレット (Cmd/Ctrl+K)",
       skillsManager: "スキル管理",
       mcpSettings: "MCP サービス設定",

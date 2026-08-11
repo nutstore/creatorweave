@@ -18,6 +18,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { useConversationStore } from '@/store/conversation.store'
+import { useFlowStore } from '@/store/flow.store'
 import { useAgentStore } from '@/store/agent.store'
 import { useProjectStore } from '@/store/project.store'
 import { useSettingsStore } from '@/store/settings.store'
@@ -288,10 +289,18 @@ export function WorkspaceLayout({
     }
   }, [enableSchedules])
 
-  // Phase 4: Load conversations on mount (independent of Sidebar rendering)
+  // Phase 4: Load conversations on mount (independent of Sidebar rendering).
+  // Also re-run when `loadError` flips (null→error or error→null): a failed
+  // load keeps `loaded=false`, which would otherwise never wake this effect
+  // back up. Tying it to loadError lets a later store change (e.g. project
+  // switch completing) reattempt the load instead of locking in an empty
+  // sidebar. The `inflightLoadFromDB` guard inside loadFromDB prevents
+  // overlapping calls.
+  const loadError = useConversationStore((s) => s.loadError)
   useEffect(() => {
     if (!loaded) loadFromDB()
-  }, [loaded, loadFromDB])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, loadError, loadFromDB])
 
   // Pre-initialize Pyodide runtime in the background so first Python execution is fast
   useEffect(() => {
@@ -835,6 +844,7 @@ export function WorkspaceLayout({
         onProjectSwitcherOpenChange={setProjectSwitcherOpen}
         onSelectWorkspace={onSelectWorkspace}
         onScheduleDrawerOpen={() => setScheduleDrawerOpen(true)}
+        onWorkflowOpen={() => useFlowStore.getState().setPanelOpen(true)}
         onNewConversation={() => {
           const newConv = createNew('New conversation')
           onSelectWorkspace?.(newConv.id)

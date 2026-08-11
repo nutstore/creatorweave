@@ -2,18 +2,7 @@ export const welcome = {
     title: "CreatorWeave",
     tagline: "AI-Native Workspace for Creators",
     placeholder: "Type a message to start...",
-    placeholderNoKey: "Please configure an AI model first",
     send: "Send",
-    openLocalFolder: "Open Local Folder",
-    recentHint:
-      "Select a conversation from the left, or type to start a new one",
-    viewCapabilities: "View Capabilities",
-    // Drag and drop overlay
-    dropFilesHere: "Drop files here",
-    supportsFileTypes: "Supports CSV, Excel, PDF, images, and more",
-    apiKeyRequiredHint:
-      "Please configure API Key in model settings first to start",
-    filesReady: "{count} file(s) ready",
     // Shown while the async API-key check is in flight (avoids flashing the
     // "no API key" setup card before SQLite has been consulted).
     checkingConfig: "Checking AI configuration...",
@@ -38,48 +27,7 @@ export const welcome = {
     mountFolderButton: "Select folder",
     mountFolderBack: "Back",
     mountFolderMounted: "Mounted folders",
-    quickStartTitle: "Try one of these:",
-    quickStartEmail: "Help me write an email",
-    quickStartSummary: "Summarize my notes",
-    quickStartCode: "Explain code in my-project",
-    personas: {
-      developer: {
-        title: "Developer",
-        description: "Code understanding, debugging, refactoring",
-        examples: {
-          0: "Explain how this function works",
-          1: "Find bugs in this code",
-          2: "Refactor for better performance",
-        },
-      },
-      analyst: {
-        title: "Data Analyst",
-        description: "Data processing, visualization, insights",
-        examples: {
-          0: "Analyze sales data in CSV",
-          1: "Create charts from Excel",
-          2: "Summarize key metrics",
-        },
-      },
-      researcher: {
-        title: "Student / Researcher",
-        description: "Document reading, learning, knowledge organization",
-        examples: {
-          0: "Summarize this documentation",
-          1: "Explain technical concepts",
-          2: "Find information across files",
-        },
-      },
-      office: {
-        title: "Office Worker",
-        description: "Document processing, reporting, content creation",
-        examples: {
-          0: "Draft a report from data",
-          1: "Format and organize documents",
-          2: "Process multiple files",
-        },
-      },
-    },
+    readyHint: "Type a message, or drop in a file and I'll take it from there",
     gateway: {
         title: "Login to Jianguoyun AI",
         close: "Close",
@@ -94,6 +42,4 @@ export const welcome = {
             "Client ID not configured. Set VITE_JIANGUOYUN_AI_CLIENT_ID env variable.",
         authFailedFallback: "Authentication failed",
     },
-    quickActionPrompt: "What can you help me with?",
-    commandPaletteHint: "Open command palette",
 } as const

@@ -13,6 +13,7 @@ import {
   BrandProgress,
 } from '@creatorweave/ui'
 import { AlertTriangle, Database, Download, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { useT } from '@/i18n'
 
 export interface StorageLoadingProps {
@@ -42,6 +43,38 @@ export function StorageLoading({
   onExport,
 }: StorageLoadingProps) {
   const t = useT()
+
+  // Two-step confirmation for the destructive "Reset Database" action.
+  // First click arms the button; a second click within the timeout window
+  // actually performs the reset. This prevents accidental data loss.
+  const [resetArmed, setResetArmed] = useState(false)
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const RESET_ARM_TIMEOUT_MS = 5000
+
+  const disarmReset = () => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current)
+      resetTimerRef.current = null
+    }
+    setResetArmed(false)
+  }
+
+  // Clean up the timer if the component unmounts or the dialog state changes.
+  useEffect(() => {
+    return disarmReset
+  }, [])
+
+  const handleResetClick = () => {
+    if (!resetArmed) {
+      // First click: arm the confirmation. Auto-disarm after a short window.
+      setResetArmed(true)
+      resetTimerRef.current = setTimeout(disarmReset, RESET_ARM_TIMEOUT_MS)
+      return
+    }
+    // Second click within the window: perform the destructive action.
+    disarmReset()
+    onReset?.()
+  }
 
   // Error state
   if (error) {
@@ -90,12 +123,25 @@ export function StorageLoading({
                     {t('app.exportBeforeResetWarning')}
                   </p>
                   <button
-                    className="bg-danger-600 hover:bg-danger-700 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors"
-                    onClick={onReset}
+                    aria-live="polite"
+                    className={
+                      resetArmed
+                        ? 'animate-pulse flex w-full items-center justify-center gap-2 rounded-md bg-danger-600 px-4 py-2 text-sm font-bold text-white ring-2 ring-danger-300 transition-colors'
+                        : 'bg-danger-600 hover:bg-danger-700 flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-white transition-colors'
+                    }
+                    onClick={handleResetClick}
+                    onBlur={disarmReset}
                   >
                     <Database className="h-4 w-4" />
-                    {t('app.resetDatabase')}
+                    {resetArmed
+                      ? t('app.resetDatabaseConfirm')
+                      : t('app.resetDatabase')}
                   </button>
+                  {resetArmed && (
+                    <p className="text-center text-xs text-danger-600 dark:text-danger-400">
+                      {t('app.resetDatabaseArmedHint')}
+                    </p>
+                  )}
                 </>
               )}
 
