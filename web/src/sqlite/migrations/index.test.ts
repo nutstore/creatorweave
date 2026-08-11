@@ -3,22 +3,31 @@ import { BASE_SCHEMA_VERSION, initializeSchema } from './index'
 
 class SchemaDatabase {
   statements: string[] = []
+  private missingConversationColumns: Set<string>
 
   constructor(
     public userVersion = 0,
-    private readonly failConversationSchemaValidation = false,
-  ) {}
+    missingConversationColumns: string[] = [],
+  ) {
+    this.missingConversationColumns = new Set(missingConversationColumns)
+  }
 
   exec(sql: string): Array<{ values: number[][] }> {
     if (sql.trim() === 'PRAGMA user_version') {
       return [{ values: [[this.userVersion]] }]
     }
 
-    if (
-      this.failConversationSchemaValidation &&
-      sql.trim().startsWith('SELECT compressed_context_summary')
-    ) {
-      throw new Error('no such column: compressed_context_summary')
+    const selectedColumns = [...sql.matchAll(/compressed_context_\w+/g)].map((match) => match[0])
+    const missingSelectedColumn = selectedColumns.find((column) =>
+      this.missingConversationColumns.has(column)
+    )
+    if (sql.includes('FROM conversations LIMIT 0') && missingSelectedColumn) {
+      throw new Error(`no such column: ${missingSelectedColumn}`)
+    }
+
+    const addedColumn = sql.match(/ALTER TABLE conversations ADD COLUMN (compressed_context_\w+)/)
+    if (addedColumn) {
+      this.missingConversationColumns.delete(addedColumn[1])
     }
 
     this.statements.push(sql)
@@ -58,7 +67,7 @@ describe('initializeSchema', () => {
 
     await initializeSchema(db)
 
-    expect(db.userVersion).toBe(14)
+    expect(db.userVersion).toBe(15)
     expect(db.statements).toContainEqual(
       expect.stringContaining('CREATE TABLE IF NOT EXISTS flow_templates')
     )
@@ -70,8 +79,25 @@ describe('initializeSchema', () => {
     )
   })
 
+  it('repairs missing compression columns when upgrading a v14 database', async () => {
+    const db = new SchemaDatabase(14, [
+      'compressed_context_summary',
+      'compressed_context_cutoff_ts',
+    ])
+
+    await initializeSchema(db)
+
+    expect(db.userVersion).toBe(15)
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ADD COLUMN compressed_context_summary')
+    )
+    expect(db.statements).toContainEqual(
+      expect.stringContaining('ADD COLUMN compressed_context_cutoff_ts')
+    )
+  })
+
   it('rejects a database whose declared schema still lacks required conversation columns', async () => {
-    const db = new SchemaDatabase(14, true)
+    const db = new SchemaDatabase(15, ['compressed_context_summary'])
 
     await expect(initializeSchema(db)).rejects.toThrow('SCHEMA_INCOMPATIBLE')
   })

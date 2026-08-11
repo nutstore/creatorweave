@@ -11,7 +11,7 @@
 
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
-PRAGMA user_version = 14;
+PRAGMA user_version = 15;
 
 -- ============================================================================
 -- Projects Table (top-level container for workspaces)

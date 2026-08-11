@@ -26,7 +26,7 @@ export type MigrationProgressCallback = (progress: {
 export interface Migration {
   version: number
   name: string
-  up: string
+  up: string | ((db: any) => void | Promise<void>)
 }
 
 function getErrorMessage(error: unknown): string {
@@ -40,10 +40,35 @@ function getErrorMessage(error: unknown): string {
  * before user_version was updated.
  */
 function canRecoverMigrationError(migration: Migration, error: unknown): boolean {
+  if (typeof migration.up !== 'string') return false
   const msg = getErrorMessage(error).toLowerCase()
   if (msg.includes('duplicate column name')) return true
   // Keep this scoped to schema-upgrade style migrations only.
   return migration.up.toLowerCase().includes('add column') && msg.includes('already exists')
+}
+
+function conversationColumnExists(db: any, column: string): boolean {
+  try {
+    db.exec(`SELECT ${column} FROM conversations LIMIT 0`)
+    return true
+  } catch {
+    return false
+  }
+}
+
+function repairConversationCompressionColumns(db: any): void {
+  const requiredColumns = [
+    ['compressed_context_summary', 'TEXT'],
+    ['compressed_context_cutoff_ts', 'INTEGER'],
+  ] as const
+
+  for (const [column, type] of requiredColumns) {
+    if (!conversationColumnExists(db, column)) {
+      db.exec(`ALTER TABLE conversations ADD COLUMN ${column} ${type}`)
+    }
+  }
+
+  db.exec('PRAGMA user_version = 15')
 }
 
 /**
@@ -65,7 +90,7 @@ function verifyConversationSchema(db: any): void {
 
 
 // Base schema version
-export const BASE_SCHEMA_VERSION = 14
+export const BASE_SCHEMA_VERSION = 15
 
 // ============================================================================
 // Migration Registry
@@ -270,6 +295,11 @@ export const migrations: Migration[] = [
       PRAGMA user_version = 14;
     `,
   },
+  {
+    version: 15,
+    name: 'repair_conversation_compression_columns',
+    up: repairConversationCompressionColumns,
+  },
 ]
 
 // ============================================================================
@@ -350,7 +380,11 @@ export async function runPendingMigrations(
         total: pendingMigrations.length,
       })
 
-      await db.exec(migration.up)
+      if (typeof migration.up === 'function') {
+        await migration.up(db)
+      } else {
+        await db.exec(migration.up)
+      }
       executed++
 
       // Verify version was updated
