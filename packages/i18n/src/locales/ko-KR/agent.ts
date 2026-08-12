@@ -64,4 +64,25 @@ export const agent = {
         moreAvailable: "더 많은 결과 사용 가능",
         untitled: "(제목 없음)",
     },
+
+    // Mermaid 다이어그램 렌더러
+    mermaid: {
+        preparing: "다이어그램 준비 중…",
+        rendering: "다이어그램 렌더링 중…",
+        syntaxError: "Mermaid 구문 오류 — 소스 표시",
+        preview: "미리보기",
+        source: "소스",
+        copy: "복사",
+        copied: "복사됨",
+        copySource: "소스 복사",
+        zoom: {
+            zoomOut: "축소",
+            zoomIn: "확대",
+            resetPercent: "초기 보기로 복원",
+            fitToWindow: "창에 맞춤",
+            fitToWindowTitle: "창에 맞춤 (전체가 보이도록 축척)",
+            reset: "재설정",
+            resetTitle: "보기 재설정",
+        },
+    },
 } as const

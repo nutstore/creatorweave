@@ -87,4 +87,25 @@ export const agent = {
         moreAvailable: "more results available",
         untitled: "(untitled)",
     },
+
+    // Mermaid diagram renderer
+    mermaid: {
+        preparing: "Preparing diagram…",
+        rendering: "Rendering diagram…",
+        syntaxError: "Mermaid syntax error — showing source",
+        preview: "Preview",
+        source: "Source",
+        copy: "Copy",
+        copied: "Copied",
+        copySource: "Copy source",
+        zoom: {
+            zoomOut: "Zoom out",
+            zoomIn: "Zoom in",
+            resetPercent: "Reset to initial view",
+            fitToWindow: "Fit to window",
+            fitToWindowTitle: "Fit to window (scale to fully visible)",
+            reset: "Reset",
+            resetTitle: "Reset view",
+        },
+    },
 } as const

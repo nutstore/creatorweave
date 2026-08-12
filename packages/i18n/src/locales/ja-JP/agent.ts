@@ -64,4 +64,25 @@ export const agent = {
         moreAvailable: "さらに結果があります",
         untitled: "（無題）",
     },
+
+    // Mermaid ダイアグラムレンダラー
+    mermaid: {
+        preparing: "図表を準備中…",
+        rendering: "図表をレンダリング中…",
+        syntaxError: "Mermaid 構文エラー — ソースを表示",
+        preview: "プレビュー",
+        source: "ソース",
+        copy: "コピー",
+        copied: "コピー済み",
+        copySource: "ソースをコピー",
+        zoom: {
+            zoomOut: "縮小",
+            zoomIn: "拡大",
+            resetPercent: "初期表示に戻す",
+            fitToWindow: "ウィンドウに合わせる",
+            fitToWindowTitle: "ウィンドウに合わせる（全体が見えるように縮尺）",
+            reset: "リセット",
+            resetTitle: "表示をリセット",
+        },
+    },
 } as const

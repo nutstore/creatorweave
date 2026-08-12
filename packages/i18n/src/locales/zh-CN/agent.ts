@@ -86,4 +86,25 @@ export const agent = {
         moreAvailable: "还有更多结果",
         untitled: "（未命名）",
     },
+
+    // Mermaid 流程图渲染器
+    mermaid: {
+        preparing: "准备图表…",
+        rendering: "正在渲染图表…",
+        syntaxError: "Mermaid 语法错误 — 显示源码",
+        preview: "预览",
+        source: "源码",
+        copy: "复制",
+        copied: "已复制",
+        copySource: "复制源码",
+        zoom: {
+            zoomOut: "缩小",
+            zoomIn: "放大",
+            resetPercent: "恢复初始视图",
+            fitToWindow: "适应窗口",
+            fitToWindowTitle: "适应窗口（缩放至完整可见）",
+            reset: "重置",
+            resetTitle: "重置视图",
+        },
+    },
 } as const

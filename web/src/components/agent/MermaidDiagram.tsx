@@ -42,6 +42,7 @@ import {
   useTransformComponent,
 } from 'react-zoom-pan-pinch'
 import { useTheme } from '@/store/theme.store'
+import { useT } from '@/i18n'
 import { Lightbox } from './Lightbox'
 
 interface MermaidDiagramProps {
@@ -79,7 +80,7 @@ function loadMermaid(): Promise<MermaidApi> {
  * like `viewBox="5 5 1130 504"`. A naive "0 0" regex fails to match those,
  * yields a width of 0, and collapses the diagram into an invisible vertical
  * sliver inside the zoom lightbox (a thin white bar that only grows thicker
- * when zoomed to 2000% — exactly the "放大后看不了" bug).
+ * when zoomed to 2000% — exactly the "cannot view after zoom" bug).
  */
 function parseViewBox(svg: string): { width: number; height: number } | null {
   const match = /viewBox=\"[\d.\-+eE]+\s+[\d.\-+eE]+\s+([\d.]+)\s+([\d.]+)\"/.exec(svg)
@@ -219,7 +220,7 @@ function ZoomableSvg({ svg }: { svg: string }) {
  * Floating zoom controls (bottom-right), reading zoom actions from the
  * react-zoom-pan-pinch context. Layout (like common image viewers):
  *
- *   [ − ]  [ 124% ]  [ + ]  |  [⛶ 适应窗口]  [↺ 重置]
+ *   [ − ]  [ 124% ]  [ + ]  |  [⛶ Fit ]  [↺ Reset ]
  *
  * The percentage shows the LIVE scale. We use `useTransformComponent`
  * (not `useTransformContext`) because the former subscribes to library
@@ -232,6 +233,7 @@ function ZoomableSvg({ svg }: { svg: string }) {
 function ZoomControls({ fitScale }: { fitScale: () => number }) {
   const { zoomIn, zoomOut, resetTransform, centerView } = useControls()
   const percent = useTransformComponent(({ state }) => Math.round(state.scale * 100))
+  const t = useT()
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex items-center gap-0.5 rounded-full border border-neutral-200 bg-white/95 p-1 shadow-lg backdrop-blur dark:border-neutral-700 dark:bg-neutral-900/95">
@@ -239,8 +241,8 @@ function ZoomControls({ fitScale }: { fitScale: () => number }) {
         type="button"
         onClick={() => zoomOut(0.25)}
         className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white"
-        title="缩小"
-        aria-label="缩小"
+        title={t('agent.mermaid.zoom.zoomOut')}
+        aria-label={t('agent.mermaid.zoom.zoomOut')}
       >
         <ZoomOut className="h-4 w-4" />
       </button>
@@ -248,7 +250,7 @@ function ZoomControls({ fitScale }: { fitScale: () => number }) {
         type="button"
         onClick={() => resetTransform(200)}
         className="min-w-[48px] rounded-full px-2 py-1 text-center text-xs font-medium tabular-nums text-neutral-600 transition-colors hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-        title="恢复初始视图"
+        title={t('agent.mermaid.zoom.resetPercent')}
       >
         {percent}%
       </button>
@@ -256,8 +258,8 @@ function ZoomControls({ fitScale }: { fitScale: () => number }) {
         type="button"
         onClick={() => zoomIn(0.25)}
         className="flex h-8 w-8 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white"
-        title="放大"
-        aria-label="放大"
+        title={t('agent.mermaid.zoom.zoomIn')}
+        aria-label={t('agent.mermaid.zoom.zoomIn')}
       >
         <ZoomIn className="h-4 w-4" />
       </button>
@@ -266,19 +268,19 @@ function ZoomControls({ fitScale }: { fitScale: () => number }) {
         type="button"
         onClick={() => centerView(fitScale(), 200)}
         className="flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white"
-        title="适应窗口（缩放至完整可见）"
+        title={t('agent.mermaid.zoom.fitToWindowTitle')}
       >
         <Scan className="h-4 w-4" />
-        <span className="hidden sm:inline">适应窗口</span>
+        <span className="hidden sm:inline">{t('agent.mermaid.zoom.fitToWindow')}</span>
       </button>
       <button
         type="button"
         onClick={() => resetTransform(200)}
         className="flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white"
-        title="重置视图"
+        title={t('agent.mermaid.zoom.resetTitle')}
       >
         <RotateCcw className="h-4 w-4" />
-        <span className="hidden sm:inline">重置</span>
+        <span className="hidden sm:inline">{t('agent.mermaid.zoom.reset')}</span>
       </button>
     </div>
   )
@@ -293,6 +295,7 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
   streaming = false,
 }: MermaidDiagramProps) {
   const { isDark } = useTheme()
+  const t = useT()
   const [state, setState] = useState<RenderState>({ kind: 'loading' })
   const [zoomOpen, setZoomOpen] = useState(false)
   // View tab: toggle between the rendered diagram and the raw source.
@@ -394,7 +397,7 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
       >
         <Loader2 className="h-4 w-4 animate-spin text-neutral-400" />
         <span className="ml-2 text-xs text-neutral-400">
-          {streaming ? 'Preparing diagram…' : 'Rendering diagram…'}
+          {streaming ? t('agent.mermaid.preparing') : t('agent.mermaid.rendering')}
         </span>
       </div>
     )
@@ -406,7 +409,7 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
       <div className="my-2 overflow-hidden rounded-md border border-amber-200 dark:border-amber-800/50">
         <div className="flex items-center gap-1.5 bg-amber-50 px-3 py-1 text-[11px] text-amber-600 dark:bg-amber-900/20 dark:text-amber-400">
           <AlertTriangle className="h-3 w-3 shrink-0" />
-          <span className="font-medium">Mermaid syntax error — showing source</span>
+          <span className="font-medium">{t('agent.mermaid.syntaxError')}</span>
         </div>
         <pre className="overflow-x-auto bg-neutral-50 p-3 dark:bg-bg-tertiary">
           <code className="text-[13px] leading-relaxed text-neutral-800 dark:text-white">
@@ -434,7 +437,7 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
                   : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
-              预览
+              {t('agent.mermaid.preview')}
             </button>
             <button
               type="button"
@@ -445,7 +448,7 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
                   : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
-              源码
+              {t('agent.mermaid.source')}
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -455,18 +458,18 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
             <button
               type="button"
               onClick={handleCopy}
-              title={copied ? '已复制' : '复制源码'}
+              title={copied ? t('agent.mermaid.copied') : t('agent.mermaid.copySource')}
               className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-700"
             >
               {copied ? (
                 <>
                   <Check className="h-3 w-3 text-green-500" />
-                  <span className="text-green-600 dark:text-green-400">已复制</span>
+                  <span className="text-green-600 dark:text-green-400">{t('agent.mermaid.copied')}</span>
                 </>
               ) : (
                 <>
                   <Copy className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
-                  <span className="text-neutral-500 dark:text-neutral-400">复制</span>
+                  <span className="text-neutral-500 dark:text-neutral-400">{t('agent.mermaid.copy')}</span>
                 </>
               )}
             </button>
