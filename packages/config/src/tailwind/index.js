@@ -152,10 +152,10 @@ export function createBaseConfig(options = {}) {
       // secondary markers) without competing for attention.
       'brand-muted': cssVar('brand-muted'),
 
-      // Gray/Neutral colors — scaled ramp. Lower values come from CSS vars
-      // (--gray-100 / --gray-200); mid/dark values are static HSL because
-      // they don't participate in accent switching and the CSS variable
-      // surface would otherwise balloon.
+      // Gray colors — kept as static HSL values for backward compat.
+      // The design-system.css @apply classes (buttons, badges, inputs) rely
+      // on these literal values. Only `gray-100` / `gray-200` are
+      // CSS-var backed (they participate in card/elevated surfaces).
       gray: {
         50: cssVar('gray-100'),
         100: cssVar('gray-100'),
@@ -169,18 +169,26 @@ export function createBaseConfig(options = {}) {
         900: 'hsl(0 0% 23%)',    /* #374151 */
       },
 
-      // Neutral alias for compatibility
+      // Neutral — theme-aware ramp. Every step reads from a CSS variable
+      // that has an explicit dark-mode override in globals.css, so that
+      // `dark:text-neutral-100/200/300` produce LIGHT text while
+      // `dark:bg-neutral-800/900` produce DARK surfaces.
+      //
+      // Previously neutral-100 aliased gray-100 (a non-inverting var), so
+      // in dark mode `dark:text-neutral-100` resolved to the dark
+      // --gray-100 value (#1F2528) → near-black text on dark backgrounds.
       neutral: {
-        50: cssVar('gray-100'),
-        100: cssVar('gray-100'),
-        200: cssVar('gray-200'),
-        300: 'hsl(0 0% 67%)',
-        400: 'hsl(0 0% 60%)',
-        500: 'hsl(0 0% 53%)',
-        600: 'hsl(0 0% 45%)',
-        700: 'hsl(0 0% 38%)',
-        800: 'hsl(0 0% 30%)',
-        900: 'hsl(0 0% 23%)',
+        50: cssVar('neutral-50'),
+        100: cssVar('neutral-100'),
+        200: cssVar('neutral-200'),
+        300: cssVar('neutral-300'),
+        400: cssVar('neutral-400'),
+        500: cssVar('neutral-500'),
+        600: cssVar('neutral-600'),
+        700: cssVar('neutral-700'),
+        800: cssVar('neutral-800'),
+        900: cssVar('neutral-900'),
+        950: cssVar('neutral-950'),
       },
 
       // Extended colors

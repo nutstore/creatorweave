@@ -103,6 +103,26 @@
 
     --gray-100: 0 0% 96%; /* #F3F4F6 */
     --gray-200: 0 0% 90%; /* #E5E7EB */
+
+    /* ========== Neutral ramp (theme-aware) ==========
+       Powers `text-neutral-*` / `bg-neutral-*`. In light mode these are
+       standard cool grays; in dark mode they invert so that the SAME class
+       (`dark:text-neutral-100`) yields light text on dark backgrounds and
+       `dark:bg-neutral-800` yields a dark surface. Without the dark
+       inversion, `dark:text-neutral-100` resolved to a near-black value
+       (#1F2528) because neutral-100 was bound to the non-inverting
+       --gray-100 variable. */
+    --neutral-50:  0 0% 98%;   /* #FAFAFA */
+    --neutral-100: 0 0% 96%;   /* #F3F4F6 */
+    --neutral-200: 0 0% 90%;   /* #E5E7EB */
+    --neutral-300: 0 0% 82%;   /* #D1D5DB */
+    --neutral-400: 0 0% 67%;   /* #AAAAAA */
+    --neutral-500: 0 0% 55%;   /* #8C8C8C */
+    --neutral-600: 0 0% 45%;   /* #737373 */
+    --neutral-700: 0 0% 35%;   /* #595959 */
+    --neutral-800: 0 0% 25%;   /* #404040 */
+    --neutral-900: 0 0% 18%;   /* #2E2E2E */
+    --neutral-950: 0 0% 10%;   /* #1A1A1A */
   }
 
   .dark {
@@ -196,6 +216,21 @@
     /* Grays - neutral */
     --gray-100: 210 8% 16%; /* #1F2528 */
     --gray-200: 210 10% 22%; /* #2A3033 */
+
+    /* Neutral ramp — INVERTED for dark mode so that
+       `dark:text-neutral-100/200/300` produce light text and
+       `dark:bg-neutral-800/900` produce dark surfaces. */
+    --neutral-50:  210 10% 5%;   /* #0C0F11 */
+    --neutral-100: 210 8% 92%;   /* #E8ECEF - 主要文字 */
+    --neutral-200: 210 6% 88%;   /* #DFE3E6 */
+    --neutral-300: 210 5% 78%;   /* #C2C7CC */
+    --neutral-400: 210 4% 65%;   /* #9CA3AA - 次要文字 */
+    --neutral-500: 210 4% 55%;   /* #828891 - 三级文字 */
+    --neutral-600: 210 6% 42%;   /* #646B74 */
+    --neutral-700: 210 8% 32%;   /* #4A525B */
+    --neutral-800: 210 10% 22%;  /* #2A3033 - 卡片/浮层背景 */
+    --neutral-900: 210 10% 16%;  /* #252B30 - 深背景 */
+    --neutral-950: 200 10% 9%;   /* #14191C */
   }
 }
 

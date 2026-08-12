@@ -14,6 +14,7 @@ import { csvHandler } from './csv'
 import { docxHandler } from './docx'
 import { htmlHandler } from './html'
 import { imageHandler, IMAGE_EXTENSIONS } from './image'
+import { mdHandler } from './md'
 import { nbmxHandler } from './nbmx'
 import { ngmHandler } from './ngm'
 import { nolHandler } from './nol'
@@ -30,6 +31,9 @@ registerFormatHandler({ ...htmlHandler, extension: 'htm' })
 for (const ext of IMAGE_EXTENSIONS) {
   registerFormatHandler({ ...imageHandler, extension: ext })
 }
+// Markdown handler: register for both .md and .markdown
+registerFormatHandler(mdHandler)
+registerFormatHandler({ ...mdHandler, extension: 'markdown' })
 registerFormatHandler(nbmxHandler)
 registerFormatHandler(ngmHandler)
 registerFormatHandler(nolHandler)

@@ -98,6 +98,7 @@
     "react-zoom-pan-pinch": "^4.0.4",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-breaks": "^4.0.0",
     "remark-math": "^6.0.0",

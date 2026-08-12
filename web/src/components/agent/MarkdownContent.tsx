@@ -19,6 +19,7 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
+import rehypeRaw from 'rehype-raw'
 import 'katex/dist/katex.min.css'
 import { Copy, Check, Loader2 } from 'lucide-react'
 import { readAssetBlob, readWorkspaceFileBlob } from './asset-utils'
@@ -423,17 +424,37 @@ interface MarkdownContentProps {
    * misleading "syntax error" banner mid-stream.
    */
   streaming?: boolean
+  /**
+   * Whether to render raw HTML embedded in the markdown.
+   *
+   * react-markdown escapes HTML by default for safety. Set this to true
+   * ONLY for trusted content (e.g. local .md file previews) where the
+   * user explicitly authored or trusts the HTML. When enabled, mounts
+   * the `rehype-raw` plugin so tags like `<div align="center">…</div>`
+   * render as real elements instead of visible tag text.
+   *
+   * Defaults to false (AI message stream stays XSS-safe).
+   */
+  allowHtml?: boolean
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content, streaming = false }: MarkdownContentProps) {
+export const MarkdownContent = memo(function MarkdownContent({ content, streaming = false, allowHtml = false }: MarkdownContentProps) {
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
   const normalized = normalizeMathDelimiters(content)
   const components = useMemo(() => buildMarkdownComponents(streaming), [streaming])
+  // rehype-raw must run BEFORE rehype-katex: it reparses raw HTML strings
+  // into hast nodes so that subsequent plugins (katex) see a real tree.
+  // Without it, embedded HTML like `<div align="center">…</div>` shows up
+  // as literal tag text instead of rendered elements.
+  const rehypePlugins = useMemo(
+    () => (allowHtml ? [rehypeRaw, ...REHYPE_PLUGINS] : REHYPE_PLUGINS),
+    [allowHtml],
+  )
   return (
     <ImageClickContext.Provider value={setLightboxSrc}>
       <ReactMarkdown
         remarkPlugins={INTERACTIVE_HTML_REMARK_PLUGINS}
-        rehypePlugins={REHYPE_PLUGINS}
+        rehypePlugins={rehypePlugins}
         components={components}
       >
         {normalized}
