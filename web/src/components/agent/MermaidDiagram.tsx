@@ -115,26 +115,59 @@ function ZoomableSvg({ svg }: { svg: string }) {
     return m ? Number(m[2]) : null
   }
 
-  // Initial scale: fit the diagram width to the available viewport width.
-  // Tall charts → scale > 1 (enlarged); wide charts → scale < 1 (fitted).
+  // Ref to the outer wrapper div (the actual viewport for the diagram).
+  // We measure it directly so "fit to window" uses the REAL container size,
+  // not a `window.innerWidth/Height * 0.9` approximation — the container has
+  // `max-w-[90vw]` and `h-[85vh]` which don't match the window's 90vh exactly.
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const [containerSize, setContainerSize] = useState<{ w: number; h: number }>({
+    w: 0,
+    h: 0,
+  })
+
+  // Observe the wrapper's size so fitScale responds to viewport / device
+  // rotation / window resize — and so the very first "fit" click (before
+  // any measurement happens) falls back to a sensible window-based value.
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const measure = () => {
+      const rect = el.getBoundingClientRect()
+      setContainerSize({ w: rect.width, h: rect.height })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Initial scale: fit the diagram width to the container width.
+  // Falls back to a window-based estimate if the wrapper hasn't been
+  // measured yet on first render.
   const initialScale = (() => {
     if (intrinsicWidth <= 0) return 1
-    const availWidth = window.innerWidth * 0.9 // 90vw (Lightbox container)
+    const availWidth =
+      containerSize.w > 0
+        ? containerSize.w
+        : window.innerWidth * 0.9 * 0.9 // nested 90% (Lightbox ⊃ wrapper)
     if (availWidth <= 0) return 1
     return availWidth / intrinsicWidth
   })()
 
   // Fit the ENTIRE diagram into the viewport (both axes).
+  // We measure the actual wrapper (not the window) so the inner padding
+  // (`p-4` on the SVG div) and the 85vh vs 90vh difference are honored.
   const fitScale = useCallback(() => {
     if (intrinsicWidth <= 0) return 1
-    const availWidth = window.innerWidth * 0.9
-    const availHeight = window.innerHeight * 0.9
     const intrinsicHeight = vbHeight() ?? intrinsicWidth
-    return Math.min(availWidth / intrinsicWidth, availHeight / intrinsicHeight)
-  }, [svg, intrinsicWidth])
+    const w = containerSize.w > 0 ? containerSize.w : window.innerWidth * 0.9
+    const h = containerSize.h > 0 ? containerSize.h : window.innerHeight * 0.85
+    if (w <= 0 || h <= 0) return 1
+    return Math.min(w / intrinsicWidth, h / intrinsicHeight)
+  }, [svg, intrinsicWidth, containerSize.w, containerSize.h])
 
   return (
-    <div className="relative h-[85vh] w-full">
+    <div ref={wrapperRef} className="relative h-[85vh] w-full">
       <TransformWrapper
         initialScale={initialScale}
         minScale={0.05}
@@ -186,7 +219,7 @@ function ZoomableSvg({ svg }: { svg: string }) {
  * Action buttons with ambiguous icons carry a text label for clarity.
  */
 function ZoomControls({ fitScale }: { fitScale: () => number }) {
-  const { zoomIn, zoomOut, resetTransform, setTransform } = useControls()
+  const { zoomIn, zoomOut, resetTransform, centerView } = useControls()
   const percent = useTransformComponent(({ state }) => Math.round(state.scale * 100))
 
   return (
@@ -220,7 +253,7 @@ function ZoomControls({ fitScale }: { fitScale: () => number }) {
       <div className="mx-0.5 h-5 w-px bg-neutral-200 dark:bg-neutral-700" />
       <button
         type="button"
-        onClick={() => setTransform(0, 0, fitScale(), 200)}
+        onClick={() => centerView(fitScale(), 200)}
         className="flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-medium text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-white"
         title="适应窗口（缩放至完整可见）"
       >
