@@ -25,7 +25,7 @@ export const syncToOPFSDefinition: ToolDefinition = {
     description:
       'Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. ' +
       'Files already in OPFS (which may contain agent edits) are skipped to avoid overwriting pending changes. ' +
-      'Use this before `python` when the script needs workspace files not yet available in OPFS. ' +
+      'Use this before `run_python` when the script needs workspace files not yet available in OPFS. ' +
       'Accepts glob patterns (e.g., "data/**/*.csv") or explicit file paths. ' +
       'Files are copied silently without loading content into the conversation.',
     parameters: {
@@ -58,7 +58,7 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
       'invalid_args',
       'sync only accepts workspace-relative native filesystem paths; vfs:// paths are already in OPFS and must not be synced',
       {
-        hint: 'Use vfs:// paths directly with read/ls, and use /mnt_assets/... in python for assets.',
+        hint: 'Use vfs:// paths directly with read/ls, and use /mnt_assets/... in run_python for assets.',
         details: { rejected_paths: vfsPaths },
       }
     )
@@ -480,6 +480,6 @@ export const syncPromptDoc: ToolPromptDoc = {
   category: 'file-ops',
   section: '### File Sync (disk → OPFS)',
   lines: [
-    '- `sync(paths)` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before `python` when the script needs workspace files not yet available in OPFS. Example: `sync(paths=["data/*.csv", "config.json"])`. In multi-root: `sync(paths=["rootName/data/*.csv"])`.',
+    '- `sync(paths)` - Copy files from disk to OPFS (mounted at /mnt/ in Python), but ONLY if they do NOT already exist in OPFS. OPFS files (which may contain agent edits) are never overwritten. Use before `run_python` when the script needs workspace files not yet available in OPFS. Example: `sync(paths=["data/*.csv", "config.json"])`. In multi-root: `sync(paths=["rootName/data/*.csv"])`.',
   ],
 }

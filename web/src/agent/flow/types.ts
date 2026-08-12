@@ -32,7 +32,7 @@ export interface InputNodeConfig {
 }
 
 export interface ToolNodeConfig {
-  /** Tool name from ToolRegistry, e.g. 'read', 'web_search', 'python', 'edit' */
+  /** Tool name from ToolRegistry, e.g. 'read', 'web_search', 'run_python', 'edit' */
   toolName: string
   /** Arguments for the tool. Values support {{var}} template references. */
   args?: Record<string, unknown>

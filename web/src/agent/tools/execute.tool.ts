@@ -1,5 +1,11 @@
 /**
- * python tool - Python code execution.
+ * run_python tool - Python code execution.
+ *
+ * NOTE: This tool is registered as `run_python` (not `python`) to avoid
+ * collisions with provider/model built-in tools of the same name (e.g. some
+ * Codex/CodeX-compatible models advertise a built-in `python` tool). The
+ * runtime executes Python via Pyodide exactly as before; only the tool name
+ * exposed to the model has changed.
  */
 
 import { Mutex } from 'async-mutex'
@@ -35,7 +41,7 @@ const pythonMutex = new Mutex()
 export const pythonDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'python',
+    name: 'run_python',
     description: `Execute Python code in browser.
 
 LANGUAGE: python
@@ -98,8 +104,8 @@ Font file is at \`/assets/fonts/NotoSansSC-Regular.otf\` (bundled, SIL OFL). Onl
 matplotlib uses FreeType which cannot render color emoji (COLRv1/CBDT/SBIX formats). All emoji glyphs (🎉🍎🍌 etc.) will appear as empty boxes (tofu). **Do NOT use emoji in chart labels/titles — use plain text labels instead.** This is a fundamental matplotlib limitation, not fixable by adding fonts.
 
 Examples:
-- python(code="print('hello')")
-- python(code="import micropip\\nawait micropip.install('beautifulsoup4')\\nfrom bs4 import BeautifulSoup\\nprint(BeautifulSoup('<h1>Hello</h1>', 'html.parser').h1.text)")`,
+- run_python(code="print('hello')")
+- run_python(code="import micropip\\nawait micropip.install('beautifulsoup4')\\nfrom bs4 import BeautifulSoup\\nprint(BeautifulSoup('<h1>Hello</h1>', 'html.parser').h1.text)")`,
     parameters: {
       type: 'object',
       properties: {
@@ -117,7 +123,7 @@ Examples:
   },
 }
 
-const TOOL_NAME = 'python'
+const TOOL_NAME = 'run_python'
 
 export const pythonToolExecutor: ToolExecutor = async (args, context) => {
   const code = args.code as string
@@ -374,7 +380,7 @@ export const pythonPromptDoc: ToolPromptDoc = {
   category: 'execution',
   section: '### Code Execution (for data/analysis tasks)',
   lines: [
-    '- `python(code)` - Execute Python with pandas, numpy, matplotlib',
-    '  Example: python(code="print(\'hello\')")',
+    '- `run_python(code)` - Execute Python with pandas, numpy, matplotlib',
+    '  Example: run_python(code="print(\'hello\')")',
   ],
 }

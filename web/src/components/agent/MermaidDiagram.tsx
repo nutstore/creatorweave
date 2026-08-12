@@ -34,7 +34,7 @@
  */
 
 import { memo, useEffect, useRef, useState, useId, useCallback } from 'react'
-import { Loader2, AlertTriangle, ZoomIn, ZoomOut, Scan, RotateCcw } from 'lucide-react'
+import { Loader2, AlertTriangle, ZoomIn, ZoomOut, Scan, RotateCcw, Copy, Check } from 'lucide-react'
 import {
   TransformWrapper,
   TransformComponent,
@@ -284,6 +284,19 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
   const { isDark } = useTheme()
   const [state, setState] = useState<RenderState>({ kind: 'loading' })
   const [zoomOpen, setZoomOpen] = useState(false)
+  // View tab: toggle between the rendered diagram and the raw source.
+  const [tab, setTab] = useState<'preview' | 'source'>('preview')
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(chart)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // clipboard API may be unavailable in some contexts
+    }
+  }, [chart])
   // Unique id prefix per instance — mermaid needs a unique render target id.
   const rawId = useId()
   // useId returns something like ":r0:" which is invalid in CSS/HTML id
@@ -397,15 +410,76 @@ const MermaidDiagramImpl = memo(function MermaidDiagramImpl({
   // (TS narrowing: after the two returns above, state.kind === 'rendered')
   return (
     <>
-      <div className="my-2 overflow-x-auto rounded-md border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
-        <div
-          className="cursor-zoom-in [&>svg]:mx-auto [&>svg]:max-w-full"
-          // mermaid.render returns sanitized SVG (securityLevel: 'strict' uses DOMPurify internally).
-          // We render it via dangerouslySetInnerHTML because the SVG string
-          // is already a complete element.
-          dangerouslySetInnerHTML={{ __html: state.svg }}
-          onClick={() => setZoomOpen(true)}
-        />
+      <div className="my-2 overflow-hidden rounded-md border border-neutral-200 dark:border-neutral-700">
+        {/* Header bar: view tabs (left) + language label & copy (right) */}
+        <div className="flex items-center justify-between bg-neutral-100 px-2 py-1 dark:bg-neutral-800">
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setTab('preview')}
+              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                tab === 'preview'
+                  ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+            >
+              预览
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('source')}
+              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                tab === 'source'
+                  ? 'bg-white text-neutral-900 shadow-sm dark:bg-neutral-700 dark:text-white'
+                  : 'text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-white'
+              }`}
+            >
+              源码
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+              mermaid
+            </span>
+            <button
+              type="button"
+              onClick={handleCopy}
+              title={copied ? '已复制' : '复制源码'}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors hover:bg-neutral-200 dark:hover:bg-neutral-700"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-3 w-3 text-green-500" />
+                  <span className="text-green-600 dark:text-green-400">已复制</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-3 w-3 text-neutral-500 dark:text-neutral-400" />
+                  <span className="text-neutral-500 dark:text-neutral-400">复制</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+        {/* Content: rendered preview or raw source */}
+        {tab === 'preview' ? (
+          <div className="overflow-x-auto bg-white p-4 dark:bg-neutral-900">
+            <div
+              className="cursor-zoom-in [&>svg]:mx-auto [&>svg]:max-w-full"
+              // mermaid.render returns sanitized SVG (securityLevel: 'strict' uses DOMPurify internally).
+              // We render it via dangerouslySetInnerHTML because the SVG string
+              // is already a complete element.
+              dangerouslySetInnerHTML={{ __html: state.svg }}
+              onClick={() => setZoomOpen(true)}
+            />
+          </div>
+        ) : (
+          <pre className="overflow-x-auto bg-neutral-50 p-3 dark:bg-bg-tertiary">
+            <code className="text-[13px] leading-relaxed text-neutral-800 dark:text-white">
+              {chart}
+            </code>
+          </pre>
+        )}
       </div>
       {zoomOpen && (
         <Lightbox

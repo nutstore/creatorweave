@@ -8,7 +8,7 @@ import { registerRenderer } from './registry'
 import type { ToolRenderCtx } from './types'
 
 registerRenderer({
-  name: 'python',
+  name: 'run_python',
   icon: <Terminal className="h-3.5 w-3.5 text-neutral-400" />,
   Summary(ctx) {
     const output = extractOutput(ctx)

@@ -56,8 +56,8 @@ describe('build-agent-tools', () => {
         {
           type: 'function',
           function: {
-            name: 'python',
-            description: 'python',
+            name: 'run_python',
+            description: 'run_python',
             parameters: { type: 'object', properties: {} },
           },
         },
@@ -107,8 +107,8 @@ describe('build-agent-tools', () => {
         {
           type: 'function',
           function: {
-            name: 'python',
-            description: 'python',
+            name: 'run_python',
+            description: 'run_python',
             parameters: { type: 'object', properties: {} },
           },
         },

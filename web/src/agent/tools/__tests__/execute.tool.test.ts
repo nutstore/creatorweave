@@ -42,14 +42,14 @@ function parseError(result: string): { error: string } | null {
   }
 }
 
-describe('python tool', () => {
-  it('exposes python tool name with python-only params', () => {
-    expect(pythonDefinition.function.name).toBe('python')
+describe('run_python tool', () => {
+  it('exposes run_python tool name with python-only params', () => {
+    expect(pythonDefinition.function.name).toBe('run_python')
     expect(pythonDefinition.function.parameters.properties.language).toBeUndefined()
     expect(pythonDefinition.function.parameters.required).toContain('code')
   })
 
-  it('python tool executes without requiring language parameter', async () => {
+  it('rejects execution when workspaceId is missing', async () => {
     getActiveConversationMock.mockResolvedValueOnce(null)
 
     const result = await pythonToolExecutor(
@@ -61,6 +61,6 @@ describe('python tool', () => {
 
     const error = parseError(result)
     expect(error).not.toBeNull()
-    expect(error?.error).toBe('No active workspace')
+    expect(error?.error).toBe('workspaceId is required but was not provided (caller bug)')
   })
 })

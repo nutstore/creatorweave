@@ -50,7 +50,7 @@ export const pdfHandler: FormatHandler = {
   binaryMode: true,
   formatHint:
     'This is a PDF file. For large PDFs, read() returns only the first few pages. '
-    + 'To read specific pages, use the python tool with pypdf: '
+    + 'To read specific pages, use the run_python tool with pypdf: '
     + 'import pypdf; reader = pypdf.PdfReader("path/to/file.pdf"); '
     + 'page = reader.pages[N]; print(page.extract_text())',
 

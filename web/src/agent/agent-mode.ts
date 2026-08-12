@@ -33,8 +33,8 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['read', { name: 'read', category: 'read' }],
   ['search', { name: 'search', category: 'read' }],
   ['ls', { name: 'ls', category: 'read' }],
-  ['python', {
-    name: 'python',
+  ['run_python', {
+    name: 'run_python',
     category: 'read',
     planModeDescription: 'Execute Python code in sandbox (read-only in plan mode - no file modifications persisted)'
   }],

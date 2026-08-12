@@ -76,7 +76,7 @@ const canvasAddNodeDefinition: ToolDefinition = {
       '',
       'Node kinds:',
       '- input: data source. config: inputType (file|text|today), path (for file, supports {{date}}), value (for text)',
-      '- tool: call a tool. config: toolName (read|web_search|python|edit|...), args (parameters)',
+      '- tool: call a tool. config: toolName (read|web_search|run_python|edit|...), args (parameters)',
       '- llm: AI reasoning (full agent — can use all tools by default). config: prompt (supports {{input}} for upstream data)',
       '- review: quality gate. config: criteria, minScore (default 80). Fails → auto retry upstream via loop edge',
       '- output: data sink. config: path (write file, supports {{date}}). Leave empty for result card',

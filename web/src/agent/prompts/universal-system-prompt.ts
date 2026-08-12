@@ -325,7 +325,7 @@ export const TOOL_DISCOVERIES: ToolDiscovery[] = [
   },
   {
     trigger: ['python', 'pandas', 'data', 'csv', 'excel', 'chart', 'graph'],
-    message: `Python is available with pandas, numpy, matplotlib, openpyxl. Use \`sync\` to bring files into OPFS first, then \`python\` to analyze. Write output to \`/mnt_assets/\`. NOTE: Network libraries (urllib, requests) do NOT work in Pyodide — use \`pyodide.http\` (pyfetch/open_url) instead.`,
+    message: `Python is available with pandas, numpy, matplotlib, openpyxl. Use \`sync\` to bring files into OPFS first, then \`run_python\` to analyze. Write output to \`/mnt_assets/\`. NOTE: Network libraries (urllib, requests) do NOT work in Pyodide — use \`pyodide.http\` (pyfetch/open_url) instead.`,
   },
   {
     trigger: ['code', 'debug', 'refactor', 'implement', 'function'],

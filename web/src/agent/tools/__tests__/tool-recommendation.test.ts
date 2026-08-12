@@ -120,9 +120,9 @@ describe('RecommendationEngine', () => {
   const engine = new RecommendationEngine()
 
   describe('tool recommendations for data analysis', () => {
-    it('should recommend python for CSV analysis', () => {
+    it('should recommend run_python for CSV analysis', () => {
       const recommendations = engine.recommend('analyze data.csv with pandas')
-      const pythonTool = recommendations.find((r) => r.toolName === 'python')
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python')
 
       expect(pythonTool).toBeDefined()
       expect(pythonTool?.score).toBeGreaterThan(0)
@@ -135,10 +135,10 @@ describe('RecommendationEngine', () => {
       expect(recommendations.length).toBeGreaterThan(0)
     })
 
-    it('should recommend both ls and python for data workflow', () => {
+    it('should recommend both ls and run_python for data workflow', () => {
       const recommendations = engine.recommend('analyze CSV files with pandas')
-      // Should have recommendations including python
-      const pythonTool = recommendations.find((r) => r.toolName === 'python')
+      // Should have recommendations including run_python
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python')
       expect(pythonTool).toBeDefined()
     })
   })
@@ -178,9 +178,9 @@ describe('RecommendationEngine', () => {
   })
 
   describe('recommendation examples', () => {
-    it('should provide contextual examples for python', () => {
+    it('should provide contextual examples for run_python', () => {
       const recommendations = engine.recommend('analyze sales.csv')
-      const pythonTool = recommendations.find((r) => r.toolName === 'python')
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python')
 
       expect(pythonTool).toBeDefined()
       if (pythonTool) {
@@ -201,12 +201,12 @@ describe('RecommendationEngine', () => {
       }
     })
 
-    it('should use python tool example without language parameter', () => {
+    it('should use run_python tool example without language parameter', () => {
       const recommendations = engine.recommend('analyze sales.csv with python')
-      const pythonTool = recommendations.find((r) => r.toolName === 'python')
+      const pythonTool = recommendations.find((r) => r.toolName === 'run_python')
 
       expect(pythonTool).toBeDefined()
-      expect(pythonTool?.example).toContain('python(code=')
+      expect(pythonTool?.example).toContain('run_python(code=')
     })
   })
 
@@ -230,9 +230,9 @@ describe('RecommendationEngine', () => {
       expect(readDirTool?.category).toBe('discovery')
     })
 
-    it('should include python in analysis category', () => {
+    it('should include run_python in analysis category', () => {
       const allTools = engine.getAllTools()
-      const pythonTool = allTools.analysis.find((t) => t.toolName === 'python')
+      const pythonTool = allTools.analysis.find((t) => t.toolName === 'run_python')
 
       expect(pythonTool).toBeDefined()
       expect(pythonTool?.category).toBe('analysis')

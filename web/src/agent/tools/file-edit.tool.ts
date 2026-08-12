@@ -533,7 +533,7 @@ async function executeEdits(
         return toolErrorJson(
           'edit',
           'no_format_writer',
-          `Cannot edit .${formatHandler.extension} files directly with the edit tool. Use the python tool instead if you need to modify this file.`,
+          `Cannot edit .${formatHandler.extension} files directly with the edit tool. Use the run_python tool instead if you need to modify this file.`,
           { hint: formatHandler.formatHint ?? `The .${formatHandler.extension} format handler only supports reading.` }
         )
       } else {
