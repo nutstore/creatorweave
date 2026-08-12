@@ -82,6 +82,7 @@
     "lucide-react": "^0.460.0",
     "mermaid": "^11.16.0",
     "micromatch": "^4.0.8",
+    "pako": "^2.1.0",
     "monaco-editor": "^0.55.1",
     "pdfjs-dist": "^4.10.38",
     "pyodide": "^0.29.3",

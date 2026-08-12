@@ -137,32 +137,55 @@ function swDevMiddleware(): Plugin {
 }
 
 /**
- * Vite plugin to shim `node:zlib` for browser builds.
+ * Vite plugin to polyfill `node:zlib` for browser builds using `pako`.
  *
- * `just-bash` browser bundle imports `gunzipSync` from `node:zlib` for
- * `rg --search-zip` decompression. Vite's default `__vite-browser-external`
- * doesn't export it, causing rollup to error during build.
- * This plugin provides a virtual module with throwing stubs — gzip support
- * is NOT needed (bash tool lists tar/gzip as unavailable).
+ * `just-bash` imports `gunzipSync`, `gzipSync`, and `constants` from
+ * `node:zlib`. Node.js has these natively; browsers don't.
+ * This plugin intercepts `node:zlib` imports and provides a virtual
+ * module backed by pako — a pure-JS zlib implementation that works
+ * in browsers and Web Workers.
+ *
+ * Supported commands after this polyfill:
+ * - `rg` searching inside `.gz` files (gunzipSync)
+ * - `gzip` / `gunzip` / `zcat` (gzipSync / gunzipSync)
+ *
+ * Note: just-bash passes `{ maxOutputLength }` (a Node-only option) to
+ * gunzipSync as a defense against zip bombs. pako doesn't support it,
+ * but just-bash already pre-checks the decompressed size before calling,
+ * so the option is stripped harmlessly.
  */
 function nodeZlibShimPlugin(): Plugin {
   const virtualId = '\0virtual:node-zlib'
   const shimCode = `
+import { ungzip, gzip, deflate, inflate, deflateRaw, inflateRaw, constants } from 'pako';
+
+// pako's ungzip/gzip/deflate/inflate are already synchronous and accept
+// (Uint8Array, options?) → Uint8Array, matching Node's *Sync signatures.
+// Strip Node-only options (maxOutputLength) that pako doesn't understand.
+function cleanOpts(opts) {
+  if (!opts) return opts;
+  const { maxOutputLength, ...rest } = opts;
+  return rest;
+}
+
+export const gunzipSync = (data, opts) => ungzip(data, cleanOpts(opts));
+export const gzipSync = (data, opts) => gzip(data, cleanOpts(opts));
+export const deflateSync = (data, opts) => deflate(data, cleanOpts(opts));
+export const inflateSync = (data, opts) => inflate(data, cleanOpts(opts));
+export const deflateRawSync = (data, opts) => deflateRaw(data, cleanOpts(opts));
+export const inflateRawSync = (data, opts) => inflateRaw(data, cleanOpts(opts));
+export const unzipSync = (data, opts) => ungzip(data, cleanOpts(opts));
+
+// Stream APIs — not needed by just-bash, but provide stubs for completeness
 const _err = (n) => () => { throw new Error('node:zlib.' + n + ' is not available in the browser') };
-export const gunzipSync = _err('gunzipSync');
-export const gzipSync = _err('gzipSync');
-export const deflateSync = _err('deflateSync');
-export const inflateSync = _err('inflateSync');
-export const deflateRawSync = _err('deflateRawSync');
-export const inflateRawSync = _err('inflateRawSync');
-export const unzipSync = _err('unzipSync');
 export const createGzip = _err('createGzip');
 export const createGunzip = _err('createGunzip');
 export const createDeflate = _err('createDeflate');
 export const createInflate = _err('createInflate');
 export const createDeflateRaw = _err('createDeflateRaw');
 export const createInflateRaw = _err('createInflateRaw');
-export const constants = {};
+
+export { constants };
 export default { gunzipSync, gzipSync, deflateSync, inflateSync, constants };
 `
   return {
@@ -264,9 +287,7 @@ export default defineConfig({
   },
   worker: {
     format: 'es',
-    plugins: () => [react()],
-    // Note: COOP/COEP headers for workers are set by vite-plugin-sqlite middleware
-    // Vite doesn't support worker.headers directly - headers must be set via server middleware
+    plugins: () => [react(), nodeZlibShimPlugin()],
   },
 
   // Configure handling of WASM assets for @sqlite.org/sqlite-wasm

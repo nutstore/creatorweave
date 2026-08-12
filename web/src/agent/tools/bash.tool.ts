@@ -1,146 +1,29 @@
 /**
  * bash tool — Execute shell commands in a sandboxed bash environment.
  *
- * Uses just-bash (https://github.com/vercel-labs/just-bash) with a VfsBridgeFs
- * that connects to the existing OPFS + Native File System Access API stack.
+ * Runs just-bash (https://github.com/vercel-labs/just-bash) inside a Web Worker
+ * so that CPU-bound interpreter loops (grep, sed, awk, rg, large loops) no
+ * longer block the browser main thread.
  *
  * All file operations inside the bash session (cat, grep, sed, echo >, etc.)
- * go through the same VfsBackend used by read/write/edit tools — preserving
- * pending-change tracking, undo/redo, and sync preview.
+ * are bridged back to the main thread via VFS RPC, so they go through the same
+ * VfsBackend used by read/write/edit tools — preserving pending-change
+ * tracking, undo/redo, and sync preview.
  *
- * In Plan mode, the tool still runs but workspace writes are silently blocked
- * by wrapping the backend with a ReadOnlyBackend wrapper.
+ * Wall-clock timeouts and abort signals truly interrupt execution by
+ * terminating the worker (the only way to stop a CPU-bound JS loop).
  */
 
 import { toolOkJson, toolErrorJson } from './tool-envelope'
 import type { ToolContext, ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
-import type { VfsBackend, VfsReadResult, VfsDirEntry, VfsReadOptions, VfsListOptions } from './vfs-backend'
-import { VfsBridgeFs } from './just-bash-bridge'
 import { resolveVfsTarget } from './vfs-resolver'
-import { AssetsBackend } from './backends/assets-backend'
-import { AgentBackend } from './backends/agent-backend'
 import { isSubagentPermissionDenied, SUBAGENT_PERMISSION_DENIED } from './agent-file-protection'
-import { withToolTimeout, isToolTimeoutError } from './tool-utils'
+import { isToolTimeoutError } from './tool-utils'
+import { bashExec } from './bash-worker/client'
+import type { VfsRpcHandlerConfig } from './bash-worker/vfs-rpc-handler'
 
-/** Workspace mount point inside the bash sandbox (must match just-bash-bridge.ts) */
+/** Workspace mount point inside the bash sandbox (must match bash-worker/bridge-shared.ts) */
 const WORKSPACE_MOUNT = '/workspace'
-
-// ---------------------------------------------------------------------------
-// Lazy-loaded just-bash (heavy module — only import when tool is actually used)
-// ---------------------------------------------------------------------------
-
-type BashExecResult = {
-  stdout: string
-  stderr: string
-  exitCode: number
-  env?: Record<string, string>
-  stdoutKind?: 'text' | 'bytes'
-  stdoutEncoding?: 'binary'
-}
-
-type BashInstance = {
-  exec(commandLine: string, options?: any): Promise<BashExecResult>
-  fs: any
-}
-
-type BashConstructor = new (options: any) => BashInstance
-
-type JustBashModule = {
-  Bash: BashConstructor
-  decodeBytesToUtf8: (input: unknown) => string
-  unsafeBytesFromLatin1: (input: string) => unknown
-  stdoutKind?: (result: { stdoutKind?: 'text' | 'bytes'; stdoutEncoding?: 'binary' }) => 'text' | 'bytes'
-}
-
-let BashClass: BashConstructor | null = null
-let decodeBytesToUtf8Helper: ((input: unknown) => string) | null = null
-let unsafeBytesFromLatin1Helper: ((input: string) => unknown) | null = null
-let stdoutKindHelper: JustBashModule['stdoutKind'] | null = null
-let loadError: string | null = null
-let loadErrorTime = 0
-/** Retry loading after this many ms (prevents permanent failure on transient WASM issues) */
-const LOAD_ERROR_TTL = 30_000
-
-async function loadBash(): Promise<BashConstructor> {
-  if (BashClass) return BashClass
-
-  // Allow retry after TTL expires — a transient WASM load failure (e.g. OOM)
-  // shouldn't permanently block the tool until page refresh.
-  if (loadError && Date.now() - loadErrorTime < LOAD_ERROR_TTL) {
-    throw new Error(loadError)
-  }
-  loadError = null
-
-  try {
-    // Use variable import to prevent rollup from statically analyzing
-    // just-bash's internals (contains node:zlib reference that breaks PWA build)
-    const mod = await import('just-bash') as JustBashModule
-    BashClass = mod.Bash
-    decodeBytesToUtf8Helper = mod.decodeBytesToUtf8
-    unsafeBytesFromLatin1Helper = mod.unsafeBytesFromLatin1
-    stdoutKindHelper = mod.stdoutKind ?? null
-    return BashClass!
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    loadError = `just-bash module not available: ${msg}`
-    loadErrorTime = Date.now()
-    throw new Error(loadError)
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Read-only VfsBackend wrapper (for Plan mode)
-// ---------------------------------------------------------------------------
-
-/** Error thrown when a write operation is attempted in Plan mode. */
-class PlanModeWriteBlockedError extends Error {
-  constructor(operation: string, path: string) {
-    super(`bash: ${path}: ${operation} blocked (read-only mode)`)
-    this.name = 'PlanModeWriteBlockedError'
-  }
-}
-
-class ReadOnlyBackend implements VfsBackend {
-  readonly label = 'workspace' as const
-
-  constructor(private inner: VfsBackend) {}
-
-  async readFile(path: string, options?: VfsReadOptions): Promise<VfsReadResult> {
-    return this.inner.readFile(path, options)
-  }
-
-  async writeFile(path: string, _content: string | ArrayBuffer | Blob): Promise<void> {
-    // Throw a permission error so the bash command fails visibly
-    throw new PlanModeWriteBlockedError('write', path)
-  }
-
-  async deleteFile(path: string): Promise<void> {
-    throw new PlanModeWriteBlockedError('delete', path)
-  }
-
-  async deleteDir(path: string): Promise<{ deletedFiles: string[]; deletedDirs: string[] }> {
-    throw new PlanModeWriteBlockedError('rm -r', path)
-  }
-
-  async listDir(path: string, options?: VfsListOptions): Promise<VfsDirEntry[]> {
-    return this.inner.listDir(path, options)
-  }
-
-  async exists(path: string): Promise<boolean> {
-    if (this.inner.exists) return this.inner.exists(path)
-    try {
-      await this.inner.readFile(path)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  async getDirectoryHandle(): Promise<FileSystemDirectoryHandle | null> {
-    if (this.inner.getDirectoryHandle) return this.inner.getDirectoryHandle()
-    return null
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Tool definition (OpenAI function-calling format)
@@ -159,7 +42,7 @@ export const bashDefinition: ToolDefinition = {
       '- Multi-file search with complex patterns (rg + grep + awk pipeline)',
       '- One-liner tasks that would otherwise need 3+ tool calls',
       '',
-      'Available: grep, sed, awk, cat, ls, find, sort, uniq, wc, head, tail, jq, diff, xargs, tr, cut, tee, rg, tree, file, split, rev, etc.',
+      'Available: grep, sed, awk, cat, ls, find, sort, uniq, wc, head, tail, jq, diff, xargs, tr, cut, tee, rg, tree, file, split, rev, gzip, gunzip, zcat, etc.',
       'NOT available: git, node, npm, python3, curl, wget, tar, patch.',
       'Limitations: no process substitution <(...), no xargs -I, echo -e does not interpret escapes (use printf instead), rg does not support --no-heading or -r (use sed -i for replacements).',
       'Pipes (|), redirections (>, >>), chaining (&&, ||, ;) all work.',
@@ -204,35 +87,16 @@ export const bashToolExecutor: ToolExecutor = async (
     return toolErrorJson('bash', 'invalid_input', 'command is required and must be a non-empty string')
   }
 
-  // Load just-bash dynamically
-  let Bash: BashConstructor
+  // Resolve VFS backend for workspace (validates that a workspace exists)
   try {
-    Bash = await loadBash()
-  } catch (err) {
-    return toolErrorJson('bash', 'module_not_available', (err as Error).message, {
-      hint: 'just-bash is an optional dependency. Install it with: npm install just-bash',
-    })
-  }
-
-  // Resolve VFS backend for workspace
-  let backend: VfsBackend
-  try {
-    const target = await resolveVfsTarget('', context, 'read', { allowEmptyPath: true })
-    backend = target.backend
+    await resolveVfsTarget('', context, 'read', { allowEmptyPath: true })
   } catch (err) {
     return toolErrorJson('bash', 'no_workspace', 'No workspace available for bash execution', {
       details: { error: (err as Error).message },
     })
   }
 
-  // In Plan mode, wrap backend to reject writes with visible errors
-  // so the bash command fails and the user sees "read-only mode" feedback.
-  // Fallback to 'act' if agentMode is not set (shouldn't happen normally).
-  // NOTE: This is defense-in-depth — VfsBridgeFs also checks readOnly internally.
-  // Two layers because ReadOnlyBackend protects at the VFS interface level,
-  // while VfsBridgeFs.readOnly guards at the bridge-to-backend boundary.
   const isPlanMode = (context.agentMode ?? 'act') === 'plan'
-  const effectiveBackend = isPlanMode ? new ReadOnlyBackend(backend) : backend
 
   // Resolve multi-root names
   let rootNames: string[] = []
@@ -249,128 +113,64 @@ export const bashToolExecutor: ToolExecutor = async (
     // Root repository not available — single root
   }
 
-  // Create assets backend (for /assets mount inside the sandbox)
-  let assetsBackend: VfsBackend | undefined
-  try {
-    assetsBackend = new AssetsBackend(context.workspaceId)
-  } catch {
-    // Assets not available — /assets will not be mounted
-  }
-
-  // Create agent backend (for /agents/<agentId>/... mount)
-  let agentBackend: VfsBackend | undefined
-  try {
-    const projectId = context.projectId
-    if (context.currentAgentId && projectId) {
-      const { ProjectManager } = await import('@/opfs')
-      const projectManager = await ProjectManager.create()
-      const project = await projectManager.getProject(projectId)
-      if (project) {
-        agentBackend = new AgentBackend(project.agentManager, context.currentAgentId)
-      }
-    }
-  } catch {
-    // Agent namespace not available — /agents will not be mounted
-  }
-
-  // Create bridge filesystem (readOnly flag is the authoritative guard)
-  const bridgeFs = new VfsBridgeFs(effectiveBackend, rootNames, assetsBackend, agentBackend, {
-    readOnly: isPlanMode,
-    restrictAgentCoreFiles: context.isSubagent === true,
-  })
-
-  // Default cwd into the first root so relative paths always work.
-  // Works for both single-root and multi-root: path always has rootName prefix.
   const defaultCwd = rootNames.length > 0
     ? `${WORKSPACE_MOUNT}/${rootNames[0]}`
     : WORKSPACE_MOUNT
-
-  // Create bash instance with the bridged filesystem
-  const bash: BashInstance = new Bash({
-    fs: bridgeFs as any,
-    cwd: defaultCwd,
-    executionLimits: {
-      maxCommandCount: 5000,
-      maxLoopIterations: 10000,
-      maxCallDepth: 50,
-    },
-  })
-
-  // Execute the command with wall-clock timeout
-  const startTime = Date.now()
+  const cwd = (args.cwd as string) || defaultCwd
   const timeoutMs = typeof args.timeout === 'number' && args.timeout > 0 ? args.timeout : 120_000
 
+  // VFS RPC handler config — passed to BashWorkerClient so it can execute
+  // file IO on the main thread (where all the zustand stores / managers live).
+  const handlerConfig: VfsRpcHandlerConfig = {
+    workspaceId: context.workspaceId ?? null,
+    projectId: context.projectId ?? null,
+    currentAgentId: context.currentAgentId ?? null,
+    readOnly: isPlanMode,
+    restrictAgentCoreFiles: context.isSubagent === true,
+    onWorkspacePathsChanged: context.onWorkspacePathsChanged,
+    directoryHandle: context.directoryHandle,
+  }
+
+  const startTime = Date.now()
+
   try {
-    const cwd = (args.cwd as string) || defaultCwd
-
-    // Race between execution and timeout
-    const result = await withToolTimeout(
-      bash.exec(command, { cwd }),
-      timeoutMs,
-      'bash',
+    const result = await bashExec(
+      {
+        command,
+        cwd,
+        rootNames,
+        readOnly: isPlanMode,
+        restrictAgentCoreFiles: context.isSubagent === true,
+        timeoutMs,
+        abortSignal: context.abortSignal,
+      },
+      handlerConfig,
     )
-    const elapsedMs = Date.now() - startTime
-
-    // Decode byte-shaped stdout for display in the tool result.
-    // just-bash 3.x distinguishes text vs bytes via stdoutKind / stdoutEncoding.
-    // The bash tool should present human-readable UTF-8 text to the agent,
-    // not the internal latin1-shaped byte string used inside the pipeline.
-    const outputKind = stdoutKindHelper
-      ? stdoutKindHelper(result)
-      : (result.stdoutEncoding === 'binary' ? 'bytes' : 'text')
-
-    // Truncate large outputs
-    const MAX_OUTPUT = 50_000
-    let stdout = result.stdout || ''
-    let stderr = result.stderr || ''
-    if (outputKind === 'bytes' && decodeBytesToUtf8Helper && unsafeBytesFromLatin1Helper) {
-      try {
-        stdout = decodeBytesToUtf8Helper(unsafeBytesFromLatin1Helper(stdout))
-      } catch {
-        // Fall back to raw stdout if decoding fails.
-      }
-    }
-
-    // just-bash reports virtual filesystem failures as a non-zero command
-    // result instead of rejecting. Normalize protected delegated-agent reads
-    // into the same tool error envelope used by the other VFS tools.
-    if (result.exitCode !== 0 && isSubagentPermissionDenied(new Error(stderr))) {
-      return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, stderr, {
-        details: { command, elapsedMs },
-      })
-    }
-    let truncated = false
-
-    if (stdout.length > MAX_OUTPUT) {
-      stdout = stdout.slice(0, MAX_OUTPUT) + `\n... truncated (${stdout.length} total chars)`
-      truncated = true
-    }
-    if (stderr.length > MAX_OUTPUT) {
-      stderr = stderr.slice(0, MAX_OUTPUT) + `\n... truncated (${stderr.length} total chars)`
-      truncated = true
-    }
 
     return toolOkJson('bash', {
-      stdout,
-      stderr,
+      stdout: result.stdout,
+      stderr: result.stderr,
       exitCode: result.exitCode,
-      truncated,
+      truncated: result.truncated,
       command,
-      elapsedMs,
+      elapsedMs: result.elapsedMs,
     })
   } catch (err) {
+    const elapsedMs = Date.now() - startTime
     if (isToolTimeoutError(err)) {
       return toolErrorJson('bash', 'timeout', err.message, {
-        details: { command, elapsedMs: Date.now() - startTime },
+        details: { command, elapsedMs },
         retryable: true,
       })
     }
     const message = err instanceof Error ? err.message : String(err)
-    if (message.startsWith('EACCES: delegated subagent')) {
-      return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, message)
+    if (isSubagentPermissionDenied(err) || message.startsWith('EACCES: delegated subagent')) {
+      return toolErrorJson('bash', SUBAGENT_PERMISSION_DENIED, message, {
+        details: { command, elapsedMs },
+      })
     }
     return toolErrorJson('bash', 'execution_error', `Bash execution failed: ${message}`, {
-      details: { command, elapsedMs: Date.now() - startTime },
+      details: { command, elapsedMs },
     })
   }
 }
@@ -384,7 +184,7 @@ export const bashPromptDoc: ToolPromptDoc = {
   section: '### Shell',
   lines: [
     '- `bash(command, cwd?)` — Execute bash commands in a sandboxed environment',
-    '  - Available: grep, sed, awk, cat, ls, find, sort, uniq, wc, head, tail, jq, rg, diff, xargs, tree, etc.',
+    '  - Available: grep, sed, awk, cat, ls, find, sort, uniq, wc, head, tail, jq, rg, diff, xargs, tree, gzip, gunzip, zcat, etc.',
     '  - NOT available: git, node, npm, python3, curl, wget, tar',
     '  - Limitations: no process substitution `<(...)`, no `xargs -I`, `echo -e` does not interpret escapes (use printf), `rg` does not support --no-heading or -r',
     '  - Pipes (`|`), redirections (`>`, `>>`), chaining (`&&`, `||`, `;`)',
