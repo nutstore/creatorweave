@@ -107,6 +107,10 @@ export function WebMCPSettings() {
     }
   }
 
+  const handleInstallExtension = () => {
+    useExtensionStore.getState().openInstallGuide()
+  }
+
   const formatTime = (timestamp: number) =>
     new Date(timestamp).toLocaleString(undefined, {
       month: 'short',
@@ -129,6 +133,7 @@ export function WebMCPSettings() {
         refreshing={refreshing}
         onToggleGlobal={handleToggleGlobal}
         onRefresh={handleRefresh}
+        onInstallExtension={handleInstallExtension}
         formatTime={formatTime}
       />
 

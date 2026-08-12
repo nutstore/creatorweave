@@ -27,14 +27,14 @@ export function ExtensionBanner({ onInstallClick }: ExtensionBannerProps) {
   if (!visible) return null
 
   return (
-    <div className="relative flex items-center justify-between gap-3 border-b border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2.5 dark:border-blue-800 dark:from-blue-950/60 dark:to-indigo-950/40">
+    <div className="relative flex items-center justify-between gap-3 border-b border-primary-200 bg-gradient-to-r from-primary-50 to-primary-100 px-4 py-2.5 dark:border-primary-100/30 dark:from-primary-100/15 dark:to-primary-100/5">
       <div className="flex items-center gap-3 min-w-0">
-        <Globe className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+        <Globe className="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400" />
         <div className="min-w-0">
-          <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+          <span className="text-sm font-medium text-primary-900 dark:text-primary-200">
             {t('extension.bannerTitle')}
           </span>
-          <span className="ml-2 hidden text-sm text-blue-700 dark:text-blue-300 sm:inline">
+          <span className="ml-2 hidden text-sm text-primary-700 dark:text-primary-300 sm:inline">
             {t('extension.bannerDescription')}
           </span>
         </div>
@@ -43,7 +43,7 @@ export function ExtensionBanner({ onInstallClick }: ExtensionBannerProps) {
         <button
           type="button"
           onClick={onInstallClick}
-          className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+          className="rounded-md bg-primary-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-600"
         >
           {t('extension.bannerAction')} →
         </button>
@@ -53,7 +53,7 @@ export function ExtensionBanner({ onInstallClick }: ExtensionBannerProps) {
             dismissBanner()
             setVisible(false)
           }}
-          className="rounded p-1 text-blue-400 transition-colors hover:bg-blue-100 hover:text-blue-600 dark:hover:bg-blue-900 dark:hover:text-blue-300"
+          className="rounded p-1 text-primary-400 transition-colors hover:bg-primary-100 hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:hover:bg-primary-100/30 dark:hover:text-primary-300"
           aria-label={t('extension.bannerDismiss')}
         >
           <X className="h-4 w-4" />

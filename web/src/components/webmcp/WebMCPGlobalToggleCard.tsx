@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { AlertTriangle, Puzzle, RefreshCw } from 'lucide-react'
 import { BrandButton, BrandSwitch } from '@creatorweave/ui'
 
 interface WebMCPGlobalToggleCardProps {
@@ -11,6 +11,7 @@ interface WebMCPGlobalToggleCardProps {
   refreshing: boolean
   onToggleGlobal: (enabled: boolean) => void
   onRefresh: () => void
+  onInstallExtension: () => void
   formatTime: (timestamp: number) => string
 }
 
@@ -24,6 +25,7 @@ export function WebMCPGlobalToggleCard({
   refreshing,
   onToggleGlobal,
   onRefresh,
+  onInstallExtension,
   formatTime,
 }: WebMCPGlobalToggleCardProps) {
   return (
@@ -66,15 +68,39 @@ export function WebMCPGlobalToggleCard({
         </BrandButton>
       </div>
 
+      {/* Extension not installed — prompt to install (inline, no tab switching) */}
       {!bridgeAvailable && !extensionInstalled && (
         <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
               {t('settings.webMCPExtensionRequired')}
             </p>
             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400/80">
               {t('settings.webMCPExtensionRequiredHint')}
+            </p>
+            <BrandButton
+              variant="ghost"
+              className="-ml-2 mt-1.5 h-7 gap-1.5 px-2 text-xs font-medium text-amber-800 hover:bg-amber-100 hover:text-amber-900 dark:text-amber-300 dark:hover:bg-amber-900/40 dark:hover:text-amber-200"
+              onClick={onInstallExtension}
+            >
+              <Puzzle className="h-3.5 w-3.5" />
+              {t('settings.webMCPInstallExtension')}
+            </BrandButton>
+          </div>
+        </div>
+      )}
+
+      {/* Extension installed but bridge not connected — prompt to refresh */}
+      {!bridgeAvailable && extensionInstalled && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              {t('settings.webMCPBridgeDisconnectedTitle')}
+            </p>
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-400/80">
+              {t('settings.webMCPBridgeDisconnectedHint')}
             </p>
           </div>
         </div>

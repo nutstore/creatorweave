@@ -25,14 +25,14 @@ export function ExtensionOutdatedBanner() {
   if (!visible) return null
 
   return (
-    <div className="relative flex items-center justify-between gap-3 border-b border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 px-4 py-2.5 dark:border-amber-800 dark:from-amber-950/60 dark:to-yellow-950/40">
+    <div className="relative flex items-center justify-between gap-3 border-b border-warning-200 bg-gradient-to-r from-warning-50 to-warning-100 px-4 py-2.5 dark:border-warning-200/30 dark:from-warning-100/15 dark:to-warning-100/5">
       <div className="flex items-center gap-3 min-w-0">
-        <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
         <div className="min-w-0">
-          <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+          <span className="text-sm font-medium text-warning-900">
             {t('extension.outdatedBannerTitle')}
           </span>
-          <span className="ml-2 hidden text-sm text-amber-700 dark:text-amber-300 sm:inline">
+          <span className="ml-2 hidden text-sm text-warning dark:text-warning-200 sm:inline">
             {t('extension.outdatedBannerDescription')
               .replace('{current}', extensionVersion || '?')
               .replace('{latest}', latestVersion)}
@@ -43,7 +43,7 @@ export function ExtensionOutdatedBanner() {
         <button
           type="button"
           onClick={() => window.open(`/chrome-extension.zip?v=${__APP_BUILD_ID__}`, '_blank')}
-          className="rounded-md bg-amber-600 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:hover:bg-amber-600"
+          className="rounded-md bg-warning px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-warning-500 focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2"
         >
           {t('extension.outdatedBannerAction')} →
         </button>
@@ -53,7 +53,7 @@ export function ExtensionOutdatedBanner() {
             dismissOutdatedBanner()
             setVisible(false)
           }}
-          className="rounded p-1 text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-600 dark:hover:bg-amber-900 dark:hover:text-amber-300"
+          className="rounded p-1 text-warning-200 transition-colors hover:bg-warning-100 hover:text-warning focus:outline-none focus:ring-2 focus:ring-warning focus:ring-offset-2 dark:hover:bg-warning-100/30"
           aria-label={t('extension.bannerDismiss')}
         >
           <X className="h-4 w-4" />

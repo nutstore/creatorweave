@@ -21,6 +21,11 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  Clock,
+  ClipboardList,
+  Folder,
+  Info,
+  AlertTriangle,
 } from 'lucide-react'
 import {
   BrandDialog,
@@ -43,27 +48,6 @@ const TOTAL_STEPS = 5
 const EXTENSION_DOWNLOAD_URL = `/chrome-extension.zip?v=${__APP_BUILD_ID__}`
 
 // ---------------------------------------------------------------------------
-// Step indicators
-// ---------------------------------------------------------------------------
-
-function StepIndicator({ current, total }: { current: number; total: number }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      {Array.from({ length: total }, (_, i) => (
-        <div
-          key={i}
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            i + 1 <= current
-              ? 'w-6 bg-blue-600 dark:bg-blue-400'
-              : 'w-3 bg-neutral-200 dark:bg-neutral-700'
-          }`}
-        />
-      ))}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Step 1: Introduction
 // ---------------------------------------------------------------------------
 
@@ -77,8 +61,8 @@ function StepIntro() {
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40">
-          <Globe className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-100/30">
+          <Globe className="h-8 w-8 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
@@ -92,25 +76,26 @@ function StepIntro() {
         {features.map((f, i) => (
           <div
             key={i}
-            className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800"
+            className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3"
           >
-            <span className="text-green-600 dark:text-green-400">{f.icon}</span>
-            <span className="text-sm text-secondary dark:text-foreground">{f.text}</span>
+            <span className="text-primary-600 dark:text-primary-400">{f.icon}</span>
+            <span className="text-sm text-secondary">{f.text}</span>
           </div>
         ))}
       </div>
 
-      <div className="space-y-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-        <div className="flex items-center gap-2 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
-          <span className="font-medium">⏱</span> {t('extension.estimatedTime')}
+      <div className="space-y-1.5 rounded-xl border border-border bg-tertiary px-4 py-3">
+        <div className="flex items-center gap-2 text-xs text-tertiary">
+          <Clock className="h-3.5 w-3.5 text-tertiary" /> {t('extension.estimatedTime')}
         </div>
-        <div className="flex items-center gap-2 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
-          <span className="font-medium">📋</span> {t('extension.prerequisite')}
+        <div className="flex items-center gap-2 text-xs text-tertiary">
+          <ClipboardList className="h-3.5 w-3.5 text-tertiary" /> {t('extension.prerequisite')}
         </div>
       </div>
 
-      <p className="text-center text-xs text-amber-600 dark:text-amber-400">
-        ⚠️ {t('extension.previewNote')}
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-warning">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+        {t('extension.previewNote')}
       </p>
     </div>
   )
@@ -134,12 +119,12 @@ function StepDownload() {
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
-          <Download className="h-7 w-7 text-green-600 dark:text-green-400" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-100/30">
+          <Download className="h-7 w-7 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
-      <p className="text-center text-sm text-secondary dark:text-foreground">
+      <p className="text-center text-sm text-secondary">
         {t('extension.stepDownloadDesc')} ({t('extension.downloadSize')})
       </p>
 
@@ -147,7 +132,7 @@ function StepDownload() {
         type="button"
         onClick={handleDownload}
         disabled={downloading}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 disabled:opacity-60 dark:bg-primary-500 dark:hover:bg-primary-600"
       >
         {downloading ? (
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -157,9 +142,9 @@ function StepDownload() {
         {downloading ? '...' : t('extension.downloadButton')}
       </button>
 
-      <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 dark:border-blue-800 dark:bg-blue-950/30">
-        <span className="text-sm">💡</span>
-        <p className="text-xs text-blue-800 dark:text-blue-300">
+      <div className="flex items-start gap-2 rounded-xl border border-border bg-tertiary px-3 py-2.5">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600 dark:text-primary-400" />
+        <p className="text-xs text-secondary">
           {t('extension.downloadHint')}
         </p>
       </div>
@@ -183,12 +168,12 @@ function StepExtract() {
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-900/40">
-          <Archive className="h-7 w-7 text-purple-600 dark:text-purple-400" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-100/30">
+          <Archive className="h-7 w-7 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
-      <h3 className="text-center text-sm font-medium text-secondary dark:text-foreground">
+      <h3 className="text-center text-sm font-medium text-secondary">
         {t('extension.extractTitle')}
       </h3>
 
@@ -196,22 +181,22 @@ function StepExtract() {
         {instructions.map((inst) => (
           <div
             key={inst.label}
-            className="flex items-start gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-800"
+            className="flex items-start gap-3 rounded-xl border border-border bg-card px-4 py-3"
           >
-            <span className="shrink-0 rounded bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600 dark:bg-neutral-700 text-neutral-300 text-neutral-300 dark:text-neutral-300">
+            <span className="shrink-0 rounded-md bg-tertiary px-2 py-0.5 text-xs font-medium text-secondary">
               {inst.label}
             </span>
-            <span className="text-sm text-secondary dark:text-foreground">{inst.text}</span>
+            <span className="text-sm text-secondary">{inst.text}</span>
           </div>
         ))}
       </div>
 
-      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
-        <div className="flex items-center gap-2 text-xs text-neutral-500">
-          <span className="font-mono text-neutral-400">📁</span>
-          <span className="text-neutral-400 text-neutral-400 dark:text-neutral-400">
-            chrome-extension.zip → 📁 chrome-extension/
-          </span>
+      <div className="rounded-xl border border-border bg-tertiary p-3">
+        <div className="flex items-center gap-2 text-xs text-tertiary">
+          <Folder className="h-3.5 w-3.5 text-tertiary" />
+          <code className="font-mono">
+            chrome-extension.zip → chrome-extension/
+          </code>
         </div>
       </div>
     </div>
@@ -236,10 +221,10 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30"
+      className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-primary-600 transition-colors hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-100/30"
     >
-      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-      {copied ? '✓' : t('extension.installCopyLink')}
+      {copied ? <Check className="h-3 w-3 text-success" /> : <Copy className="h-3 w-3" />}
+      {t('extension.installCopyLink')}
     </button>
   )
 }
@@ -250,34 +235,34 @@ function StepInstall() {
   return (
     <div className="space-y-4">
       <div className="flex justify-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/40">
-          <Puzzle className="h-7 w-7 text-orange-600 dark:text-orange-400" />
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-100/30">
+          <Puzzle className="h-7 w-7 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
-      <h3 className="text-center text-sm font-medium text-secondary dark:text-foreground">
+      <h3 className="text-center text-sm font-medium text-secondary">
         {t('extension.stepInstallDesc')}
       </h3>
 
       {/* Step A */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
+      <div className="rounded-xl border border-border bg-card p-3">
         <div className="mb-1.5 flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-100/30 dark:text-primary-300">
             A
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-foreground">
+          <span className="text-sm font-medium text-secondary">
             {t('extension.installStepA')}
           </span>
         </div>
         <div className="ml-7 space-y-1">
           <div className="flex items-center gap-2">
-            <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs dark:bg-neutral-700">
+            <code className="rounded bg-tertiary px-1.5 py-0.5 text-xs text-secondary">
               chrome://extensions
             </code>
             <CopyButton text="chrome://extensions" />
           </div>
           <div className="flex items-center gap-2">
-            <code className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs dark:bg-neutral-700">
+            <code className="rounded bg-tertiary px-1.5 py-0.5 text-xs text-secondary">
               edge://extensions
             </code>
             <CopyButton text="edge://extensions" />
@@ -286,42 +271,42 @@ function StepInstall() {
       </div>
 
       {/* Step B */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
+      <div className="rounded-xl border border-border bg-card p-3">
         <div className="mb-1.5 flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-100/30 dark:text-primary-300">
             B
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-foreground">
+          <span className="text-sm font-medium text-secondary">
             {t('extension.installStepB')}
           </span>
         </div>
         <div className="ml-7">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">OFF</span>
-            <div className="h-5 w-9 rounded-full bg-neutral-200 dark:bg-neutral-600" />
-            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">ON</span>
+            <span className="text-xs text-tertiary">OFF</span>
+            <div className="h-5 w-9 rounded-full bg-border-strong" />
+            <span className="text-xs font-medium text-primary-600 dark:text-primary-400">ON</span>
           </div>
         </div>
       </div>
 
       {/* Step C */}
-      <div className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-800">
+      <div className="rounded-xl border border-border bg-card p-3">
         <div className="mb-1.5 flex items-center gap-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-700 dark:bg-primary-100/30 dark:text-primary-300">
             C
           </span>
-          <span className="text-sm font-medium text-secondary dark:text-foreground">
+          <span className="text-sm font-medium text-secondary">
             {t('extension.installStepC')}
           </span>
         </div>
-        <div className="ml-7 text-xs text-tertiary text-neutral-400 text-neutral-400 dark:text-neutral-400">
+        <div className="ml-7 text-xs text-tertiary">
           {t('extension.installStepCSelect')}
         </div>
       </div>
 
-      <div className="flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2.5 dark:border-green-800 dark:bg-green-950/30">
-        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
-        <p className="text-xs text-green-800 dark:text-green-300">
+      <div className="flex items-start gap-2 rounded-xl border border-success/20 bg-success-bg px-3 py-2.5">
+        <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+        <p className="text-xs text-success">
           {t('extension.installSuccessHint')}
         </p>
       </div>
@@ -339,8 +324,8 @@ function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
   return (
     <div className="space-y-5">
       <div className="flex justify-center">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/40">
-          <RefreshCw className="h-8 w-8 text-green-600 dark:text-green-400" />
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-100/30">
+          <RefreshCw className="h-8 w-8 text-primary-600 dark:text-primary-400" />
         </div>
       </div>
 
@@ -348,7 +333,7 @@ function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
         <h3 className="text-lg font-semibold text-secondary">
           {t('extension.refreshTitle')}
         </h3>
-        <p className="mt-2 text-sm text-secondary text-neutral-300 text-neutral-300 dark:text-neutral-300">
+        <p className="mt-2 text-sm text-tertiary">
           {t('extension.refreshDescription')}
         </p>
       </div>
@@ -356,18 +341,36 @@ function StepRefresh({ onRefresh }: { onRefresh: () => void }) {
       <button
         type="button"
         onClick={onRefresh}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-600"
       >
         <RefreshCw className="h-4 w-4" />
         {t('extension.refreshButton')}
       </button>
 
-      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
-        <span className="text-sm">💡</span>
-        <p className="text-xs text-amber-800 dark:text-amber-300">
+      <div className="flex items-start gap-2 rounded-xl border border-border bg-tertiary px-3 py-2.5">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600 dark:text-primary-400" />
+        <p className="text-xs text-secondary">
           {t('extension.refreshHint')}
         </p>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Step Indicator (progress dots)
+// ---------------------------------------------------------------------------
+
+function StepIndicator({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: total }, (_, i) => {
+        const active = i < current
+        const cls = active
+          ? 'h-1.5 w-6 rounded-full bg-primary-600 transition-all dark:bg-primary-500'
+          : 'h-1.5 w-1.5 rounded-full bg-border-strong transition-all'
+        return <span key={i} className={cls} />
+      })}
     </div>
   )
 }
@@ -409,7 +412,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
       <BrandDialogContent className="flex w-[min(94vw,560px)] max-w-none flex-col overflow-hidden p-0">
         <BrandDialogHeader>
           <div className="flex items-center gap-2.5">
-            <Globe className="h-[18px] w-[18px] text-blue-600" />
+            <Globe className="h-[18px] w-[18px] text-primary-600 dark:text-primary-400" />
             <BrandDialogTitle>{t('extension.guideTitle')}</BrandDialogTitle>
           </div>
           <BrandDialogClose asChild>
@@ -425,13 +428,13 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
         </BrandDialogHeader>
 
         {/* Step indicator + quick jump */}
-        <div className="border-b border-neutral-200 px-5 pb-3 pt-1 dark:border-neutral-700">
+        <div className="border-b border-border px-5 pb-3 pt-1">
           <div className="flex items-center justify-between">
             <StepIndicator current={installGuideStep} total={TOTAL_STEPS} />
             <button
               type="button"
               onClick={() => goToStep(5)}
-              className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+              className="text-xs text-primary-600 hover:underline dark:text-primary-400"
             >
               {t('extension.refreshPageLink')}
             </button>
@@ -444,8 +447,8 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
                 onClick={() => goToStep(i + 1)}
                 className={`shrink-0 rounded-md px-2 py-1 text-xs transition-colors ${
                   installGuideStep === i + 1
-                    ? 'bg-blue-100 font-medium text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                    : 'text-tertiary hover:bg-neutral-100 text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800'
+                    ? 'bg-primary-100 font-medium text-primary-700 dark:bg-primary-100/30 dark:text-primary-300'
+                    : 'text-tertiary hover:bg-hover'
                 }`}
               >
                 {label}
@@ -464,11 +467,11 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
         </div>
 
         {/* Navigation */}
-        <div className="flex items-center justify-between border-t border-neutral-200 px-5 py-3 dark:border-neutral-700">
+        <div className="flex items-center justify-between border-t border-border px-5 py-3">
           <button
             type="button"
             onClick={installGuideStep > 1 ? () => goToStep(installGuideStep - 1) : handleClose}
-            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-neutral-100 hover:text-secondary text-neutral-400 text-neutral-400 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-foreground"
+            className="flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-tertiary transition-colors hover:bg-hover hover:text-secondary"
           >
             <ChevronLeft className="h-4 w-4" />
             {installGuideStep > 1 ? t('extension.prevStep') : t('extension.skip')}
@@ -478,7 +481,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
             <button
               type="button"
               onClick={() => goToStep(installGuideStep + 1)}
-              className="flex items-center gap-1 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="flex items-center gap-1 rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-600"
             >
               {t('extension.nextStep')}
               <ChevronRight className="h-4 w-4" />
@@ -487,7 +490,7 @@ export function ExtensionInstallGuide({ open, onOpenChange }: ExtensionInstallGu
             <button
               type="button"
               onClick={handleClose}
-              className="flex items-center gap-1 rounded-md bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+              className="flex items-center gap-1 rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-600"
             >
               {t('extension.finish')}
             </button>

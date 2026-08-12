@@ -17,27 +17,27 @@ export const ExtensionErrorCard = memo(function ExtensionErrorCard({
   const t = useT()
 
   return (
-    <div className="my-2 overflow-hidden rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
-      <div className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5 dark:border-amber-800">
-        <Globe className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-        <span className="text-sm font-medium text-amber-900 dark:text-amber-200">
+    <div className="my-2 overflow-hidden rounded-xl border border-danger/20 bg-danger-bg">
+      <div className="flex items-center gap-2 border-b border-danger/20 px-4 py-2.5">
+        <Globe className="h-4 w-4 text-danger" />
+        <span className="text-sm font-medium text-danger">
           {t('extension.errorCardTitle')}
         </span>
       </div>
       <div className="px-4 py-3">
-        <p className="text-sm text-amber-800 dark:text-amber-300">
+        <p className="text-sm text-danger">
           {t('extension.errorCardDescription')}
         </p>
         <ul className="mt-2.5 space-y-1.5">
-          <li className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+          <li className="flex items-center gap-2 text-sm text-danger">
             <Search className="h-3.5 w-3.5 shrink-0" />
             {t('extension.errorCardFeature1')}
           </li>
-          <li className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+          <li className="flex items-center gap-2 text-sm text-danger">
             <FileText className="h-3.5 w-3.5 shrink-0" />
             {t('extension.errorCardFeature2')}
           </li>
-          <li className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+          <li className="flex items-center gap-2 text-sm text-danger">
             <MonitorSmartphone className="h-3.5 w-3.5 shrink-0" />
             {t('extension.errorCardFeature3')}
           </li>
@@ -46,11 +46,11 @@ export const ExtensionErrorCard = memo(function ExtensionErrorCard({
           <button
             type="button"
             onClick={onInstallClick}
-            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-blue-700"
+            className="rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 dark:bg-primary-500 dark:hover:bg-primary-600"
           >
             {t('extension.errorCardAction')} →
           </button>
-          <span className="text-xs text-amber-600 dark:text-amber-500">
+          <span className="text-xs text-danger">
             {t('extension.errorCardDismiss')}
           </span>
         </div>
