@@ -8,10 +8,11 @@ import History from '@tiptap/extension-history'
 import Mention from '@tiptap/extension-mention'
 import { FileMention, type FileMentionItem } from './FileMentionExtension'
 import { SlashCommandExtension, type SlashCommandItem } from './SlashCommandExtension'
-import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Check, FileIcon, FolderIcon, Paperclip, X, ImageIcon, Loader2, FileText } from 'lucide-react'
 import { useT } from '@/i18n'
 import { useAssetStore } from '@/store/asset.store'
 import { Lightbox } from './Lightbox'
+import { MarkdownContent } from './MarkdownContent'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -333,6 +334,10 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
   const t = useT()
   const [isFocused, setIsFocused] = useState(false)
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null)
+  // Markdown preview: rendered in a Lightbox (children mode) when the user
+  // clicks a .md attachment chip before sending.
+  const [mdPreviewContent, setMdPreviewContent] = useState<{ name: string; text: string } | null>(null)
+  const [mdPreviewLoading, setMdPreviewLoading] = useState(false)
   // Agent selector state
   const [showAgentSelector, setShowAgentSelector] = useState(false)
   const [isCreatingAgent, setIsCreatingAgent] = useState(false)
@@ -364,6 +369,23 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
     },
     [addFiles],
   )
+
+  /**
+   * Open a modal preview of a pending markdown attachment.
+   * Reads the file text, then renders it via MarkdownContent inside the
+   * shared Lightbox (children mode) — mirroring the image lightbox flow.
+   */
+  const handlePreviewMarkdown = useCallback(async (asset: { file: File; name: string }) => {
+    setMdPreviewLoading(true)
+    try {
+      const text = await asset.file.text()
+      setMdPreviewContent({ name: asset.name, text })
+    } catch {
+      // best-effort — ignore read errors
+    } finally {
+      setMdPreviewLoading(false)
+    }
+  }, [])
 
   // Suggestion state – driven by tiptap Mention/Suggestion
   const [suggestionItems, setSuggestionItems] = useState<AgentMentionCandidate[]>([])
@@ -1129,7 +1151,9 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
             {/* Pending asset uploads preview */}
             {pendingAssets.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {pendingAssets.map((asset) => (
+                {pendingAssets.map((asset) => {
+                  const isMarkdown = /\.(md|markdown)$/i.test(asset.name) || asset.mimeType === 'text/markdown'
+                  return (
                   <div
                     key={asset.id}
                     className="group relative flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-2 py-1.5 dark:border-neutral-700 dark:bg-neutral-800"
@@ -1149,6 +1173,26 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                           }
                         }}
                       />
+                    ) : isMarkdown ? (
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="flex h-8 w-8 cursor-pointer items-center justify-center rounded bg-primary-50 text-primary-600 transition-colors hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/50"
+                        onClick={() => handlePreviewMarkdown(asset)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handlePreviewMarkdown(asset)
+                          }
+                        }}
+                        title={t('conversation.input.previewMarkdown')}
+                      >
+                        {mdPreviewLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <FileText className="h-4 w-4" />
+                        )}
+                      </div>
                     ) : (
                       <div className="flex h-8 w-8 items-center justify-center rounded bg-neutral-200 dark:bg-neutral-700">
                         <ImageIcon className="h-4 w-4" />
@@ -1180,7 +1224,8 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
                       <X className="h-4 w-4" />
                     </button>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </>
@@ -1416,6 +1461,30 @@ export const AgentRichInput = forwardRef<AgentRichInputHandle, AgentRichInputPro
       {/* Lightbox overlay for click-to-enlarge images */}
       {lightboxSrc && (
         <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
+
+      {/* Markdown preview overlay for .md attachments (before send) */}
+      {mdPreviewContent && (
+        <Lightbox onClose={() => setMdPreviewContent(null)}>
+          <div className="flex h-[90vh] w-[min(90vw,860px)] flex-col overflow-hidden rounded-lg bg-white shadow-2xl dark:bg-neutral-900">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2 dark:border-neutral-700">
+              <span className="truncate text-sm font-medium text-neutral-700 dark:text-neutral-200">
+                {mdPreviewContent.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => setMdPreviewContent(null)}
+                className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto px-6 py-4 text-sm leading-relaxed text-neutral-800 dark:text-neutral-100">
+              <MarkdownContent content={mdPreviewContent.text} allowHtml />
+            </div>
+          </div>
+        </Lightbox>
       )}
     </div>
   )

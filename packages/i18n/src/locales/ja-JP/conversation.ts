@@ -59,6 +59,7 @@ export const conversation = {
       },
       dropFilesHere: "ここにファイルをドロップ",
       attachFiles: "ファイルを添付",
+      previewMarkdown: "Markdown をプレビュー",
       agentIdPlaceholder: "agent-id",
       createAgent: "作成",
       agentCreateFailed: "作成できませんでした — ID が既に存在する可能性があります",

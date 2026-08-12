@@ -60,6 +60,7 @@ export const conversation = {
       },
       dropFilesHere: "Drop files here",
       attachFiles: "Attach files",
+      previewMarkdown: "Preview Markdown",
       agentIdPlaceholder: "agent-id",
       createAgent: "Create",
       agentCreateFailed: "Couldn't create agent — ID may already exist",

@@ -221,11 +221,20 @@ function streamCwOpenAIChatCompletions(
         const delta = choice.delta
         if (!delta) return
 
-        // Skip pure-whitespace content chunks. Some models (e.g. MiniMax-M2.7)
-        // emit trailing newlines between the reasoning phase and tool_calls,
-        // which would otherwise render as empty bubbles in the UI.
-        if (delta.content && delta.content.trim().length > 0) {
-          if (!currentBlock || currentBlock.type !== 'text') {
+        // Skip pure-whitespace content chunks, but ONLY at the start of a new
+        // text block. Some models (e.g. MiniMax-M2.7) emit trailing newlines
+        // between the reasoning phase and tool_calls, which would otherwise
+        // render as empty bubbles in the UI.
+        //
+        // IMPORTANT: Whitespace-only deltas that arrive IN THE MIDDLE of an
+        // existing text block must be preserved — they carry meaningful
+        // markdown structure (e.g. `\n\n` separating a `### heading` from a
+        // following GFM table). Dropping them caused tables to render as a
+        // single mashed-together paragraph.
+        const isWhitespaceOnly = !!delta.content && delta.content.length > 0 && delta.content.trim().length === 0
+        const startsNewTextBlock = !currentBlock || currentBlock.type !== 'text'
+        if (delta.content && !(isWhitespaceOnly && startsNewTextBlock)) {
+          if (startsNewTextBlock) {
             finishCurrentBlock(currentBlock)
             currentBlock = { type: 'text', text: '' }
             blocks.push(currentBlock)

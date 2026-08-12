@@ -60,6 +60,7 @@ export const conversation = {
       },
       dropFilesHere: "拖拽文件到此处",
       attachFiles: "添加附件",
+      previewMarkdown: "预览 Markdown",
       agentIdPlaceholder: "agent-id",
       createAgent: "创建",
       agentCreateFailed: "创建失败 — ID 可能已存在",

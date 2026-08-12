@@ -59,6 +59,7 @@ export const conversation = {
       },
       dropFilesHere: "여기에 파일을 드롭하세요",
       attachFiles: "파일 첨부",
+      previewMarkdown: "Markdown 미리보기",
       agentIdPlaceholder: "agent-id",
       createAgent: "생성",
       agentCreateFailed: "생성 실패 — ID가 이미 존재할 수 있습니다",
