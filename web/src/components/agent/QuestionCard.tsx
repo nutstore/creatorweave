@@ -83,9 +83,9 @@ export function QuestionCard({
     return (
       <div className="my-1 max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
         {/* Header — subtle tint marks it as completed */}
-        <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800/50">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
-          <span className="break-words text-xs font-medium text-tertiary">
+        <div className="flex items-center gap-2 border-b border-primary-100 bg-primary-50 px-3 py-2 dark:border-primary-100/20 dark:bg-primary-100/10">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary-600 dark:text-primary-400" />
+          <span className="break-words text-xs font-medium text-primary-700 dark:text-primary-300">
             {t('questionCard.answered')}
           </span>
         </div>
@@ -150,7 +150,7 @@ export function QuestionCard({
 
   return (
     <div className="my-1 max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
-      {/* Header — teal tint signals "your action needed" */}
+      {/* Header */}
       <div className="flex items-center gap-2 border-b border-primary-100 bg-primary-50 px-3 py-2 dark:border-primary-100/20 dark:bg-primary-100/10">
         <MessageCircleQuestion className="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400" />
         <span className="break-words text-xs font-medium text-primary-700 dark:text-primary-300">
@@ -224,7 +224,7 @@ function OptionContent({ option }: { option: NormalizedOption }) {
       <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
         {option.recommended && (
           <span
-            className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary-100 px-1 py-0.5 text-[10px] font-medium text-primary-700"
+            className="inline-flex shrink-0 items-center gap-0.5 rounded bg-neutral-100 px-1 py-0.5 text-[10px] font-medium text-tertiary ring-1 ring-neutral-200"
             title={t('questionCard.recommended')}
           >
             <Star className="h-2.5 w-2.5 fill-current" />
@@ -234,7 +234,7 @@ function OptionContent({ option }: { option: NormalizedOption }) {
         <span className="break-words text-sm text-secondary">{option.label}</span>
       </div>
       {option.description && (
-        <div className="mt-0.5 break-words text-xs text-primary-600">
+        <div className="mt-0.5 break-words text-xs text-tertiary">
           {option.description}
         </div>
       )}
@@ -288,8 +288,8 @@ function YesNoInput({
           className={
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed ' +
             (yesIsDefault
-              ? 'bg-success text-white ring-2 ring-success/40 hover:opacity-90 focus:ring-success'
-              : 'bg-success text-white hover:opacity-90 focus:ring-success')
+              ? 'bg-primary-600 text-white ring-2 ring-primary-400 hover:bg-primary-700 focus:ring-primary-600'
+              : 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-600')
           }
         >
           {t('questionCard.yes')}
@@ -313,7 +313,7 @@ function YesNoInput({
           className={
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 ' +
             (showCustom
-              ? 'bg-primary-100 text-primary-700 ring-1 ring-primary-300'
+              ? 'bg-neutral-100 text-secondary ring-1 ring-neutral-300'
               : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-tertiary dark:hover:bg-neutral-700')
           }
           title={t('questionCard.customInputHint')}
@@ -330,10 +330,10 @@ function YesNoInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400"
           />
           <div className="mt-1.5 flex items-center justify-between">
-            <span className="text-[10px] text-primary-600">
+            <span className="text-[10px] text-tertiary">
               {t('questionCard.submitHint')}
             </span>
             <button
@@ -405,7 +405,7 @@ function SingleChoiceInput({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-primary-100 dark:hover:bg-primary-100/20"
+              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
             >
               <input
                 type="radio"
@@ -413,7 +413,7 @@ function SingleChoiceInput({
                 value={value}
                 checked={selected === value}
                 onChange={() => handleSelect(value)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600 focus:ring-primary-500"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neutral-500 focus:ring-neutral-400"
               />
               <OptionContent option={option} />
             </label>
@@ -421,7 +421,7 @@ function SingleChoiceInput({
         })}
         {/* Custom input option */}
         <label
-          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-primary-100 dark:hover:bg-primary-100/20"
+          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
         >
           <input
             type="radio"
@@ -429,9 +429,9 @@ function SingleChoiceInput({
             value={CUSTOM_VALUE}
             checked={selected === CUSTOM_VALUE}
             onChange={() => handleSelect(CUSTOM_VALUE)}
-            className="h-3.5 w-3.5 shrink-0 text-primary-600 focus:ring-primary-500"
+            className="h-3.5 w-3.5 shrink-0 text-neutral-500 focus:ring-neutral-400"
           />
-          <PencilLine className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+          <PencilLine className="h-3.5 w-3.5 shrink-0 text-tertiary" />
           <span className="text-sm text-secondary">
             {t('questionCard.customInput')}
           </span>
@@ -445,7 +445,7 @@ function SingleChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400"
           />
         </div>
       )}
@@ -530,14 +530,14 @@ function MultiChoiceInput({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-primary-100 dark:hover:bg-primary-100/20"
+              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-700/50"
             >
               <input
                 type="checkbox"
                 value={value}
                 checked={selected.has(value)}
                 onChange={() => toggle(value)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded text-primary-600 focus:ring-primary-500"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded text-neutral-500 focus:ring-neutral-400"
               />
               <OptionContent option={option} />
             </label>
@@ -551,8 +551,8 @@ function MultiChoiceInput({
         className={
           'mt-2 flex items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors ' +
           (showCustom
-            ? 'bg-primary-100 text-primary-700'
-            : 'text-primary-600 hover:bg-primary-100 dark:text-primary-400 dark:hover:bg-primary-100/20')
+            ? 'bg-neutral-100 text-secondary ring-1 ring-neutral-300'
+            : 'text-tertiary hover:bg-neutral-100 dark:hover:bg-neutral-700/50')
         }
       >
         <PencilLine className="h-3.5 w-3.5" />
@@ -566,7 +566,7 @@ function MultiChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400"
           />
         </div>
       )}
@@ -615,10 +615,10 @@ function FreeTextInput({
         onKeyDown={handleKeyDown}
         placeholder={t('questionCard.placeholder')}
         rows={3}
-        className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+        className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-neutral-400 focus:outline-none focus:ring-1 focus:ring-neutral-400"
       />
       <div className="mt-1.5 flex items-center justify-between">
-        <span className="text-[10px] text-primary-600">
+        <span className="text-[10px] text-tertiary">
           {t('questionCard.submitHint')}
         </span>
         <button

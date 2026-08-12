@@ -169,13 +169,31 @@ dark mode so `dark:text-neutral-100` produces light, not near-black, text.
 
 ## Colors
 
-The palette is one accent (teal) plus a warm neutral system and three
-deliberately desaturated status hues.
+The palette uses a **color-role model**: each of four roles has one job and
+a defined surface area. This prevents the failure mode where a single brand
+color is applied to everything that needs emphasis, canceling out all
+hierarchy.
+
+### Color Roles (the 4-role model)
+
+| Role | Job | Token | Surface area |
+|------|-----|-------|-------------|
+| **Brand** (teal) | Primary action, current focus, identity | `primary-*` | Restrained: one solid button per region, focus rings, icons. Never fill a container. |
+| **Attention** (warm amber) | "Look up here" — passive notices, banners, reminders | `accent-warm` / `warning` | Rare: only on elements that must interrupt scanning. |
+| **Status** (desaturated) | Result feedback: done / failed / caution | `success` / `danger` / `warning` | Signal: a badge, an icon, a thin border. |
+| **Neutral** (warm gray) | Everything else: containers, text, dividers | `neutral-*`, `text-*` | The default. Most of the screen. |
+
+**Why four roles, not one color.** A muted system still needs contrast.
+Teal-on-teal produces no hierarchy. The warm amber `accent-warm` earns its
+visibility by being the only warm note in a cool-neutral field — it jumps
+out precisely because nothing else is warm. Reserve it for elements that
+must catch the eye (banner notices, overdue indicators). Do not use teal
+for this job: teal is the calm brand voice, not the alarm.
 
 ### Primary
 
-- **Muted Teal — 500** (#4D9F98): brand baseline; the only saturated color in
-  the system. Used for the primary action, focus rings, links, and active nav.
+- **Muted Teal — 500** (#4D9F98): brand baseline. Used for the primary
+  action, focus rings, links, and active nav.
 - **Muted Teal — 600** (#3A7D77): hover and the default resting fill of the
   primary button (buttons use the darker step at rest for contrast on white).
 - **Muted Teal — 50/100** (#F4F8F7 / #E0EBE9): secondary button fill, tints,
@@ -185,12 +203,23 @@ deliberately desaturated status hues.
 (nav rails, inactive dots, secondary markers), use `brand-muted`
 (`#CEDDDB`) — a teal-tinted gray — so the transition doesn't read as a step.
 
+**The Teal-Budget Rule.** Count solid teal fills in a given viewport: there
+should be at most one primary button and a handful of small accents (icons,
+focus rings). If a card, banner, and button are all teal, remove teal from
+the container — let neutral carry it, reserve teal for the action.
+
 ### Status (all desaturated)
 
 - **Success** (#2D8A4E, bg #EDF5F0): softened green, never `green-500`.
 - **Warning** (#B86E0D, bg #FEF6E8): muted amber.
 - **Danger** (#C46B4A, bg #FDF5F0): clay red, not alert red. Used for
   destructive buttons (bg + text + border, never solid fill) and error inputs.
+- **Info** (#2B8AEF, bg #EFF6FF): a brighter blue than the desaturated status
+hues, intentionally. Banners are 5-second signals, not 8-hour reading surfaces,
+so they earn enough saturation to be noticed. Use for passive banners and
+notices that must be visible (e.g. "extension not installed", "new feature
+available"). This is the system's answer to `blue-600` — it keeps blue's clean,
+informational character while respecting the muted field.
 
 ### Neutral
 
@@ -200,9 +229,14 @@ deliberately desaturated status hues.
 - **Border** (#E5E5E5 / #D4D4D4 strong / #F0F0F0 subtle): hairline borders
   carry most of the structural work that shadows would in a heavier system.
 
-### Accent (warm)
+### Attention (warm)
 
-- **Warm Amber** (#C9922E): a rare warm counterpoint, used sparingly.
+- **Warm Amber — `accent-warm`** (#C9922E): the system's **official attention
+color**. The only warm note in a cool-neutral field, so it reads as
+interruptive by nature. Use for passive notices that must catch the eye
+while scanning: install/upgrade banners, stale-session reminders, unread
+indicators. Pair with a neutral container and reserve the amber for the
+signal elements (icon, left edge, label) — do not flood the entire surface.
 
 ## Typography
 
@@ -320,8 +354,11 @@ The active rail uses `brand-muted` for inactive dots so they harmonize with teal
   shadow only when a surface genuinely floats (cards, dialogs).
 - **Re-point tokens for dark mode.** Every semantic token has a `.dark`
   override — use it; don't hardcode dark values in components.
-- **Keep the primary button the only solid teal on screen** unless it's a focus
-  ring or link.
+- **Keep the primary button the only solid teal in a region** unless it's a
+  focus ring or link. Enforce the Teal-Budget Rule.
+- **Use `accent-warm` for attention, not teal.** Banners, notices, and
+  reminders that must interrupt scanning belong to the warm amber attention
+  role — that's what makes them visible against a teal-neutral field.
 
 ### Don't:
 
@@ -335,5 +372,12 @@ The active rail uses `brand-muted` for inactive dots so they harmonize with teal
   (the 1.5px danger input is the only sanctioned exception).
 - **Don't add gradient text or glass/blur as decoration.** Emphasis comes from
   weight, size, or the serif voice — never from a gradient or backdrop-filter.
+- **Don't use teal for attention.** Teal is the calm brand voice. If an element
+  must interrupt scanning (a banner, an overdue reminder), use `accent-warm` —
+  the warm note jumps out precisely because the rest of the field is cool.
+  Flooding a notice with teal makes it disappear into the brand-colored sea.
+- **Don't flood a container with one color.** Cards and banners should be
+  neutral containers with color reserved for the signal (icon, label, button).
+  A monochrome card has no internal hierarchy.
 - **Don't introduce a neutral `zinc`/`slate` dark background.** The dark theme
   is warm with a teal tint; a cool neutral dark would break the temperature.

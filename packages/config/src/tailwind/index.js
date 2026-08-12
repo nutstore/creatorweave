@@ -144,6 +144,17 @@ export function createBaseConfig(options = {}) {
         700: cssVar('danger-700'),
       },
 
+      // Info — brighter blue for banners/notices. Intentionally more
+      // saturated than the desaturated status hues: banners are 5-second
+      // signals that must be noticed, not 8-hour reading surfaces.
+      info: {
+        DEFAULT: cssVar('info'),
+        bg: cssVar('info-bg'),
+        text: cssVar('info-text'),
+        50: cssVar('info-50'),
+        100: cssVar('info-100'),
+      },
+
       // Warm accent — extended brand token (only used in a few places)
       'accent-warm': cssVar('accent-warm'),
 

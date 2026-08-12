@@ -56,13 +56,13 @@
     --primary-900: 174 30% 18%; /* #1F3532 */
     --primary-950: 174 30% 11%; /* #121F1D */
 
-    /* ========== Status Colors (Muted) ========== */
-    --success: 150 50% 38%; /* #2D8A4E - 更柔和的绿色 */
-    --success-50: 150 30% 96%; /* #EDF5F0 */
-    --success-200: 150 40% 85%; /* #C5E0CD */
-    --success-bg: 150 25% 96%; /* #EDF5F0 */
-    --success-text: 150 50% 35%; /* #257543 */
-    --success-950: 150 50% 8%; /* #0D1F14 */
+    /* ========== Status Colors ========== */
+    --success: 150 50% 38%; /* #2D8A4E */
+    --success-50: 142 70% 95%; /* #E8F7EE */
+    --success-200: 142 55% 82%; /* #A7E0BF */
+    --success-bg: 142 70% 95%; /* #E8F7EE */
+    --success-text: 142 60% 30%; /* #1B7A3E */
+    --success-950: 142 50% 8%; /* #0A1F10 */
 
     --warning: 35 60% 45%; /* #B86E0D - 柔和的橙色 */
     --warning-50: 35 30% 96%; /* #FEF6E8 */
@@ -81,6 +81,15 @@
     --danger-700: 15 65% 38%; /* #823520 */
     --danger-bg: 15 30% 97%; /* #FDF5F0 */
     --danger-border: 15 45% 70%; /* #D98B6E */
+
+    /* Info — a brighter blue than the desaturated status hues, intentionally.
+       Banners are 5-second signals, not 8-hour reading surfaces, so they
+       earn enough saturation to be noticed without going to raw #2563EB. */
+    --info: 212 75% 52%; /* #2B8AEF - 清爽信息蓝，通知栏专用 */
+    --info-50: 212 90% 96%; /* #EFF6FF */
+    --info-100: 212 85% 90%; /* #D6E9FE */
+    --info-bg: 212 90% 96%; /* #EFF6FF */
+    --info-text: 212 70% 35%; /* #155B9E */
 
     /* ========== Extended Colors ========== */
     --bg-tertiary: 40 15% 97%; /* #F8F7F5 - 暖灰 */
@@ -171,12 +180,12 @@
     --primary-900: 174 30% 8%; /* #0E1817 */
     --primary-950: 174 30% 5%; /* #080D0C */
 
-    --success: 150 55% 50%; /* #3D9E66 */
-    --success-50: 150 30% 12%; /* #121D16 */
-    --success-200: 150 35% 22%; /* #1A3425 */
-    --success-bg: 150 45% 18%; /* #1A3425 - 更明显的深色背景 */
-    --success-text: 150 50% 60%; /* #5CB882 */
-    --success-950: 150 40% 5%; /* #07140D */
+    --success: 142 60% 55%; /* #43B56A - dark mode 增亮 */
+    --success-50: 142 40% 12%; /* #11281A */
+    --success-200: 142 45% 22%; /* #1B3D28 */
+    --success-bg: 142 45% 15%; /* #15301F */
+    --success-text: 142 60% 68%; /* #5BC98A */
+    --success-950: 142 50% 5%; /* #06150B */
 
     --warning: 38 70% 50%; /* #C9922E */
     --warning-50: 38 40% 12%; /* #1F180C */
@@ -195,6 +204,12 @@
     --danger-700: 15 65% 70%; /* #E89F86 */
     --danger-bg: 15 55% 18%; /* #34231D - 更明显的深色背景 */
     --danger-border: 15 45% 45%; /* #A05540 */
+
+    --info: 212 80% 65%; /* #4FA3F5 - dark mode 增亮保持清爽 */
+    --info-50: 212 40% 14%; /* #15233A */
+    --info-100: 212 45% 22%; /* #1E3658 */
+    --info-bg: 212 45% 12%; /* #142033 */
+    --info-text: 212 70% 72%; /* #74BAFA */
 
     /* Extended - neutral dark */
     --bg-tertiary: 210 8% 11%; /* #1A2024 */
