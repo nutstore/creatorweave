@@ -27,7 +27,7 @@
  */
 
 import { useState, useCallback, useId, type KeyboardEvent, type TextareaHTMLAttributes } from 'react'
-import { MessageCircleQuestion, CheckCircle2, Clock, FileText, PencilLine, Star } from 'lucide-react'
+import { MessageCircleQuestion, CheckCircle2, Clock, FileText, PencilLine, Star, AlertTriangle } from 'lucide-react'
 import { MarkdownContent } from './MarkdownContent'
 import { useT } from '@/i18n'
 import { normalizeOption, type RawOption, type NormalizedOption } from './QuestionCard.utils'
@@ -81,26 +81,26 @@ export function QuestionCard({
   // Already answered — show question + answer for context
   if (answered) {
     return (
-      <div className="my-1 max-w-full overflow-hidden rounded border border-green-200 bg-green-50 text-sm dark:border-green-800 dark:bg-green-950/30">
-        {/* Header */}
-        <div className="flex items-center gap-2 border-b border-green-200 px-3 py-2 dark:border-green-800">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600 dark:text-green-400" />
-          <span className="break-words text-xs font-medium text-green-700 dark:text-green-300">
+      <div className="my-1 max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+        {/* Header — subtle tint marks it as completed */}
+        <div className="flex items-center gap-2 border-b border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-800/50">
+          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
+          <span className="break-words text-xs font-medium text-tertiary">
             {t('questionCard.answered')}
           </span>
         </div>
 
         {/* Original question */}
-        <div className="border-b border-green-200 px-3 py-2 dark:border-green-800">
-          <div className="break-words text-xs text-green-800 dark:text-green-200">
+        <div className="border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <div className="break-words text-xs text-tertiary">
             <MarkdownContent content={question} />
           </div>
         </div>
 
         {/* Context: affected files */}
         {context?.affected_files && context.affected_files.length > 0 && (
-          <div className="border-b border-green-200 px-3 py-2 dark:border-green-800">
-            <div className="mb-1 flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+          <div className="border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+            <div className="mb-1 flex items-center gap-1 text-xs text-tertiary">
               <FileText className="h-3 w-3 shrink-0" />
               <span>{t('questionCard.affectedFiles')}</span>
             </div>
@@ -109,7 +109,7 @@ export function QuestionCard({
                 <div
                   key={file}
                   title={file}
-                  className="break-all font-mono text-xs text-green-800 dark:text-green-200"
+                  className="break-all font-mono text-xs text-secondary"
                 >
                   {file}
                 </div>
@@ -120,8 +120,8 @@ export function QuestionCard({
 
         {/* Context: preview */}
         {context?.preview && (
-          <div className="border-b border-green-200 px-3 py-2 dark:border-green-800">
-            <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-green-800 dark:text-green-200">
+          <div className="border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+            <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-secondary">
               {context.preview}
             </pre>
           </div>
@@ -130,15 +130,16 @@ export function QuestionCard({
         {/* User's answer */}
         {resultAnswer && (
           <div className="px-3 py-2">
-            <div className="text-xs font-medium text-green-600 dark:text-green-400">
+            <div className="text-xs font-medium text-tertiary">
               {t('questionCard.userAnswer')}
             </div>
-            <div className="mt-1 break-words rounded bg-green-100 px-2 py-1.5 text-sm text-green-900 dark:bg-green-900/40 dark:text-green-100">
+            <div className="mt-1 break-words rounded-lg bg-primary-50 px-2 py-1.5 text-sm text-secondary ring-1 ring-primary-100 dark:bg-primary-100/15 dark:ring-primary-100/20">
               {resultAnswer}
             </div>
             {resultWarning && (
-              <div className="mt-1.5 break-words rounded bg-amber-100 px-2 py-1.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
-                ⚠ {resultWarning}
+              <div className="mt-1.5 flex items-start gap-1 break-words rounded bg-warning-bg px-2 py-1.5 text-xs text-warning ring-1 ring-warning/20">
+                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                <span>{resultWarning}</span>
               </div>
             )}
           </div>
@@ -148,20 +149,20 @@ export function QuestionCard({
   }
 
   return (
-    <div className="my-1 max-w-full overflow-hidden rounded border border-amber-200 bg-amber-50 text-sm dark:border-amber-800 dark:bg-amber-950/30">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-amber-200 px-3 py-2 dark:border-amber-800">
-        <MessageCircleQuestion className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-        <span className="break-words text-xs font-medium text-amber-700 dark:text-amber-300">
+    <div className="my-1 max-w-full overflow-hidden rounded-xl border border-neutral-200 bg-white text-sm dark:border-neutral-700 dark:bg-neutral-800">
+      {/* Header — teal tint signals "your action needed" */}
+      <div className="flex items-center gap-2 border-b border-primary-100 bg-primary-50 px-3 py-2 dark:border-primary-100/20 dark:bg-primary-100/10">
+        <MessageCircleQuestion className="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400" />
+        <span className="break-words text-xs font-medium text-primary-700 dark:text-primary-300">
           {t('questionCard.title')}
         </span>
-        <Clock className="ml-auto h-3 w-3 shrink-0 text-amber-400 dark:text-amber-500" />
+        <Clock className="ml-auto h-3 w-3 shrink-0 text-primary-400 dark:text-primary-500" />
       </div>
 
       {/* Context: affected files */}
       {context?.affected_files && context.affected_files.length > 0 && (
-        <div className="border-b border-amber-200 px-3 py-2 dark:border-amber-800">
-          <div className="mb-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+        <div className="border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <div className="mb-1 flex items-center gap-1 text-xs text-tertiary">
             <FileText className="h-3 w-3 shrink-0" />
             <span>{t('questionCard.affectedFiles')}</span>
           </div>
@@ -170,7 +171,7 @@ export function QuestionCard({
               <div
                 key={file}
                 title={file}
-                className="break-all font-mono text-xs text-amber-800 dark:text-amber-200"
+                className="break-all font-mono text-xs text-secondary"
               >
                 {file}
               </div>
@@ -181,8 +182,8 @@ export function QuestionCard({
 
       {/* Context: preview */}
       {context?.preview && (
-        <div className="border-b border-amber-200 px-3 py-2 dark:border-amber-800">
-          <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-amber-800 dark:text-amber-200">
+        <div className="border-b border-neutral-200 px-3 py-2 dark:border-neutral-700">
+          <pre className="max-h-32 overflow-auto whitespace-pre-wrap break-all text-xs text-secondary">
             {context.preview}
           </pre>
         </div>
@@ -190,7 +191,7 @@ export function QuestionCard({
 
       {/* Question body */}
       <div className="px-3 py-3">
-        <div className="mb-3 break-words text-sm text-amber-900 dark:text-amber-100">
+        <div className="mb-3 break-words text-sm text-secondary">
           <MarkdownContent content={question} />
         </div>
 
@@ -223,17 +224,17 @@ function OptionContent({ option }: { option: NormalizedOption }) {
       <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
         {option.recommended && (
           <span
-            className="inline-flex shrink-0 items-center gap-0.5 rounded bg-amber-200/70 px-1 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-800/60 dark:text-amber-200"
+            className="inline-flex shrink-0 items-center gap-0.5 rounded bg-primary-100 px-1 py-0.5 text-[10px] font-medium text-primary-700"
             title={t('questionCard.recommended')}
           >
             <Star className="h-2.5 w-2.5 fill-current" />
             <span>{t('questionCard.recommended')}</span>
           </span>
         )}
-        <span className="break-words text-sm text-amber-900 dark:text-amber-100">{option.label}</span>
+        <span className="break-words text-sm text-secondary">{option.label}</span>
       </div>
       {option.description && (
-        <div className="mt-0.5 break-words text-xs text-amber-700 dark:text-amber-300">
+        <div className="mt-0.5 break-words text-xs text-primary-600">
           {option.description}
         </div>
       )}
@@ -287,8 +288,8 @@ function YesNoInput({
           className={
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed ' +
             (yesIsDefault
-              ? 'bg-green-700 text-white ring-2 ring-green-400 hover:bg-green-800 focus:ring-green-500 dark:bg-green-600 dark:ring-green-500 dark:hover:bg-green-700'
-              : 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 dark:bg-green-700 dark:hover:bg-green-600')
+              ? 'bg-success text-white ring-2 ring-success/40 hover:opacity-90 focus:ring-success'
+              : 'bg-success text-white hover:opacity-90 focus:ring-success')
           }
         >
           {t('questionCard.yes')}
@@ -312,8 +313,8 @@ function YesNoInput({
           className={
             'rounded-md px-4 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1 ' +
             (showCustom
-              ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-400 dark:bg-amber-900/40 dark:text-amber-300 dark:ring-amber-600'
-              : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700')
+              ? 'bg-primary-100 text-primary-700 ring-1 ring-primary-300'
+              : 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-tertiary dark:hover:bg-neutral-700')
           }
           title={t('questionCard.customInputHint')}
           aria-label={t('questionCard.customInputHint')}
@@ -329,17 +330,17 @@ function YesNoInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
           <div className="mt-1.5 flex items-center justify-between">
-            <span className="text-[10px] text-amber-500 dark:text-amber-400">
+            <span className="text-[10px] text-primary-600">
               {t('questionCard.submitHint')}
             </span>
             <button
               type="button"
               disabled={!customText.trim()}
               onClick={handleCustomSubmit}
-              className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
+              className="rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-500 dark:hover:bg-primary-600"
             >
               {t('questionCard.submit')}
             </button>
@@ -404,7 +405,7 @@ function SingleChoiceInput({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-primary-100 dark:hover:bg-primary-100/20"
             >
               <input
                 type="radio"
@@ -412,7 +413,7 @@ function SingleChoiceInput({
                 value={value}
                 checked={selected === value}
                 onChange={() => handleSelect(value)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600 focus:ring-amber-500"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary-600 focus:ring-primary-500"
               />
               <OptionContent option={option} />
             </label>
@@ -420,7 +421,7 @@ function SingleChoiceInput({
         })}
         {/* Custom input option */}
         <label
-          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+          className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 hover:bg-primary-100 dark:hover:bg-primary-100/20"
         >
           <input
             type="radio"
@@ -428,10 +429,10 @@ function SingleChoiceInput({
             value={CUSTOM_VALUE}
             checked={selected === CUSTOM_VALUE}
             onChange={() => handleSelect(CUSTOM_VALUE)}
-            className="h-3.5 w-3.5 shrink-0 text-amber-600 focus:ring-amber-500"
+            className="h-3.5 w-3.5 shrink-0 text-primary-600 focus:ring-primary-500"
           />
-          <PencilLine className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-          <span className="text-sm text-amber-700 dark:text-amber-300">
+          <PencilLine className="h-3.5 w-3.5 shrink-0 text-primary-600" />
+          <span className="text-sm text-secondary">
             {t('questionCard.customInput')}
           </span>
         </label>
@@ -444,7 +445,7 @@ function SingleChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
         </div>
       )}
@@ -452,7 +453,7 @@ function SingleChoiceInput({
         type="button"
         disabled={selected === CUSTOM_VALUE ? !customText.trim() : !selected}
         onClick={handleSubmit}
-        className="mt-2 rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
+        className="mt-2 rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-500 dark:hover:bg-primary-600"
       >
         {t('questionCard.submit')}
       </button>
@@ -529,14 +530,14 @@ function MultiChoiceInput({
           return (
             <label
               key={key}
-              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+              className="flex cursor-pointer items-start gap-2 rounded px-2 py-1.5 hover:bg-primary-100 dark:hover:bg-primary-100/20"
             >
               <input
                 type="checkbox"
                 value={value}
                 checked={selected.has(value)}
                 onChange={() => toggle(value)}
-                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded text-amber-600 focus:ring-amber-500"
+                className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded text-primary-600 focus:ring-primary-500"
               />
               <OptionContent option={option} />
             </label>
@@ -550,8 +551,8 @@ function MultiChoiceInput({
         className={
           'mt-2 flex items-center gap-1.5 rounded px-2 py-1 text-sm transition-colors ' +
           (showCustom
-            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-            : 'text-amber-600 hover:bg-amber-100 dark:text-amber-400 dark:hover:bg-amber-900/30')
+            ? 'bg-primary-100 text-primary-700'
+            : 'text-primary-600 hover:bg-primary-100 dark:text-primary-400 dark:hover:bg-primary-100/20')
         }
       >
         <PencilLine className="h-3.5 w-3.5" />
@@ -565,7 +566,7 @@ function MultiChoiceInput({
             onKeyDown={handleCustomKeyDown}
             placeholder={t('questionCard.placeholder')}
             rows={2}
-            className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
+            className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
         </div>
       )}
@@ -573,7 +574,7 @@ function MultiChoiceInput({
         type="button"
         disabled={!canSubmit}
         onClick={handleSubmit}
-        className="mt-2 rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
+        className="mt-2 rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-500 dark:hover:bg-primary-600"
       >
         {t('questionCard.submit')}
       </button>
@@ -614,17 +615,17 @@ function FreeTextInput({
         onKeyDown={handleKeyDown}
         placeholder={t('questionCard.placeholder')}
         rows={3}
-        className="w-full break-words rounded-md border border-amber-300 bg-white px-3 py-2 text-sm placeholder:text-neutral-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-amber-700 dark:bg-neutral-800 dark:placeholder:text-neutral-500"
+        className="w-full break-words rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-tertiary focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
       />
       <div className="mt-1.5 flex items-center justify-between">
-        <span className="text-[10px] text-amber-500 dark:text-amber-400">
+        <span className="text-[10px] text-primary-600">
           {t('questionCard.submitHint')}
         </span>
         <button
           type="button"
           disabled={!text.trim()}
           onClick={handleSubmit}
-          className="rounded-md bg-amber-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-amber-700 dark:hover:bg-amber-600"
+          className="rounded-md bg-primary-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-primary-500 dark:hover:bg-primary-600"
         >
           {t('questionCard.submit')}
         </button>
