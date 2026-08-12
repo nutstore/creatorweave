@@ -72,12 +72,26 @@ function loadMermaid(): Promise<MermaidApi> {
 }
 
 /**
+ * Parse the viewBox dimensions {width, height} from a mermaid SVG.
+ *
+ * IMPORTANT: matches a viewBox starting at ANY origin (minX minY), not just
+ * "0 0 W H". Some diagram types — notably `mindmap` — emit non-zero origins
+ * like `viewBox="5 5 1130 504"`. A naive "0 0" regex fails to match those,
+ * yields a width of 0, and collapses the diagram into an invisible vertical
+ * sliver inside the zoom lightbox (a thin white bar that only grows thicker
+ * when zoomed to 2000% — exactly the "放大后看不了" bug).
+ */
+function parseViewBox(svg: string): { width: number; height: number } | null {
+  const match = /viewBox=\"[\d.\-+eE]+\s+[\d.\-+eE]+\s+([\d.]+)\s+([\d.]+)\"/.exec(svg)
+  return match ? { width: Number(match[1]), height: Number(match[2]) } : null
+}
+
+/**
  * Parse the intrinsic width (px) from a mermaid SVG's viewBox.
  * Returns null if the viewBox can't be read (fallback: 0 = container-relative).
  */
 export function mermaidViewBoxWidth(svg: string): number | null {
-  const match = /viewBox=\"0\s+0\s+([\d.]+)\s+([\d.]+)\"/.exec(svg)
-  return match ? Number(match[1]) : null
+  return parseViewBox(svg)?.width ?? null
 }
 
 /**
@@ -110,10 +124,7 @@ export function isMermaidErrorSvg(svg: string): boolean {
 function ZoomableSvg({ svg }: { svg: string }) {
   const intrinsicWidth = mermaidViewBoxWidth(svg) ?? 0
 
-  const vbHeight = () => {
-    const m = /viewBox=\"0\s+0\s+([\d.]+)\s+([\d.]+)\"/.exec(svg)
-    return m ? Number(m[2]) : null
-  }
+  const vbHeight = () => parseViewBox(svg)?.height ?? null
 
   // Ref to the outer wrapper div (the actual viewport for the diagram).
   // We measure it directly so "fit to window" uses the REAL container size,
