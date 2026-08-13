@@ -1819,34 +1819,38 @@ export const useConversationStoreSQLite = create<ConversationState>()(
         deleteConversationFromDB(id),
         useConversationContextStore.getState().deleteWorkspace(id),
       ])
-      const errors: string[] = []
+
+      // Workspace (OPFS files / SQLite workspace row) deletion failure is
+      // non-fatal for the conversation itself. Once deleteConversationFromDB
+      // resolves the conversation record is already gone from the DB, so we
+      // must still clean up the in-memory state regardless — otherwise the UI
+      // keeps showing a ghost conversation and "clear all" reports a spurious
+      // failure. Orphan workspace directories are logged and can be GC'd later.
+      if (workspaceDeleteResult.status === 'rejected') {
+        console.error(
+          '[conversation.store] Failed to delete workspace (non-fatal, orphan dir may remain):',
+          workspaceDeleteResult.reason
+        )
+      }
+
+      // If the conversation record itself could not be deleted from the DB,
+      // keep the in-memory state in sync with the DB and surface the error.
       if (convDeleteResult.status === 'rejected') {
         console.error(
           '[conversation.store] Failed to delete conversation from DB:',
           convDeleteResult.reason
         )
-        errors.push(
-          convDeleteResult.reason instanceof Error
-            ? convDeleteResult.reason.message
-            : String(convDeleteResult.reason)
+        throw new Error(
+          `delete conversation failed: ${
+            convDeleteResult.reason instanceof Error
+              ? convDeleteResult.reason.message
+              : String(convDeleteResult.reason)
+          }`
         )
-      }
-      if (workspaceDeleteResult.status === 'rejected') {
-        console.error(
-          '[conversation.store] Failed to delete workspace:',
-          workspaceDeleteResult.reason
-        )
-        errors.push(
-          workspaceDeleteResult.reason instanceof Error
-            ? workspaceDeleteResult.reason.message
-            : String(workspaceDeleteResult.reason)
-        )
-      }
-      if (errors.length > 0) {
-        throw new Error(`delete conversation failed: ${errors.join('; ')}`)
       }
 
-      // Only remove in-memory conversation after persisted deletion succeeds.
+      // Conversation record deleted — remove from memory and clear active id
+      // so the UI switches to the Welcome screen when appropriate.
       set((state) => {
         state.conversations = state.conversations.filter((c) => c.id !== id)
         if (state.activeConversationId === id) {

@@ -687,10 +687,31 @@ describe('conversation.store.sqlite tool-call routing', () => {
     expect(conversationRepoDeleteMock).toHaveBeenCalledWith('missing-id')
   })
 
-  it('should keep conversation when persisted deletion fails', async () => {
+  it('should remove conversation even when workspace deletion fails', async () => {
     const store = useConversationStore.getState()
     const conv = store.createNew('delete-fail')
+    // Workspace (OPFS) deletion fails, but the conversation DB record delete
+    // succeeds. The conversation should still be removed from memory — it is
+    // already gone from the DB, so keeping it would be a ghost. Workspace
+    // failure is treated as non-fatal (orphan dir can be GC'd later).
     deleteWorkspaceMock.mockRejectedValueOnce(new Error('opfs delete failed'))
+
+    await useConversationStore.getState().deleteConversation(conv.id)
+
+    const state = useConversationStore.getState()
+    expect(state.conversations.some((c) => c.id === conv.id)).toBe(false)
+    if (state.activeConversationId === conv.id) {
+      expect(state.activeConversationId).toBeNull()
+    }
+  })
+
+  it('should keep conversation when DB deletion fails', async () => {
+    const store = useConversationStore.getState()
+    const conv = store.createNew('db-delete-fail')
+    // The conversation record itself could not be deleted from the DB.
+    // In-memory state must stay in sync with the DB, so the conversation is
+    // kept and the error is surfaced.
+    conversationRepoDeleteMock.mockRejectedValueOnce(new Error('db delete failed'))
 
     await expect(useConversationStore.getState().deleteConversation(conv.id)).rejects.toThrow(
       /delete conversation failed/i
