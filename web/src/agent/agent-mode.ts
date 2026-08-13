@@ -102,9 +102,6 @@ export const TOOL_MODE_CLASSIFICATION: Map<string, ToolModeMetadata> = new Map([
   ['page_type', { name: 'page_type', category: 'write' }],
   ['page_scroll', { name: 'page_scroll', category: 'write' }],
   ['page_evaluate', { name: 'page_evaluate', category: 'write' }],
-
-  // Schedule management (creates/modifies persistent schedule configs)
-  ['manage_schedule', { name: 'manage_schedule', category: 'write' }],
 ])
 
 /**

@@ -31,7 +31,6 @@ export const topbar = {
       appSettings: "App Settings",
       docs: "Documentation",
       more: "More",
-      schedules: "Schedules",
       webContainer: "WebContainer",
     },
     projectSwitcher: {

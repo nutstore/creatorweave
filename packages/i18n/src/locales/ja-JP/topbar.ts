@@ -32,7 +32,6 @@ export const topbar = {
       appSettings: "アプリ設定",
       docs: "ドキュメント",
       more: "もっと",
-      schedules: "スケジュール",
       webContainer: "WebContainer",
     },
     mobile: {

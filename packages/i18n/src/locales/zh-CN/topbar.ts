@@ -32,7 +32,6 @@ export const topbar = {
       appSettings: "应用设置",
       docs: "帮助文档",
       more: "更多",
-      schedules: "定时任务",
       webContainer: "WebContainer",
     },
     projectSwitcher: {

@@ -203,30 +203,11 @@ export class WorkspaceBackend implements VfsBackend {
     }
     deletedDirs.push(path)
 
-    // Try to remove the directory itself from native filesystem.
-    // This handles the case where all files are already pending deletion —
-    // the directory can be removed immediately since it's effectively empty.
-    try {
-      const { workspace } = await this.getWorkspaceForBackend()
-      if (workspace) {
-        const resolved = await workspace.resolvePath(path)
-        const rootHandle = await workspace.getNativeDirectoryHandleForPath(path)
-        if (rootHandle) {
-          const relativePath = resolved.relativePath || ''
-          const parts = relativePath.split('/').filter(Boolean)
-          if (parts.length > 0) {
-            let parentHandle = rootHandle
-            for (let i = 0; i < parts.length - 1; i++) {
-              parentHandle = await parentHandle.getDirectoryHandle(parts[i])
-            }
-            const dirName = parts[parts.length - 1]
-            await parentHandle.removeEntry(dirName, { recursive: true })
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('[deleteDir] Failed to remove directory from native FS:', path, e)
-    }
+    // NOTE: The directory itself is NOT removed from the native filesystem here.
+    // In manual-apply mode, deletions must only be recorded as pending changes
+    // (via deleteFile → markForDeletion) so the user can review them before they
+    // affect real disk. Removing native entries directly here would bypass the
+    // pending pipeline — see the regression in deleteDir that wiped real files.
 
     return { deletedFiles, deletedDirs }
   }

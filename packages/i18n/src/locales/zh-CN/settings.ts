@@ -125,8 +125,6 @@ export const settings = {
     experimentalWarningDesc: "开启后可能存在稳定性问题，且部分功能依赖服务商并发能力支持。",
     batchSpawn: "并行子代理 (batch_spawn)",
     batchSpawnDesc: "允许 AI 同时启动多个子任务并行处理。需要服务商支持高并发，否则可能导致速率限制错误。",
-    scheduleToggle: "定时任务 (Schedules)",
-    scheduleToggleDesc: "启用 cron 表达式驱动的定时任务。开启后可在 TopBar 打开定时任务面板，Agent 也会获得 manage_schedule 工具。",
 
     // Snapshot retention
     snapshotRetention: "快照保留策略",

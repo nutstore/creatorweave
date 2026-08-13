@@ -17,7 +17,6 @@ import {
   Workflow,
   Menu,
   ArrowLeft,
-  Clock,
   ExternalLink,
   SquarePen,
   MoreHorizontal,
@@ -80,8 +79,6 @@ interface TopBarProps {
   onProjectSwitcherOpenChange?: (open: boolean) => void
   /** Navigate to a workspace within the current project (updates URL) */
   onSelectWorkspace?: (workspaceId: string) => void
-  /** Open the schedule drawer */
-  onScheduleDrawerOpen?: () => void
   /** Open the workflow canvas */
   onWorkflowOpen?: () => void
   /** Create a new conversation */
@@ -109,7 +106,6 @@ export function TopBar({
   projectSwitcherOpen,
   onProjectSwitcherOpenChange,
   onSelectWorkspace,
-  onScheduleDrawerOpen,
   onWorkflowOpen,
   folderButtonRef,
   onNewConversation,
@@ -120,7 +116,6 @@ export function TopBar({
   const mobileMorePanelRef = useRef<HTMLDivElement | null>(null)
   const hasApiKey = useHasApiKey() // Use the reactive hook that syncs with database
   const hasApiKeyLoaded = useSettingsStore((s) => s.hasApiKeyLoaded)
-  const enableSchedules = useSettingsStore((s) => s.enableSchedules)
   const hasImageModels = useHasImageModels()
   const flowPanelOpen = useFlowStore((s) => s.panelOpen)
   const t = useT()
@@ -331,15 +326,6 @@ export function TopBar({
             </ActionTooltip>
 
             <div className="h-5 w-px bg-muted" />
-
-            {/* Schedule / Timer (experimental) */}
-            {enableSchedules && (
-            <ActionTooltip label={t('topbar.tooltips.schedules')}>
-              <BrandButton iconButton className="shrink-0" onClick={onScheduleDrawerOpen} data-tour="schedules">
-                <Clock className="h-[14px] w-[14px]" />
-              </BrandButton>
-            </ActionTooltip>
-            )}
 
             {/* Settings */}
             <ActionTooltip label={t('topbar.tooltips.appSettings')}>

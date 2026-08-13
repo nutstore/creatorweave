@@ -24,7 +24,7 @@ export const onboarding = {
       },
       explore: {
         title: "Explore More Features",
-        description: "Press ⌘K to open the command palette for skills, schedules, and more",
+        description: "Press ⌘K to open the command palette for skills and more",
         tip: "Access all features from the command palette anytime",
       },
     },

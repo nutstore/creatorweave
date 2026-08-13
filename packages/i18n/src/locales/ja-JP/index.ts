@@ -31,7 +31,6 @@ import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { assets } from './assets'
 import { tools } from './tools'
-import { schedule } from './schedule'
 
 export const jaJP = {
   common,
@@ -88,5 +87,4 @@ export const jaJP = {
   runChanges,
   assets,
   tools,
-  schedule,
 } as const

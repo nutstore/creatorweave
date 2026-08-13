@@ -162,12 +162,6 @@ import {
   imageGenExecutor,
   imageGenPromptDoc,
 } from './tools/image-gen.tool'
-// Schedule management tool
-import {
-  manageScheduleDefinition,
-  manageScheduleExecutor,
-  schedulePromptDoc,
-} from './tools/schedule.tool'
 import { onModelsUpdated } from './providers/model-store'
 
 // Unified external tool bridge (replaces separate MCP + WebMCP tool pairs)
@@ -223,8 +217,6 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   { definition: resumeSubagentDefinition, executor: resumeSubagentExecutor },
   { definition: getSubagentStatusDefinition, executor: getSubagentStatusExecutor },
   { definition: listSubagentsDefinition, executor: listSubagentsExecutor },
-  // Schedule management
-  { definition: manageScheduleDefinition, executor: manageScheduleExecutor },
 ]
 
 /**
@@ -256,7 +248,6 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   installSkillPromptDoc,
   unifiedExternalToolsPromptDoc,
   imageGenPromptDoc,
-  schedulePromptDoc,
   // Page action tools (only rendered when available — see getAvailableToolsDoc)
   pageReadPromptDoc,
   pageWritePromptDoc,
@@ -343,10 +334,9 @@ export class ToolRegistry {
 
   /** Filter out tools disabled by feature flags (e.g. batch_spawn) */
   private filterByFeatureFlags(definitions: ToolDefinition[]): ToolDefinition[] {
-    const { enableBatchSpawn, enableSchedules } = useSettingsStore.getState()
+    const { enableBatchSpawn } = useSettingsStore.getState()
     return definitions.filter(tool => {
       if (!enableBatchSpawn && tool.function.name === 'batch_spawn') return false
-      if (!enableSchedules && tool.function.name === 'schedule') return false
       return true
     })
   }
