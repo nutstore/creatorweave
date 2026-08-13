@@ -76,6 +76,11 @@ export const settings = {
 
     // General tab
     generalDescription: "语言、主题等基础设置",
+    versionInfoTitle: "版本信息",
+    versionInfoAppVersion: "版本号",
+    versionInfoBuildId: "构建标识",
+    versionInfoCopy: "复制完整版本信息",
+    versionInfoCopied: "已复制到剪贴板",
     webMCPDescription: "发现当前浏览器窗口各标签页中的 WebMCP 工具，并按站点与工具组级别控制启用状态。",
     webMCPSetupTitle: "浏览器设置",
     webMCPMinChrome: "最低支持 Chrome 版本：{version}+",
@@ -126,13 +131,6 @@ export const settings = {
     batchSpawn: "并行子代理 (batch_spawn)",
     batchSpawnDesc: "允许 AI 同时启动多个子任务并行处理。需要服务商支持高并发，否则可能导致速率限制错误。",
 
-    // Snapshot retention
-    snapshotRetention: "快照保留策略",
-    snapshotRetentionDesc: "限制每个项目保留的快照数量上限。快照含文件内容备份，保留越少 SQLite 文件越小。每次创建快照后会自动清理：超过高水位时清理到低水位，当前快照和最近一个可回滚点永远保留。",
-    snapshotHighWatermark: "高水位",
-    snapshotHighWatermarkDesc: "当快照数量超过这个值时，旧的快照会被标记为可清理。",
-    snapshotLowWatermark: "低水位",
-    snapshotLowWatermarkDesc: "清理后保留多少条。要 ≤ 高水位，且 ≥ 1。",
 
     // Sync panel
     syncPanel: {

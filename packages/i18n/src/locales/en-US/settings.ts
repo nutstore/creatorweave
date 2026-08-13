@@ -75,6 +75,11 @@ export const settings = {
 
     // General tab
     generalDescription: "Language, theme and basic settings",
+    versionInfoTitle: "Version Info",
+    versionInfoAppVersion: "Version",
+    versionInfoBuildId: "Build ID",
+    versionInfoCopy: "Copy full version info",
+    versionInfoCopied: "Copied to clipboard",
     webMCPDescription: "Discover WebMCP tools from tabs in the current browser window and control host- and group-level enablement.",
     webMCPSetupTitle: "Browser setup",
     webMCPMinChrome: "Minimum supported Chrome: {version}+",
@@ -125,13 +130,6 @@ export const settings = {
     batchSpawn: "Parallel Subagents (batch_spawn)",
     batchSpawnDesc: "Allow AI to launch multiple subtasks in parallel. Requires provider support for high concurrency, otherwise rate limit errors may occur.",
 
-    // Snapshot retention
-    snapshotRetention: "Snapshot retention",
-    snapshotRetentionDesc: "Limit how many snapshot records are kept per project. Snapshots contain file content backups, so fewer snapshots means a smaller database. After every snapshot creation, automatic cleanup runs: when the high watermark is exceeded, the oldest snapshots are pruned down to the low watermark. The current snapshot and the most recent rollback point are always preserved.",
-    snapshotHighWatermark: "High watermark",
-    snapshotHighWatermarkDesc: "When snapshots exceed this count, old ones become eligible for cleanup.",
-    snapshotLowWatermark: "Low watermark",
-    snapshotLowWatermarkDesc: "After cleanup, the count is reduced to this level. Should be ≤ high watermark and ≥ 1.",
 
     // Sync panel
     syncPanel: {

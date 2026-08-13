@@ -23,6 +23,7 @@ import {
   Trash2,
   ExternalLink,
   Check,
+  Copy,
   FlaskConical,
   Globe,
   Sun,
@@ -739,69 +740,60 @@ function BatchSpawnToggle() {
 }
 
 // =============================================================================
-// Snapshot Retention Section
+// Version Info Section (within General tab)
 // =============================================================================
-//
-// Two number inputs (high/low watermark) persisted to localStorage via
-// useSettingsStore. UI-only for now — automatic pruning is not wired up
-// (see comment in settings.store.ts).
 
-function SnapshotRetentionSection() {
+/**
+ * Displays the current app version and build identifier.
+ *
+ * - __APP_VERSION__: semantic version from package.json (e.g. "0.1.4")
+ * - __APP_BUILD_ID__: git commit SHA in CI, or ISO timestamp in local dev
+ *
+ * Both are injected at build time by vite.config.ts (define plugin).
+ * Click anywhere on the card to copy full version info to clipboard.
+ */
+function VersionInfoSection() {
   const t = useT()
-  const high = useSettingsStore((s) => s.snapshotHighWatermark)
-  const low = useSettingsStore((s) => s.snapshotLowWatermark)
-  const setHigh = useSettingsStore((s) => s.setSnapshotHighWatermark)
-  const setLow = useSettingsStore((s) => s.setSnapshotLowWatermark)
+  const version = __APP_VERSION__
+  const buildId = __APP_BUILD_ID__
+
+  // Format the build ID for display:
+  // - git SHA (40 hex) → short 7-char form
+  // - ISO timestamp (dev mode) → readable date like "2026-08-13"
+  const isSha = /^[0-9a-f]{40}$/i.test(buildId)
+  const displayBuildId = isSha ? buildId.slice(0, 7) : buildId.slice(0, 10)
+
+  const handleCopy = useCallback(() => {
+    const fullInfo = `CreatorWeave v${version} (${buildId})`
+    navigator.clipboard.writeText(fullInfo).then(
+      () => toast.success(t('settings.versionInfoCopied')),
+      () => toast.error('Copy failed'),
+    )
+  }, [version, buildId, t])
 
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <Database className="h-4 w-4 text-tertiary" />
-        <h3 className="text-sm font-medium text-secondary">{t('settings.snapshotRetention')}</h3>
+        <Info className="h-4 w-4 text-tertiary" />
+        <h3 className="text-sm font-medium text-secondary">{t('settings.versionInfoTitle')}</h3>
       </div>
-      <p className="text-xs text-tertiary">{t('settings.snapshotRetentionDesc')}</p>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-secondary">
-            {t('settings.snapshotHighWatermark')}
-          </label>
-          <input
-            type="number"
-            value={high}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10)
-              if (!Number.isNaN(n) && n > 0) setHigh(n)
-            }}
-            min={1}
-            step={1}
-            className="h-10 w-full rounded-md border border-neutral-200 bg-background px-3 text-sm tabular-nums text-foreground outline-none focus:border-primary-500 dark:border-neutral-700"
-          />
-          <p className="text-[10px] text-tertiary">
-            {t('settings.snapshotHighWatermarkDesc')}
-          </p>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-secondary">
-            {t('settings.snapshotLowWatermark')}
-          </label>
-          <input
-            type="number"
-            value={low}
-            onChange={(e) => {
-              const n = parseInt(e.target.value, 10)
-              if (!Number.isNaN(n) && n > 0) setLow(n)
-            }}
-            min={1}
-            step={1}
-            className="h-10 w-full rounded-md border border-neutral-200 bg-background px-3 text-sm tabular-nums text-foreground outline-none focus:border-primary-500 dark:border-neutral-700"
-          />
-          <p className="text-[10px] text-tertiary">
-            {t('settings.snapshotLowWatermarkDesc')}
-          </p>
-        </div>
-      </div>
+      {/* Plain inline text — no box, matching neighboring sections.
+          Click to copy full version info. */}
+      <button
+        type="button"
+        onClick={handleCopy}
+        title={t('settings.versionInfoCopy')}
+        className="group flex items-baseline gap-2 text-left"
+      >
+        <span className="text-sm font-medium text-secondary dark:text-foreground">
+          v{version}
+        </span>
+        <span className="text-xs text-tertiary">
+          {displayBuildId}
+        </span>
+        <Copy className="ml-0.5 h-3 w-3 self-center text-muted opacity-0 transition-opacity group-hover:opacity-100" />
+      </button>
     </div>
   )
 }
@@ -1581,8 +1573,8 @@ const SettingsDialogContent = forwardRef<
                 <NotificationsSection />
               </div>
 
-              {/* Snapshot Retention Section */}
-              <SnapshotRetentionSection />
+              {/* Version Info Section */}
+              <VersionInfoSection />
             </div>
           )}
 

@@ -76,6 +76,11 @@ export const settings = {
 
     // General tab
     generalDescription: "言語、テーマなどの基本設定",
+    versionInfoTitle: "バージョン情報",
+    versionInfoAppVersion: "バージョン",
+    versionInfoBuildId: "ビルド ID",
+    versionInfoCopy: "完全なバージョン情報をコピー",
+    versionInfoCopied: "クリップボードにコピーしました",
     webMCPDescription: "現在のブラウザウィンドウ内タブから WebMCP ツールを検出し、ホスト単位とグループ単位で有効化を制御します。",
     webMCPSetupTitle: "ブラウザ設定",
     webMCPMinChrome: "最小対応 Chrome バージョン: {version}+",
@@ -126,13 +131,6 @@ export const settings = {
     batchSpawn: "並列サブエージェント (batch_spawn)",
     batchSpawnDesc: "AIが複数のサブタスクを並列で起動できるようにします。高い同時接続数をサポートするプロバイダーが必要です。そうでない場合、レート制限エラーが発生する可能性があります。",
 
-    // Snapshot retention
-    snapshotRetention: "スナップショット保存ポリシー",
-    snapshotRetentionDesc: "プロジェクトごとに保持するスナップショット数を制限します。スナップショットにはファイルのバックアップ内容が含まれるため、数を減らすとデータベースサイズが小さくなります。スナップショットの作成後、自動的にクリーンアップが実行されます：高水位を超えると、最も古いスナップショットが低水位まで削除されます。現在のスナップショットと最新のロールバックポイントは常に保持されます。",
-    snapshotHighWatermark: "高水位",
-    snapshotHighWatermarkDesc: "スナップショット数がこの値を超えると、古いスナップショットがクリーンアップ対象になります。",
-    snapshotLowWatermark: "低水位",
-    snapshotLowWatermarkDesc: "クリーンアップ後に残す件数。高水位以下、かつ 1 以上。",
 
     // Sync panel
     syncPanel: {

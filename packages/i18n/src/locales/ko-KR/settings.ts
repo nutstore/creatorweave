@@ -76,6 +76,11 @@ export const settings = {
 
     // General tab
     generalDescription: "언어, 테마 등 기본 설정",
+    versionInfoTitle: "버전 정보",
+    versionInfoAppVersion: "버전",
+    versionInfoBuildId: "빌드 ID",
+    versionInfoCopy: "전체 버전 정보 복사",
+    versionInfoCopied: "클립보드에 복사되었습니다",
     webMCPDescription: "현재 브라우저 창 탭의 WebMCP 도구를 검색하고 호스트 및 그룹 단위 활성화를 제어합니다.",
     webMCPSetupTitle: "브라우저 설정",
     webMCPMinChrome: "최소 지원 Chrome 버전: {version}+",
@@ -126,13 +131,6 @@ export const settings = {
     batchSpawn: "병렬 서브에이전트 (batch_spawn)",
     batchSpawnDesc: "AI가 여러 하위 작업을 병렬로 시작할 수 있도록 허용합니다. 높은 동시성을 지원하는 제공업체가 필요하며, 그렇지 않으면 속도 제한 오류가 발생할 수 있습니다.",
 
-    // Snapshot retention
-    snapshotRetention: "스냅샷 보존 정책",
-    snapshotRetentionDesc: "프로젝트당 보존할 스냅샷 수를 제한합니다. 스냅샷에는 파일 내용 백업이 포함되므로, 수를 줄이면 데이터베이스가 작아집니다. 스냅샷 생성 후 자동 정리가 실행됩니다: 상한선을 초과하면 가장 오래된 스냅샷이 하한선까지 제거됩니다. 현재 스냅샷과 가장 최근의 롤백 지점은 항상 보존됩니다.",
-    snapshotHighWatermark: "상한선",
-    snapshotHighWatermarkDesc: "스냅샷 수가 이 값을 초과하면 오래된 스냅샷이 정리 대상이 됩니다.",
-    snapshotLowWatermark: "하한선",
-    snapshotLowWatermarkDesc: "정리 후 남길 수. 상한선 이하, 1 이상.",
 
     // Sync panel
     syncPanel: {
