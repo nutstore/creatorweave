@@ -643,7 +643,6 @@ export function PendingSyncPanel() {
               </>
             ) : (
               <>
-                <RefreshCw className="w-4 h-4" />
                 {showSyncSuccess ? t('settings.pendingSyncPanel.syncComplete') : t('settings.pendingSyncPanel.approveSelectedCount', { count: selectedCount })}
               </>
             )}
