@@ -73,6 +73,13 @@ export const agent = {
         deny: "Deny",
     },
 
+    execAuth: {
+        title: "Command Approval",
+        subtitle: "Agent wants to run a command on your machine",
+        allow: "Allow",
+        deny: "Deny",
+    },
+
     // Search-conversations tool
     searchConversations: {
         failed: "failed",

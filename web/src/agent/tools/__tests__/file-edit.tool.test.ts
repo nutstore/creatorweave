@@ -39,7 +39,14 @@ vi.mock('../vfs-resolver', () => ({
         backend: {
           label: 'workspace',
           readFile: async (path: string) => readFileMock(path, null, 'ws-1', 'auto'),
-          writeFile: async (path: string, content: string) => writeFileMock(path, content, null, 'ws-1'),
+          writeFile: async (path: string, content: string | ArrayBuffer | Blob) => {
+            const text = typeof content === 'string'
+              ? content
+              : content instanceof Blob
+                ? await content.text()
+                : new TextDecoder().decode(content)
+            return writeFileMock(path, text, null, 'ws-1')
+          },
         },
       }
     }
@@ -55,8 +62,14 @@ vi.mock('../vfs-resolver', () => ({
               metadata: { size: typeof content === 'string' ? content.length : 0, contentType: 'text/plain' },
             }
           },
-          writeFile: async (path: string, content: string) =>
-            writePathMock(target.agentId, path, content),
+          writeFile: async (path: string, content: string | ArrayBuffer | Blob) => {
+            const text = typeof content === 'string'
+              ? content
+              : content instanceof Blob
+                ? await content.text()
+                : new TextDecoder().decode(content)
+            return writePathMock(target.agentId, path, text)
+          },
         },
       }
     }
@@ -68,6 +81,8 @@ vi.mock('../vfs-resolver', () => ({
 
 vi.mock('../tool-utils', () => ({
   resolveNativeDirectoryHandle: (...args: unknown[]) => resolveNativeDirectoryHandleMock(...args),
+  withToolTimeout: <T>(promise: Promise<T>) => promise,
+  isToolTimeoutError: () => false,
 }))
 
 function makeContext(overrides?: Partial<ToolContext>): ToolContext {
@@ -102,7 +117,15 @@ describe('file edit tool (edits-array-only)', () => {
   })
 
   it('requires file to be read before edit', async () => {
-    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
+    resolveVfsTargetMock.mockResolvedValueOnce({
+      kind: 'workspace',
+      path: 'src/a.ts',
+      backend: {
+        label: 'workspace',
+        readFile: readFileMock,
+        writeFile: writeFileMock,
+      },
+    })
 
     const result = await editExecutor(
       { path: 'src/a.ts', edits: [{ old_text: '1', new_text: '2' }] },
@@ -110,7 +133,7 @@ describe('file edit tool (edits-array-only)', () => {
     )
     const error = unwrapError(result)
     expect(error.code).toBe('read_required')
-    expect(error.message).toContain('Read file before editing')
+    expect(error.message).toContain('Read the full file first')
     expect(readFileMock).not.toHaveBeenCalled()
     expect(writeFileMock).not.toHaveBeenCalled()
   })
@@ -212,6 +235,7 @@ describe('file edit tool (edits-array-only)', () => {
       makeContext({ readFileState })
     )
 
+    if (!JSON.parse(result).ok) console.error(result)
     unwrapOk(result)
     expect(readFileMock).toHaveBeenCalledWith('src/a.ts', null, 'ws-1', 'auto')
     expect(writeFileMock).toHaveBeenCalledWith('src/a.ts', 'const a = 2\n', null, 'ws-1')
@@ -391,13 +415,32 @@ describe('file edit tool (edits-array-only)', () => {
       path: 'SOUL.md',
       agentId: 'novel-editor',
       projectId: 'project-1',
+      backend: {
+        label: 'agent',
+        readFile: async (_path: string, options?: { encoding?: string }) =>
+          options?.encoding === 'binary'
+            ? {
+                content: new TextEncoder().encode('hello old').buffer,
+                metadata: { size: 9, contentType: 'text/plain' },
+              }
+            : {
+                content: 'hello old',
+                metadata: { size: 9, contentType: 'text/plain' },
+              },
+        writeFile: async (_path: string, content: string | ArrayBuffer | Blob) => {
+          const text = typeof content === 'string'
+            ? content
+            : content instanceof Blob
+              ? await content.text()
+              : new TextDecoder().decode(content)
+          return writePathMock('novel-editor', 'SOUL.md', text)
+        },
+      },
       agentManager: {
         readPath: readPathMock,
         writePath: writePathMock,
       },
     })
-    readPathMock.mockResolvedValueOnce('hello old')
-
     const readFileState = new Map([
       [
         'agent:project-1:novel-editor:SOUL.md',
@@ -449,7 +492,7 @@ describe('file edit tool (edits-array-only)', () => {
     const error = unwrapError(result)
 
     expect(error.code).toBe('read_required')
-    expect(error.message).toContain('Read file before editing')
+    expect(error.message).toContain('Read the full file first')
     expect(readFileMock).not.toHaveBeenCalled()
     expect(writeFileMock).not.toHaveBeenCalled()
   })
@@ -566,7 +609,25 @@ describe('file edit tool (edits-array-only)', () => {
   })
 
   it('preserves trailing whitespace in new_text for markdown files', async () => {
-    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'README.md' })
+    resolveVfsTargetMock.mockResolvedValueOnce({
+      kind: 'workspace',
+      path: 'README.md',
+      backend: {
+        label: 'workspace',
+        readFile: async () => ({
+          content: new TextEncoder().encode('Title\n').buffer,
+          metadata: { size: 6, contentType: 'text/markdown' },
+        }),
+        writeFile: async (_path: string, content: string | ArrayBuffer | Blob) => {
+          const text = typeof content === 'string'
+            ? content
+            : content instanceof Blob
+              ? await content.text()
+              : new TextDecoder().decode(content)
+          return writeFileMock('README.md', text, null, 'ws-1')
+        },
+      },
+    })
     readFileMock.mockResolvedValueOnce({
       content: 'Title\n',
       metadata: { size: 6, contentType: 'text/markdown' },
@@ -588,10 +649,17 @@ describe('file edit tool (edits-array-only)', () => {
   })
 
   it('does not fuzzy-match old_text based on trailing whitespace differences', async () => {
-    resolveVfsTargetMock.mockResolvedValueOnce({ kind: 'workspace', path: 'src/a.ts' })
-    readFileMock.mockResolvedValueOnce({
-      content: 'abc   \nnext\n',
-      metadata: { size: 11, contentType: 'text/plain' },
+    resolveVfsTargetMock.mockResolvedValueOnce({
+      kind: 'workspace',
+      path: 'src/a.ts',
+      backend: {
+        label: 'workspace',
+        readFile: async () => ({
+          content: 'abc   \nnext\n',
+          metadata: { size: 11, contentType: 'text/plain' },
+        }),
+        writeFile: writeFileMock,
+      },
     })
     const readFileState = new Map([
       [

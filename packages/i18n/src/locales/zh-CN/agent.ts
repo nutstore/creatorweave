@@ -72,6 +72,13 @@ export const agent = {
         deny: "拒绝",
     },
 
+    execAuth: {
+        title: "命令执行授权",
+        subtitle: "AI 想要在你的机器上执行命令",
+        allow: "允许",
+        deny: "拒绝",
+    },
+
     // 搜索会话工具
     searchConversations: {
         failed: "失败",

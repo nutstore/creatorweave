@@ -524,4 +524,23 @@ export const settings = {
       testDenied: "权限被拒绝 — 请检查浏览器设置",
       testUnsupported: "当前浏览器不支持通知",
     },
+
+    execPolicy: {
+        tab: "执行策略",
+        description: "配置 AI 可以在你的机器上执行哪些命令。未匹配任何规则的命令将使用默认策略。",
+        searchPlaceholder: "搜索命令...",
+        newCommandPlaceholder: "命令名（如 touch、mkdir）",
+        auto: "自动",
+        prompt: "询问",
+        forbidden: "禁止",
+        add: "添加",
+        remove: "移除",
+        defaultLabel: "未匹配命令的默认策略：",
+        defaultHint: "当没有规则匹配时生效",
+        save: "保存",
+        saving: "保存中...",
+        cancel: "取消",
+        loading: "加载策略中...",
+        retry: "重试",
+    },
 } as const

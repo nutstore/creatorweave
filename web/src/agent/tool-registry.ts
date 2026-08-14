@@ -24,20 +24,20 @@ import { pluginToToolDefinition, createPluginBridgeExecutor } from './tools/wasm
 // Bash shell tool (just-bash sandbox)
 import { bashDefinition, bashToolExecutor, bashPromptDoc } from './tools/bash.tool'
 
-// Git tools
+// Snapshot tools (OPFS change review — NOT real git; real git goes through exec)
 import {
-  gitStatusDefinition,
-  gitStatusExecutor,
-  gitDiffDefinition,
-  gitDiffExecutor,
-  gitLogDefinition,
-  gitLogExecutor,
-  gitShowDefinition,
-  gitShowExecutor,
-  gitRestoreDefinition,
-  gitRestoreExecutor,
-  gitPromptDoc,
-} from './tools/git.tool'
+  snapshotStatusDefinition,
+  snapshotStatusExecutor,
+  snapshotDiffDefinition,
+  snapshotDiffExecutor,
+  snapshotLogDefinition,
+  snapshotLogExecutor,
+  snapshotShowDefinition,
+  snapshotShowExecutor,
+  snapshotRestoreDefinition,
+  snapshotRestoreExecutor,
+  snapshotPromptDoc,
+} from './tools/snapshot.tool'
 
 // Import skill tools
 import {
@@ -155,6 +155,21 @@ import {
 import { isPageActionAvailable } from './tools/page-action-bridge'
 import { supportsImageInput } from './llm/pi-ai-model-resolver'
 
+// Exec tool — run shell commands via Native Host (Tier 1.5, conditional)
+import {
+  isExecBridgeAvailable,
+  execDefinition,
+  execExecutor,
+  execPromptDoc,
+} from './tools/exec.tool'
+
+// Processes tool — inspect/manage background processes (STATUS.md §17, conditional on exec bridge)
+import {
+  processesDefinition,
+  processesExecutor,
+  processesPromptDoc,
+} from './tools/processes.tool'
+
 // Image generation tool (conditional — requires image gen model in provider cache)
 import {
   isImageGenAvailable,
@@ -194,12 +209,12 @@ const BUILTIN_TOOLS: Array<{ definition: ToolDefinition; executor: ToolExecutor 
   ...(import.meta.env.DEV
     ? [{ definition: dbQueryTool.definition, executor: dbQueryTool.executor }]
     : []),
-  // Git tools
-  { definition: gitStatusDefinition, executor: gitStatusExecutor },
-  { definition: gitDiffDefinition, executor: gitDiffExecutor },
-  { definition: gitLogDefinition, executor: gitLogExecutor },
-  { definition: gitShowDefinition, executor: gitShowExecutor },
-  { definition: gitRestoreDefinition, executor: gitRestoreExecutor },
+  // Snapshot tools (OPFS change review — NOT real git; real git goes through exec)
+  { definition: snapshotStatusDefinition, executor: snapshotStatusExecutor },
+  { definition: snapshotDiffDefinition, executor: snapshotDiffExecutor },
+  { definition: snapshotLogDefinition, executor: snapshotLogExecutor },
+  { definition: snapshotShowDefinition, executor: snapshotShowExecutor },
+  { definition: snapshotRestoreDefinition, executor: snapshotRestoreExecutor },
   // Sync native files to OPFS
   { definition: syncToOPFSDefinition, executor: syncToOPFSExecutor },
   // Changeset & sync tools (detect_conflicts always available; checkpoint tools registered dynamically)
@@ -235,7 +250,7 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   bashPromptDoc,
   ocrPromptDoc,
   canvasPromptDoc,
-  gitPromptDoc,
+  snapshotPromptDoc,
   changesetPromptDoc,
   searchConversationsPromptDoc,
   subagentPromptDoc,
@@ -251,6 +266,8 @@ const ALL_PROMPT_DOCS: ToolPromptDoc[] = [
   // Page action tools (only rendered when available — see getAvailableToolsDoc)
   pageReadPromptDoc,
   pageWritePromptDoc,
+  execPromptDoc,
+  processesPromptDoc,
 ]
 
 export function getBuiltinToolNames(): string[] {
@@ -567,6 +584,36 @@ export class ToolRegistry {
   }
 
   //=============================================================================
+  // Exec Tool (Native Host — Tier 1.5 command execution)
+  //=============================================================================
+
+  /**
+   * Register the exec tool if the Native Host exec bridge is available.
+   * This lets the agent run shell commands (tests, builds, linters) on the
+   * user's machine via the authorized native-host root.
+   * Safe to call multiple times.
+   */
+  registerExecTool(): boolean {
+    if (!isExecBridgeAvailable()) return false
+    if (!this.has('exec')) {
+      this.register(execDefinition, execExecutor)
+      console.log('[ToolRegistry] ✅ Exec tool registered (Native Host bridge detected)')
+    }
+    // Background-process management rides along with the exec bridge.
+    if (!this.has('processes')) {
+      this.register(processesDefinition, processesExecutor)
+      console.log('[ToolRegistry] ✅ Processes tool registered')
+    }
+    return true
+  }
+
+  /** Unregister the exec tool (e.g. when native host disconnects). */
+  unregisterExecTool(): void {
+    this.unregister('exec')
+    this.unregister('processes')
+  }
+
+  //=============================================================================
   // Image Generation Tool (conditional — requires model in provider cache)
   //=============================================================================
 
@@ -724,6 +771,8 @@ export function getToolRegistry(): ToolRegistry {
     instance.registerSkillTools()
     // Conditionally register web bridge tools (Browser Extension)
     instance.registerWebBridgeTools()
+    // Conditionally register exec tool (Native Host Tier 1.5)
+    instance.registerExecTool()
     // Conditionally register page action tools (Browser Extension + side panel)
     instance.registerPageActionTools()
     // Set up listener for model cache updates (triggers image gen tool re-registration)
@@ -733,6 +782,8 @@ export function getToolRegistry(): ToolRegistry {
     // installed after page load). registerWebBridgeTools() is idempotent — it
     // checks both availability and existing registration.
     instance.registerWebBridgeTools()
+    // Also try exec tool (native host may have been installed after page load)
+    instance.registerExecTool()
     // Also try page action tools (side-panel mode may have just become active)
     instance.registerPageActionTools()
     // Also re-check image gen tool on every access

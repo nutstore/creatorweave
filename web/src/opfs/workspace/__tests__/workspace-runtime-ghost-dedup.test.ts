@@ -148,7 +148,11 @@ describe('writeFile ghost change dedup', () => {
         metadata: { path: 'src/a.ts', mtime: 1000, size: 13, contentType: 'text' },
       })),
       readFromFilesDir: vi.fn(async () => ({
-        content: '<<<<<<< OPFS\nclean content\n=======\nother\n>>>>>>> Native',
+        content: `<<<<<<< OPFS
+clean content
+=======
+other
+>>>>>>> DISK`,
         mtime: 999,
         size: 50,
         contentType: 'text',

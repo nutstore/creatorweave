@@ -11,7 +11,6 @@
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
 import type { WorkspaceRuntime } from '@/opfs/workspace/workspace-runtime'
-import { resolveNativeDirectoryHandle } from './tool-utils'
 import { toolErrorJson, toolOkJson } from './tool-envelope'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
@@ -73,17 +72,23 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
   }
   const filesDir = await runtime.getFilesDir()
 
+  // Native Host roots have no FileSystemDirectoryHandle. Handle an
+  // all-Native-Host request through WorkspaceRuntime's executor-backed APIs
+  // before entering the legacy handle-based implementation below.
+  const nativeHostResult = await syncNativeHostFilesToOPFS(runtime, filesDir, paths as string[], projectId)
+  if (nativeHostResult) return nativeHostResult
+
   // Collect all native handles: multi-root aware
   let nativeHandleMap: Map<string, FileSystemDirectoryHandle>
 
   // Always try to get all handles from runtime (multi-root)
   nativeHandleMap = await runtime.getAllNativeDirectoryHandles(projectId)
   if (nativeHandleMap.size === 0) {
-    // Fallback: use context handle or resolve single handle
-    const fallbackHandle = context.directoryHandle
-      ?? await resolveNativeDirectoryHandle(null, context.workspaceId)
+    // Do not fall back to OPFS files/: that directory is the destination cache,
+    // not a disk source. Only an explicitly supplied or FS Access handle is valid.
+    const fallbackHandle = context.directoryHandle ?? await runtime.getNativeDirectoryHandle()
     if (!fallbackHandle) {
-      return toolErrorJson('sync', 'no_native_fs', 'No native filesystem access available')
+      return toolErrorJson('sync', 'no_native_fs', 'No File System Access root is available. Native Host roots are handled through the executor-backed sync path.')
     }
     nativeHandleMap = new Map([['', fallbackHandle]])
   }
@@ -211,6 +216,143 @@ export const syncToOPFSExecutor: ToolExecutor = async (args, context) => {
     totalBytes,
     errors: errors.length > 0 ? errors : undefined,
   })
+}
+
+/**
+ * Sync disk files from a Native Host root into OPFS without overwriting an
+ * existing OPFS file. Returns null when the request is not exclusively for
+ * Native Host roots, allowing the legacy FS Access path to handle it.
+ */
+async function syncNativeHostFilesToOPFS(
+  runtime: WorkspaceRuntime,
+  filesDir: FileSystemDirectoryHandle,
+  paths: string[],
+  projectId: string | null,
+) {
+  const requests: Array<{ rootName: string; pattern: string }> = []
+
+  for (const rawPath of paths) {
+    try {
+      const normalized = rawPath.replace(/^(\.\/)+/, '')
+      const resolved = await runtime.resolvePath(normalized, projectId)
+      if (resolved.backend !== 'native-host' || !resolved.rootId) return null
+      requests.push({ rootName: resolved.rootName, pattern: resolved.relativePath || '**' })
+    } catch {
+      return null
+    }
+  }
+
+  if (requests.length === 0) return null
+
+  const byRoot = new Map<string, string[]>()
+  for (const request of requests) {
+    const patterns = byRoot.get(request.rootName) ?? []
+    patterns.push(request.pattern)
+    byRoot.set(request.rootName, patterns)
+  }
+
+  let synced = 0
+  let skipped = 0
+  let totalBytes = 0
+  const errors: string[] = []
+
+  for (const [rootName, patterns] of byRoot) {
+    const tree = await runtime.scanDiskTree(rootName, 50, projectId, {
+      includeSizes: true,
+      maxEntries: 5_000,
+      deadlineMs: 25_000,
+    })
+    if (!tree) {
+      errors.push(`${rootName}: Native Host disk root is unavailable`)
+      continue
+    }
+
+    const files = tree.filter((entry) =>
+      entry.type === 'file' && patterns.some((pattern) => matchesSyncPattern(entry.path, pattern))
+    )
+
+    for (const entry of files) {
+      if (synced >= MAX_FILES) {
+        errors.push(`Reached max file limit (${MAX_FILES}), stopping`)
+        break
+      }
+      if (totalBytes >= MAX_TOTAL_SIZE) {
+        errors.push(`Reached total size limit (${MAX_TOTAL_SIZE / 1024 / 1024}MB), stopping`)
+        break
+      }
+      if (entry.size > MAX_FILE_SIZE) {
+        errors.push(`${entry.path}: File too large (${(entry.size / 1024 / 1024).toFixed(1)}MB, max ${MAX_FILE_SIZE / 1024 / 1024}MB)`)
+        continue
+      }
+
+      const workspacePath = rootName ? `${rootName}/${entry.path}` : entry.path
+      if (await opfsFileExists(filesDir, workspacePath)) {
+        skipped++
+        continue
+      }
+
+      try {
+        // prepareFiles routes native-host reads through DiskExecutor.read().
+        // Its public contract expects a workspace path under /mnt/.
+        await runtime.prepareFiles([`/mnt/${workspacePath}`])
+        synced++
+        totalBytes += entry.size
+      } catch (error) {
+        errors.push(`${workspacePath}: ${error instanceof Error ? error.message : String(error)}`)
+      }
+    }
+
+    if (synced >= MAX_FILES || totalBytes >= MAX_TOTAL_SIZE) break
+  }
+
+  if (synced > 0) await runtime.rebuildFilesIndex()
+
+  if (synced === 0 && skipped === 0 && errors.length === 0) {
+    return toolErrorJson('sync', 'no_files', 'No files found on Native Host disk matching the given paths', {
+      hint: 'Paths are resolved relative to the authorized project root.',
+      details: { requested_paths: paths },
+    })
+  }
+
+  return toolOkJson('sync', {
+    synced,
+    skipped,
+    skippedReason: skipped > 0 ? 'File already exists in OPFS (preserved to avoid overwriting agent edits)' : undefined,
+    totalBytes,
+    errors: errors.length > 0 ? errors : undefined,
+  })
+}
+
+function matchesSyncPattern(path: string, rawPattern: string): boolean {
+  const pattern = rawPattern.replace(/^(\.\/)+/, '').replace(/\/+$/, '')
+  if (!pattern || pattern === '**') return true
+  if (!pattern.includes('*') && !pattern.includes('?')) {
+    return path === pattern || path.startsWith(`${pattern}/`)
+  }
+
+  // `**/` must also match zero directories, so `**/*.csv` includes a.csv
+  // at the root as well as nested/a.csv.
+  const regexSource = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\//g, '(?:.*/)?')
+    .replace(/\*\*/g, '.*')
+    .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+  return new RegExp(`^${regexSource}$`, 'i').test(path)
+}
+
+async function opfsFileExists(filesDir: FileSystemDirectoryHandle, path: string): Promise<boolean> {
+  try {
+    const parts = path.split('/').filter(Boolean)
+    let current = filesDir
+    for (let i = 0; i < parts.length - 1; i++) {
+      current = await current.getDirectoryHandle(parts[i])
+    }
+    await current.getFileHandle(parts[parts.length - 1])
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

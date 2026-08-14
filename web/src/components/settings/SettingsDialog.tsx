@@ -47,6 +47,7 @@ import { toast } from 'sonner'
 import { useT, useLocale, LOCALE_LABELS } from '@/i18n'
 import { ModelSettings } from './ModelSettings'
 import { SecretManager } from './SecretManager'
+import ExecPolicyPanel from './ExecPolicyPanel'
 import { OfflineQueue } from '@/components/mobile/OfflineQueue'
 import { MCPSettings } from '@/components/mcp/MCPSettings'
 import { WebMCPSettings } from '@/components/webmcp/WebMCPSettings'
@@ -89,6 +90,7 @@ type SettingsTab =
   | 'mcp'
   | 'webmcp'
   | 'extension'
+  | 'exec-policy'
   | 'sync'
   | 'offline'
   | 'experimental'
@@ -1414,6 +1416,7 @@ const SettingsDialogContent = forwardRef<
     { id: 'mcp', label: t('settings.mcp'), icon: <Server className="h-4 w-4" /> },
     { id: 'webmcp', label: t('settings.webMCP'), icon: <Globe className="h-4 w-4" /> },
     { id: 'extension', label: t('extension.settingsTab'), icon: <Puzzle className="h-4 w-4" /> },
+    { id: 'exec-policy', label: t('execPolicy.tab'), icon: <Terminal className="h-4 w-4" /> },
     { id: 'experimental', label: t('settings.experimental'), icon: <FlaskConical className="h-4 w-4" /> },
   ]
 
@@ -1605,6 +1608,11 @@ const SettingsDialogContent = forwardRef<
           {/* Extension Tab */}
           {activeTab === 'extension' && (
             <ExtensionSettingsPanel />
+          )}
+
+          {/* Exec Policy Tab */}
+          {activeTab === 'exec-policy' && (
+            <ExecPolicyPanel />
           )}
 
           {/* Sync Tab */}

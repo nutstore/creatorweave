@@ -872,6 +872,57 @@ export default defineBackground(() => {
     }
   }
 
+  // ── Agent completion notifications ────────────────────────────────────────
+  // The Web SW's showNotification cannot focus a tab (Web SWs lack tab
+  // privileges), so agent-loop-complete notifications route through the
+  // extension background instead: chrome.notifications + onClicked →
+  // chrome.tabs.update(tabId, { active: true }) refocuses the CreatorWeave tab.
+
+  /** sender tab ids of pending agent notifications, keyed by notification id */
+  const _agentNotifTabs = new Map<string, number>()
+
+  /** Show an agent-completion notification that focuses the sender tab on click. */
+  async function showAgentNotification(options: {
+    title: string
+    body: string
+    conversationId?: string
+    tabId?: number
+  }): Promise<void> {
+    try {
+      const notifId = `agent-${Date.now()}`
+      if (typeof options.tabId === 'number') {
+        _agentNotifTabs.set(notifId, options.tabId)
+      }
+      await chrome.notifications.create(notifId, {
+        type: 'basic',
+        iconUrl: '/icon.png',
+        title: options.title,
+        message: options.body,
+        priority: 1,
+        requireInteraction: false,
+      })
+    } catch {
+      // notifications may not be available
+    }
+  }
+
+  chrome.notifications.onClicked.addListener((notifId) => {
+    const tabId = _agentNotifTabs.get(notifId)
+    if (tabId === undefined) return // not an agent notification
+    _agentNotifTabs.delete(notifId)
+    chrome.tabs.update(tabId, { active: true }).catch(() => {
+      // Tab may be closed — ignore
+    })
+    // Also raise the tab's window (tab activation alone may not unminimize).
+    chrome.tabs.get(tabId).then((tab) => {
+      if (tab.windowId) chrome.windows.update(tab.windowId, { focused: true }).catch(() => {})
+    }).catch(() => {})
+  })
+
+  chrome.notifications.onClosed.addListener((notifId) => {
+    _agentNotifTabs.delete(notifId)
+  })
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // ── Side Panel: toggle open/close on user click ──
     // Per Chrome's official sample, chrome.sidePanel.open() can be called
@@ -1494,6 +1545,24 @@ export default defineBackground(() => {
           return
         }
 
+        if (message.type === 'cw_agent_show_notification') {
+          // Agent-loop-complete notification — clicking it refocuses the
+          // sender tab (see showAgentNotification above for rationale).
+          const { title, body, conversationId } = message as {
+            title: string
+            body: string
+            conversationId?: string
+          }
+          await showAgentNotification({
+            title,
+            body,
+            conversationId,
+            tabId: _sender?.tab?.id,
+          })
+          sendResponse({ ok: true })
+          return
+        }
+
         if (message.type === 'cw_schedule_disable_notification') {
           // CreatorWeave notifies us that a schedule was disabled (e.g., bound conversation deleted)
           const { scheduleId, reason } = message as { scheduleId: string; reason?: string }
@@ -1507,6 +1576,40 @@ export default defineBackground(() => {
             body: reason ? `原因：${reason}` : '定时任务已被禁用',
           })
           sendResponse({ ok: true })
+          return
+        }
+
+        if (message.type === 'native_host_call') {
+          // Native Host: disk file I/O via Chrome Native Messaging
+          // content.ts relays page payload fields at the top level
+          // ({ type, ...payload }). Keep the nested-payload fallback for
+          // direct/legacy callers, but never lose the current action field.
+          const nestedPayload = message.payload as Record<string, any> | undefined
+          const action = (message.action ?? nestedPayload?.action) as string
+          const allowedActions = new Set([
+            'ping', 'list_scopes', 'pick_folder', 'remove_scope',
+            'stat_file', 'list_dir', 'read_file', 'read_file_at',
+            'write_file', 'write_file_at', 'delete_file',
+            'check_policy', 'exec_sync',
+            'get_execpolicy', 'set_execpolicy',
+            // Background process management (STATUS.md §17)
+            'exec_start', 'exec_logs', 'exec_status', 'exec_stop', 'exec_list',
+          ])
+          if (!action || !allowedActions.has(action)) {
+            sendResponse({ ok: false, error: `action not allowed: ${action || '(empty)'}` })
+            return
+          }
+          try {
+            const { type: _type, __agentWebBridge: _bridge, id: _id, payload: _payload, ...topLevelPayload } = message as Record<string, any>
+            const nativePayload = message.action !== undefined ? topLevelPayload : nestedPayload
+            const response = await chrome.runtime.sendNativeMessage(
+              'com.creatorweave.nativehost',
+              nativePayload
+            )
+            sendResponse(response)
+          } catch (err: any) {
+            sendResponse({ ok: false, error: String(err?.message || err), errorCode: 'NATIVE_HOST_ERROR' })
+          }
           return
         }
 

@@ -30,9 +30,10 @@ import { sidebar } from './sidebar'
 import { goToFile } from './goToFile'
 import { keyboardShortcuts } from './keyboardShortcuts'
 import { extension } from './extension'
+import { execPolicy } from './execPolicy'
 import { assets } from './assets'
+import { processes } from './processes'
 import { tools } from './tools'
-
 export const zhCN = {
   common,
   app,
@@ -87,6 +88,8 @@ export const zhCN = {
   questionCard,
   runChanges,
   extension,
+  execPolicy,
   assets,
+  processes,
   tools,
 } as const

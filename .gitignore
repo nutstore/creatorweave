@@ -1,6 +1,8 @@
 # Rust
 target/
+# Cargo.lock: ignored for library crates (wasm); binary crates should commit it
 Cargo.lock
+!browser-extension/native-host/Cargo.lock
 **/*.rs.bk
 *.pdb
 

@@ -1,8 +1,8 @@
 /**
- * Renderer for `git_log` and `git_show` tools.
+ * Renderer for `snapshot_log` and `snapshot_show` tools.
  *
- * git_log: commit list with date, summary, workspace badge, and "hasMore" indicator.
- * git_show: single commit detail with files, status badge, and optional diff stats.
+ * snapshot_log: commit list with date, summary, workspace badge, and "hasMore" indicator.
+ * snapshot_show: single commit detail with files, status badge, and optional diff stats.
  *
  * Consumes structured data from ctx.result.data.log / ctx.result.data.show directly.
  */
@@ -165,11 +165,11 @@ function StreamingPlaceholder() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// git_log renderer
+// snapshot_log renderer
 // ════════════════════════════════════════════════════════════════════════════
 
 registerRenderer({
-  name: 'git_log',
+  name: 'snapshot_log',
   icon: <GitBranch className="h-3.5 w-3.5 text-neutral-400" />,
 
   Summary(ctx) {
@@ -179,7 +179,7 @@ registerRenderer({
     if (!log) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_log</code>
           {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
           {ctx.isExecuting && <span className="ml-auto text-xs text-blue-500 shrink-0">loading...</span>}
         </>
@@ -188,7 +188,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-foreground">git_log</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_log</code>
         {path && <span className="max-w-[200px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">{path}</span>}
         <span className="ml-auto flex items-center gap-1.5 shrink-0">
           <span className="text-xs text-neutral-400">{log.commits.length}{log.hasMore ? '+' : ''} commits</span>
@@ -268,11 +268,11 @@ registerRenderer({
 })
 
 // ════════════════════════════════════════════════════════════════════════════
-// git_show renderer
+// snapshot_show renderer
 // ════════════════════════════════════════════════════════════════════════════
 
 registerRenderer({
-  name: 'git_show',
+  name: 'snapshot_show',
   icon: <GitCommitHorizontal className="h-3.5 w-3.5 text-neutral-400" />,
 
   Summary(ctx) {
@@ -282,7 +282,7 @@ registerRenderer({
     if (!show) {
       return (
         <>
-          <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
+          <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_show</code>
           {snapshotId && (
             <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
               {shortId(snapshotId)}
@@ -298,7 +298,7 @@ registerRenderer({
 
     return (
       <>
-        <code className="font-medium text-neutral-700 dark:text-foreground">git_show</code>
+        <code className="font-medium text-neutral-700 dark:text-foreground">snapshot_show</code>
         <span className="max-w-[120px] truncate font-mono text-[11px] text-neutral-400 text-neutral-500 text-neutral-500 dark:text-neutral-500">
           {shortId(show.id)}
         </span>

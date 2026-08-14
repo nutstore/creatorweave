@@ -85,4 +85,17 @@ export const agent = {
             resetTitle: "보기 재설정",
         },
     },
+
+    pageWriteAuth: {
+        title: "AI가 현재 페이지를 조작하려고 합니다",
+        approve: "허용",
+        deny: "거부",
+    },
+
+    execAuth: {
+        title: "명령어 실행 승인",
+        subtitle: "AI가 컴퓨터에서 명령어를 실행하려고 합니다",
+        allow: "허용",
+        deny: "거부",
+    },
 } as const

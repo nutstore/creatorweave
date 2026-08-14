@@ -17,4 +17,11 @@ export const projectRoots = {
     setAsDefault: "デフォルトに設定",
     removeRoot: "フォルダーを削除",
     confirmRemove: '本当にこのプロジェクトから "{name}" を削除しますか？',
+    nativeHostBadge: "ローカル接続",
+    nativeHostUnavailable: "ローカル接続は利用できません",
+    rootAlreadyExists: '「{name}」というフォルダーはすでに存在します',
+    nativeRootAdded: 'ローカル接続で「{name}」を追加しました',
+    nativeRootAddFailed: "ローカル接続の追加に失敗しました: {error}",
+    nativeRootMissingScope: "このローカル接続には認可情報がありません",
+    nativeRootRevokeFailed: "ローカル接続の削除に失敗しました: {error}",
 } as const

@@ -536,4 +536,23 @@ export const settings = {
       testDenied: "Permission denied — check browser settings",
       testUnsupported: "Notifications unsupported in this browser",
     },
+
+    execPolicy: {
+        tab: "Exec Policy",
+        description: "Configure which commands the AI can run on your machine. Commands not matching any rule will use the default policy.",
+        searchPlaceholder: "Search commands...",
+        newCommandPlaceholder: "Command name (e.g. touch, mkdir)",
+        auto: "Auto",
+        prompt: "Ask",
+        forbidden: "Blocked",
+        add: "Add",
+        remove: "Remove",
+        defaultLabel: "Default for unmatched commands:",
+        defaultHint: "Applies when no rule matches",
+        save: "Save",
+        saving: "Saving...",
+        cancel: "Cancel",
+        loading: "Loading policy...",
+        retry: "Retry",
+    },
 } as const

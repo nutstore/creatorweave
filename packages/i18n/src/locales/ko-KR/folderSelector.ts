@@ -1,6 +1,10 @@
 // 폴더 선택
 export const folderSelector = {
     openFolder: "폴더 선택",
+    browserAccess: "브라우저 액세스",
+    browserAccessDescription: "브라우저에서 폴더를 선택하고 접근 권한 부여",
+    localConnection: "로컬 연결",
+    localConnectionDescription: "CreatorWeave 로컬 서비스를 통해 폴더 연결",
     switchFolder: "폴더 전환",
     releaseHandle: "핸들 해제",
     copyPath: "폴더 이름 복사",

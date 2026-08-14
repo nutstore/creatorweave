@@ -1,7 +1,8 @@
 /**
- * Git Tools - OPFS 版本 Git 基础工具
+ * Snapshot Tools - OPFS 变更快照审查工具（非真实 Git）
  *
- * 提供浏览器版本的 Git 命令，基于现有的变更追踪和快照系统实现。
+ * 基于 OPFS 变更追踪和快照系统（pending_ops / fs_changesets）实现，
+ * 用于 agent 编辑的审查/撤销/回滚。真实 git 请通过 exec 工具执行。
  */
 
 import type { ToolDefinition, ToolExecutor, ToolPromptDoc } from './tool-types'
@@ -10,18 +11,18 @@ import { toolErrorJson, toolOkJson } from './tool-envelope'
 
 // 导入 Git 工具实现
 import { 
-  gitStatus, 
-  formatGitStatus,
-  gitDiff,
-  formatGitDiff,
-  gitLog,
-  formatGitLog,
-  formatGitLogOneline,
-  gitShow,
-  formatGitShow,
-  gitRestore,
-  formatGitRestore
-} from '@/opfs/git'
+  snapshotStatus, 
+  formatSnapshotStatus,
+  snapshotDiff,
+  formatSnapshotDiff,
+  snapshotLog,
+  formatSnapshotLog,
+  formatSnapshotLogOneline,
+  snapshotShow,
+  formatSnapshotShow,
+  snapshotRestore,
+  formatSnapshotRestore
+} from '@/opfs/snapshot'
 
 function parseFormat(raw: unknown): { ok: true; format: 'json' | 'text' } | { ok: false; error: string } {
   if (raw === undefined) return { ok: true, format: 'text' }
@@ -91,16 +92,16 @@ function buildPathHint(inputPath: string, existingFiles: Array<{ path: string }>
 }
 
 //=============================================================================
-// git_status - 查看工作区状态
+// snapshot_status - 查看工作区状态
 //=============================================================================
 
-export const gitStatusDefinition: ToolDefinition = {
+export const snapshotStatusDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'git_status',
+    name: 'snapshot_status',
     description:
-      'Show the working tree status. Lists changes in working directory and staged changes. ' +
-      'Based on pending_ops and fs_changesets tables.',
+      'Show OPFS pending changes and sync status. NOT real git — these are OPFS-internal ' +
+      'change tracking snapshots for review/undo. Based on pending_ops and fs_changesets tables.',
     parameters: {
       type: 'object',
       properties: {
@@ -114,35 +115,35 @@ export const gitStatusDefinition: ToolDefinition = {
   },
 }
 
-export const gitStatusExecutor: ToolExecutor = async (args, context) => {
+export const snapshotStatusExecutor: ToolExecutor = async (args, context) => {
   try {
     const workspaceId = ensureWorkspaceId(context)
     if (!workspaceId) {
-      return toolErrorJson('git_status', 'no_active_workspace', 'No active workspace')
+      return toolErrorJson('snapshot_status', 'no_active_workspace', 'No active workspace')
     }
 
     const parsedFormat = parseFormat(args.format)
     if (!parsedFormat.ok) {
-      return toolErrorJson('git_status', 'invalid_arguments', parsedFormat.error)
+      return toolErrorJson('snapshot_status', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitStatus(workspaceId)
-    const output = formatGitStatus(result)
+    const result = await snapshotStatus(workspaceId)
+    const output = formatSnapshotStatus(result)
     if (parsedFormat.format === 'json') {
-      return toolOkJson('git_status', {
+      return toolOkJson('snapshot_status', {
         format: 'json',
         status: result,
       })
     }
 
-    return toolOkJson('git_status', {
+    return toolOkJson('snapshot_status', {
       format: 'text',
       output,
       status: result,
     })
   } catch (error) {
     return toolErrorJson(
-      'git_status',
+      'snapshot_status',
       'internal_error',
       `Failed to get status: ${error instanceof Error ? error.message : String(error)}`,
       { retryable: true }
@@ -151,15 +152,15 @@ export const gitStatusExecutor: ToolExecutor = async (args, context) => {
 }
 
 //=============================================================================
-// git_diff - 查看文件差异
+// snapshot_diff - 查看文件差异
 //=============================================================================
 
-export const gitDiffDefinition: ToolDefinition = {
+export const snapshotDiffDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'git_diff',
+    name: 'snapshot_diff',
     description:
-      'Show changes between commits, commit and working tree, etc. ' +
+      'Show diffs of OPFS pending changes vs snapshots. NOT real git. ' +
       'Modes: working (default) = pending changes, cached = staged changes, snapshot = specific snapshot.',
     parameters: {
       type: 'object',
@@ -215,18 +216,18 @@ export const gitDiffDefinition: ToolDefinition = {
   },
 }
 
-export const gitDiffExecutor: ToolExecutor = async (args, context) => {
+export const snapshotDiffExecutor: ToolExecutor = async (args, context) => {
   try {
     const workspaceId = ensureWorkspaceId(context)
     if (!workspaceId) {
-      return toolErrorJson('git_diff', 'no_active_workspace', 'No active workspace')
+      return toolErrorJson('snapshot_diff', 'no_active_workspace', 'No active workspace')
     }
 
     const modeRaw = args.mode
     let mode = (modeRaw as 'working' | 'cached' | 'snapshot') || 'working'
     if (mode !== 'working' && mode !== 'cached' && mode !== 'snapshot') {
       return toolErrorJson(
-        'git_diff',
+        'snapshot_diff',
         'invalid_arguments',
         'mode must be one of: working, cached, snapshot'
       )
@@ -234,12 +235,12 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
 
     const cachedParsed = parseBooleanArg(args.cached, 'cached')
     if (!cachedParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', cachedParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', cachedParsed.error)
     }
     if (cachedParsed.value) {
       if (args.mode !== undefined && mode !== 'cached') {
         return toolErrorJson(
-          'git_diff',
+          'snapshot_diff',
           'invalid_arguments',
           'cached=true conflicts with mode. Use mode="cached" or remove mode.'
         )
@@ -249,20 +250,20 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
 
     const snapshotId = args.snapshot_id as string | undefined
     if (mode === 'snapshot' && !snapshotId) {
-      return toolErrorJson('git_diff', 'invalid_arguments', 'snapshot_id is required when mode="snapshot"')
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', 'snapshot_id is required when mode="snapshot"')
     }
 
     const nameOnlyParsed = parseBooleanArg(args.name_only, 'name_only')
     if (!nameOnlyParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', nameOnlyParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', nameOnlyParsed.error)
     }
     const nameStatusParsed = parseBooleanArg(args.name_status, 'name_status')
     if (!nameStatusParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', nameStatusParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', nameStatusParsed.error)
     }
     if (nameOnlyParsed.value && nameStatusParsed.value) {
       return toolErrorJson(
-        'git_diff',
+        'snapshot_diff',
         'invalid_arguments',
         'name_only and name_status cannot both be true'
       )
@@ -270,30 +271,30 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
 
     const statParsed = parseBooleanArg(args.stat, 'stat')
     if (!statParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', statParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', statParsed.error)
     }
     const numstatParsed = parseBooleanArg(args.numstat, 'numstat')
     if (!numstatParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', numstatParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', numstatParsed.error)
     }
 
     const patchParsed = parseBooleanArg(args.patch, 'patch')
     if (!patchParsed.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', patchParsed.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', patchParsed.error)
     }
 
     const unified = args.unified as number | undefined
     if (unified !== undefined && (!Number.isFinite(unified) || unified < 0 || !Number.isInteger(unified))) {
-      return toolErrorJson('git_diff', 'invalid_arguments', 'unified must be a non-negative integer')
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', 'unified must be a non-negative integer')
     }
 
     const path = args.path as string | undefined
     const parsedFormat = parseFormat(args.format)
     if (!parsedFormat.ok) {
-      return toolErrorJson('git_diff', 'invalid_arguments', parsedFormat.error)
+      return toolErrorJson('snapshot_diff', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitDiff(workspaceId, {
+    const result = await snapshotDiff(workspaceId, {
       mode,
       snapshotId,
       path,
@@ -309,7 +310,7 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
     if (hasPath && filesChanged === 0) {
       // 额外查一次不带 path 的 diff，提取 root 前缀用于提示
       try {
-        const fullResult = await gitDiff(workspaceId, {
+        const fullResult = await snapshotDiff(workspaceId, {
           mode,
           snapshotId,
           path: undefined,
@@ -331,28 +332,28 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
       patch: args.patch === undefined ? undefined : patchParsed.value,
     }
 
-    let output = formatGitDiff(result, renderOptions)
+    let output = formatSnapshotDiff(result, renderOptions)
 
     // 附加路径提示
     if (pathHint) {
       output = `No changes matched path "${path}".\n${pathHint}\n\n${output}`
     }
     if (parsedFormat.format === 'json') {
-      return toolOkJson('git_diff', {
+      return toolOkJson('snapshot_diff', {
         format: 'json',
         diff: result,
         render: renderOptions,
       })
     }
 
-    return toolOkJson('git_diff', {
+    return toolOkJson('snapshot_diff', {
       format: 'text',
       output,
       diff: result,
     })
   } catch (error) {
     return toolErrorJson(
-      'git_diff',
+      'snapshot_diff',
       'internal_error',
       `Failed to get diff: ${error instanceof Error ? error.message : String(error)}`,
       { retryable: true }
@@ -361,15 +362,15 @@ export const gitDiffExecutor: ToolExecutor = async (args, context) => {
 }
 
 //=============================================================================
-// git_log - 查看提交历史
+// snapshot_log - 查看提交历史
 //=============================================================================
 
-export const gitLogDefinition: ToolDefinition = {
+export const snapshotLogDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'git_log',
+    name: 'snapshot_log',
     description:
-      'Show the commit history. Based on fs_changesets (snapshots) table.',
+      'Show OPFS snapshot history (auto-saved changesets). NOT real git commit history. Based on fs_changesets table.',
     parameters: {
       type: 'object',
       properties: {
@@ -400,11 +401,11 @@ export const gitLogDefinition: ToolDefinition = {
   },
 }
 
-export const gitLogExecutor: ToolExecutor = async (args, context) => {
+export const snapshotLogExecutor: ToolExecutor = async (args, context) => {
   try {
     const projectId = ensureProjectId(context)
     if (!projectId) {
-      return toolErrorJson('git_log', 'no_active_project', 'No active project')
+      return toolErrorJson('snapshot_log', 'no_active_project', 'No active project')
     }
     if (args.limit !== undefined) {
       if (
@@ -413,7 +414,7 @@ export const gitLogExecutor: ToolExecutor = async (args, context) => {
         args.limit <= 0 ||
         !Number.isInteger(args.limit)
       ) {
-        return toolErrorJson('git_log', 'invalid_arguments', 'limit must be a positive integer')
+        return toolErrorJson('snapshot_log', 'invalid_arguments', 'limit must be a positive integer')
       }
     }
     const limit = (args.limit as number) || 10
@@ -421,35 +422,35 @@ export const gitLogExecutor: ToolExecutor = async (args, context) => {
     const status = args.status as 'committed' | 'approved' | 'rolled_back' | undefined
     if (status && status !== 'committed' && status !== 'approved' && status !== 'rolled_back') {
       return toolErrorJson(
-        'git_log',
+        'snapshot_log',
         'invalid_arguments',
         'status must be one of: committed, approved, rolled_back'
       )
     }
     const oneline = args.oneline as boolean
     if (args.oneline !== undefined && typeof args.oneline !== 'boolean') {
-      return toolErrorJson('git_log', 'invalid_arguments', 'oneline must be boolean')
+      return toolErrorJson('snapshot_log', 'invalid_arguments', 'oneline must be boolean')
     }
     const parsedFormat = parseFormat(args.format)
     if (!parsedFormat.ok) {
-      return toolErrorJson('git_log', 'invalid_arguments', parsedFormat.error)
+      return toolErrorJson('snapshot_log', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitLog(projectId, {
+    const result = await snapshotLog(projectId, {
       limit,
       path,
       status,
     })
 
-    const output = oneline ? formatGitLogOneline(result) : formatGitLog(result)
+    const output = oneline ? formatSnapshotLogOneline(result) : formatSnapshotLog(result)
     if (parsedFormat.format === 'json') {
-      return toolOkJson('git_log', {
+      return toolOkJson('snapshot_log', {
         format: 'json',
         log: result,
       })
     }
 
-    return toolOkJson('git_log', {
+    return toolOkJson('snapshot_log', {
       format: 'text',
       output,
       log: result,
@@ -457,7 +458,7 @@ export const gitLogExecutor: ToolExecutor = async (args, context) => {
     })
   } catch (error) {
     return toolErrorJson(
-      'git_log',
+      'snapshot_log',
       'internal_error',
       `Failed to get log: ${error instanceof Error ? error.message : String(error)}`,
       { retryable: true }
@@ -466,15 +467,15 @@ export const gitLogExecutor: ToolExecutor = async (args, context) => {
 }
 
 //=============================================================================
-// git_show - 查看提交详情
+// snapshot_show - 查看提交详情
 //=============================================================================
 
-export const gitShowDefinition: ToolDefinition = {
+export const snapshotShowDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'git_show',
+    name: 'snapshot_show',
     description:
-      'Show detailed information about a commit (snapshot). Includes commit message and diffs.',
+      'Show detailed information about an OPFS snapshot (changeset). Includes summary and diffs. NOT real git.',
     parameters: {
       type: 'object',
       properties: {
@@ -500,48 +501,48 @@ export const gitShowDefinition: ToolDefinition = {
   },
 }
 
-export const gitShowExecutor: ToolExecutor = async (args, context) => {
+export const snapshotShowExecutor: ToolExecutor = async (args, context) => {
   try {
     const projectId = ensureProjectId(context)
     if (!projectId) {
-      return toolErrorJson('git_show', 'no_active_project', 'No active project')
+      return toolErrorJson('snapshot_show', 'no_active_project', 'No active project')
     }
     const snapshotId = args.snapshot_id as string | undefined
     if (args.include_diff !== undefined && typeof args.include_diff !== 'boolean') {
-      return toolErrorJson('git_show', 'invalid_arguments', 'include_diff must be boolean')
+      return toolErrorJson('snapshot_show', 'invalid_arguments', 'include_diff must be boolean')
     }
     const includeDiff = args.include_diff as boolean | undefined
     const path = args.path as string | undefined
     const parsedFormat = parseFormat(args.format)
     if (!parsedFormat.ok) {
-      return toolErrorJson('git_show', 'invalid_arguments', parsedFormat.error)
+      return toolErrorJson('snapshot_show', 'invalid_arguments', parsedFormat.error)
     }
 
-    const result = await gitShow(projectId, snapshotId, {
+    const result = await snapshotShow(projectId, snapshotId, {
       includeDiff: includeDiff === true,
       path,
     })
 
     if (!result) {
-      return toolErrorJson('git_show', 'not_found', 'No snapshots found')
+      return toolErrorJson('snapshot_show', 'not_found', 'No snapshots found')
     }
 
-    const output = formatGitShow(result)
+    const output = formatSnapshotShow(result)
     if (parsedFormat.format === 'json') {
-      return toolOkJson('git_show', {
+      return toolOkJson('snapshot_show', {
         format: 'json',
         show: result,
       })
     }
 
-    return toolOkJson('git_show', {
+    return toolOkJson('snapshot_show', {
       format: 'text',
       output,
       show: result,
     })
   } catch (error) {
     return toolErrorJson(
-      'git_show',
+      'snapshot_show',
       'internal_error',
       `Failed to show commit: ${error instanceof Error ? error.message : String(error)}`,
       { retryable: true }
@@ -550,15 +551,15 @@ export const gitShowExecutor: ToolExecutor = async (args, context) => {
 }
 
 //=============================================================================
-// git_restore - 恢复文件
+// snapshot_restore - 恢复文件
 //=============================================================================
 
-export const gitRestoreDefinition: ToolDefinition = {
+export const snapshotRestoreDefinition: ToolDefinition = {
   type: 'function',
   function: {
-    name: 'git_restore',
+    name: 'snapshot_restore',
     description:
-      'Restore working tree files. Can undo pending changes or restore from history snapshots. ' +
+      'Restore/undo OPFS pending changes or restore from a previous snapshot. NOT real git. ' +
       'Use staged=true to unstage files (like git restore --staged).',
     parameters: {
       type: 'object',
@@ -587,11 +588,11 @@ export const gitRestoreDefinition: ToolDefinition = {
   },
 }
 
-export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
+export const snapshotRestoreExecutor: ToolExecutor = async (args, context) => {
   try {
     const workspaceId = ensureWorkspaceId(context)
     if (!workspaceId) {
-      return toolErrorJson('git_restore', 'no_active_workspace', 'No active workspace')
+      return toolErrorJson('snapshot_restore', 'no_active_workspace', 'No active workspace')
     }
     const rawPaths = args.paths
     const paths = Array.isArray(rawPaths) ? (rawPaths as string[]) : []
@@ -599,20 +600,20 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
     const snapshotId = args.snapshot_id as string | undefined
     const parsedFormat = parseFormat(args.format)
     if (!parsedFormat.ok) {
-      return toolErrorJson('git_restore', 'invalid_arguments', parsedFormat.error)
+      return toolErrorJson('snapshot_restore', 'invalid_arguments', parsedFormat.error)
     }
 
     if (rawPaths !== undefined && !Array.isArray(rawPaths)) {
-      return toolErrorJson('git_restore', 'invalid_arguments', 'paths must be an array of strings')
+      return toolErrorJson('snapshot_restore', 'invalid_arguments', 'paths must be an array of strings')
     }
     if (paths.some((path) => typeof path !== 'string' || !path)) {
-      return toolErrorJson('git_restore', 'invalid_arguments', 'paths must be a string array')
+      return toolErrorJson('snapshot_restore', 'invalid_arguments', 'paths must be a string array')
     }
     if (args.staged !== undefined && typeof args.staged !== 'boolean') {
-      return toolErrorJson('git_restore', 'invalid_arguments', 'staged must be boolean')
+      return toolErrorJson('snapshot_restore', 'invalid_arguments', 'staged must be boolean')
     }
 
-    const result = await gitRestore(workspaceId, {
+    const result = await snapshotRestore(workspaceId, {
       paths,
       staged: staged || false,
       worktree: !staged,
@@ -624,22 +625,22 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
     await useConversationContextStore.getState().updateCurrentCounts()
     await useConversationContextStore.getState().refreshPendingChanges(true)
 
-    const output = formatGitRestore(result)
+    const output = formatSnapshotRestore(result)
     if (parsedFormat.format === 'json') {
-      return toolOkJson('git_restore', {
+      return toolOkJson('snapshot_restore', {
         format: 'json',
         restore: result,
       })
     }
 
-    return toolOkJson('git_restore', {
+    return toolOkJson('snapshot_restore', {
       format: 'text',
       output,
       restore: result,
     })
   } catch (error) {
     return toolErrorJson(
-      'git_restore',
+      'snapshot_restore',
       'internal_error',
       `Failed to restore: ${error instanceof Error ? error.message : String(error)}`,
       { retryable: true }
@@ -647,14 +648,14 @@ export const gitRestoreExecutor: ToolExecutor = async (args, context) => {
   }
 }
 
-export const gitPromptDoc: ToolPromptDoc = {
-  category: 'git',
-  section: '### Git Tools (Version Control)',
+export const snapshotPromptDoc: ToolPromptDoc = {
+  category: 'snapshot',
+  section: '### Snapshot Tools (OPFS Change Review)',
   lines: [
-    '- `git_status(format?)` - Show the working tree status',
-    '- `git_diff(mode?, path?, ...)` - Show changes between commits, commit and working tree, etc.',
-    '- `git_log(limit?, path?, ...)` - Show the commit history',
-    '- `git_show(snapshot_id?, ...)` - Show detailed info about a commit (snapshot)',
-    '- `git_restore(paths?, staged?, snapshot_id?)` - Restore working tree files',
+    '- `snapshot_status(format?)` - Show OPFS pending changes and sync status. NOT real git.',
+    '- `snapshot_diff(mode?, path?, ...)` - Show diffs of OPFS pending/staged changes vs snapshots',
+    '- `snapshot_log(limit?, path?, ...)` - Show OPFS snapshot history (auto-saved changesets)',
+    '- `snapshot_show(snapshot_id?, ...)` - Show details of a specific OPFS snapshot',
+    '- `snapshot_restore(paths?, staged?, snapshot_id?)` - Restore/undo OPFS pending changes',
   ],
 }

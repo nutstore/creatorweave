@@ -17,4 +17,11 @@ export const projectRoots = {
     setAsDefault: "기본으로 설정",
     removeRoot: "폴더 제거",
     confirmRemove: '정말 이 프로젝트에서 "{name}"을(를) 제거하시겠습니까?',
+    nativeHostBadge: "로컬 연결",
+    nativeHostUnavailable: "로컬 연결을 사용할 수 없습니다",
+    rootAlreadyExists: '“{name}” 이름의 폴더가 이미 있습니다',
+    nativeRootAdded: '로컬 연결로 “{name}”을(를) 추가했습니다',
+    nativeRootAddFailed: "로컬 연결 추가에 실패했습니다: {error}",
+    nativeRootMissingScope: "이 로컬 연결에 권한 정보가 없습니다",
+    nativeRootRevokeFailed: "로컬 연결 제거에 실패했습니다: {error}",
 } as const

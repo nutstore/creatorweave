@@ -22,7 +22,8 @@ describe('SearchConversationsRenderer', () => {
     }
 
     expect(renderer).toBeDefined()
-    render(<>{renderer!.Detail(ctx)}</>)
+    const Detail = renderer!.Detail
+    render(<Detail {...ctx} />)
 
     expect(screen.getByText('A filter is required')).toBeInTheDocument()
   })

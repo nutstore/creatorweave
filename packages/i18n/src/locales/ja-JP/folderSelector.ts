@@ -1,6 +1,10 @@
 // フォルダ選択
 export const folderSelector = {
     openFolder: "フォルダを選択",
+    browserAccess: "ブラウザーアクセス",
+    browserAccessDescription: "ブラウザーでフォルダーを選択してアクセスを許可",
+    localConnection: "ローカル接続",
+    localConnectionDescription: "CreatorWeave のローカルサービスでフォルダーに接続",
     switchFolder: "フォルダを切り替え",
     releaseHandle: "ハンドルを解放",
     copyPath: "フォルダ名をコピー",

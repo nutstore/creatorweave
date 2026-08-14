@@ -6,6 +6,7 @@ const nativeDirectory = {} as FileSystemDirectoryHandle
 function createWorkspace(overrides: Partial<AutoApplyWorkspace> = {}): AutoApplyWorkspace {
   return {
     getNativeDirectoryHandle: vi.fn().mockResolvedValue(nativeDirectory),
+    hasAnyNativeDirectoryHandle: vi.fn().mockResolvedValue(true),
     getPendingChanges: vi.fn().mockReturnValue([
       { id: 'a', path: 'root/a.ts', type: 'modify', fsMtime: 1, timestamp: 1 },
     ]),
@@ -29,7 +30,7 @@ describe('autoApplyCompletedRunChanges', () => {
     })
 
     expect(workspace.detectSyncConflicts).toHaveBeenCalledWith(nativeDirectory, ['root/a.ts'])
-    expect(workspace.createApprovedSnapshotForPaths).toHaveBeenCalledWith(['root/a.ts'], undefined, nativeDirectory)
+    expect(workspace.createApprovedSnapshotForPaths).toHaveBeenCalledWith(['root/a.ts'], undefined, nativeDirectory, undefined)
     expect(workspace.syncToDisk).toHaveBeenCalledWith(nativeDirectory, ['root/a.ts'], false)
     expect(workspace.markSnapshotAsSynced).toHaveBeenCalledWith('snapshot-1')
     expect(refresh).toHaveBeenCalledOnce()

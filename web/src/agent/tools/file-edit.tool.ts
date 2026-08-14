@@ -360,6 +360,14 @@ async function executeEdits(
     const readStateKey = getReadStateKey(target)
     const snapshot = readFileState.get(readStateKey)
 
+    if (!snapshot) {
+      return toolErrorJson(
+        'edit',
+        'read_required',
+        'Read file before editing. Read the full file first, then retry edit.'
+      )
+    }
+
     if (snapshot?.isPartialView) {
       return toolErrorJson(
         'edit',

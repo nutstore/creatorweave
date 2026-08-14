@@ -141,6 +141,21 @@ export async function readFileFromNativeFSMultiRoot(
         : undefined
       if (workspace) {
         const resolved = await workspace.resolvePath(path)
+        // Native-host root: no FS Access handle — use diskExec instead.
+        if (resolved.backend === 'native-host' && resolved.rootId) {
+          try {
+            const diskExec = (workspace as any).diskExec
+            if (diskExec) {
+              const result = await diskExec.read(resolved.rootId, resolved.relativePath)
+              if (result?.stat?.contentType === 'text' && typeof result.content === 'string') {
+                return result.content
+              }
+            }
+          } catch {
+            // Fall through to native-host failure
+          }
+          return null
+        }
         const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
         if (rootHandle) {
           return await readFileFromNativeFS(rootHandle, resolved.relativePath)
@@ -293,6 +308,19 @@ export async function fileExistsInNativeFSMultiRoot(
         : undefined
       if (workspace) {
         const resolved = await workspace.resolvePath(path)
+        // Native-host root: use diskExec.stat instead of FS Access.
+        if (resolved.backend === 'native-host' && resolved.rootId) {
+          try {
+            const diskExec = (workspace as any).diskExec
+            if (diskExec) {
+              const stat = await diskExec.stat(resolved.rootId, resolved.relativePath)
+              return stat !== null
+            }
+          } catch {
+            return false
+          }
+          return false
+        }
         const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
         if (rootHandle) {
           return await fileExistsInNativeFS(rootHandle, resolved.relativePath)
@@ -454,6 +482,27 @@ export async function readBinaryFileFromNativeFSMultiRoot(
         : undefined
       if (workspace) {
         const resolved = await workspace.resolvePath(path)
+        // Native-host root: use diskExec.read (returns ArrayBuffer for binary).
+        if (resolved.backend === 'native-host' && resolved.rootId) {
+          try {
+            const diskExec = (workspace as any).diskExec
+            if (diskExec) {
+              const result = await diskExec.read(resolved.rootId, resolved.relativePath)
+              const content = result?.content
+              if (content instanceof ArrayBuffer) {
+                const bytes = new Uint8Array(content)
+                let binary = ''
+                for (let i = 0; i < bytes.byteLength; i++) {
+                  binary += String.fromCharCode(bytes[i])
+                }
+                return btoa(binary)
+              }
+            }
+          } catch {
+            return null
+          }
+          return null
+        }
         const rootHandle = getRuntimeDirectoryHandle(activeProject.id, resolved.rootName)
         if (rootHandle) {
           return await readBinaryFileFromNativeFS(rootHandle, resolved.relativePath)

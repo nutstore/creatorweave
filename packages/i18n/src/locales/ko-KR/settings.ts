@@ -532,4 +532,23 @@ export const settings = {
       testDenied: "권한 거부됨 — 브라우저 설정 확인",
       testUnsupported: "이 브라우저에서는 알림 미지원",
     },
+
+    execPolicy: {
+        tab: "실행 정책",
+        description: "AI가 컴퓨터에서 실행할 수 있는 명령어를 설정합니다. 규칙에 일치하지 않는 명령어는 기본 정책이 적용됩니다.",
+        searchPlaceholder: "명령어 검색...",
+        newCommandPlaceholder: "명령어 이름 (예: touch, mkdir)",
+        auto: "자동",
+        prompt: "확인",
+        forbidden: "금지",
+        add: "추가",
+        remove: "삭제",
+        defaultLabel: "일치하지 않는 명령어 기본 정책:",
+        defaultHint: "규칙이 없을 때 적용",
+        save: "저장",
+        saving: "저장 중...",
+        cancel: "취소",
+        loading: "정책 로딩 중...",
+        retry: "재시도",
+    },
 } as const

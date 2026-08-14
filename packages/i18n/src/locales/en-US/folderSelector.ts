@@ -1,6 +1,10 @@
 // Folder Selector
 export const folderSelector = {
     openFolder: "Select Folder",
+    browserAccess: "Browser access",
+    browserAccessDescription: "Choose and authorize a folder through your browser",
+    localConnection: "Local connection",
+    localConnectionDescription: "Connect a folder through the CreatorWeave local service",
     switchFolder: "Switch Folder",
     releaseHandle: "Release Handle",
     copyPath: "Copy Folder Name",

@@ -1,0 +1,21 @@
+export const execPolicy = {
+    tab: "执行策略",
+    description: "配置哪些命令 AI 可以自动执行、哪些需要询问、哪些始终禁止。修改会保存到 ~/.creatorweave/execpolicy.json。",
+    searchPlaceholder: "搜索命令...",
+    newCommandPlaceholder: "命令名（如 mkdir）",
+    add: "添加",
+    remove: "移除",
+    auto: "自动执行",
+    prompt: "需要询问",
+    forbidden: "禁止",
+    defaultLabel: "未列出命令的默认策略：",
+    defaultHint: "当没有规则匹配时生效",
+    loading: "加载中...",
+    saving: "保存中...",
+    save: "保存",
+    cancel: "取消",
+    retry: "重试",
+    saveHint: "有未保存的修改",
+    // ExecAuthModal guidance
+    authGuide: "如需修改命令的授权方式，请前往 设置 → 执行策略",
+} as const

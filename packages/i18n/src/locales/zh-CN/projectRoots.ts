@@ -17,4 +17,11 @@ export const projectRoots = {
     setAsDefault: "设为默认",
     removeRoot: "移除文件夹",
     confirmRemove: '确定要从此项目中移除 "{name}" 吗？',
+    nativeHostBadge: "本机连接",
+    nativeHostUnavailable: "本机连接不可用",
+    rootAlreadyExists: '已存在名为“{name}”的文件夹',
+    nativeRootAdded: '已通过本机连接添加文件夹“{name}”',
+    nativeRootAddFailed: "添加本机连接失败：{error}",
+    nativeRootMissingScope: "此本机连接缺少授权信息",
+    nativeRootRevokeFailed: "移除本机连接失败：{error}",
 } as const

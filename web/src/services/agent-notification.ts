@@ -100,6 +100,26 @@ export async function notifyAgentComplete(params: NotifyAgentCompleteParams): Pr
     if (typeof Notification === 'undefined') return
     if (Notification.permission !== 'granted') return
 
+    // Prefer the extension bridge when available: Web SW notifications
+    // cannot focus the host tab on click (Web SWs lack tab privileges),
+    // while the extension background uses chrome.notifications +
+    // chrome.tabs.update to refocus the CreatorWeave tab. Falls back to
+    // the Web SW path in plain web tabs without the extension.
+    const agentWeb = (window as any).__agentWeb
+    if (typeof agentWeb?.showAgentNotification === 'function') {
+      try {
+        const resp = await agentWeb.showAgentNotification({
+          title,
+          body,
+          conversationId,
+        })
+        if (resp?.ok) return
+        // Bridge responded with an error — fall through to the Web SW path.
+      } catch {
+        // Bridge call failed — fall through to the Web SW path.
+      }
+    }
+
     // Use navigator.serviceWorker.ready (matches the working manual test).
     // This is an awaitable Promise that resolves once a SW controls the page.
     // It is the officially recommended way to get a usable registration.

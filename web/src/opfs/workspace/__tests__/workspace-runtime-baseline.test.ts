@@ -46,11 +46,13 @@ describe('WorkspaceRuntime baseline mtime', () => {
 
     await runtime.writeFile('src/a.ts', 'next-content', {} as FileSystemDirectoryHandle)
 
-    expect(runtime.pendingManager.add).toHaveBeenCalledWith('src/a.ts', 222)
+    expect(runtime.pendingManager.add).toHaveBeenCalledWith('src/a.ts', 222, {
+      forceUpdateMtime: false,
+    })
     expect(runtime.pendingManager.markAsCreated).not.toHaveBeenCalled()
   })
 
-  it('captures OPFS baseline for modify in OPFS-only mode', async () => {
+  it('writes directly to OPFS without pending tracking in OPFS-only mode', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true
     runtime.metadata = { lastAccessedAt: 0 }
@@ -74,8 +76,9 @@ describe('WorkspaceRuntime baseline mtime', () => {
 
     await runtime.writeFile('src/a.ts', 'next-content')
 
-    expect(runtime.captureModifyBaseline).toHaveBeenCalledWith('src/a.ts', 'old-opfs')
-    expect(runtime.pendingManager.add).toHaveBeenCalledWith('src/a.ts', 111)
+    expect(runtime.captureModifyBaseline).not.toHaveBeenCalled()
+    expect(runtime.pendingManager.add).not.toHaveBeenCalled()
+    expect(runtime.writeToFilesDir).toHaveBeenCalledWith('src/a.ts', 'next-content')
     expect(runtime.pendingManager.markAsCreated).not.toHaveBeenCalled()
   })
 
@@ -341,7 +344,7 @@ describe('WorkspaceRuntime baseline mtime', () => {
     expect(result.content).toBe('changed-on-disk')
   })
 
-  it('normalizes /mnt paths in writeFile and keeps modify semantics', async () => {
+  it('normalizes /mnt paths for direct OPFS writes', async () => {
     const runtime = new WorkspaceRuntime('w1', {} as FileSystemDirectoryHandle, '/tmp') as any
     runtime.initialized = true
     runtime.metadata = { lastAccessedAt: 0 }
@@ -365,8 +368,9 @@ describe('WorkspaceRuntime baseline mtime', () => {
 
     await runtime.writeFile('/mnt/src/a.ts', 'next-content')
 
-    expect(runtime.captureModifyBaseline).toHaveBeenCalledWith('src/a.ts', 'old-opfs')
-    expect(runtime.pendingManager.add).toHaveBeenCalledWith('src/a.ts', 111)
+    expect(runtime.captureModifyBaseline).not.toHaveBeenCalled()
+    expect(runtime.pendingManager.add).not.toHaveBeenCalled()
+    expect(runtime.writeToFilesDir).toHaveBeenCalledWith('src/a.ts', 'next-content')
     expect(runtime.pendingManager.markAsCreated).not.toHaveBeenCalled()
   })
 

@@ -13,12 +13,17 @@ vi.mock('../MonacoDiffEditor', () => ({
   default: () => <div data-testid="monaco-diff-editor" />,
 }))
 
+vi.mock('../LazyDiffViewer', () => ({
+  default: () => <div data-testid="lazy-diff-viewer" />,
+}))
+
 vi.mock('@/store/conversation-context.store', () => ({
   getActiveConversation: () => getActiveConversationMock(),
 }))
 
 vi.mock('@/opfs', () => ({
   isImageFile: () => false,
+  getFileContentType: () => 'text',
   fileExistsInNativeFS: (...args: unknown[]) => fileExistsInNativeFSMock(...args),
   readFileFromOPFS: (...args: unknown[]) => readFileFromOPFSMock(...args),
   readFileFromNativeFS: (...args: unknown[]) => readFileFromNativeFSMock(...args),
@@ -41,7 +46,7 @@ describe('FileDiffViewer', () => {
     readFileFromNativeFSMock.mockResolvedValue('const n = 1')
   })
 
-  it('renders monaco diff editor for text file changes', async () => {
+  it('renders lazy diff viewer for text file changes', async () => {
     render(
       <FileDiffViewer
         fileChange={{
@@ -52,6 +57,8 @@ describe('FileDiffViewer', () => {
       />
     )
 
-    expect(await screen.findByTestId('monaco-diff-editor')).toBeDefined()
+    // Default renderer is LazyDiffViewer (only changed hunks).
+    // Monaco full editor is opt-in via the "switch" button.
+    expect(await screen.findByTestId('lazy-diff-viewer')).toBeDefined()
   })
 })

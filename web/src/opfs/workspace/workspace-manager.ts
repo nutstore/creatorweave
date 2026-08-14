@@ -11,6 +11,11 @@ import { generateId } from '../utils/opfs-utils'
 import { WorkspaceRuntime } from './workspace-runtime'
 import { getWorkspaceRepository } from '@/sqlite/repositories/workspace.repository'
 import { getProjectRepository } from '@/sqlite/repositories/project.repository'
+import type { DiskExecutor } from '../native-disk/executor'
+import { isNativeHostAvailable } from '../native-disk/executor'
+import { FSAccessExecutor } from '../native-disk/executor-fsaccess'
+import { NativeHostExecutor } from '../native-disk/executor-native-host'
+import { CompositeExecutor } from '../native-disk/executor-composite'
 
 const PROJECTS_ROOT_DIR = 'projects'
 const PROJECT_WORKSPACES_DIR = 'workspaces'
@@ -54,6 +59,14 @@ export class WorkspaceManager {
 
     await this.loadIndexFromSQLite()
     this.initialized = true
+  }
+
+  /** Choose a root-routed executor; bridge availability never changes existing roots. */
+  private resolveDiskExecutor(): DiskExecutor {
+    if (isNativeHostAvailable()) {
+      return new CompositeExecutor(new FSAccessExecutor(), new NativeHostExecutor())
+    }
+    return new FSAccessExecutor()
   }
 
   /**
@@ -180,7 +193,9 @@ export class WorkspaceManager {
     const workspaceDir = await this.getWorkspaceDirForProject(projectId, id, true)
     await workspaceDir.getDirectoryHandle(WORKSPACE_ASSETS_DIR, { create: true })
 
-    const workspace = new WorkspaceRuntime(id, workspaceDir, rootDirectory)
+    // Choose disk executor: Native Host if available, else FS Access API
+    const diskExec = this.resolveDiskExecutor()
+    const workspace = new WorkspaceRuntime(id, workspaceDir, rootDirectory, diskExec)
     await workspace.initialize()
 
     this.workspaces.set(id, workspace)
@@ -275,7 +290,7 @@ export class WorkspaceManager {
     try {
       const workspaceDir = await this.getWorkspaceDirForProject(projectId, workspaceId, false)
       await workspaceDir.getDirectoryHandle(WORKSPACE_ASSETS_DIR, { create: true })
-      const workspace = new WorkspaceRuntime(workspaceId, workspaceDir, rootDirectory)
+      const workspace = new WorkspaceRuntime(workspaceId, workspaceDir, rootDirectory, this.resolveDiskExecutor())
       await workspace.initialize()
 
       this.workspaces.set(workspaceId, workspace)

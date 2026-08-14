@@ -365,7 +365,7 @@ describe('AgentLoop', () => {
       expect(result[1].content).toBeNull()
     })
 
-    it('should trim context via convertToLlm bridge', async () => {
+    it('does not heuristically trim context in the convertToLlm bridge', async () => {
       const loop = new AgentLoop({
         provider: mockProvider,
         toolRegistry: mockTools,
@@ -374,37 +374,21 @@ describe('AgentLoop', () => {
       })
 
       await loop.run([createUserMessage('test')])
-      expect(mockContextManager.trimMessages).toHaveBeenCalled()
+      expect(mockContextManager.trimMessages).not.toHaveBeenCalled()
     })
 
     it('should call LLM to summarize dropped context when compression occurs', async () => {
       let convertedMessages: any[] | null = null
-      const longDroppedContent =
-        'User: ' + 'earlier requirement '.repeat(80) + '\nAssistant: ' + 'earlier implementation '.repeat(80)
-      let trimCallCount = 0
-      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => {
-        trimCallCount++
-        if (trimCallCount === 1) {
-          return {
-            messages: [{ role: 'user', content: 'latest user message' }],
-            wasTruncated: true,
-            droppedGroups: 3,
-            droppedContent: longDroppedContent,
-          }
-        }
-        return {
-          messages: msgs,
-          wasTruncated: false,
-          droppedGroups: 0,
-        }
-      })
       ;(mockProvider.chat as any).mockResolvedValue({
         choices: [{ message: { content: 'Earlier requirement implemented with fallback.' } }],
       })
 
-      mockAgentLoopContinue.mockImplementation((context: any, config: any) => {
+      mockAgentLoopContinue.mockImplementation((_context: any, config: any) => {
         return (async function* () {
-          convertedMessages = await config.convertToLlm(context.messages)
+          convertedMessages = await config.convertToLlm([
+            { role: 'user', content: 'earlier requirement', timestamp: Date.now() - 2_000 },
+            { ...assistantMessage('earlier implementation'), usage: { input: 90_000, output: 1, totalTokens: 110_000 }, timestamp: Date.now() - 1_000 },
+          ])
           yield { type: 'message_start', message: assistantMessage('') }
           yield { type: 'message_end', message: assistantMessage('Hello!') }
         })()
@@ -420,7 +404,7 @@ describe('AgentLoop', () => {
       await loop.run([createUserMessage('test')])
 
       expect(mockProvider.chat).toHaveBeenCalledTimes(1)
-      expect(mockContextManager.trimMessages).toHaveBeenCalledTimes(2)
+      expect(mockContextManager.trimMessages).not.toHaveBeenCalled()
       expect(convertedMessages).toBeTruthy()
       const hasSummary = (convertedMessages || []).some(
         (m: any) =>
@@ -431,13 +415,7 @@ describe('AgentLoop', () => {
       expect(hasSummary).toBe(true)
     })
 
-    it('should skip LLM summary when dropped content is too small', async () => {
-      mockContextManager.trimMessages.mockReturnValue({
-        messages: [{ role: 'user', content: 'latest user message' }],
-        wasTruncated: true,
-        droppedGroups: 3,
-        droppedContent: 'User: short',
-      })
+    it('skips LLM summary without a prior real token usage report', async () => {
 
       const loop = new AgentLoop({
         provider: mockProvider,
@@ -450,32 +428,15 @@ describe('AgentLoop', () => {
       expect(mockProvider.chat).not.toHaveBeenCalled()
     })
 
-    it('should fallback to heuristic summary when LLM summary call fails', async () => {
-      let convertedMessages: any[] | null = null
-      const longDroppedContent =
-        'User: ' + 'critical requirement '.repeat(80) + '\nAssistant: ' + 'implementation detail '.repeat(80)
-      let trimCallCount = 0
-      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => {
-        trimCallCount++
-        if (trimCallCount === 1) {
-          return {
-            messages: [{ role: 'user', content: 'latest user message' }],
-            wasTruncated: true,
-            droppedGroups: 4,
-            droppedContent: longDroppedContent,
-          }
-        }
-        return {
-          messages: msgs,
-          wasTruncated: false,
-          droppedGroups: 0,
-        }
-      })
+    it('propagates an LLM summary failure after real token usage triggers compression', async () => {
       ;(mockProvider.chat as any).mockRejectedValue(new Error('network failed'))
 
-      mockAgentLoopContinue.mockImplementation((context: any, config: any) => {
+      mockAgentLoopContinue.mockImplementation((_context: any, config: any) => {
         return (async function* () {
-          convertedMessages = await config.convertToLlm(context.messages)
+          await config.convertToLlm([
+            { role: 'user', content: 'critical requirement', timestamp: Date.now() - 2_000 },
+            { ...assistantMessage('implementation detail'), usage: { input: 90_000, output: 1, totalTokens: 110_000 }, timestamp: Date.now() - 1_000 },
+          ])
           yield { type: 'message_start', message: assistantMessage('') }
           yield { type: 'message_end', message: assistantMessage('Hello!') }
         })()
@@ -488,40 +449,13 @@ describe('AgentLoop', () => {
         toolContext: createMockToolContext(),
       })
 
-      await loop.run([createUserMessage('test')])
+      await expect(loop.run([createUserMessage('test')])).rejects.toThrow('network failed')
       expect(mockProvider.chat).toHaveBeenCalledTimes(1)
-      const hasSummary = (convertedMessages || []).some(
-        (m: any) =>
-          m.role === 'user' &&
-          typeof m.content === 'string' &&
-          m.content.includes('Earlier conversation summary')
-      )
-      expect(hasSummary).toBe(true)
     })
 
-    it('should append subsequent turns on compression baseline context', async () => {
+    it('keeps all messages until a later real usage report triggers compression', async () => {
       let firstConvertMessages: any[] = []
       let secondConvertMessages: any[] = []
-      let trimCallCount = 0
-      const longDroppedContent =
-        'User: ' + 'baseline requirement '.repeat(80) + '\nAssistant: ' + 'baseline implementation '.repeat(80)
-
-      mockContextManager.trimMessages.mockImplementation((msgs: ChatMessage[]) => {
-        trimCallCount++
-        if (trimCallCount === 1) {
-          return {
-            messages: [{ role: 'user', content: 'latest user request' }],
-            wasTruncated: true,
-            droppedGroups: 3,
-            droppedContent: longDroppedContent,
-          }
-        }
-        return {
-          messages: msgs,
-          wasTruncated: false,
-          droppedGroups: 0,
-        }
-      })
 
       ;(mockProvider.chat as any).mockResolvedValue({
         choices: [{ message: { content: 'Compressed baseline summary.' } }],
@@ -532,19 +466,16 @@ describe('AgentLoop', () => {
           const now = Date.now()
           firstConvertMessages = await config.convertToLlm([
             { role: 'user', content: 'old user request', timestamp: now - 5000 },
-            { role: 'assistant', content: [{ type: 'text', text: 'old assistant response' }], timestamp: now - 4000 },
+            { ...assistantMessage('old assistant response'), timestamp: now - 4000 },
             { role: 'user', content: 'latest user request', timestamp: now - 1000 },
           ])
 
           secondConvertMessages = await config.convertToLlm([
             { role: 'user', content: 'old user request', timestamp: now - 5000 },
-            { role: 'assistant', content: [{ type: 'text', text: 'old assistant response' }], timestamp: now - 4000 },
+            { ...assistantMessage('old assistant response'), timestamp: now - 4000 },
             { role: 'user', content: 'latest user request', timestamp: now - 1000 },
             {
-              role: 'toolResult',
-              toolCallId: 'call_1',
-              toolName: 'read',
-              content: [{ type: 'text', text: 'fresh tool result' }],
+              ...toolResultMessage('call_1', 'read', 'fresh tool result'),
               timestamp: now - 500,
             },
           ])
@@ -579,9 +510,9 @@ describe('AgentLoop', () => {
       )
 
       expect(firstConvertMessages.length).toBeGreaterThan(0)
-      expect(hasOldUser).toBe(false)
-      expect(hasOldAssistant).toBe(false)
-      expect(hasLatestUser).toBe(false)
+      expect(hasOldUser).toBe(true)
+      expect(hasOldAssistant).toBe(true)
+      expect(hasLatestUser).toBe(true)
       expect(hasLatestTool).toBe(true)
     })
 
@@ -892,7 +823,7 @@ describe('AgentLoop', () => {
       expect(callbacks.onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Provider error' }))
     })
 
-    it('should degrade latest tool result to summary when dropped by compression', async () => {
+    it('preserves the latest tool result when no real usage triggers compression', async () => {
       let convertedMessages: any[] = []
       mockProvider.estimateTokens = vi.fn((messages: ChatMessage[]) => {
         return messages.reduce((sum, msg) => {
@@ -905,17 +836,6 @@ describe('AgentLoop', () => {
         maxContextTokens: 200,
         reserveTokens: 20,
       })
-      mockContextManager.trimMessages
-        .mockImplementationOnce((msgs: ChatMessage[]) => ({
-          messages: msgs.filter((m) => m.role !== 'tool'),
-          wasTruncated: true,
-          droppedGroups: 1,
-        }))
-        .mockImplementationOnce((msgs: ChatMessage[]) => ({
-          messages: msgs,
-          wasTruncated: false,
-          droppedGroups: 0,
-        }))
 
       mockAgentLoopContinue.mockImplementation((_context: any, config: any) => {
         return (async function* () {
@@ -943,7 +863,7 @@ describe('AgentLoop', () => {
       expect(degradedToolMessage).toBeDefined()
       expect(Array.isArray(degradedToolMessage.content)).toBe(true)
       expect(degradedToolMessage.content[0]?.type).toBe('text')
-      expect(degradedToolMessage.content[0]?.text).toContain('tool_result_truncated')
+      expect(degradedToolMessage.content[0]?.text).toBe('x'.repeat(500))
     })
 
     it('should stop gracefully at maxIterations in Pi loop', async () => {

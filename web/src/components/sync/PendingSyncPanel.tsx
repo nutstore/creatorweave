@@ -134,10 +134,6 @@ export function PendingSyncPanel() {
       }
 
       const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-      if (!nativeDir) {
-        setConflictPaths(new Set())
-        return
-      }
 
       const paths = pendingChanges.changes.map((c) => c.path)
       const conflicts = await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
@@ -294,45 +290,42 @@ export function PendingSyncPanel() {
         nativeDir
       )
 
-      // Only sync to disk when local directory exists
-      if (nativeDir) {
-        const allPaths = filesToSync.map((c) => c.path)
-        const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
-        const regularList = allPaths.filter((path) => !overwritePaths.has(path))
+      const allPaths = filesToSync.map((c) => c.path)
+      const forceOverwriteList = allPaths.filter((path) => overwritePaths.has(path))
+      const regularList = allPaths.filter((path) => !overwritePaths.has(path))
 
-        let result: SyncResult = {
-          success: 0,
-          failed: 0,
-          skipped: 0,
-          conflicts: [],
-        }
-        if (regularList.length > 0) {
-          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, regularList))
-        }
-        if (forceOverwriteList.length > 0) {
-          result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
-        }
+      let result: SyncResult = {
+        success: 0,
+        failed: 0,
+        skipped: 0,
+        conflicts: [],
+      }
+      if (regularList.length > 0) {
+        result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, regularList))
+      }
+      if (forceOverwriteList.length > 0) {
+        result = mergeSyncResult(result, await conversation.syncToDisk(nativeDir, forceOverwriteList, true))
+      }
 
-        if (result.failed > 0) {
-          console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
-          const conflictHint =
-            result.conflicts.length > 0
-              ? t('settings.pendingSyncPanel.conflictCount', { count: result.conflicts.length })
-              : ''
-          setSyncError(t('settings.pendingSyncPanel.syncFailedCount', { failed: result.failed, conflicts: conflictHint }))
-          setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
-          setTimeout(() => setSyncError(null), 6000)
-          return false
-        }
+      if (result.failed > 0 || result.success !== allPaths.length) {
+        console.error(`[PendingSyncPanel] ${result.failed} files failed to sync`)
+        const conflictHint =
+          result.conflicts.length > 0
+            ? t('settings.pendingSyncPanel.conflictCount', { count: result.conflicts.length })
+            : ''
+        setSyncError(t('settings.pendingSyncPanel.syncFailedCount', { failed: result.failed || allPaths.length - result.success, conflicts: conflictHint }))
+        setConflictPaths(new Set(result.conflicts.map((c) => c.path)))
+        setTimeout(() => setSyncError(null), 6000)
+        return false
+      }
 
-        // Keep partial or conflicted batches available to the recovery flow.
-        if (
-          snapshotResult?.snapshotId &&
-          result.conflicts.length === 0 &&
-          result.success === allPaths.length
-        ) {
-          await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
-        }
+      // Keep partial or conflicted batches available to the recovery flow.
+      if (
+        snapshotResult?.snapshotId &&
+        result.conflicts.length === 0 &&
+        result.success === allPaths.length
+      ) {
+        await conversation.markSnapshotAsSynced(snapshotResult.snapshotId)
       }
 
       // Refresh list after sync (supports partial sync)
@@ -396,7 +389,6 @@ export function PendingSyncPanel() {
           const activeConversation = await getActiveConversation()
           if (!activeConversation) return []
           const nativeDir = await activeConversation.conversation.getNativeDirectoryHandle()
-          if (!nativeDir) return []
           const paths = filesToSync.map((c) => c.path)
           return await activeConversation.conversation.detectSyncConflicts(nativeDir, paths)
         } catch {

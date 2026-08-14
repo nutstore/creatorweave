@@ -1,6 +1,10 @@
 // 文件夹选择器
 export const folderSelector = {
     openFolder: "选择文件夹",
+    browserAccess: "浏览器授权",
+    browserAccessDescription: "通过浏览器选择并授权文件夹",
+    localConnection: "本机连接",
+    localConnectionDescription: "通过 CreatorWeave 本机服务连接文件夹",
     switchFolder: "切换文件夹",
     releaseHandle: "释放文件夹句柄",
     copyPath: "复制文件夹名称",

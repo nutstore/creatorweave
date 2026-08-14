@@ -1,0 +1,21 @@
+export const execPolicy = {
+    tab: "実行ポリシー",
+    description: "AIが自動実行できるコマンド、承認が必要なコマンド、常にブロックされるコマンドを設定します。変更は ~/.creatorweave/execpolicy.json に保存されます。",
+    searchPlaceholder: "コマンドを検索...",
+    newCommandPlaceholder: "コマンド名（例: mkdir）",
+    add: "追加",
+    remove: "削除",
+    auto: "自動実行",
+    prompt: "確認あり",
+    forbidden: "禁止",
+    defaultLabel: "未記載コマンドのデフォルト：",
+    defaultHint: "ルールに一致しない場合に適用",
+    loading: "読み込み中...",
+    saving: "保存中...",
+    save: "保存",
+    cancel: "キャンセル",
+    retry: "再試行",
+    saveHint: "未保存の変更があります",
+    // ExecAuthModal guidance
+    authGuide: "コマンドの承認方式を変更するには、設定 → 実行ポリシーへ",
+} as const

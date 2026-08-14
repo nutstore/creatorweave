@@ -34,6 +34,13 @@ vi.mock('@/store/remote.store', () => ({
   },
 }))
 
+vi.mock('@/store/workspace.store', () => ({
+  useWorkspaceStore: {
+    getState: () => ({ activeWorkspaceId: null }),
+    subscribe: vi.fn(),
+  },
+}))
+
 vi.mock('../vfs-resolver', () => ({
   resolveVfsTarget: async (...args: unknown[]) => {
     const target = await resolveVfsTargetMock(...args)
@@ -53,12 +60,20 @@ vi.mock('../vfs-resolver', () => ({
         backend: {
           label: 'agent',
           exists: async (path: string) => Boolean(await target.agentManager.readPath(target.agentId, path)),
-          writeFile: async (path: string, content: string) => target.agentManager.writePath(target.agentId, path, content),
+          writeFile: async (path: string, content: string | ArrayBuffer | Blob) => {
+            const text = typeof content === 'string'
+              ? content
+              : content instanceof Blob
+                ? await content.text()
+                : new TextDecoder().decode(content)
+            return target.agentManager.writePath(target.agentId, path, text)
+          },
         },
       }
     }
     return target
   },
+  isVfsPath: (path: string) => path.startsWith('vfs://'),
   withVfsAgentIdHint: (message: string) => message,
 }))
 

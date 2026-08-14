@@ -539,4 +539,23 @@ export const settings = {
       testDenied: "権限拒否 — ブラウザ設定を確認",
       testUnsupported: "このブラウザでは通知非対応",
     },
+
+    execPolicy: {
+        tab: "実行ポリシー",
+        description: "AIがマシン上で実行できるコマンドを設定します。ルールに一致しないコマンドはデフォルトポリシーが適用されます。",
+        searchPlaceholder: "コマンドを検索...",
+        newCommandPlaceholder: "コマンド名（例: touch、mkdir）",
+        auto: "自動",
+        prompt: "確認",
+        forbidden: "禁止",
+        add: "追加",
+        remove: "削除",
+        defaultLabel: "不一致コマンドのデフォルト:",
+        defaultHint: "ルールに一致しない場合に適用",
+        save: "保存",
+        saving: "保存中...",
+        cancel: "キャンセル",
+        loading: "ポリシーを読み込み中...",
+        retry: "再試行",
+    },
 } as const

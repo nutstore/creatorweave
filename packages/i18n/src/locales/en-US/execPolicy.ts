@@ -1,0 +1,21 @@
+export const execPolicy = {
+    tab: "Exec Policy",
+    description: "Configure which commands the AI can run automatically, which require approval, and which are always blocked. Changes are saved to ~/.creatorweave/execpolicy.json.",
+    searchPlaceholder: "Search commands...",
+    newCommandPlaceholder: "command name (e.g. mkdir)",
+    add: "Add",
+    remove: "Remove",
+    auto: "Auto-execute",
+    prompt: "Ask first",
+    forbidden: "Forbidden",
+    defaultLabel: "Default for unlisted commands:",
+    defaultHint: "Applies when no rule matches",
+    loading: "Loading policy...",
+    saving: "Saving...",
+    save: "Save",
+    cancel: "Cancel",
+    retry: "Retry",
+    saveHint: "You have unsaved changes",
+    // ExecAuthModal guidance
+    authGuide: "To change which commands need approval, go to Settings → Exec Policy",
+} as const

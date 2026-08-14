@@ -24,6 +24,7 @@ import { InstallPrompt } from '@/pwa/InstallPrompt'
 import { useExtensionStore } from '@/store/extension.store'
 import { ExtensionInstallGuide } from '@/components/extension'
 import { PageWriteAuthModal } from '@/components/agent/PageWriteAuthModal'
+import { ExecAuthModal } from '@/components/agent/ExecAuthModal'
 import { ProjectHome } from '@/components/project/ProjectHome'
 import { WebContainerStandalonePreview } from '@/components/webcontainer/WebContainerStandalonePreview'
 import { StandalonePreview } from '@/components/file-viewer/StandalonePreview'
@@ -566,6 +567,7 @@ function AppReady() {
         onOpenChange={(open) => { if (!open) extensionCloseGuide() }}
       />
       <PageWriteAuthModal />
+      <ExecAuthModal />
       <Toaster position="bottom-right" />
     </>
   )

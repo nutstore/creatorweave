@@ -62,6 +62,21 @@ export interface FolderAccessActions {
 }
 
 /**
+ * Which disk backend granted / backs this root.
+ *
+ * - `'fsaccess'`     — File System Access API (browser `showDirectoryPicker`).
+ *                      Permission may lapse on browser restart → needs re-activation.
+ * - `'native-host'`  — CreatorWeave native host (Chrome Native Messaging).
+ *                      Permission persisted in the host's scopes file; does not lapse
+ *                      across browser restarts as long as the host is installed.
+ *
+ * Defaults to `'fsaccess'` for backward compatibility (pre-native-host roots).
+ * The UI uses this to badge native-host roots distinctly so that, during
+ * testing and operation, the two backends are visually distinguishable.
+ */
+export type DiskBackend = 'fsaccess' | 'native-host'
+
+/**
  * Root info for multi-root display
  */
 export interface RootInfo {
@@ -69,6 +84,10 @@ export interface RootInfo {
   name: string
   isDefault: boolean
   readOnly: boolean
+  /** Which backend backs this root. */
+  backend: DiskBackend
+  /** Native Host scope ID; null for File System Access roots. */
+  scopeId: string | null
   /** In-memory handle (null if permission lost) */
   handle: FileSystemDirectoryHandle | null
   /** Persisted handle (permission-restorable) */
@@ -111,6 +130,8 @@ export interface FolderAccessStore extends FolderAccessActions {
   ensureFilePaths: () => Promise<string[]>
   /** Refresh file path cache (forces re-traversal) */
   refreshFilePaths: () => Promise<string[]>
+  /** Scan native-host roots for file paths (no FS Access handle) */
+  refreshFilePathsNativeHost: (projectId: string) => Promise<string[]>
   /** Clear file path cache (called automatically on project switch/release) */
   clearFilePaths: () => void
 
@@ -120,6 +141,8 @@ export interface FolderAccessStore extends FolderAccessActions {
   loadRoots: () => Promise<void>
   /** Add a new root (shows folder picker) */
   addRoot: () => Promise<boolean>
+  /** Add a root through the explicitly selected Native Host picker. */
+  addNativeHostRoot: () => Promise<boolean>
   /** Remove a root by ID */
   removeRoot: (rootId: string) => Promise<void>
   /** Set a root as default */

@@ -30,6 +30,7 @@ import { useSkillsStore } from '@/store/skills.store'
 import { SidebarPanelHeader } from '@/components/layout/SidebarPanelHeader'
 import { useT } from '@/i18n'
 import type { PendingChange } from '@/opfs/types/opfs-types'
+import type { DiskExecutor } from '@/opfs/native-disk/executor'
 
 const HIDDEN_PATTERNS = [
   /^\.DS_Store$/, // macOS .DS_Store
@@ -56,6 +57,13 @@ interface TreeNode {
 
 interface FileTreePanelBaseProps {
   directoryHandle: FileSystemDirectoryHandle | null
+  /**
+   * Persistent disk root ID for a non-FS-Access root (currently a Native Host
+   * scope). When set, disk entries are loaded through diskExecutor instead of
+   * a FileSystemDirectoryHandle.
+   */
+  diskRootId?: string | null
+  diskExecutor?: Pick<DiskExecutor, 'listDir'> | null
   rootName?: string | null
   /** Prefix for OPFS path matching in multi-root mode (e.g., "my-app"). Pending/cached paths in OPFS store use "{prefix}/path" format. */
   pathPrefix?: string | null
@@ -493,6 +501,8 @@ const TreeBranch = memo(function TreeBranch({
 
 export const FileTreePanel = memo(function FileTreePanel({
   directoryHandle,
+  diskRootId = null,
+  diskExecutor = null,
   rootName,
   pathPrefix,
   onFileSelect,
@@ -686,14 +696,41 @@ export const FileTreePanel = memo(function FileTreePanel({
     []
   )
 
-  /** Load children of a directory handle (can be null for OPFS-only directories) */
+  /** Load children from a browser handle, a routed disk executor, or OPFS. */
   const loadChildren = useCallback(
     async (dirHandle: FileSystemDirectoryHandle | null, parentPath: string): Promise<TreeNode[]> => {
       const children: TreeNode[] = []
       const allEntries: string[] = []
 
-      // If dirHandle is null (OPFS-only directory), skip disk entries
-      if (dirHandle !== null) {
+      if (diskRootId && diskExecutor) {
+        const entries = await diskExecutor.listDir(diskRootId, parentPath)
+        for (const entry of entries) {
+          const { name } = entry
+          allEntries.push(name)
+          if (isHidden(name)) continue
+
+          const path = parentPath ? `${parentPath}/${name}` : name
+          if (entry.kind === 'file') {
+            if (mode === 'directories') continue
+            children.push({
+              name,
+              path,
+              kind: 'file',
+              size: entry.stat?.size,
+              handle: null,
+            })
+          } else {
+            children.push({
+              name,
+              path,
+              kind: 'directory',
+              handle: null,
+              children: [],
+              loaded: false,
+            })
+          }
+        }
+      } else if (dirHandle !== null) {
         for await (const entry of dirHandle.entries()) {
           const [name, handle] = entry
           allEntries.push(name)
@@ -780,6 +817,8 @@ export const FileTreePanel = memo(function FileTreePanel({
     [
       isHidden,
       mode,
+      diskRootId,
+      diskExecutor,
       getPendingCreatesForPath,
       getPendingCreateSubdirs,
       rootCachedPaths,
@@ -837,7 +876,7 @@ export const FileTreePanel = memo(function FileTreePanel({
         setLoading(false)
       }
     },
-    [directoryHandle, loadChildren, expandedPaths]
+    [directoryHandle, diskRootId, diskExecutor, loadChildren, expandedPaths]
   )
 
   const handleRefresh = useCallback(() => {
@@ -1024,7 +1063,7 @@ export const FileTreePanel = memo(function FileTreePanel({
     setLoadError(null)
     setExpandedPaths(new Set())
     setRootNodes([])
-  }, [directoryHandle, activeWorkspaceId])
+  }, [directoryHandle, diskRootId, diskExecutor, activeWorkspaceId])
 
   // Auto-load root when not loaded and not loading.
   // directoryHandle may be null (OPFS-only mode) — loadChildren handles that.
@@ -1065,10 +1104,10 @@ export const FileTreePanel = memo(function FileTreePanel({
     loadRootRef.current(true)
   }, [activeWorkspaceId])
 
-  // Show empty state only if no directoryHandle AND no pending changes AND no cached files
+  // Show empty state only if no disk root, pending changes, or cached files exist.
   const hasPendingChanges = pendingChanges.length > 0
   const hasCachedFiles = cachedPaths.length > 0
-  if (!directoryHandle && !hasPendingChanges && !hasCachedFiles) {
+  if (!directoryHandle && !diskRootId && !hasPendingChanges && !hasCachedFiles) {
     return (
       <div className="flex h-full items-center justify-center p-4">
         <p className="text-tertiary text-center text-xs">

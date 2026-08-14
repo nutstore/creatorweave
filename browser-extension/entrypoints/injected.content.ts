@@ -867,28 +867,59 @@ export default defineContentScript({
         return sendToBridge('cw_schedule_show_notification', { title, body });
       },
 
-      // TODO(Future Enhancement): Agent Loop Notifications via Extension
-      // ------------------------------------------------------------------
-      // Currently, agent loop notifications are handled entirely by the Web App's
-      // Service Worker (web/src/sw.ts). This works perfectly for standard web tabs.
-      //
-      // LIMITATION:
-      // If the user is running the agent inside THIS extension's Side Panel,
-      // clicking the Web SW notification will fail to focus/switch back to the
-      // host browser tab (Web SWs cannot steal tab focus).
-      //
-      // FUTURE API TO ADD HERE:
-      //   async showAgentNotification(data: {
-      //     conversationId: string; projectId: string; title: string; body: string
-      //   }): Promise<{ ok: boolean }>
-      //
-      // It should send a message to `background.ts`, which will call
-      // `chrome.notifications.create()`, and listen for
-      // `chrome.notifications.onClicked` to execute
-      // `chrome.tabs.update(senderTabId, { active: true })`.
-      //
-      // The Web App (`agent-notification.ts`) will then check for
-      // `window.__agentWeb?.showAgentNotification` and prefer it over the Web SW.
+      // ── Native Host ──────────────────────────────────────────────────
+
+      /**
+       * Call the CreatorWeave native host (Rust binary) via Chrome Native
+       * Messaging. Each call spawns a fresh host process (stateless model).
+       *
+       * Returns the host's JSON response verbatim.
+       */
+      async nativeHostCall(payload: Record<string, any>) {
+        return sendToBridge('native_host_call', payload, 60000);
+      },
+
+      /**
+       * Query the execpolicy decision for a command without executing it.
+       * Stateless — uses sendNativeMessage under the hood.
+       *
+       * Returns: { ok, decision: 'auto'|'prompt'|'forbidden', command }
+       */
+      async nativeHostCheckPolicy(command: string[]): Promise<{
+        ok: boolean
+        decision?: 'auto' | 'prompt' | 'forbidden'
+        command?: string[]
+        error?: string
+      }> {
+        return sendToBridge('native_host_call', {
+          action: 'check_policy',
+          command,
+        });
+      },
+
+      // ── Agent Notification ───────────────────────────────────────────
+
+      /**
+       * Show an agent-completion desktop notification via the extension's
+       * background script.
+       *
+       * Rationale: When the agent runs inside the Extension's Side Panel,
+       * the Web Service Worker's `registration.showNotification` cannot focus
+       * the host browser tab on click (Web SWs lack tab privileges). The
+       * extension background handles the click with
+       * `chrome.notifications.onClicked` to execute
+       * `chrome.tabs.update(senderTabId, { active: true })`.
+       *
+       * The Web App (`agent-notification.ts`) will then check for
+       * `window.__agentWeb?.showAgentNotification` and prefer it over the Web SW.
+       */
+      async showAgentNotification(payload: {
+        title: string
+        body: string
+        conversationId?: string
+      }): Promise<{ ok: boolean; error?: string }> {
+        return sendToBridge('cw_agent_show_notification', payload || {})
+      },
     };
 
     ;(window as any).__agentWebBridgeState = {
