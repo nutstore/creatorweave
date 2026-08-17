@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CreatorWeave</title>
+  <title>eo2weave</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -11,27 +11,13 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f8fafc;
       color: #0f172a;
-      display: flex;
       flex-direction: column;
     }
     .header {
-      display: flex;
-      align-items: center;
       gap: 10px;
       padding: 14px 16px 12px;
       background: linear-gradient(135deg, #14B8A6, #0D9488);
       color: #fff;
-    }
-    .logo {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      background: rgba(255,255,255,0.18);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 700;
-      font-size: 14px;
     }
     .title-wrap {
       flex: 1;
@@ -39,7 +25,6 @@
     }
     .title {
       font-size: 15px;
-      font-weight: 700;
       line-height: 1.2;
     }
     .subtitle {
@@ -49,7 +34,6 @@
     }
     .build-mode {
       font-size: 10px;
-      font-weight: 700;
       padding: 2px 6px;
       border-radius: 999px;
       border: 1px solid rgba(255,255,255,0.28);
@@ -59,13 +43,10 @@
     .build-mode.prod { color: #dcfce7; }
     .main {
       padding: 14px 16px 16px;
-      display: flex;
       flex-direction: column;
       gap: 12px;
     }
     .status {
-      display: flex;
-      align-items: center;
       gap: 8px;
       padding: 10px 12px;
       border-radius: 10px;
@@ -130,8 +111,6 @@
       border-radius: 8px;
     }
     .reset-credit-summary {
-      display: flex;
-      align-items: center;
       justify-content: space-between;
       gap: 8px;
       font-size: 11px;
@@ -152,7 +131,6 @@
     a { color: #0f766e; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .footer {
-      display: flex;
       gap: 8px;
       margin-top: 4px;
     }
@@ -171,19 +149,66 @@
       background: #f8fafc;
       border-color: #cbd5e1;
     }
+    /* WebMCP discovered tools (mirrors the web app's Settings → WebMCP host list) */
+    .webmcp-box {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .webmcp-summary {
+      font-size: 11px;
+      font-weight: 600;
+      color: #0f766e;
+      margin-bottom: 6px;
+    }
+    .webmcp-host {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .webmcp-host:hover {
+      background: #f0fdfa;
+    }
+    .webmcp-host-name {
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color: #334155;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .webmcp-host-count {
+      flex: 0 0 auto;
+      font-size: 10px;
+      font-weight: 600;
+      color: #0f766e;
+      background: #f0fdfa;
+      border: 1px solid #ccfbf1;
+      border-radius: 999px;
+      padding: 1px 7px;
+    }
   </style>
 </head>
 <body>
   <header class="header">
-    <div class="logo">CW</div>
     <div class="title-wrap">
-      <div class="title">CreatorWeave</div>
+      <div class="title">eo2weave</div>
       <div class="subtitle" data-i18n="popupSubtitle">网页搜索与内容抓取服务</div>
     </div>
     <div id="buildMode" class="build-mode" hidden></div>
   </header>
 
   <main class="main">
+    <div id="webmcpBox" class="webmcp-box" style="display:none">
+      <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
+      <div id="webmcpList"></div>
+    </div>
     <div class="status" id="status">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-text" id="statusText" data-i18n="checking">检测中…</span>

@@ -1,5 +1,7 @@
 {
-  "extensionName": { "message": "CreatorWeave" },
+  "extensionName": { "message": "eo2weave" },
+  "webmcpScanning": { "message": "Scanning tabs for WebMCP tools…" },
+  "webmcpFoundSummary": { "message": "WebMCP: $HOSTS site(s), $TOOLS tool(s) available" },
   "extensionDescription": { "message": "Provides web search and content fetching capabilities for in-browser agents" },
   "popupSubtitle": { "message": "Web search and content fetching service" },
   "checking": { "message": "Checking…" },

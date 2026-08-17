@@ -38,6 +38,77 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   el.textContent = isDev ? 'DEV' : 'PROD';
 })();
 
+// WebMCP tools discovered in this window — grouped by hostname.
+// Mirrors the web app's Settings → WebMCP host list (WebMCPHostList.tsx),
+// simplified: hostname + tool count, click to jump to the source tab.
+(function () {
+  var box = document.getElementById('webmcpBox');
+  var list = document.getElementById('webmcpList');
+  var summary = document.getElementById('webmcpSummary');
+  if (!box || !list || !summary) return;
+
+  function renderIdle() {
+    summary.textContent = chrome.i18n.getMessage('webmcpScanning') || 'Scanning tabs…';
+    list.textContent = '';
+  }
+
+  function renderEmpty() {
+    box.style.display = 'none';
+  }
+
+  function renderList(tools: any[]) {
+    if (!tools || tools.length === 0) {
+      renderEmpty();
+      return;
+    }
+    box.style.display = '';
+    // Group by hostname → { count, firstTabId }
+    var byHost: Record<string, { count: number; tabId: number; toolNames: string[] }> = {};
+    for (var i = 0; i < tools.length; i++) {
+      var tool = tools[i];
+      var host = tool.hostname || 'unknown';
+      if (!byHost[host]) byHost[host] = { count: 0, tabId: tool.tabId, toolNames: [] };
+      byHost[host].count++;
+      if (byHost[host].toolNames.length < 3) byHost[host].toolNames.push(tool.name);
+    }
+    var hosts = Object.keys(byHost);
+    var totalTools = tools.length;
+    summary.textContent = (chrome.i18n.getMessage('webmcpFoundSummary') || '$HOSTS hosts · $TOOLS tools')
+      .replace('$HOSTS', String(hosts.length))
+      .replace('$TOOLS', String(totalTools));
+
+    list.textContent = '';
+    hosts.sort().forEach(function (host) {
+      var info = byHost[host];
+      var item = document.createElement('div');
+      item.className = 'webmcp-host';
+      item.title = info.toolNames.join(', ');
+      var left = document.createElement('div');
+      left.className = 'webmcp-host-name';
+      left.textContent = host;
+      var count = document.createElement('span');
+      count.className = 'webmcp-host-count';
+      count.textContent = String(info.count);
+      item.appendChild(left);
+      item.appendChild(count);
+      item.addEventListener('click', function () {
+        if (typeof info.tabId === 'number') {
+          chrome.tabs.update(info.tabId, { active: true });
+          window.close();
+        }
+      });
+      list.appendChild(item);
+    });
+  }
+
+  renderIdle();
+  chrome.runtime.sendMessage({ type: 'webmcp_discover_tools' }, function (resp: any) {
+    if (chrome.runtime.lastError) { renderEmpty(); return; }
+    if (!resp || !resp.ok) { renderEmpty(); return; }
+    renderList(resp.tools || []);
+  });
+})();
+
 // Check injection status
 (function () {
   var el = document.getElementById('status')!;
