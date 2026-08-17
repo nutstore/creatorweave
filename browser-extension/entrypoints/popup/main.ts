@@ -39,13 +39,18 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 })();
 
 // WebMCP tools discovered in this window — grouped by hostname.
-// Mirrors the web app's Settings → WebMCP host list (WebMCPHostList.tsx),
-// simplified: hostname + tool count, click to jump to the source tab.
+// Mirrors the web app's Settings → WebMCP host list (WebMCPHostList.tsx):
+// hostname + tool count + per-host authorization switch. Clicking the
+// host name jumps to the source tab; the switch writes the extension-side
+// authorization store (enforced by the background invoke gate).
 (function () {
   var box = document.getElementById('webmcpBox');
   var list = document.getElementById('webmcpList');
   var summary = document.getElementById('webmcpSummary');
   if (!box || !list || !summary) return;
+
+  // hostname → latest authorization state (default: enabled)
+  var hostEnabled: Record<string, boolean> = {};
 
   function renderIdle() {
     summary.textContent = chrome.i18n.getMessage('webmcpScanning') || 'Scanning tabs…';
@@ -56,19 +61,46 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     box.style.display = 'none';
   }
 
+  function cssEscape(value: string): string {
+    return (window as any).CSS && CSS.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
+  }
+
+  function setHostEnabledState(hostname: string, enabled: boolean) {
+    hostEnabled[hostname] = enabled;
+    var row = list && list.querySelector('[data-host="' + cssEscape(hostname) + '"]');
+    if (row) {
+      row.classList.toggle('disabled-host', !enabled);
+      var toggle = row.querySelector('input.webmcp-toggle') as HTMLInputElement | null;
+      if (toggle) {
+        toggle.checked = enabled;
+        toggle.disabled = false;
+        toggle.title = enabled
+          ? (chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools")
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+      }
+      var leftEl = row.querySelector('.webmcp-host-left') as HTMLElement | null;
+      if (leftEl) {
+        leftEl.title = enabled
+          ? (row.getAttribute('data-tools') || '')
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+      }
+    }
+  }
+
   function renderList(tools: any[]) {
     if (!tools || tools.length === 0) {
       renderEmpty();
       return;
     }
     box.style.display = '';
-    // Group by hostname → { count, firstTabId }
-    var byHost: Record<string, { count: number; tabId: number; toolNames: string[] }> = {};
+    // Group by hostname → { count, firstTabId, toolNames, hostEnabled }
+    var byHost: Record<string, { count: number; tabId: number; toolNames: string[]; enabled?: boolean }> = {};
     for (var i = 0; i < tools.length; i++) {
       var tool = tools[i];
       var host = tool.hostname || 'unknown';
       if (!byHost[host]) byHost[host] = { count: 0, tabId: tool.tabId, toolNames: [] };
       byHost[host].count++;
+      if (typeof tool.hostEnabled === 'boolean') byHost[host].enabled = tool.hostEnabled;
       if (byHost[host].toolNames.length < 3) byHost[host].toolNames.push(tool.name);
     }
     var hosts = Object.keys(byHost);
@@ -80,23 +112,67 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     list.textContent = '';
     hosts.sort().forEach(function (host) {
       var info = byHost[host];
+      var enabled = info.enabled !== false;
+      hostEnabled[host] = enabled;
+
       var item = document.createElement('div');
-      item.className = 'webmcp-host';
-      item.title = info.toolNames.join(', ');
+      item.className = 'webmcp-host' + (enabled ? '' : ' disabled-host');
+      item.dataset.host = host;
+      item.dataset.tools = info.toolNames.join(', ');
+
       var left = document.createElement('div');
-      left.className = 'webmcp-host-name';
-      left.textContent = host;
+      left.className = 'webmcp-host-left';
+      left.title = enabled
+        ? info.toolNames.join(', ')
+        : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+      var name = document.createElement('span');
+      name.className = 'webmcp-host-name';
+      name.textContent = host;
       var count = document.createElement('span');
       count.className = 'webmcp-host-count';
       count.textContent = String(info.count);
-      item.appendChild(left);
-      item.appendChild(count);
-      item.addEventListener('click', function () {
+      left.appendChild(name);
+      left.appendChild(count);
+
+      // Per-host authorization switch — writes through the background store.
+      var toggleLabel = document.createElement('label');
+      toggleLabel.style.margin = '0';
+      toggleLabel.style.flex = '0 0 auto';
+      toggleLabel.title = chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools";
+      var toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.className = 'webmcp-toggle';
+      toggle.checked = enabled;
+      toggle.title = enabled
+        ? (chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools")
+        : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+      toggle.addEventListener('change', function () {
+        var next = toggle.checked;
+        toggle.disabled = true;
+        chrome.runtime.sendMessage(
+          { type: 'webmcp_set_host_enabled', hostname: host, enabled: next },
+          function (resp: any) {
+            if (chrome.runtime.lastError || !resp || !resp.ok) {
+              // revert on failure
+              toggle.checked = !next;
+              toggle.disabled = false;
+              return;
+            }
+            setHostEnabledState(host, next);
+          }
+        );
+      });
+      toggleLabel.appendChild(toggle);
+
+      left.addEventListener('click', function () {
         if (typeof info.tabId === 'number') {
           chrome.tabs.update(info.tabId, { active: true });
           window.close();
         }
       });
+
+      item.appendChild(left);
+      item.appendChild(toggleLabel);
       list.appendChild(item);
     });
   }

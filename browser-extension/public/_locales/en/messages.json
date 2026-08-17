@@ -2,6 +2,8 @@
   "extensionName": { "message": "eo2weave" },
   "webmcpScanning": { "message": "Scanning tabs for WebMCP tools…" },
   "webmcpFoundSummary": { "message": "WebMCP: $HOSTS site(s), $TOOLS tool(s) available" },
+  "webmcpToggleHostTitle": { "message": "Allow the agent to use this site's WebMCP tools" },
+  "webmcpHostDisabled": { "message": "Disabled — tools from this site are blocked" },
   "extensionDescription": { "message": "Provides web search and content fetching capabilities for in-browser agents" },
   "popupSubtitle": { "message": "Web search and content fetching service" },
   "checking": { "message": "Checking…" },

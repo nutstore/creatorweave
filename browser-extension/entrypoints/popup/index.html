@@ -175,6 +175,16 @@
     .webmcp-host:hover {
       background: #f0fdfa;
     }
+    .webmcp-host.disabled-host {
+      opacity: 0.55;
+    }
+    .webmcp-host-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
     .webmcp-host-name {
       font-size: 12px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -182,6 +192,10 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .webmcp-host.disabled-host .webmcp-host-name {
+      text-decoration: line-through;
+      text-decoration-color: #94a3b8;
     }
     .webmcp-host-count {
       flex: 0 0 auto;
@@ -192,6 +206,54 @@
       border: 1px solid #ccfbf1;
       border-radius: 999px;
       padding: 1px 7px;
+    }
+    .webmcp-host.disabled-host .webmcp-host-count {
+      color: #64748b;
+      background: #f1f5f9;
+      border-color: #e2e8f0;
+    }
+    /* Per-host authorization switch (mirrors web app's WebMCPHostList) */
+    .webmcp-toggle {
+      position: relative;
+      width: 30px;
+      height: 17px;
+      flex: 0 0 auto;
+      appearance: none;
+      -webkit-appearance: none;
+      background: #cbd5e1;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin: 0;
+      padding: 0;
+      border: none;
+      outline: none;
+    }
+    .webmcp-toggle::-webkit-slider-thumb {
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .webmcp-toggle:checked {
+      background: #0d9488;
+    }
+    .webmcp-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 13px;
+      height: 13px;
+      border-radius: 999px;
+      background: #fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+      transition: transform 0.15s;
+    }
+    .webmcp-toggle:checked::after {
+      transform: translateX(13px);
+    }
+    .webmcp-toggle:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
   </style>
 </head>

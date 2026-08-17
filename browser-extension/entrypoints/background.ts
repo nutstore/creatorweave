@@ -4,6 +4,11 @@
 
 import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
 import { invokeWebMCPTool } from './webmcp/invoke'
+import {
+  getHostAuthorizationMap,
+  setHostEnabled as setWebMCPHostEnabled,
+  annotateToolsWithHostAuthorization,
+} from './webmcp/authorization'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
 import type { WebMCPPluginDownloadPlan } from './webmcp/types'
 import {
@@ -1314,7 +1319,36 @@ export default defineBackground(() => {
 
         if (message.type === 'webmcp_discover_tools') {
           const senderWindowId = _sender?.tab?.windowId;
-          sendResponse(await discoverWebMCPToolsInCurrentWindow(senderWindowId));
+          const response = await discoverWebMCPToolsInCurrentWindow(senderWindowId);
+          // Annotate tools with extension-side per-host authorization state so
+          // clients (web app, popup) render one consistent truth.
+          if (response.ok) {
+            const map = await getHostAuthorizationMap();
+            (response as any).tools = annotateToolsWithHostAuthorization(response.tools || [], map);
+          }
+          sendResponse(response);
+          return;
+        }
+
+        if (message.type === 'webmcp_get_host_authorization') {
+          const map = await getHostAuthorizationMap();
+          sendResponse({ ok: true, enabledByHost: map });
+          return;
+        }
+
+        if (message.type === 'webmcp_set_host_enabled') {
+          const hostname = typeof message.hostname === 'string' ? message.hostname : '';
+          const enabled = message.enabled === true;
+          if (!hostname) {
+            sendResponse({ ok: false, error: 'hostname is required' });
+            return;
+          }
+          try {
+            const map = await setWebMCPHostEnabled(hostname, enabled);
+            sendResponse({ ok: true, enabledByHost: map });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
           return;
         }
 

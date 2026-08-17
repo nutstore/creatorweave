@@ -7,6 +7,7 @@ import {
   rememberSuccessfulInvocation,
 } from './discovery'
 import { buildSafeFullName } from './tool-name'
+import { isHostEnabled, hostDisabledError } from './authorization'
 import type {
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
@@ -197,6 +198,20 @@ export async function invokeWebMCPTool(
   }
 
   const { hostname, toolName, groupKey } = route
+
+  // Authorization gate: per-host opt-out is enforced here, in the extension
+  // layer, not just as a UI filter on the web side. Disabled host → refuse
+  // before any script is executed in a tab (privacy policy: per-site
+  // authorization, revocable at any time).
+  if (!(await isHostEnabled(hostname))) {
+    return {
+      hostname,
+      toolName,
+      fullToolName: request.fullToolName,
+      ...hostDisabledError(hostname),
+    }
+  }
+
   const tabId = await pickTargetTabId(groupKey, hostname, request)
   if (tabId === null) {
     return {
