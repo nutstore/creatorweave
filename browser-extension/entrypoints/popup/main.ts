@@ -1,3 +1,7 @@
+// Build-time Codex OAuth feature flag (see wxt.config.ts).
+// Store builds (CW_CODEX_OAUTH=0) hide the whole Codex box in the popup.
+declare const __CW_CODEX_OAUTH__: boolean;
+
 function t(key: string, substitutions?: string | string[]): string {
   return chrome.i18n.getMessage(key as any, substitutions) || key;
 }
@@ -14,7 +18,9 @@ function localizeStaticContent(): void {
 localizeStaticContent();
 try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.getManifest().version; } catch {}
 
-// Show build mode (dev/prod)
+// Show build mode badge — DEV builds only.
+// Production builds hide the badge entirely: store users shouldn't see a
+// "PROD" tag (it leaks internal jargon and looks unpolished).
 (function () {
   var el = document.getElementById('buildMode');
   if (!el) return;
@@ -22,6 +28,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   // MODE is one of 'development' | 'production' per Vite contract.
   var mode = import.meta.env.MODE || 'production';
   var isDev = mode === 'development';
+  if (!isDev) {
+    el.remove();
+    return;
+  }
+  // DEV build: reveal and fill the badge (static HTML ships it hidden/empty).
+  el.removeAttribute('hidden');
   el.className = 'build-mode ' + (isDev ? 'dev' : 'prod');
   el.textContent = isDev ? 'DEV' : 'PROD';
 })();
@@ -68,6 +80,10 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 })();
 
 (function () {
+  // Whole IIFE is folded away in store builds (CW_CODEX_OAUTH=0) via the
+  // __CW_CODEX_OAUTH__ block guard; markup/CSS/locales are also stripped at
+  // build time (wxt.config.ts). Dev builds keep full functionality.
+  if (__CW_CODEX_OAUTH__) {
   var logEl = document.getElementById('codexLog')!;
   var btn = document.getElementById('codexLoginBtn')!;
   var resetBtn = document.getElementById('codexResetBtn')!;
@@ -485,6 +501,7 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     await clearPendingAuth();
     log(t('authorizationExpiredLog'));
   });
+  } // end if (__CW_CODEX_OAUTH__)
 })();
 
 document.getElementById('openDocs')!.addEventListener('click', function () {

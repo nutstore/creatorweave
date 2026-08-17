@@ -8,6 +8,8 @@
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
     "build": "wxt build",
+    "build:store": "CW_CODEX_OAUTH=0 wxt build",
+    "zip:store": "CW_CODEX_OAUTH=0 wxt zip",
     "build:firefox": "wxt build -b firefox",
     "watch": "wxt build --watch",
     "zip": "wxt zip",

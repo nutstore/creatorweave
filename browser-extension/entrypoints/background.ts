@@ -189,9 +189,13 @@ async function searchDuckDuckGo(query, limit) {
 /** Fetch Baidu search results HTML (raw, unparsed) */
 async function fetchBaiduHtml(query, limit) {
   const url = `https://www.baidu.com/s?wd=${encodeURIComponent(query)}&rn=${Math.min(limit * 2, 20)}`;
+  // No spoofed User-Agent: the extension's own identity is used. Baidu serves
+  // /s results fine without a browser UA (verified), and an honest UA avoids
+  // impersonation concerns in store review. Note: in MV3 service workers the
+  // User-Agent header is browser-controlled anyway and custom values are
+  // ignored by fetch (it's a forbidden header) — kept here only as Accept/A-L.
   const resp = await fetchWithTimeout(url, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml',
       'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
     },
@@ -481,7 +485,26 @@ async function handleFetchRender(message) {
 
 // ============================================================
 // Codex auth + proxy (minimal version)
+//
+// FEATURE FLAG: the whole block below is guarded by __CW_CODEX_OAUTH__
+// (build-time define, see wxt.config.ts). In the Chrome Web Store build
+// (CW_CODEX_OAUTH=0) every OpenAI endpoint / client_id / UA string is
+// treeshaken out of the bundle — no OpenAI code ships at all.
 // ============================================================
+
+declare const __CW_CODEX_OAUTH__: boolean;
+const CODEX_OAUTH_ENABLED: boolean = __CW_CODEX_OAUTH__;
+
+// The entire Codex block below is wrapped in `if (CODEX_OAUTH_ENABLED) {}`.
+// This is what makes the store build (CW_CODEX_OAUTH=0) actually DROP the
+// code: esbuild folds `if (false) { ... }` at block level and eliminates the
+// whole scope — every OpenAI URL / client_id / UA string vanishes from the
+// bundle. (A bare top-level `const FLAG && ...` guard is NOT enough: the
+// helper functions and their string constants stay module-scope and survive
+// tree-shaking — verified by grepping the first store build.)
+// All call sites outside this block already check CODEX_OAUTH_ENABLED before
+// referencing these helpers, so the internal block scoping is safe.
+if (CODEX_OAUTH_ENABLED) {
 
 const DEVICEAUTH_USERCODE_URL = 'https://auth.openai.com/api/accounts/deviceauth/usercode';
 const DEVICEAUTH_TOKEN_URL = 'https://auth.openai.com/api/accounts/deviceauth/token';
@@ -704,11 +727,18 @@ async function pollCodexAuthOnce(deviceAuthId: string, userCode: string) {
   return { ok: true, done: true };
 }
 
+}
+
 // ============================================================
 // Message listener
 // ============================================================
 
 export default defineBackground(() => {
+  if (!CODEX_OAUTH_ENABLED) {
+    // Store build: Codex OAuth stripped. Alarm listener below still registers
+    // the non-Codex branches (schedule triggers), so keep going — only the
+    // Codex-specific proactive refresh and auth-poll branches are skipped.
+  }
   // ── Proactive token refresh: check on startup and every 5 minutes ──
   const CODEX_TOKEN_REFRESH_ALARM = 'codex_token_refresh_alarm';
 
@@ -743,13 +773,13 @@ export default defineBackground(() => {
   }
 
   // Check on service worker startup
-  proactiveRefreshIfNeeded();
+  if (CODEX_OAUTH_ENABLED) proactiveRefreshIfNeeded();
 
   // Schedule periodic checks (every 5 minutes)
-  chrome.alarms.create(CODEX_TOKEN_REFRESH_ALARM, { periodInMinutes: 5 });
+  if (CODEX_OAUTH_ENABLED) chrome.alarms.create(CODEX_TOKEN_REFRESH_ALARM, { periodInMinutes: 5 });
 
   chrome.alarms.onAlarm.addListener(async (alarm) => {
-    if (alarm.name === CODEX_TOKEN_REFRESH_ALARM) {
+    if (CODEX_OAUTH_ENABLED && alarm.name === CODEX_TOKEN_REFRESH_ALARM) {
       await proactiveRefreshIfNeeded();
       return;
     }
@@ -761,7 +791,7 @@ export default defineBackground(() => {
       return
     }
 
-    if (alarm.name !== CODEX_AUTH_POLL_ALARM) return;
+    if (!CODEX_OAUTH_ENABLED || alarm.name !== CODEX_AUTH_POLL_ALARM) return;
     try {
       const pending = await getPendingCodexAuth();
       if (!pending) {
@@ -1313,7 +1343,7 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_auth_start') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_auth_start') {
           const resp = await fetch(DEVICEAUTH_USERCODE_URL, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -1346,7 +1376,7 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_auth_poll') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_auth_poll') {
           let deviceAuthId = message.deviceAuthId;
           let userCode = message.userCode;
 
@@ -1366,7 +1396,7 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_get_status') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_status') {
           const tokens = await getCodexTokens();
           const pending = await getPendingCodexAuth();
           let authState: string = 'idle';
@@ -1420,13 +1450,13 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_get_usage') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_usage') {
           const { codex_usage } = await chrome.storage.local.get('codex_usage');
           sendResponse({ ok: true, data: codex_usage || null });
           return;
         }
 
-        if (message.type === 'codex_get_reset_credits') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_get_reset_credits') {
           const tokens = await getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
@@ -1441,7 +1471,7 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_consume_reset_credit') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_consume_reset_credit') {
           const tokens = await getCodexTokens();
           const creditId = typeof message.creditId === 'string' ? message.creditId : '';
           if (!tokens?.access_token) {
@@ -1461,7 +1491,7 @@ export default defineBackground(() => {
           return;
         }
 
-        if (message.type === 'codex_proxy_fetch') {
+        if (CODEX_OAUTH_ENABLED && message.type === 'codex_proxy_fetch') {
           let tokens = await getCodexTokens();
           if (!tokens?.access_token) {
             sendResponse({ ok: false, errorCode: 'NOT_AUTHORIZED', status: 0, message: 'Not authorized. Please complete device code login first.' });
@@ -1743,7 +1773,7 @@ export default defineBackground(() => {
         return;
       }
 
-      if (message.type !== 'codex_proxy_fetch_stream') return;
+      if (!CODEX_OAUTH_ENABLED || message.type !== 'codex_proxy_fetch_stream') return;
 
       (async () => {
         // Per-request timeout: 5 minutes for streaming (long-running requests)

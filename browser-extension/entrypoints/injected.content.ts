@@ -12,6 +12,10 @@
 import { Readability } from '@mozilla/readability'
 import TurndownService from 'turndown'
 
+// Build-time Codex OAuth feature flag (see wxt.config.ts). Store builds
+// (CW_CODEX_OAUTH=0) fold the guards below and treeshake the bridge names.
+declare const __CW_CODEX_OAUTH__: boolean;
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
@@ -590,16 +594,21 @@ export default defineContentScript({
       },
 
       /**
-       * Get Codex OAuth authorization status
+       * Get Codex OAuth authorization status.
+       * Store build (CW_CODEX_OAUTH=0): the guard folds to `return` and the
+       * bridge message name is treeshaken out.
        */
       async codexGetStatus() {
+        if (!__CW_CODEX_OAUTH__) return { ok: false, errorCode: 'FEATURE_DISABLED' };
         return sendToBridge('codex_get_status', {});
       },
 
       /**
-       * Proxy a Codex API request through the extension
+       * Proxy a Codex API request through the extension.
+       * Store build: disabled (see above).
        */
       async codexProxyFetch(body: Record<string, any>) {
+        if (!__CW_CODEX_OAUTH__) return { ok: false, errorCode: 'FEATURE_DISABLED' };
         return sendToBridge('codex_proxy_fetch', { body });
       },
 
@@ -774,6 +783,14 @@ export default defineContentScript({
        * The caller should parse SSE events from the yielded strings.
        */
       codexProxyFetchStream(body: Record<string, any>): AsyncIterable<string> & { cancel: () => void } {
+        if (!__CW_CODEX_OAUTH__) {
+          // Store build: disabled — yield nothing, cancel is a no-op.
+          const dead: AsyncIterable<string> & { cancel: () => void } = {
+            [Symbol.asyncIterator]() { return (async function* () {})(); },
+            cancel() {},
+          };
+          return dead;
+        }
         const source = sendToBridgeStream('codex_proxy_fetch_stream', { body })
         const typed: AsyncIterable<string> & { cancel: () => void } = {
           [Symbol.asyncIterator]() {

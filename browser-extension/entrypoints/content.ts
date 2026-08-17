@@ -11,6 +11,9 @@
 // to the MAIN-world script.
 // ============================================================
 
+// Build-time Codex OAuth feature flag (see wxt.config.ts).
+declare const __CW_CODEX_OAUTH__: boolean;
+
 export default defineContentScript({
   matches: ['<all_urls>'],
   runAt: 'document_idle',
@@ -35,7 +38,7 @@ export default defineContentScript({
 
       // ── Streaming request: use port-based messaging ──
       if (
-        type === 'codex_proxy_fetch_stream' ||
+        (__CW_CODEX_OAUTH__ && type === 'codex_proxy_fetch_stream') ||
         type === 'webmcp_plugin_download_stream' ||
         type === 'mcp_proxy_fetch_stream'
       ) {
