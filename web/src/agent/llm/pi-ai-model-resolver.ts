@@ -7,7 +7,17 @@ import { getOpenRouterInputModalities } from '@/agent/providers/openrouter-prici
 import { CW_OPENAI_FETCH_API } from './pi-ai-custom-openai-fetch'
 import { normalizeBaseUrl } from './pi-ai-url-utils'
 
-const DEFAULT_MAX_TOKENS = 8192
+// Output ceiling for OpenAI-compatible fallback models (deepseek, minimax,
+// custom providers, …) whose real limit is unknown to the pi-ai catalog.
+// This is the total budget shared by reasoning/thinking tokens AND visible
+// output. 8192 was far too small for agentic loops: with thinking enabled,
+// pi-ai's adjustMaxTokensForThinking() carves a thinking budget out of this
+// cap and reserves only 1024 tokens for the actual reply, silently truncating
+// long drafts mid-tool-call-planning (e.g. drafting a full article inside the
+// thinking block). 64K is safely below the output ceilings of modern fallback
+// models (DeepSeek V4 allows up to 384K) while large enough that truncation
+// from this constant should no longer be the binding constraint.
+const DEFAULT_MAX_TOKENS = 65536
 
 const PROVIDER_MAP: Partial<Record<LLMProviderType, KnownProvider>> = {
   openai: 'openai',
