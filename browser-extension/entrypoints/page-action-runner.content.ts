@@ -21,7 +21,7 @@
 //   ambiguity => fail and return candidates.
 // ============================================================
 
-import { browserSelectorSynthesisSource } from '../lib/page-action-synthesis-source'
+import { synthesizeElementLocators } from '../lib/page-action-synthesis-source'
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -302,37 +302,21 @@ export default defineContentScript({
     }
 
     // --------------------------------------------------------------
-    // Locator synthesis (browser-side, self-contained)
+    // Locator synthesis (browser-side, direct function call)
     // --------------------------------------------------------------
-    // `synthesizeElementLocators(el)` is defined by evaluating
-    // browserSelectorSynthesisSource() once, lazily. It returns a ranked
-    // list of {kind, query, verification, stability, score, strategy} for
-    // the element. This is the browser-agent-wxt scoring table ported
+    // `synthesizeElementLocators(el)` is imported directly from
+    // lib/page-action-synthesis-source. It returns a ranked list of
+    // {kind, query, verification, stability, score, strategy} for the
+    // element. This is the browser-agent-wxt scoring table ported
     // verbatim — do not re-tune casually.
-    let _synthesizeElementLocators: ((el: Element) => any[]) | null = null
-    function getSynthesizer(): ((el: Element) => any[]) | null {
-      if (_synthesizeElementLocators) return _synthesizeElementLocators
-      try {
-        // The source string defines `synthesizeElementLocators` in the
-        // enclosing scope; evaluate it via Function to avoid polluting the
-        // page's global scope and to capture the definition.
-        const source = browserSelectorSynthesisSource()
-        // eslint-disable-next-line no-new-func
-        const factory = new Function(source + '\nreturn synthesizeElementLocators') as () => (el: Element) => any[]
-        _synthesizeElementLocators = factory()
-        return _synthesizeElementLocators
-      } catch (err) {
-        console.warn('[__cwPageAction] Failed to initialize synthesizer:', err)
-        return null
-      }
-    }
+    // NOTE: it used to be eval'd lazily via `new Function(source)`; that
+    // broke on strict-CSP pages (no 'unsafe-eval'). A plain imported
+    // function call is not restricted by page CSP.
 
     function synthesizeLocatorsForMatches(matches: Element[], limit?: number): any[] {
-      const synth = getSynthesizer()
-      if (!synth) return []
       const out: any[] = []
       for (const el of matches) {
-        const locators = synth(el)
+        const locators = synthesizeElementLocators(el)
         out.push({ elementId: ensureElementId(el), locators })
         if (typeof limit === 'number' && limit > 0 && out.length >= limit) break
       }
@@ -653,16 +637,12 @@ export default defineContentScript({
           // link_text locators (with stability scores) for each match.
           // The agent uses these to pick the most stable locator for reuse.
           const matches = resolveLocator(action.locator, action.limit ?? 20)
-          const synth = getSynthesizer()
-          if (!synth) {
-            return { ok: false, errorCode: 'SYNTHESIS_UNAVAILABLE', error: 'Locator synthesizer failed to initialize' }
-          }
           return {
             ok: true,
             count: matches.length,
             elements: matches.map((el) => ({
               ...elementInfo(el),
-              locators: synth(el),
+              locators: synthesizeElementLocators(el),
             })),
           }
         }
