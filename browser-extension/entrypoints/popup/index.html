@@ -11,9 +11,12 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f8fafc;
       color: #0f172a;
+      display: flex;
       flex-direction: column;
     }
     .header {
+      display: flex;
+      align-items: center;
       gap: 10px;
       padding: 14px 16px 12px;
       background: linear-gradient(135deg, #14B8A6, #0D9488);
@@ -43,10 +46,13 @@
     .build-mode.prod { color: #dcfce7; }
     .main {
       padding: 14px 16px 16px;
+      display: flex;
       flex-direction: column;
       gap: 12px;
     }
     .status {
+      display: flex;
+      align-items: center;
       gap: 8px;
       padding: 10px 12px;
       border-radius: 10px;
@@ -131,6 +137,7 @@
     a { color: #0f766e; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .footer {
+      display: flex;
       gap: 8px;
       margin-top: 4px;
     }
@@ -255,6 +262,70 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
+    /* Host card is a vertical container: header row + nested groups */
+    .webmcp-host {
+      display: block;
+      padding: 4px 0;
+    }
+    .webmcp-host > .webmcp-host-left {
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .webmcp-host > .webmcp-host-left:hover {
+      background: #f0fdfa;
+    }
+    .webmcp-groups {
+      margin-top: 2px;
+      margin-left: 10px;
+      border-left: 2px solid #ccfbf1;
+      padding-left: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .webmcp-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3px 6px;
+      border-radius: 6px;
+    }
+    .webmcp-group:hover {
+      background: #f8fafc;
+    }
+    .webmcp-group.disabled-host {
+      opacity: 0.55;
+    }
+    .webmcp-group-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      flex: 1;
+      cursor: pointer;
+    }
+    .webmcp-group-name {
+      font-size: 11px;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .webmcp-group.disabled-host .webmcp-group-name {
+      text-decoration: line-through;
+      text-decoration-color: #94a3b8;
+    }
+    .webmcp-group-count {
+      flex: 0 0 auto;
+      font-size: 9px;
+      font-weight: 600;
+      color: #0f766e;
+      background: #f0fdfa;
+      border: 1px solid #ccfbf1;
+      border-radius: 999px;
+      padding: 0 6px;
+    }
   </style>
 </head>
 <body>
@@ -267,13 +338,13 @@
   </header>
 
   <main class="main">
-    <div id="webmcpBox" class="webmcp-box" style="display:none">
-      <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
-      <div id="webmcpList"></div>
-    </div>
     <div class="status" id="status">
       <span class="status-dot" id="statusDot"></span>
       <span class="status-text" id="statusText" data-i18n="checking">检测中…</span>
+    </div>
+    <div id="webmcpBox" class="webmcp-box" style="display:none">
+      <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
+      <div id="webmcpList"></div>
     </div>
     <div class="codex-box">
       <div id="codexStatus" style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">

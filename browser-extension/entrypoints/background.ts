@@ -6,7 +6,9 @@ import { discoverWebMCPToolsInCurrentWindow } from './webmcp/discovery'
 import { invokeWebMCPTool } from './webmcp/invoke'
 import {
   getHostAuthorizationMap,
+  getGroupAuthorizationMap,
   setHostEnabled as setWebMCPHostEnabled,
+  setGroupEnabled as setWebMCPGroupEnabled,
   annotateToolsWithHostAuthorization,
 } from './webmcp/authorization'
 import { streamPluginDownload } from './webmcp/plugin-download-transfer'
@@ -1320,19 +1322,29 @@ export default defineBackground(() => {
         if (message.type === 'webmcp_discover_tools') {
           const senderWindowId = _sender?.tab?.windowId;
           const response = await discoverWebMCPToolsInCurrentWindow(senderWindowId);
-          // Annotate tools with extension-side per-host authorization state so
-          // clients (web app, popup) render one consistent truth.
+          // Annotate tools with extension-side per-host/per-group authorization
+          // state so clients (web app, popup) render one consistent truth.
           if (response.ok) {
-            const map = await getHostAuthorizationMap();
-            (response as any).tools = annotateToolsWithHostAuthorization(response.tools || [], map);
+            const [hostMap, groupMap] = await Promise.all([
+              getHostAuthorizationMap(),
+              getGroupAuthorizationMap(),
+            ]);
+            (response as any).tools = annotateToolsWithHostAuthorization(
+              response.tools || [],
+              hostMap,
+              groupMap
+            );
           }
           sendResponse(response);
           return;
         }
 
         if (message.type === 'webmcp_get_host_authorization') {
-          const map = await getHostAuthorizationMap();
-          sendResponse({ ok: true, enabledByHost: map });
+          const [hostMap, groupMap] = await Promise.all([
+            getHostAuthorizationMap(),
+            getGroupAuthorizationMap(),
+          ]);
+          sendResponse({ ok: true, enabledByHost: hostMap, enabledByGroup: groupMap });
           return;
         }
 
@@ -1346,6 +1358,22 @@ export default defineBackground(() => {
           try {
             const map = await setWebMCPHostEnabled(hostname, enabled);
             sendResponse({ ok: true, enabledByHost: map });
+          } catch (err: any) {
+            sendResponse({ ok: false, error: err?.message || String(err) });
+          }
+          return;
+        }
+
+        if (message.type === 'webmcp_set_group_enabled') {
+          const groupKey = typeof message.groupKey === 'string' ? message.groupKey : '';
+          const enabled = message.enabled === true;
+          if (!groupKey) {
+            sendResponse({ ok: false, error: 'groupKey is required' });
+            return;
+          }
+          try {
+            const map = await setWebMCPGroupEnabled(groupKey, enabled);
+            sendResponse({ ok: true, enabledByGroup: map });
           } catch (err: any) {
             sendResponse({ ok: false, error: err?.message || String(err) });
           }

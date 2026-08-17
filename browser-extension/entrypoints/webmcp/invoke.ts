@@ -7,7 +7,7 @@ import {
   rememberSuccessfulInvocation,
 } from './discovery'
 import { buildSafeFullName } from './tool-name'
-import { isHostEnabled, hostDisabledError } from './authorization'
+import { isHostEnabled, isGroupEnabled, hostDisabledError, groupDisabledError } from './authorization'
 import type {
   WebMCPInvokeRequest,
   WebMCPInvokeResponse,
@@ -209,6 +209,17 @@ export async function invokeWebMCPTool(
       toolName,
       fullToolName: request.fullToolName,
       ...hostDisabledError(hostname),
+    }
+  }
+
+  // Group gate: same enforcement for per-group opt-out (mirrors the web
+  // app's enabledByGroup switches in WebMCPHostList).
+  if (groupKey && !(await isGroupEnabled(groupKey))) {
+    return {
+      hostname,
+      toolName,
+      fullToolName: request.fullToolName,
+      ...groupDisabledError(groupKey),
     }
   }
 
