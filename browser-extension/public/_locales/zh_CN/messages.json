@@ -1,9 +1,17 @@
 {
   "extensionName": { "message": "eo2weave" },
   "webmcpScanning": { "message": "正在扫描标签页中的 WebMCP 工具…"},
-  "webmcpFoundSummary": { "message": "WebMCP：$HOSTS 个站点，$TOOLS 个工具可用" },
+  "webmcpFoundSummary": {
+    "message": "WebMCP：$HOSTS$ 个站点，$TOOLS$ 个工具可用",
+    "placeholders": {
+      "hosts": { "content": "$1" },
+      "tools": { "content": "$2" }
+    }
+  },
   "webmcpToggleHostTitle": { "message": "允许 AI 助手使用该站点的 WebMCP 工具" },
   "webmcpHostDisabled": { "message": "已禁用——来自该站点的工具将被拦截" },
+  "webmcpNoTools": { "message": "本窗口未发现 WebMCP 工具" },
+  "webmcpDiscoverError": { "message": "WebMCP 发现失败" },
   "extensionDescription": { "message": "为浏览器内 AI 助手提供网页搜索与内容抓取能力" },
   "popupSubtitle": { "message": "网页搜索与内容抓取服务" },
   "checking": { "message": "检测中…" },

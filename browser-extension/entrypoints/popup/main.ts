@@ -61,6 +61,22 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     box.style.display = 'none';
   }
 
+  // Debug visibility: a silent hide makes "no tools" indistinguishable from
+  // "discovery crashed". Keep the box visible with a reason when discovery
+  // responded but found nothing, so issues are diagnosable at a glance.
+  function renderNoTools(detail?: string) {
+    box.style.display = '';
+    const base = chrome.i18n.getMessage('webmcpNoTools') || 'No WebMCP tools found in this window';
+    summary.textContent = detail ? base + ' — ' + detail : base;
+    list.textContent = '';
+  }
+
+  function renderError(detail: string) {
+    box.style.display = '';
+    summary.textContent = (chrome.i18n.getMessage('webmcpDiscoverError') || 'WebMCP discovery failed') + ': ' + detail;
+    list.textContent = '';
+  }
+
   function cssEscape(value: string): string {
     return (window as any).CSS && CSS.escape ? CSS.escape(value) : value.replace(/["\\]/g, '\\$&');
   }
@@ -105,9 +121,11 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     }
     var hosts = Object.keys(byHost);
     var totalTools = tools.length;
-    summary.textContent = (chrome.i18n.getMessage('webmcpFoundSummary') || '$HOSTS hosts · $TOOLS tools')
-      .replace('$HOSTS', String(hosts.length))
-      .replace('$TOOLS', String(totalTools));
+    // chrome.i18n.getMessage handles $HOSTS$/$TOOLS$ via declared placeholders
+    // + substitutions — bare $NAME in the message gets eaten by Chrome's own
+    // substitution parser ("$HOSTS" rendered as "OSTS").
+    summary.textContent = chrome.i18n.getMessage('webmcpFoundSummary', [String(hosts.length), String(totalTools)])
+      || (hosts.length + ' site(s), ' + totalTools + ' tool(s)');
 
     list.textContent = '';
     hosts.sort().forEach(function (host) {
@@ -179,9 +197,24 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 
   renderIdle();
   chrome.runtime.sendMessage({ type: 'webmcp_discover_tools' }, function (resp: any) {
-    if (chrome.runtime.lastError) { renderEmpty(); return; }
-    if (!resp || !resp.ok) { renderEmpty(); return; }
-    renderList(resp.tools || []);
+    if (chrome.runtime.lastError) {
+      renderError(chrome.runtime.lastError.message || 'runtime error');
+      return;
+    }
+    if (!resp) {
+      renderError('no response from background');
+      return;
+    }
+    if (!resp.ok) {
+      renderError(resp.error || 'unknown error');
+      return;
+    }
+    const tools = resp.tools || [];
+    if (tools.length === 0) {
+      renderNoTools(resp.scannedTabs != null ? `${resp.scannedTabs} tab(s) scanned, 0 tools` : undefined);
+      return;
+    }
+    renderList(tools);
   });
 })();
 
