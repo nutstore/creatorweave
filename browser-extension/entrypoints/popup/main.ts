@@ -210,8 +210,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
           sendSetEnabled({ type: 'webmcp_set_host_enabled', hostname: host, enabled: next }, done);
         },
       });
-      item.appendChild(left);
-      item.appendChild(hostToggle);
+      // Header row keeps name area and switch on the same line.
+      var head = document.createElement('div');
+      head.className = 'webmcp-host-head';
+      head.appendChild(left);
+      head.appendChild(hostToggle);
+      item.appendChild(head);
 
       // Nested group rows (mirror the web app's WebMCPHostList hierarchy).
       var groupKeys = Object.keys(info.groups);

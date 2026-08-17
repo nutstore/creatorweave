@@ -7,7 +7,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 320px;
+      width: 360px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #f8fafc;
       color: #0f172a;
@@ -169,21 +169,18 @@
       color: #0f766e;
       margin-bottom: 6px;
     }
+    /* Host card: vertical container — header row + nested group rows */
     .webmcp-host {
+      padding: 4px 0;
+    }
+    .webmcp-host.disabled-host {
+      opacity: 0.55;
+    }
+    .webmcp-host-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      padding: 6px 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.12s;
-    }
-    .webmcp-host:hover {
-      background: #f0fdfa;
-    }
-    .webmcp-host.disabled-host {
-      opacity: 0.55;
     }
     .webmcp-host-left {
       display: flex;
@@ -191,6 +188,13 @@
       gap: 8px;
       min-width: 0;
       flex: 1;
+      border-radius: 6px;
+      padding: 6px 8px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .webmcp-host-left:hover {
+      background: #f0fdfa;
     }
     .webmcp-host-name {
       font-size: 12px;
@@ -263,19 +267,6 @@
       cursor: not-allowed;
     }
     /* Host card is a vertical container: header row + nested groups */
-    .webmcp-host {
-      display: block;
-      padding: 4px 0;
-    }
-    .webmcp-host > .webmcp-host-left {
-      border-radius: 6px;
-      padding: 6px 8px;
-      cursor: pointer;
-      transition: background 0.12s;
-    }
-    .webmcp-host > .webmcp-host-left:hover {
-      background: #f0fdfa;
-    }
     .webmcp-groups {
       margin-top: 2px;
       margin-left: 10px;
