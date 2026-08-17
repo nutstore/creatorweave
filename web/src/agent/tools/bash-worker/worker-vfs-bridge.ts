@@ -455,12 +455,17 @@ export class WorkerVfsBridgeFs {
       if (options?.recursive) {
         await this.cpCrossBackend(srcRoute, destRoute)
       } else {
-        // Single-file cross-backend copy
-        const readResp = await this.rpcCall(srcRoute.backend, 'readFile', { path: srcRoute.relPath })
+        // Single-file cross-backend copy.
+        // MUST use the binary channel (readFileBuffer + encoding: 'binary'):
+        // the readFile RPC forces encoding:'text' on the main thread, which
+        // UTF-8-decodes arbitrary bytes into U+FFFD replacement chars and
+        // corrupts binary files (e.g. a JPEG's ffd8ff header becomes efbfbd...).
+        const readResp = await this.rpcCall(srcRoute.backend, 'readFileBuffer', { path: srcRoute.relPath })
         if (!readResp.ok) throw new Error(`cp: cannot stat '${src}': No such file or directory`)
         const writeResp = await this.rpcCall(destRoute.backend, 'writeFile', {
           path: destRoute.relPath,
           content: readResp.result as string,
+          encoding: 'binary',
         })
         if (!writeResp.ok) throw new Error(`cp: cannot write to '${dest}': ${writeResp.error}`)
       }
@@ -478,12 +483,14 @@ export class WorkerVfsBridgeFs {
     // Stat source to determine if it's a directory
     const statResp = await this.rpcCall(srcRoute.backend, 'stat', { path: srcRoute.relPath })
     if (!statResp.ok || !(statResp.result as { isDirectory: boolean })?.isDirectory) {
-      // Not a directory — fall back to single-file copy
-      const readResp = await this.rpcCall(srcRoute.backend, 'readFile', { path: srcRoute.relPath })
+      // Not a directory — fall back to single-file copy (binary channel;
+      // see cp() for why a readFile text roundtrip corrupts binary files)
+      const readResp = await this.rpcCall(srcRoute.backend, 'readFileBuffer', { path: srcRoute.relPath })
       if (!readResp.ok) throw new Error(`cp: cannot stat '${srcRoute.relPath}'`)
       const writeResp = await this.rpcCall(destRoute.backend, 'writeFile', {
         path: destRoute.relPath,
         content: readResp.result as string,
+        encoding: 'binary',
       })
       if (!writeResp.ok) throw new Error(`cp: cannot write: ${writeResp.error}`)
       return
@@ -497,11 +504,14 @@ export class WorkerVfsBridgeFs {
       const childSrcRel = srcRoute.relPath ? `${srcRoute.relPath}/${entry.name}` : entry.name
       const childDestRel = destRoute.relPath ? `${destRoute.relPath}/${entry.name}` : entry.name
       if (entry.isFile) {
-        const readResp = await this.rpcCall(srcRoute.backend, 'readFile', { path: childSrcRel })
+        // Binary channel — see cp() for why a readFile text roundtrip
+        // corrupts binary files
+        const readResp = await this.rpcCall(srcRoute.backend, 'readFileBuffer', { path: childSrcRel })
         if (readResp.ok) {
           await this.rpcCall(destRoute.backend, 'writeFile', {
             path: childDestRel,
             content: readResp.result as string,
+            encoding: 'binary',
           })
         }
       } else if (entry.isDirectory) {
