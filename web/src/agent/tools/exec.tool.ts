@@ -207,12 +207,21 @@ export const execExecutor: ToolExecutor = async (args, context) => {
   // Same pattern as page-write-auth: a UI-level confirmation that blocks tool
   // execution until the user decides. The LLM never sees an approval token
   // and cannot bypass it.
+  // Description carries ONLY the execution-context explanation (which
+  // project root, which subdir, whether the process keeps running). The
+  // command itself is rendered separately by ExecAuthModal — embedding it
+  // here would flood the modal whenever an argv element contains newlines
+  // (e.g. `git commit -m <multi-line commit message>`).
+  const projectLabel = rootName ?? scopeId
+  const subdir = cwd ? ` (subdir: ${cwd})` : ''
+  const description = background
+    ? `This BACKGROUND process will start in the "${projectLabel}" project directory${subdir}${procName ? ` as "${procName}"` : ''} and keep running until stopped.`
+    : `This command will run in the "${projectLabel}" project directory${subdir}.`
+
   if (decision === 'prompt') {
     const approved = await useExecAuthStore.getState().request(
       cmdStrings,
-      background
-        ? `$ ${cmdDisplay}\n\nThis BACKGROUND process will start in the "${rootName ?? scopeId}" project directory${cwd ? ` (subdir: ${cwd})` : ''}${procName ? ` as "${procName}"` : ''} and keep running until stopped.`
-        : `$ ${cmdDisplay}\n\nThis command will run in the "${rootName ?? scopeId}" project directory${cwd ? ` (subdir: ${cwd})` : ''}.`,
+      description,
       context.abortSignal,
     )
 

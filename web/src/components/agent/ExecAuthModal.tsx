@@ -22,18 +22,10 @@ export function ExecAuthModal() {
 
   const cmdDisplay = pending.command.join(' ')
 
-  // The exec tool builds the description as "$ <command>\n\n<explanation>".
-  // The command is rendered separately below — strip it from the description
-  // so it never shows twice.
-  const descriptionText = (() => {
-    const desc = pending.description ?? ''
-    if (desc.startsWith('$')) {
-      // Drop the first line (the command) and any leading blank lines.
-      const rest = desc.split('\n').slice(1).join('\n').trim()
-      return rest || undefined
-    }
-    return desc || undefined
-  })()
+  // The exec tool's description now contains only the execution context
+  // (project root / subdir / background process hint) — the command itself
+  // is rendered separately below.
+  const descriptionText = pending.description?.trim() || undefined
 
   return (
     <div
