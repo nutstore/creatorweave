@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '@/i18n'
 import {
@@ -9,18 +9,20 @@ import {
 import { useSettingsStore } from '@/store/settings.store'
 import { useExtensionStore } from '@/store/extension.store'
 import { WebMCPGlobalToggleCard } from './WebMCPGlobalToggleCard'
+import { WebMCPHostList } from './WebMCPHostList'
 
 /**
- * WebMCP settings — connection status only.
+ * WebMCP settings — connection status + read-only tool list.
  *
- * Everything else (host/group authorization switches, per-site management)
- * lives exclusively in the extension popup. The extension-side store
- * (chrome.storage.local) is the single source of truth and the background
- * invoke gate enforces it; this page exists to tell the user whether the
- * bridge is alive and to refresh the catalog.
+ * The list shows discovered (authorized) WebMCP tools: the extension
+ * filters unauthorized tools out of discovery responses, so whatever
+ * renders here is usable by the agent right now. Authorization
+ * management lives exclusively in the extension popup; this page never
+ * mutates authorization state.
  */
 export function WebMCPSettings() {
   const t = useT()
+  const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
   const extensionStatus = useExtensionStore((state) => state.status)
@@ -28,6 +30,14 @@ export function WebMCPSettings() {
   const [refreshing, setRefreshing] = useState(false)
 
   const bridgeAvailable = isWebMCPBridgeAvailable()
+
+  const hosts = useMemo(
+    () =>
+      Object.values(catalogByHost).sort((a, b) =>
+        a.hostname.localeCompare(b.hostname)
+      ),
+    [catalogByHost]
+  )
 
   const handleRefresh = async () => {
     if (!bridgeAvailable) {
@@ -77,6 +87,8 @@ export function WebMCPSettings() {
         onInstallExtension={handleInstallExtension}
         formatTime={formatTime}
       />
+
+      {globalEnabled && <WebMCPHostList t={t} hosts={hosts} />}
     </div>
   )
 }
