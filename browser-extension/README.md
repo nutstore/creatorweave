@@ -38,11 +38,9 @@ npm run zip:store      # Store zip (Codex-stripped)
 
 ## Features
 
+Core features — identical in every distribution (community & store):
+
 ### Web Search & Fetch
-
-### WebMCP Tool Discovery
-
-Both core features work identically in every distribution (community & store):
 
 After installation, `window.__agentWeb` is injected into the page:
 
