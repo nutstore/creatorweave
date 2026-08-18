@@ -4,6 +4,7 @@ import { useT } from '@/i18n'
 import { useWebMCPStore } from '@/webmcp'
 import {
   applyWebMCPGlobalToggle,
+  applyWebMCPGroupToggle,
   applyWebMCPHostToggle,
   isWebMCPBridgeAvailable,
   refreshWebMCPCatalog,
@@ -19,7 +20,6 @@ export function WebMCPSettings() {
   const catalogByHost = useWebMCPStore((state) => state.catalogByHost)
   const enabledByHost = useWebMCPStore((state) => state.enabledByHost)
   const enabledByGroup = useWebMCPStore((state) => state.enabledByGroup)
-  const setGroupEnabled = useWebMCPStore((state) => state.setGroupEnabled)
   const lastScanAt = useWebMCPStore((state) => state.lastScanAt)
   const globalEnabled = useSettingsStore((state) => state.enableWebMCP)
   const extensionStatus = useExtensionStore((state) => state.status)
@@ -98,7 +98,9 @@ export function WebMCPSettings() {
     if (!globalEnabled) return
     setTogglingGroup(groupKey)
     try {
-      setGroupEnabled(groupKey, enabled)
+      // Write-through to the extension-side authoritative store; the local
+      // mirror updates on the next discovery annotation sync.
+      await applyWebMCPGroupToggle(groupKey, enabled)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       toast.error(t('settings.webMCPToggleFailed') + `: ${message}`)

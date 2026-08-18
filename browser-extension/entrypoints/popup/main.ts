@@ -105,8 +105,10 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 
   function buildToggle(opts: {
     checked: boolean;
+    disabled?: boolean;
     titleOn: string;
     titleOff: string;
+    disabledTitle?: string;
     onToggle: (next: boolean, done: (ok: boolean) => void) => void;
   }): HTMLLabelElement {
     var toggleLabel = document.createElement('label');
@@ -116,7 +118,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     toggle.type = 'checkbox';
     toggle.className = 'webmcp-toggle';
     toggle.checked = opts.checked;
-    toggle.title = opts.checked ? opts.titleOn : opts.titleOff;
+    toggle.disabled = !!opts.disabled;
+    if (opts.disabled && opts.disabledTitle) {
+      toggle.title = opts.disabledTitle;
+    } else {
+      toggle.title = opts.checked ? opts.titleOn : opts.titleOff;
+    }
     toggle.addEventListener('change', function () {
       var next = toggle.checked;
       toggle.disabled = true;
@@ -148,11 +155,11 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       return;
     }
     box.style.display = '';
-    // Group by hostname → { groups: Map<groupKey, {count, tabId, toolNames, enabled}> , hostEnabled }
+    // Group by hostname → { groups: Map<groupKey, {count, tabId, toolNames, tabTitles, enabled}> , hostEnabled }
     var byHost: Record<string, {
       count: number;
       tabId: number;
-      groups: Record<string, { count: number; tabId: number; toolNames: string[]; enabled?: boolean }>;
+      groups: Record<string, { count: number; tabId: number; toolNames: string[]; tabTitles: string[]; enabled?: boolean }>;
       enabled?: boolean;
     }> = {};
     for (var i = 0; i < tools.length; i++) {
@@ -162,10 +169,12 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       byHost[host].count++;
       if (typeof tool.hostEnabled === 'boolean') byHost[host].enabled = tool.hostEnabled;
       var gk = tool.groupKey || (host + '_default');
-      if (!byHost[host].groups[gk]) byHost[host].groups[gk] = { count: 0, tabId: tool.tabId, toolNames: [] };
+      if (!byHost[host].groups[gk]) byHost[host].groups[gk] = { count: 0, tabId: tool.tabId, toolNames: [], tabTitles: [] };
       byHost[host].groups[gk].count++;
       if (typeof tool.groupEnabled === 'boolean') byHost[host].groups[gk].enabled = tool.groupEnabled;
-      if (byHost[host].groups[gk].toolNames.length < 4) byHost[host].groups[gk].toolNames.push(tool.name);
+      if (byHost[host].groups[gk].toolNames.length < 6 && byHost[host].groups[gk].toolNames.indexOf(tool.name) === -1) byHost[host].groups[gk].toolNames.push(tool.name);
+      var tt = (tool.tabTitle || '').trim();
+      if (tt && byHost[host].groups[gk].tabTitles.indexOf(tt) === -1 && byHost[host].groups[gk].tabTitles.length < 3) byHost[host].groups[gk].tabTitles.push(tt);
     }
     var hosts = Object.keys(byHost);
     var totalTools = tools.length;
@@ -202,12 +211,24 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       left.appendChild(name);
       left.appendChild(count);
 
+      // Group rows register here so the host switch can cascade state to
+      // them (mirrors web WebMCPHostList: host off → group switches disabled).
+      var groupUpdaters: Array<(hostOn: boolean) => void> = [];
+
       var hostToggle = buildToggle({
         checked: hostOn,
         titleOn: chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools",
         titleOff: chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked',
         onToggle: function (next, done) {
-          sendSetEnabled({ type: 'webmcp_set_host_enabled', hostname: host, enabled: next }, done);
+          sendSetEnabled({ type: 'webmcp_set_host_enabled', hostname: host, enabled: next }, function (ok) {
+            if (ok) {
+              hostEnabled[host] = next;
+              item.classList.toggle('disabled-host', !next);
+              left.title = next ? String(info.count) + ' tool(s)' : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+              for (var u = 0; u < groupUpdaters.length; u++) groupUpdaters[u](next);
+            }
+            done(ok);
+          });
         },
       });
       // Header row keeps name area and switch on the same line.
@@ -224,36 +245,91 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
         groupsWrap.className = 'webmcp-groups';
         groupKeys.forEach(function (gk, idx) {
           var g = info.groups[gk];
-          var groupOn = hostOn && g.enabled !== false;
+          // Switch position reflects the group's OWN state; the host gate is
+          // expressed via disabled + row dimming (mirrors web BrandSwitch:
+          // checked={groupChecked} disabled={!globalEnabled || !checked}).
+          // Using effective state here made the switch show "off" while the
+          // group itself was on — clicking then toggled the wrong direction.
+          var groupOwn = g.enabled !== false;
+          var effective = hostOn && groupOwn;
           var row = document.createElement('div');
-          row.className = 'webmcp-group' + (groupOn ? '' : ' disabled-host');
+          row.className = 'webmcp-group' + (effective ? '' : ' disabled-host');
+
+          // Group title = source tab title — that's a group's identity
+          // (one toolset version from one page). Tool names go to the
+          // preview line. Fallback: tabTitle → first tool name → Group N.
+          var titleText = (g.tabTitles && g.tabTitles[0])
+            || g.toolNames[0]
+            || ('Group ' + (idx + 1));
 
           var gLeft = document.createElement('div');
           gLeft.className = 'webmcp-group-left';
-          gLeft.title = g.toolNames.join(', ');
+          gLeft.title = g.toolNames.join(', ') + (g.tabTitles.length ? '\n' + g.tabTitles.join('\n') : '');
           gLeft.addEventListener('click', function () {
             if (typeof g.tabId === 'number') {
               chrome.tabs.update(g.tabId, { active: true });
               window.close();
             }
           });
+          var gNameWrap = document.createElement('div');
+          gNameWrap.className = 'webmcp-group-name-wrap';
           var gName = document.createElement('span');
           gName.className = 'webmcp-group-name';
-          gName.textContent = 'Group ' + (idx + 1);
+          gName.textContent = titleText;
           var gCount = document.createElement('span');
           gCount.className = 'webmcp-group-count';
           gCount.textContent = String(g.count);
-          gLeft.appendChild(gName);
-          gLeft.appendChild(gCount);
+          gCount.title = chrome.i18n.getMessage('webmcpToolCountTitle') || 'tools';
+          var gNameRow = document.createElement('div');
+          gNameRow.className = 'webmcp-group-name-row';
+          gNameRow.appendChild(gName);
+          gNameRow.appendChild(gCount);
+          gNameWrap.appendChild(gNameRow);
+          // Tool name preview (light, one line, ellipsized) — mirrors the
+          // web group card's tool preview strip.
+          if (g.toolNames.length > 0) {
+            var gPreview = document.createElement('div');
+            gPreview.className = 'webmcp-group-preview';
+            gPreview.textContent = g.toolNames.join(' · ');
+            gNameWrap.appendChild(gPreview);
+          }
+          gLeft.appendChild(gNameWrap);
 
+          var gToggleInput: HTMLInputElement | null = null;
           var gToggle = buildToggle({
-            checked: groupOn,
+            checked: groupOwn,
+            disabled: !hostOn,
             titleOn: chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'Allow the agent to use this tool group',
             titleOff: chrome.i18n.getMessage('webmcpGroupDisabled') || 'Disabled — this tool group is blocked',
+            disabledTitle: chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked',
             onToggle: function (next, done) {
-              sendSetEnabled({ type: 'webmcp_set_group_enabled', groupKey: gk, enabled: next }, done);
+              sendSetEnabled({ type: 'webmcp_set_group_enabled', groupKey: gk, enabled: next }, function (ok) {
+                if (ok) {
+                  g.enabled = next;
+                  row.classList.toggle('disabled-host', !(hostEnabled[host] && next));
+                }
+                done(ok);
+              });
             },
           });
+          gToggleInput = gToggle.querySelector('input.webmcp-toggle');
+
+          // Cascade registration: recompute this group row's visual + switch
+          // state whenever the host switch changes. Mirrors the web app's
+          // effective = hostOn && groupOn semantics.
+          groupUpdaters.push(function (hostOnNow: boolean) {
+            var effective = hostOnNow && g.enabled !== false;
+            row.classList.toggle('disabled-host', !effective);
+            if (gToggleInput) {
+              gToggleInput.disabled = !hostOnNow;
+              gToggleInput.title = !hostOnNow
+                ? (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked')
+                : (gToggleInput.checked
+                    ? (chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'Allow the agent to use this tool group')
+                    : (chrome.i18n.getMessage('webmcpGroupDisabled') || 'Disabled — this tool group is blocked'));
+            }
+          });
+
           row.appendChild(gLeft);
           row.appendChild(gToggle);
           groupsWrap.appendChild(row);

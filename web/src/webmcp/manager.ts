@@ -15,6 +15,24 @@ function isExtensionContextInvalidatedError(error: unknown): boolean {
 }
 
 /**
+ * Sync extension-side authorization state into the store mirror.
+ * Called after discovery — the tools' hostEnabled/groupEnabled annotations
+ * (attached by the extension background) are the source of truth; the web
+ * app's localStorage copy is read-only from now on.
+ */
+function syncAuthorizationFromTools(tools: Array<{ hostname: string; groupKey: string; hostEnabled?: boolean; groupEnabled?: boolean }>): void {
+  const enabledByHost: Record<string, boolean> = {}
+  const enabledByGroup: Record<string, boolean> = {}
+  for (const tool of tools) {
+    const host = tool.hostname.trim().toLowerCase()
+    if (host && typeof tool.hostEnabled === 'boolean') enabledByHost[host] = tool.hostEnabled
+    const group = tool.groupKey.trim()
+    if (group && typeof tool.groupEnabled === 'boolean') enabledByGroup[group] = tool.groupEnabled
+  }
+  useWebMCPStore.getState().setAuthorizationMirror(enabledByHost, enabledByGroup)
+}
+
+/**
  * Discover WebMCP tools from browser tabs and cache them in the store.
  * This is called by the agent loop to keep the catalog fresh.
  * Tool registration is handled by the unified external-tool bridge (search_tools/call_tool).
@@ -51,6 +69,7 @@ async function discoverAndCacheTools(force = false): Promise<WebMCPRegisteredToo
     const tools = dedupeDiscoveredInstances(response.tools || []).sort((a, b) =>
       a.fullName.localeCompare(b.fullName),
     )
+    syncAuthorizationFromTools(tools)
     useWebMCPStore.getState().setDiscoveredTools(tools, response.discoveredAt || Date.now())
     lastDiscoveryAt = Date.now()
     return useWebMCPStore.getState().getAllTools()
@@ -77,11 +96,40 @@ export async function refreshWebMCPCatalog(): Promise<WebMCPRegisteredTool[]> {
 
 export async function applyWebMCPHostToggle(
   hostname: string,
-  _enabled: boolean,
+  enabled: boolean,
 ): Promise<number> {
-  useWebMCPStore.getState().setHostEnabled(hostname, _enabled)
+  // Write-through to the extension-side authoritative store; the web
+  // localStorage copy is only a mirror synced from discovery annotations.
+  const bridge = getWebMCPBridge()
+  if (bridge?.webMCPSetHostEnabled) {
+    const resp = await bridge.webMCPSetHostEnabled({ hostname, enabled })
+    if (!resp?.ok) {
+      throw new Error(resp?.error || 'Extension rejected the host toggle')
+    }
+  } else {
+    // Old extension without bridge methods: keep local-only behavior so the
+    // UI keeps working (catalog filtering) until the extension updates.
+    useWebMCPStore.getState().setHostEnabled(hostname, enabled)
+  }
   const tools = await discoverAndCacheTools(true)
   return tools.length
+}
+
+export async function applyWebMCPGroupToggle(
+  groupKey: string,
+  enabled: boolean,
+): Promise<void> {
+  // Write-through to the extension-side authoritative store (same pattern
+  // as host toggles).
+  const bridge = getWebMCPBridge()
+  if (bridge?.webMCPSetGroupEnabled) {
+    const resp = await bridge.webMCPSetGroupEnabled({ groupKey, enabled })
+    if (!resp?.ok) {
+      throw new Error(resp?.error || 'Extension rejected the group toggle')
+    }
+  } else {
+    useWebMCPStore.getState().setGroupEnabled(groupKey, enabled)
+  }
 }
 
 export async function applyWebMCPGlobalToggle(

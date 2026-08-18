@@ -298,10 +298,28 @@
       flex: 1;
       cursor: pointer;
     }
+    .webmcp-group-name-wrap {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .webmcp-group-name-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
     .webmcp-group-name {
       font-size: 11px;
-      color: #475569;
+      font-weight: 500;
+      color: #334155;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+      flex: 0 1 auto;
     }
     .webmcp-group.disabled-host .webmcp-group-name {
       text-decoration: line-through;
@@ -316,6 +334,13 @@
       border: 1px solid #ccfbf1;
       border-radius: 999px;
       padding: 0 6px;
+    }
+    .webmcp-group-preview {
+      font-size: 10px;
+      color: #94a3b8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   </style>
 </head>

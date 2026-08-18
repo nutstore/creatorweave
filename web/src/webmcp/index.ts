@@ -5,6 +5,7 @@ export {
   refreshWebMCPCatalog,
   applyWebMCPGlobalToggle,
   applyWebMCPHostToggle,
+  applyWebMCPGroupToggle,
 } from './manager'
 export { startWebMCPSyncLoop } from './runtime'
 export {

@@ -728,6 +728,32 @@ export default defineContentScript({
       },
 
       /**
+       * Get the extension-side WebMCP authorization state.
+       * The extension storage is the single source of truth for host/group
+       * switches (enforced by the background invoke gate); the web app only
+       * renders this state.
+       */
+      async webMCPGetAuthorization() {
+        return sendToBridge('webmcp_get_host_authorization', {});
+      },
+
+      /**
+       * Toggle a host's WebMCP authorization (writes the extension-side
+       * authoritative store). Returns the updated maps.
+       */
+      async webMCPSetHostEnabled(payload: { hostname: string; enabled: boolean }) {
+        return sendToBridge('webmcp_set_host_enabled', payload);
+      },
+
+      /**
+       * Toggle a tool group's WebMCP authorization (writes the extension-side
+       * authoritative store). Returns the updated group map.
+       */
+      async webMCPSetGroupEnabled(payload: { groupKey: string; enabled: boolean }) {
+        return sendToBridge('webmcp_set_group_enabled', payload);
+      },
+
+      /**
        * Pull page context from the upstream tab that opened this CreatorWeave
        * side panel. Used by workspace-assistant-context.ts at system-prompt
        * build time. The extension executes

@@ -20,6 +20,10 @@ export interface WebMCPDiscoveredTool {
   tabUrl?: string
   discoveredAt: number
   apiMode: WebMCPApiMode
+  /** Extension-side per-host authorization flag (annotated by background) */
+  hostEnabled?: boolean
+  /** Extension-side per-group authorization flag (annotated by background) */
+  groupEnabled?: boolean
 }
 
 export type WebMCPDiscoveredToolInstance = WebMCPDiscoveredTool
@@ -142,6 +146,23 @@ export interface WebMCPBridge {
   ready: boolean
   webMCPDiscover: (options?: { force?: boolean }) => Promise<WebMCPDiscoverResponse>
   webMCPInvoke: (payload: WebMCPInvokeRequest) => Promise<WebMCPInvokeResponse>
+  /** Extension-side authorization state (storage.local is the source of truth) */
+  webMCPGetAuthorization?: () => Promise<{
+    ok: boolean
+    enabledByHost?: Record<string, boolean>
+    enabledByGroup?: Record<string, boolean>
+    error?: string
+  }>
+  webMCPSetHostEnabled?: (payload: { hostname: string; enabled: boolean }) => Promise<{
+    ok: boolean
+    enabledByHost?: Record<string, boolean>
+    error?: string
+  }>
+  webMCPSetGroupEnabled?: (payload: { groupKey: string; enabled: boolean }) => Promise<{
+    ok: boolean
+    enabledByGroup?: Record<string, boolean>
+    error?: string
+  }>
   webMCPPluginDownloadStream?: (payload: {
     transferId: string
     downloadUrl: string
