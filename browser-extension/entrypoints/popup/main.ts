@@ -38,6 +38,138 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   el.textContent = isDev ? 'DEV' : 'PROD';
 })();
 
+// ── L1 primary action: open the side-panel workbench ──
+// chrome.sidePanel.open() requires a user gesture, and that gesture does
+// NOT survive the popup → background message hop — so the popup calls
+// open() DIRECTLY, synchronously in its own click handler. The active tab
+// is cached at popup load time so the click handler stays synchronous.
+// Binding registration goes to the background fire-and-forget
+// (cw_side_panel_register_binding): storage writes settle in ~ms while the
+// panel web app resolves the binding much later, so the race is negligible.
+(function () {
+  var btn = document.getElementById('openWorkbenchBtn');
+  if (!btn) return;
+
+  // Cache the active tab once at popup load (async) so the click handler
+  // below runs fully synchronously — preserving the user gesture.
+  var activeTab: { id?: number; url?: string } | null = null;
+  chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+    var tab = tabs && tabs[0];
+    if (tab) activeTab = { id: tab.id, url: tab.url || '' };
+  });
+
+  btn.addEventListener('click', function () {
+    var tabId = activeTab && activeTab.id;
+    if (typeof tabId !== 'number') {
+      // No valid tab yet (very rare — popup opened before query resolved):
+      // open the web app in a plain tab as a graceful fallback.
+      var isDevFb = import.meta.env.MODE === 'development';
+      chrome.tabs.create({ url: (isDevFb ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn') + '/#/' });
+      window.close();
+      return;
+    }
+
+    // 1) Register the binding + panel-open marker (fire-and-forget).
+    var bindingId = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    var isDev = import.meta.env.MODE === 'development';
+    var cwBase = isDev ? 'http://localhost:5173' : 'https://creatorweave.eo2suite.cn';
+    var params = new URLSearchParams();
+    params.set('source', 'side_panel');
+    params.set('binding', bindingId);
+    var pageUrl = (activeTab && activeTab.url) || '';
+    if (pageUrl) {
+      try { params.set('origin', new URL(pageUrl).origin); } catch {}
+    }
+    chrome.runtime.sendMessage(
+      { type: 'cw_side_panel_register_binding', bindingId: bindingId, tabId: tabId },
+      function () { void chrome.runtime.lastError; }
+    );
+
+    // 2) Configure the panel for this tab, then open it — directly from the
+    //    popup (user gesture intact). Same ordering contract as the floating
+    //    button's background handler: fire setOptions WITHOUT awaiting, then
+    //    call open() synchronously right after — Chrome processes both
+    //    browser-process calls in order, and open() stays on the gesture
+    //    call stack instead of inside a promise callback.
+    chrome.sidePanel.setOptions({
+      tabId: tabId,
+      path: cwBase + '/#/?' + params.toString(),
+      enabled: true,
+    }).catch(function (err: any) {
+      // eslint-disable-next-line no-console
+      console.warn('[eo2weave popup] sidePanel.setOptions failed:', err);
+    });
+    chrome.sidePanel.open({ tabId: tabId }).then(function () {
+      window.close();
+    }).catch(function (err: any) {
+      // eslint-disable-next-line no-console
+      console.warn('[eo2weave popup] side panel open failed, falling back to new tab:', err);
+      chrome.tabs.create({ url: cwBase + '/#/' }).catch(function () {});
+      window.close();
+    });
+  });
+})();
+
+// ── L2 capability block: two quiet rows summarizing what works right now ──
+// Two async writers feed one state object (injection check + WebMCP
+// discovery); renderCapline() merges them so the block never flickers between
+// competing updates. Search runs in the background service worker and works
+// regardless of injection — injection only gates page reading/acting.
+// Layout: row 1 = search status; row 2 (only when tools exist) = tool count
+// + manage toggle right-aligned — structured rows instead of one wrapping
+// long line (mid-sentence wraps looked broken at 360px).
+var capState = {
+  search: 'checking' as 'checking' | 'ready' | 'inactive' | 'internal' | 'unavailable' | 'error',
+  tools: null as null | { hosts: number; total: number },
+  note: '' as string, // diagnosability detail (tooltip only)
+};
+var capExpanded = false;
+
+function renderCapline(): void {
+  var dot = document.getElementById('capDot');
+  var text = document.getElementById('capText');
+  var toolsRow = document.getElementById('capToolsRow');
+  var toolsText = document.getElementById('capToolsText');
+  var mgr = document.getElementById('mgrToggle');
+  if (!dot || !text || !mgr || !toolsRow || !toolsText) return;
+
+  var base = '';
+  var dotCls = 'cap-dot ok';
+  switch (capState.search) {
+    case 'ready': base = t('capReady'); break;
+    case 'inactive': dotCls = 'cap-dot warn'; base = t('capInactive'); break;
+    case 'internal': dotCls = 'cap-dot warn'; base = t('capInternal'); break;
+    case 'unavailable': dotCls = 'cap-dot warn'; base = t('capUnavailable'); break;
+    case 'error': dotCls = 'cap-dot warn'; base = t('capCheckFailed'); break;
+    default: base = t('checking');
+  }
+  dot.className = dotCls;
+  text.textContent = base;
+  text.title = capState.note || '';
+
+  if (capState.tools && capState.tools.hosts > 0) {
+    toolsText.textContent = chrome.i18n.getMessage('capTools', [String(capState.tools.hosts)]) || String(capState.tools.hosts);
+    toolsText.title = chrome.i18n.getMessage('webmcpFoundSummary', [String(capState.tools.hosts), String(capState.tools.total)]) || '';
+    toolsRow.style.display = '';
+    mgr.style.display = '';
+    mgr.textContent = capExpanded ? t('hideTools') : t('manageTools');
+  } else {
+    toolsRow.style.display = 'none';
+    mgr.style.display = 'none';
+  }
+}
+
+(function () {
+  var mgr = document.getElementById('mgrToggle');
+  var box = document.getElementById('webmcpBox');
+  if (!mgr || !box) return;
+  mgr.addEventListener('click', function () {
+    capExpanded = !capExpanded;
+    box.style.display = capExpanded && capState.tools ? '' : 'none';
+    renderCapline();
+  });
+})();
+
 // WebMCP tools discovered in this window — grouped by hostname.
 // Mirrors the web app's Settings → WebMCP host list (WebMCPHostList.tsx):
 // hostname + tool count + per-host authorization switch. Clicking the
@@ -53,28 +185,32 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   var hostEnabled: Record<string, boolean> = {};
 
   function renderIdle() {
-    summary.textContent = chrome.i18n.getMessage('webmcpScanning') || 'Scanning tabs…';
-    list.textContent = '';
+    box.style.display = 'none';
   }
 
   function renderEmpty() {
     box.style.display = 'none';
+    capState.tools = null;
+    capState.note = '';
+    renderCapline();
   }
 
-  // Debug visibility: a silent hide makes "no tools" indistinguishable from
-  // "discovery crashed". Keep the box visible with a reason when discovery
-  // responded but found nothing, so issues are diagnosable at a glance.
+  // Debug visibility: with the collapsed design, "no tools" and "discovery
+  // crashed" would be indistinguishable (the section just never appears).
+  // Keep the detail in the capability line's tooltip so issues stay
+  // diagnosable at a glance without cluttering the row.
   function renderNoTools(detail?: string) {
-    box.style.display = '';
-    const base = chrome.i18n.getMessage('webmcpNoTools') || 'No WebMCP tools found in this window';
-    summary.textContent = detail ? base + ' — ' + detail : base;
-    list.textContent = '';
+    box.style.display = 'none';
+    capState.tools = null;
+    capState.note = detail || '';
+    renderCapline();
   }
 
   function renderError(detail: string) {
-    box.style.display = '';
-    summary.textContent = (chrome.i18n.getMessage('webmcpDiscoverError') || 'WebMCP discovery failed') + ': ' + detail;
-    list.textContent = '';
+    box.style.display = 'none';
+    capState.tools = null;
+    capState.note = (chrome.i18n.getMessage('webmcpDiscoverError') || 'webmcpDiscoverError') + ': ' + detail;
+    renderCapline();
   }
 
   function cssEscape(value: string): string {
@@ -91,14 +227,14 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
         toggle.checked = enabled;
         toggle.disabled = false;
         toggle.title = enabled
-          ? (chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools")
-          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+          ? (chrome.i18n.getMessage('webmcpToggleHostTitle') || 'webmcpToggleHostTitle')
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
       }
       var leftEl = row.querySelector('.webmcp-host-left') as HTMLElement | null;
       if (leftEl) {
         leftEl.title = enabled
           ? (row.getAttribute('data-tools') || '')
-          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+          : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
       }
     }
   }
@@ -154,8 +290,8 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       renderEmpty();
       return;
     }
-    box.style.display = '';
-    // Group by hostname → { groups: Map<groupKey, {count, tabId, toolNames, tabTitles, enabled}> , hostEnabled }
+    box.style.display = capExpanded ? '' : 'none';
+    // Group by hostname → { groups: Map<groupKey, ...>, hostEnabled }
     var byHost: Record<string, {
       count: number;
       tabId: number;
@@ -183,6 +319,9 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
     // substitution parser ("$HOSTS" rendered as "OSTS").
     summary.textContent = chrome.i18n.getMessage('webmcpFoundSummary', [String(hosts.length), String(totalTools)])
       || (hosts.length + ' site(s), ' + totalTools + ' tool(s)');
+    // Fold the counts into the capability line and refresh the manage toggle.
+    capState.tools = { hosts: hosts.length, total: totalTools };
+    renderCapline();
 
     list.textContent = '';
     hosts.sort().forEach(function (host) {
@@ -217,14 +356,14 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
 
       var hostToggle = buildToggle({
         checked: hostOn,
-        titleOn: chrome.i18n.getMessage('webmcpToggleHostTitle') || "Allow the agent to use this site's tools",
-        titleOff: chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked',
+        titleOn: chrome.i18n.getMessage('webmcpToggleHostTitle') || 'webmcpToggleHostTitle',
+        titleOff: chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled',
         onToggle: function (next, done) {
           sendSetEnabled({ type: 'webmcp_set_host_enabled', hostname: host, enabled: next }, function (ok) {
             if (ok) {
               hostEnabled[host] = next;
               item.classList.toggle('disabled-host', !next);
-              left.title = next ? String(info.count) + ' tool(s)' : (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked');
+              left.title = next ? String(info.count) + ' tool(s)' : (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled');
               for (var u = 0; u < groupUpdaters.length; u++) groupUpdaters[u](next);
             }
             done(ok);
@@ -279,7 +418,7 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
           var gCount = document.createElement('span');
           gCount.className = 'webmcp-group-count';
           gCount.textContent = String(g.count);
-          gCount.title = chrome.i18n.getMessage('webmcpToolCountTitle') || 'tools';
+          gCount.title = chrome.i18n.getMessage('webmcpToolCountTitle') || 'webmcpToolCountTitle';
           var gNameRow = document.createElement('div');
           gNameRow.className = 'webmcp-group-name-row';
           gNameRow.appendChild(gName);
@@ -299,9 +438,9 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
           var gToggle = buildToggle({
             checked: groupOwn,
             disabled: !hostOn,
-            titleOn: chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'Allow the agent to use this tool group',
-            titleOff: chrome.i18n.getMessage('webmcpGroupDisabled') || 'Disabled — this tool group is blocked',
-            disabledTitle: chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked',
+            titleOn: chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'webmcpToggleGroupTitle',
+            titleOff: chrome.i18n.getMessage('webmcpGroupDisabled') || 'webmcpGroupDisabled',
+            disabledTitle: chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled',
             onToggle: function (next, done) {
               sendSetEnabled({ type: 'webmcp_set_group_enabled', groupKey: gk, enabled: next }, function (ok) {
                 if (ok) {
@@ -323,10 +462,10 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
             if (gToggleInput) {
               gToggleInput.disabled = !hostOnNow;
               gToggleInput.title = !hostOnNow
-                ? (chrome.i18n.getMessage('webmcpHostDisabled') || 'Disabled — tools from this site are blocked')
+                ? (chrome.i18n.getMessage('webmcpHostDisabled') || 'webmcpHostDisabled')
                 : (gToggleInput.checked
-                    ? (chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'Allow the agent to use this tool group')
-                    : (chrome.i18n.getMessage('webmcpGroupDisabled') || 'Disabled — this tool group is blocked'));
+                    ? (chrome.i18n.getMessage('webmcpToggleGroupTitle') || 'webmcpToggleGroupTitle')
+                    : (chrome.i18n.getMessage('webmcpGroupDisabled') || 'webmcpGroupDisabled'));
             }
           });
 
@@ -349,9 +488,19 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   // Discovery is now registry-backed (event-fed by the static content
   // scripts), so this first read is fast (no per-tab scan). The registry
   // broadcast below re-triggers it whenever a tab reports new tools.
+  //
+  // Window scoping: the popup has no sender.tab, so background can't tell
+  // which window to scope to. Cache chrome.windows.getCurrent()'s id at
+  // popup-open time and forward it via options.windowId — otherwise the
+  // response would be a CROSS-WINDOW global list.
+  let popupWindowId: number | undefined;
+  chrome.windows.getCurrent(function (win) {
+    if (win && typeof win.id === 'number') popupWindowId = win.id;
+  });
+
   function loadTools() {
     chrome.runtime.sendMessage(
-      { type: 'webmcp_discover_tools', options: { includeDisabled: true } },
+      { type: 'webmcp_discover_tools', options: { includeDisabled: true, windowId: popupWindowId } },
       function (resp: any) {
         if (chrome.runtime.lastError) {
           renderError(chrome.runtime.lastError.message || 'runtime error');
@@ -394,27 +543,23 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
   loadTools();
 })();
 
-// Check injection status
+// L2 writer #1: page injection check. Feeds the capability line — search
+// itself runs in the background service worker, so "ready" here means
+// "page reading is available on the current tab".
 (function () {
-  var el = document.getElementById('status')!;
-  var dot = document.getElementById('statusDot')!;
-  var text = document.getElementById('statusText')!;
-
-  function setStatus(type: string, msg: string) {
-    el.className = 'status ' + type;
-    dot.className = 'status-dot ' + type;
-    text.textContent = msg;
-  }
-
   chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
     var tab = tabs && tabs[0];
     if (!tab || !tab.id) {
-      setStatus('disabled', t('cannotAccessCurrentPage'));
+      capState.search = 'unavailable';
+      capState.note = t('cannotAccessCurrentPage');
+      renderCapline();
       return;
     }
     var url = tab.url || '';
     if (url.indexOf('chrome') === 0 || url.indexOf('about:') === 0) {
-      setStatus('disabled', t('browserInternalPage'));
+      capState.search = 'internal';
+      capState.note = t('browserInternalPage');
+      renderCapline();
       return;
     }
     chrome.scripting.executeScript({
@@ -423,14 +568,17 @@ try { document.getElementById('version')!.textContent = 'v' + chrome.runtime.get
       func: function () { return !!(window.__agentWeb && (window.__agentWeb as any).ready); }
     }, function (results) {
       if (chrome.runtime.lastError) {
-        setStatus('disabled', t('injectionCheckFailed'));
+        capState.search = 'error';
+        capState.note = t('injectionCheckFailed') + ': ' + chrome.runtime.lastError.message;
+        renderCapline();
         return;
       }
       if (results && results[0] && results[0].result === true) {
-        setStatus('active', t('apiReady'));
+        capState.search = 'ready';
       } else {
-        setStatus('inactive', t('apiInactive'));
+        capState.search = 'inactive';
       }
+      renderCapline();
     });
   });
 })();
@@ -866,3 +1014,36 @@ document.getElementById('openDocs')!.addEventListener('click', function () {
 document.getElementById('openGithub')!.addEventListener('click', function () {
   chrome.tabs.create({ url: 'https://github.com/nutstore/creatorweave' });
 });
+
+// ── Supported Sites entry → recipes management page ──
+// Shows "N/M enabled" and opens the full-page manager in a tab
+// (the manager needs space for tool chips + descriptions).
+(function () {
+  var btn = document.getElementById('supportedSitesBtn');
+  var sub = document.getElementById('sitesSubtitle');
+  if (!btn || !sub) return;
+
+  // Recipes metadata is tiny; import from the shared module.
+  import('../webmcp/recipes').then(function (mod) {
+    var total = mod.recipes.length;
+    function refresh() {
+      chrome.storage.local.get(mod.ENABLED_RECIPES_STORAGE_KEY, function (stored) {
+        var enabled = stored && stored[mod.ENABLED_RECIPES_STORAGE_KEY];
+        var count = enabled && typeof enabled === 'object' ? Object.keys(enabled).length : 0;
+        sub.textContent = chrome.i18n.getMessage('recipesCount', [String(count), String(total)])
+          || (count + ' / ' + total + ' enabled');
+      });
+    }
+    refresh();
+    chrome.storage.onChanged.addListener(function (changes, area) {
+      if (area === 'local' && changes[mod.ENABLED_RECIPES_STORAGE_KEY]) refresh();
+    });
+  }).catch(function () {
+    // metadata import failed — keep the entry but show a dash
+  });
+
+  btn.addEventListener('click', function () {
+    chrome.tabs.create({ url: chrome.runtime.getURL('/recipes.html') });
+    window.close();
+  });
+})();

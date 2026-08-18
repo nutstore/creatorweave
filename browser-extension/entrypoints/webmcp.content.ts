@@ -28,6 +28,7 @@ import {
   buildRelayEnvelope,
   parseAgentEvent,
 } from './webmcp/relay-protocol'
+import { ENABLED_RECIPES_STORAGE_KEY, findRecipeForHostname } from './webmcp/recipes'
 
 type InvokeWaiter = {
   resolve: (value: {
@@ -48,6 +49,49 @@ export default defineContentScript({
 
   main() {
     const invokeWaiters = new Map<string, InvokeWaiter>()
+
+    // ── Recipe activation (consent-gated) ──
+    // storage.local holds the user's enabled-recipe map. When a
+    // recipe matches this page's hostname AND is enabled, send a
+    // recipe-activate command into the MAIN world. The MAIN-side
+    // injector re-validates everything before registering tools.
+    function postRecipeCommand(kind: 'recipe-activate' | 'recipe-deactivate', recipeId?: string): void {
+      if (kind === 'recipe-activate' && recipeId) {
+        window.postMessage(
+          buildRelayEnvelope({ kind: 'recipe-activate', recipeId }),
+          window.location.origin,
+        )
+      } else if (kind === 'recipe-deactivate') {
+        window.postMessage(buildRelayEnvelope({ kind: 'recipe-deactivate' }), window.location.origin)
+      }
+    }
+
+    async function syncRecipeState(): Promise<void> {
+      try {
+        const stored = await chrome.storage.local.get(ENABLED_RECIPES_STORAGE_KEY)
+        const enabled = (stored?.[ENABLED_RECIPES_STORAGE_KEY] || {}) as Record<string, unknown>
+        const recipe = findRecipeForHostname(location.hostname)
+        if (!recipe) return
+        if (enabled[recipe.id]) {
+          postRecipeCommand('recipe-activate', recipe.id)
+          // Retry once after a delay: the MAIN-world injector may still be
+          // booting (both scripts run at document_idle; ordering is not
+          // guaranteed) and its message listener would miss the first send.
+          setTimeout(() => postRecipeCommand('recipe-activate', recipe.id), 1500)
+        } else {
+          postRecipeCommand('recipe-deactivate')
+        }
+      } catch {
+        // storage unavailable — stay inactive, never auto-enable
+      }
+    }
+
+    void syncRecipeState()
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes[ENABLED_RECIPES_STORAGE_KEY]) {
+        void syncRecipeState()
+      }
+    })
 
     // ── Downstream: page agent → background ──
     window.addEventListener('message', (event) => {

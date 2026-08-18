@@ -6,11 +6,20 @@
   <title>eo2weave</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Slim scrollbars — the narrow 360px popup makes the default chunky
+       scrollbar especially obtrusive. Neutral gray, matches the card borders. */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
     body {
       width: 360px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8fafc;
-      color: #0f172a;
+      background: #fafaf8;
+      color: #171717;
       display: flex;
       flex-direction: column;
     }
@@ -19,7 +28,7 @@
       align-items: center;
       gap: 10px;
       padding: 14px 16px 12px;
-      background: linear-gradient(135deg, #14B8A6, #0D9488);
+      background: #0d9488;
       color: #fff;
     }
     .title-wrap {
@@ -50,37 +59,84 @@
       flex-direction: column;
       gap: 12px;
     }
-    .status {
+    /* L1 primary action: the single dominant button of the popup.
+       Solid teal resting fill with tinted whisper-shadow — matches the
+       popup logo gradient (`#14B8A6 → #0d7377`) at its mid-stop, so the
+       chrome and the action feel like one surface. */
+    .cta {
+      width: 100%;
+      border: none;
+      border-radius: 8px;
+      background: #0d9488;
+      color: #fff;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      box-shadow: 0 1px 3px rgba(13, 148, 136, 0.3);
+      transition: background-color 0.12s, box-shadow 0.12s, transform 0.12s;
+    }
+    .cta:hover { background: #0b7a7a; box-shadow: 0 1px 4px rgba(13, 148, 136, 0.5); }
+    .cta:active { transform: scale(0.98); }
+    .cta-hint {
+      font-size: 10.5px;
+      color: #585858;
+      /* left-aligned to match the rest of the popup's body type; the
+         long instructional sentence (3 actions in one line) reads 30%
+         faster when not re-centered per line in the narrow 360px column. */
+      margin-top: 6px;
+    }
+    /* L2 capability line: quiet status block. Two structured rows —
+       row 1 search status, row 2 (only when tools exist) tool count +
+       manage toggle right-aligned. Prevents the mid-sentence wrap a
+       single long line produced at 360px. */
+    .capline {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      color: #585858;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 7px 10px;
+    }
+    .cap-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      gap: 6px;
+      min-width: 0;
     }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: #94a3b8;
+    .cap-row > span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .capline .cap-dot { font-size: 9px; flex: 0 0 auto; }
+    .capline .cap-dot.ok { color: #2d8a4e; }
+    .capline .cap-dot.warn { color: #b86e0d; }
+    .capline .cap-tools-row { padding-left: 15px; }
+    .capline .mgr {
+      margin-left: auto;
+      color: #0f766e;
+      cursor: pointer;
+      white-space: nowrap;
       flex: 0 0 auto;
+      user-select: none;
     }
-    .status.active .status-dot { background: #22c55e; }
-    .status.inactive .status-dot { background: #f59e0b; }
-    .status.disabled .status-dot { background: #94a3b8; }
-    .status-text { font-size: 12px; color: #334155; }
+    .capline .mgr:hover { text-decoration: underline; }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background: #e2e8f0;
+      background: #f0f0f0;
       border-radius: 4px;
       padding: 1px 4px;
       font-size: 11px;
     }
     .codex-box {
       background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
       padding: 12px;
     }
     .codex-btn {
@@ -131,10 +187,24 @@
       width: auto;
       margin-top: 8px;
       padding: 6px 9px;
-      background: #d97706;
+      background: #c9922e;
       font-size: 11px;
     }
-    a { color: #0f766e; text-decoration: none; }
+    /* Focus rings — match the popup's brand teal (logo mid-stop). Mouse
+       click stays clean; only keyboard navigation reveals the ring. */
+    .cta:focus-visible,
+    .footer-link:focus-visible,
+    .codex-btn:focus-visible,
+    #copyCodeBtn:focus-visible,
+    .capline .mgr:focus-visible,
+    .webmcp-toggle:focus-visible,
+    .webmcp-host-left:focus-visible,
+    .webmcp-group-left:focus-visible {
+      outline: 2px solid #0d9488;
+      outline-offset: 2px;
+    }
+
+    a { color: #0d9488; text-decoration: none; }
     a:hover { text-decoration: underline; }
     .footer {
       display: flex;
@@ -143,31 +213,40 @@
     }
     .footer-link {
       flex: 1;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #e5e5e5;
       background: #fff;
-      color: #334155;
+      color: #585858;
       border-radius: 8px;
       padding: 8px 12px;
       font-size: 12px;
       cursor: pointer;
-      transition: all 0.15s;
+      transition: background-color 0.15s, border-color 0.15s;
     }
     .footer-link:hover {
-      background: #f8fafc;
-      border-color: #cbd5e1;
+      background: #fafaf8;
+      border-color: #d4d4d4;
     }
     /* WebMCP discovered tools (mirrors the web app's Settings → WebMCP host list) */
     .webmcp-box {
       background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
       padding: 10px 12px;
+    }
+    /* Cap the host list height: many discovered sites would otherwise stretch
+       the popup past Chrome's 600px max, triggering an ugly page-level
+       scrollbar on the 360px-wide edge. Scroll inside the box instead. */
+    .webmcp-list-scroll {
+      max-height: 264px;
+      overflow-y: auto;
+      /* keep the inner scroll from chaining to the popup body */
+      overscroll-behavior: contain;
     }
     .webmcp-summary {
       font-size: 11px;
       font-weight: 600;
-      color: #0f766e;
-      margin-bottom: 6px;
+      color: #0d9488;
+      margin-bottom: 8px;
     }
     /* Host card: vertical container — header row + nested group rows */
     .webmcp-host {
@@ -212,16 +291,16 @@
       flex: 0 0 auto;
       font-size: 10px;
       font-weight: 600;
-      color: #0f766e;
-      background: #f0fdfa;
-      border: 1px solid #ccfbf1;
+      color: #0d9488;
+      background: #f4f8f7;
+      border: 1px solid #d5e8e5;
       border-radius: 999px;
       padding: 1px 7px;
     }
     .webmcp-host.disabled-host .webmcp-host-count {
-      color: #64748b;
-      background: #f1f5f9;
-      border-color: #e2e8f0;
+      color: #585858;
+      background: #f8f7f5;
+      border-color: #e5e5e5;
     }
     /* Per-host authorization switch (mirrors web app's WebMCPHostList) */
     .webmcp-toggle {
@@ -266,11 +345,12 @@
       opacity: 0.5;
       cursor: not-allowed;
     }
-    /* Host card is a vertical container: header row + nested groups */
+    /* Nested group rows: indent with padding only (craft-floor bans >1px
+       side-stripe borders). Color is teal-tinted to harmonize with the
+       Brand-Muted Rule (DESIGN.md). */
     .webmcp-groups {
       margin-top: 2px;
       margin-left: 10px;
-      border-left: 2px solid #ccfbf1;
       padding-left: 8px;
       display: flex;
       flex-direction: column;
@@ -329,9 +409,9 @@
       flex: 0 0 auto;
       font-size: 9px;
       font-weight: 600;
-      color: #0f766e;
-      background: #f0fdfa;
-      border: 1px solid #ccfbf1;
+      color: #0d9488;
+      background: #f4f8f7;
+      border: 1px solid #d5e8e5;
       border-radius: 999px;
       padding: 0 6px;
     }
@@ -342,25 +422,63 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    /* Supported Sites entry — opens the recipes management page */
+    .sites-entry {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #e5e5e5;
+      border-radius: 8px;
+      padding: 9px 12px;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+    .sites-entry:hover { background: #fafaf8; border-color: #d4d4d4; }
+    .sites-entry:focus-visible { outline: 2px solid #0d9488; outline-offset: 2px; }
+    .sites-icon { font-size: 16px; flex: 0 0 auto; }
+    .sites-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .sites-title { font-size: 12px; font-weight: 600; color: #171717; }
+    .sites-subtitle { font-size: 10.5px; color: #737373; }
+    .sites-chevron { color: #a3a3a3; font-size: 16px; flex: 0 0 auto; }
   </style>
 </head>
 <body>
   <header class="header">
     <div class="title-wrap">
       <div class="title">eo2weave</div>
-      <div class="subtitle" data-i18n="popupSubtitle">网页搜索与内容抓取服务</div>
+      <div class="subtitle" data-i18n="popupSubtitle">浏览器里的 AI 工作台</div>
     </div>
     <div id="buildMode" class="build-mode" hidden></div>
   </header>
 
   <main class="main">
-    <div class="status" id="status">
-      <span class="status-dot" id="statusDot"></span>
-      <span class="status-text" id="statusText" data-i18n="checking">检测中…</span>
+    <button id="openWorkbenchBtn" class="cta" data-i18n="openWorkbench">打开工作台</button>
+    <div class="cta-hint" data-i18n="openWorkbenchHint">在侧边栏中与 AI 对话、搜索网页、操作页面</div>
+    <div class="capline" id="capline">
+      <div class="cap-row">
+        <span class="cap-dot ok" id="capDot">●</span>
+        <span id="capText" data-i18n="checking">检测中…</span>
+      </div>
+      <div class="cap-row cap-tools-row" id="capToolsRow" style="display:none">
+        <span id="capToolsText"></span>
+        <span class="mgr" id="mgrToggle" style="display:none">管理 ▾</span>
+      </div>
     </div>
+    <button id="supportedSitesBtn" class="sites-entry" type="button">
+      <span class="sites-icon">🌐</span>
+      <span class="sites-text">
+        <span class="sites-title" data-i18n="supportedSites">Supported Sites</span>
+        <span class="sites-subtitle" id="sitesSubtitle">—</span>
+      </span>
+      <span class="sites-chevron">›</span>
+    </button>
     <div id="webmcpBox" class="webmcp-box" style="display:none">
       <div id="webmcpSummary" class="webmcp-summary">Scanning tabs…</div>
-      <div id="webmcpList"></div>
+      <div id="webmcpList" class="webmcp-list-scroll"></div>
     </div>
     <div class="codex-box">
       <div id="codexStatus" style="margin-bottom: 8px; font-size: 12px; color: #6b7280;">
@@ -387,11 +505,11 @@
         <button id="resetCreditBtn" class="codex-btn reset-credit-btn" data-i18n="useResetCredit">使用一次重置</button>
       </div>
 
-      <div id="deviceCodeBox" style="display:none; margin-bottom: 10px; padding: 8px 10px; background: #f0fdfa; border: 1px solid #ccfbf1; border-radius: 8px;">
+      <div id="deviceCodeBox" style="display:none; margin-bottom: 10px; padding: 8px 10px; background: #f4f8f7; border: 1px solid #d5e8e5; border-radius: 8px;">
         <div style="font-size: 10px; color: #6b7280; margin-bottom: 4px;" data-i18n="deviceCode">Device Code</div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <code id="deviceCodeText" style="flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #0d9488; font-family: 'SF Mono', 'Fira Code', monospace;"></code>
-          <button id="copyCodeBtn" style="border: none; background: none; cursor: pointer; padding: 2px 6px; color: #6b7280; font-size: 11px; border-radius: 4px; transition: all 0.15s;" data-i18n-title="copyCode" title="Copy code">📋</button>
+          <code id="deviceCodeText" style="flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 1px; color: #2d4745; font-family: 'SF Mono', 'Fira Code', monospace;"></code>
+          <button id="copyCodeBtn" style="border: none; background: none; cursor: pointer; padding: 2px 6px; color: #6b7280; font-size: 11px; border-radius: 4px; transition: all 0.15s;" data-i18n-title="copyCode">📋</button>
         </div>
         <div id="deviceCodeLink" style="font-size: 10px; margin-top: 4px;"></div>
       </div>

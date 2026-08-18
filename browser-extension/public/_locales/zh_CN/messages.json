@@ -1,6 +1,5 @@
 {
-  "extensionName": { "message": "eo2weave" },
-  "webmcpScanning": { "message": "正在扫描标签页中的 WebMCP 工具…"},
+  "extensionName": { "message": "EO2Weave" },
   "webmcpFoundSummary": {
     "message": "WebMCP：$HOSTS$ 个站点，$TOOLS$ 个工具可用",
     "placeholders": {
@@ -10,18 +9,28 @@
   },
   "webmcpToggleHostTitle": { "message": "允许 AI 助手使用该站点的 WebMCP 工具" },
   "webmcpHostDisabled": { "message": "已禁用——来自该站点的工具将被拦截" },
-  "webmcpNoTools": { "message": "本窗口未发现 WebMCP 工具" },
   "webmcpDiscoverError": { "message": "WebMCP 发现失败" },
   "webmcpToggleGroupTitle": { "message": "允许 AI 助手使用该工具组" },
   "webmcpGroupDisabled": { "message": "已禁用——该工具组将被拦截" },
   "extensionDescription": { "message": "为浏览器内 AI 助手提供网页搜索与内容抓取能力" },
-  "popupSubtitle": { "message": "网页搜索与内容抓取服务" },
+  "popupSubtitle": { "message": "浏览器里的 AI 工作台" },
+  "openWorkbench": { "message": "打开工作台" },
+  "openWorkbenchHint": { "message": "在侧边栏中与 AI 对话、搜索网页、操作页面" },
+  "capReady": { "message": "已就绪 · 支持搜索与网页读取" },
+  "capInactive": { "message": "刷新本页后可读取页面" },
+  "capInternal": { "message": "打开任意网页即可使用" },
+  "capUnavailable": { "message": "无法访问当前页面" },
+  "capCheckFailed": { "message": "状态检测失败" },
+  "capTools": {
+    "message": "$N$ 个站点提供 AI 工具",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "manageTools": { "message": "管理 ▾" },
+  "hideTools": { "message": "收起 ▴" },
   "checking": { "message": "检测中…" },
   "cannotAccessCurrentPage": { "message": "无法访问当前页面" },
   "browserInternalPage": { "message": "浏览器内部页面，不支持注入" },
   "injectionCheckFailed": { "message": "检测失败" },
-  "apiReady": { "message": "API 已注入，可以使用" },
-  "apiInactive": { "message": "未注入，刷新页面后生效" },
   "checkingAuthStatus": { "message": "正在检查授权状态…" },
   "statusCheckFailed": { "message": "授权状态检查失败" },
   "authorized": { "message": "已授权" },
@@ -42,6 +51,8 @@
   "resetLogin": { "message": "重新开始（清除状态）" },
   "documentation": { "message": "使用文档" },
   "github": { "message": "GitHub" },
+  "sidePanelButtonLabel": { "message": "怡氧知知" },
+  "sidePanelButtonTitle": { "message": "点击唤起怡氧知知 AI 助手" },
   "resetCreditsAvailable": { "message": "手动重置额度" },
   "availableCount": { "message": "可用 $COUNT$ 次", "placeholders": { "count": { "content": "$1" } } },
   "resetCreditExpires": { "message": "有效期至 $DATE$", "placeholders": { "date": { "content": "$1" } } },
@@ -61,5 +72,17 @@
   "pollError": { "message": "授权轮询失败：$ERROR$", "placeholders": { "error": { "content": "$1" } } },
   "authorizationSucceeded": { "message": "授权成功！" },
   "authorizationPendingLog": { "message": "等待授权：$CODE$", "placeholders": { "code": { "content": "$1" } } },
-  "authorizationExpiredLog": { "message": "授权已过期，请重试。" }
+  "authorizationExpiredLog": { "message": "授权已过期，请重试。" },
+  "supportedSites": { "message": "支持的站点" },
+  "recipesCount": {
+    "message": "已启用 $COUNT$ / $TOTAL$",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "recipesInstalled": { "message": "已启用" },
+  "recipesAvailable": { "message": "可启用" },
+  "recipesEmptyInstalled": { "message": "尚未启用任何站点——在下方开启一个，让 AI 在那里获得工具。" },
+  "recipesEmptyAvailable": { "message": "当前版本没有更多可启用的站点。" }
 }

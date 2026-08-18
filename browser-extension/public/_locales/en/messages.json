@@ -1,6 +1,5 @@
 {
   "extensionName": { "message": "eo2weave" },
-  "webmcpScanning": { "message": "Scanning tabs for WebMCP tools…" },
   "webmcpFoundSummary": {
     "message": "WebMCP: $HOSTS$ site(s), $TOOLS$ tool(s) available",
     "placeholders": {
@@ -10,18 +9,28 @@
   },
   "webmcpToggleHostTitle": { "message": "Allow the agent to use this site's WebMCP tools" },
   "webmcpHostDisabled": { "message": "Disabled — tools from this site are blocked" },
-  "webmcpNoTools": { "message": "No WebMCP tools found in this window" },
   "webmcpDiscoverError": { "message": "WebMCP discovery failed" },
   "webmcpToggleGroupTitle": { "message": "Allow the agent to use this tool group" },
   "webmcpGroupDisabled": { "message": "Disabled — this tool group is blocked" },
   "extensionDescription": { "message": "Provides web search and content fetching capabilities for in-browser agents" },
-  "popupSubtitle": { "message": "Web search and content fetching service" },
+  "popupSubtitle": { "message": "Your AI workbench in the browser" },
+  "openWorkbench": { "message": "Open workbench" },
+  "openWorkbenchHint": { "message": "Chat with AI, search the web, and act on pages — in the side panel" },
+  "capReady": { "message": "Ready · search & page reading available" },
+  "capInactive": { "message": "Refresh this page to enable page reading" },
+  "capInternal": { "message": "Open any web page to get started" },
+  "capUnavailable": { "message": "Cannot access the current page" },
+  "capCheckFailed": { "message": "Status check failed" },
+  "capTools": {
+    "message": "$N$ site(s) provide AI tools",
+    "placeholders": { "n": { "content": "$1" } }
+  },
+  "manageTools": { "message": "Manage ▾" },
+  "hideTools": { "message": "Hide ▴" },
   "checking": { "message": "Checking…" },
   "cannotAccessCurrentPage": { "message": "Cannot access the current page" },
   "browserInternalPage": { "message": "Browser internal pages do not support injection" },
   "injectionCheckFailed": { "message": "Injection check failed" },
-  "apiReady": { "message": "API is injected and ready" },
-  "apiInactive": { "message": "Not injected. Refresh the page to activate." },
   "checkingAuthStatus": { "message": "Checking auth status…" },
   "statusCheckFailed": { "message": "Status check failed" },
   "authorized": { "message": "Authorized" },
@@ -42,6 +51,8 @@
   "resetLogin": { "message": "Start over (clear state)" },
   "documentation": { "message": "Documentation" },
   "github": { "message": "GitHub" },
+  "sidePanelButtonLabel": { "message": "eo2weave" },
+  "sidePanelButtonTitle": { "message": "Open eo2weave in the side panel" },
   "resetCreditsAvailable": { "message": "Banked reset credits" },
   "availableCount": { "message": "$COUNT$ available", "placeholders": { "count": { "content": "$1" } } },
   "resetCreditExpires": { "message": "Expires $DATE$", "placeholders": { "date": { "content": "$1" } } },
@@ -61,5 +72,17 @@
   "pollError": { "message": "Authorization polling error: $ERROR$", "placeholders": { "error": { "content": "$1" } } },
   "authorizationSucceeded": { "message": "Authorized!" },
   "authorizationPendingLog": { "message": "Authorization pending: $CODE$", "placeholders": { "code": { "content": "$1" } } },
-  "authorizationExpiredLog": { "message": "Authorization expired. Please try again." }
+  "authorizationExpiredLog": { "message": "Authorization expired. Please try again." },
+  "supportedSites": { "message": "Supported Sites" },
+  "recipesCount": {
+    "message": "$COUNT$ of $TOTAL$ enabled",
+    "placeholders": {
+      "count": { "content": "$1" },
+      "total": { "content": "$2" }
+    }
+  },
+  "recipesInstalled": { "message": "Enabled" },
+  "recipesAvailable": { "message": "Available" },
+  "recipesEmptyInstalled": { "message": "Nothing enabled yet — turn on a site below to give your agent tools there." },
+  "recipesEmptyAvailable": { "message": "No more sites available in this version." }
 }
